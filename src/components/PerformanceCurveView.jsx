@@ -428,87 +428,93 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     if (loading) return <LoadingSpinner />;
 
     return (
-        <>
-            {!presentationMode && <div className="card mb-6">
-                <div className="flex flex-wrap items-end gap-6">
-                    <div>
-                        <label className="block font-medium mb-2">Focus:</label>
-                        <select
-                            value={scale.xMax == null ? 'full' : 'launch'}
-                            onChange={e => setScale(prev => ({
-                                ...prev,
-                                // A merged drag ladder stretches the axis to ~13 s and
-                                // squeezes the whole 0-60 into the left quarter, which
-                                // reads as if the low-speed splits had gone missing.
-                                xMax: e.target.value === 'launch' ? 5 : null,
-                            }))}
-                            className="form-input"
-                        >
-                            <option value="full">Full run</option>
-                            <option value="launch">Launch (0–5 s)</option>
-                        </select>
+        <div className="chart-layout">
+            {/* ── Sidebar: the same rig as the other six chart screens ──
+              * The controls were a horizontal band in a card above the figure,
+              * so a reader crossing from Charging & Efficiency found what to
+              * plot moved overhead (#300). */}
+            {!presentationMode && <aside className="chart-rail">
+                <div className="chart-rail-group">
+                    <span className="text-micro">Plot</span>
+                    <div className="axis-selectors">
+                        <div>
+                            <label className="axis-label">Focus</label>
+                            <select
+                                value={scale.xMax == null ? 'full' : 'launch'}
+                                onChange={e => setScale(prev => ({
+                                    ...prev,
+                                    // A merged drag ladder stretches the axis to ~13 s and
+                                    // squeezes the whole 0-60 into the left quarter, which
+                                    // reads as if the low-speed splits had gone missing.
+                                    xMax: e.target.value === 'launch' ? 5 : null,
+                                }))}
+                                className="form-input"
+                            >
+                                <option value="full">Full run</option>
+                                <option value="launch">Launch (0–5 s)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="axis-label">Runs shown</label>
+                            <select
+                                value={grouping}
+                                onChange={e => setGrouping(e.target.value)}
+                                className="form-input"
+                            >
+                                <option value="mode">Best per drive mode</option>
+                                <option value="vehicle">Best per vehicle</option>
+                                <option value="all">Every run</option>
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block font-medium mb-2">Runs shown:</label>
-                        <select
-                            value={grouping}
-                            onChange={e => setGrouping(e.target.value)}
-                            className="form-input"
-                        >
-                            <option value="mode">Best per drive mode</option>
-                            <option value="vehicle">Best per vehicle</option>
-                            <option value="all">Every run</option>
-                        </select>
-                    </div>
-                    {/* Both toggles sit together to the right of the pickers, styled
-                        alike so they read as one pair rather than two controls that
-                        happen to be checkboxes. */}
-                    <div className="flex flex-col gap-1.5 pb-1">
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                </div>
+
+                <div className="chart-rail-group">
+                    <span className="text-micro">Display</span>
+                    <div className="chart-toggles">
+                        <label className="toggle-label">
                             <input
                                 type="checkbox"
                                 checked={showPublished}
                                 onChange={e => setShowPublished(e.target.checked)}
+                                className="w-4 h-4"
                             />
-                            <span className="text-secondary">Include published figures</span>
+                            <span className="text-sm">Include published figures</span>
                         </label>
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <label className="toggle-label">
                             <input
                                 type="checkbox"
                                 checked={showG}
                                 onChange={e => setShowG(e.target.checked)}
+                                className="w-4 h-4"
                             />
-                            <span className="text-secondary">Show acceleration (g)</span>
+                            <span className="text-sm">Show acceleration (g)</span>
                         </label>
                     </div>
-                    <span className="text-xs text-meta pb-1">
-                        {series.length} line{series.length === 1 ? '' : 's'} plotted
-                    </span>
+                    <p className="text-xs text-secondary">
+                        Solid lines are traced from imported splits, dashed lines reconstructed
+                        from a source’s headline figures. The 1&nbsp;ft-rollout split is left out —
+                        it is the same 60&nbsp;mph point on a different clock.
+                        {showG && ' Dotted lines are estimated acceleration between splits.'}
+                    </p>
                 </div>
-                <p className="text-xs text-secondary mt-3">
-                    Solid lines are traced from imported splits, dashed lines reconstructed
-                    from a source’s headline figures. The 1&nbsp;ft-rollout split is left out —
-                    it is the same 60&nbsp;mph point on a different clock.
-                    {showG && ' Dotted lines are estimated acceleration between splits.'}
-                </p>
 
                 {/* Curation sits with the control that enables it, and only under
                     "Every run" — the other groupings already pick for you, so a
                     picker there would silently do nothing. */}
                 {grouping === 'all' && selectorVehicles.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
-                        <PerformanceRunSelector
-                            vehicles={selectorVehicles}
-                            selectedRunIds={pickedRunIds}
-                            onChange={setPickedRunIds}
-                            colorMap={colorMap}
-                            onUpdateColor={handleRunColor}
-                            colorPicked={id => id in colorEdits}
-                        />
-                    </div>
+                    <PerformanceRunSelector
+                        vehicles={selectorVehicles}
+                        selectedRunIds={pickedRunIds}
+                        onChange={setPickedRunIds}
+                        colorMap={colorMap}
+                        onUpdateColor={handleRunColor}
+                        colorPicked={id => id in colorEdits}
+                    />
                 )}
-            </div>}
+            </aside>}
 
+            <div className="chart-main">
             {series.length === 0 ? (
                 <div className="card mb-4">
                     <h3 className="text-lg font-semibold mb-3">Speed vs Time</h3>
@@ -558,7 +564,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 </PlotFrame>
             )}
 
-            {/* Scale controls sit BELOW the chart in their own card, matching every
+            {/* Scale controls sit BELOW the chart in their own card, as in every
                 other chart view. X and Y value pickers are omitted: the split
                 series supports only time-versus-speed, and a control with one
                 option is noise. */}
@@ -573,6 +579,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             )}
 
             {!presentationMode && <ChartInfoBubble chartKey="perfcurve" />}
-        </>
+            </div>{/* .chart-main */}
+        </div>
     );
 }
