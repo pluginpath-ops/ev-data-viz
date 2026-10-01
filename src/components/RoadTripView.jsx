@@ -51,6 +51,7 @@ function sharedSessionName(rangeRun, chargingRun, sessions) {
 // ── Speed sweep constants ────────────────────────────────────────────────────
 const SPEED_SWEEP_MIN  = 45;   // mph
 const SPEED_SWEEP_MAX  = 100;  // mph
+const EMPTY_PICKS = {};      // stable identity for "no pairing colors set"
 const SPEED_SWEEP_STEP = 5;    // mph
 const SPEED_SWEEP_MPH  = Array.from(
     { length: Math.floor((SPEED_SWEEP_MAX - SPEED_SWEEP_MIN) / SPEED_SWEEP_STEP) + 1 },
@@ -643,7 +644,7 @@ export default function RoadTripView({
                 const pinned = partnersFor(pairings, rangeRun.id);
                 const rows   = pinned.length ? pinned : [null];
 
-                for (const partnerId of rows) {
+                for (const [slot, partnerId] of rows.entries()) {
                     const chargingRun = partnerId
                         ? chargingRuns.find(r => String(r.id) === String(partnerId)) ?? pairedChargingRun(rangeRun, vehicle)
                         : pairedChargingRun(rangeRun, vehicle);
@@ -665,6 +666,9 @@ export default function RoadTripView({
                         key,
                         vehicle,
                         rangeRun,
+                        // Which pairing of this range test the row is: 0 for the
+                        // first, 1 for the one added with ＋. See selectionRows.
+                        slot,
                         // `run` stays the CHARGING run: it is what supplies the
                         // data points the simulation walks.
                         run:            chargingRun,
@@ -695,7 +699,13 @@ export default function RoadTripView({
             // Scoped to the vehicle: the EPA row's id is a shared sentinel, so a
             // bare run id would make every vehicle's EPA row one group and the
             // hook's carry rule would select them all together.
-            groupId: `${e.vehicle.id}:${e.rangeRun.id}`,
+            //
+            // And per PAIRING SLOT, not per range test (#379). The carry rule
+            // hands a new key the selection of any row in its group, so with one
+            // group per range test an added pairing was re-ticked the moment it
+            // was unticked, because its parent row was still selected. Changing
+            // a row's charging test keeps its slot, which is all carry is for.
+            groupId: `${e.vehicle.id}:${e.rangeRun.id}:${e.slot}`,
         })),
         [pairStructure]
     );
@@ -711,13 +721,13 @@ export default function RoadTripView({
         const vehicle = selectedVehicles.find(v => v.id === vehicleId);
         const preferred = vehicle ? defaultRangeRun(vehicle) : null;
         const match = preferred
-            ? vehicleRows.find(r => String(r.groupId) === `${vehicleId}:${preferred.id}`)
+            ? vehicleRows.find(r => String(r.groupId) === `${vehicleId}:${preferred.id}:0`)
             : null;
         const pick = match ?? vehicleRows[0];
         return pick ? [pick.key] : [];
     }, [selectedVehicles]);
 
-    const { selected: selectedRunIds, toggle: toggleRunId } = useRunSelection(
+    const { selected: selectedRunIds, toggle: toggleRunId, setSelected: setSelectedRunIds } = useRunSelection(
         selectionRows, { initial: initialRunIds, shouldBootstrap: bootstrapOneRow }
     );
 
@@ -754,6 +764,21 @@ export default function RoadTripView({
         plottedIds,
     });
 
+    // A pairing's own color, set from the swatch on its row (#379). Colors above
+    // are keyed on the RANGE test, so without this an added pairing's swatch
+    // edited its parent's color. Keyed on the pair key and held here rather than
+    // in the sticky-color hook, which only knows run ids. Resets with the
+    // vehicle set, as the hook's picks do: a pick names a pairing that may not be
+    // on the next plot.
+    const vehicleSetKey = selectedVehicleIds.join(',');
+    const [pairPickState, setPairPickState] = useState({ key: vehicleSetKey, map: {} });
+    const pairPicks = pairPickState.key === vehicleSetKey ? pairPickState.map : EMPTY_PICKS;
+    const setPairPick = (pairKeyStr, color) => setPairPickState(prev => {
+        const map = { ...(prev.key === vehicleSetKey ? prev.map : {}) };
+        if (color) map[pairKeyStr] = color; else delete map[pairKeyStr];
+        return { key: vehicleSetKey, map };
+    });
+
     // ── Attach colors, now that colorMap knows what's actually selected ───────
     const allPairsInfo = useMemo(() => {
         const map = new Map();
@@ -771,10 +796,20 @@ export default function RoadTripView({
         const pairColors = resolvePairColors([...map.values()].map(e => ({
             key: e.key, primaryId: e.rangeRun.id, baseColor: e.color,
         })));
-        for (const entry of map.values()) entry.color = pairColors[entry.key] ?? entry.color;
+        for (const entry of map.values()) {
+            entry.color = pairPicks[entry.key] ?? pairColors[entry.key] ?? entry.color;
+        }
 
         return map;
-    }, [pairStructure, colorMap]);
+    }, [pairStructure, colorMap, pairPicks]);
+
+    // What the selector's swatches should show: the range-keyed colors, plus the
+    // drawn color of every pairing by its pair key.
+    const selectorColorMap = useMemo(() => {
+        const out = { ...colorMap };
+        for (const e of allPairsInfo.values()) out[e.key] = e.color;
+        return out;
+    }, [colorMap, allPairsInfo]);
 
     // ── Active run entries — ordered by vehicle pill position ─────────────────
     const runEntries = useMemo(() => {
@@ -1849,10 +1884,13 @@ export default function RoadTripView({
                             )}
                             selectedRunIds={selectedRunIds}
                             onToggleRun={toggleRunId}
-                            onUpdateRunColor={(_vehicleId, runId, color) => setColorOverride(runId, color)}
+                            onUpdateRunColor={(_vehicleId, runId, color) =>
+                                // An added pairing's swatch hands over its pair key.
+                                (String(runId).includes('::') ? setPairPick : setColorOverride)(runId, color)}
                             colorSeries={seriesRowsOf(runEntries.map(e => e.rangeRun), selectedVehicles, isColorOverridden)}
                             onUpdateRunColors={setColorOverrides}
-                            colorMap={colorMap}
+                            colorMap={selectorColorMap}
+                            pairColors
                             runFilter={(run, vehicle) =>
                                 isRangeRun(run) && filterChargingRuns(vehicle.runs).length > 0}
                             emptyMessage="No range test records"
@@ -1871,8 +1909,15 @@ export default function RoadTripView({
                             }}
                             onSetPartner={(rangeId, oldChargingId, newChargingId) =>
                                 setPairings(prev => replacePartner(prev, rangeId, oldChargingId, newChargingId))}
-                            onAddPartner={(rangeId, chargingId) =>
-                                setPairings(prev => addPartner(prev, rangeId, chargingId))}
+                            onAddPartner={(rangeId, chargingId) => {
+                                setPairings(prev => addPartner(prev, rangeId, chargingId));
+                                // A new pairing arrives ticked when its range test is.
+                                // It used to inherit that through the shared selection
+                                // group; each pairing is its own group now (#379).
+                                const newKey = pairKey(rangeId, chargingId);
+                                const parentOn = selectedRunIds.some(k => parsePairKey(k).rangeRunId === String(rangeId));
+                                if (parentOn) setSelectedRunIds(prev => prev.includes(newKey) ? prev : [...prev, newKey]);
+                            }}
                             onRemovePartner={(rangeId, chargingId) =>
                                 setPairings(prev => removePartner(prev, rangeId, chargingId))}
                             renderRunMeta={run => {

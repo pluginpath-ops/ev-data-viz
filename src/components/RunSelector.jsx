@@ -67,6 +67,9 @@ function plottedColorOf(run, colorMap, vehicle) {
  *   partnerLabel    — prefix before the dropdown,      e.g. "Charging:"
  *   partnerRunsFor  — (vehicle) => runs offered as partners
  *   extraPrimaryRunsFor — (vehicle) => synthetic primary rows (e.g. EPA range)
+ *   pairColors      — an added pairing's swatch colors THAT pairing, keyed by its
+ *                     pair key (colorMap and onUpdateRunColor then carry pair
+ *                     keys for those rows). Off, it shares the range test's color.
  *   singlePartner   — one partner per row, selection still keyed by run id
  *   partnerIdFor    — (run) => partnerRunId | null, single-partner mode only
  *   resolvePartner  — (primaryRun, vehicle) => { sourceRun, note } for the
@@ -95,6 +98,7 @@ export default function RunSelector({
     headerActions = null,
     // Pair mode
     pairMode = false,
+    pairColors = false,
     pairings = {},
     partnerLabel = 'Paired with:',
     // One partner per row, selection still keyed by run id. For views whose
@@ -320,6 +324,7 @@ export default function RunSelector({
                                                         resolvePartner={resolvePartner}
                                                         partnerLabel={partnerLabel}
                                                         singlePartner={singlePartner}
+                                                        pairColors={pairColors}
                                                         selectedRunIds={selectedRunIds}
                                                         onToggleRun={onToggleRun}
                                                         onSetPartner={onSetPartner}
@@ -376,7 +381,7 @@ export default function RunSelector({
  */
 function PairRows({
     run, vehicle, partnerIds, partnerRuns, resolvePartner,
-    partnerLabel, singlePartner,
+    partnerLabel, singlePartner, pairColors,
     selectedRunIds, onToggleRun, onSetPartner, onAddPartner, onRemovePartner,
     onUpdateRunColor, onUpdateRunColors, colorSeries, renderRunBadges, renderRunMeta, colorMap,
     chartPalette, onChartPaletteChange, handSetColorOf,
@@ -430,17 +435,21 @@ function PairRows({
                         the dropdown beside it say together. */}
                     {idx > 0 && (
                         <RunColorControl
-                            run={run}
+                            // Pair-keyed when the view colors pairings apart (#379):
+                            // the swatch then edits this pairing alone, so the
+                            // set-wide apply and the parked color, which are keyed
+                            // on run ids, do not apply to it.
+                            run={pairColors ? { ...run, id: rowKey(partnerId) } : run}
                             vehicle={vehicle}
                             vehicleId={vehicle.id}
                             vehicleName={vehicle.name}
                             onUpdateRunColor={onUpdateRunColor}
-                            onUpdateRunColors={onUpdateRunColors}
-                            colorSeries={colorSeries}
+                            onUpdateRunColors={pairColors ? undefined : onUpdateRunColors}
+                            colorSeries={pairColors ? null : colorSeries}
                             colorMap={colorMap}
                             chartPalette={chartPalette}
                             onChartPaletteChange={onChartPaletteChange}
-                            handSetColorOf={handSetColorOf}
+                            handSetColorOf={pairColors ? undefined : handSetColorOf}
                         />
                     )}
 
