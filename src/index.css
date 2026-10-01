@@ -7313,6 +7313,13 @@ a.is-test-link:focus-visible {
 .guide-detail-item {
     @apply flex flex-col;
 }
+.guide-certification {
+    @apply flex flex-col gap-4;
+}
+.guide-certification-group {
+    @apply flex flex-col gap-2 p-3 rounded;
+    background-color: var(--color-surface-sunken);
+}
 .guide-raw {
     @apply mt-2 p-3 rounded max-h-64 overflow-y-auto flex flex-col gap-1;
     background-color: var(--color-surface-sunken);
