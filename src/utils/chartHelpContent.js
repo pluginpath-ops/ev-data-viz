@@ -141,32 +141,40 @@ export const CHART_HELP_DEFAULTS = {
         data_source:
             'A theoretical efficiency-vs-speed curve built from a vehicle’s official EPA ' +
             'lab data — the road-load coefficients and test phases stored in the linked ' +
-            'EPA test group (imported from EPA’s CSI lab documents). It is not plotted ' +
-            'from your own driving tests; it’s computed from physics. The “confidence” ' +
-            'badge shows how certain the link between the vehicle and the EPA test group ' +
-            'is.',
+            'EPA test group (from EPA’s CSI lab documents, the Test Car List, or curator ' +
+            'entry). It is not plotted from your own driving tests; it’s computed from ' +
+            'physics. The “confidence” badge shows how certain the link between the ' +
+            'vehicle and the EPA test group is, and a second badge names the curve’s ' +
+            'tier — how much of the energy model is the vehicle’s own.',
         how_to_read:
             'Use it to see how a car’s energy use and range change with steady cruising ' +
             'speed, and to compare cars on the same physical basis regardless of ' +
             'marketing claims. The shaded band marks typical 65–75 mph highway speeds. ' +
             'Switch the Y axis between energy use (kWh/100mi, Wh/mi), efficiency (mi/kWh, ' +
-            'MPGe) and estimated Range. It assumes flat ground, no wind, steady speed and ' +
-            'a fixed accessory load — real trips with hills, weather and stop-and-go will ' +
-            'differ.',
+            'MPGe) and estimated Range. Set viewing conditions — altitude, temperature, ' +
+            'accessory load, wind and grade — to see how they move the curve; a ▲ on a ' +
+            'label means a condition is applied. Turn on the real-world overlay to plot ' +
+            'the vehicle’s own range tests as points, raw or corrected to the same ' +
+            'conditions. With no conditions set it assumes flat ground, no wind, steady ' +
+            'speed and a fixed accessory load — real trips with hills, weather and ' +
+            'stop-and-go will differ.',
         key_terms:
             'Road-load (A, B, C) — the rolling, speed-proportional and aerodynamic resistance from EPA coast-down testing: Force = A + B·speed + C·speed².\n' +
-            'η (drivetrain efficiency) — the share of battery energy that reaches the wheels, back-solved from the EPA highway test.\n' +
+            'η (drivetrain efficiency) — the share of battery energy that reaches the wheels, back-solved from the record’s 65 mph constant-speed phases.\n' +
+            'Tier — how much of the model is the vehicle’s own: test cycle (η and capacity both measured), corrected (capacity measured, η borrowed from its highway phase), published pack (default η, guide capacity), road load only (no capacity, so consumption but not range).\n' +
             'MPGe — miles per gallon-equivalent (33.7 kWh = 1 gallon).\n' +
             'kWh/100mi, Wh/mi — energy used per distance.\n' +
             'Useable kWh — the battery capacity used for the range estimate.',
         math_approach:
             'At each speed: resistance Force = A + B·v + C·v²; wheel energy comes from ' +
             'that force; battery energy = wheel energy ÷ η + a fixed ~0.3 kW accessory ' +
-            'draw ÷ speed. η is solved so the curve matches the car’s measured EPA ' +
-            'highway energy at 48.3 mph (preferring the multi-cycle test, falling back to ' +
-            'the highway test, then a 0.88 default). Range = useable battery kWh ÷ energy ' +
-            'per mile. Altitude, when set, thins the air by scaling only the aerodynamic ' +
-            '(C) term at display time.',
+            'draw ÷ speed. η is solved from the constant-speed phases at 65 mph, the ' +
+            'same steady cruise the curve plots. A record with no constant-speed phase ' +
+            'uses its highway η scaled by the fleet-median ratio between the two (the ' +
+            '“corrected” tier), and failing that a 0.88 default. Range = useable ' +
+            'battery kWh ÷ energy per mile. Altitude thins the air by scaling only the ' +
+            'aerodynamic (C) term at display time; temperature, wind and grade adjust ' +
+            'the curve for the conditions you set.',
     },
 
     roadtrip: {
