@@ -15,7 +15,7 @@ export const EPA_EXPLAINERS = {
         'Road-load force F = A + B·v + C·v² describes the total resistance the drivetrain must overcome at constant speed. A captures rolling resistance; B·v captures speed-proportional losses (bearing drag, tire flexing); C·v² captures aerodynamic drag. Measured by EPA coast-down testing on a flat road.',
 
     targetVsSet:
-        'Target coefficients are the EPA-certified values used to compute label MPGe. Set coefficients are what was actually programmed on the dynamometer for testing — they usually match the target but may differ slightly. This chart uses set values when available, falling back to target.',
+        'Target coefficients are the EPA-certified road load, from the vehicle\'s coast-down test, and the ones used to compute label MPGe. Set coefficients are what was programmed into the dynamometer, adjusted downward (A is often negative) because the drums add their own friction. The curves and derived values use the target coefficients, and fall back to the set only when a target is missing.',
 
     equivTestWeight:
         'Equivalent Test Weight (ETW) is the vehicle\'s curb weight plus 300 lbs (representing passengers and cargo), rounded to the nearest 125-lb increment. It determines how much inertia the dynamometer simulates during acceleration phases. May differ from the spec sheet curb weight by up to ~60 lbs.',

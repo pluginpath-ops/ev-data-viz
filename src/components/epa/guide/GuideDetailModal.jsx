@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
-import { GUIDE_COLUMNS, COLUMN_GROUPS, formatCell } from '../../../utils/feGuideBrowse';
+import { GUIDE_COLUMNS, COLUMN_GROUPS, columnByKey, formatCell } from '../../../utils/feGuideBrowse';
+import GuideCertificationResults from './GuideCertificationResults';
+
+// The label, kept short: what a window sticker says. Everything else sits
+// behind "Show all fields".
+const LABEL_KEYS = ['label_comb_range_mi', 'label_city_range_mi', 'label_hwy_range_mi',
+    'label_comb_mpge', 'label_adjustment_factor', 'adjustment_signature'];
+const LABEL_COLUMNS = LABEL_KEYS.map(columnByKey).filter(Boolean);
 
 /**
  * One configuration, every field (#235).
@@ -15,9 +22,10 @@ import { GUIDE_COLUMNS, COLUMN_GROUPS, formatCell } from '../../../utils/feGuide
  * a re-import to answer", and the disclosure below is where that pays off — it
  * is the only place a reader can see a field we never mapped.
  */
-export default function GuideDetailModal({ row, vehicles, onClose }) {
+export default function GuideDetailModal({ row, vehicles, testGroupIds = [], configCount = 1, onClose }) {
     const { getFeGuideRow } = useAppContext();
     const [showRaw, setShowRaw] = useState(false);
+    const [showAll, setShowAll] = useState(false);
 
     const loadRow = useCallback(() => getFeGuideRow(row.id), [getFeGuideRow, row.id]);
     const { data: full, error: rawError } = useAsyncResource(loadRow, [row.id]);
@@ -73,47 +81,85 @@ export default function GuideDetailModal({ row, vehicles, onClose }) {
                         </div>
                     )}
 
-                    {COLUMN_GROUPS.map(group => {
-                        const cols = GUIDE_COLUMNS.filter(c => c.group === group);
-                        return (
-                            <div key={group} className="guide-detail-group">
-                                <div className="text-label guide-detail-group-title">{group}</div>
-                                <dl className="guide-detail-grid">
-                                    {cols.map(col => (
-                                        <div key={col.key} className="guide-detail-item" title={col.hint || ''}>
-                                            <dt className="text-label">
-                                                {col.label}{col.unit ? ` (${col.unit})` : ''}
-                                            </dt>
-                                            <dd className="text-data">{formatCell(row, col)}</dd>
-                                        </div>
-                                    ))}
-                                </dl>
-                            </div>
-                        );
-                    })}
+                    <div className="guide-detail-group">
+                        <div className="text-label guide-detail-group-title">On the label</div>
+                        <dl className="guide-detail-grid">
+                            {LABEL_COLUMNS.map(col => (
+                                <div key={col.key} className="guide-detail-item" title={col.hint || ''}>
+                                    <dt className="text-label">
+                                        {col.label}{col.unit ? ` (${col.unit})` : ''}
+                                    </dt>
+                                    <dd className="text-data">{formatCell(row, col)}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    </div>
+
+                    <div className="guide-detail-group">
+                        <div className="text-label guide-detail-group-title">Certification results</div>
+                        <GuideCertificationResults
+                            testGroupIds={testGroupIds}
+                            vehicles={vehicles}
+                            configCount={configCount}
+                        />
+                    </div>
 
                     <div className="guide-detail-group">
                         <button
                             type="button"
                             className="section-action"
-                            onClick={() => setShowRaw(s => !s)}
+                            onClick={() => setShowAll(v => !v)}
                         >
-                            {showRaw ? 'Hide' : 'Show'} EPA source row
-                            {rawEntries.length > 0 && ` (${rawEntries.length} fields, verbatim)`}
+                            {showAll ? 'Hide' : 'Show'} all fields
                         </button>
-                        {showRaw && (
-                            <div className="guide-raw">
-                                {rawError && <div className="text-note">The source row could not be loaded.</div>}
-                                {!rawError && raw == null && <div className="text-note">Loading…</div>}
-                                {rawEntries.map(([k, v]) => (
-                                    <div key={k} className="guide-raw-row">
-                                        <span className="text-label">{k}</span>
-                                        <span className="text-data">{v == null || v === '' ? '—' : String(v)}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
                     </div>
+
+                    {showAll && (
+                        <>
+                            {COLUMN_GROUPS.map(group => {
+                                const cols = GUIDE_COLUMNS.filter(c => c.group === group);
+                                return (
+                                    <div key={group} className="guide-detail-group">
+                                        <div className="text-label guide-detail-group-title">{group}</div>
+                                        <dl className="guide-detail-grid">
+                                            {cols.map(col => (
+                                                <div key={col.key} className="guide-detail-item" title={col.hint || ''}>
+                                                    <dt className="text-label">
+                                                        {col.label}{col.unit ? ` (${col.unit})` : ''}
+                                                    </dt>
+                                                    <dd className="text-data">{formatCell(row, col)}</dd>
+                                                </div>
+                                            ))}
+                                        </dl>
+                                    </div>
+                                );
+                            })}
+
+                            <div className="guide-detail-group">
+                                <button
+                                    type="button"
+                                    className="section-action"
+                                    onClick={() => setShowRaw(s => !s)}
+                                >
+                                    {showRaw ? 'Hide' : 'Show'} EPA source row
+                                    {rawEntries.length > 0 && ` (${rawEntries.length} fields, verbatim)`}
+                                </button>
+                                {showRaw && (
+                                    <div className="guide-raw">
+                                        {rawError && <div className="text-note">The source row could not be loaded.</div>}
+                                        {!rawError && raw == null && <div className="text-note">Loading…</div>}
+                                        {rawEntries.map(([k, v]) => (
+                                            <div key={k} className="guide-raw-row">
+                                                <span className="text-label">{k}</span>
+                                                <span className="text-data">{v == null || v === '' ? '—' : String(v)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+
                 </div>
             </div>
         </div>

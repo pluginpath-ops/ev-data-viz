@@ -11,6 +11,7 @@ import GuideColumnPicker from './GuideColumnPicker';
 import GuideTable from './GuideTable';
 import GuideComparePanel from './GuideComparePanel';
 import GuideDetailModal from './GuideDetailModal';
+import { configurationsInTestGroup } from '../../../utils/guideCertification';
 import LoadingSpinner from '../../LoadingSpinner';
 import CollapsibleSection from '../../CollapsibleSection';
 
@@ -270,6 +271,8 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 <GuideDetailModal
                     row={openRow}
                     vehicles={vehicleLinks[openRow.id]?.vehicles ?? []}
+                    testGroupIds={vehicleLinks[openRow.id]?.testGroupIds ?? []}
+                    configCount={configurationsInTestGroup(rows, openRow)}
                     onClose={() => setOpenRow(null)}
                 />
             )}
