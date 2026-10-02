@@ -1518,3 +1518,21 @@ describe('a link wins over the saved vehicle selection', () => {
         }
     });
 });
+
+describe('Road Trip pairings are selected and colored apart (#379)', () => {
+    const road = read('src/components/RoadTripView.jsx');
+    const selector = read('src/components/RunSelector.jsx');
+
+    it('the selection group is per pairing slot, so an added pairing can be unticked', () => {
+        // One group per range test lets the hook's carry rule re-tick a row whose
+        // parent is still selected.
+        expect(road).toMatch(/groupId: `\$\{e\.vehicle\.id\}:\$\{e\.rangeRun\.id\}:\$\{e\.slot\}`/);
+        expect(road).toMatch(/slot,\s*\n/);
+    });
+
+    it('an added pairing\'s swatch writes a pair-keyed color, and the selector is told to', () => {
+        expect(road).toMatch(/\bpairColors\b/);
+        expect(road).toMatch(/pairPicks\[entry\.key\]/);
+        expect(selector).toMatch(/pairColors \? \{ \.\.\.run, id: rowKey\(partnerId\) \} : run/);
+    });
+});
