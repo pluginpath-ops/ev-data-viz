@@ -7320,11 +7320,19 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-2 p-3 rounded;
     background-color: var(--color-surface-sunken);
 }
-/* Numbers in a certification table sit on their right edge, headings with
-   them, so a column of decimals lines up on the point — -6.5900 above 42.0500
-   does not when both are left-aligned. Text columns stay left. */
+/* Numbers in a certification table sit on their right edge, so a column of
+   decimals lines up on the point — -6.5900 above 42.0500 does not when both are
+   left-aligned. The base table pads cells on the right only, which is lopsided
+   for numbers, so a numeric cell gets equal padding either side; its heading is
+   centered over the column. Text columns stay left. */
 .epa-phase-table .is-numeric {
-    @apply text-right tabular-nums;
+    @apply px-3 tabular-nums whitespace-nowrap;
+}
+.epa-phase-table td.is-numeric {
+    @apply text-right;
+}
+.epa-phase-table th.is-numeric {
+    @apply text-center;
 }
 
 /* Which of two coefficient sets the app computes with. The used cells carry the
