@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import DerivedValues from '../DerivedValues';
+import InfoIcon from '../../InfoIcon';
+import { EPA_EXPLAINERS } from '../../../utils/epaExplainers';
 import { certificationTests, certificationCoefficients, linkedVehicleLinks } from '../../../utils/guideCertification';
 
 const fmt = (v, digits = 2) => (v == null ? '—' : Number(v).toFixed(digits));
@@ -82,7 +84,7 @@ function CertificationGroup({ group, configCount }) {
                 <div className="epa-phase-table">
                     <table>
                         <thead>
-                            <tr><th>Test</th><th>Date</th><th>Procedure</th><th>DC energy (kWh)</th></tr>
+                            <tr><th>Test</th><th>Date</th><th>Procedure</th><th>DC energy (kWh)</th><th /></tr>
                         </thead>
                         <tbody>
                             {tests.map(t => <TestRows key={t.id} test={t} />)}
@@ -96,21 +98,38 @@ function CertificationGroup({ group, configCount }) {
                     <table>
                         <thead>
                             <tr>
-                                <th>Road load</th><th>Target A</th><th>B</th><th>C</th>
-                                <th>Set A</th><th>B</th><th>C</th><th>Weight (lb)</th>
+                                <th />
+                                <th colSpan={3} className="coeff-group-head">Target (used)</th>
+                                <th colSpan={3} className="coeff-group-head">Set (dyno)</th>
+                                <th />
+                            </tr>
+                            <tr>
+                                <th>Road load</th>
+                                <th>A</th><th>B</th><th>C</th>
+                                <th>A</th><th>B</th><th>C</th>
+                                <th>Weight (lb)</th>
                             </tr>
                         </thead>
                         <tbody>
                             {coefficients.map(c => (
                                 <tr key={c.id ?? c.category}>
                                     <td>{c.category ?? '—'}{c.primary && ' (primary)'}</td>
-                                    {c.target.map((v, i) => <td key={`t${i}`}>{fmt(v, 4)}</td>)}
-                                    {c.set.map((v, i) => <td key={`s${i}`}>{fmt(v, 4)}</td>)}
+                                    {c.target.map((v, i) => (
+                                        <td key={`t${i}`} className={c.used === 'target' ? 'coeff-used' : 'coeff-unused'}>{fmt(v, 4)}</td>
+                                    ))}
+                                    {c.set.map((v, i) => (
+                                        <td key={`s${i}`} className={c.used === 'set' ? 'coeff-used' : 'coeff-unused'}>{fmt(v, 4)}</td>
+                                    ))}
                                     <td>{fmt(c.weightLbs, 0)}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                    <div className="text-note">
+                        Highlighted is the set the curves and derived values use. The set
+                        coefficients are the dynamometer’s programming, not the road load.
+                        {' '}<InfoIcon text={EPA_EXPLAINERS.targetVsSet} />
+                    </div>
                 </div>
             )}
 
@@ -130,15 +149,12 @@ function TestRows({ test }) {
                     {test.procedure}
                     {test.isEpaTested && ' · EPA tested'}
                 </td>
+                <td>{fmt(test.dcKwh)}</td>
                 <td>
-                    {fmt(test.dcKwh)}
                     {test.phases.length > 0 && (
-                        <>
-                            {' '}
-                            <button type="button" className="section-action" onClick={() => setOpen(o => !o)}>
-                                {open ? 'Hide' : 'Show'} {test.phases.length} phases
-                            </button>
-                        </>
+                        <button type="button" className="row-toggle" onClick={() => setOpen(o => !o)}>
+                            {open ? 'Hide' : 'Show'} {test.phases.length} phases
+                        </button>
                     )}
                 </td>
             </tr>
@@ -148,6 +164,7 @@ function TestRows({ test }) {
                     <td>Phase {p.index}</td>
                     <td>{p.type ?? '—'}{p.distanceMi != null && ` · ${fmt(p.distanceMi)} mi`}</td>
                     <td>{fmt(p.dcKwh)}</td>
+                    <td />
                 </tr>
             ))}
         </>

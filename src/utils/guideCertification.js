@@ -52,12 +52,19 @@ export function certificationCoefficients(group) {
     return [...(group?.epa_coefficient_sets ?? [])]
         .sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0)
             || String(a.category ?? '').localeCompare(String(b.category ?? '')))
-        .map(c => ({
-            id: c.id, category: c.category ?? null, primary: Boolean(c.is_primary),
-            target: [c.target_a, c.target_b, c.target_c].map(num),
-            set: [c.set_a, c.set_b, c.set_c].map(num),
-            weightLbs: num(c.equiv_test_weight_lbs),
-        }));
+        .map(c => {
+            const target = [c.target_a, c.target_b, c.target_c].map(num);
+            const set = [c.set_a, c.set_b, c.set_c].map(num);
+            const complete = (v) => v.every(x => x != null);
+            return {
+                id: c.id, category: c.category ?? null, primary: Boolean(c.is_primary),
+                target, set,
+                // The set the app computes with: the target when it is whole, the
+                // set only as its fallback — see resolvePrimaryCoeffs.
+                used: complete(target) ? 'target' : complete(set) ? 'set' : null,
+                weightLbs: num(c.equiv_test_weight_lbs),
+            };
+        });
 }
 
 /**

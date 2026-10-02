@@ -7320,6 +7320,28 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-2 p-3 rounded;
     background-color: var(--color-surface-sunken);
 }
+/* A button inside a table row that opens that row's detail rows. Text, not a
+   pill: a pill in a data cell is the loudest thing in the table. */
+.row-toggle {
+    @apply text-xs whitespace-nowrap underline-offset-2 hover:underline;
+    color: var(--color-primary-text);
+}
+
+/* Which of two coefficient sets the app computes with. The used cells carry the
+   accent; the other set is muted but still legible, since it is data too. */
+.coeff-group-head {
+    @apply text-center;
+}
+.coeff-used {
+    /* A wash of the accent over whatever the surface is, so one rule serves
+       both themes — a [data-theme] override cannot follow a themed subtree. */
+    background-color: color-mix(in srgb, var(--color-primary) 16%, transparent);
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+.coeff-unused {
+    color: var(--color-text-muted);
+}
 .guide-raw {
     @apply mt-2 p-3 rounded max-h-64 overflow-y-auto flex flex-col gap-1;
     background-color: var(--color-surface-sunken);

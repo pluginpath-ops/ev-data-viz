@@ -50,6 +50,16 @@ describe('certificationCoefficients', () => {
         expect(sets[0].weightLbs).toBe(5500);
         expect(sets[1].set).toEqual([1, 2, 3]);
     });
+
+    it('says which set is used: the target, and the set only when a target is missing', () => {
+        const sets = certificationCoefficients({ epa_coefficient_sets: [
+            { id: 1, category: 'Both', is_primary: true, target_a: 1, target_b: 2, target_c: 3, set_a: 4, set_b: 5, set_c: 6 },
+            { id: 2, category: 'Partial target', target_a: 1, target_b: null, target_c: 3, set_a: 4, set_b: 5, set_c: 6 },
+            { id: 3, category: 'Nothing' },
+        ] });
+        const usedBy = Object.fromEntries(sets.map(s => [s.category, s.used]));
+        expect(usedBy).toEqual({ Both: 'target', 'Partial target': 'set', Nothing: null });
+    });
 });
 
 describe('configurationsInTestGroup', () => {
