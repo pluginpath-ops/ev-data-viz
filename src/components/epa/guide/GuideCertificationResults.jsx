@@ -84,7 +84,7 @@ function CertificationGroup({ group, configCount }) {
                 <div className="epa-phase-table">
                     <table>
                         <thead>
-                            <tr><th>Test</th><th>Date</th><th>Procedure</th><th>DC energy (kWh)</th><th /></tr>
+                            <tr><th>Test</th><th>Date</th><th>Procedure</th><th className="is-numeric">DC energy (kWh)</th><th /></tr>
                         </thead>
                         <tbody>
                             {tests.map(t => <TestRows key={t.id} test={t} />)}
@@ -105,9 +105,9 @@ function CertificationGroup({ group, configCount }) {
                             </tr>
                             <tr>
                                 <th>Road load</th>
-                                <th>A</th><th>B</th><th>C</th>
-                                <th>A</th><th>B</th><th>C</th>
-                                <th>Weight (lb)</th>
+                                <th className="is-numeric">A</th><th className="is-numeric">B</th><th className="is-numeric">C</th>
+                                <th className="is-numeric">A</th><th className="is-numeric">B</th><th className="is-numeric">C</th>
+                                <th className="is-numeric">Weight (lb)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -115,12 +115,12 @@ function CertificationGroup({ group, configCount }) {
                                 <tr key={c.id ?? c.category}>
                                     <td>{c.category ?? '—'}{c.primary && ' (primary)'}</td>
                                     {c.target.map((v, i) => (
-                                        <td key={`t${i}`} className={c.used === 'target' ? 'coeff-used' : 'coeff-unused'}>{fmt(v, 4)}</td>
+                                        <td key={`t${i}`} className={`is-numeric ${c.used === 'target' ? 'coeff-used' : 'coeff-unused'}`}>{fmt(v, 4)}</td>
                                     ))}
                                     {c.set.map((v, i) => (
-                                        <td key={`s${i}`} className={c.used === 'set' ? 'coeff-used' : 'coeff-unused'}>{fmt(v, 4)}</td>
+                                        <td key={`s${i}`} className={`is-numeric ${c.used === 'set' ? 'coeff-used' : 'coeff-unused'}`}>{fmt(v, 4)}</td>
                                     ))}
-                                    <td>{fmt(c.weightLbs, 0)}</td>
+                                    <td className="is-numeric">{fmt(c.weightLbs, 0)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -149,10 +149,10 @@ function TestRows({ test }) {
                     {test.procedure}
                     {test.isEpaTested && ' · EPA tested'}
                 </td>
-                <td>{fmt(test.dcKwh)}</td>
-                <td>
+                <td className="is-numeric">{fmt(test.dcKwh)}</td>
+                <td className="is-numeric">
                     {test.phases.length > 0 && (
-                        <button type="button" className="row-toggle" onClick={() => setOpen(o => !o)}>
+                        <button type="button" className="section-action" onClick={() => setOpen(o => !o)}>
                             {open ? 'Hide' : 'Show'} {test.phases.length} phases
                         </button>
                     )}
@@ -163,7 +163,7 @@ function TestRows({ test }) {
                     <td />
                     <td>Phase {p.index}</td>
                     <td>{p.type ?? '—'}{p.distanceMi != null && ` · ${fmt(p.distanceMi)} mi`}</td>
-                    <td>{fmt(p.dcKwh)}</td>
+                    <td className="is-numeric">{fmt(p.dcKwh)}</td>
                     <td />
                 </tr>
             ))}
