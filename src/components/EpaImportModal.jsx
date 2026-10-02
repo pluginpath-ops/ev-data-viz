@@ -187,11 +187,12 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                         {parsed.map(g => {
                                             const isSelected = selected.has(g.test_group_id);
                                             const linkedVid  = linkMap[g.test_group_id] || '';
-                                            // Coefficients live on the primary set; prefer set, fall back to target.
+                                            // Coefficients live on the primary set; prefer target, fall back to set —
+                                            // the order the derivations use (resolvePrimaryCoeffs).
                                             const cs = g._coefficientSet || {};
-                                            const a = cs.set_a ?? cs.target_a;
-                                            const b = cs.set_b ?? cs.target_b;
-                                            const c = cs.set_c ?? cs.target_c;
+                                            const a = cs.target_a ?? cs.set_a;
+                                            const b = cs.target_b ?? cs.set_b;
+                                            const c = cs.target_c ?? cs.set_c;
                                             return (
                                                 <tr key={g.test_group_id} className={`transition ${isSelected ? '' : 'opacity-40'}`}>
                                                     <td className="py-2 pr-2">
@@ -216,15 +217,15 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                     <td className="py-2 pr-3 font-mono whitespace-nowrap">
                                                         {a != null ? (
                                                             <div>
-                                                                <span className={cs.set_a != null ? '' : 'text-meta'}>{a?.toFixed(2)}</span>
+                                                                <span className={cs.target_a != null ? '' : 'text-meta'}>{a?.toFixed(2)}</span>
                                                                 <span className="text-meta mx-1">/</span>
-                                                                <span className={cs.set_b != null ? '' : 'text-meta'}>{b?.toFixed(4)}</span>
+                                                                <span className={cs.target_b != null ? '' : 'text-meta'}>{b?.toFixed(4)}</span>
                                                                 <span className="text-meta mx-1">/</span>
-                                                                <span className={cs.set_c != null ? '' : 'text-meta'}>{c?.toFixed(5)}</span>
+                                                                <span className={cs.target_c != null ? '' : 'text-meta'}>{c?.toFixed(5)}</span>
                                                             </div>
                                                         ) : <span className="text-meta">—</span>}
-                                                        {cs.set_a == null && a != null && (
-                                                            <div className="text-amber-500 text-[10px]">target only</div>
+                                                        {cs.target_a == null && a != null && (
+                                                            <div className="text-amber-500 text-[10px]">set only</div>
                                                         )}
                                                     </td>
                                                     <td className="py-2 pr-3 whitespace-nowrap">
