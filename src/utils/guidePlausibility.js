@@ -26,8 +26,8 @@ function checkPair(flags, kind, unit, city, hwy, comb) {
     if (ratio < HWY_CITY_RATIO_MIN || ratio > HWY_CITY_RATIO_MAX) {
         flags.push({
             kind: `${kind}-ratio`,
-            text: `The provided highway ${kind} (${hwy} ${unit}) to city ${kind} (${city} ${unit}) ratio is not plausible. `
-                + `The ratio of ${ratio.toFixed(2)} does not match the rest of the fleet at ${HWY_CITY_RATIO_MIN} to ${HWY_CITY_RATIO_MAX}.`,
+            text: `The provided highway ${kind} (${hwy} ${unit}) to city ${kind} (${city} ${unit}) ratio is not plausible at ${ratio.toFixed(2)}. `
+                + `The typical range in the data set is from ${HWY_CITY_RATIO_MIN} to ${HWY_CITY_RATIO_MAX}.`,
         });
     }
     if (comb != null) {
