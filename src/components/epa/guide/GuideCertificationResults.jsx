@@ -144,7 +144,7 @@ function TestRows({ test }) {
         <>
             <tr>
                 <td>{test.number ?? '—'}</td>
-                <td>{test.date ?? '—'}</td>
+                <td className="whitespace-nowrap">{test.date ?? '—'}</td>
                 <td>
                     {test.procedure}
                     {test.isEpaTested && ' · EPA tested'}

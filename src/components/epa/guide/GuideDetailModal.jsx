@@ -77,7 +77,7 @@ export default function GuideDetailModal({ row, vehicles, testGroupIds = [], con
 
                     {vehicles.length > 0 && (
                         <div className="guide-tested-note">
-                            We hold test data for {vehicles.map(v => `${v.year} ${v.name}`).join(', ')}.
+                            We hold test data for {[...new Set(vehicles.map(v => `${v.year} ${v.name}`))].join(', ')}.
                         </div>
                     )}
 
