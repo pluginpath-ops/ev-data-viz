@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
+import { useSyncedScale } from '../hooks/useSyncedScale';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
@@ -78,10 +79,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const [copiedUrl,    setCopiedUrl]    = useState(false);
 
     // ── Axis scale state — yMin defaults to 0, rest auto ─────────────────────
-    const [xMin, setXMin] = useState(null);
-    const [xMax, setXMax] = useState(null);
-    const [yMin, setYMin] = useState(0);
-    const [yMax, setYMax] = useState(null);
+    const [xMinOwn, setXMin] = useState(null);
+    const [xMaxOwn, setXMax] = useState(null);
+    const [yMinOwn, setYMin] = useState(0);
+    const [yMaxOwn, setYMax] = useState(null);
+    // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
+    const { xMin, xMax, yMin, yMax } = useSyncedScale({
+        xMin: xMinOwn, xMax: xMaxOwn, yMin: yMinOwn, yMax: yMaxOwn,
+    });
     const [showPoints,       setShowPoints]       = useState(true);
     const handleScaleChange = (key, val) => {
         if (key === 'xMin') setXMin(val);

@@ -1545,7 +1545,7 @@ describe('the EPA curve explorer follows the pop-out channel (#259)', () => {
     it('the explorer reports its state up, and App broadcasts it', () => {
         expect(read('src/components/epa/EpaSection.jsx')).toMatch(/<EpaCurveExplorer onStateChange=\{onExplorerState\}/);
         expect(app).toMatch(/<EpaSection subtab=\{epaSubtab\} onExplorerState=\{setEpaExplorer\}/);
-        expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, sendState\]/);
+        expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, viewScale, sendState\]/);
     });
 
     it('the channel carries it both ways, null included', () => {
@@ -1557,5 +1557,25 @@ describe('the EPA curve explorer follows the pop-out channel (#259)', () => {
         expect(read('src/components/PopoutView.jsx')).toMatch(/<EpaCurveExplorer presentationMode synced=\{epaExplorer\}/);
         expect(app).toMatch(/\(view === 'epa' && epaSubtab === 'curves'\)/);
         expect(app).toMatch(/epaExplorer=\{epaExplorer\}/);
+    });
+});
+
+describe('charts that hold their axis limits locally reach the pop-out (#259)', () => {
+    const sync = read('src/hooks/useChartSync.js');
+    const app = read('src/App.jsx');
+
+    it('the three charts draw with the synced limits', () => {
+        // Charging Curves and Modeled Efficiency keep theirs in synced config;
+        // these three keep theirs in component state the pop-out never saw.
+        expect(read('src/components/PerformanceCurveView.jsx')).toMatch(/const scale = useSyncedScale\(scaleOwn\)/);
+        expect(read('src/components/RangeChartView.jsx')).toMatch(/= useSyncedScale\(\{\s*xMin: xMinOwn/);
+        expect(read('src/components/RoadTripView.jsx')).toMatch(/const axisScale = useSyncedScale\(axisScaleOwn\)/);
+    });
+
+    it('the main tab reports, the pop-out receives, over the same channel', () => {
+        expect(app).toMatch(/synced: isPopout \? viewScale : null, report: isPopout \? null : setViewScale/);
+        expect(app, 'both trees need the provider').toMatch(/<ScaleSyncContext\.Provider value=\{scaleSync\}>[\s\S]*<ScaleSyncContext\.Provider value=\{scaleSync\}>/);
+        expect(sync).toMatch(/if \('viewScale' in data\) setViewScale\(data\.viewScale\)/);
+        expect((sync.match(/viewScale,\n/g) || []).length).toBeGreaterThanOrEqual(2);
     });
 });
