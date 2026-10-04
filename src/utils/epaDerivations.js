@@ -231,6 +231,12 @@ export function deriveChargerEfficiency(group) {
  *
  * source: 'computed' | null (when inputs absent)
  */
+const SIGNATURE_METHOD = {
+    'fixed':       'default 2-cycle',
+    'per-vehicle': 'vehicle-specific 5-cycle',
+    'per-cycle':   'per-cycle factors',
+};
+
 export function deriveEffectiveAdjustmentFactor(group) {
     const published = num(group?.label_range_published);
     const calc      = num(group?.cd_range_combined_calc);
@@ -242,14 +248,21 @@ export function deriveEffectiveAdjustmentFactor(group) {
     const factor = published / calc;
     // Plausible adjustment factors sit in ~0.6–0.8; flag anything well outside.
     const flags = factor >= 0.55 && factor <= 0.85 ? [] : ['adj-factor-implausible'];
-    const method = factor >= 0.715 ? 'vehicle-specific 5-cycle' : 'default 2-cycle';
+    // The guide states outright what the factor is, so use that when the group is
+    // linked to a row that does; the size threshold is only the fallback for a
+    // group with no guide row (#222). 0.715 is a proxy for a distinction the
+    // data now carries.
+    const signature = group?.epa_fe_guide?.adjustment_signature ?? null;
+    const method = SIGNATURE_METHOD[signature]
+        ?? (factor >= 0.715 ? 'vehicle-specific 5-cycle' : 'default 2-cycle');
+    const methodSource = SIGNATURE_METHOD[signature] ? 'signature' : 'threshold';
 
     return {
         value: factor,
         source: 'computed',
         certain: flags.length === 0,
         flags,
-        basis: { label_range_published: published, cd_range_combined_calc: calc, method },
+        basis: { label_range_published: published, cd_range_combined_calc: calc, method, methodSource },
     };
 }
 

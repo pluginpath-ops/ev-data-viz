@@ -57,7 +57,7 @@ export default function EpaMethodologyDiagram({ model }) {
 
     const { cycles, weights, adjustment, cycleSpeeds, combinedMi, combinedMpge,
             labeledMi, deratePct, chargeEfficiency, testMethod, phases, runs,
-            adjustmentSource, adjustmentFixed,
+            adjustmentSource, adjustmentFixed, adjustmentLine,
             combinedFixedMi, combinedHarmMi, blendAgreeing } = model;
 
     // Whether this vehicle's real factor differs from the flat shortcut at all.
@@ -72,7 +72,10 @@ export default function EpaMethodologyDiagram({ model }) {
 
     return (
         <div className="epa-methodology">
-            <p className="text-sm text-secondary mb-4">{METHOD_LABEL[testMethod]}</p>
+            <p className="text-sm text-secondary mb-1">{METHOD_LABEL[testMethod]}</p>
+            {/* Which adjustment, and where it came from — a bare × 0.7051 does
+                not say whether the guide stated it or the model assumed it. */}
+            {adjustmentLine && <p className="text-xs text-meta mb-4">{adjustmentLine}</p>}
 
             <div className="epa-flow-columns">
                 {[

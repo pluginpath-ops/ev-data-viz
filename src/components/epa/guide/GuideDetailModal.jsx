@@ -3,6 +3,7 @@ import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
 import { GUIDE_COLUMNS, COLUMN_GROUPS, columnByKey, formatCell } from '../../../utils/feGuideBrowse';
 import GuideCertificationResults from './GuideCertificationResults';
+import { guidePlausibilityFlags } from '../../../utils/guidePlausibility';
 
 // The label, kept short: what a window sticker says. Everything else sits
 // behind "Show all fields".
@@ -72,6 +73,17 @@ export default function GuideDetailModal({ row, vehicles, testGroupIds = [], con
                             EPA collapsed several configurations into this row. Its motor count and
                             motor power are the union of those configurations, so no arithmetic over them
                             describes one vehicle.
+                        </div>
+                    )}
+
+                    {guidePlausibilityFlags(row).length > 0 && (
+                        <div className="guide-warning">
+                            The published EPA data for this vehicle appears to be incorrect based on
+                            automated checks.
+                            <ul>
+                                {guidePlausibilityFlags(row).map(f => <li key={f.kind}>{f.text}</li>)}
+                            </ul>
+                            There may be corrected data available from the EPA.
                         </div>
                     )}
 

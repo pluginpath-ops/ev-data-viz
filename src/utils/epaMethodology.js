@@ -282,7 +282,8 @@ function labelBlendAgreement(labeled, arithmetic, harmonic) {
  * 0.55–0.85 is a corrupt row, not a vehicle, and silently scaling every figure
  * on the diagram by it would be worse than ignoring it.
  *
- * @returns {{ value, source: 'guide'|'default', declared: string|null }}
+ * @returns {{ value, source: 'guide'|'default', declared: string|null,
+ *            signature: 'fixed'|'per-vehicle'|'per-cycle'|null }}
  */
 export function resolveAdjustment(record) {
     const published = Number(record?.adjustmentFactor);
@@ -294,7 +295,41 @@ export function resolveAdjustment(record) {
         value:    usable ? published : LABEL_ADJUSTMENT,
         source:   usable ? 'guide' : 'default',
         declared: record?.calcApproach ?? null,
+        // What the guide's own ratios say the factor IS, rather than a class
+        // guessed from its size (see parseFeGuide.adjustmentSignature).
+        signature: record?.adjustmentSignature ?? null,
     };
+}
+
+const SIGNATURE_PHRASE = {
+    'fixed':       'the flat factor',
+    'per-vehicle': 'one factor for this vehicle',
+    'per-cycle':   'a different factor per cycle',
+};
+
+/**
+ * One line saying which adjustment a figure used and where it came from, so
+ * "×0.7051" is never a bare number on screen.
+ *
+ * A per-cycle signature gets the caveat it has earned: the guide's single
+ * factor is the MPGe ratio of ONE cycle pair, and this model applies one factor
+ * to both, which a per-cycle row does not do. What produces those rows is
+ * unexplained (0 of 106 match the published regression), so it is reported, not
+ * modelled.
+ */
+export function describeAdjustment(adj) {
+    if (!adj || !Number.isFinite(adj.value)) return null;
+    const parts = [`× ${Number(adj.value.toFixed(4))}`];
+    parts.push(adj.source === 'guide'
+        ? 'from the Fuel Economy Guide'
+        : 'the default — no usable guide factor is linked');
+    if (adj.signature && SIGNATURE_PHRASE[adj.signature]) parts.push(SIGNATURE_PHRASE[adj.signature]);
+    if (adj.declared) parts.push(`declared “${adj.declared}”`);
+    let line = parts.join(' · ');
+    if (adj.signature === 'per-cycle') {
+        line += '. This model applies one factor to both cycles, so its ranges will not match the label exactly.';
+    }
+    return line;
 }
 
 /**
@@ -359,6 +394,8 @@ export function buildMethodologyModel(record) {
         adjustmentSource: adjustment.source,
         adjustmentFixed:  LABEL_ADJUSTMENT,
         adjustmentDeclared: adjustment.declared,
+        adjustmentSignature: adjustment.signature,
+        adjustmentLine: describeAdjustment(adjustment),
         weights:     { city: LABEL_WEIGHT_CITY, hwy: LABEL_WEIGHT_HWY },
         cycleSpeeds: { city: UDDS_AVG_MPH, hwy: HWFET_AVG_MPH },
         adjustmentMethod: record.adjustmentMethod ?? null,
