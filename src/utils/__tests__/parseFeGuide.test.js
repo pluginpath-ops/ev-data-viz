@@ -266,3 +266,49 @@ describe('adjustmentSignature', () => {
         expect(adjustmentSignature(0.7, 0)).toBeNull();
     });
 });
+
+describe('parseFeGuide — surviving a rename (#214)', () => {
+    const REQUIRED = 'Comb Range as shown on FE Label (miles)';
+
+    it('imports a file whose required column differs only in case, spacing or punctuation', () => {
+        const renamed = CSV.replace(REQUIRED, 'comb range as shown on FE label  (Miles)');
+        const base = parseFeGuide(CSV);
+        const out = parseFeGuide(renamed);
+
+        expect(out.missingColumns).toEqual([]);
+        expect(out.rows).toHaveLength(base.rows.length);
+        // The figures came through the renamed column, not around it.
+        expect(byCarline(out.rows, 'R2 Performance AWD (20in AT)').labelCombRangeMi).toBe(307);
+        // Said, not absorbed.
+        expect(out.renamed).toEqual([
+            { column: REQUIRED, header: 'comb range as shown on FE label  (Miles)', how: 'normalised' },
+        ]);
+    });
+
+    it('keeps the source row under EPA\'s own headings, not ours', () => {
+        const out = parseFeGuide(CSV.replace(REQUIRED, 'comb range as shown on FE label  (Miles)'));
+        const raw = byCarline(out.rows, 'R2 Performance AWD (20in AT)').raw;
+        expect(raw['comb range as shown on FE label  (Miles)']).toBeDefined();
+        expect(raw[REQUIRED]).toBeUndefined();
+    });
+
+    it('still refuses a relabelled required column, but names the closest header', () => {
+        const out = parseFeGuide(CSV.replace(REQUIRED, 'Comb Range as shown on the FE Label (miles)'));
+        expect(out.rows).toEqual([]);
+        expect(out.missingColumns).toEqual([REQUIRED]);
+        expect(out.suggestions).toEqual([
+            expect.objectContaining({ column: REQUIRED, closest: 'Comb Range as shown on the FE Label (miles)' }),
+        ]);
+    });
+
+    it('points at the likely header when an optional column goes missing', () => {
+        const out = parseFeGuide(CSV.replace('Hwy Range (miles)', 'Hwy Range (mi)'));
+        expect(out.warnings.join(' ')).toContain('"Hwy Range (miles)" (the closest in the file is "Hwy Range (mi)")');
+    });
+
+    it('reports nothing renamed for an untouched file', () => {
+        const out = parseFeGuide(CSV);
+        expect(out.renamed).toEqual([]);
+        expect(out.suggestions).toEqual([]);
+    });
+});
