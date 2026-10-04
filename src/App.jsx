@@ -787,6 +787,14 @@ export default function App() {
     useEffect(() => {
         if (isPopout) return;
         if (view !== 'vehicles') return;
+        // Not while the app is loading (#386). `view` starts as 'vehicles' and
+        // only becomes the tab the URL named once the restore effects have run,
+        // so this fired first and replaced the whole query with `?tab=vehicles` —
+        // taking with it every parameter a view reads for itself once it mounts
+        // (the curve explorer's `c`, for one). Nothing is lost by waiting: the
+        // filters decode from the URL, and a genuine Vehicles view is written by
+        // the first change to it.
+        if (loading) return;
         const p = new URLSearchParams();
         p.set('tab', 'vehicles');
         for (const [k, v] of encodeVehicleFilters(vehicleFilters)) p.set(k, v);

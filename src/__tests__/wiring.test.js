@@ -1579,3 +1579,17 @@ describe('charts that hold their axis limits locally reach the pop-out (#259)', 
         expect((sync.match(/viewScale,\n/g) || []).length).toBeGreaterThanOrEqual(2);
     });
 });
+
+describe('a direct link keeps the parameters its view reads for itself (#386)', () => {
+    it('the Vehicles URL effect waits for the app to load', () => {
+        // `view` starts as 'vehicles' and only becomes the tab the URL named once
+        // the restore effects run. Writing the URL before then replaced the whole
+        // query with ?tab=vehicles and took the curve explorer's ?c= with it.
+        const app = read('src/App.jsx');
+        const effect = app.slice(app.indexOf("if (view !== 'vehicles') return;"));
+        const guard = effect.indexOf('if (loading) return;');
+        const write = effect.indexOf("p.set('tab', 'vehicles')");
+        expect(guard, 'the guard must exist').toBeGreaterThan(-1);
+        expect(guard, 'and come before the write').toBeLessThan(write);
+    });
+});
