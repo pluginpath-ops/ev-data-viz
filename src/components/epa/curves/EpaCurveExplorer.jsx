@@ -148,12 +148,14 @@ export function explorerStateFromUrl(search = window.location.search) {
 
 /**
  * @param {boolean}  presentationMode  the pop-out: the plot alone, no controls
- * @param {Object}   synced            `{ selected, yAxis, conditions }` pushed by the
+ * @param {Object}   synced            `{ selected, yAxis, conditions, scale }` pushed by the
  *                                     window that has the controls; replaces local state
  * @param {Function} onStateChange     called with that same shape whenever it
  *                                     changes, and with null on unmount, so App can
  *                                     broadcast it to a pop-out
  */
+const NO_SCALE = { xMin: null, xMax: null, yMin: null, yMax: null };
+
 export default function EpaCurveExplorer({ presentationMode = false, synced = null, onStateChange = null }) {
     const { getCertGroupsForCurves, units } = useAppContext();
     const { isDark } = useTheme();
@@ -171,7 +173,9 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
     // Manual axis bounds, null = auto. Not persisted to the URL: the record
     // selection and the axis choice describe WHAT is plotted and are worth
     // sharing, where a zoom is tuning for the session.
-    const [scale, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    const [scaleOwn, setScale] = useState(NO_SCALE);
+    // A pop-out has no controls to set these, so it takes the other window's.
+    const scale = synced?.scale ?? scaleOwn;
 
     // The same controls the vehicle-driven curves use, from the same module —
     // two views computing air density slightly differently would be invisible
@@ -246,7 +250,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
     // Tell App what is on screen so it can broadcast it to a pop-out. Keyed on the
     // serialised state because `conditions.values` is a new object every render,
     // which would otherwise report on every render.
-    const reportKey = JSON.stringify({ selected, yAxis, conditions: conditions.values });
+    const reportKey = JSON.stringify({ selected, yAxis, conditions: conditions.values, scale });
     useEffect(() => {
         if (!onStateChange || presentationMode) return;
         onStateChange(JSON.parse(reportKey));
