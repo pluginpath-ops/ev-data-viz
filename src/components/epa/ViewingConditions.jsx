@@ -30,22 +30,36 @@ import { AccessoryLoadReferenceTable, MIN_TEMP_F, MAX_TEMP_F } from './accessory
  * an empty input means "not set", not zero — has one implementation. `''` and
  * `0` are different for temperature especially, where 0°F is a real value.
  */
-export function useViewingConditions() {
-    const [elevationFt, setElevationFt] = useState(0);
-    const [tempF, setTempF] = useState('');
-    const [accessoryOverrideW, setAccessoryOverrideW] = useState('');
+export function useViewingConditions(driven = null) {
+    const [elevationFtState, setElevationFt] = useState(0);
+    const [tempFState, setTempF] = useState('');
+    const [accessoryOverrideWState, setAccessoryOverrideW] = useState('');
     // Wind uses the same 0=tailwind / 180=headwind / 90|270=crosswind
     // convention as runs.wind_direction_deg (#142), applied as apparent
     // airspeed. Never persisted; η untouched.
-    const [windSpeedMph, setWindSpeedMph] = useState('');
-    const [windDirectionDeg, setWindDirectionDeg] = useState('');
+    const [windSpeedMphState, setWindSpeedMph] = useState('');
+    const [windDirectionDegState, setWindDirectionDeg] = useState('');
     // Elevation gain/loss is a ROUTE effect, distinct from static altitude,
     // which is an air-density one. Almost always zero, and the physics behind
     // it (weight-based potential energy, a regen approximation on descents) is
     // more involved than the others — hence its own disclosure.
-    const [gradeExpanded, setGradeExpanded] = useState(false);
-    const [gradeGainFt, setGradeGainFt] = useState('');
-    const [gradeDistanceMiles, setGradeDistanceMiles] = useState('');
+    const [gradeExpandedState, setGradeExpanded] = useState(false);
+    const [gradeGainFtState, setGradeGainFt] = useState('');
+    const [gradeDistanceMilesState, setGradeDistanceMiles] = useState('');
+
+    // A pop-out window has no controls to hold these, so it is DRIVEN by the
+    // window that does: pass the other window's `values` and they replace this
+    // one's own state. Without it a pop-out of a chart drawn at 20 mph of
+    // headwind would draw the standard-conditions curve, silently.
+    const pick = (name, own) => (driven && driven[name] !== undefined ? driven[name] : own);
+    const elevationFt        = pick('elevationFt', elevationFtState);
+    const tempF              = pick('tempF', tempFState);
+    const accessoryOverrideW = pick('accessoryOverrideW', accessoryOverrideWState);
+    const windSpeedMph       = pick('windSpeedMph', windSpeedMphState);
+    const windDirectionDeg   = pick('windDirectionDeg', windDirectionDegState);
+    const gradeExpanded      = pick('gradeExpanded', gradeExpandedState);
+    const gradeGainFt        = pick('gradeGainFt', gradeGainFtState);
+    const gradeDistanceMiles = pick('gradeDistanceMiles', gradeDistanceMilesState);
 
     const clampTempF = (raw) => {
         if (raw === '' || raw === '-') return raw; // mid-typing a negative

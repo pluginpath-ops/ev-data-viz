@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useSyncedScale } from '../hooks/useSyncedScale';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
 import { vehicleLabel } from '../utils/specHelpers';
@@ -603,7 +604,9 @@ export default function RoadTripView({
         (new URLSearchParams(window.location.search).get('rt_r') || '')
             .split(',').filter(Boolean)
     ).current;
-    const [axisScale, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    const [axisScaleOwn, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
+    const axisScale = useSyncedScale(axisScaleOwn);
     const [copiedUrl, setCopiedUrl] = useState(false);
     const [sortCol, setSortCol] = useState(null);   // column key or null
     const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'

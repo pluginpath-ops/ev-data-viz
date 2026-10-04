@@ -10,8 +10,8 @@ const CHANNEL = 'evbench-chart-sync';
  * Pop-out tab: sends 'request-state' on mount + focus, applies received state.
  */
 export function useChartSync({
-    chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings,
-    setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings,
+    chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, viewScale,
+    setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer, setViewScale,
 }) {
     const isPopout = useRef(
         new URLSearchParams(window.location.search).get('popout') === '1'
@@ -20,9 +20,9 @@ export function useChartSync({
     const channelRef = useRef(null);
 
     // Keep a ref of current state so the onmessage handler never closes over stale values
-    const stateRef = useRef({ chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings });
+    const stateRef = useRef({ chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, viewScale });
     useEffect(() => {
-        stateRef.current = { chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings };
+        stateRef.current = { chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, viewScale };
     });
 
     useEffect(() => {
@@ -46,6 +46,13 @@ export function useChartSync({
                 // opened it, with nothing on screen saying so. Assigned even when
                 // empty, unlike the configs above — {} is a meaningful state here.
                 if (data.pairings)       setPairings(data.pairings);
+                // The EPA curve explorer is not a chart mode, so it travels as its
+                // own field: its selection, Y axis and viewing conditions, or null
+                // once the main tab has left it. Assigned even when null, which is
+                // what sends the pop-out back to the chart.
+                if ('epaExplorer' in data) setEpaExplorer(data.epaExplorer);
+                // Axis limits of a chart that holds them locally (useSyncedScale).
+                if ('viewScale' in data) setViewScale(data.viewScale);
             };
             // Request current state on mount and whenever the tab regains focus
             // (covers the case where the main tab refreshed while this was in the background)
@@ -60,7 +67,7 @@ export function useChartSync({
             // Main tab: respond to state requests from pop-outs
             channel.onmessage = ({ data }) => {
                 if (data?.type !== 'request-state') return;
-                const { chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings } = stateRef.current;
+                const { chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, viewScale } = stateRef.current;
                 channel.postMessage({
                     type: 'chart-state',
                     chartMode,
@@ -70,6 +77,8 @@ export function useChartSync({
                     roadTripConfig,
                     epaConfig,
                     pairings,
+                    epaExplorer,
+                    viewScale,
                 });
             };
             return () => channel.close();
@@ -79,7 +88,7 @@ export function useChartSync({
     /** Called by App.jsx whenever chart state changes (main tab only). */
     const sendState = useCallback(() => {
         if (isPopout || !channelRef.current) return;
-        const { chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings } = stateRef.current;
+        const { chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, viewScale } = stateRef.current;
         channelRef.current.postMessage({
             type: 'chart-state',
             chartMode,
@@ -89,6 +98,8 @@ export function useChartSync({
             roadTripConfig,
             epaConfig,
             pairings,
+            epaExplorer,
+            viewScale,
         });
     }, [isPopout]);
 

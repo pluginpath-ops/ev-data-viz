@@ -18,6 +18,7 @@ import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import AxisScaleControls from './AxisScaleControls';
+import { useSyncedScale } from '../hooks/useSyncedScale';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve, tracedCurvePoints, segmentAccelerationG } from '../utils/performanceDerivations';
 import { resolveChartColors } from '../utils/colorUtils';
@@ -53,7 +54,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     // 'vehicle' — one line per vehicle, its single quickest run
     // 'all'     — every run, for run-to-run consistency
     const [grouping, setGrouping] = useState('mode');
-    const [scale, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    const [scaleOwn, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
+    const scale = useSyncedScale(scaleOwn);
     // Only consulted when grouping is 'all'; null means "not curated yet", which
     // shows everything rather than an empty chart on first switch.
     const [pickedRunIds, setPickedRunIds] = useState(null);

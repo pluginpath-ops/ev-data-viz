@@ -134,7 +134,29 @@ function makeReferencePlugin(refX, refLabel, xCaption, yCaption) {
     };
 }
 
-export default function EpaCurveExplorer() {
+/**
+ * The selection and Y axis a link names, from the URL: `?c=` and `?cy=`. Shared
+ * with App, which seeds a pop-out from it before the first message arrives.
+ */
+export function explorerStateFromUrl(search = window.location.search) {
+    const p = new URLSearchParams(search);
+    return {
+        selected: p.get('c') ? p.get('c').split(',').filter(Boolean) : [],
+        yAxis: Y_AXES.some(a => a.key === p.get('cy')) ? p.get('cy') : 'kwh100mi',
+    };
+}
+
+/**
+ * @param {boolean}  presentationMode  the pop-out: the plot alone, no controls
+ * @param {Object}   synced            `{ selected, yAxis, conditions, scale }` pushed by the
+ *                                     window that has the controls; replaces local state
+ * @param {Function} onStateChange     called with that same shape whenever it
+ *                                     changes, and with null on unmount, so App can
+ *                                     broadcast it to a pop-out
+ */
+const NO_SCALE = { xMin: null, xMax: null, yMin: null, yMax: null };
+
+export default function EpaCurveExplorer({ presentationMode = false, synced = null, onStateChange = null }) {
     const { getCertGroupsForCurves, units } = useAppContext();
     const { isDark } = useTheme();
     const canvasRef = useRef(null);
@@ -143,24 +165,22 @@ export default function EpaCurveExplorer() {
     const load = useCallback(() => getCertGroupsForCurves(), [getCertGroupsForCurves]);
     const { data: groups, loading, error } = useAsyncResource(load, []);
 
-    const [initial] = useState(() => {
-        const p = new URLSearchParams(window.location.search);
-        return {
-            selected: p.get('c') ? p.get('c').split(',').filter(Boolean) : [],
-            yAxis: Y_AXES.some(a => a.key === p.get('cy')) ? p.get('cy') : 'kwh100mi',
-        };
-    });
-    const [selected, setSelected] = useState(initial.selected);
-    const [yAxis, setYAxis] = useState(initial.yAxis);
+    const [initial] = useState(() => explorerStateFromUrl());
+    const [selectedOwn, setSelected] = useState(initial.selected);
+    const [yAxisOwn, setYAxis] = useState(initial.yAxis);
+    const selected = synced ? synced.selected : selectedOwn;
+    const yAxis    = synced ? synced.yAxis    : yAxisOwn;
     // Manual axis bounds, null = auto. Not persisted to the URL: the record
     // selection and the axis choice describe WHAT is plotted and are worth
     // sharing, where a zoom is tuning for the session.
-    const [scale, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
+    const [scaleOwn, setScale] = useState(NO_SCALE);
+    // A pop-out has no controls to set these, so it takes the other window's.
+    const scale = synced?.scale ?? scaleOwn;
 
     // The same controls the vehicle-driven curves use, from the same module —
     // two views computing air density slightly differently would be invisible
     // until someone compared one car in both.
-    const conditions = useViewingConditions();
+    const conditions = useViewingConditions(synced?.conditions ?? null);
     const {
         densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum,
         gradeGainFtNum, gradeDistanceMilesNum,
@@ -227,14 +247,25 @@ export default function EpaCurveExplorer() {
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
     const [urlCopied, setUrlCopied] = useState(false);
 
+    // Tell App what is on screen so it can broadcast it to a pop-out. Keyed on the
+    // serialised state because `conditions.values` is a new object every render,
+    // which would otherwise report on every render.
+    const reportKey = JSON.stringify({ selected, yAxis, conditions: conditions.values, scale });
     useEffect(() => {
+        if (!onStateChange || presentationMode) return;
+        onStateChange(JSON.parse(reportKey));
+    }, [reportKey, onStateChange, presentationMode]);
+    useEffect(() => () => { onStateChange?.(null); }, [onStateChange]);
+
+    useEffect(() => {
+        if (presentationMode) return;   // a pop-out does not manage its own URL
         const p = new URLSearchParams(window.location.search);
         p.set('tab', 'epa');
         p.set('sub', 'curves');
         if (selected.length) p.set('c', selected.join(','));
         if (yAxis !== 'kwh100mi') p.set('cy', yAxis);
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [selected, yAxis]);
+    }, [selected, yAxis, presentationMode]);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -374,9 +405,9 @@ export default function EpaCurveExplorer() {
     if (error) return <div className="empty-state">Certification records could not be loaded.</div>;
 
     return (
-        <div className="stats-view">
-            <div className="chart-layout">
-                <aside className="chart-rail">
+        <div className={presentationMode ? undefined : 'stats-view'}>
+            <div className={presentationMode ? undefined : 'chart-layout'}>
+                {!presentationMode && <aside className="chart-rail">
                     {/* What this view is, beside its sibling for the selected vehicles
                         (#338): the two share a model and differ in scope. */}
                     <p className="text-note">Efficiency against speed, modeled from EPA certification data, for any configuration. No vehicle, selection or tests.</p>
@@ -460,9 +491,9 @@ export default function EpaCurveExplorer() {
                             colors={colorByKey}
                         />
                     </div>
-                </aside>
+                </aside>}
 
-                <div className="chart-main">
+                <div className={presentationMode ? undefined : 'chart-main'}>
                     {plotted.length === 0 ? (
                         <div className="empty-state">Choose one or more certification records to plot.</div>
                     ) : (
@@ -472,7 +503,7 @@ export default function EpaCurveExplorer() {
                                 subtitle={plotSubtitle}
                                 preview={preview}
                                 onDismissPreview={dismissPreview}
-                                exportControls={(
+                                exportControls={!presentationMode && (
                                     <>
                                         <button
                                             onClick={() => {
@@ -496,7 +527,7 @@ export default function EpaCurveExplorer() {
                                     </>
                                 )}
                             >
-                                <div style={{ height: 460, position: 'relative' }}>
+                                <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460, position: 'relative' }}>
                                     <canvas ref={canvasRef} />
                                 </div>
                             </PlotFrame>
@@ -546,13 +577,13 @@ export default function EpaCurveExplorer() {
                                 </div>
                             )}
 
-                            <AxisScaleControls
+                            {!presentationMode && <AxisScaleControls
                                 xMin={scale.xMin} xMax={scale.xMax}
                                 yMin={scale.yMin} yMax={scale.yMax}
                                 xAxisLabel={`Speed (${speedLabel(units)})`}
                                 yAxisLabel={`${axis.label} (${axis.unit})`}
                                 onChange={(key, value) => setScale(p => ({ ...p, [key]: value }))}
-                            />
+                            />}
                         </>
                     )}
                 </div>
