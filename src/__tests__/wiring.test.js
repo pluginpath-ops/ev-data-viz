@@ -774,7 +774,8 @@ describe('the seams that broke before', () => {
         expect(app, 'EPA\'s own sub-tabs are its All EVs section').toMatch(/group: 'All EVs'/);
         expect(app, 'a tab\'s sub-nav must carry the chart modes under it').toMatch(/\.\.\.chartModesUnder\(parentStrip\.tab\)\.map/);
         expect(app).toMatch(/epa:\s+\{ tab: 'epa'/);
-        expect(app, 'a chart mode keeps its pop-out wherever it is drawn').toMatch(/end=\{activeChartCategory && popoutButton\}[\s\S]*end=\{activeChartCategory && popoutButton\}/);
+        expect(app, 'a chart mode keeps its pop-out wherever it is drawn').toMatch(/end=\{showsPopout && popoutButton\}[\s\S]*end=\{showsPopout && popoutButton\}/);
+        expect(app, 'and showsPopout covers every chart mode').toMatch(/const showsPopout = Boolean\(activeChartCategory\)/);
         expect(read('src/components/shell/SubTabStrip.jsx'), 'a sub-tab\'s description is its tooltip').toMatch(/title=\{description\}/);
     });
 
@@ -1534,5 +1535,27 @@ describe('Road Trip pairings are selected and colored apart (#379)', () => {
         expect(road).toMatch(/\bpairColors\b/);
         expect(road).toMatch(/pairPicks\[entry\.key\]/);
         expect(selector).toMatch(/pairColors \? \{ \.\.\.run, id: rowKey\(partnerId\) \} : run/);
+    });
+});
+
+describe('the EPA curve explorer follows the pop-out channel (#259)', () => {
+    const app = read('src/App.jsx');
+    const sync = read('src/hooks/useChartSync.js');
+
+    it('the explorer reports its state up, and App broadcasts it', () => {
+        expect(read('src/components/epa/EpaSection.jsx')).toMatch(/<EpaCurveExplorer onStateChange=\{onExplorerState\}/);
+        expect(app).toMatch(/<EpaSection subtab=\{epaSubtab\} onExplorerState=\{setEpaExplorer\}/);
+        expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, sendState\]/);
+    });
+
+    it('the channel carries it both ways, null included', () => {
+        expect(sync).toMatch(/if \('epaExplorer' in data\) setEpaExplorer\(data\.epaExplorer\)/);
+        expect((sync.match(/epaExplorer,\n/g) || []).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('the pop-out draws it, and the main tab offers the button on it', () => {
+        expect(read('src/components/PopoutView.jsx')).toMatch(/<EpaCurveExplorer presentationMode synced=\{epaExplorer\}/);
+        expect(app).toMatch(/\(view === 'epa' && epaSubtab === 'curves'\)/);
+        expect(app).toMatch(/epaExplorer=\{epaExplorer\}/);
     });
 });

@@ -8,6 +8,7 @@ import VehicleTable from './VehicleTable';
 import EpaCurvesView from './EpaCurvesView';
 import PerformanceCompareView from './PerformanceCompareView';
 import PerformanceCurveView from './PerformanceCurveView';
+import EpaCurveExplorer from './epa/curves/EpaCurveExplorer';
 
 /**
  * Minimal fullscreen chart-only view rendered in the pop-out tab.
@@ -16,8 +17,19 @@ import PerformanceCurveView from './PerformanceCurveView';
  */
 export default function PopoutView({
     vehicles, selectedVehicles, chartMode, chartConfig,
-    setChartConfig, compareConfig, roadTripConfig, epaConfig, pairings, onUpdateRunColor,
+    setChartConfig, compareConfig, roadTripConfig, epaConfig, pairings, onUpdateRunColor, epaExplorer,
 }) {
+    // The EPA curve explorer is not a chart mode and needs no vehicle selection,
+    // so when the main tab is on it nothing below applies (#259).
+    if (epaExplorer) {
+        return (
+            <div className="popout-root">
+                <div className="popout-watermark">EVBench | Live</div>
+                <EpaCurveExplorer presentationMode synced={epaExplorer} />
+            </div>
+        );
+    }
+
     return (
         <div className="popout-root">
             <div className="popout-watermark">EVBench | Live</div>

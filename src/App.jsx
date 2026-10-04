@@ -22,6 +22,7 @@ import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
 import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/AdminView';
 import Playground from './components/playground/Playground';
+import { explorerStateFromUrl } from './components/epa/curves/EpaCurveExplorer';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
 import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
 import SpecChartKind from './components/SpecChartKind';
@@ -166,6 +167,16 @@ export default function App() {
     // chart session rather than per-view, so two charts on one screen can never
     // disagree about what "range" means. See utils/pairings.js.
     const [pairings, setPairings] = useState({});
+    // The EPA curve explorer's selection, Y axis and viewing conditions, reported
+    // up by the explorer while it is open so a pop-out can follow it (#259).
+    // null when it is not on screen. A pop-out is seeded from its own URL, so it
+    // draws the explorer from the first frame instead of waiting for a message.
+    const [epaExplorer, setEpaExplorer] = useState(() => {
+        const p = new URLSearchParams(window.location.search);
+        return p.get('popout') === '1' && p.get('tab') === 'epa' && p.get('sub') === 'curves'
+            ? { ...explorerStateFromUrl(), conditions: null }
+            : null;
+    });
     const [epaConfig, setEpaConfig] = useState({
         yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null,
         // Which curves are drawn, and any colors overridden for them (#221).
@@ -288,8 +299,8 @@ export default function App() {
     };
 
     const { isPopout, sendState } = useChartSync({
-        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings,
-        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings,
+        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer,
+        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer,
     });
 
     /**
@@ -831,7 +842,7 @@ export default function App() {
     // ── Broadcast chart state to any open pop-out windows ───────────────────
     useEffect(() => {
         sendState();
-    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, sendState]);
+    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, sendState]);
 
     // The header tab a view is shown under (#338): a vehicle's page (the
     // `runs` view) is under Vehicles & Specs; a chart category drawn under
@@ -846,6 +857,10 @@ export default function App() {
             // A sub-tab opens its own top level: Platforms is the list.
             select: (key) => { setReferenceSubtab(key); setReferencePlatformId(null); setReferenceTopic(null); } },
     }[headerTab] ?? null;
+
+    // Where the pop-out is offered: any chart mode, and the EPA curve explorer,
+    // which is a sub-tab rather than a mode but follows the same channel (#259).
+    const showsPopout = Boolean(activeChartCategory) || (view === 'epa' && epaSubtab === 'curves');
 
     // The pop-out, at the right end of whichever sub-nav a chart mode is drawn in.
     const popoutButton = (
@@ -886,6 +901,7 @@ export default function App() {
                 roadTripConfig={roadTripConfig}
                 epaConfig={epaConfig}
                 pairings={pairings}
+                epaExplorer={epaExplorer}
             />
         );
     }
@@ -963,7 +979,7 @@ export default function App() {
                                 if (view !== parentStrip.tab) navigateTo(parentStrip.tab);
                                 parentStrip.select(key);
                             }}
-                            end={activeChartCategory && popoutButton}
+                            end={showsPopout && popoutButton}
                         />
                     ) : (
                         <SubTabStrip
@@ -974,7 +990,7 @@ export default function App() {
                             }))}
                             activeKey={chartMode}
                             onSelect={handleChartModeChange}
-                            end={activeChartCategory && popoutButton}
+                            end={showsPopout && popoutButton}
                         />
                     )}
                     {!SELECTION_INERT_VIEWS.has(view) && <div className="selected-strip">
@@ -1250,7 +1266,7 @@ export default function App() {
                     {activeChartCategory && chartMode === 'specstable' && (
                         <VehicleTable onOpenTest={openTest} filters={vehicleFilters} onFiltersChange={setVehicleFilters} />
                     )}
-                    {view === 'epa' && <EpaSection subtab={epaSubtab} />}
+                    {view === 'epa' && <EpaSection subtab={epaSubtab} onExplorerState={setEpaExplorer} />}
                     {view === 'reference' && (
                         <ReferenceSection
                             subtab={referenceSubtab}
