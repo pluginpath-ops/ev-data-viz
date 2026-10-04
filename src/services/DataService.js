@@ -162,7 +162,7 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
  * getModeledEfficiencyPreview, so an explainer's preview can never be built
  * from less of the record than the chart it links to.
  */
-const EPA_GROUP_FIELDS = 'test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))';
+const EPA_GROUP_FIELDS = 'test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi)), epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(adjustment_signature)';
 
 class DataService {
   constructor() {
@@ -2605,7 +2605,8 @@ class DataService {
                   total_dc_energy_kwh, ac_recharge_kwh,
                   cd_range_combined_calc, cd_range_hwy_calc,
                   epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
-        epa_vehicle_mappings(id, confidence, vehicles(id, name, year))
+        epa_vehicle_mappings(id, confidence, vehicles(id, name, year)),
+        epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(adjustment_signature)
       `)
       .order('test_group_id', { ascending: true }));
   }
@@ -2639,7 +2640,7 @@ class DataService {
                   epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
         epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(
           division, carline, carline_class, drive_desc, nominal_pack_kwh,
-          label_comb_range_mi, label_comb_mpge, model_year
+          label_comb_range_mi, label_comb_mpge, model_year, adjustment_signature
         )
       `)
       .order('test_group_id');

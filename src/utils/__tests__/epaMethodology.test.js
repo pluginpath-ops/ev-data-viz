@@ -300,3 +300,26 @@ describe('incomplete bags (#222)', () => {
         expect(Math.round(m.cycles.hwy.rangeUnadjMi)).toBe(392);
     });
 });
+
+describe('describeAdjustment (#222)', () => {
+    it('says where the factor came from and what the guide says it is', async () => {
+        const { describeAdjustment } = await import('../epaMethodology');
+        const line = describeAdjustment({ value: 0.7051, source: 'guide', signature: 'per-vehicle', declared: 'Electric Vehicle 5-cycle label' });
+        expect(line).toContain('× 0.7051');
+        expect(line).toContain('from the Fuel Economy Guide');
+        expect(line).toContain('one factor for this vehicle');
+        expect(line).toContain('Electric Vehicle 5-cycle label');
+    });
+
+    it('owns up to the default when no guide factor is linked', async () => {
+        const { describeAdjustment } = await import('../epaMethodology');
+        expect(describeAdjustment({ value: 0.7, source: 'default', signature: null, declared: null }))
+            .toContain('the default');
+    });
+
+    it('warns that a per-cycle row is only approximated', async () => {
+        const { describeAdjustment } = await import('../epaMethodology');
+        expect(describeAdjustment({ value: 0.69, source: 'guide', signature: 'per-cycle', declared: null }))
+            .toContain('one factor to both cycles');
+    });
+});

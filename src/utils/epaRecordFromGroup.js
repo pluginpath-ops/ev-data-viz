@@ -191,6 +191,9 @@ export function epaRecordFromGroup(group, meta = {}) {
         // simply falls back to the flat factor there.
         adjustmentFactor: num(group.label_adjustment_factor),
         calcApproach:     group.label_calc_approach ?? null,
+        // Through the linked guide row rather than copied onto the group: it is
+        // EPA's statement about that row, and a copy could go stale.
+        adjustmentSignature: group.epa_fe_guide?.adjustment_signature ?? null,
         adjustmentMethod: group.label_calc_approach ?? null,
     };
 
