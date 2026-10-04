@@ -26,7 +26,8 @@ function checkPair(flags, kind, unit, city, hwy, comb) {
     if (ratio < HWY_CITY_RATIO_MIN || ratio > HWY_CITY_RATIO_MAX) {
         flags.push({
             kind: `${kind}-ratio`,
-            text: `Highway ${kind} (${hwy} ${unit}) is ${ratio.toFixed(2)}× city (${city} ${unit}); the fleet sits between ${HWY_CITY_RATIO_MIN} and ${HWY_CITY_RATIO_MAX}.`,
+            text: `The provided highway ${kind} (${hwy} ${unit}) to city ${kind} (${city} ${unit}) ratio is not plausible. `
+                + `The ratio of ${ratio.toFixed(2)} does not match the rest of the fleet at ${HWY_CITY_RATIO_MIN} to ${HWY_CITY_RATIO_MAX}.`,
         });
     }
     if (comb != null) {
@@ -35,7 +36,7 @@ function checkPair(flags, kind, unit, city, hwy, comb) {
         if (comb < lo || comb > hi) {
             flags.push({
                 kind: `${kind}-combined`,
-                text: `Combined ${kind} (${comb} ${unit}) is outside city (${city}) and highway (${hwy}).`,
+                text: `The provided combined ${kind} (${comb} ${unit}) is not plausible: it falls outside the city (${city} ${unit}) and highway (${hwy} ${unit}) figures it should sit between.`,
             });
         }
     }

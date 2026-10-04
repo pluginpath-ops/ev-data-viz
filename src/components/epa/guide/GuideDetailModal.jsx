@@ -78,8 +78,8 @@ export default function GuideDetailModal({ row, vehicles, testGroupIds = [], con
 
                     {guidePlausibilityFlags(row).length > 0 && (
                         <div className="guide-warning">
-                            This row contradicts itself, and EPA published it that way — treat its
-                            figures with care:
+                            Based on automated checks, the published EPA data for this vehicle appears to
+                            be incorrect. There may be corrected data available from the EPA.
                             <ul>
                                 {guidePlausibilityFlags(row).map(f => <li key={f.kind}>{f.text}</li>)}
                             </ul>
