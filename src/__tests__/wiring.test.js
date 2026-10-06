@@ -1593,3 +1593,12 @@ describe('a direct link keeps the parameters its view reads for itself (#386)', 
         expect(guard, 'and come before the write').toBeLessThan(write);
     });
 });
+
+describe('the Fuel Economy Guide importer recovers from a renamed column (#214)', () => {
+    it('the parser resolves columns, and the importer shows what it found', () => {
+        expect(read('src/utils/parseFeGuide.js')).toMatch(/resolveColumns\(headers, \[\.\.\.REQUIRED_COLUMNS, \.\.\.OPTIONAL_COLUMNS\]\)/);
+        const ui = read('src/components/admin/FeGuideImport.jsx');
+        expect(ui, 'a hint for a required column that is missing').toMatch(/parsed\.suggestions\?\.find/);
+        expect(ui, 'and a note for a column read under another name').toMatch(/parsed\?\.renamed\?\.length > 0/);
+    });
+});

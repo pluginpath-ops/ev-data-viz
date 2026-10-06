@@ -39,6 +39,7 @@
 
 import Papa from 'papaparse';
 import { rangePlausibility } from './feGuidePlausibility';
+import { resolveColumns, suggestColumns } from './feGuideColumns';
 
 /** Columns without which a row cannot be interpreted at all — a hard failure. */
 export const REQUIRED_COLUMNS = [
@@ -166,7 +167,7 @@ export function adjustmentSignature(cityRatio, hwyRatio) {
 }
 
 /** One guide row, mapped and derived. */
-function mapRow(row) {
+function mapRow(row, original = row) {
     const unadjCity = num(row, 'City Unadj FE - Conventional Fuel');
     const unadjHwy  = num(row, 'Hwy Unadj FE - Conventional Fuel');
     const adjCity   = num(row, 'City Unrd Adj FE - Conventional Fuel');
@@ -234,8 +235,11 @@ function mapRow(row) {
         // Empty values are dropped: roughly half the 168 columns are blank on
         // any given row, and a blank answers no question. What is kept is every
         // value the row actually carried.
+        //
+        // From the row as the file had it, under EPA's own headings: `row` may
+        // carry copies under the names this parser reads (see feGuideColumns).
         raw: Object.fromEntries(
-            Object.entries(row).filter(([k, v]) => k && String(v ?? '').trim() !== ''),
+            Object.entries(original).filter(([k, v]) => k && String(v ?? '').trim() !== ''),
         ),
     };
 }
@@ -245,14 +249,18 @@ function mapRow(row) {
  *
  * @param {string} csvText
  * @returns {{ rows: Array, skipped: { nonEv: number, duplicateUnit: number, unusable: number },
- *             missingColumns: string[], warnings: string[], errors: string[] }}
- *          `missingColumns` is fatal and leaves `rows` empty; `warnings` names
- *          optional columns this file lacks, which import fine but arrive null.
+ *             missingColumns: string[], suggestions: Array, renamed: Array,
+ *             warnings: string[], errors: string[] }}
+ *          `missingColumns` is fatal and leaves `rows` empty, and `suggestions`
+ *          names the closest header in the file for each (a hint, never applied);
+ *          `renamed` lists columns found under a slightly different name and read
+ *          anyway (feGuideColumns); `warnings` names optional columns this file
+ *          lacks, which import fine but arrive null.
  *          `rows` is empty when required columns are absent — a file whose
  *          headers we do not recognise is reported, never partially imported.
  */
 export function parseFeGuide(csvText) {
-    const empty = { rows: [], skipped: { nonEv: 0, duplicateUnit: 0, unusable: 0 }, flagged: [] };
+    const empty = { rows: [], skipped: { nonEv: 0, duplicateUnit: 0, unusable: 0 }, flagged: [], suggestions: [], renamed: [] };
 
     const parsed = Papa.parse(String(csvText ?? ''), {
         header: true,
@@ -263,19 +271,39 @@ export function parseFeGuide(csvText) {
     });
 
     const headers = parsed.meta?.fields ?? [];
-    const missingColumns = REQUIRED_COLUMNS.filter(c => !headers.includes(c));
+
+    // Which header in this file is each column the parser reads (#214). Exact
+    // names first, then known past names, then the same name apart from case,
+    // spacing and punctuation — so a rename of that kind imports unchanged,
+    // and says so below.
+    const resolved = resolveColumns(headers, [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS]);
+    const missingColumns = REQUIRED_COLUMNS.filter(c => resolved.missing.includes(c));
+    const claimed = Object.values(resolved.found);
     if (missingColumns.length) {
         // Hard fail rather than import what is recognisable: a guide missing
         // its range column would import as a list of names with no figures,
-        // which looks like a successful import of useless data.
-        return { ...empty, missingColumns, warnings: [], errors: [] };
+        // which looks like a successful import of useless data. The closest
+        // headers are named, never applied: a wrong pairing imports a
+        // plausible column of the wrong figures.
+        return {
+            ...empty, missingColumns, warnings: [], errors: [],
+            suggestions: suggestColumns(missingColumns, headers, claimed),
+            renamed: resolved.renamed,
+        };
     }
 
     // Survivable absences, named so the import can say what this file will not
-    // carry instead of leaving a column of nulls to be discovered later.
-    const warnings = OPTIONAL_COLUMNS
-        .filter(c => !headers.includes(c))
-        .map(c => `Column not found, values will be empty: "${c}"`);
+    // carry instead of leaving a column of nulls to be discovered later. A
+    // close header in the file is named too: it is probably the same column.
+    const missingOptional = OPTIONAL_COLUMNS.filter(c => resolved.missing.includes(c));
+    const hints = new Map(suggestColumns(missingOptional, headers, claimed).map(h => [h.column, h.closest]));
+    const warnings = missingOptional.map(c => hints.has(c)
+        ? `Column not found, values will be empty: "${c}" (the closest in the file is "${hints.get(c)}")`
+        : `Column not found, values will be empty: "${c}"`);
+
+    // Columns read under a different name, so a rename is visible rather than
+    // quietly absorbed.
+    const renamed = resolved.renamed;
 
     const rows = [];
     const skipped = { nonEv: 0, duplicateUnit: 0, unusable: 0 };
@@ -283,13 +311,17 @@ export function parseFeGuide(csvText) {
     const flagged = [];
 
     for (const raw of parsed.data) {
-        const fuel = (str(raw, 'Fuel Usage Desc - Conventional Fuel') ?? '').toLowerCase();
+        // The row under the names this parser reads; `raw` keeps EPA's own.
+        const canon = renamed.length
+            ? { ...raw, ...Object.fromEntries(renamed.map(r => [r.column, raw[r.header]])) }
+            : raw;
+        const fuel = (str(canon, 'Fuel Usage Desc - Conventional Fuel') ?? '').toLowerCase();
         if (fuel !== EV_FUEL) { skipped.nonEv++; continue; }
 
-        const unit = (str(raw, 'Fuel Unit Desc - Conventional Fuel') ?? '').toLowerCase();
+        const unit = (str(canon, 'Fuel Unit Desc - Conventional Fuel') ?? '').toLowerCase();
         if (unit !== MPGE_UNIT) { skipped.duplicateUnit++; continue; }
 
-        const row = mapRow(raw);
+        const row = mapRow(canon, raw);
         // A row missing any part of the key, or its range, cannot be stored or
         // linked. modelTypeIndex counts: without it two Audi configurations at
         // different ranges collapse into one.
@@ -324,5 +356,5 @@ export function parseFeGuide(csvText) {
         rows.push(row);
     }
 
-    return { rows, skipped, flagged, missingColumns: [], warnings, errors: parsed.errors?.map(e => e.message) ?? [] };
+    return { rows, skipped, flagged, missingColumns: [], suggestions: [], renamed, warnings, errors: parsed.errors?.map(e => e.message) ?? [] };
 }

@@ -115,8 +115,38 @@ export default function FeGuideImport() {
 
             {parsed?.missingColumns?.length > 0 && (
                 <ul className="mt-2 text-xs text-red-500 list-disc pl-5">
-                    {parsed.missingColumns.map(c => <li key={c}>{c}</li>)}
+                    {parsed.missingColumns.map(c => {
+                        // The closest header in the file, named for a person to
+                        // judge. It is never applied: a wrong pairing would import
+                        // a plausible column of the wrong figures (#214).
+                        const hint = parsed.suggestions?.find(s => s.column === c);
+                        return (
+                            <li key={c}>
+                                {c}
+                                {hint && (
+                                    <span className="text-secondary">
+                                        {' '}— the closest header in this file is “{hint.closest}”
+                                    </span>
+                                )}
+                            </li>
+                        );
+                    })}
                 </ul>
+            )}
+
+            {/* Columns EPA named slightly differently, read anyway. Said out loud
+                so a rename is noticed rather than quietly absorbed. */}
+            {parsed?.renamed?.length > 0 && !parsed.missingColumns?.length && (
+                <div className="mt-3">
+                    <p className="text-xs font-medium text-secondary">
+                        {parsed.renamed.length} column(s) found under a slightly different name:
+                    </p>
+                    <ul className="text-xs text-secondary list-disc pl-5 mt-1">
+                        {parsed.renamed.map(r => (
+                            <li key={r.column}>“{r.header}” was read as “{r.column}”</li>
+                        ))}
+                    </ul>
+                </div>
             )}
 
             {/* Survivable absences. Named because the alternative is discovering
