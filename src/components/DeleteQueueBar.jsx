@@ -8,6 +8,10 @@
  *   Shows a draining CSS progress bar and an Undo button. The actual
  *   DB delete fires after the 5 s window if Undo is not clicked.
  *
+ * `notes` are consequences worth reading before committing (what a delete does
+ * to vehicles that inherit from the one going); they sit above the buttons in
+ * queue mode.
+ *
  * Returns null when there is nothing to show.
  */
 export default function DeleteQueueBar({
@@ -18,6 +22,7 @@ export default function DeleteQueueBar({
     secondsLeft,
     onUndo,
     noun = 'item',
+    notes = [],
 }) {
     const plural = (n) => `${n} ${noun}${n === 1 ? '' : 's'}`;
 
@@ -50,6 +55,11 @@ export default function DeleteQueueBar({
     if (pendingCount > 0) {
         return (
             <div className="fixed-action-bar is-danger z-50">
+                {notes.length > 0 && (
+                    <ul className="delete-queue-notes page-container">
+                        {notes.map(note => <li key={note}>{note}</li>)}
+                    </ul>
+                )}
                 <div className="page-container py-3 flex items-center gap-4">
                     <span className="text-red-700 font-medium flex-1">
                         🗑 {plural(pendingCount)} queued for deletion
