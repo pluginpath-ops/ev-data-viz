@@ -27,6 +27,7 @@ import TestCounts from './vehicles/TestCounts';
 import LazyBoundary from './LazyBoundary';
 import { EditVehicleForm, ImportVehiclesModal } from './lazyComponents';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
+import { deletionImpact, impactLines } from '../utils/vehicleDeletion';
 
 /**
  * The card's EPA range figure: the resolved range, or — with several EPA
@@ -151,6 +152,13 @@ export default function VehiclesView({
         pendingDeletes, committedDeletes, undoState, secondsLeft,
         queueDelete, restoreItem, clearQueue, commitDeletes, undoDelete,
     } = useDeleteQueue(onDelete);
+
+    // What the queued deletes do to vehicles that inherit from them, said before
+    // the delete rather than found out after.
+    const deleteNotes = useMemo(
+        () => impactLines(deletionImpact(vehicles, [...pendingDeletes])),
+        [vehicles, pendingDeletes],
+    );
 
     // Open edit modal for a vehicle duplicated from the Tests tab
     useEffect(() => {
@@ -981,6 +989,7 @@ export default function VehiclesView({
             )}
 
             <DeleteQueueBar
+                notes={deleteNotes}
                 pendingCount={pendingDeletes.size}
                 onClearQueue={clearQueue}
                 onCommit={commitDeletes}

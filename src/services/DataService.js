@@ -2,6 +2,7 @@ import { getSupabase } from './supabase';
 import { RETIRED_RUN_COLOR } from '../utils/colorUtils';
 import { fetchSiteSettings, updateCachedSetting, MODEL_CONSTANTS_KEY } from './siteSettings';
 import { vehicleLabel } from '../utils/specHelpers';
+import { passDown } from '../utils/vehicleDeletion';
 import { roundTo, } from '../utils/unitConversions';
 import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
@@ -1044,17 +1045,30 @@ class DataService {
     });
   }
 
+  /**
+   * Delete a vehicle, passing its own specs, color, photo and tags to the
+   * vehicles that inherit from it and re-pointing them at its source, so none
+   * of them changes what it shows (migration 075, utils/vehicleDeletion.js).
+   */
   async deleteVehicle(vehicleId) {
     if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
       const data = saved ? JSON.parse(saved) : { vehicles: [], selectedVehicles: [] };
-      data.vehicles = data.vehicles.filter(v => v.id !== vehicleId);
+      data.vehicles = passDown(data.vehicles, vehicleId);
       data.selectedVehicles = data.selectedVehicles.filter(id => id !== vehicleId);
       localStorage.setItem('evData', JSON.stringify(data));
       return;
     }
-    const { error } = await getSupabase().from('vehicles').delete().eq('id', vehicleId);
-    if (error) throw error;
+    const { error } = await getSupabase().rpc('delete_vehicle_passing_down', { p_vehicle_id: vehicleId });
+    if (error) {
+      // PGRST202: the function is not there yet. Falling back to a plain delete
+      // would orphan the vehicle's variants, which is what the function exists
+      // to prevent, so say what to do instead.
+      if (error.code === 'PGRST202') {
+        throw new Error('Migration 075 has not been applied, so a vehicle cannot be deleted without orphaning the vehicles that inherit from it.');
+      }
+      throw error;
+    }
   }
 
   async addRun(vehicleId, run) {

@@ -42,11 +42,36 @@ export function fieldShortLabel(path) {
     return formatCustomKey(path.split('.').pop());
 }
 
+// ── Model years ──────────────────────────────────────────────────────────────
+
+/**
+ * A vehicle's model years as [first, last], or null when it names none.
+ * "2025" → [2025, 2025]; "2022-2023" and "2022-23" → [2022, 2023]. A year the
+ * text does not say is null, and null overlaps everything: a row with no year
+ * can only be told apart by its name, as before.
+ */
+export function yearSpan(year) {
+    const m = String(year ?? '').match(/(\d{4})\s*[-–]\s*(\d{2,4})?|(\d{4})/);
+    if (!m) return null;
+    const first = Number(m[1] ?? m[3]);
+    if (m[1] === undefined || m[2] === undefined) return [first, first];
+    const last = m[2].length === 2 ? Math.floor(first / 100) * 100 + Number(m[2]) : Number(m[2]);
+    return [first, Math.max(first, last)];
+}
+
+/** Whether two year spans share a model year. A missing span overlaps anything. */
+export function yearsOverlap(a, b) {
+    return !a || !b || (a[0] <= b[1] && b[0] <= a[1]);
+}
+
 // ── Matching ─────────────────────────────────────────────────────────────────
 
 /**
  * Find the existing vehicle a row refers to: explicit id wins, then an exact
- * (case-insensitive) name match, then a full make/model/trim/year match.
+ * (case-insensitive) name match in an overlapping model year, then a full
+ * make/model/trim/year match. A name may repeat across model years — "Model 3
+ * LR" in 2021 and in 2022-23 are two vehicles — so a name alone matches only a
+ * vehicle sold in the same year.
  * Returns { vehicle, by } or { vehicle: null }.
  */
 function matchExisting(row, vehicles) {
@@ -55,7 +80,9 @@ function matchExisting(row, vehicles) {
         return { vehicle: byId ?? null, by: byId ? 'id' : null, missingId: !byId };
     }
     if (row.core.name) {
-        const byName = vehicles.find(v => lower(v.name) === lower(row.core.name));
+        const span = yearSpan(row.core.year);
+        const byName = vehicles.find(v =>
+            lower(v.name) === lower(row.core.name) && yearsOverlap(span, yearSpan(v.year)));
         if (byName) return { vehicle: byName, by: 'name' };
     }
     const { make, model, trim, year } = row.core;
@@ -83,9 +110,16 @@ function resolveInheritRef(ref, vehicles, rowsByName) {
         return byId ? { vehicleId: byId.id } : { error: `No vehicle with id ${ref}` };
     }
     const key = lower(ref);
-    const byName = vehicles.find(v => lower(v.name) === key || lower(vehicleLabel(v)) === key);
-    if (byName) return { vehicleId: byName.id };
-    if (rowsByName.has(key)) return { rowIndex: rowsByName.get(key) };
+    // A name can repeat across model years, so a bare name that matches more
+    // than one vehicle is ambiguous. The label ("2021 Model 3 LR") names one.
+    const existing = vehicles.filter(v => lower(v.name) === key || lower(vehicleLabel(v)) === key);
+    const inFile = rowsByName.get(key) ?? [];
+    const count = existing.length || inFile.length;
+    if (existing.length > 1 || (!existing.length && inFile.length > 1)) {
+        return { error: `"${ref}" matches ${count} vehicles — add the model year, e.g. "2021 ${ref}"` };
+    }
+    if (existing.length) return { vehicleId: existing[0].id };
+    if (inFile.length) return { rowIndex: inFile[0] };
     return { error: `"${ref}" matches no existing vehicle or row in this file` };
 }
 
@@ -166,13 +200,25 @@ function mergeSpecs(existingSpecs, row) {
  * (migration 072 not applied) ignores platform columns with a warning.
  */
 export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags = [], platforms = [], platformsAvailable = true } = {}) {
-    // Name → row index, so inherits_from can point at a vehicle created by this same file.
+    // Name → row indexes, so inherits_from can point at a vehicle created by this
+    // same file. A row is reachable by its name and by its label ("2021 Model 3
+    // LR", with or without " · trim"), since names may repeat across years.
     const rowsByName = new Map();
+    const addRowKey = (key, i) => {
+        if (!rowsByName.has(key)) rowsByName.set(key, []);
+        rowsByName.get(key).push(i);
+    };
     rows.forEach((row, i) => {
-        if (row.core.name) rowsByName.set(lower(row.core.name), i);
+        const { name, year, trim } = row.core;
+        if (!name) return;
+        addRowKey(lower(name), i);
+        if (year) {
+            addRowKey(lower(`${year} ${name}`), i);
+            if (trim) addRowKey(lower(`${year} ${name} · ${trim}`), i);
+        }
     });
 
-    const seenNames = new Set();
+    const seenNames = new Map(); // lowercased name → year spans already used in this file
     const newManufacturers = new Map(); // lowercased name → display name
     const newTags = new Map();
     const newPlatforms = new Map();     // `${kind}:${lowercased name}` → { kind, name }
@@ -188,11 +234,16 @@ export function buildImportPlan(rows, { vehicles = [], manufacturers = [], tags 
             || [row.core.year, row.manufacturerName || row.core.make, row.core.model, row.core.trim].filter(Boolean).join(' ')
             || (existing ? vehicleLabel(existing) : `Row ${row.index + 1}`);
 
-        // Duplicate names inside one file would race each other on create.
+        // Two rows with one name and an overlapping model year would race each
+        // other on create. The same name in another year is a different vehicle.
         const nameKey = lower(row.core.name);
         if (nameKey) {
-            if (seenNames.has(nameKey)) errors.push('Duplicate of an earlier row with the same name.');
-            else seenNames.add(nameKey);
+            const span = yearSpan(row.core.year);
+            const seen = seenNames.get(nameKey) ?? [];
+            if (seen.some(s => yearsOverlap(s, span))) {
+                errors.push('Duplicate of an earlier row with the same name and model year.');
+            }
+            seenNames.set(nameKey, [...seen, span]);
         }
 
         // ── Manufacturer ──

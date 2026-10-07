@@ -207,6 +207,7 @@ status and is never chrome.
 | A curator's recorded decision that something needs no action, still visible under a filter | **a skip** — skipped, un-skip | `epa_test_groups.fe_guide_skipped_at` (link sweep), `data_check_skips` (Data Checks), `.skip-ask` |
 | A vehicle whose specs, tests, color, photo and tags come from another vehicle until set on it — the same car with a stated difference (battery, weight, wheels) | **a variant**; it **inherits from** its source. Created with **＋ Variant** | `spec_source_vehicle_id`, [vehicleInheritance.js](../src/utils/vehicleInheritance.js), [NewVariantButton.jsx](../src/components/NewVariantButton.jsx) |
 | What a variant shows that is not set on it | **inherited** — "Inherited from *source*" | `vehicle.inheritedFrom`, `.vehicle-tag.is-inherited` |
+| What deleting a source does to its variants: its own values are copied onto each variant that has none of its own, and the variant is re-pointed at the source's source, so nothing the variant shows changes | **passed down** — a deleted source's values are passed down to its variants, as an inheritance passes to its children. Not "orphaning" (what the old foreign key did) and not "push down" or "merge down", both considered and set aside as jargon with the wrong picture | `delete_vehicle_passing_down()` (migration 075), [vehicleDeletion.js](../src/utils/vehicleDeletion.js) `passDown` |
 | EPA configurations offered to a curator on a vehicle's EPA section — drawn from a variant's source, else from the vehicle's own make and model — each a one-click link | **suggested configurations** — "Suggested from *source*", "Suggested for *vehicle*" | [variantEpaSuggestions.js](../src/utils/variantEpaSuggestions.js), [VariantEpaSuggestions.jsx](../src/components/epa/VariantEpaSuggestions.jsx), `.config-suggestion` |
 | A vehicle's values as stored, before inheritance: what an editor reads and writes | **its own** color, photo, tags | `vehicle.own`, `ownValues()` |
 | A new vehicle holding its own duplicates of another's values and tests | **a copy** — "⧉ Copy" | `duplicateVehicle` |
@@ -232,6 +233,8 @@ uses "variant" loosely for the configurations one certification covers ("the
 20-inch variant"). That stays fine when qualified. Unqualified in UI text,
 "variant" means the vehicle record, so an EPA configuration is called a
 configuration.
+
+**A deleted source passes down.** Deleting a source copies its OWN values onto the variants that had none of their own and re-points them one level up, so a variant is never left showing an older figure, or none. The database refuses a delete that skips this (migration 075). Its tests cannot move: they are the deleted vehicle's own runs, and the variants stop showing them.
 
 **A variant points; a copy duplicates.** Change the source's photo, color,
 tags or a spec, and every variant that has not set its own shows the change.

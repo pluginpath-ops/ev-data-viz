@@ -962,6 +962,17 @@ body {
     color: var(--color-primary-text);
 }
 
+/* What a queued delete does to the vehicles that depend on it, read above the
+ * buttons that confirm it. Smaller than the bar's own message: it is detail
+ * the person came to the bar for, not the headline. */
+.delete-queue-notes {
+    @apply pt-3 space-y-1;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+}
+.delete-queue-notes li {
+    @apply list-disc ml-5;
+}
+
 /* A run's kind, as the pill that opens its title line.
  *
  * Charging and range are the one place in this app where two hues genuinely

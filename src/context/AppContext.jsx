@@ -13,6 +13,7 @@ import { dataService } from '../services/DataService';
 import { applyDefaultRun, clearDefaultRuns, isCompositeRun } from '../utils/runUtils';
 import { toSessionRow } from '../utils/testSessions';
 import { createWriteGuard } from '../utils/writeGuard';
+import { passDown } from '../utils/vehicleDeletion';
 
 const AppContext = createContext(null);
 
@@ -300,7 +301,9 @@ export function AppProvider({ children }) {
     const deleteVehicle = async (vehicleId) => {
         try {
             await dataService.deleteVehicle(vehicleId);
-            setVehicles(prev => prev.filter(v => v.id !== vehicleId));
+            // The same pass-down the database just did, so the variants show what
+            // the deleted source said without a refetch.
+            setVehicles(prev => passDown(prev, vehicleId));
             setSelectedVehicles(prev => prev.filter(id => id !== vehicleId));
         } catch (error) {
             logIfUnauthorized('delete_vehicle', 'vehicle', vehicleId, error);
