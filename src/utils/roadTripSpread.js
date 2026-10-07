@@ -12,7 +12,7 @@
  * Efficiency from measured energy only. Pricing an SoC window at a capacity
  * estimate would put a guess inside an observed spread.
  */
-import { filterRangeRuns } from './runUtils';
+import { visibleRangeTests } from './rangeTestSpread';
 import { miPerKwhFrom } from './rangeSource';
 import { correctionFactor } from './conditionCorrection';
 import { STANDARD_CONDITIONS } from '../constants/epa';
@@ -32,7 +32,9 @@ const ASSUMED_TEST_SPEED_MPH = 70;
  */
 export function spreadTestsFor(vehicle, { correctionMode = 'none', sessionOf = () => null } = {}) {
     const out = [];
-    for (const run of filterRangeRuns(vehicle?.runs)) {
+    // Hidden tests left out, as on the bar charts. Viewers never receive them;
+    // a contributor does, and must see the same spread a viewer would.
+    for (const run of visibleRangeTests(vehicle)) {
         const { miPerKwh, method } = miPerKwhFrom(run);
         if (method !== 'measured-energy' || !(miPerKwh > 0) || !Number.isFinite(miPerKwh)) continue;
         const ownSpeed = run.speed_mph || ASSUMED_TEST_SPEED_MPH;

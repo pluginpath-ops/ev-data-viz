@@ -49,3 +49,11 @@ describe('rangeBasesFor', () => {
         expect(visibleRangeTests(vehicle).map(r => r.id)).toEqual([1]);
     });
 });
+
+describe('spreadTestsFor (Road Trip)', () => {
+    it('leaves hidden tests out, as the bar charts do', async () => {
+        const { spreadTestsFor } = await import('../roadTripSpread');
+        const vehicle = { runs: [range(1), range(2, { isHidden: true }), range(3, { is_hidden: true })] };
+        expect(spreadTestsFor(vehicle).map(t => t.run.id)).toEqual([1]);
+    });
+});
