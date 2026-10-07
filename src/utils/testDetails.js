@@ -16,6 +16,7 @@
 import { REPORTED_RANGE_REASON } from './testedRange';
 import { fmtSpeed, fmtDistance } from './unitConversions';
 import { preconditionedFact } from './runPreconditioning';
+import { chargerClassFact } from './runChargerClass';
 
 /**
  * @typedef {Object} TestReference
@@ -99,6 +100,7 @@ export function chargeTimeTestReference(vehicle, tested, { from, to }, units = '
             ...commonFacts(run, units),
             fact(`${from}→${to}%`, `${Math.round(tested.minutes)} min`),
             fact('Preconditioned', preconditionedFact(run.preconditioned)),
+            fact('Charger', chargerClassFact(run.charger_voltage_class)),
             fact('Started at', summary.startSoc != null ? `${summary.startSoc}%` : null),
             fact('Peak', summary.peakKw != null ? `${Math.round(summary.peakKw)} kW` : null),
             fact('Session', summary.durationMin != null ? `${Math.round(summary.durationMin)} min` : null),

@@ -8,7 +8,7 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { MI_TO_KM, convDistance, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
-import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { resolveRangeSource, pricedAtSpeedMph, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { figureSources } from '../utils/vehicleFigures';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
@@ -747,8 +747,11 @@ export default function RoadTripView({
                             ? `${rangeRun.name} × ${chargingRun.name}`
                             : rangeRun.name,
                         miPerKwh:       src.miPerKwh,
-                        // Assume 70 mph if neither the range test nor its source says
-                        testSpeedMph:   rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null,
+                        // The speed miPerKwh is priced at, which the simulation
+                        // re-prices from: the test's own, or the standard speed
+                        // once correction has already moved it there. Assume
+                        // 70 mph if neither the range test nor its source says.
+                        testSpeedMph:   pricedAtSpeedMph(src, rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null),
                         batteryKwh:     vehicle.socWindowKwh,
                         efficiencyNote: src.note,
                     });

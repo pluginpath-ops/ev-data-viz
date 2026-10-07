@@ -168,3 +168,19 @@ describe('sessionFor', () => {
         expect(sessionFor(sessions, run(1, 'range', null))).toBeNull();
     });
 });
+
+describe('groupRunsBySession — composite curves (#313)', () => {
+    const comp = (id, classV) => ({ id, kind: 'charging', session_id: null, composite: { chargerClassV: classV } });
+
+    it('gives composites a group of their own, first, the vehicle\'s own class on top', () => {
+        const groups = groupRunsBySession([run(1, 'charging', 7), run(2, 'charging', null), comp(9, 400), comp(8, 800)]);
+        expect(groups.map(g => g.key)).toEqual(['__composite__', '7', '__none__']);
+        expect(groups[0]).toMatchObject({ composite: true, sessionId: null });
+        expect(groups[0].runs.map(r => r.id)).toEqual([8, 9]);
+        expect(groups[2].runs.map(r => r.id)).toEqual([2]);   // not among the unassigned tests
+    });
+
+    it('has no composite group when there are none', () => {
+        expect(groupRunsBySession([run(1, 'charging', null)]).map(g => g.key)).toEqual(['__none__']);
+    });
+});

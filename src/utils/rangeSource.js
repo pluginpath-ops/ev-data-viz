@@ -52,6 +52,7 @@
 
 import { correctionFactor, applyCorrection, correctionNote } from './conditionCorrection';
 import { isRangeRun } from './runUtils';
+import { STANDARD_CONDITIONS } from '../constants/epa';
 
 /**
  * Sentinel partner id for "use the vehicle's EPA range".
@@ -240,6 +241,26 @@ function correctBasis(basis, run, correction, session) {
         ...applyCorrection(basis, result.factor),
         correction: { ...result, note: correctionNote(result) },
     };
+}
+
+/**
+ * The speed a resolved source's miPerKwh is priced at — what a caller that
+ * re-prices for speed (simulateRoadTrip's testSpeedMph) must start from.
+ *
+ * When correction applied the speed axis, the figure has already been moved to
+ * STANDARD_CONDITIONS.speedMph; handing the simulation the test's own speed on
+ * top re-prices from 80 mph a figure that is already at 70, and counts speed
+ * twice (an 80 mph test read 21% better corrected than uncorrected). Otherwise
+ * — correction off, the run states no speed, or a mixed cycle skipped the axis
+ * — the figure is still at the test's own speed.
+ *
+ * @param {Object} src           a resolveRangeSource result
+ * @param {number|null} ownSpeedMph  the test's own speed, as the caller reads it
+ */
+export function pricedAtSpeedMph(src, ownSpeedMph) {
+    return src?.correction?.applied?.includes('speed')
+        ? STANDARD_CONDITIONS.speedMph
+        : ownSpeedMph;
 }
 
 export function resolveRangeSource(chargingRun, {

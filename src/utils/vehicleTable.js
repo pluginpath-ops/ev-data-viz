@@ -56,6 +56,7 @@ import {
 import { ASSUMED_CHARGER_EFF, MPG_E_CONVERSION } from '../constants/epa';
 import { vehiclePlatforms, resolveVoltageClass } from './platforms';
 import { preconditionedNote } from './runPreconditioning';
+import { isCompositeRun } from './runUtils';
 
 // ── Units ───────────────────────────────────────────────────────────────────
 
@@ -673,6 +674,12 @@ function chargeWindowTime(vehicle, specs, { windowFrom, windowTo, isSpecWindow }
     const maxDcKw = num(specs?.charging?.max_dc_kw);
     const tested = chargeTimeSession(vehicle.runs ?? [], { from: windowFrom, to: windowTo, maxDcKw });
     if (tested.run) {
+        // A composite curve (#313) has no source or conditions of its own; the
+        // note says what it is, so the figure never reads as one test's.
+        if (isCompositeRun(tested.run)) {
+            const n = tested.run.composite.tests?.length ?? 0;
+            return { minutes: tested.minutes, note: `composite of ${n} test${n === 1 ? '' : 's'}`, summary: tested.run.charge_summary, tested };
+        }
         const parts = [tested.run.source, tested.temperatureF != null ? temperatureText(tested.temperatureF, units) : null,
             preconditionedNote(tested.run.preconditioned)];
         return { minutes: tested.minutes, note: parts.filter(Boolean).join(' · ') || 'tested', summary: tested.run.charge_summary, tested };

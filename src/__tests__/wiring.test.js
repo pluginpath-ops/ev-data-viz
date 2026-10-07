@@ -766,6 +766,49 @@ describe('the seams that broke before', () => {
         expect(read('src/utils/testDetails.js')).toMatch(/fact\('Preconditioned'/);
     });
 
+    it('carries a charging test\'s charger class from the database to the composite curve (#366, #313)', () => {
+        expect(read('supabase/migrations/076_run_charger_voltage_class.sql')).toMatch(/ADD COLUMN IF NOT EXISTS charger_voltage_class smallint/);
+        const ds = read('src/services/DataService.js');
+        expect(ds, 'written on add').toMatch(/charger_voltage_class: toChargerClass\(run\.chargerVoltageClass/);
+        expect(ds, 'written on edit').toMatch(/charger_voltage_class: toChargerClass\(updates\.chargerVoltageClass\)/);
+        expect(read('src/context/AppContext.jsx')).toMatch(/case 'chargerVoltageClass':/);
+        expect(read('src/components/RunsView.jsx').match(/<ChargerClassSelect/g)).toHaveLength(2);   // add and edit
+        expect(read('src/utils/compositeCurve.js'), 'the composite must read it').toMatch(/run\.charger_voltage_class/);
+        expect(read('src/utils/testDetails.js')).toMatch(/fact\('Charger'/);
+    });
+
+    it('stores composite curves as runs, rebuilt on every charging-test write (#313)', () => {
+        expect(read('supabase/migrations/077_run_composite.sql')).toMatch(/ADD COLUMN IF NOT EXISTS composite jsonb/);
+        const ctx = read('src/context/AppContext.jsx');
+        // Every write path that can change a vehicle's charging tests rebuilds.
+        for (const fn of ['addRun', 'updateRun', 'deleteRun', 'replaceRunData', 'mergeRunData', 'duplicateRun', 'copyRunToVehicle']) {
+            // To the next declaration at the provider's own indent — the function's end.
+            const start = ctx.indexOf(`    const ${fn} = async`);
+            const body = ctx.slice(start, ctx.indexOf('\n    const ', start + 1));
+            expect(body, `${fn} must rebuild composites`).toMatch(/refreshComposites\(/);
+        }
+        expect(read('src/services/DataService.js'), 'points carry n + spread').toMatch(/extra_data:\s*\{ n: p\.n/);
+        expect(read('src/components/admin/DataChecksPanel.jsx')).toMatch(/<CompositeMaintenance \/>/);
+        expect(read('src/components/RunsView.jsx'), 'curators set the default in Tests & Data').toMatch(/<CompositeRunCard/);
+    });
+
+    it('takes a composite as the default charging curve everywhere: DEF → composite → newest (#313)', () => {
+        expect(read('src/components/ChargingView.jsx'), 'the Charging chart').toMatch(/defaultChargingRun\(\{ runs: vehicleRows\.map/);
+        expect(read('src/utils/runUtils.js'), 'Charge Stop + Road Trip, via pairedChargingRun').toMatch(/\?\? nativeComposite\(charging\)/);
+        expect(read('src/utils/chargeWindows.js'), 'the vehicle table').toMatch(/nativeComposite\(covering/);
+    });
+
+    it('draws a composite as a composite, and names what it left out (#313)', () => {
+        const view = read('src/components/ChargingView.jsx');
+        expect(view, 'what it left out is named in its ⓘ').toMatch(/compositeExplainer\(run\.composite, units\)/);
+        expect(view, 'thin support must be marked').toMatch(/THIN_SUPPORT/);
+        expect(view, 'the test spread must be shaded').toMatch(/edge\('spreadLo'\)/);
+        expect(view, 'its ⓘ sits where a source link would').toMatch(/renderRunSource=\{run => isCompositeRun\(run\)/);
+        expect(read('src/components/RunSelector.jsx'), 'a derived row is told apart by its name').toMatch(/run-name-derived/);
+        expect(read('src/utils/colorUtils.js'), 'a composite wears the vehicle color').toMatch(/r\.composite \? -\(r\.composite\.chargerClassV/);
+        expect(read('src/App.jsx'), 'the spread toggle rides the URL').toMatch(/p\.set\('cspread'/);
+    });
+
     it('draws Modeled vs Tested under the EPA tab, keeping it a chart mode (#338)', () => {
         const app = read('src/App.jsx');
         expect(app, 'the header must light the parent tab').toMatch(/const headerTab = view === 'runs' \? 'vehicles' : navTabFor\(view\)/);

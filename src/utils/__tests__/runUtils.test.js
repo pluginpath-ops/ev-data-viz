@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyDefaultRun, clearDefaultRuns, runKindFrom } from '../runUtils';
+import { applyDefaultRun, clearDefaultRuns, runKindFrom, defaultChargingRun, nativeComposite, filterTests, compositesFirst } from '../runUtils';
 
 // A vehicle after the 046 split: charging halves and range halves side by side.
 const fleet = () => ([
@@ -70,5 +70,42 @@ describe('runKindFrom', () => {
         expect(runKindFrom({ kind: 'range' })).toBe('range');
         expect(runKindFrom({ has_range: true, has_charging: false })).toBe('range');
         expect(runKindFrom({})).toBe('charging');
+    });
+});
+
+describe('defaultChargingRun: DEF → composite → newest (#313)', () => {
+    const test = (id, date, extra = {}) => ({ id, kind: 'charging', date, ...extra });
+    const comp = (id, classV, extra = {}) => ({ id, kind: 'charging', synthetic: true, composite: { chargerClassV: classV }, ...extra });
+
+    it("takes the curator's DEF test over a composite", () => {
+        const v = { runs: [test(1, '2026-01-01', { isDefault: true }), test(2, '2026-05-01'), comp(9, 800)] };
+        expect(defaultChargingRun(v).id).toBe(1);
+    });
+
+    it('takes a composite a curator marked DEF — the 400 V one, say', () => {
+        const v = { runs: [test(1, '2026-01-01'), comp(8, 800), comp(9, 400, { is_default: true })] };
+        expect(defaultChargingRun(v).id).toBe(9);
+    });
+
+    it("falls to the vehicle's own composite when nothing is DEF, its own class first", () => {
+        const v = { runs: [test(1, '2026-01-01'), test(2, '2026-05-01'), comp(9, 400), comp(8, 800)] };
+        expect(defaultChargingRun(v).id).toBe(8);
+    });
+
+    it('skips a hidden composite, and falls to the newest TEST — never a composite by date', () => {
+        const v = { runs: [test(1, '2026-01-01'), test(2, '2026-05-01'), comp(8, 800, { isHidden: true })] };
+        expect(defaultChargingRun(v).id).toBe(2);
+        expect(nativeComposite(v.runs)).toBeNull();
+    });
+
+    it('counts tests without the composites', () => {
+        expect(filterTests([test(1), comp(8, null)]).map(r => r.id)).toEqual([1]);
+    });
+});
+
+describe('compositesFirst', () => {
+    it('puts composites at the top, own class first, and leaves the tests in order', () => {
+        const runs = [{ id: 1 }, { id: 9, composite: { chargerClassV: 400 } }, { id: 2 }, { id: 8, composite: { chargerClassV: 800 } }];
+        expect(compositesFirst(runs).map(r => r.id)).toEqual([8, 9, 1, 2]);
     });
 });
