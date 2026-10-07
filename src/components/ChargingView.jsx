@@ -43,7 +43,7 @@ import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE, withAlpha } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
-import { compositeConditions, compositeNote, compositeExplainer, THIN_SUPPORT } from '../utils/compositeCurve';
+import { compositeConditions, compositeExplainer, THIN_SUPPORT } from '../utils/compositeCurve';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
@@ -141,9 +141,12 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         ),
         [selectedVehicles, selectedRuns]
     );
-    // The composite curves being drawn (#313), each with its vehicle — for the
-    // notes beneath the chart. Stored runs (migration 077), so they arrive
-    // with the vehicle's runs like any test.
+    // The composite curves being drawn (#313), each with its vehicle. Stored
+    // runs (migration 077), so they arrive with the vehicle's runs like any
+    // test. What each was built from and left out is in its ⓘ in the picker,
+    // beside the row it explains — a block of notes above the plot read as
+    // clutter (owner, 2026-10-07), and the legend says how many tests stand
+    // behind each.
     const selectedComposites = useMemo(
         () => selectedVehicles.flatMap(vehicle => (vehicle.runs || [])
             .filter(r => isCompositeRun(r) && selectedRuns.includes(r.id))
@@ -1133,20 +1136,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     {trimmedRuns.map(t => `${t.name} (${t.n} point${t.n === 1 ? '' : 's'})`).join(', ')}
                     {' '}· switch to raw test time to see every sample
                 </p>
-            )}
-
-            {/* What each composite was built from and what it left out, named
-                on the chart — a composite quietly drawn from two of five tests
-                is worse than none (#313). */}
-            {selectedComposites.length > 0 && (
-                <div className="composite-notes">
-                    {selectedComposites.map(({ vehicle, run }) => (
-                        <p key={run.id}>
-                            <strong>{vehicleLabel(vehicle)} · {run.name}</strong>
-                            {compositeNote(run.composite, units) && ` · ${compositeNote(run.composite, units)}`}
-                        </p>
-                    ))}
-                </div>
             )}
 
             {/* ── The plot, inside the frame the export captures ── */}

@@ -5314,15 +5314,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply text-amber-700 text-xs font-medium;
 }
 
-/* What each composite curve on the Charging chart was built from, and what it
-   left out (#313) — beneath the chart's other notes, in the meta voice. */
-.composite-notes {
-    margin-bottom: 0.5rem;
-    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
-    color: var(--color-text-muted);
-}
-.composite-notes strong { color: var(--color-text-secondary); font-weight: 600; }
-
 /* A picker row that is derived from several tests rather than measured — a
    composite curve. Italic, so it never reads as a test someone ran. */
 .run-name-derived { font-style: italic; }

@@ -800,7 +800,7 @@ describe('the seams that broke before', () => {
 
     it('draws a composite as a composite, and names what it left out (#313)', () => {
         const view = read('src/components/ChargingView.jsx');
-        expect(view, 'what it left out is named on the chart').toMatch(/compositeNote\(run\.composite, units\)/);
+        expect(view, 'what it left out is named in its ⓘ').toMatch(/compositeExplainer\(run\.composite, units\)/);
         expect(view, 'thin support must be marked').toMatch(/THIN_SUPPORT/);
         expect(view, 'the test spread must be shaded').toMatch(/edge\('spreadLo'\)/);
         expect(view, 'its ⓘ sits where a source link would').toMatch(/renderRunSource=\{run => isCompositeRun\(run\)/);
