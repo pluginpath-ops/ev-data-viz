@@ -1,0 +1,1174 @@
+{
+ "source": "evbench-app-20260928-1845.sql",
+ "vehicles": [
+  {
+   "id": "26",
+   "name": "2027 Rivian R2 Performance",
+   "color": "#17becf",
+   "runs": [
+    {
+     "id": "137",
+     "name": "Out of Spec 70mph",
+     "date": "2026-07-29",
+     "is_default": true,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 253,
+     "energy_kwh": 89.3,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 98,
+     "altitude_ft": null
+    },
+    {
+     "id": "176",
+     "name": "Doms PNW In-N-Out",
+     "date": "2026-08-09",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 5,
+     "distance_miles": 262.8,
+     "energy_kwh": 86.8,
+     "speed_mph": 52.7,
+     "speed_basis": "mixed",
+     "temperature_f": 80,
+     "altitude_ft": 200
+    },
+    {
+     "id": "153",
+     "name": "State of Charge",
+     "date": "2026-07-02",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 1,
+     "distance_miles": 260,
+     "energy_kwh": 88,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 65,
+     "altitude_ft": 5500
+    },
+    {
+     "id": "129",
+     "name": "OoS SxS 50mph",
+     "date": "2026-07-26",
+     "is_default": false,
+     "start_soc": null,
+     "end_soc": null,
+     "distance_miles": 23.3,
+     "energy_kwh": 5.8,
+     "speed_mph": 50,
+     "speed_basis": null,
+     "temperature_f": 70,
+     "altitude_ft": null
+    },
+    {
+     "id": "173",
+     "name": "OoS 10% Challenge",
+     "date": "2026-07-25",
+     "is_default": false,
+     "start_soc": 59,
+     "end_soc": 10,
+     "distance_miles": 92.8,
+     "energy_kwh": 42,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 80,
+     "altitude_ft": null
+    },
+    {
+     "id": "131",
+     "name": "OoS SxS 60mph",
+     "date": "2026-07-26",
+     "is_default": false,
+     "start_soc": null,
+     "end_soc": null,
+     "distance_miles": 22.8,
+     "energy_kwh": 7.3,
+     "speed_mph": 60,
+     "speed_basis": null,
+     "temperature_f": 71,
+     "altitude_ft": null
+    },
+    {
+     "id": "133",
+     "name": "OoS SxS 70mph",
+     "date": "2026-07-26",
+     "is_default": false,
+     "start_soc": null,
+     "end_soc": null,
+     "distance_miles": 19.7,
+     "energy_kwh": 6.4,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 72,
+     "altitude_ft": null
+    },
+    {
+     "id": "135",
+     "name": "OoS SxS 80mph",
+     "date": "2026-07-26",
+     "is_default": false,
+     "start_soc": 60,
+     "end_soc": 46,
+     "distance_miles": 30.3,
+     "energy_kwh": 12.4,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 72,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "73",
+   "name": "2026 Tesla Model Y Performance",
+   "color": "#db0606",
+   "runs": [
+    {
+     "id": "130",
+     "name": "OoS SxS 50mph",
+     "date": "2026-07-26",
+     "is_default": false,
+     "start_soc": null,
+     "end_soc": null,
+     "distance_miles": 23.3,
+     "energy_kwh": 4.9,
+     "speed_mph": 50,
+     "speed_basis": null,
+     "temperature_f": 70,
+     "altitude_ft": null
+    },
+    {
+     "id": "132",
+     "name": "OoS SxS 60mph",
+     "date": "2026-07-26",
+     "is_default": false,
+     "start_soc": null,
+     "end_soc": null,
+     "distance_miles": 22.8,
+     "energy_kwh": 5.7,
+     "speed_mph": 60,
+     "speed_basis": null,
+     "temperature_f": 71,
+     "altitude_ft": null
+    },
+    {
+     "id": "134",
+     "name": "OoS SxS 70mph",
+     "date": "2026-07-26",
+     "is_default": false,
+     "start_soc": null,
+     "end_soc": null,
+     "distance_miles": 19.7,
+     "energy_kwh": 5.3,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 72,
+     "altitude_ft": null
+    },
+    {
+     "id": "138",
+     "name": "Out of Spec",
+     "date": "2026-07-29",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 310.1,
+     "energy_kwh": 82.2,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 98,
+     "altitude_ft": null
+    },
+    {
+     "id": "150",
+     "name": "OoS 10% Challenge",
+     "date": "2026-07-23",
+     "is_default": false,
+     "start_soc": 51,
+     "end_soc": 10,
+     "distance_miles": 105.3,
+     "energy_kwh": 32,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 90,
+     "altitude_ft": 100
+    },
+    {
+     "id": "136",
+     "name": "OoS SxS 80mph",
+     "date": "2026-07-26",
+     "is_default": false,
+     "start_soc": 60,
+     "end_soc": 48,
+     "distance_miles": 30.3,
+     "energy_kwh": 9.8,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 72,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "24",
+   "name": "2027 Chevrolet Bolt",
+   "color": "#ff9933",
+   "runs": [
+    {
+     "id": "174",
+     "name": "OoS 10% Challenge.",
+     "date": "2026-05-10",
+     "is_default": false,
+     "start_soc": 54,
+     "end_soc": 10,
+     "distance_miles": 80,
+     "energy_kwh": null,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": null,
+     "altitude_ft": 300
+    },
+    {
+     "id": "228",
+     "name": "State of Charge 80mph",
+     "date": "2026-09-08",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 1,
+     "distance_miles": 219.3,
+     "energy_kwh": 66.3,
+     "speed_mph": 80,
+     "speed_basis": "steady",
+     "temperature_f": null,
+     "altitude_ft": 300
+    },
+    {
+     "id": "229",
+     "name": "State of Charge 70mph",
+     "date": "2026-09-08",
+     "is_default": true,
+     "start_soc": 100,
+     "end_soc": 1,
+     "distance_miles": 243.1,
+     "energy_kwh": 66.6,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": null,
+     "altitude_ft": 300
+    },
+    {
+     "id": "162",
+     "name": "EV Motoring",
+     "date": "2026-03-26",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 15,
+     "distance_miles": 170,
+     "energy_kwh": 56.5,
+     "speed_mph": 75,
+     "speed_basis": "steady",
+     "temperature_f": 73,
+     "altitude_ft": 730
+    }
+   ]
+  },
+  {
+   "id": "50",
+   "name": "2025 Ford Mach E Rally",
+   "color": "#cbcedc",
+   "runs": [
+    {
+     "id": "167",
+     "name": "OoS 10% Challenge",
+     "date": "2024-01-11",
+     "is_default": false,
+     "start_soc": 48,
+     "end_soc": 10,
+     "distance_miles": 65.4,
+     "energy_kwh": 34.5,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 45,
+     "altitude_ft": null
+    },
+    {
+     "id": "230",
+     "name": "OoS 70mph",
+     "date": "2026-09-09",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 238.5,
+     "energy_kwh": 98,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 85,
+     "altitude_ft": 200
+    },
+    {
+     "id": "172",
+     "name": "Destination Charged",
+     "date": "2026-03-04",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 2,
+     "distance_miles": 251,
+     "energy_kwh": 89,
+     "speed_mph": 65,
+     "speed_basis": null,
+     "temperature_f": 95,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "21",
+   "name": "2025-2026 Rivian R1S",
+   "color": "#2ca02c",
+   "runs": [
+    {
+     "id": "175",
+     "name": "OoS 70mph (old)",
+     "date": "2026-03-11",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 376,
+     "energy_kwh": 142,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 70,
+     "altitude_ft": 5500
+    },
+    {
+     "id": "145",
+     "name": "OoS 70mph",
+     "date": "2026-08-05",
+     "is_default": true,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 356,
+     "energy_kwh": 137,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 96,
+     "altitude_ft": null
+    },
+    {
+     "id": "149",
+     "name": "OoS 10% Challenge",
+     "date": "2026-03-22",
+     "is_default": false,
+     "start_soc": 40,
+     "end_soc": 10,
+     "distance_miles": 76.7,
+     "energy_kwh": 45,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 58,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "5",
+   "name": "2022 Ford Mach E",
+   "color": null,
+   "runs": [
+    {
+     "id": "226",
+     "name": "OoS 70mph",
+     "date": "2026-09-03",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 5,
+     "distance_miles": 223,
+     "energy_kwh": 88,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 40,
+     "altitude_ft": 5000
+    },
+    {
+     "id": "227",
+     "name": "State of Charge 70mph",
+     "date": "2026-09-03",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 282.5,
+     "energy_kwh": 88,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 72,
+     "altitude_ft": 300
+    }
+   ]
+  },
+  {
+   "id": "65",
+   "name": "2025 Chevrolet Equinox FWD",
+   "color": null,
+   "runs": [
+    {
+     "id": "123",
+     "name": "EPA Range",
+     "date": "2026-07-08",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 226,
+     "energy_kwh": null,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 70,
+     "altitude_ft": null
+    },
+    {
+     "id": "158",
+     "name": "OoS 10% Challenge",
+     "date": "0005-02-24",
+     "is_default": false,
+     "start_soc": 46,
+     "end_soc": 10,
+     "distance_miles": 73.4,
+     "energy_kwh": 35,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 44,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "16",
+   "name": "2025 Ford Lightning",
+   "color": "#c4c4c4",
+   "runs": [
+    {
+     "id": "151",
+     "name": "OutOfSpec",
+     "date": "2024-04-03",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 270,
+     "energy_kwh": 128.7,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 74,
+     "altitude_ft": null
+    },
+    {
+     "id": "165",
+     "name": "3yr Check-in",
+     "date": "2026-03-11",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 286.7,
+     "energy_kwh": 124.6,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 80,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "106",
+   "name": "2026 Volvo EX90 Performance+",
+   "color": null,
+   "runs": [
+    {
+     "id": "214",
+     "name": "OoS 10% ",
+     "date": "2026-08-20",
+     "is_default": false,
+     "start_soc": 64,
+     "end_soc": 10,
+     "distance_miles": 114,
+     "energy_kwh": 53.6,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 92,
+     "altitude_ft": 200
+    },
+    {
+     "id": "218",
+     "name": "OoS 70mph",
+     "date": "2026-08-31",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 262,
+     "energy_kwh": 101.1,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 85,
+     "altitude_ft": 200
+    }
+   ]
+  },
+  {
+   "id": "94",
+   "name": "2027 Porsche Cayenne",
+   "color": "#a3a3a3",
+   "runs": [
+    {
+     "id": "160",
+     "name": "OoS 10% Challenge",
+     "date": "2026-08-03",
+     "is_default": false,
+     "start_soc": 78,
+     "end_soc": 10,
+     "distance_miles": 185.8,
+     "energy_kwh": 76,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 91,
+     "altitude_ft": null
+    },
+    {
+     "id": "144",
+     "name": "OoS 70mph",
+     "date": "2026-08-05",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 345,
+     "energy_kwh": 112,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 96,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "96",
+   "name": "2027 Rivian R2 Performance (20\")",
+   "color": "#17becf",
+   "runs": [
+    {
+     "id": "177",
+     "name": "Doms PNW In-N-Out",
+     "date": "2026-08-09",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 5,
+     "distance_miles": 262.8,
+     "energy_kwh": 86.8,
+     "speed_mph": 52.7,
+     "speed_basis": null,
+     "temperature_f": 80,
+     "altitude_ft": null
+    },
+    {
+     "id": "181",
+     "name": "State of Charge",
+     "date": "2026-07-02",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 1,
+     "distance_miles": 260,
+     "energy_kwh": 88,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 65,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "82",
+   "name": "2022 Tesla Model Y",
+   "color": null,
+   "runs": [
+    {
+     "id": "166",
+     "name": "OoS",
+     "date": "2026-07-07",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 286,
+     "energy_kwh": null,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 75,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "25",
+   "name": "2022-2024 Tesla Model Y LR",
+   "color": "#bcbd22",
+   "runs": [
+    {
+     "id": "163",
+     "name": "Flasch",
+     "date": "2026-03-11",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 293,
+     "energy_kwh": 77,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 55,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "92",
+   "name": "2023-2026 Cadillac  Lyriq RWD",
+   "color": "#1f58b4",
+   "runs": [
+    {
+     "id": "196",
+     "name": "Sate of Charge 70mph",
+     "date": "2026-08-11",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 330,
+     "energy_kwh": 104.7,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 72,
+     "altitude_ft": 100
+    }
+   ]
+  },
+  {
+   "id": "30",
+   "name": "2024 Chevrolet Silverado RST",
+   "color": null,
+   "runs": [
+    {
+     "id": "148",
+     "name": "State of Charge 70mph",
+     "date": "2026-03-15",
+     "is_default": true,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 441.7,
+     "energy_kwh": 213,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": null,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "27",
+   "name": "2024 Kia EV9 GT",
+   "color": "#8c564b",
+   "runs": [
+    {
+     "id": "44",
+     "name": "Out of Spec",
+     "date": "2026-03-12",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 260,
+     "energy_kwh": 96,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 47,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "22",
+   "name": "2025 GMC Hummer Pickup",
+   "color": null,
+   "runs": [
+    {
+     "id": "28",
+     "name": "G580 - Hummer EV - R1S",
+     "date": "2026-03-10",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 295,
+     "energy_kwh": 174,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 70,
+     "altitude_ft": 5500
+    }
+   ]
+  },
+  {
+   "id": "52",
+   "name": "2025 Hyundai IONIQ5",
+   "color": null,
+   "runs": [
+    {
+     "id": "193",
+     "name": "OoS 70mph",
+     "date": "2025-02-09",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 231,
+     "energy_kwh": 82,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 38,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "119",
+   "name": "2025 Kia EV6 GT-Line AWD",
+   "color": null,
+   "runs": [
+    {
+     "id": "239",
+     "name": "The Ioniq Guy 70mph",
+     "date": "2025-09-07",
+     "is_default": false,
+     "start_soc": 80,
+     "end_soc": 10,
+     "distance_miles": 176,
+     "energy_kwh": 57,
+     "speed_mph": 71,
+     "speed_basis": "mixed",
+     "temperature_f": 85,
+     "altitude_ft": 100
+    }
+   ]
+  },
+  {
+   "id": "19",
+   "name": "2025 Lucid Gravity Grand Touring",
+   "color": null,
+   "runs": [
+    {
+     "id": "155",
+     "name": "State of Charge",
+     "date": "2026-03-04",
+     "is_default": true,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 401,
+     "energy_kwh": 116.8,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 60,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "23",
+   "name": "2025 Mercedes Mercedes G580 (EQG)",
+   "color": null,
+   "runs": [
+    {
+     "id": "29",
+     "name": "G580 - Hummer EV - R1S",
+     "date": "2026-03-10",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 237,
+     "energy_kwh": 116,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 70,
+     "altitude_ft": 5500
+    }
+   ]
+  },
+  {
+   "id": "126",
+   "name": "2025 Nissan Ariya Platinum+",
+   "color": null,
+   "runs": [
+    {
+     "id": "237",
+     "name": "State of Charge 70mph",
+     "date": "2025-05-07",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 249.6,
+     "energy_kwh": 81,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 55,
+     "altitude_ft": 300
+    }
+   ]
+  },
+  {
+   "id": "28",
+   "name": "2025 Porsche Taycan J1.2",
+   "color": null,
+   "runs": [
+    {
+     "id": "171",
+     "name": "State of Charge",
+     "date": "2026-03-12",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 302,
+     "energy_kwh": 97,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 50,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "31",
+   "name": "2025 Volkswage ID.Buzz",
+   "color": "#ff7f0e",
+   "runs": [
+    {
+     "id": "51",
+     "name": "Out of Spec",
+     "date": "2026-03-15",
+     "is_default": true,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 212,
+     "energy_kwh": 86,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 55,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "67",
+   "name": "2025-2026 Tesla Model 3 Highland",
+   "color": null,
+   "runs": [
+    {
+     "id": "96",
+     "name": "OoS 70mph",
+     "date": "2026-01-12",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 329.6,
+     "energy_kwh": 82,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 50,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "47",
+   "name": "2025-2026 Tesla Model Y Prem. RWD",
+   "color": null,
+   "runs": [
+    {
+     "id": "157",
+     "name": "OoS 10% Challenge",
+     "date": "2026-04-13",
+     "is_default": true,
+     "start_soc": 57,
+     "end_soc": 10,
+     "distance_miles": 110.9,
+     "energy_kwh": 36,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 68,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "66",
+   "name": "2025-2026 Tesla Model Y Premium",
+   "color": null,
+   "runs": [
+    {
+     "id": "94",
+     "name": "OoS 70MPH",
+     "date": "2025-04-19",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 296,
+     "energy_kwh": 81.4,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": null,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "48",
+   "name": "2026 BMW iX3",
+   "color": "#2552e4",
+   "runs": [
+    {
+     "id": "170",
+     "name": "Bjorn Nyland",
+     "date": "2026-04-24",
+     "is_default": true,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 317,
+     "energy_kwh": 108.6,
+     "speed_mph": 74.5,
+     "speed_basis": null,
+     "temperature_f": 65,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "115",
+   "name": "2026 Ford Mach E Rally",
+   "color": "#fcff66",
+   "runs": [
+    {
+     "id": "235",
+     "name": "OoS 70mph",
+     "date": "2026-09-09",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 238.5,
+     "energy_kwh": 98,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 85,
+     "altitude_ft": 200
+    }
+   ]
+  },
+  {
+   "id": "88",
+   "name": "2026 Hyundai IONIQ 9 AWD",
+   "color": null,
+   "runs": [
+    {
+     "id": "203",
+     "name": "OoS 70mph",
+     "date": "2026-08-12",
+     "is_default": true,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 275.9,
+     "energy_kwh": 108,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 75,
+     "altitude_ft": 200
+    }
+   ]
+  },
+  {
+   "id": "108",
+   "name": "2026 Mercedes CLA 350 4MATIC",
+   "color": null,
+   "runs": [
+    {
+     "id": "217",
+     "name": "State of Charge 70mph",
+     "date": "2026-08-24",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 385,
+     "energy_kwh": 86.7,
+     "speed_mph": 709,
+     "speed_basis": "steady",
+     "temperature_f": 72,
+     "altitude_ft": 300
+    }
+   ]
+  },
+  {
+   "id": "102",
+   "name": "2026 Nissan Leaf Platinum",
+   "color": null,
+   "runs": [
+    {
+     "id": "212",
+     "name": "OoS 70mph",
+     "date": "2026-08-18",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 215,
+     "energy_kwh": 76,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 35,
+     "altitude_ft": 200
+    }
+   ]
+  },
+  {
+   "id": "99",
+   "name": "2026 Subaru Solterra",
+   "color": null,
+   "runs": [
+    {
+     "id": "208",
+     "name": "OoS 70mph",
+     "date": "2026-08-16",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 232.6,
+     "energy_kwh": 70.5,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 74,
+     "altitude_ft": 200
+    }
+   ]
+  },
+  {
+   "id": "83",
+   "name": "2026 Subaru Trailseeker",
+   "color": "#182df2",
+   "runs": [
+    {
+     "id": "156",
+     "name": "Ever 10-80",
+     "date": "2026-04-18",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 234,
+     "energy_kwh": 74.7,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 70,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "114",
+   "name": "2026 Subaru Uncharted GT",
+   "color": null,
+   "runs": [
+    {
+     "id": "225",
+     "name": "State of Charge 70mph",
+     "date": "2026-09-03",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 255.1,
+     "energy_kwh": 69,
+     "speed_mph": 70,
+     "speed_basis": "steady",
+     "temperature_f": 85,
+     "altitude_ft": 300
+    }
+   ]
+  },
+  {
+   "id": "68",
+   "name": "2026 Tesla Model 3 Standard",
+   "color": null,
+   "runs": [
+    {
+     "id": "95",
+     "name": "OoS 70mph",
+     "date": "2026-01-12",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 274.8,
+     "energy_kwh": 69,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 50,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "81",
+   "name": "2026 Tesla Model X",
+   "color": null,
+   "runs": [
+    {
+     "id": "159",
+     "name": "OoS",
+     "date": "2026-04-08",
+     "is_default": false,
+     "start_soc": 100,
+     "end_soc": 0,
+     "distance_miles": 287.2,
+     "energy_kwh": 87.7,
+     "speed_mph": 70,
+     "speed_basis": null,
+     "temperature_f": 64,
+     "altitude_ft": null
+    }
+   ]
+  },
+  {
+   "id": "107",
+   "name": "2026 Tesla Model Y L",
+   "color": null,
+   "runs": [
+    {
+     "id": "216",
+     "name": "Dirty Tesla",
+     "date": "2026-08-21",
+     "is_default": false,
+     "start_soc": 28,
+     "end_soc": 5,
+     "distance_miles": 77.2,
+     "energy_kwh": 18.1,
+     "speed_mph": 75,
+     "speed_basis": null,
+     "temperature_f": 75,
+     "altitude_ft": 950
+    }
+   ]
+  },
+  {
+   "id": "72",
+   "name": "2026 Tesla Model Y Standard",
+   "color": null,
+   "runs": [
+    {
+     "id": "152",
+     "name": "OoS 10% Challenge",
+     "date": "2026-01-14",
+     "is_default": false,
+     "start_soc": 56,
+     "end_soc": 10,
+     "distance_miles": 99.2,
+     "energy_kwh": 29.4,
+     "speed_mph": 80,
+     "speed_basis": null,
+     "temperature_f": 56,
+     "altitude_ft": null
+    }
+   ]
+  }
+ ]
+}

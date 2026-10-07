@@ -342,6 +342,18 @@ says to stop and ask when the right name is not obvious.
 |---|---|---|---|
 | The aggregate curve standing for a vehicle's charging behaviour | [#313](https://github.com/pluginpath-ops/ev-data-viz/issues/313) | typical curve · representative curve · composite curve · nominal curve | **typical curve** |
 | The shrinkage weight that trades a vehicle's own spread against the fleet's | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314) | — | undecided |
+| The mark showing how far apart a vehicle's range tests landed — every test's figure, not a summary of them | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314); prototype under Playground | test spread (widened to cover both charts) · tested span · spread of tests | **test spread**, widened — see below |
+
+**Range tests and "test spread."** #313 defines test spread for a curve: the
+best test at each SoC down to one SD below the mean, lopsided on purpose. A range
+test is one figure, and at the n the fleet has (most vehicles 1, a handful 2–3)
+a mean and an SD say nothing a reader can use, so the range mark is every test
+itself — its extent is lowest to highest. Same idea for the reader ("how far
+apart this car's tests landed"), different construction. Widening the term to
+cover both keeps one word for one idea; a second word ("tested span") keeps one
+word per construction. Not "range" in any form — it already means distance — and
+never "error bar" or "confidence band", which #314 keeps for where a repeat
+would land.
 
 **Why not "nominal curve."** In this codebase *nominal* already means **rated**,
 as filed — `nominal_pack_kwh`, `battery_nominal_voltage_v`, `epa_fe_guide.total_voltage_v`.

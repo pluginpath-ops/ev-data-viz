@@ -128,7 +128,9 @@ describe('the playground is inert', () => {
     // popover specimen is one. That is exactly when an inertness guarantee
     // stops being free and has to be checked.
     const files = ['components/playground/Playground.jsx', 'components/playground/catalogue.js',
-        'components/playground/specimens.jsx']
+        'components/playground/specimens.jsx',
+        // Draws real range tests, but from a frozen snapshot rather than a request.
+        'components/playground/RangeSpreadPrototype.jsx']
         .map(f => ({ f, src: readFileSync(join(ROOT, 'src', f), 'utf8') }));
 
     it('reads no application data', () => {

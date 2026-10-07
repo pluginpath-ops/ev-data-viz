@@ -8208,3 +8208,48 @@ a.is-test-link:focus-visible {
     background-color: var(--color-warning-surface);
     color: var(--color-warning-text);
 }
+
+/* ── Range spread prototype (playground only) ───────────────────────────────
+   Four candidate marks for the spread of a vehicle's range tests, drawn as
+   SVG so every stroke and label can take a token. The series color is the
+   only runtime value, set inline as the chart views set theirs. Names are
+   prototype names: the mark's real name is in docs/vocabulary.md Open names. */
+.pg-spread { @apply flex flex-col gap-3; }
+.pg-spread-controls { @apply flex flex-wrap gap-4; }
+.pg-spread-control-group { @apply flex flex-wrap gap-1.5; }
+.pg-spread-test-count { font-family: var(--font-mono); color: var(--color-text-meta); }
+.pg-spread-grid {
+    @apply grid gap-3;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 36rem), 1fr));
+}
+/* A grid item's min-width is its content's by default, which would let a wide
+   plot push the page sideways instead of scrolling inside its frame. */
+.pg-spread-grid > * { min-width: 0; }
+.pg-spread-scroll { @apply overflow-x-auto; }
+.pg-spread-svg { display: block; }
+.pg-spread-gridline { stroke: var(--color-chart-grid); stroke-width: 1; }
+.pg-spread-axis { stroke: var(--color-chart-axis); stroke-width: 1; }
+.pg-spread-tick,
+.pg-spread-count {
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    fill: var(--color-text-meta);
+}
+.pg-spread-name {
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    fill: var(--color-text-secondary);
+}
+.pg-spread-value {
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    fill: var(--color-text-value);
+}
+.pg-spread-bar { fill-opacity: 0.8; }
+.pg-spread-span { fill-opacity: 0.25; stroke-width: 1; }
+.pg-spread-tick-mark { stroke-width: 2; }
+.pg-spread-dot { stroke: var(--color-card); stroke-width: 1; }
+.pg-spread-dot-hollow { fill: var(--color-card); stroke: var(--color-text-primary); stroke-width: 1.25; }
+.pg-spread-reported { fill: none; stroke: var(--color-text-primary); stroke-width: 1.25; }
+.pg-spread-whisker line { stroke: var(--color-text-primary); stroke-width: 1.5; }
+.pg-spread-ghost { fill: none; stroke: var(--color-text-muted); stroke-width: 1; }
+.pg-spread-moved { stroke: var(--color-text-muted); stroke-width: 1; stroke-dasharray: 2 2; }
