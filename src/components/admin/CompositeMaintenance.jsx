@@ -31,12 +31,12 @@ export default function CompositeMaintenance() {
         };
     }, [vehicles]);
 
-    async function run() {
+    async function run(all) {
         setRunning(true);
         setResult(null);
         setError(null);
         try {
-            setResult(await rebuildAllComposites({ onProgress: setProgress }));
+            setResult(await rebuildAllComposites({ all, onProgress: setProgress }));
         } catch (e) {
             setError(e.message);
         } finally {
@@ -55,8 +55,12 @@ export default function CompositeMaintenance() {
                 {stale ? `, ${stale} out of date (a test changed, or built before method version ${COMPOSITE_VERSION})` : ''}.
             </p>
             <div className="flex items-center gap-2">
-                <button type="button" className="btn btn-secondary text-sm" onClick={run} disabled={running}>
-                    {running ? 'Rebuilding…' : 'Rebuild all'}
+                <button type="button" className="btn btn-secondary text-sm" onClick={() => run(false)} disabled={running}
+                    title="Vehicles with an out-of-date composite, or none stored yet">
+                    {running ? 'Rebuilding…' : 'Rebuild what needs it'}
+                </button>
+                <button type="button" className="btn btn-secondary text-sm" onClick={() => run(true)} disabled={running}>
+                    Rebuild all
                 </button>
                 {progress && <span className="text-meta">{progress.done} / {progress.total}</span>}
             </div>

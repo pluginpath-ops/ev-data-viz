@@ -49,7 +49,8 @@ const vehicle = { id: 48, platforms: { electrical: { voltage_class_v: 800 } }, s
 
 function given(runs) {
     vi.spyOn(dataService, 'getVehicleRuns').mockResolvedValue(runs);
-    vi.spyOn(dataService, 'getRunData').mockImplementation(async (id) => POINTS[id]);
+    vi.spyOn(dataService, 'getPointsForRuns').mockImplementation(async (ids) =>
+        Object.fromEntries(ids.map(id => [id, POINTS[id]])));
     vi.spyOn(dataService, 'writeCompositePoints').mockResolvedValue();
     vi.spyOn(dataService, 'writeChargeSummary').mockResolvedValue({});
 }
@@ -69,8 +70,13 @@ describe('rebuildComposites — stored composite curves (#313, migration 077)', 
         const inserts = runsWrites().filter(c => c.op === 'insert');
         expect(inserts.map(c => c.payload.composite.chargerClassV)).toEqual([800, 400]);
         expect(inserts[0].payload).toMatchObject({ vehicle_id: 48, kind: 'charging', synthetic: true, name: 'Composite on 800 V chargers (2 tests)' });
-        expect(dataService.writeCompositePoints.mock.calls.map(c => c[0])).toEqual([1000, 1001]);
-        expect(dataService.writeChargeSummary).toHaveBeenCalledTimes(2);
+        expect(dataService.writeCompositePoints.mock.calls.map(c => c[0]).sort()).toEqual([1000, 1001]);
+        // One query for every test's points, and the summary rides on the row
+        // write — the round trips that made a rebuild slow (owner, 2026-10-07).
+        expect(dataService.getPointsForRuns).toHaveBeenCalledTimes(1);
+        expect(dataService.getPointsForRuns.mock.calls[0][0]).toEqual([1, 2, 3, 4]);
+        expect(dataService.writeChargeSummary).not.toHaveBeenCalled();
+        expect(inserts[0].payload.charge_summary.peakKw).toBe(400);
     });
 
     it('updates in place by charger class, and deletes the class that lost its tests', async () => {

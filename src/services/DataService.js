@@ -101,6 +101,46 @@ function normalisePoint(point, runId, frame) {
 }
 
 /**
+ * A data_points row as the app holds it — the one mapping getRunData and the
+ * batched getPointsForRuns share.
+ */
+function shapePoint(p, efficiencyFactor = 1, capacityFactor = 1) {
+  return {
+    frame:       p.frame,
+    timestamp:   p.timestamp,
+    soc:         p.soc,
+    // Same rule as buildInheritedRuns, by what the field IS rather than what
+    // kind of run it sits on — a charging test carries a range readout too,
+    // and it is still a distance:
+    //
+    //   charge_rate (power)  → × cap        a bigger pack pulls more kW
+    //   range_value (distance) → × cap × eff  remaining range is range
+    //
+    // Time is untouched in both cases: these scale magnitude, not the axis
+    // the magnitude is plotted against.
+    //
+    // Each rounds back to its own column's precision (charge_rate is
+    // numeric(8,2), range_value numeric(8,1)) so a scaled point claims no
+    // more precision than the measurement behind it.
+    chargeRate:  p.charge_rate != null && capacityFactor !== 1
+      ? roundField(p.charge_rate * capacityFactor, 2)
+      : p.charge_rate,
+    time:        p.time_value,
+    range:       p.range_value != null && (efficiencyFactor !== 1 || capacityFactor !== 1)
+      ? roundField(p.range_value * capacityFactor * efficiencyFactor, 1)
+      : p.range_value,
+    temperature: p.temperature,
+    // A composite curve's points carry how many tests stand behind them and
+    // their test spread (migration 077); a test's points carry none.
+    ...(p.extra_data?.n != null ? {
+      n:        p.extra_data.n,
+      spreadHi: p.extra_data.spreadHi ?? null,
+      spreadLo: p.extra_data.spreadLo ?? null,
+    } : {}),
+  };
+}
+
+/**
  * A runs row as the app holds it. The one door every run comes through —
  * getVehicles, and a vehicle's runs re-read after its composites are rebuilt —
  * so the two can never shape a run differently.
@@ -1173,17 +1213,22 @@ class DataService {
     const withRuns = { ...vehicle, runs };
     if (!mayHaveComposite(withRuns) && !runs.some(isCompositeRun)) return runs;
 
-    const pointsByRunId = {};
-    for (const r of runs.filter(compositeEligible)) pointsByRunId[r.id] = await this.getRunData(r.id);
+    const pointsByRunId = await this.getPointsForRuns(runs.filter(compositeEligible).map(r => r.id));
     const { writes, deletes } = planCompositeRebuild(withRuns, pointsByRunId);
 
+    // A vehicle's composites (800 V and 400 V) are independent, so they are
+    // written side by side; each one's row write carries its charge summary,
+    // which used to be a request of its own.
     const sb = getSupabase();
-    for (const w of writes) {
+    await Promise.all(writes.map(async (w) => {
+      const row = {
+        name: w.name, composite: w.composite,
+        charge_summary: { ...summarizeChargeSession(w.points), computedAt: new Date().toISOString() },
+      };
       let id = w.id;
       if (id == null) {
         const { data, error } = await sb.from('runs').insert({
-          vehicle_id: vehicle.id, kind: 'charging', synthetic: true,
-          name: w.name, composite: w.composite,
+          vehicle_id: vehicle.id, kind: 'charging', synthetic: true, ...row,
           date: new Date().toISOString().split('T')[0],
           upload_date: new Date().toISOString(),
           populated_fields: ['soc', 'chargeRate', 'time'],
@@ -1191,12 +1236,11 @@ class DataService {
         if (error) throw error;
         id = data.id;
       } else {
-        const { error } = await sb.from('runs').update({ name: w.name, composite: w.composite }).eq('id', id);
+        const { error } = await sb.from('runs').update(row).eq('id', id);
         if (error) throw error;
       }
       await this.writeCompositePoints(id, w.points);
-      await this.writeChargeSummary(id, w.points);
-    }
+    }));
     if (deletes.length) {
       // .select() so a delete RLS filtered out reads as 0 rows, not success:
       // Postgres drops rows a policy hides without an error (migration 077's
@@ -1487,39 +1531,28 @@ class DataService {
       .eq('run_id', actualId)
       .order('frame', { ascending: true })
       .order('id', { ascending: true }));
-    return (data || []).map(p => ({
-      frame:       p.frame,
-      timestamp:   p.timestamp,
-      soc:         p.soc,
-      // Same rule as buildInheritedRuns, by what the field IS rather than what
-      // kind of run it sits on — a charging test carries a range readout too,
-      // and it is still a distance:
-      //
-      //   charge_rate (power)  → × cap        a bigger pack pulls more kW
-      //   range_value (distance) → × cap × eff  remaining range is range
-      //
-      // Time is untouched in both cases: these scale magnitude, not the axis
-      // the magnitude is plotted against.
-      //
-      // Each rounds back to its own column's precision (charge_rate is
-      // numeric(8,2), range_value numeric(8,1)) so a scaled point claims no
-      // more precision than the measurement behind it.
-      chargeRate:  p.charge_rate != null && capacityFactor !== 1
-        ? roundField(p.charge_rate * capacityFactor, 2)
-        : p.charge_rate,
-      time:        p.time_value,
-      range:       p.range_value != null && (efficiencyFactor !== 1 || capacityFactor !== 1)
-        ? roundField(p.range_value * capacityFactor * efficiencyFactor, 1)
-        : p.range_value,
-      temperature: p.temperature,
-      // A composite curve's points carry how many tests stand behind them and
-      // their test spread (migration 077); a test's points carry none.
-      ...(p.extra_data?.n != null ? {
-        n:        p.extra_data.n,
-        spreadHi: p.extra_data.spreadHi ?? null,
-        spreadLo: p.extra_data.spreadLo ?? null,
-      } : {}),
-    }));
+    return (data || []).map(p => shapePoint(p, efficiencyFactor, capacityFactor));
+  }
+
+  /**
+   * Several runs' points in one paged query, keyed by run id — for a composite
+   * rebuild, which needs every test of a vehicle at once. One request (or one
+   * per thousand rows) instead of one per test: per-test fetches one after
+   * another were most of a rebuild's time. Real runs only; no inherited
+   * scaling, which a composite never reads.
+   */
+  async getPointsForRuns(runIds) {
+    const out = Object.fromEntries(runIds.map(id => [id, []]));
+    if (!runIds.length) return out;
+    const data = await fetchAllRows(() => getSupabase()
+      .from('data_points')
+      .select('*')
+      .in('run_id', runIds)
+      .order('run_id', { ascending: true })
+      .order('frame', { ascending: true })
+      .order('id', { ascending: true }));
+    for (const p of data || []) (out[p.run_id] ??= []).push(shapePoint(p));
+    return out;
   }
 
   async toggleVehicleVisibility(vehicleId, newVisibility) {

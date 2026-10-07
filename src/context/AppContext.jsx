@@ -4,7 +4,11 @@ import { withInheritance, variantLinkPlan } from '../utils/vehicleInheritance';
 import { withPlatforms } from '../utils/platforms';
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
-import { mayHaveComposite } from '../utils/compositeCurve';
+import { mayHaveComposite, staleComposites } from '../utils/compositeCurve';
+
+/** Vehicles rebuilt at once by Admin → Rebuild composites. Enough to overlap
+ *  the round trips; few enough not to flood the database with writes. */
+const REBUILD_CONCURRENCY = 4;
 import { dataService } from '../services/DataService';
 import { applyDefaultRun, clearDefaultRuns, isCompositeRun } from '../utils/runUtils';
 import { toSessionRow } from '../utils/testSessions';
@@ -343,18 +347,34 @@ export function AppProvider({ children }) {
     };
 
     /**
-     * Rebuild every vehicle's composites (Admin → Data checks): the first fill
-     * after migration 077, and after COMPOSITE_VERSION changes. One vehicle at
-     * a time — each reads every one of its tests' points.
+     * Rebuild vehicles' composites (Admin → Data checks): the first fill after
+     * migration 077, and after COMPOSITE_VERSION changes.
+     *
+     * By default only what needs it: a vehicle whose stored composites are all
+     * current is skipped. One that could have a composite but has none stored
+     * is always rebuilt — it may never have been built, or its tests may
+     * support none (one per charger class), and only a rebuild can tell.
+     * `all` forces every vehicle.
+     *
+     * REBUILD_CONCURRENCY vehicles at a time: each rebuild is a handful of
+     * round trips, and one after another they were most of the wait.
      */
-    const rebuildAllComposites = async ({ onProgress } = {}) => {
-        const todo = visibleVehiclesRef.current.filter(v => mayHaveComposite(v) || (v.runs || []).some(isCompositeRun));
-        let rebuilt = 0, failed = 0;
-        for (const [i, v] of todo.entries()) {
-            try { await dataService.rebuildComposites(v); rebuilt++; }
-            catch (error) { failed++; console.warn('[composites] not rebuilt for vehicle', v.id, error?.message ?? error); }
-            onProgress?.({ done: i + 1, total: todo.length });
-        }
+    const rebuildAllComposites = async ({ onProgress, all = false } = {}) => {
+        const todo = visibleVehiclesRef.current.filter(v => {
+            const stored = (v.runs || []).filter(isCompositeRun);
+            if (!mayHaveComposite(v) && !stored.length) return false;
+            return all || !stored.length || staleComposites(v).length > 0;
+        });
+        let rebuilt = 0, failed = 0, done = 0, next = 0;
+        const worker = async () => {
+            while (next < todo.length) {
+                const v = todo[next++];
+                try { await dataService.rebuildComposites(v); rebuilt++; }
+                catch (error) { failed++; console.warn('[composites] not rebuilt for vehicle', v.id, error?.message ?? error); }
+                onProgress?.({ done: ++done, total: todo.length });
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(REBUILD_CONCURRENCY, todo.length) }, worker));
         if (rebuilt > 0) await softRefreshVehicles();
         return { checked: todo.length, rebuilt, failed };
     };
