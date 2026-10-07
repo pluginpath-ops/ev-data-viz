@@ -1721,8 +1721,9 @@ class DataService {
    *
    * The PostgreSQL function merge_run_data_points does a set-based UPDATE
    * (patching only non-null fields with COALESCE) for rows whose join-key
-   * matches, then INSERTs any unmatched rows.  One round-trip, no extra RLS
-   * policy needed (SECURITY DEFINER handles auth internally).
+   * matches, then INSERTs any unmatched rows.  One round-trip.  SECURITY
+   * DEFINER bypasses RLS, so the function enforces the data_points write rule
+   * itself (vehicle owner, admin or contributor — migration 078).
    *
    * @param {string} runId
    * @param {Array}  newDataPoints — [{ soc, chargeRate, time, range, temperature }]
@@ -1776,7 +1777,8 @@ class DataService {
 
   /**
    * Replace all data points for a run with a new set of rows.
-   * Uses a SECURITY DEFINER RPC (delete + re-insert) so RLS is not an obstacle.
+   * Uses a SECURITY DEFINER RPC (delete + re-insert), which enforces the
+   * data_points write rule itself: vehicle owner, admin or contributor (078).
    * Updates populated_fields on the runs table after the write.
    *
    * @param {string|number} runId

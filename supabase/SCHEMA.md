@@ -290,15 +290,19 @@ Upserts a row in `site_settings`. Admin-only SECURITY DEFINER function used beca
 
 ---
 
-### `merge_run_data_points(p_run_id, p_join_key, p_rows) → json`
+### `merge_run_data_points(p_run_id, p_join_key, p_rows) → jsonb`
 
 Merges new data points into an existing run using a set-based UPDATE + INSERT. Join key is `'soc'` or `'time'`. Returns `{ updated: N, inserted: M }`.
 
+**Who may call it:** the owner of the run's vehicle, or an admin or contributor — the same rule as the `data_points` write policies (007). It is SECURITY DEFINER, so RLS does not apply and the function checks this itself, raising `Not authorized` (SQLSTATE 42501) otherwise. EXECUTE is granted to `authenticated` only; `anon` cannot call it (078).
+
 ---
 
-### `replace_run_data_points(p_run_id, p_rows) → void`
+### `replace_run_data_points(p_run_id, p_rows) → integer`
 
-Deletes all existing data points for a run and inserts the new set. Used when replacing data wholesale (e.g. re-uploading a CSV).
+Deletes all existing data points for a run and inserts the new set, returning the number inserted. Used when replacing data wholesale (e.g. re-uploading a CSV, or editing and saving a test). Each row may carry an optional `timestamp`.
+
+**Who may call it:** the owner of the run's vehicle, or an admin or contributor — the same rule as the `data_points` write policies (007). It is SECURITY DEFINER, so RLS does not apply and the function checks this itself, raising `Not authorized` (SQLSTATE 42501) otherwise. EXECUTE is granted to `authenticated` only; `anon` cannot call it (078).
 
 ---
 
