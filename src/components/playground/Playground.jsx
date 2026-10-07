@@ -1,10 +1,7 @@
-import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { SECTIONS, OWNED_FAMILIES, hasDarkOverride } from './catalogue';
 import { COMPOSITES } from './specimens';
 import { parseColor, compositeStack, contrastRatio, AA_NORMAL, AA_LARGE } from '../../utils/contrast';
-
-// A prototype with a data snapshot, so its own chunk: the catalogue loads without it.
-const RangeSpreadPrototype = lazy(() => import('./RangeSpreadPrototype'));
 
 /**
  * Every control the site is allowed to draw with, on one page, live.
@@ -258,13 +255,6 @@ export default function Playground() {
                     <SpecimenSet specimens={section.specimens} split={side} />
                 </section>
             ))}
-
-            <section className="pg-section">
-                <h3 className="section-title">Prototype · spread of a vehicle’s range tests</h3>
-                <Suspense fallback={<p className="text-note">Loading…</p>}>
-                    <RangeSpreadPrototype />
-                </Suspense>
-            </section>
         </div>
     );
 }
