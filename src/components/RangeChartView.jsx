@@ -368,22 +368,35 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     }
                     if (badges.length === 0) return;
 
-                    const pillH  = 15, pillPad = 5, gap = 3, topPad = 6;
-                    let drawY = bar.y + topPad;
+                    const pillH  = 15, pillPad = 5, gap = 3, pad = 6;
+                    const fontOf = primary => (primary
+                        ? `600 ${fonts.badge}px ${fonts.sans}`
+                        : `${fonts.micro}px ${fonts.sans}`);
 
-                    badges.forEach(({ text, primary }) => {
-                        // Skip if no vertical room left inside the bar
-                        if (drawY + pillH > bar.base - topPad) return;
-
+                    // Stacked against the axis, at the FOOT of the bar — the
+                    // top is where the test spread's dots gather (the bar's own
+                    // test is one of them), and pills hung from it sat under
+                    // them. Same order, read top to bottom; when the bar is too
+                    // short for all of them the first ones win, as they did. A
+                    // pill wider than the bar is skipped.
+                    const fits = [];
+                    let stackH = 0;
+                    for (const b of badges) {
                         ctx2.save();
-                        ctx2.font = primary
-                            ? `600 ${fonts.badge}px ${fonts.sans}`
-                            : `${fonts.micro}px ${fonts.sans}`;
-                        const tw = ctx2.measureText(text).width;
-                        const pw = tw + pillPad * 2;
+                        ctx2.font = fontOf(b.primary);
+                        const pw = ctx2.measureText(b.text).width + pillPad * 2;
+                        ctx2.restore();
+                        if (pw > barW - 4) continue;
+                        const nextH = stackH + (fits.length ? gap : 0) + pillH;
+                        if (nextH > barH - pad * 2) break;
+                        fits.push({ ...b, pw });
+                        stackH = nextH;
+                    }
+                    let drawY = bar.base - pad - stackH;
 
-                        // Skip if pill is wider than the bar
-                        if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
+                    fits.forEach(({ text, primary, pw }) => {
+                        ctx2.save();
+                        ctx2.font = fontOf(primary);
 
                         const px = bar.x - pw / 2;
                         const rr = 3;

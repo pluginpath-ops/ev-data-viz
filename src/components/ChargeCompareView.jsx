@@ -191,22 +191,37 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                         drawX += pw + gap;
                     });
                 } else {
-                    // Vertical bars: stacked top-to-bottom
+                    // Vertical bars: stacked against the axis, at the FOOT of
+                    // the bar, as horizontal bars already sit against theirs.
+                    // The top of a bar is where the test spread's dots gather
+                    // (the bar's own test is one of them), so pills hung from
+                    // the top sat under them. Same order as before, read top
+                    // to bottom; when the bar is too short for all of them the
+                    // first ones win, as they did.
                     const barW = bar.width;
-                    const gap = 3, topPad = 6;
-                    let drawY = bar.y + topPad;
-
-                    badges.forEach(({ text, primary, alertAmt }) => {
-                        if (drawY + pillH > bar.base - topPad) return;
+                    const gap = 3, pad = 6;
+                    const fits = [];
+                    let stackH = 0;
+                    for (const b of badges) {
+                        ctx2.save();
+                        ctx2.font = b.primary
+                            ? `600 ${fonts.badge}px ${fonts.sans}`
+                            : `${fonts.micro}px ${fonts.sans}`;
+                        const pw = ctx2.measureText(b.text).width + pillPad * 2;
+                        ctx2.restore();
+                        if (pw > barW - 4) continue;
+                        const nextH = stackH + (fits.length ? gap : 0) + pillH;
+                        if (nextH > bar.base - bar.y - pad * 2) break;
+                        fits.push({ ...b, pw });
+                        stackH = nextH;
+                    }
+                    let drawY = bar.base - pad - stackH;
+                    fits.forEach(({ text, primary, alertAmt, pw }) => {
                         ctx2.save();
                         ctx2.font = primary
                             ? `600 ${fonts.badge}px ${fonts.sans}`
                             : `${fonts.micro}px ${fonts.sans}`;
-                        const tw = ctx2.measureText(text).width;
-                        const pw = tw + pillPad * 2;
-                        if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
-                        const px = bar.x - pw / 2;
-                        drawPill(px, drawY, pw, text, alertAmt);
+                        drawPill(bar.x - pw / 2, drawY, pw, text, alertAmt);
                         ctx2.restore();
                         drawY += pillH + gap;
                     });
