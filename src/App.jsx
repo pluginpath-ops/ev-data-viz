@@ -1241,6 +1241,7 @@ export default function App() {
                             correctionMode={chartConfig.correctionMode ?? 'none'}
                             palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                             handSet={chartConfig.handSet ?? false}
+                            testSpread={chartConfig.testSpread ?? true}
                             setChartConfig={setChartConfig}
                         />
                     )}

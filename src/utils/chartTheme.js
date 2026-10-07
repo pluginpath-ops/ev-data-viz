@@ -140,6 +140,7 @@ export function applyChartDefaults(Chart) {
 const FALLBACK = {
     tick:       'rgb(139, 149, 165)',
     legend:     'rgb(168, 178, 193)',
+    ink:        'rgb(242, 245, 249)',
     grid:       'rgb(26, 33, 44)',
     axis:       'rgb(61, 74, 90)',
     accent:     'rgb(45, 127, 249)',
@@ -172,6 +173,9 @@ export function chartTheme() {
     return {
         tick:       read('--color-text-muted', FALLBACK.tick),
         legend:     read('--color-text-secondary', FALLBACK.legend),
+        // Marks drawn ON a series color — the test spread's line and dots —
+        // need the strongest text color to hold against any bar.
+        ink:        read('--color-text-primary', FALLBACK.ink),
         grid:       read('--color-chart-grid', FALLBACK.grid),
         axis:       read('--color-chart-axis', FALLBACK.axis),
         // Not a data color. The one canvas surface that needs it is the

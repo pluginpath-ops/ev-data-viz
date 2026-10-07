@@ -115,6 +115,7 @@ export default function PopoutView({
                     pairings={pairings}
                     verboseLabels={chartConfig?.verboseLabels ?? false}
                     palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
+                    testSpread={chartConfig?.testSpread ?? true}
                     presentationMode
                 />
             )}

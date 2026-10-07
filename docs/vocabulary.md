@@ -345,7 +345,7 @@ says to stop and ask when the right name is not obvious.
 | The thing | Where it lands | Candidates | Leaning |
 |---|---|---|---|
 | The shrinkage weight that trades a vehicle's own spread against the fleet's | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314) | — | undecided |
-| The mark showing how far apart a vehicle's range tests landed — every test's figure, not a summary of them | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314); prototype under Playground | test spread (widened to cover both charts) · tested span · spread of tests | **test spread**, widened — see below |
+| The mark showing how far apart a vehicle's range tests landed — every test's figure, not a summary of them | Range & Efficiency and Charge Stop bars, Road Trip ([rangeTestSpread.js](../src/utils/rangeTestSpread.js), [roadTripSpread.js](../src/utils/roadTripSpread.js)); labelled "Test spread" meanwhile | test spread (widened to cover both charts) · tested span · spread of tests | **test spread**, widened — see below |
 
 **Range tests and "test spread."** #313 defines test spread for a curve: the
 best test at each SoC down to one SD below the mean, lopsided on purpose. A range

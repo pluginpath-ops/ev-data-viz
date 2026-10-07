@@ -16,6 +16,8 @@ import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import VerboseLabelToggle from './VerboseLabelToggle';
+import TestSpreadToggle from './TestSpreadToggle';
+import { spreadOf, rangeBasesFor, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip } from '../utils/rangeTestSpread';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
@@ -101,6 +103,21 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     groups.push({ vehicleName: run.vehicleName, startIdx: i, endIdx: i });
                 }
             });
+
+            // ── Test spread (utils/rangeTestSpread): line under the badges,
+            //    dots over them ──────────────────────────────────────────────
+            const { ink, background } = chartTheme();
+            const valueScale = isHorizontal ? chart.scales.x : chart.scales.y;
+            const spreadPx = run => run._spread?.values.map(v => valueScale.getPixelForValue(v));
+            const drawSpread = phase => flatRuns.forEach((run, i) => {
+                const bar = meta.data[i];
+                if (!bar || !run._spread) return;
+                drawTestSpread(ctx2, {
+                    at: isHorizontal ? bar.y : bar.x, px: spreadPx(run),
+                    horizontal: isHorizontal, ink, fill: background, phase,
+                });
+            });
+            drawSpread('line');
 
             // ── Badges inside each bar ────────────────────────────────────────
             flatRuns.forEach((run, i) => {
@@ -196,18 +213,22 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                 }
             });
 
+            drawSpread('dots');
+
             // ── Vehicle group labels + dashed separators ──────────────────────
             if (isHorizontal) {
-                // Run names drawn to the right of each bar
+                // Run names drawn to the right of each bar — and of its
+                // furthest test, so a dot never sits on the name.
                 flatRuns.forEach((run, i) => {
                     const bar = meta.data[i];
                     if (!bar) return;
+                    const end = Math.max(bar.x, ...(spreadPx(run) ?? []).map(p => p + 4));
                     ctx2.save();
                     ctx2.font         = `${fonts.label}px ${fonts.sans}`;
                     ctx2.fillStyle    = tickColor;
                     ctx2.textAlign    = 'left';
                     ctx2.textBaseline = 'middle';
-                    ctx2.fillText(run.name, bar.x + 8, bar.y);
+                    ctx2.fillText(run.name, end + 8, bar.y);
                     ctx2.restore();
                 });
 
@@ -334,6 +355,7 @@ export default function ChargeCompareView({
     correctionMode = 'none',
     palette = VEHICLE_PALETTE,
     handSet = false,
+    testSpread = true,
     setChartConfig = null,
 }) {
     const { units, testSessions } = useAppContext();
@@ -561,6 +583,22 @@ export default function ChargeCompareView({
         }));
     }, [resolvedPairs, selectedRuns, verboseLabels, colorMap]);
 
+    // The test spread's inputs: every range test of the bar's vehicle as a
+    // range basis for the bar's charging run, through the resolver the bars
+    // use (utils/rangeTestSpread). Per bar, not per vehicle — the charging
+    // curve is held fixed, so two partners give two spreads.
+    const spreadBases = useMemo(() => {
+        const out = new Map();
+        if (!testSpread) return out;
+        for (const p of activePairs) {
+            out.set(p.key, rangeBasesFor(p.chargingRun, p.vehicle, {
+                correctionMode,
+                sessionOf: r => sessionFor(testSessions, r),
+            }).filter(b => b.miPerSoc > 0));
+        }
+        return out;
+    }, [testSpread, activePairs, correctionMode, testSessions]);
+
     // ── The frames' caption, and their exports ───────────────────────────────
     // This view had no PNG export at all — only a Copy URL — so the one chart
     // most likely to be pasted into a comparison thread was the one that could
@@ -688,6 +726,13 @@ export default function ChargeCompareView({
                     : interpolate(byTime, 'time', 'range', targetTime, false, true);
                 const yValueMi = Rend != null ? Math.round((Rend - Rz) * 10) / 10 : null;
                 const yValue   = yValueMi != null ? convDistance(yValueMi, units) : null;
+                // The same window, priced by each range test in turn.
+                const spread = useLinear && SocEnd != null
+                    ? spreadOf((spreadBases.get(key) ?? []).map(b => ({
+                        value: convDistance(Math.round((SocEnd - startSoc) * b.miPerSoc * 10) / 10, units),
+                        run: b.run, note: b.note,
+                    })))
+                    : null;
                 flatRuns.push({
                     ...base,
                     _yValue:          yValue ?? 0,
@@ -698,6 +743,7 @@ export default function ChargeCompareView({
                     _socDeviation:    socDeviation,
                     _topDeviationAmt: topAlertAmt(timeOvershoot, xMinutes),
                     _noData:          yValue == null,
+                    _spread:          yValue != null ? spread : null,
                 });
             } else {
                 // Linear: the miles asked for convert to a SoC target, and the
@@ -724,6 +770,16 @@ export default function ChargeCompareView({
                     rangeOvershoot = Math.max(0, targetRange - lastRange);
                 }
                 const yValue = Tend != null ? Math.round((Tend - Tz) * 10) / 10 : null;
+                // The same miles, priced by each range test in turn: a test
+                // that cannot reach them from this SoC has no time to give.
+                const spread = useLinear
+                    ? spreadOf((spreadBases.get(key) ?? []).map(b => {
+                        const soc = startSoc + mMiles / b.miPerSoc;
+                        if (soc > 100) return null;
+                        const t = interpolate(bySoc, 'soc', 'time', soc, false, true);
+                        return t != null ? { value: Math.round((t - Tz) * 10) / 10, run: b.run, note: b.note } : null;
+                    }))
+                    : null;
                 flatRuns.push({
                     ...base,
                     _yValue:          yValue ?? 0,
@@ -734,6 +790,7 @@ export default function ChargeCompareView({
                     _socDeviation:    socDeviation,
                     _topDeviationAmt: topAlertAmt(rangeOvershoot, mMiles),
                     _noData:          yValue == null,
+                    _spread:          yValue != null ? spread : null,
                 });
             }
         }
@@ -750,7 +807,10 @@ export default function ChargeCompareView({
             borderSkipped:   false,
         }];
 
-        return { data: { labels: flatRuns.map(r => r.name), datasets }, flatRuns, yLabel };
+        // A test past every bar would otherwise draw off the end of the axis.
+        const spreadHi = Math.max(...flatRuns.map(r => r._spread?.hi ?? -Infinity));
+        const spreadMax = Number.isFinite(spreadHi) ? spreadHi * 1.03 : undefined;
+        return { data: { labels: flatRuns.map(r => r.name), datasets }, flatRuns, yLabel, spreadMax };
     };
 
     // ── Build and render both charts ──────────────────────────────────────────
@@ -771,7 +831,10 @@ export default function ChargeCompareView({
             instanceRef.current = new Chart(canvasRef.current.getContext('2d'), {
                 type:    'bar',
                 data:    built.data,
-                plugins: [makeBarPlugin(built.flatRuns, isHorizontal, units)],
+                plugins: [makeBarPlugin(built.flatRuns, isHorizontal, units), testSpreadHoverPlugin(built.flatRuns, {
+                    horizontal: isHorizontal,
+                    describe: (p, row) => testPointLines(p.run, `${p.value} ${row._yUnit}`, units, p.note),
+                })],
                 options: {
                     indexAxis: isHorizontal ? 'y' : undefined,
                     layout: { padding: isHorizontal ? { top: 0, left: 140, right: 10 } : { top: 0, bottom: 55 } },
@@ -782,6 +845,7 @@ export default function ChargeCompareView({
                         legend: { display: false },
                         tooltip: {
                             displayColors: false,
+                            filter: suppressBarTooltip,
                             callbacks: {
                                 title(items) {
                                     if (!items.length) return;
@@ -811,17 +875,20 @@ export default function ChargeCompareView({
                                                 ? `Range basis: ${run._rangeSourceRun}`
                                                 : null,
                                         ...(run._figureSources ?? []).map(s => s.line),
+                                        run._spread
+                                            ? `Across ${run._spread.n} range tests: ${run._spread.lo}–${run._spread.hi} ${run._yUnit}`
+                                            : null,
                                     ].filter(Boolean), units);
                                 },
                             },
                         },
                     },
                     scales: isHorizontal ? {
-                        x: { title: { display: true, text: built.yLabel, color: legendColor }, beginAtZero: true, ticks: { color: tickColor }, grid: { color: gridColor } },
+                        x: { title: { display: true, text: built.yLabel, color: legendColor }, beginAtZero: true, suggestedMax: built.spreadMax, ticks: { color: tickColor }, grid: { color: gridColor } },
                         y: { type: 'category', grid: { display: false }, title: { display: false }, ticks: { display: false } },
                     } : {
                         x: { type: 'category', grid: { display: false }, title: { display: false }, ticks: { color: tickColor } },
-                        y: { title: { display: true, text: built.yLabel, color: legendColor }, beginAtZero: true, ticks: { color: tickColor }, grid: { color: gridColor } },
+                        y: { title: { display: true, text: built.yLabel, color: legendColor }, beginAtZero: true, suggestedMax: built.spreadMax, ticks: { color: tickColor }, grid: { color: gridColor } },
                     },
                 },
             });
@@ -841,7 +908,7 @@ export default function ChargeCompareView({
     // It also carries the labels and colors, so a Full Labels toggle redraws —
     // depending on resolvedPairs alone left that toggle inert, since it changes
     // neither the pairs nor the selection.
-    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, activePairs, units, isDark]);
+    }, [selectedVehicleIds, xMinutes, mMiles, startSoc, runDataCache, orientation, activePairs, units, isDark, spreadBases]);
 
     const hasRangeRuns = resolvedPairs.length > 0;
 
@@ -918,6 +985,7 @@ export default function ChargeCompareView({
                         <>
                             <div className="display-grid">
                                 <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                                <TestSpreadToggle on={testSpread} setChartConfig={setChartConfig} />
                             </div>
                             <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                             <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />

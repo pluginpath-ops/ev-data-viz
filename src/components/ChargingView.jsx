@@ -858,6 +858,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 // App, so it misses anything App hands the other charts.
                 verboseLabels={chartConfig.verboseLabels ?? false}
                 correctionMode={chartConfig.correctionMode ?? 'none'}
+                testSpread={chartConfig.testSpread ?? true}
             />
         );
     }
