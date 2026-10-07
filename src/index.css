@@ -4283,6 +4283,17 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply flex justify-between items-start;
 }
 
+/* A test card under its identity line: the bands on the left, the action
+ * column on the right, the column running the body's full height so the data
+ * actions can sit at its foot. */
+.run-card-body {
+    @apply flex justify-between items-stretch;
+    gap: 1.25rem;
+}
+/* .run-meta opens with mt-2; the column takes the same step, so the first
+ * button's top edge is level with the bands' top edge. */
+.run-card-body > .run-actions { margin-top: 0.5rem; }
+
 /* Run metadata block (date, conditions, notes) */
 .run-meta {
     @apply text-sm mt-2 space-y-1;
@@ -4296,7 +4307,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Run card actions — own runs: single horizontal row; inherited: column of rows */
 .run-actions {
-    @apply flex flex-col gap-1.5 items-end shrink-0;
+    @apply flex flex-col gap-1.5 items-end shrink-0 self-stretch;
+    /* The fixed width of a test card's grid and data actions — see
+       .run-curation-grid. Sized by "⚑ Checks overridden", two up. */
+    --run-actions-w: 20rem;
 }
 .run-actions-row {
     @apply flex gap-2 items-center;
@@ -4309,6 +4323,58 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * field; a labelled field wants a line. */
 .run-actions-stack {
     @apply flex flex-col gap-1.5 items-end;
+}
+/* Where a test stands, two to a row: Default, Unlist, Exclude, Override checks.
+ * A grid rather than a wrapping row so the cells line up from card to card
+ * whatever their labels say — a wrapped row left each card's toggles in a
+ * different ragged shape. Equal columns, sized by the longest label. */
+.run-curation-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.375rem;
+    width: var(--run-actions-w);
+}
+/* A test card's action column is one fixed width, top to bottom, so Edit,
+ * the grid and the data actions line up on every card whatever their labels
+ * say (`--run-actions-w`, set on .run-actions). */
+.run-edit-actions {
+    display: flex;
+    gap: 0.375rem;
+}
+.run-edit-actions > .btn { width: 5rem; }
+/* What can be done with a test's data — CSV, Copy, Copy to, Upload — in four
+ * equal cells across the column's width, pinned to the card's foot: they are
+ * the least-used group, and the foot is where the column had nothing. */
+.run-data-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.375rem;
+    width: var(--run-actions-w);
+    margin-top: auto;
+}
+.run-data-actions > .btn {
+    padding-inline: 0.25rem;
+    white-space: nowrap;
+}
+/* Bordered, unlike a bare `.btn-toggle`, so an empty grid cell and a toggle at
+ * its default still read as a slot. A changed toggle goes orange: the
+ * vocabulary's "selected or overridden" signal, which is what a curator's
+ * departure from the default is. Default keeps `.btn-toggle.active`'s blue. */
+.run-curation-toggle {
+    text-align: left;
+    white-space: nowrap;
+    background: none;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+}
+.run-curation-toggle:hover:not(:disabled) {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-primary);
+}
+.run-curation-toggle.is-set {
+    border-color: var(--color-accent-orange);
+    background-color: var(--color-accent-orange-surface);
+    color: var(--color-accent-orange);
 }
 
 

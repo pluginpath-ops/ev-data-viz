@@ -505,9 +505,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [editingRunId, setEditingRunId] = useState(null);
     const [editFormData, setEditFormData] = useState({});
 
-    // ── Overflow action menu state ────────────────────────────────────────────
-    const [openMenuRunId, setOpenMenuRunId] = useState(null);
-
     // ── Inherited test link form state ────────────────────────────────────────
     const [showAddLink, setShowAddLink]     = useState(false);
     const [newLinkSourceId, setNewLinkSourceId] = useState('');
@@ -2418,7 +2415,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 vehicle={vehicle}
                                 units={units}
                                 canEdit={canEdit}
-                                canCreate={canCreate}
                                 isContributor={isContributor}
                                 clearDefaultRun={clearDefaultRun}
                                 onSetDefaultRun={onSetDefaultRun}
@@ -2438,10 +2434,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 copyTargetVehicles={copyTargetVehicles}
                                 calcKwhByRun={calcKwhByRun}
                                 canEdit={canEdit}
-                                canCreate={canCreate}
                                 isContributor={isContributor}
-                                openMenuRunId={openMenuRunId}
-                                setOpenMenuRunId={setOpenMenuRunId}
                                 exportingRunId={exportingRunId}
                                 duplicatingRunId={duplicatingRunId}
                                 toggleRunVote={toggleRunVote}
