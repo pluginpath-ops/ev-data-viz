@@ -216,6 +216,17 @@ status and is never chrome.
 | A spec flag made in View Specs but not yet saved (saved when the modal closes) | **a pending flag** | `pendingFlags` in [ViewSpecsModal.jsx](../src/components/ViewSpecsModal.jsx) |
 | An admin removing a spec flag | **clearing a flag** — "click to clear" | `unflagSpecField` / `unflag_spec_field` (the code's verb; the UI says clear) |
 | A table cell whose value carries a flag | **a flagged cell** — the corner mark, and a peek that always shows | `.guide-td.is-flagged`, `.guide-td-flag`, `TableCell` `flagged` |
+| Whether a test appears to viewers in the pickers, the charts and Tests & Data | **listed** / **unlisted** — "Unlist", "List". An unlisted test is still reachable, and still counts in the statistics unless it is excluded; it is only kept out of the lists. Replaces "hidden" in UI text when [#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394) lands. Not "public" / "private": unlisted tests still reach viewers' browsers (the filter is client-side), and `vehicles.visibility = 'public'` is real access control | `runs.is_hidden` (migration 034) narrows to this — see Deferred renames ([#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394)) |
+| A test left out of the statistics — composite curves, test spreads, best charge windows, and #314's error bars — whether listed or not | **excluded** — "Exclude from statistics", "Include". Counting is the default and has no word of its own. Not "verified", which means an EPA link confirmed against the certification document; not the filter chip's **exclude** above, which leaves rows out of a view, not out of a dataset | `runs.is_excluded` (planned, [#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394)) |
+| A vehicle's tests that are unlisted but still count | **the pool** — pooled tests. Where `n` grows without cluttering the lists: a curator lists the one to five tests that represent the vehicle and pools the rest | [#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394) |
+
+**Unlisted and excluded are two questions, not one.** Listing asks whether
+viewers see a test; excluding asks whether it counts. All four answers are
+real: listed and counted (the representative tests), unlisted and counted (the
+pool), unlisted and excluded (disputed or incomplete — what "hidden" was made
+for), and listed but excluded (shown for illustration, kept out of the figures:
+a towing run, a −10 °F test). Until [#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394) lands, `is_hidden` still means
+both unlisted AND excluded, and the code treats it so.
 
 **A skip is a decision, not a deletion.** The same word in both places because
 it is the same act: someone looked, and nothing needs doing. A Data Checks skip
@@ -388,3 +399,10 @@ touch ~40 CSS references plus JSX across five views. Worth doing on its own
 branch, not folded into unrelated work. Until then the classes keep the old
 names and the prose uses the new ones — a gap this file exists to record rather
 than hide.
+
+`runs.is_hidden` will mean **unlisted** only once [#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394) splits out
+`is_excluded`; the column keeps its name rather than churn every query and the
+RLS-free client filter in `AppContext`. Until then it means unlisted and
+excluded together, which is what migration 034 made it for. "Hidden" stays out of
+the Retired table until the UI says "Unlist", or the check would fire on the
+current code.
