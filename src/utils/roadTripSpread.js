@@ -9,11 +9,12 @@
  * shading says "how much the answer depends on which range test you trust"
  * and nothing else.
  *
- * Efficiency from measured energy only. Pricing an SoC window at a capacity
- * estimate would put a guess inside an observed spread.
+ * Efficiency from measured energy where a test has it, else estimated from
+ * its SoC change and the vehicle's SoC window (rangeTestSpread.spreadEfficiency)
+ * — the owner's call: an estimate, counted as one in the tooltip, beats a test
+ * left out. Road Trip's own line has always taken the same estimate.
  */
-import { visibleRangeTests } from './rangeTestSpread';
-import { miPerKwhFrom } from './rangeSource';
+import { countedRangeTests, spreadEfficiency } from './rangeTestSpread';
 import { correctionFactor } from './conditionCorrection';
 import { STANDARD_CONDITIONS } from '../constants/epa';
 
@@ -32,14 +33,15 @@ const ASSUMED_TEST_SPEED_MPH = 70;
  */
 export function spreadTestsFor(vehicle, { correctionMode = 'none', sessionOf = () => null } = {}) {
     const out = [];
-    // Hidden tests left out, as on the bar charts. Viewers never receive them;
-    // a contributor does, and must see the same spread a viewer would.
-    for (const run of visibleRangeTests(vehicle)) {
-        const { miPerKwh, method } = miPerKwhFrom(run);
-        if (method !== 'measured-energy' || !(miPerKwh > 0) || !Number.isFinite(miPerKwh)) continue;
+    // The tests that count, as on the bar charts: listed and pooled, less the
+    // excluded (#394). A viewer and a contributor see the same spread.
+    for (const run of countedRangeTests(vehicle)) {
+        const e = spreadEfficiency(run, vehicle?.socWindowKwh);
+        if (!e) continue;
+        const { miPerKwh, estimated } = e;
         const ownSpeed = run.speed_mph || ASSUMED_TEST_SPEED_MPH;
         if (correctionMode === 'none') {
-            out.push({ run, miPerKwh, testSpeedMph: ownSpeed });
+            out.push({ run, miPerKwh, estimated, testSpeedMph: ownSpeed });
             continue;
         }
         const session = sessionOf(run);
@@ -52,6 +54,7 @@ export function spreadTestsFor(vehicle, { correctionMode = 'none', sessionOf = (
         out.push({
             run,
             miPerKwh: miPerKwh * c.factor,
+            estimated,
             testSpeedMph: c.applied.includes('speed') ? STANDARD_CONDITIONS.speedMph : ownSpeed,
         });
     }

@@ -11,8 +11,7 @@ import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import TestSpreadToggle from './TestSpreadToggle';
-import { coversPracticalPack } from '../utils/testedRange';
-import { spreadOf, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip } from '../utils/rangeTestSpread';
+import { spreadOf, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip, countedRangeTests, spreadSummary, rangeCoverageOk, spreadEfficiency } from '../utils/rangeTestSpread';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -114,24 +113,26 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // multiplication corrects range AND efficiency in every unit — including
     // Wh/mi, which inverts correctly because it is energy over distance.
     // Correcting the two outputs separately would let them drift apart.
-    const allRangeRuns = selectedVehicles.flatMap(v =>
-        filterRangeRuns(v.runs).map(r => {
-            const session = sessionFor(testSessions, r);
-            const result = correctionFactor({
-                speedMph:     r.speed_mph,
-                speedBasis:   r.speed_basis,
-                altitudeFt:   r.altitude_ft   ?? session?.altitude_ft,
-                temperatureF: r.temperature_f ?? session?.temperature_f,
-            }, { mode: correctionMode });
-            const base = { ...r, vehicle: v, vehicleName: vehicleLabel(v), vehicleId: v.id };
-            if (result.factor === 1) return base;
-            return {
-                ...base,
-                distance_miles: base.distance_miles != null ? base.distance_miles * result.factor : null,
-                _correction: { ...result, note: correctionNote(result) },
-            };
-        })
-    );
+    const corrected = (v, r) => {
+        const session = sessionFor(testSessions, r);
+        const result = correctionFactor({
+            speedMph:     r.speed_mph,
+            speedBasis:   r.speed_basis,
+            altitudeFt:   r.altitude_ft   ?? session?.altitude_ft,
+            temperatureF: r.temperature_f ?? session?.temperature_f,
+        }, { mode: correctionMode });
+        const base = { ...r, vehicle: v, vehicleName: vehicleLabel(v), vehicleId: v.id };
+        if (result.factor === 1) return base;
+        return {
+            ...base,
+            distance_miles: base.distance_miles != null ? base.distance_miles * result.factor : null,
+            _correction: { ...result, note: correctionNote(result) },
+        };
+    };
+    const allRangeRuns = selectedVehicles.flatMap(v => filterRangeRuns(v.runs).map(r => corrected(v, r)));
+    // What the test spread is drawn from: the tests that COUNT — listed and
+    // pooled, less the excluded (#394) — corrected exactly as the bars are.
+    const spreadSource = new Map(selectedVehicles.map(v => [v.id, countedRangeTests(v).map(r => corrected(v, r))]));
 
     const selectedRangeRuns = allRangeRuns.filter(r =>
         selectedRuns.some(id => String(id) === String(r.id))
@@ -200,18 +201,30 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             const labels = plottableRuns.map(nameFor);
 
             // The test spread (utils/rangeTestSpread): every range test of the
-            // vehicle, selected or not, on the same basis as the bars — already
-            // corrected, since allRangeRuns carries the corrected distance. A
-            // range figure only from a test that saw the pack: the bar's own
+            // vehicle that counts, selected or not, unlisted or not, on the same
+            // basis as the bars — already corrected (spreadSource). A
+            // range figure only from a test that saw the pack, or one a curator
+            // overrode the quality checks on (rangeCoverageOk): the bar's own
             // fallback to raw distance would put a 23-mile speed-sweep segment
             // at the bottom of the spread.
             const spreadByVehicle = new Map();
             if (testSpread) {
                 for (const v of selectedVehicles) {
-                    spreadByVehicle.set(v.id, spreadOf(allRangeRuns
-                        .filter(r => r.vehicleId === v.id && !(r.isHidden || r.is_hidden))
-                        .filter(r => hasDataForType(r, chartType) && (!isRange || coversPracticalPack(r)))
-                        .map(r => ({ value: getY(r), run: r }))));
+                    const tests = spreadSource.get(v.id);
+                    spreadByVehicle.set(v.id, spreadOf(isRange
+                        ? tests.filter(r => hasDataForType(r, chartType) && rangeCoverageOk(r))
+                            .map(r => ({ value: getY(r), run: r }))
+                        // Efficiency: measured energy, else estimated from the
+                        // SoC change (spreadEfficiency) — the bars still need
+                        // measured energy; the spread takes an estimate, marked.
+                        : tests.map(r => {
+                            const e = spreadEfficiency(r, v.socWindowKwh);
+                            if (!e) return null;
+                            return {
+                                value: calcEff(r.distance_miles, r.distance_miles / e.miPerKwh, effUnit, units),
+                                run: r, estimated: e.estimated, estimateNote: e.note,
+                            };
+                        })));
                 }
             }
             const spreadMax = Math.max(...[...spreadByVehicle.values()].map(sp => sp?.hi ?? -Infinity));
@@ -235,7 +248,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     fullName: barLabels.get(r.id)?.full ?? r.name,
                     _yValue: getY(r), _yUnit: yUnit,
                     _spread: spreadByVehicle.get(r.vehicleId) ?? null,
-                    _spreadBasis: isRange ? 'range tests that saw most of the pack' : 'range tests with measured energy',
+                    _spreadBasis: 'range tests',
                 })),
             };
         }
@@ -429,7 +442,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 // ── Test spread, second pass: the dots, over the badges ──────
                 runs.forEach((run, i) => {
                     const bar = meta.data[i];
-                    if (bar && run._spread) drawTestSpread(ctx2, { at: bar.x, px: spreadPx(run), horizontal: false, ink, fill: background, phase: 'dots' });
+                    if (bar && run._spread) drawTestSpread(ctx2, { at: bar.x, px: spreadPx(run), horizontal: false, ink, fill: background, phase: 'dots', dashed: run._spread.points.map(p => !!p.estimated), own: run._spread.points.map(p => String(p.run?.id) === String(run.id)), ownFill: bar.options?.backgroundColor });
                 });
 
                 // ── Vehicle group labels + dashed separators below x-axis ────
@@ -502,7 +515,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             type:    built.kind,
             data:    built.data,
             plugins: built.kind === 'bar' ? [barGroupPlugin, testSpreadHoverPlugin(built.flatRuns, {
-                describe: (p, row) => testPointLines(p.run, `${p.value} ${row._yUnit}`, units, p.run._correction?.note),
+                describe: (p, row) => testPointLines(p.run, `${p.value} ${row._yUnit}`, units, p.run._correction?.note, p.estimateNote),
             })] : [],
             options: {
                 layout: {
@@ -556,7 +569,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                                         // infer it from the size of the change.
                                         run._correction?.note ?? null,
                                         run._spread
-                                            ? `Across ${run._spread.n} ${run._spreadBasis}: ${run._spread.lo}–${run._spread.hi} ${run._yUnit}`
+                                            ? spreadSummary(run._spread, run._yUnit, run._spreadBasis)
                                             : null,
                                     ].filter(Boolean), units);
                                 }

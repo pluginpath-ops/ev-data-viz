@@ -217,6 +217,21 @@ status and is never chrome.
 | A spec flag made in View Specs but not yet saved (saved when the modal closes) | **a pending flag** | `pendingFlags` in [ViewSpecsModal.jsx](../src/components/ViewSpecsModal.jsx) |
 | An admin removing a spec flag | **clearing a flag** — "click to clear" | `unflagSpecField` / `unflag_spec_field` (the code's verb; the UI says clear) |
 | A table cell whose value carries a flag | **a flagged cell** — the corner mark, and a peek that always shows | `.guide-td.is-flagged`, `.guide-td-flag`, `TableCell` `flagged` |
+| Whether a test appears to viewers in the pickers, the charts and Tests & Data | **listed** / **unlisted** — "Unlist", "List". An unlisted test is still reachable, and still counts in the statistics unless it is excluded; it is only kept out of the lists. Replaced "hidden" in UI text in [#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394). Not "public" / "private": unlisted tests still reach viewers' browsers (the filter is client-side), and `vehicles.visibility = 'public'` is real access control | `runs.is_hidden` (migration 034), narrowed to this by migration 079 — see Deferred renames; `isUnlisted`, `isListed` in [runListing.js](../src/utils/runListing.js) |
+| A test left out of the statistics — composite curves, test spreads, best charge windows, and #314's error bars — whether listed or not | **excluded** — "Exclude from statistics", "Include". Counting is the default and has no word of its own. Not "verified", which means an EPA link confirmed against the certification document; not the filter chip's **exclude** above, which leaves rows out of a view, not out of a dataset | `runs.is_excluded` (migration 079); `isExcluded`, `countsInStatistics`, `statisticalRuns` in [runListing.js](../src/utils/runListing.js); "⊖ Exclude from statistics" on a test's ⋯ menu |
+| A vehicle's tests that are unlisted but still count | **the pool** — pooled tests. Where `n` grows without cluttering the lists: a curator lists the tests that represent the vehicle (no cap) and pools the rest. An unlisted RANGE test joins the pool only with its speed and temperature recorded; one without says "Not counted: no speed" on its card. Counted after the listed ones in grey: "Charging (4/2)" | `vehicle.pooledRuns`, `poolOf`, `poolGateMissing`; `.test-count-pool`; [RunListingBadges.jsx](../src/components/runs/RunListingBadges.jsx) |
+| A curator's "I have looked; count it" on a test the automatic checks would keep out | **override quality checks** — "⚑ Override quality checks", "↺ Restore quality checks"; the card's badge reads "Checks overridden". Overrides the range spread's pack-coverage rule and the pool's speed/temperature rule, nothing else: not missing data (no start/end SoC is still no range), not exclusion. Not **Data Checks**, the Admin panel's findings about a vehicle's figures | `runs.quality_override` (migration 080); `hasQualityOverride` in [runListing.js](../src/utils/runListing.js), `rangeCoverageOk` in [rangeTestSpread.js](../src/utils/rangeTestSpread.js) |
+
+**Unlisted and excluded are two questions, not one.** Listing asks whether
+viewers see a test; excluding asks whether it counts. All four answers are
+real: listed and counted (the representative tests), unlisted and counted (the
+pool), unlisted and excluded (disputed or incomplete — what "hidden" was made
+for, and where every hidden test started when migration 079 split the flag),
+and listed but excluded (shown for illustration, kept out of the figures: a
+towing run, a −10 °F test). A figure that AGGREGATES tests — a composite, a
+spread, a best — counts the pool; a figure that QUOTES one test — the reported
+range test, a default, an explainer's citation — quotes a listed one, so a
+reader can find it.
 
 **A skip is a decision, not a deletion.** The same word in both places because
 it is the same act: someone looked, and nothing needs doing. A Data Checks skip
@@ -338,6 +353,7 @@ series, so nothing here is a sparkline and the word should not appear.
 | "pinning" for choosing vehicles in the specs table | selecting | pin is view-scoped; that click drives every chart |
 | "sparkline" for an in-cell magnitude bar | bar cell | nothing here is a series |
 | a bare "band" | validity band / confidence band | two live meanings, opposite jobs |
+| "Hidden" / "Hide" for a test, in UI text | **Unlisted** / Unlist — or **Excluded**, if it is the statistics that are meant | one word carried two questions until #394 split them |
 
 ## Open names
 
@@ -391,3 +407,8 @@ touch ~40 CSS references plus JSX across five views. Worth doing on its own
 branch, not folded into unrelated work. Until then the classes keep the old
 names and the prose uses the new ones — a gap this file exists to record rather
 than hide.
+
+`runs.is_hidden` means **unlisted** since migration 079 split out
+`is_excluded` ([#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394)); the column, the `isHidden` key and the
+`.badge-hidden` class keep their names rather than churn every query and the
+client-side filter in `AppContext`. The UI says Unlisted.

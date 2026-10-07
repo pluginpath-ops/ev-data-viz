@@ -43,6 +43,7 @@
  * guess with a decimal point. Those are reported as measured, with the window
  * named, and the reader is told the test cannot answer the question.
  */
+import { isListed, isExcluded } from './runListing';
 import { defaultRangeRun, miPerKwhFrom } from './rangeSource';
 import { speedBasisNote } from './unitConversions';
 
@@ -164,7 +165,9 @@ export const REPORTED_RANGE_REASON = {
 
 /** reportedRangeRun, with which rule chose it (a key of REPORTED_RANGE_REASON). */
 export function reportedRangeChoice(vehicle) {
-    const usable = (vehicle?.runs || []).filter(r => r.distance_miles > 0);
+    // A quoted figure names one test, so a listed one a reader can find, and
+    // never one kept out of the figures (#394, utils/runListing).
+    const usable = (vehicle?.runs || []).filter(r => r.distance_miles > 0 && isListed(r) && !isExcluded(r));
     const curated = usable.find(r => r.isDefault || r.is_default);
     if (curated) return { run: curated, reason: 'default' };
     const byNewest = (a, b) => new Date(b.date) - new Date(a.date);

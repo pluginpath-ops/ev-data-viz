@@ -17,7 +17,9 @@
  * claim agreement.
  */
 import { filterRangeRuns } from './runUtils';
-import { resolveRangeSource } from './rangeSource';
+import { resolveRangeSource, miPerKwhFrom } from './rangeSource';
+import { statisticalRuns, isUnlisted, unlistedCount, hasQualityOverride } from './runListing';
+import { coversPracticalPack, socWindow } from './testedRange';
 import { chartTheme, chartFonts } from './chartTheme';
 import { fmtSpeed, fmtTemp, speedBasisNote } from './unitConversions';
 
@@ -39,9 +41,46 @@ export function spreadOf(entries) {
     return { lo: Math.min(...values), hi: Math.max(...values), n: values.length, values, points };
 }
 
-/** A vehicle's range tests, hidden ones left out — a curator hid them for a reason. */
-export function visibleRangeTests(vehicle) {
-    return filterRangeRuns(vehicle?.runs).filter(r => !(r.isHidden || r.is_hidden));
+/**
+ * A vehicle's range tests that count (#394): the listed ones and the pool,
+ * less any a curator excluded. utils/runListing decides; this only narrows to
+ * range tests.
+ */
+export function countedRangeTests(vehicle) {
+    return filterRangeRuns(statisticalRuns(vehicle));
+}
+
+/**
+ * Whether a range test may put a RANGE figure in the spread: it saw most of the
+ * pack (testedRange.coversPracticalPack), or a curator overrode its quality
+ * checks (#394, migration 080) — and it has a start and end SoC to scale from
+ * either way. Without one the bar falls back to the raw distance, and a
+ * 23-mile sweep is not a 23-mile range however sure the curator is.
+ */
+export function rangeCoverageOk(run) {
+    if (coversPracticalPack(run)) return true;
+    return hasQualityOverride(run) && socWindow(run) != null;
+}
+
+/**
+ * A range test's efficiency for the spreads: measured energy where the test has
+ * it, else ESTIMATED from its SoC change and the vehicle's SoC window — the
+ * same estimate Road Trip's own line already uses (rangeSource.miPerKwhFrom).
+ * The owner's call (#393): an estimate, marked as one, beats a test left out.
+ *
+ * @returns {{ miPerKwh: number, estimated: boolean, note: string|null } | null}
+ */
+export function spreadEfficiency(run, socWindowKwh) {
+    const { miPerKwh, method } = miPerKwhFrom(run, socWindowKwh);
+    if (!(miPerKwh > 0) || !Number.isFinite(miPerKwh)) return null;
+    const estimated = method === 'soc-delta-estimate';
+    return {
+        miPerKwh,
+        estimated,
+        note: estimated
+            ? `Energy estimated: ${run.start_soc}→${run.end_soc}% of a ${Math.round(socWindowKwh * 10) / 10} kWh SoC window`
+            : null,
+    };
 }
 
 /**
@@ -54,7 +93,7 @@ export function visibleRangeTests(vehicle) {
  * @returns {Array<{ run: object, miPerSoc: number|null, miPerKwh: number|null }>}
  */
 export function rangeBasesFor(chargingRun, vehicle, { correctionMode = 'none', sessionOf = () => null } = {}) {
-    return visibleRangeTests(vehicle).flatMap(run => {
+    return countedRangeTests(vehicle).flatMap(run => {
         const src = resolveRangeSource(chargingRun, {
             vehicle,
             explicitPairing: run,
@@ -84,8 +123,11 @@ export function rangeBasesFor(chargingRun, vehicle, { correctionMode = 'none', s
  * @param {string}   o.ink         line and dot outline (chartTheme().ink)
  * @param {string}   o.fill        dot fill (chartTheme().background)
  * @param {'line'|'dots'} o.phase
+ * @param {boolean[]} [o.dashed]  per dot: an estimated figure, broken outline
+ * @param {boolean[]} [o.own]     per dot: the bar's own test, filled in `ownFill`
+ * @param {string}   [o.ownFill]  the bar's color
  */
-export function drawTestSpread(ctx, { at, px, horizontal, ink, fill, phase }) {
+export function drawTestSpread(ctx, { at, px, horizontal, ink, fill, phase, dashed = [], own = [], ownFill = fill }) {
     if (!(px?.length >= 2)) return;
     const point = v => (horizontal ? [v, at] : [at, v]);
     ctx.save();
@@ -99,12 +141,18 @@ export function drawTestSpread(ctx, { at, px, horizontal, ink, fill, phase }) {
     } else {
         ctx.lineWidth = 1.25;
         ctx.fillStyle = fill;
-        for (const v of px) {
+        px.forEach((v, k) => {
+            // An estimated figure is drawn with a broken outline, so it never
+            // passes for a measured one at a glance.
+            ctx.setLineDash(dashed[k] ? [2, 2] : []);
+            // The bar's own test: filled in the bar's color and a touch
+            // larger, so the reader can tell which dot the bar IS.
+            ctx.fillStyle = own[k] ? ownFill : fill;
             ctx.beginPath();
-            ctx.arc(...point(v), 3.5, 0, Math.PI * 2);
+            ctx.arc(...point(v), own[k] ? 5.5 : 4.5, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-        }
+        });
     }
     ctx.restore();
 }
@@ -113,14 +161,35 @@ export function drawTestSpread(ctx, { at, px, horizontal, ink, fill, phase }) {
  * What a hovered dot says: the test, its figure on this chart, and the
  * conditions that produced it — the same facts the bar's own pills carry.
  */
-export function testPointLines(run, valueText, units, note = null) {
+export function testPointLines(run, valueText, units, note = null, estimateNote = null) {
     const conditions = [
         run.speed_mph != null ? fmtSpeed(run.speed_mph, units) : null,
         speedBasisNote(run),
         run.temperature_f != null ? fmtTemp(run.temperature_f, units) : null,
         run.start_soc != null && run.end_soc != null ? `${run.start_soc}→${run.end_soc}%` : null,
     ].filter(Boolean).join(' · ');
-    return [run.name, valueText, conditions || null, note].filter(Boolean);
+    return [
+        run.name,
+        isUnlisted(run) ? 'Unlisted test' : null,
+        hasQualityOverride(run) ? 'Quality checks overridden by a curator' : null,
+        valueText, conditions || null, note, estimateNote,
+    ].filter(Boolean);
+}
+
+/**
+ * "Across 7 range tests (5 unlisted): 236–272 mi" — the count says the pool is
+ * in it, so dots with no bar of their own in the picker are not a mystery.
+ */
+export function spreadSummary(spread, unit, basis = 'range tests') {
+    const unlisted = unlistedCount(spread.points.map(p => p.run).filter(Boolean));
+    const estimated = spread.points.filter(p => p.estimated).length;
+    return `Across ${spread.n} ${basis}${countsAside(unlisted, estimated)}: ${spread.lo}–${spread.hi} ${unit}`;
+}
+
+/** " (5 unlisted, 2 estimated)", or "" — what a spread's n is made of. */
+export function countsAside(unlisted = 0, estimated = 0) {
+    const parts = [unlisted ? `${unlisted} unlisted` : null, estimated ? `${estimated} estimated` : null].filter(Boolean);
+    return parts.length ? ` (${parts.join(', ')})` : '';
 }
 
 const HIT_PX = 7;
@@ -193,7 +262,8 @@ export function testSpreadHoverPlugin(rows, { horizontal = false, describe }) {
             ctx.strokeStyle = ink;
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(h.x, h.y, 6, 0, Math.PI * 2);
+            // Outside even the bar's own dot (5.5).
+            ctx.arc(h.x, h.y, 7.5, 0, Math.PI * 2);
             ctx.stroke();
 
             // The label: beside the dot, kept inside the plot.

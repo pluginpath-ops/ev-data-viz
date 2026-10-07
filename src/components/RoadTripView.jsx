@@ -35,6 +35,8 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
 import { spreadTestsFor, sweepSpread, timelineSpread } from '../utils/roadTripSpread';
+import { unlistedCount } from '../utils/runListing';
+import { countsAside } from '../utils/rangeTestSpread';
 
 Chart.register(ZoomPlugin);
 
@@ -130,13 +132,18 @@ function laneSpreadDatasets(entries, spread) {
 /** When the trip ends, across the tests, as a tooltip line, or nothing. */
 function finishTooltipLine(dataset) {
     const f = dataset._spreadFinish;
-    return f ? [`Finish across ${f.n} range tests: ${formatTime(f.lo)} – ${formatTime(f.hi)}`] : [];
+    return f ? [`Finish across ${testsPhrase(f.n, f.unlisted, f.estimated)}: ${formatTime(f.lo)} – ${formatTime(f.hi)}`] : [];
 }
 
 /** The test spread at one sweep step, as a tooltip line, or nothing. */
 function spreadTooltipLine(dataset, index) {
     const step = dataset._spreadSteps?.[index];
-    return step ? [`Across ${step.n} range tests: ${formatTime(step.lo)} – ${formatTime(step.hi)}`] : [];
+    return step ? [`Across ${testsPhrase(step.n, dataset._spreadUnlisted, dataset._spreadEstimated)}: ${formatTime(step.lo)} – ${formatTime(step.hi)}`] : [];
+}
+
+/** "7 range tests (5 unlisted, 2 estimated)" — what the shading's n is made of (#394). */
+function testsPhrase(n, unlisted, estimated) {
+    return `${n} range tests${countsAside(unlisted, estimated)}`;
 }
 
 /** Y-value for one sweep sim result (shared by speed and distance sweeps). */
@@ -1109,7 +1116,12 @@ export default function RoadTripView({
                 });
                 return isSimUnrealistic(sim) ? null : Math.round(getSweepY(sim, mph, totalDistance, sweepYAxis));
             }));
-            return { tests: tests.length, steps: sweepSpread(perTest) };
+            return {
+                tests: tests.length,
+                unlisted: unlistedCount(tests.map(t => t.run)),
+                estimated: tests.filter(t => t.estimated).length,
+                steps: sweepSpread(perTest),
+            };
         });
     }, [spreadInputs, validEntries, runDataCache, roadTripConfig]);
 
@@ -1130,7 +1142,7 @@ export default function RoadTripView({
             if (!chargingData?.length) return null;
             const ov = perRun[entry.key] || {};
             // A test whose trip cannot be finished has no finish to spread.
-            const sims = spreadInputs[i].map(t => simulateRoadTrip({
+            const done = spreadInputs[i].map(t => ({ t, sim: simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
                 miPerKwh:          t.miPerKwh,
                 testSpeedMph:      t.testSpeedMph,
@@ -1144,10 +1156,15 @@ export default function RoadTripView({
                 chargeTimeMinutes: ov.chargeTime ?? chargeTime,
                 overheadMinutes:   overhead,
                 mode,
-            })).filter(sim => sim.completed);
+            }) })).filter(d => d.sim.completed);
+            const sims = done.map(d => d.sim);
             if (sims.length < 2) return { tests: sims.length, steps: null };
             const finishes = sims.map(sim => sim.totalTimeMin);
-            const finish = { lo: Math.min(...finishes), hi: Math.max(...finishes), n: sims.length };
+            const finish = {
+                lo: Math.min(...finishes), hi: Math.max(...finishes), n: sims.length,
+                unlisted: unlistedCount(done.map(d => d.t.run)),
+                estimated: done.filter(d => d.t.estimated).length,
+            };
             // Lanes always run on elapsed time, as the main lines do.
             if (yAxis === 'byTest') {
                 return { tests: sims.length, finish, steps: [], traces: sims.map(sim => segmentsToChartPointsByTest(sim.segments, i)) };
@@ -1218,6 +1235,8 @@ export default function RoadTripView({
                 }));
                 return {
                     _spreadSteps: spreadSweep?.[i]?.steps,
+                    _spreadUnlisted: spreadSweep?.[i]?.unlisted,
+                    _spreadEstimated: spreadSweep?.[i]?.estimated,
                     label: entryLabel(entry),
                     _fullLabel: entryLabelFull(entry),
                     data,
@@ -1322,6 +1341,8 @@ export default function RoadTripView({
                 }));
                 return {
                     _spreadSteps: spreadSweep?.[i]?.steps,
+                    _spreadUnlisted: spreadSweep?.[i]?.unlisted,
+                    _spreadEstimated: spreadSweep?.[i]?.estimated,
                     label: entryLabel(entry),
                     _fullLabel: entryLabelFull(entry),
                     data,
@@ -2036,7 +2057,7 @@ export default function RoadTripView({
                                 </>
                             )}
                             <label className="toggle-label"
-                                title="Prototype. Shades each vehicle from the fastest to the slowest trip its range tests give, with the charging curve held fixed. On the timeline, the area between the furthest-along and the least at each moment; by test, every test's trip as a faint trace and the finish range printed at the end of the lane. Hover a line for the finish times. None where a vehicle has one range test with measured energy.">
+                                title="Prototype. Shades each vehicle from the fastest to the slowest trip its range tests give, with the charging curve held fixed. On the timeline, the area between the furthest-along and the least at each moment; by test, every test's trip as a faint trace and the finish range printed at the end of the lane. Hover a line for the finish times. None where a vehicle has fewer than two range tests with an efficiency, measured or estimated from SoC.">
                                 <input type="checkbox" className="w-4 h-4" checked={showTestSpread}
                                     onChange={e => setShowTestSpread(e.target.checked)} />
                                 <span className="text-sm font-medium">Test spread</span>
@@ -2239,7 +2260,7 @@ export default function RoadTripView({
                             {(() => {
                                 const spread = spreadSweep ?? spreadTimeline;
                                 const single = validEntries.filter((e, i) => spread[i] && !spread[i].steps);
-                                return single.length > 0 && ` No shading for ${single.map(e => vehicleLabel(e.vehicle)).join(', ')}: fewer than two range tests with measured energy${spreadTimeline ? ' that finish the trip' : ''}.`;
+                                return single.length > 0 && ` No shading for ${single.map(e => vehicleLabel(e.vehicle)).join(', ')}: fewer than two range tests with an efficiency${spreadTimeline ? ' that finish the trip' : ''}.`;
                             })()}
                         </p>
                     )}

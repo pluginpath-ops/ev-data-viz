@@ -156,7 +156,15 @@ function shapeRun(r) {
     color: RETIRED_RUN_COLOR,
     // Normalise DB snake_case to the camelCase used throughout the app.
     isDefault: !!r.is_default,
+    // Unlisted (#394: is_hidden narrowed to this in migration 079) and
+    // excluded from the statistics — two questions, see utils/runListing.js.
     isHidden:  !!r.is_hidden,
+    // Before migration 079 the column does not exist, and a hidden test meant
+    // an untrusted one — so read it as excluded, as the backfill would. Either
+    // order of deploy and migration then leaves the statistics unchanged.
+    isExcluded: r.is_excluded === undefined ? !!r.is_hidden : !!r.is_excluded,
+    // A curator's "I have looked; count it" (migration 080, runListing).
+    qualityOverride: !!r.quality_override,
     // data_points(count) returns [{ count: N }]; normalise to a plain number
     dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
   };
@@ -1320,6 +1328,8 @@ class DataService {
       ...(updates.windDirectionDeg !== undefined ? { wind_direction_deg: updates.windDirectionDeg !== '' ? Number(updates.windDirectionDeg) : null } : {}),
       ...(updates.sourceUrl !== undefined ? { source_url: updates.sourceUrl || null } : {}),
       ...(updates.isHidden !== undefined ? { is_hidden: updates.isHidden } : {}),
+      ...(updates.isExcluded !== undefined ? { is_excluded: updates.isExcluded } : {}),
+      ...(updates.qualityOverride !== undefined ? { quality_override: updates.qualityOverride } : {}),
       ...(updates.preconditioned !== undefined ? { preconditioned: toPreconditioned(updates.preconditioned) } : {}),
       ...(updates.chargerVoltageClass !== undefined ? { charger_voltage_class: toChargerClass(updates.chargerVoltageClass) } : {}),
     }).eq('id', runId);
@@ -1518,7 +1528,7 @@ class DataService {
     if (!ids.length) return [];
     const { data, error } = await getSupabase()
       .from('epa_vehicle_mappings')
-      .select(`id, vehicle_id, vehicles(id, name, runs(id, name, kind, synthetic, is_hidden, speed_mph, distance_miles, energy_kwh, temperature_f, altitude_ft, avg_wind_speed_mph, wind_direction_deg, elevation_gain_ft, source)), epa_test_groups(${EPA_GROUP_FIELDS})`)
+      .select(`id, vehicle_id, vehicles(id, name, runs(id, name, kind, synthetic, is_hidden, is_excluded, speed_mph, distance_miles, energy_kwh, temperature_f, altitude_ft, avg_wind_speed_mph, wind_direction_deg, elevation_gain_ft, source)), epa_test_groups(${EPA_GROUP_FIELDS})`)
       .in('id', ids);
     if (error) throw error;
     const byId = new Map((data || []).map(m => [m.id, m]));

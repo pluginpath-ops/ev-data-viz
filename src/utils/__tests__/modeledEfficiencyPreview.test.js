@@ -44,6 +44,8 @@ describe('modeledEfficiencyPreview', () => {
         const tests = modeledEfficiencyPreview(row([
             run({ id: 1, is_hidden: true }), run({ id: 2, synthetic: true }),
             run({ id: 3, kind: 'charging' }), run({ id: 4, speed_mph: null }), run({ id: 5 }),
+            // Listed but excluded from the statistics (#394): not cited either.
+            run({ id: 6, is_excluded: true }),
         ])).tests;
         expect(tests.map(t => t.id)).toEqual([5]);
     });

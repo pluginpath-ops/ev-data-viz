@@ -19,7 +19,7 @@
  *
  * ── What is NOT checked, and why ────────────────────────────────────────────
  *
- * Four of the eight Retired rows cannot be matched without flagging correct
+ * Five of the nine Retired rows cannot be matched without flagging correct
  * code, and driftProbes.js already has this project's position on that: "a
  * ledger that counts legitimate code teaches people to ignore it." These stay
  * with the reader, which is what the pledge in CLAUDE.md is for:
@@ -36,11 +36,13 @@
  *   - a bare "band". Measured: 81 existing bare uses against 10 qualified
  *     ones, so on any line near the EPA curves this would fire constantly and
  *     be the first thing anyone learned to skip.
+ *   - "Hidden" for a test (#394, now Unlisted). `hidden` is also an HTML
+ *     attribute, a Tailwind class and the column's own name.
  */
 import { execSync } from 'child_process';
 
 // Straight from the Retired table. A row lands here only if its wrong use can
-// be told from its right use by the token alone — see the header for the four
+// be told from its right use by the token alone — see the header for the five
 // that cannot.
 const RETIRED = [
     {
@@ -131,8 +133,8 @@ console.log(`\nvocabulary — ${label}: ${lines.length} added line(s)\n`);
 
 if (!hits.length) {
     console.log('  No retired terms.\n');
-    console.log('  Four Retired rows are not machine-checkable ("chrome" for the header,');
-    console.log('  "Runs" in UI text, "pinning", a bare "band") — those are on you.');
+    console.log('  Five Retired rows are not machine-checkable ("chrome" for the header,');
+    console.log('  "Runs" in UI text, "pinning", a bare "band", "Hidden" for a test) — those are on you.');
     console.log('  docs/vocabulary.md\n');
     process.exit(0);
 }

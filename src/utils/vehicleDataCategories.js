@@ -16,6 +16,7 @@
  * run — and all of them pick up `kind` (migration 044) together.
  */
 import { isChargingRun, isRangeRun, filterTests } from './runUtils';
+import { isListed } from './runListing';
 
 /**
  * Category definitions, in display order.
@@ -29,14 +30,18 @@ export const DATA_CATEGORIES = [
         label: 'Charging',
         colorClass: 'text-green-600 dark:text-green-400',
         // Tests only: a stored composite curve (#313) is a charging run but
-        // not a test anyone ran.
-        count: (v) => filterTests(v.runs).filter(isChargingRun).length,
+        // not a test anyone ran. Listed tests only (#394) — a contributor's
+        // runs include the unlisted ones, a viewer's do not, and the count
+        // must read the same for both. The pool is counted apart.
+        count: (v) => filterTests(v.runs).filter(r => isChargingRun(r) && isListed(r)).length,
+        pooled: (v) => filterTests(v.pooledRuns).filter(isChargingRun).length,
     },
     {
         key: 'range',
         label: 'Range',
         colorClass: 'text-amber-600 dark:text-amber-400',
-        count: (v) => (v.runs || []).filter(isRangeRun).length,
+        count: (v) => (v.runs || []).filter(r => isRangeRun(r) && isListed(r)).length,
+        pooled: (v) => (v.pooledRuns || []).filter(isRangeRun).length,
     },
     {
         key: 'epa',
@@ -67,6 +72,17 @@ export const DATA_CATEGORIES = [
 export function vehicleDataCategories(vehicle, performanceCounts = {}) {
     const out = {};
     for (const c of DATA_CATEGORIES) out[c.key] = c.count(vehicle, performanceCounts);
+    return out;
+}
+
+/**
+ * Unlisted tests per category that still count in the statistics (#394, the
+ * pool) — the grey half of "Charging (4/2)". Categories with no pool are absent.
+ * @returns {Record<string, number>}
+ */
+export function vehiclePooledCounts(vehicle) {
+    const out = {};
+    for (const c of DATA_CATEGORIES) if (c.pooled) out[c.key] = c.pooled(vehicle);
     return out;
 }
 

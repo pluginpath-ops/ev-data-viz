@@ -62,6 +62,7 @@
  * Pure module — no React, no chart library.
  */
 
+import { isExcluded } from './runListing';
 import { interpolate } from './interpolate';
 import { trimRamp } from './socAlignment';
 import { isInheritedRunId, isCompositeRun } from './runUtils';
@@ -94,13 +95,14 @@ const finite = (x) => x != null && x !== '' && Number.isFinite(Number(x));
 
 /**
  * Whether a run may feed a composite. The same exclusions as a vehicle's best
- * charge windows (chargeWindows.countsTowardBest): hidden (a curator took it
- * out of view), synthetic (not measured), inherited (another vehicle's test).
+ * charge windows (chargeWindows.countsTowardBest): excluded from the
+ * statistics (#394 — an UNLISTED test still counts: that is the pool),
+ * synthetic (not measured), inherited (another vehicle's test).
  */
 export function compositeEligible(run) {
     if (!run || run.kind !== 'charging') return false;
     // A stored composite is synthetic too; said outright so it never feeds itself.
-    if (run.isHidden || run.is_hidden || run.synthetic || isCompositeRun(run)) return false;
+    if (isExcluded(run) || run.synthetic || isCompositeRun(run)) return false;
     return !isInheritedRunId(run.id) && !run._inherited;
 }
 
@@ -482,7 +484,7 @@ export const COMPOSITE_VERSION = 1;
 /**
  * What a vehicle's composites are built FROM, as one comparable string. A
  * stored composite whose fingerprint differs is out of date: a test was added,
- * removed, hidden, re-uploaded, renamed or given a charger class since.
+ * removed, excluded, re-uploaded, renamed or given a charger class since.
  *
  * Point count and peak stand in for the points themselves — no stored
  * timestamp moves when a test's points are replaced (runs.updated_at has no
