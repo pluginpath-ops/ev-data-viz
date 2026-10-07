@@ -35,19 +35,56 @@ export const filterChargingRuns = (runs) => (runs || []).filter(isChargingRun);
 export const filterRangeRuns    = (runs) => (runs || []).filter(isRangeRun);
 
 /**
- * The charging test to use for a vehicle when the user hasn't picked one:
- * the explicitly-defaulted run, else the most recent.
+ * Whether a run is a stored composite curve (#313, migration 077): synthetic,
+ * kind 'charging', the mean of the vehicle's tests rather than a test itself.
+ * Charts and pickers take it like a test; counts of tests must not.
+ */
+export const isCompositeRun = (r) => !!r?.composite;
+
+/** Runs that are tests someone ran — everything but stored composites. */
+export const filterTests = (runs) => (runs || []).filter(r => !isCompositeRun(r));
+
+/**
+ * Runs with the composite curves first — the vehicle's own charger class ahead
+ * of a lower one — and everything else in its existing order. Every list of a
+ * vehicle's runs shows the composites at the top: they stand for the car, and
+ * are its default unless a test is marked DEF.
+ */
+export function compositesFirst(runs) {
+    const rank = (r) => (isCompositeRun(r) ? -(r.composite.chargerClassV ?? 1e4) : 0);
+    return [...(runs || [])].sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * A vehicle's own composite: the one for the car's own charger class, ahead
+ * of a lower class's (an 800 V car's 800 V composite before its 400 V one).
+ * Hidden composites are passed over.
+ */
+export function nativeComposite(runs) {
+    const composites = (runs || []).filter(r => isCompositeRun(r) && !(r.isHidden || r.is_hidden));
+    return composites.sort((a, b) =>
+        (b.composite.chargerClassV ?? Infinity) - (a.composite.chargerClassV ?? Infinity))[0] ?? null;
+}
+
+/**
+ * The charging curve to use for a vehicle when the user hasn't picked one:
  *
- * The mirror of defaultRangeRun() in utils/rangeSource.js. Charging curves vary
- * far less than range tests — they're a property of the car, where a range test
- * is a property of the day — so this default is usually the right answer and
- * rarely worth overriding.
+ *   1. the curator's DEF — a test, or a composite a curator chose (say the
+ *      400 V one); the curator's word always wins
+ *   2. the vehicle's own composite (#313), which stands for the car better
+ *      than any one session
+ *   3. the most recent test
+ *
+ * The mirror of defaultRangeRun() in utils/rangeSource.js. Read by every view
+ * that needs one charging curve per vehicle: the Charging chart's first curve,
+ * and through pairedChargingRun, Charge Stop and Road Trip.
  */
 export function defaultChargingRun(vehicle) {
     const charging = filterChargingRuns(vehicle?.runs);
     if (!charging.length) return null;
     return charging.find(r => r.isDefault || r.is_default)
-        ?? [...charging].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+        ?? nativeComposite(charging)
+        ?? [...filterTests(charging)].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
         ?? null;
 }
 

@@ -3,6 +3,7 @@ import { pairKey, partnersFor } from '../utils/pairings';
 import RunSourceLinks from './RunSourceLinks';
 import SeriesColorPicker from './SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
+import { compositesFirst } from '../utils/runUtils';
 
 /**
  * The color a row is drawn in: an Okabe-Ito slot in auto mode, a session
@@ -72,6 +73,14 @@ function plottedColorOf(run, colorMap, vehicle) {
  *                     keys for those rows). Off, it shares the range test's color.
  *   singlePartner   — one partner per row, selection still keyed by run id
  *   partnerIdFor    — (run) => partnerRunId | null, single-partner mode only
+ *   renderRunSource — optional (run) => ReactNode | undefined — what sits in the
+ *                     row's source slot, at its right edge. Undefined keeps the
+ *                     ↗ source link; a row with no single source to credit (a
+ *                     composite curve, drawn from several tests) puts its own
+ *                     explanation there instead.
+ *   isDerivedRun    — optional (run) => boolean — a row that is not one measured
+ *                     test but something computed from several. Its name is set
+ *                     in italics, so it never reads as a test someone ran.
  *   resolvePartner  — (primaryRun, vehicle) => { sourceRun, note } for the
  *                     automatic choice shown when nothing is pinned
  *   onSetPartner    — (primaryRunId, oldPartnerId, newPartnerId) => void
@@ -109,6 +118,8 @@ export default function RunSelector({
     // (run) => partnerRunId | null — single-partner mode only
     partnerIdFor = null,
     partnerRunsFor = null,
+    renderRunSource = null,
+    isDerivedRun = null,
     // Rows that are not runs — e.g. the vehicle's EPA rated range, which is a
     // legitimate range basis with no test behind it.
     extraPrimaryRunsFor = null,
@@ -193,7 +204,8 @@ export default function RunSelector({
      * count silently drifted from what was on screen.
      */
     const primaryRunsFor = (vehicle) => {
-        const own = (vehicle.runs || []).filter(r => runFilter(r, vehicle));
+        // Composite curves at the top, in every chart's picker (#313).
+        const own = compositesFirst((vehicle.runs || []).filter(r => runFilter(r, vehicle)));
         return pairMode && extraPrimaryRunsFor
             ? [...own, ...(extraPrimaryRunsFor(vehicle) || [])]
             : own;
@@ -335,6 +347,8 @@ export default function RunSelector({
                                                         colorSeries={colorSeries}
                                                         renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
+                                                        renderRunSource={renderRunSource}
+                                                        isDerivedRun={isDerivedRun}
                                                         colorMap={colorMap}
                                                         chartPalette={chartPalette}
                                                         onChartPaletteChange={onChartPaletteChange}
@@ -352,6 +366,8 @@ export default function RunSelector({
                                                         colorSeries={colorSeries}
                                                         renderRunBadges={renderRunBadges}
                                                         renderRunMeta={renderRunMeta}
+                                                        renderRunSource={renderRunSource}
+                                                        isDerivedRun={isDerivedRun}
                                                         colorMap={colorMap}
                                                         chartPalette={chartPalette}
                                                         onChartPaletteChange={onChartPaletteChange}
@@ -384,7 +400,7 @@ function PairRows({
     partnerLabel, singlePartner, pairColors,
     selectedRunIds, onToggleRun, onSetPartner, onAddPartner, onRemovePartner,
     onUpdateRunColor, onUpdateRunColors, colorSeries, renderRunBadges, renderRunMeta, colorMap,
-    chartPalette, onChartPaletteChange, handSetColorOf,
+    chartPalette, onChartPaletteChange, handSetColorOf, renderRunSource, isDerivedRun,
 }) {
     // What the resolver would pick with nothing pinned — shown as the dropdown's
     // placeholder so an unpaired row still says where its miles come from.
@@ -471,7 +487,7 @@ function PairRows({
                                 onChartPaletteChange={onChartPaletteChange}
                                 handSetColorOf={handSetColorOf}
                             />
-                            <span className="truncate" title={run.name}>{run.name}</span>
+                            <RunName run={run} isDerivedRun={isDerivedRun} />
                             {/* Identity markers only. Conditions moved to their
                                 own row: a paired row already spends a line on
                                 the pairing, so name + chips + control on one
@@ -481,7 +497,7 @@ function PairRows({
                                 that leaves the page, so it sits at the edge
                                 rather than trailing whatever length the name
                                 happened to be. */}
-                            <RunSourceLinks run={run} className="shrink-0 ml-auto" />
+                            <RunSource run={run} renderRunSource={renderRunSource} />
                         </span>
                     ) : null}
 
@@ -619,7 +635,7 @@ function RunColorControl({ run, vehicle, vehicleId, vehicleName, onUpdateRunColo
  * and "Charging test"; the names carry that now, and in a rail it was spending
  * a third of the identity line on a fact nobody was comparing.
  */
-function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateRunColors, colorSeries, renderRunBadges, renderRunMeta, colorMap = {}, chartPalette, onChartPaletteChange, handSetColorOf }) {
+function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateRunColors, colorSeries, renderRunBadges, renderRunMeta, colorMap = {}, chartPalette, onChartPaletteChange, handSetColorOf, renderRunSource, isDerivedRun }) {
     const meta = renderRunMeta?.(run);
     return (
         <label className={`pair-row ${isChecked ? '' : 'opacity-60 hover:opacity-100'}`}>
@@ -642,11 +658,29 @@ function RunRow({ run, vehicle, isChecked, onToggle, onUpdateRunColor, onUpdateR
                     onChartPaletteChange={onChartPaletteChange}
                     handSetColorOf={handSetColorOf}
                 />
-                <span className="truncate" title={run.name}>{run.name}</span>
+                <RunName run={run} isDerivedRun={isDerivedRun} />
                 {renderRunBadges?.(run)}
-                <RunSourceLinks run={run} className="shrink-0 ml-auto" />
+                <RunSource run={run} renderRunSource={renderRunSource} />
             </span>
             {meta && <span className="run-row-meta">{meta}</span>}
         </label>
     );
+}
+
+/** A row's name: italic when it is derived rather than measured (a composite). */
+function RunName({ run, isDerivedRun }) {
+    const derived = !!isDerivedRun?.(run);
+    return (
+        <span className={`truncate${derived ? ' run-name-derived' : ''}`} title={run.name}>{run.name}</span>
+    );
+}
+
+/** The right-edge slot: the caller's content when it supplies some, else the ↗ source link. */
+function RunSource({ run, renderRunSource }) {
+    const custom = renderRunSource?.(run);
+    return custom !== undefined && custom !== null
+        // Beside the name, where the ↗ link sits — not pushed to the row's
+        // far edge, where in the narrow sidebar it was lost.
+        ? <span className="shrink-0" onClick={e => e.preventDefault()}>{custom}</span>
+        : <RunSourceLinks run={run} className="shrink-0 ml-auto" />;
 }

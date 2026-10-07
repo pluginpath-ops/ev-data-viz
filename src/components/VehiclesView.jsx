@@ -3,6 +3,7 @@ import { ownValues } from '../utils/vehicleInheritance';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import SeriesColorPicker from './SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
+import { filterTests } from '../utils/runUtils';
 import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
 import { DATA_CATEGORIES, vehicleDataCategories } from '../utils/vehicleDataCategories';
@@ -547,7 +548,8 @@ export default function VehiclesView({
     // whole list, deliberately — a survey that moved when you typed in the
     // search box would be describing the filter, not the fleet.
     const totalTests = useMemo(
-        () => vehicles.reduce((n, v) => n + (v.runs?.length ?? 0), 0),
+        // Tests only — a stored composite curve (#313) is not one.
+        () => vehicles.reduce((n, v) => n + filterTests(v.runs).length, 0),
         [vehicles],
     );
 

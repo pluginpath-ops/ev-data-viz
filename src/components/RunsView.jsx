@@ -6,6 +6,8 @@ import { useAppContext } from '../context/AppContext';
 import { autoMapHeaders } from '../utils/csvColumnMapping';
 import PreconditionedSelect from './PreconditionedSelect';
 import { toPreconditioned, preconditionedFormValue } from '../utils/runPreconditioning';
+import ChargerClassSelect from './ChargerClassSelect';
+import { toChargerClass, chargerClassFormValue } from '../utils/runChargerClass';
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
@@ -33,9 +35,10 @@ import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
 import { displayImageUrl } from '../utils/imageRenditions';
-import { isRangeRun, runKindFrom, linkableRuns, linkableCounts } from '../utils/runUtils';
+import { isRangeRun, runKindFrom, linkableRuns, linkableCounts, isCompositeRun } from '../utils/runUtils';
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 import RunCard from './runs/RunCard';
+import CompositeRunCard from './runs/CompositeRunCard';
 import VehicleCombobox from './VehicleCombobox';
 import { DATA_FLAGS, RunKindPill, FIELD_META, inferRunFlags } from './runs/runDisplay';
 
@@ -412,7 +415,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, onFocused, onBack, onClose }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -479,6 +482,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         temperatureF: '',
         speedBasis: '',
         preconditioned: '',
+        chargerVoltageClass: '',
         altitudeFt: '',
         elevationGainFt: '',
         windSpeedMph: '',
@@ -566,7 +570,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', chargerVoltageClass: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -841,6 +845,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             temperatureF: run.temperature_f ?? '',
             speedBasis: run.speed_basis ?? '',
             preconditioned: preconditionedFormValue(run.preconditioned),
+            chargerVoltageClass: chargerClassFormValue(run.charger_voltage_class),
             altitudeFt: run.altitude_ft ?? '',
             elevationGainFt: run.elevation_gain_ft ?? '',
             windSpeedMph: run.avg_wind_speed_mph ?? '',
@@ -854,13 +859,15 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setSavingData(true);
         try {
             // Convert dataFlags → boolean columns and drop the flags field
-            const { dataFlags, preconditioned, ...formRest } = editFormData;
+            const { dataFlags, preconditioned, chargerVoltageClass, ...formRest } = editFormData;
             // Sent only when it changed, so saving any other field never names
-            // a column an unmigrated database lacks (migration 073).
-            const stored = vehicle.runs?.find(r => r.id === runId)?.preconditioned ?? null;
+            // a column an unmigrated database lacks (migrations 073, 076).
+            const storedRun = vehicle.runs?.find(r => r.id === runId);
             await onUpdateRun(runId, {
                 ...formRest,
-                ...(toPreconditioned(preconditioned) !== stored ? { preconditioned } : {}),
+                ...(toPreconditioned(preconditioned) !== (storedRun?.preconditioned ?? null) ? { preconditioned } : {}),
+                ...(toChargerClass(chargerVoltageClass) !== toChargerClass(storedRun?.charger_voltage_class)
+                    ? { chargerVoltageClass } : {}),
                 kind: dataFlags.includes('range') ? 'range' : 'charging',
                 calculated_fields: editCalculatedFields,
             });
@@ -1552,6 +1559,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     value={runMetadata.preconditioned}
                                                     onChange={v => setRunMetadata({ ...runMetadata, preconditioned: v })}
                                                 />
+                                                <ChargerClassSelect
+                                                    value={runMetadata.chargerVoltageClass}
+                                                    onChange={v => setRunMetadata({ ...runMetadata, chargerVoltageClass: v })}
+                                                />
                                             </div>
                                         )}
 
@@ -1919,9 +1930,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                   return (
                     <div
                         key={group.key}
-                        className={`session-group${session ? '' : ' is-unassigned'}${collapsed ? ' is-collapsed' : ''}`}
+                        className={`session-group${session || group.composite ? '' : ' is-unassigned'}${collapsed ? ' is-collapsed' : ''}`}
                     >
                     <SessionGroupHeader
+                        composite={!!group.composite}
                         session={session}
                         vehicle={vehicle}
                         vehicles={vehicles}
@@ -2126,6 +2138,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             <PreconditionedSelect
                                                 value={editFormData.preconditioned}
                                                 onChange={v => setEditFormData({ ...editFormData, preconditioned: v })}
+                                            />
+                                            <ChargerClassSelect
+                                                value={editFormData.chargerVoltageClass}
+                                                onChange={v => setEditFormData({ ...editFormData, chargerVoltageClass: v })}
                                             />
                                         </div>
                                     )}
@@ -2396,6 +2412,19 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     )}
                                 </div>
                             </div>
+                        ) : isCompositeRun(run) ? (
+                            <CompositeRunCard
+                                run={run}
+                                vehicle={vehicle}
+                                units={units}
+                                canEdit={canEdit}
+                                canCreate={canCreate}
+                                isContributor={isContributor}
+                                clearDefaultRun={clearDefaultRun}
+                                onSetDefaultRun={onSetDefaultRun}
+                                onUpdateRun={onUpdateRun}
+                                onRebuild={refreshComposites}
+                            />
                         ) : (
                             <RunCard
                                 run={run}

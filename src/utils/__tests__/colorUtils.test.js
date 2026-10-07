@@ -5,7 +5,7 @@ import {
     seriesRowsOf, expandPalette, OKABE_ITO, SERIES_NEUTRAL, resolveChartColors, seedPlot,
     SERIES_PALETTES, HOUSE_PALETTE,
     VEHICLE_PALETTE,
-    paletteColorsById
+    paletteColorsById, withAlpha
 } from '../colorUtils';
 
 const r = (key, primaryId, baseColor) => ({ key, primaryId, baseColor });
@@ -395,6 +395,20 @@ describe('a vehicle color is the family base (#308)', () => {
         });
     });
 
+    describe('a composite curve leads the ramp, ahead of the default test (#313)', () => {
+        const comp = (id, classV) => ({ id, created_at: '', composite: { chargerClassV: classV } });
+        const runs = [{ ...at(1, 1), isDefault: true }, comp('composite_v1_400', 400), comp('composite_v1_800', 800)];
+        const v = [vehicle('v1', '#009E73', runs)];
+
+        it('wears the vehicle color exactly; the tests behind it take the shades', () => {
+            const out = resolveChartColors(runs, {}, VEHICLE_PALETTE, v);
+            const [base, second, third] = rampFrom('#009E73', 3);
+            expect(out.composite_v1_800).toBe(base);    // the car's own class first
+            expect(out.composite_v1_400).toBe(second);
+            expect(out[1]).toBe(third);                 // the default test after them
+        });
+    });
+
     describe("the vehicle's default run leads the ramp", () => {
         // Without this, the base color went to whichever test was entered
         // first — often not the one a reader would actually recognize the
@@ -592,5 +606,17 @@ describe('a color pinned to a run that sorts later', () => {
         const out = resolveChartColors(runs, { 1: '#E69F00' }, 'auto');
         expect(out[1]).toBe('#E69F00');
         expect(new Set(Object.values(out)).size).toBe(3);
+    });
+});
+
+describe('withAlpha', () => {
+    it('turns a hex series color into rgba at the given opacity', () => {
+        expect(withAlpha('#3b82f6', 0.2)).toBe('rgba(59, 130, 246, 0.2)');
+        expect(withAlpha('#fff', 0.5)).toBe('rgba(255, 255, 255, 0.5)');
+    });
+
+    it('leaves anything it cannot read unchanged', () => {
+        expect(withAlpha('rebeccapurple', 0.2)).toBe('rebeccapurple');
+        expect(withAlpha(null, 0.2)).toBeNull();
     });
 });

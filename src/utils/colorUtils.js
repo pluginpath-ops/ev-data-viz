@@ -50,6 +50,19 @@ export const OKABE_ITO_NAMES = [
 export const DEFAULT_RUN_COLOR = '#3b82f6';
 
 /**
+ * A series color at an opacity, for a fill drawn behind its own line (the
+ * composite curve's test spread). Takes #rgb or #rrggbb; anything else — a
+ * CSS name, an rgb() string — is returned unchanged rather than guessed at.
+ */
+export function withAlpha(color, alpha) {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color ?? '');
+    if (!m) return color;
+    const h = m[1].length === 3 ? [...m[1]].map(c => c + c).join('') : m[1];
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
  * The color a run reports now that color belongs to the VEHICLE (#308).
  *
  * `runs.color` still exists in the database and still holds whatever a curator
@@ -358,8 +371,14 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
             // test happened to be entered first, and a vehicle's own default
             // could land on the most-shaded (least recognizable) end of its
             // own family. `sort` is stable, so ties keep the creation order.
-            const ranked = [...plottedMine].sort((a, b) =>
-                Number(!(a.isDefault || a.is_default)) - Number(!(b.isDefault || b.is_default)));
+            //
+            // A composite curve leads even that (#313): it stands for the
+            // vehicle rather than for one session, so it is the line that wears
+            // the vehicle's color, and the tests behind it take the shades. On
+            // an 800 V car the 800 V composite leads the 400 V one.
+            const rank = (r) => (r.composite ? -(r.composite.chargerClassV ?? 1e4) : 0)
+                + Number(!(r.isDefault || r.is_default));
+            const ranked = [...plottedMine].sort((a, b) => rank(a) - rank(b));
             const shades = rampFrom(vehicle.color, ranked.length);
             ranked.forEach((run, i) => curated.set(String(run.id), shades[i]));
         }

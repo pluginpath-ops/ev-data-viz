@@ -14,8 +14,26 @@ import VehicleLink from './VehicleLink';
  * makes the comparison trustworthy — invisible from this page otherwise.
  */
 export default function SessionGroupHeader({
-    session, vehicle, vehicles, runsHere, collapsed, onToggle, onEdit, onViewVehicle,
+    session, vehicle, vehicles, runsHere, collapsed, onToggle, onEdit, onViewVehicle, composite = false,
 }) {
+    // A vehicle's composite curves (#313): a group of their own, at the top.
+    // Not an outing either, but not an absence — they are what stands for the
+    // car, so they get a heading like a session's.
+    if (composite) {
+        return (
+            <div className="session-group-header">
+                <button onClick={onToggle} className="session-group-toggle" title={collapsed ? 'Expand' : 'Collapse'}>
+                    <span className={`session-group-chevron${collapsed ? '' : ' is-open'}`}>▶</span>
+                    <span className="font-semibold">Composite curves</span>
+                </button>
+                <span className="text-xs text-secondary"
+                    title="Each is the mean of this vehicle's charging tests, rebuilt whenever one of them changes. The vehicle's default charging curve unless a test is marked default.">
+                    {runsHere} curve{runsHere === 1 ? '' : 's'} · built from the tests below
+                </span>
+            </div>
+        );
+    }
+
     // Ungrouped runs get a plain divider — a heading would imply they belong to
     // something, and "no session" is an absence, not a group.
     if (!session) {

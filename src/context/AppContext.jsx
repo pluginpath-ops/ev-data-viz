@@ -3,8 +3,10 @@ import { withVehicleFigures } from '../utils/vehicleFigures';
 import { withInheritance, variantLinkPlan } from '../utils/vehicleInheritance';
 import { withPlatforms } from '../utils/platforms';
 import { toPreconditioned } from '../utils/runPreconditioning';
+import { toChargerClass } from '../utils/runChargerClass';
+import { mayHaveComposite } from '../utils/compositeCurve';
 import { dataService } from '../services/DataService';
-import { applyDefaultRun, clearDefaultRuns } from '../utils/runUtils';
+import { applyDefaultRun, clearDefaultRuns, isCompositeRun } from '../utils/runUtils';
 import { toSessionRow } from '../utils/testSessions';
 import { createWriteGuard } from '../utils/writeGuard';
 
@@ -302,6 +304,61 @@ export function AppProvider({ children }) {
         }
     };
 
+    // ── Composite curves (#313) ───────────────────────────────────────────────
+    //
+    // A vehicle's composites are stored runs built from its charging tests, so
+    // any write to one of those tests has to rebuild them, or every chart and
+    // the vehicle table go on drawing the old mean. Rebuilt AFTER the write
+    // lands — DataService re-reads the runs itself, since state has not caught
+    // up yet — and only the composite rows are swapped into state.
+    //
+    // The vehicle comes from visibleVehicles, through a ref: it carries the
+    // resolved platforms and specs the voltage class needs, which the raw
+    // `vehicles` state does not.
+    const visibleVehiclesRef = useRef([]);
+
+    /** Whether a write to this run can change its vehicle's composites. */
+    const feedsComposites = (vehicleId, runId, kind) => {
+        if (kind === 'charging') return true;
+        const run = vehicles.find(v => v.id === vehicleId)?.runs?.find(r => r.id === runId);
+        return !!run && run.kind === 'charging' && !isCompositeRun(run);
+    };
+
+    const refreshComposites = async (vehicleId) => {
+        if (!isContributor) return;
+        const vehicle = visibleVehiclesRef.current.find(v => v.id === vehicleId);
+        if (!vehicle) return;
+        try {
+            const runs = await dataService.rebuildComposites(vehicle);
+            if (!runs) return;
+            const composites = runs.filter(isCompositeRun);
+            setVehicles(prev => prev.map(v => v.id !== vehicleId ? v : {
+                ...v,
+                runs: [...(v.runs || []).filter(r => !isCompositeRun(r)), ...composites],
+            }));
+        } catch (error) {
+            logIfUnauthorized('rebuild_composites', 'vehicle', vehicleId, error);
+            showError('Composite curves not rebuilt: ' + error.message);
+        }
+    };
+
+    /**
+     * Rebuild every vehicle's composites (Admin → Data checks): the first fill
+     * after migration 077, and after COMPOSITE_VERSION changes. One vehicle at
+     * a time — each reads every one of its tests' points.
+     */
+    const rebuildAllComposites = async ({ onProgress } = {}) => {
+        const todo = visibleVehiclesRef.current.filter(v => mayHaveComposite(v) || (v.runs || []).some(isCompositeRun));
+        let rebuilt = 0, failed = 0;
+        for (const [i, v] of todo.entries()) {
+            try { await dataService.rebuildComposites(v); rebuilt++; }
+            catch (error) { failed++; console.warn('[composites] not rebuilt for vehicle', v.id, error?.message ?? error); }
+            onProgress?.({ done: i + 1, total: todo.length });
+        }
+        if (rebuilt > 0) await softRefreshVehicles();
+        return { checked: todo.length, rebuilt, failed };
+    };
+
     // ── Copy run to a different vehicle ───────────────────────────────────────
 
     const copyRunToVehicle = async (sourceVehicleId, run, targetVehicleId) => {
@@ -313,6 +370,7 @@ export function AppProvider({ children }) {
                     : v
             ));
             showSuccess(`Test copied to ${vehicles.find(v => v.id === targetVehicleId)?.name || 'vehicle'}`);
+            if (run.kind === 'charging') await refreshComposites(targetVehicleId);
         } catch (error) {
             logIfUnauthorized('copy_run', 'run', null, error);
             showError('Error copying test: ' + error.message);
@@ -330,6 +388,7 @@ export function AppProvider({ children }) {
                     ? { ...v, runs: [...(v.runs || []), newRun] }
                     : v
             ));
+            if (feedsComposites(vehicleId, runId)) await refreshComposites(vehicleId);
         } catch (error) {
             logIfUnauthorized('duplicate_run', 'run', runId, error);
             showError('Error duplicating run: ' + error.message);
@@ -344,6 +403,7 @@ export function AppProvider({ children }) {
                     ? { ...v, runs: [...(v.runs || []), newRun] }
                     : v
             ));
+            if (newRun?.kind === 'charging') await refreshComposites(vehicleId);
             return vehicleId;
         } catch (error) {
             logIfUnauthorized('add_run', 'run', null, error);
@@ -352,6 +412,9 @@ export function AppProvider({ children }) {
     };
 
     const updateRun = async (vehicleId, runId, updates) => {
+        // Decided BEFORE the write: a test switched from charging to range no
+        // longer feeds a composite afterwards, but its leaving changes them.
+        const feeds = feedsComposites(vehicleId, runId, updates.kind);
         try {
             await dataService.updateRun(vehicleId, runId, updates);
             // Convert the camelCase editFormData keys back to the snake_case keys that
@@ -371,6 +434,7 @@ export function AppProvider({ children }) {
                     case 'temperatureF':    normalized.temperature_f      = toNum(v);  break;
                     case 'speedBasis':     normalized.speed_basis       = v || null; break;
                     case 'preconditioned':  normalized.preconditioned     = toPreconditioned(v); break;
+                    case 'chargerVoltageClass': normalized.charger_voltage_class = toChargerClass(v); break;
                     case 'altitudeFt':      normalized.altitude_ft       = toNum(v);  break;
                     case 'elevationGainFt': normalized.elevation_gain_ft  = toNum(v);  break;
                     case 'sourceUrl':       normalized.source_url         = v;         break;
@@ -382,6 +446,7 @@ export function AppProvider({ children }) {
                     ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, ...normalized } : r) }
                     : v
             ));
+            if (feeds) await refreshComposites(vehicleId);
         } catch (error) {
             logIfUnauthorized('update_run', 'run', runId, error);
             showError('Error updating run: ' + error.message);
@@ -504,6 +569,7 @@ export function AppProvider({ children }) {
 
 
     const deleteRun = async (vehicleId, runId) => {
+        const feeds = feedsComposites(vehicleId, runId);
         try {
             await dataService.deleteRun(vehicleId, runId);
             setVehicles(prev => prev.map(v =>
@@ -511,6 +577,7 @@ export function AppProvider({ children }) {
                     ? { ...v, runs: v.runs.filter(r => r.id !== runId) }
                     : v
             ));
+            if (feeds) await refreshComposites(vehicleId);
         } catch (error) {
             logIfUnauthorized('delete_run', 'run', runId, error);
             showError('Error deleting run: ' + error.message);
@@ -528,6 +595,7 @@ export function AppProvider({ children }) {
                         : r) }
                     : v
             ));
+            if (feedsComposites(vehicleId, runId)) await refreshComposites(vehicleId);
             return result;
         } catch (error) {
             logIfUnauthorized('save_run_data', 'run', runId, error);
@@ -553,6 +621,7 @@ export function AppProvider({ children }) {
                         : v
                 ));
             }
+            if (feedsComposites(vehicleId, runId)) await refreshComposites(vehicleId);
             return result;
         } catch (error) {
             logIfUnauthorized('merge_run_data', 'run', runId, error);
@@ -1854,6 +1923,7 @@ export function AppProvider({ children }) {
             : vehicles.map(v => ({ ...v, runs: (v.runs || []).filter(r => !r.isHidden) }));
         return withVehicleFigures(withPlatforms(withInheritance(shown), platformsById));
     }, [vehicles, isContributor, platformsById]);
+    useEffect(() => { visibleVehiclesRef.current = visibleVehicles; }, [visibleVehicles]);
 
     const value = {
         vehicles: visibleVehicles,
@@ -1897,6 +1967,8 @@ export function AppProvider({ children }) {
         uploadVehicleImage,
         backfillVehicleThumbnails,
         backfillChargeSummaries,
+        rebuildAllComposites,
+        refreshComposites,
         toggleVehicleVisibility,
         replaceRunData,
         mergeRunData,
