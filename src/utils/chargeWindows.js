@@ -41,7 +41,7 @@
  *
  * Pure module: no data access, no React.
  */
-import { isInheritedRunId } from './runUtils';
+import { isInheritedRunId, isCompositeRun, nativeComposite } from './runUtils';
 
 /**
  * Bump when the calculation changes; stale summaries are then recomputed.
@@ -279,11 +279,14 @@ const CHARGER_LIMITED_SHARE = 0.7;
  * from `from`% to `to`% (#335).
  *
  * Charge time depends on conditions — a cold pack, a warm one — so this is not
- * the best session. It is the curator's default charging run when that covers
- * the window, else the newest session that does: a measurement with its
- * conditions beside it, not a verdict. Sessions that could not stand for the
- * car are left out: hidden, synthetic or inherited ones (as for the best
- * windows), and charger-limited ones.
+ * the best session. It follows the same order as every chart's default
+ * charging curve (runUtils.defaultChargingRun), among the sessions that cover
+ * the window: the curator's DEF, else the vehicle's own composite curve (#313)
+ * — the mean of its tests, which stands for the car better than any one day —
+ * else the newest test. Sessions that could not stand for the car are left
+ * out: hidden, synthetic or inherited ones (as for the best windows; a stored
+ * composite is synthetic but IS the car's, so it stays), and charger-limited
+ * ones.
  *
  * @param {Array} runs
  * @param {{ from: number, to: number, maxDcKw?: number|null }} window
@@ -295,15 +298,19 @@ export function chargeTimeSession(runs = [], { from, to, maxDcKw = null }) {
     const covering = [];
     for (const run of runs) {
         if (!run || run.kind !== 'charging') continue;
-        if (run.isHidden || run.is_hidden || run.synthetic || isInheritedRunId(run.id)) continue;
+        if (run.isHidden || run.is_hidden || isInheritedRunId(run.id)) continue;
+        if (run.synthetic && !isCompositeRun(run)) continue;
         const minutes = minutesBetween(run.charge_summary, from, to);
         if (!(minutes > 0)) continue;
         const peak = run.charge_summary.peakKw;
         if (maxDcKw > 0 && peak > 0 && peak < maxDcKw * CHARGER_LIMITED_SHARE) { limitedOut++; continue; }
         covering.push({ run, minutes });
     }
+    const own = nativeComposite(covering.map(c => c.run));
     const pick = covering.find(c => c.run.isDefault || c.run.is_default)
-        ?? covering.sort((a, b) => new Date(b.run.date) - new Date(a.run.date))[0];
+        ?? covering.find(c => c.run === own)
+        ?? covering.filter(c => !isCompositeRun(c.run))
+            .sort((a, b) => new Date(b.run.date) - new Date(a.run.date))[0];
     if (!pick) return { run: null, limitedOut };
     return {
         run: pick.run,

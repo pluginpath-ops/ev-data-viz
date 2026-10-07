@@ -210,6 +210,21 @@ describe('chargeTimeSession — which session a charge time comes from (#335)', 
         expect(got.temperatureF).toBe(41);
     });
 
+    it("takes the vehicle's composite curve over the newest test when nothing is default (#313)", () => {
+        const composite = { synthetic: true, composite: { chargerClassV: null, tests: [{}, {}] }, date: '2020-01-01' };
+        const got = chargeTimeSession([
+            run(1, curve(30), { date: '2024-01-01' }),
+            run(2, curve(20), { date: '2025-06-01' }),
+            run(9, curve(25), composite),
+        ], { from: 10, to: 80 });
+        expect(got.run.id).toBe(9);
+        // …but a DEF test still wins, and other synthetic runs still never count.
+        expect(chargeTimeSession([run(1, curve(30), { is_default: true }), run(9, curve(25), composite)],
+            { from: 10, to: 80 }).run.id).toBe(1);
+        expect(chargeTimeSession([run(1, curve(30)), run(5, curve(10), { synthetic: true })],
+            { from: 10, to: 80 }).run.id).toBe(1);
+    });
+
     it('falls back to the newest session that covers the window', () => {
         const got = chargeTimeSession([
             run(1, curve(30), { date: '2024-01-01' }),

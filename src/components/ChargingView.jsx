@@ -32,7 +32,7 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
-import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun } from '../utils/runUtils';
+import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun, isCompositeRun, defaultChargingRun } from '../utils/runUtils';
 import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
@@ -40,12 +40,21 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE, withAlpha } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
+import InfoIcon from './InfoIcon';
+import { compositeConditions, compositeExplainer, THIN_SUPPORT } from '../utils/compositeCurve';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
 const RUN_ATOMS = [{ key: 'test', of: s => s.run?.name }];
+
+/** The Y axes a composite's test spread can be drawn on: charge rate, and the
+ *  two axes that are charge rate scaled by a vehicle figure. On any other Y the
+ *  spread in kW has no meaning. */
+const SPREAD_AXES = new Set(['chargeRate', 'cRate', 'rangeRate']);
+
+
 
 /** "Charge Rate (kW)" → "Charge Rate". Axis labels carry their unit; a title
  *  should not repeat it beside the axis that already says it. */
@@ -97,17 +106,17 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         [selectedVehicles, chartMode]
     );
 
-    // Charging arrives with ONE curve per vehicle — its default test, else its
-    // most recent. A dozen overlapping curves is not a chart, and the per-vehicle
-    // "all" link is there for when you want the rest.
+    // Charging arrives with ONE curve per vehicle — its default charging curve
+    // (runUtils.defaultChargingRun: the curator's DEF, else its composite, else
+    // its newest test). A dozen overlapping curves is not a chart, and the
+    // per-vehicle "all" link is there for when you want the rest.
     //
     // Range arrives with all of them: those are bars, not curves, and a vehicle's
     // own tests are usually the comparison being made.
     const bootstrapRuns = useCallback((vehicleId, vehicleRows) => {
         if (chartMode === 'range') return vehicleRows.map(r => r.key);
-        const pick = vehicleRows.find(r => r.run.isDefault)
-            ?? [...vehicleRows].sort((a, b) => new Date(b.run.date) - new Date(a.run.date))[0];
-        return pick ? [pick.key] : [];
+        const pick = defaultChargingRun({ runs: vehicleRows.map(r => r.run) });
+        return pick ? [pick.id] : [];
     }, [chartMode]);
 
     // Charging and Range are different populations, not the same rows filtered:
@@ -130,6 +139,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         () => selectedVehicles.flatMap(v =>
             (v.runs || []).filter(r => selectedRuns.includes(r.id))
         ),
+        [selectedVehicles, selectedRuns]
+    );
+    // The composite curves being drawn (#313), each with its vehicle. Stored
+    // runs (migration 077), so they arrive with the vehicle's runs like any
+    // test. What each was built from and left out is in its ⓘ in the picker,
+    // beside the row it explains — a block of notes above the plot read as
+    // clutter (owner, 2026-10-07), and the legend says how many tests stand
+    // behind each.
+    const selectedComposites = useMemo(
+        () => selectedVehicles.flatMap(vehicle => (vehicle.runs || [])
+            .filter(r => isCompositeRun(r) && selectedRuns.includes(r.id))
+            .map(run => ({ vehicle, run }))),
         [selectedVehicles, selectedRuns]
     );
     const handSet = chartConfig.handSet ?? false;
@@ -165,16 +186,67 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         });
     }, [pairings]);
 
-    // Lazy-load data_points for newly selected runs.
+    // The vehicle a run belongs to.
+    const parentOf = (runId) =>
+        vehicles.find(v => v.runs?.some(r => String(r.id) === String(runId))) ?? null;
+
+    // The range test a charging series is explicitly paired with, if any.
+    const pairedRangeOf = (parentVehicle, runId) => {
+        const own = (parentVehicle?.runs || []).filter(r => !r._inherited && isRangeRun(r));
+        const pairedIds = rangePartnersOfCharging(pairings, runId);
+        return pairedIds.length
+            ? (isEpaPartnerId(pairedIds[0]) ? EPA_PARTNER_ID : own.find(r => String(r.id) === pairedIds[0]) ?? null)
+            : null;
+    };
+
+    // Range axis, resolved on the same ranking as every other chart
+    // (utils/rangeSource.js):
+    //
+    //   pairing → default range test → recorded range column
+    //
+    // A range test now outranks the recorded column outright, not just when
+    // one was explicitly paired. The recorded values are themselves mostly
+    // estimates — usually the car's guess-o-meter — so they carry no more
+    // authority than a figure derived from a measured range test, and treating
+    // them as more authoritative was the anomaly.
+    //
+    // Returns (soc) => miles, or null when no range test won ('recorded' and
+    // 'none' leave the run's own column alone). Deliberately UNCORRECTED:
+    // correction is a single multiplier applied at render time (rangeFactorFor),
+    // so the dropdown takes effect without refetching.
+    const rangeAtFor = async (runId, run) => {
+        const parentVehicle = parentOf(runId);
+        const src = resolveRangeSource(run ?? { id: runId }, {
+            vehicle: parentVehicle,
+            explicitPairing: pairedRangeOf(parentVehicle, runId),
+        });
+        if (src.miPerSoc == null) return null;
+        // A range test WITH its own SoC/range time series gives the real,
+        // non-linear shape; prefer it. Most range tests are scalar (distance +
+        // SoC bounds), so the linear miPerSoc model is the usual path.
+        let lookup = null;
+        if (src.sourceRun?.id && !isEpaPartnerId(src.sourceRun.id)) {
+            try {
+                lookup = await dataService.buildRangePerSocLookup(src.sourceRun.id);
+            } catch (_) { /* fall through to linear */ }
+        }
+        return lookup
+            ? (soc) => lookup(soc)
+            : (soc) => Math.round(soc * src.miPerSoc * 10) / 10;
+    };
+
+    // Lazy-load data_points for newly selected runs — a composite's included:
+    // it is a stored run with points like any test.
     //
     // Keyed on what is MISSING, not on the selection: a pairing change evicts
     // cached runs (their derived range is stale), and keying on the selection
     // alone meant nothing refetched them — the series vanished until some
     // unrelated toggle changed the selection and happened to trigger this.
-    const missingRunIds = selectedRuns.filter(id => !(id in runDataCache));
+    const wantedRunIds = selectedRuns;
+    const missingRunIds = wantedRunIds.filter(id => !(id in runDataCache));
     useEffect(() => {
         const fetchMissingData = async () => {
-            const missingIds = selectedRuns.filter(id => !(id in runDataCache));
+            const missingIds = wantedRunIds.filter(id => !(id in runDataCache));
             if (missingIds.length === 0) return;
             setLoadingData(true);
             const updates = {};
@@ -203,44 +275,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         // figure derived from a measured range test, and treating
                         // them as more authoritative was the anomaly.
                         if (runData.length > 0) {
-                            const parentVehicle = vehicles.find(v =>
-                                v.runs?.some(r => String(r.id) === String(runId))
-                            );
-                            const pairedRangeIds = rangePartnersOfCharging(pairings, runId);
-                            const own = (parentVehicle?.runs || []).filter(r => !r._inherited && isRangeRun(r));
-                            const pairedRange = pairedRangeIds.length
-                                ? (isEpaPartnerId(pairedRangeIds[0])
-                                    ? EPA_PARTNER_ID
-                                    : own.find(r => String(r.id) === pairedRangeIds[0]) ?? null)
-                                : null;
-
-                            // Deliberately UNCORRECTED here. This runs once per
-                            // run, when its data points are fetched, so a
-                            // correction baked in now would never respond to the
-                            // dropdown and toggling a run would reuse the cache.
-                            // Correction is a single multiplier, so it is applied
-                            // at render time instead — see rangeFactorFor.
-                            const src = resolveRangeSource(run ?? { id: runId }, {
-                                vehicle: parentVehicle,
-                                explicitPairing: pairedRange,
-                            });
-
-                            // 'recorded' and 'none' mean no range test won — leave
-                            // the run's own column alone.
-                            if (src.miPerSoc != null) {
-                                let lookup = null;
-                                // A range test WITH its own SoC/range time series gives
-                                // the real, non-linear shape; prefer it. Most range
-                                // tests are scalar (distance + SoC bounds), so the
-                                // linear miPerSoc model is the usual path.
-                                if (src.sourceRun?.id && !isEpaPartnerId(src.sourceRun.id)) {
-                                    try {
-                                        lookup = await dataService.buildRangePerSocLookup(src.sourceRun.id);
-                                    } catch (_) { /* fall through to linear */ }
-                                }
-                                const rangeAt = lookup
-                                    ? (soc) => lookup(soc)
-                                    : (soc) => Math.round(soc * src.miPerSoc * 10) / 10;
+                            const rangeAt = await rangeAtFor(runId, run);
+                            if (rangeAt) {
                                 runData = runData.map(p => ({
                                     ...p,
                                     range: p.soc != null ? rangeAt(p.soc) : null,
@@ -310,13 +346,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const rangeFactorFor = (runId) => {
         const mode = chartConfig.correctionMode ?? 'none';
         if (mode === 'none') return 1;
-        const parentVehicle = vehicles.find(v => v.runs?.some(r => String(r.id) === String(runId)));
+        const parentVehicle = parentOf(runId);
         if (!parentVehicle) return 1;
-        const own = (parentVehicle.runs || []).filter(r => !r._inherited && isRangeRun(r));
-        const pairedIds = rangePartnersOfCharging(pairings, runId);
-        const pairedRange = pairedIds.length
-            ? (isEpaPartnerId(pairedIds[0]) ? EPA_PARTNER_ID : own.find(r => String(r.id) === pairedIds[0]) ?? null)
-            : null;
+        const pairedRange = pairedRangeOf(parentVehicle, runId);
         const run = (parentVehicle.runs || []).find(r => String(r.id) === String(runId));
         // Resolve first to learn WHICH range test supplied the miles, then price
         // that test's own conditions — the charging run's conditions are
@@ -566,14 +598,46 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 : (d) => convertAxisValue(scaleRange(getFieldValue(d, chartConfig.xAxis, vehicleBattery, vehicleRange), chartConfig.xAxis, rangeK), chartConfig.xAxis);
 
             // 4. Y1 dataset
+            const getY = (d) => convertAxisValue(scaleRange(getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange), chartConfig.yAxis, rangeK), chartConfig.yAxis);
+            const composite = run.composite;
             const y1Points = workingData
-                .map(d => ({ x: getX(d), y: convertAxisValue(scaleRange(getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange), chartConfig.yAxis, rangeK), chartConfig.yAxis) }))
+                // A composite's points carry how many tests stand behind them and
+                // its test spread. An interpolated race-mode start reads n from
+                // its neighbours; a projected one has none and counts as thin.
+                .map(d => composite
+                    ? { x: getX(d), y: getY(d), n: d.n ?? 1, hi: d.spreadHi, lo: d.spreadLo }
+                    : { x: getX(d), y: getY(d) })
                 .filter(p => p.x != null && p.y != null);
             if (y1Points.length === 0) return [];
 
             const showPts = chartConfig.showPoints || false;
 
-            const result = [{
+            // The test spread, shaded from one standard deviation below the
+            // mean up to the best test (compositeCurve.testSpread). A point with
+            // no spread — a single test — is a null y, which BREAKS the fill
+            // there rather than bridging a dashed stretch with shading that
+            // claims an agreement nobody measured. The low edge comes first:
+            // the high one fills down to the dataset just before it.
+            const spread = [];
+            if (composite && (chartConfig.compositeSpread ?? true) && SPREAD_AXES.has(chartConfig.yAxis)) {
+                const edge = (key) => workingData
+                    .map(d => ({ x: getX(d), y: d[key] != null ? getY({ ...d, chargeRate: d[key] }) : null }))
+                    .filter(p => p.x != null);
+                const lo = edge('spreadLo');
+                if (lo.some(p => p.y != null)) {
+                    const edgeStyle = { borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, showLine: true,
+                        tension: 0.2, spanGaps: false, yAxisID: 'y', spreadOf: run.id };
+                    spread.push({ ...edgeStyle, label: 'spread-lo', data: lo, fill: false });
+                    spread.push({ ...edgeStyle, label: 'spread-hi', data: edge('spreadHi'),
+                        fill: '-1', backgroundColor: withAlpha(color, 0.18) });
+                }
+            }
+            // A composite is never solid — solid is a measured test. Dashed
+            // where it rests on THIN_SUPPORT tests or more, dotted on its weak
+            // tails where fewer cover it.
+            const thin = (ctx) => (ctx.p0.raw.n < THIN_SUPPORT || ctx.p1.raw.n < THIN_SUPPORT) ? [2, 4] : [10, 5];
+
+            const result = [...spread, {
                 // The legend is the only thing identifying a curve, and it is
                 // what a PNG export keeps — so the source goes in it, not only
                 // in the tooltip.
@@ -588,6 +652,16 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 tension:          0.1,
                 yAxisID:          'y',
                 runMeta:          run,
+                // A composite: the same stroke width as a test, drawn over the
+                // tests it stands for, dashed — dotted where one test covers it.
+                // Always a line — a composite has no samples to mark as points.
+                ...(composite ? {
+                    pointRadius:      0,
+                    pointHoverRadius: 4,
+                    showLine:         true,
+                    order:            -1,
+                    segment:          { borderDash: thin },
+                } : {}),
             }];
 
             // 5. Y2 dataset (hidden from legend; dashed line + triangle points)
@@ -643,12 +717,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         position: 'top',
                         labels: {
                             color: legendColor,
-                            // Y2 datasets share color+style with their Y1 pair — hide duplicates
-                            filter: (item, data) => data.datasets[item.datasetIndex].yAxisID !== 'y2',
+                            // Y2 datasets share color+style with their Y1 pair — hide
+                            // duplicates; a test spread is explained in the notes.
+                            filter: (item, data) => data.datasets[item.datasetIndex].yAxisID !== 'y2'
+                                && !data.datasets[item.datasetIndex].spreadOf,
                         },
                     },
                     tooltip: {
                         displayColors: false,
+                        filter: (item) => !item.dataset?.spreadOf,
                         callbacks: {
                             title(ctx) {
                                 const run = ctx[0]?.dataset?.runMeta;
@@ -661,6 +738,16 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 return [`${xl}: ${ctx.parsed.x}`, `${yl}: ${ctx.parsed.y}`];
                             },
                             afterLabel(ctx) {
+                                const comp = ctx.dataset?.runMeta?.composite;
+                                if (comp) {
+                                    const n = ctx.raw?.n;
+                                    const { hi, lo } = ctx.raw ?? {};
+                                    return [
+                                        `From ${n} test${n === 1 ? '' : 's'} at this point`,
+                                        hi != null ? `Test spread: best ${Math.round(hi)} kW, mean − 1 SD ${Math.round(lo)} kW` : null,
+                                        compositeConditions(comp, units),
+                                    ].filter(Boolean);
+                                }
                                 return runTooltipLines(ctx.dataset?.runMeta, (ctx.dataset?.figureSources ?? []).map(s => s.line), units);
                             },
                         },
@@ -727,7 +814,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // the frame. A chart pasted into a thread has to answer "how many runs, on
     // what, corrected how, in which units" without anyone typing a caption.
     const plotSubtitle = useMemo(() => {
-        const runs = selectedRuns.length;
+        const runs = colorableRuns.filter(r => !isCompositeRun(r)).length;
         const vehicles = selectedVehicles.filter(
             v => (v.runs || []).some(r => selectedRuns.includes(r.id))).length;
         const parts = [
@@ -735,11 +822,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
         ];
         if (raceActive) parts.push(`race mode from ${raceThreshold}% SoC`);
+        const curves = selectedComposites.length;
+        if (curves) parts.push(`${curves} composite curve${curves === 1 ? '' : 's'}`);
         const mode = chartConfig.correctionMode ?? 'none';
         parts.push(mode === 'none' ? 'no correction' : `corrected: ${mode}`);
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.correctionMode, units]);
+    }, [colorableRuns, selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.correctionMode, units, selectedComposites]);
 
     // ── PNG export ───────────────────────────────────────────────────────────
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
@@ -909,6 +998,19 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             <span className="text-sm">Points</span>
                         </label>
                         <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
+                        {/* Composites are picked in the test list below, as tests
+                            are; how they are drawn is a display choice. */}
+                        {selectedComposites.length > 0 && (
+                            <label className="toggle-label" title="Shading around each composite: from the best test at that SoC down to one standard deviation below the mean. None where the composite rests on a single test — one test has no spread.">
+                                <input
+                                    type="checkbox"
+                                    checked={chartConfig.compositeSpread ?? true}
+                                    onChange={e => setChartConfig(prev => ({ ...prev, compositeSpread: e.target.checked }))}
+                                    className="w-4 h-4"
+                                />
+                                <span className="text-sm">Test spread</span>
+                            </label>
+                        )}
                     </div>
                     {/* A select, so it takes a row of its own beside the correction
                         picker rather than a cell of the checkbox grid above — that
@@ -941,6 +1043,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         return epa ? [...filterRangeRuns(vehicle.runs), epa] : filterRangeRuns(vehicle.runs);
                     }}
                     partnerIdFor={run => rangePartnersOfCharging(pairings, run.id)[0] ?? null}
+                    // A composite has no single source to credit — it is drawn
+                    // from several tests — so its slot explains what it is made
+                    // of instead, and its name is italic: it is not a test.
+                    renderRunSource={run => isCompositeRun(run)
+                        ? <InfoIcon className="run-source-info" title={run.name} text={compositeExplainer(run.composite, units)} />
+                        : undefined}
+                    isDerivedRun={isCompositeRun}
                     resolvePartner={(chargingRun, vehicle) =>
                         resolveRangeSource(chargingRun, { vehicle })}
                     onSetPartner={(chargingId, _old, newRangeId) =>
@@ -954,6 +1063,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     )}
                     // Conditions: what race-mode alignment did to this run.
                     renderRunMeta={run => {
+                        // A composite's conditions live in its ⓘ, not on a second line.
+                        if (isCompositeRun(run)) return null;
                         const exclusionReason = getRaceExclusionReason(run.id);
                         const offset = getRaceOffset(run.id);
                         const noTrim = offset !== null && offset === 0;

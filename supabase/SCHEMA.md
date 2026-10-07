@@ -125,6 +125,8 @@ One charging or range test session per vehicle.
 | `calculated_fields` | `text[]` | — | Fields computed rather than measured |
 | `charge_summary` | `jsonb` | `NULL` | Charging sessions only: best 5/10/15-minute average charge rate and where each window sat, with a calculation `version`. Since version 2 also `socMin`, the minute each whole percent of SoC was first reached (101 entries, null where the session did not reach it), which the vehicle table reads for the charge window (#335). Computed client-side (`utils/chargeWindows.js`) whenever the session's points are written; null until then (migration 071, #346) |
 | `preconditioned` | `boolean` | `NULL` | Charging tests: whether the battery was preconditioned. `false` is "not preconditioned", `NULL` is "not recorded" — kept apart on purpose. Shown beneath a tested charge time and in the test peek (migration 073, #352) |
+| `charger_voltage_class` | `smallint` | `NULL` | Charging tests: the voltage class (400 or 800, CHECK) of the charger used; `NULL` is "not recorded". A test on a lower class than its car's is kept out of the car's composite curve and forms its own (`utils/compositeCurve.js`). Shown in the test peek (migration 076, #366, #313) |
+| `composite` | `jsonb` | `NULL` | Composite curves only: marks this synthetic run as the mean of the vehicle's charging tests, and records how it was built — `chargerClassV` (800, 400, or null for a single composite), `version`, input `fingerprint`, contributing `tests`, `heldBack` stretches, `inferredTests`, `conditions`. NULL on every real test. Unique per vehicle × class (`runs_one_composite_per_class`). Rebuilt in place by `DataService.rebuildComposites`, so its id is stable. Contributors may delete composite rows (policy `rbac: runs delete composite`) though not tests — a rebuild removes a class its tests no longer support. Its points carry `{ n, spreadHi, spreadLo }` in `data_points.extra_data` (migration 077, #313) |
 | `created_at` | `timestamptz` | `now()` | |
 
 > Runs have no `user_id`. Ownership and edit permission are inherited from the parent vehicle via RLS subquery joins.
@@ -169,6 +171,7 @@ Individual time-series frames within a run.
 | `time_value` | `numeric(8,1)` | Minutes or seconds |
 | `range_value` | `numeric(8,1)` | Miles or km |
 | `temperature` | `numeric(6,1)` | °C or °F |
+| `extra_data` | `jsonb` | Per-point extras. On a composite curve's points: `{ n, spreadHi, spreadLo }` — how many tests stand behind the point, and its test spread (migration 077) |
 
 ---
 

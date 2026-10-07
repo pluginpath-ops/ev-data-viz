@@ -15,7 +15,7 @@
  * the chart run selectors can never disagree about what counts as a charging
  * run — and all of them pick up `kind` (migration 044) together.
  */
-import { isChargingRun, isRangeRun } from './runUtils';
+import { isChargingRun, isRangeRun, filterTests } from './runUtils';
 
 /**
  * Category definitions, in display order.
@@ -28,7 +28,9 @@ export const DATA_CATEGORIES = [
         key: 'charging',
         label: 'Charging',
         colorClass: 'text-green-600 dark:text-green-400',
-        count: (v) => (v.runs || []).filter(isChargingRun).length,
+        // Tests only: a stored composite curve (#313) is a charging run but
+        // not a test anyone ran.
+        count: (v) => filterTests(v.runs).filter(isChargingRun).length,
     },
     {
         key: 'range',

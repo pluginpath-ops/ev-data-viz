@@ -8,9 +8,11 @@ import { rankFeCandidates } from '../utils/feGuideMatch';
 import { promotionUpdates, demotionUpdates, acceptGuideUpdates, isCuratorOwned } from '../utils/feGuidePromotion';
 import { selectTestForGuide } from '../utils/epaTestSelection';
 import { planGroupImport, uniqueCoveredModels } from '../utils/epaImportMerge';
-import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
+import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, isCompositeRun, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
+import { planCompositeRebuild, compositeEligible, mayHaveComposite } from '../utils/compositeCurve';
 import { toPreconditioned } from '../utils/runPreconditioning';
+import { toChargerClass } from '../utils/runChargerClass';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -95,6 +97,67 @@ function normalisePoint(point, runId, frame) {
     time_value:  roundField(point.time,        1),  // min/s,     1 dp
     range_value: roundField(point.range,       1),  // mi/km,     1 dp
     temperature: roundField(point.temperature, 1),  // °C/°F,     1 dp
+  };
+}
+
+/**
+ * A data_points row as the app holds it — the one mapping getRunData and the
+ * batched getPointsForRuns share.
+ */
+function shapePoint(p, efficiencyFactor = 1, capacityFactor = 1) {
+  return {
+    frame:       p.frame,
+    timestamp:   p.timestamp,
+    soc:         p.soc,
+    // Same rule as buildInheritedRuns, by what the field IS rather than what
+    // kind of run it sits on — a charging test carries a range readout too,
+    // and it is still a distance:
+    //
+    //   charge_rate (power)  → × cap        a bigger pack pulls more kW
+    //   range_value (distance) → × cap × eff  remaining range is range
+    //
+    // Time is untouched in both cases: these scale magnitude, not the axis
+    // the magnitude is plotted against.
+    //
+    // Each rounds back to its own column's precision (charge_rate is
+    // numeric(8,2), range_value numeric(8,1)) so a scaled point claims no
+    // more precision than the measurement behind it.
+    chargeRate:  p.charge_rate != null && capacityFactor !== 1
+      ? roundField(p.charge_rate * capacityFactor, 2)
+      : p.charge_rate,
+    time:        p.time_value,
+    range:       p.range_value != null && (efficiencyFactor !== 1 || capacityFactor !== 1)
+      ? roundField(p.range_value * capacityFactor * efficiencyFactor, 1)
+      : p.range_value,
+    temperature: p.temperature,
+    // A composite curve's points carry how many tests stand behind them and
+    // their test spread (migration 077); a test's points carry none.
+    ...(p.extra_data?.n != null ? {
+      n:        p.extra_data.n,
+      spreadHi: p.extra_data.spreadHi ?? null,
+      spreadLo: p.extra_data.spreadLo ?? null,
+    } : {}),
+  };
+}
+
+/**
+ * A runs row as the app holds it. The one door every run comes through —
+ * getVehicles, and a vehicle's runs re-read after its composites are rebuilt —
+ * so the two can never shape a run differently.
+ */
+function shapeRun(r) {
+  return {
+    ...r,
+    // Color belongs to the vehicle now (#308). The stored value is left
+    // in the database and replaced HERE, at the one door every run comes
+    // through, so a read we missed anywhere downstream paints magenta
+    // rather than silently keeping the old per-run color alive.
+    color: RETIRED_RUN_COLOR,
+    // Normalise DB snake_case to the camelCase used throughout the app.
+    isDefault: !!r.is_default,
+    isHidden:  !!r.is_hidden,
+    // data_points(count) returns [{ count: N }]; normalise to a plain number
+    dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
   };
 }
 
@@ -259,19 +322,7 @@ class DataService {
           epaGroup:  m.epa_test_groups,
         })),
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
-        runs:  (v.runs || []).map(r => ({
-          ...r,
-          // Color belongs to the vehicle now (#308). The stored value is left
-          // in the database and replaced HERE, at the one door every run comes
-          // through, so a read we missed anywhere downstream paints magenta
-          // rather than silently keeping the old per-run color alive.
-          color: RETIRED_RUN_COLOR,
-          // Normalise DB snake_case to the camelCase used throughout the app.
-          isDefault: !!r.is_default,
-          isHidden:  !!r.is_hidden,
-          // data_points(count) returns [{ count: N }]; normalise to a plain number
-          dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
-        })),
+        runs:  (v.runs || []).map(shapeRun),
       };
     });
 
@@ -1049,6 +1100,9 @@ class DataService {
       // Only when recorded: a test added without it never names a column an
       // unmigrated database lacks (migration 073).
       ...(toPreconditioned(run.preconditioned) != null ? { preconditioned: toPreconditioned(run.preconditioned) } : {}),
+      // The same rule for the charger's class (migration 076).
+      ...(toChargerClass(run.chargerVoltageClass ?? run.charger_voltage_class) != null
+        ? { charger_voltage_class: toChargerClass(run.chargerVoltageClass ?? run.charger_voltage_class) } : {}),
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -1131,6 +1185,97 @@ class DataService {
     return { checked: runs?.length ?? 0, written, failed };
   }
 
+  // ── Composite curves (#313, migration 077) ───────────────────────────────
+
+  /** A vehicle's runs straight from the database, shaped as getVehicles shapes them. */
+  async getVehicleRuns(vehicleId) {
+    const { data, error } = await getSupabase()
+      .from('runs').select('*, data_points(count)').eq('vehicle_id', vehicleId);
+    if (error) throw error;
+    return (data ?? []).map(shapeRun);
+  }
+
+  /**
+   * Bring a vehicle's stored composite curves up to date with its tests, and
+   * return its runs as they now stand.
+   *
+   * Reads the runs from the database rather than trusting the caller's copy:
+   * this runs straight after a write, before React state has caught up. The
+   * vehicle object still supplies what a write cannot change — its platforms
+   * and specs, for its voltage class. Curators only; a viewer never writes.
+   *
+   * Each composite is rebuilt IN PLACE where one of its class exists
+   * (planCompositeRebuild), so its id, DEF tag and pairings survive.
+   */
+  async rebuildComposites(vehicle) {
+    if (!this.useSupabase || !this.isContributor || !vehicle) return null;
+    const runs = await this.getVehicleRuns(vehicle.id);
+    const withRuns = { ...vehicle, runs };
+    if (!mayHaveComposite(withRuns) && !runs.some(isCompositeRun)) return runs;
+
+    const pointsByRunId = await this.getPointsForRuns(runs.filter(compositeEligible).map(r => r.id));
+    const { writes, deletes } = planCompositeRebuild(withRuns, pointsByRunId);
+
+    // A vehicle's composites (800 V and 400 V) are independent, so they are
+    // written side by side; each one's row write carries its charge summary,
+    // which used to be a request of its own.
+    const sb = getSupabase();
+    await Promise.all(writes.map(async (w) => {
+      const row = {
+        name: w.name, composite: w.composite,
+        charge_summary: { ...summarizeChargeSession(w.points), computedAt: new Date().toISOString() },
+      };
+      let id = w.id;
+      if (id == null) {
+        const { data, error } = await sb.from('runs').insert({
+          vehicle_id: vehicle.id, kind: 'charging', synthetic: true, ...row,
+          date: new Date().toISOString().split('T')[0],
+          upload_date: new Date().toISOString(),
+          populated_fields: ['soc', 'chargeRate', 'time'],
+        }).select('id').single();
+        if (error) throw error;
+        id = data.id;
+      } else {
+        const { error } = await sb.from('runs').update(row).eq('id', id);
+        if (error) throw error;
+      }
+      await this.writeCompositePoints(id, w.points);
+    }));
+    if (deletes.length) {
+      // .select() so a delete RLS filtered out reads as 0 rows, not success:
+      // Postgres drops rows a policy hides without an error (migration 077's
+      // composite delete policy is what lets a contributor do this at all).
+      const { data: gone, error } = await sb.from('runs').delete().in('id', deletes).select('id');
+      if (error) throw error;
+      if ((gone?.length ?? 0) < deletes.length) {
+        throw new Error(`${deletes.length - (gone?.length ?? 0)} obsolete composite curve(s) could not be deleted — is migration 077 applied?`);
+      }
+    }
+    return this.getVehicleRuns(vehicle.id);
+  }
+
+  /**
+   * Replace a composite's points. Direct writes rather than the
+   * replace_run_data_points RPC, which has no column for extra_data — where
+   * each point's contributor count and test spread live.
+   */
+  async writeCompositePoints(runId, points) {
+    const sb = getSupabase();
+    const { error: delError } = await sb.from('data_points').delete().eq('run_id', runId);
+    if (delError) throw delError;
+    const rows = points.map((p, frame) => ({
+      run_id: runId, frame,
+      soc:         roundField(p.soc, 1),
+      charge_rate: roundField(p.chargeRate, 2),
+      time_value:  roundField(p.time, 1),
+      extra_data:  { n: p.n, spreadHi: p.spreadHi ?? null, spreadLo: p.spreadLo ?? null },
+    }));
+    for (let i = 0; i < rows.length; i += 1000) {
+      const { error } = await sb.from('data_points').insert(rows.slice(i, i + 1000));
+      if (error) throw error;
+    }
+  }
+
   async updateRun(vehicleId, runId, updates) {
     if (!this.useSupabase || !this.user) {
       const saved = localStorage.getItem('evData');
@@ -1162,6 +1307,7 @@ class DataService {
       ...(updates.sourceUrl !== undefined ? { source_url: updates.sourceUrl || null } : {}),
       ...(updates.isHidden !== undefined ? { is_hidden: updates.isHidden } : {}),
       ...(updates.preconditioned !== undefined ? { preconditioned: toPreconditioned(updates.preconditioned) } : {}),
+      ...(updates.chargerVoltageClass !== undefined ? { charger_voltage_class: toChargerClass(updates.chargerVoltageClass) } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }
@@ -1385,32 +1531,28 @@ class DataService {
       .eq('run_id', actualId)
       .order('frame', { ascending: true })
       .order('id', { ascending: true }));
-    return (data || []).map(p => ({
-      frame:       p.frame,
-      timestamp:   p.timestamp,
-      soc:         p.soc,
-      // Same rule as buildInheritedRuns, by what the field IS rather than what
-      // kind of run it sits on — a charging test carries a range readout too,
-      // and it is still a distance:
-      //
-      //   charge_rate (power)  → × cap        a bigger pack pulls more kW
-      //   range_value (distance) → × cap × eff  remaining range is range
-      //
-      // Time is untouched in both cases: these scale magnitude, not the axis
-      // the magnitude is plotted against.
-      //
-      // Each rounds back to its own column's precision (charge_rate is
-      // numeric(8,2), range_value numeric(8,1)) so a scaled point claims no
-      // more precision than the measurement behind it.
-      chargeRate:  p.charge_rate != null && capacityFactor !== 1
-        ? roundField(p.charge_rate * capacityFactor, 2)
-        : p.charge_rate,
-      time:        p.time_value,
-      range:       p.range_value != null && (efficiencyFactor !== 1 || capacityFactor !== 1)
-        ? roundField(p.range_value * capacityFactor * efficiencyFactor, 1)
-        : p.range_value,
-      temperature: p.temperature,
-    }));
+    return (data || []).map(p => shapePoint(p, efficiencyFactor, capacityFactor));
+  }
+
+  /**
+   * Several runs' points in one paged query, keyed by run id — for a composite
+   * rebuild, which needs every test of a vehicle at once. One request (or one
+   * per thousand rows) instead of one per test: per-test fetches one after
+   * another were most of a rebuild's time. Real runs only; no inherited
+   * scaling, which a composite never reads.
+   */
+  async getPointsForRuns(runIds) {
+    const out = Object.fromEntries(runIds.map(id => [id, []]));
+    if (!runIds.length) return out;
+    const data = await fetchAllRows(() => getSupabase()
+      .from('data_points')
+      .select('*')
+      .in('run_id', runIds)
+      .order('run_id', { ascending: true })
+      .order('frame', { ascending: true })
+      .order('id', { ascending: true }));
+    for (const p of data || []) (out[p.run_id] ??= []).push(shapePoint(p));
+    return out;
   }
 
   async toggleVehicleVisibility(vehicleId, newVisibility) {

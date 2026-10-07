@@ -17,7 +17,7 @@
  * Pure module — no React, no Supabase.
  */
 
-import { runKindFrom } from './runUtils';
+import { runKindFrom, isCompositeRun, compositesFirst } from './runUtils';
 
 /** camelCase field → database column. One definition, so the writer and the
  *  optimistic update cannot drift — which is how the per-kind default bug
@@ -203,15 +203,20 @@ export function summariseSessions(sessions, vehicles) {
  * Unassigned runs collect at the end: they are an absence, not an outing, and
  * putting them first would bury the grouping under the ungrouped.
  *
- * Returns [{ key, sessionId, runs }] — a real nesting rather than a flat list
- * with markers, because the session card CONTAINS its runs on screen and
- * collapsing it should visibly fold them away.
+ * Composite curves (#313) are not from any outing, so they get a group of
+ * their own — FIRST, as they come first in every list of a vehicle's runs —
+ * rather than sitting among the unassigned tests as if they had lost theirs.
+ *
+ * Returns [{ key, sessionId, runs, composite? }] — a real nesting rather than
+ * a flat list with markers, because the session card CONTAINS its runs on
+ * screen and collapsing it should visibly fold them away.
  */
 export function groupRunsBySession(runs) {
     const order = [];
     const bySession = new Map();
 
-    for (const run of runs || []) {
+    const composites = compositesFirst((runs || []).filter(isCompositeRun));
+    for (const run of (runs || []).filter(r => !isCompositeRun(r))) {
         const key = run.session_id == null ? '__none__' : String(run.session_id);
         if (!bySession.has(key)) { bySession.set(key, []); order.push(key); }
         bySession.get(key).push(run);
@@ -221,11 +226,14 @@ export function groupRunsBySession(runs) {
     const keys = order.filter(k => k !== '__none__');
     if (bySession.has('__none__')) keys.push('__none__');
 
-    return keys.map(key => ({
-        key,
-        sessionId: key === '__none__' ? null : key,
-        runs: bySession.get(key),
-    }));
+    return [
+        ...(composites.length ? [{ key: '__composite__', sessionId: null, runs: composites, composite: true }] : []),
+        ...keys.map(key => ({
+            key,
+            sessionId: key === '__none__' ? null : key,
+            runs: bySession.get(key),
+        })),
+    ];
 }
 
 /** The session a run belongs to, or null. Used to fill in conditions the run
