@@ -34,6 +34,7 @@ import InfoIcon from './InfoIcon';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
+import { spreadTestsFor, sweepSpread, timelineSpread } from '../utils/roadTripSpread';
 
 Chart.register(ZoomPlugin);
 
@@ -82,6 +83,60 @@ function isSimUnrealistic(sim) {
     if (sim.segments.some(s => s.type === 'charge' && s.endSoc > CHARGE_CEIL_SOC)) return true;
     if (sim.warnings.some(w => /depleted|maximum iterations|complete trip/i.test(w))) return true;
     return false;
+}
+
+/**
+ * PROTOTYPE — shading for the test spread on a sweep chart (utils/roadTripSpread).
+ *
+ * Two datasets per vehicle, the top edge then the bottom filled up to it
+ * (`fill: '-1'`), drawn behind the lines (`order: 1`). Kept out of the legend
+ * and the tooltip; the line's own tooltip quotes the spread instead.
+ */
+function spreadDatasets(entries, spread, xs, { tension = 0.3 } = {}) {
+    const out = [];
+    entries.forEach((entry, i) => {
+        const steps = spread?.[i]?.steps;
+        if (!steps?.some(Boolean)) return;
+        // A timeline's steps carry their own x; a sweep's share the sweep's.
+        const at = spread[i].xs ?? xs;
+        const edge = key => at.map((x, k) => ({ x, y: steps[k]?.[key] ?? null }));
+        const common = { borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, tension, order: 1, _spread: true };
+        out.push({ ...common, label: `${entry.key} spread top`, data: edge('hi'), fill: false });
+        out.push({ ...common, label: `${entry.key} spread bottom`, data: edge('lo'), fill: '-1', backgroundColor: entry.color + '2e' });
+    });
+    return out;
+}
+
+/**
+ * PROTOTYPE — the test spread in a 'byTest' lane, where an area would tangle:
+ * every test's own trip as a faint trace behind the line. The finish range is
+ * printed in the lane's end callout rather than shaded — a shaded block there
+ * read as one more charge stop.
+ */
+function laneSpreadDatasets(entries, spread) {
+    const out = [];
+    entries.forEach((entry, i) => {
+        const s = spread?.[i];
+        if (!s?.traces) return;
+        const common = { pointRadius: 0, pointHoverRadius: 0, tension: 0, order: 1, _spread: true };
+        s.traces.forEach((data, t) => out.push({
+            ...common, label: `${entry.key} test ${t}`, data, fill: false,
+            borderColor: entry.color + '66', borderWidth: 1,
+        }));
+    });
+    return out;
+}
+
+/** When the trip ends, across the tests, as a tooltip line, or nothing. */
+function finishTooltipLine(dataset) {
+    const f = dataset._spreadFinish;
+    return f ? [`Finish across ${f.n} range tests: ${formatTime(f.lo)} – ${formatTime(f.hi)}`] : [];
+}
+
+/** The test spread at one sweep step, as a tooltip line, or nothing. */
+function spreadTooltipLine(dataset, index) {
+    const step = dataset._spreadSteps?.[index];
+    return step ? [`Across ${step.n} range tests: ${formatTime(step.lo)} – ${formatTime(step.hi)}`] : [];
 }
 
 /** Y-value for one sweep sim result (shared by speed and distance sweeps). */
@@ -364,7 +419,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             if (yAxis === 'byTest') {
                 let simIdx = 0;
                 chart.data.datasets.forEach((ds, di) => {
-                    if (ds._isIce) return;
+                    if (ds._isIce || ds._spread) return;
                     const sim = simResults[simIdx++];
                     if (!sim || !ds.data.length) return;
                     const meta   = chart.getDatasetMeta(di);
@@ -396,6 +451,14 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                         ctx.fillStyle = deltaMin > 0 ? '#d97706' : '#16a34a'; // amber-600 / green-600
                         ctx.fillText(vsIce, lastPt.x + 6, labelY + 13);
                     }
+
+                    // PROTOTYPE test spread: the finish range across the range tests.
+                    const f = ds._spreadFinish;
+                    if (f) {
+                        ctx.font      = `${fonts.micro}px ${fonts.sans}`;
+                        ctx.fillStyle = chartTheme().tick;
+                        ctx.fillText(`${f.n} tests: ${formatTime(f.lo)}–${formatTime(f.hi)}`, lastPt.x + 6, labelY + (vsIce ? 26 : 13));
+                    }
                     ctx.restore();
                 });
 
@@ -425,7 +488,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             // ── Pass 1: charging segment badges (EV lines only) ───────────
             let simIdx = 0;
             chart.data.datasets.forEach((ds, di) => {
-                if (ds._isIce) return;
+                if (ds._isIce || ds._spread) return;
                 const sim = simResults[simIdx++];
                 if (!sim) return;
 
@@ -478,6 +541,8 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             const finishLabels = [];
             let si = 0;
             chart.data.datasets.forEach((ds, di) => {
+                // Test spread shading has no sim and no finish of its own.
+                if (ds._spread) return;
                 const meta = chart.getDatasetMeta(di);
                 const pts  = meta.data;
                 if (!pts.length) return;
@@ -608,6 +673,8 @@ export default function RoadTripView({
     // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
     const axisScale = useSyncedScale(axisScaleOwn);
     const [copiedUrl, setCopiedUrl] = useState(false);
+    // PROTOTYPE, local to this view: not in chartConfig, not in the URL.
+    const [showTestSpread, setShowTestSpread] = useState(false);
     const [sortCol, setSortCol] = useState(null);   // column key or null
     const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
     const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
@@ -998,6 +1065,100 @@ export default function RoadTripView({
         });
     }, [validEntries, runDataCache, roadTripConfig]);
 
+    // ── PROTOTYPE: test spread on the sweeps ─────────────────────────────────
+    // The same sweep, once per range test of the vehicle, with the row's own
+    // charging curve held fixed. See utils/roadTripSpread.
+    // Towing overrides every test with one efficiency, so there is nothing to spread.
+    const spreadInputs = useMemo(() => {
+        if (!showTestSpread || roadTripConfig.towingMode) return null;
+        return validEntries.map(entry => spreadTestsFor(entry.vehicle, {
+            correctionMode,
+            sessionOf: r => sessionFor(testSessions, r),
+        }));
+    }, [showTestSpread, roadTripConfig.towingMode, validEntries, correctionMode, testSessions]);
+
+    const spreadSweep = useMemo(() => {
+        const {
+            xAxis, startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance,
+            speed, mode, overhead, sweepYAxis,
+        } = roadTripConfig;
+        if (!spreadInputs || (xAxis !== 'speed' && xAxis !== 'tripDist')) return null;
+        const isSpeed = xAxis === 'speed';
+        const xs = isSpeed ? SPEED_SWEEP_MPH : LEG_SWEEP_MI;
+        const perRun = roadTripConfig.perRun || {};
+        return validEntries.map((entry, i) => {
+            const chargingData = runDataCache[entry.run.id];
+            if (!chargingData?.length) return null;
+            const tests = spreadInputs[i];
+            if (tests.length < 2) return { tests: tests.length, steps: null };
+            const ov = perRun[entry.key] || {};
+            const perTest = tests.map(t => xs.map(x => {
+                const mph = isSpeed ? x : speed;
+                const sim = simulateRoadTrip({
+                    batteryKwh:        entry.batteryKwh,
+                    miPerKwh:          t.miPerKwh,
+                    testSpeedMph:      t.testSpeedMph,
+                    chargingData,
+                    startSoc, minSoc: ov.minSoc ?? minSoc, destinationMinSoc,
+                    legDistanceMi:     isSpeed ? (ov.legDistance ?? legDistance) : x,
+                    totalDistanceMi:   totalDistance,
+                    speedMph:          mph,
+                    chargeTimeMinutes: ov.chargeTime ?? chargeTime,
+                    overheadMinutes:   overhead,
+                    mode,
+                });
+                return isSimUnrealistic(sim) ? null : Math.round(getSweepY(sim, mph, totalDistance, sweepYAxis));
+            }));
+            return { tests: tests.length, steps: sweepSpread(perTest) };
+        });
+    }, [spreadInputs, validEntries, runDataCache, roadTripConfig]);
+
+    // The timeline: each test's whole trip under the current scenario, and the
+    // area between the furthest-along and the least at every minute. In the
+    // SoC lanes ('byTest') an area would tangle, so there the trips are kept
+    // as traces and only the finish is bracketed.
+    const spreadTimeline = useMemo(() => {
+        const {
+            xAxis, yAxis, startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance,
+            speed, mode, overhead,
+        } = roadTripConfig;
+        if (!spreadInputs || (xAxis !== 'totalTime' && xAxis !== 'driveTime')) return null;
+        const driveX = xAxis === 'driveTime';
+        const perRun = roadTripConfig.perRun || {};
+        return validEntries.map((entry, i) => {
+            const chargingData = runDataCache[entry.run.id];
+            if (!chargingData?.length) return null;
+            const ov = perRun[entry.key] || {};
+            // A test whose trip cannot be finished has no finish to spread.
+            const sims = spreadInputs[i].map(t => simulateRoadTrip({
+                batteryKwh:        entry.batteryKwh,
+                miPerKwh:          t.miPerKwh,
+                testSpeedMph:      t.testSpeedMph,
+                chargingData,
+                startSoc,
+                minSoc:            ov.minSoc ?? minSoc,
+                destinationMinSoc,
+                legDistanceMi:     ov.legDistance ?? legDistance,
+                totalDistanceMi:   totalDistance,
+                speedMph:          speed,
+                chargeTimeMinutes: ov.chargeTime ?? chargeTime,
+                overheadMinutes:   overhead,
+                mode,
+            })).filter(sim => sim.completed);
+            if (sims.length < 2) return { tests: sims.length, steps: null };
+            const finishes = sims.map(sim => sim.totalTimeMin);
+            const finish = { lo: Math.min(...finishes), hi: Math.max(...finishes), n: sims.length };
+            // Lanes always run on elapsed time, as the main lines do.
+            if (yAxis === 'byTest') {
+                return { tests: sims.length, finish, steps: [], traces: sims.map(sim => segmentsToChartPointsByTest(sim.segments, i)) };
+            }
+            const lines = sims.map(sim => (yAxis === 'chargeTime'
+                ? segmentsToChartPointsChargeTime(sim.segments, driveX)
+                : segmentsToChartPoints(sim.segments, units, driveX)));
+            return { tests: sims.length, ...timelineSpread(lines), finish };
+        });
+    }, [spreadInputs, validEntries, runDataCache, roadTripConfig, units]);
+
     // ── Build & render chart ──────────────────────────────────────────────────
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -1056,6 +1217,7 @@ export default function RoadTripView({
                     y: isSimUnrealistic(sweepSims[si]) ? null : Math.round(getSweepY(sweepSims[si], mph, totalDistance, sweepYAxis)),
                 }));
                 return {
+                    _spreadSteps: spreadSweep?.[i]?.steps,
                     label: entryLabel(entry),
                     _fullLabel: entryLabelFull(entry),
                     data,
@@ -1067,6 +1229,8 @@ export default function RoadTripView({
                     fill: false,
                 };
             }).filter(Boolean);
+            speedDatasets.push(...spreadDatasets(validEntries, spreadSweep,
+                SPEED_SWEEP_MPH.map(mph => (units === 'metric' ? Math.round(mph * MI_TO_KM) : mph))));
 
             // ICE reference line
             const iceSpeedData = SPEED_SWEEP_MPH.map(mph => {
@@ -1117,13 +1281,16 @@ export default function RoadTripView({
                         },
                     },
                     plugins: {
-                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor } },
+                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor,
+                            filter: (item, data) => !data.datasets[item.datasetIndex]._spread } },
                         tooltip: {
+                            filter: item => !item.dataset._spread,
                             callbacks: {
                                 title: items => items[0]?.dataset._fullLabel ?? items[0]?.dataset.label ?? '',
                                 label: ctx => [
                                     `Speed: ${ctx.parsed.x} ${sl}`,
                                     `${speedYLabel}: ${formatTime(ctx.parsed.y)}`,
+                                    ...spreadTooltipLine(ctx.dataset, ctx.dataIndex),
                                 ],
                             },
                         },
@@ -1154,6 +1321,7 @@ export default function RoadTripView({
                     y: isSimUnrealistic(sweepSims[di]) ? null : Math.round(getSweepY(sweepSims[di], speed, totalDistance, sweepYAxis)),
                 }));
                 return {
+                    _spreadSteps: spreadSweep?.[i]?.steps,
                     label: entryLabel(entry),
                     _fullLabel: entryLabelFull(entry),
                     data,
@@ -1165,6 +1333,8 @@ export default function RoadTripView({
                     fill: false,
                 };
             }).filter(Boolean);
+            distDatasets.push(...spreadDatasets(validEntries, spreadSweep,
+                LEG_SWEEP_MI.map(legMi => (units === 'metric' ? Math.round(legMi * MI_TO_KM) : legMi))));
 
             // ICE reference line — ICE stops every 3 hrs regardless of leg distance setting
             const iceDistData = LEG_SWEEP_MI.map(legMi => {
@@ -1215,13 +1385,16 @@ export default function RoadTripView({
                         },
                     },
                     plugins: {
-                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor } },
+                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor,
+                            filter: (item, data) => !data.datasets[item.datasetIndex]._spread } },
                         tooltip: {
+                            filter: item => !item.dataset._spread,
                             callbacks: {
                                 title: items => items[0]?.dataset._fullLabel ?? items[0]?.dataset.label ?? '',
                                 label: ctx => [
                                     `${dl} between charges: ${ctx.parsed.x} ${dl}`,
                                     `${sweepLabel}: ${formatTime(ctx.parsed.y)}`,
+                                    ...spreadTooltipLine(ctx.dataset, ctx.dataIndex),
                                 ],
                             },
                         },
@@ -1256,6 +1429,7 @@ export default function RoadTripView({
             }
 
             return {
+                _spreadFinish: spreadTimeline?.[i]?.finish,
                 label: entryLabel(entry),
                 _fullLabel: entryLabelFull(entry),
                 data: points,
@@ -1270,6 +1444,9 @@ export default function RoadTripView({
                 _simIndex: i,
             };
         }).filter(Boolean);
+        datasets.push(...(isByTestMode
+            ? laneSpreadDatasets(validEntries, spreadTimeline)
+            : spreadDatasets(validEntries, spreadTimeline, null, { tension: 0 })));
 
         // ── ICE reference line ───────────────────────────────────────────
         const ICE_DRIVE_INTERVAL_MIN = 180; // 3 hours between stops
@@ -1466,11 +1643,14 @@ export default function RoadTripView({
                     legend: {
                         display: true,
                         position: 'top',
-                        labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor },
+                        labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor,
+                            filter: (item, data) => !data.datasets[item.datasetIndex]._spread },
                     },
                     tooltip: {
                         displayColors: true,
+                        filter: item => !item.dataset._spread,
                         callbacks: {
+                            afterLabel: ctx => finishTooltipLine(ctx.dataset),
                             title: (items) => {
                                 if (!items.length) return '';
                                 return items[0].dataset._fullLabel ?? items[0].dataset.label;
@@ -1533,7 +1713,7 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, speedSweepResults, distSweepResults, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisScale, isDark]);
+    }, [simResults, speedSweepResults, distSweepResults, spreadSweep, spreadTimeline, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisScale, isDark]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
@@ -1855,6 +2035,12 @@ export default function RoadTripView({
                                     <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                                 </>
                             )}
+                            <label className="toggle-label"
+                                title="Prototype. Shades each vehicle from the fastest to the slowest trip its range tests give, with the charging curve held fixed. On the timeline, the area between the furthest-along and the least at each moment; by test, every test's trip as a faint trace and the finish range printed at the end of the lane. Hover a line for the finish times. None where a vehicle has one range test with measured energy.">
+                                <input type="checkbox" className="w-4 h-4" checked={showTestSpread}
+                                    onChange={e => setShowTestSpread(e.target.checked)} />
+                                <span className="text-sm font-medium">Test spread</span>
+                            </label>
                         </div>
                         {setChartConfig && (
                             <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
@@ -2044,6 +2230,22 @@ export default function RoadTripView({
                     <div style={{ height: `${isSweepMode ? 400 : yAxis === 'byTest' ? Math.max(300, validEntries.length * 120) : Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
                         <canvas ref={canvasRef} />
                     </div>
+                    {(spreadSweep || spreadTimeline) && (
+                        <p className="text-note text-center mt-1">
+                            {yAxis === 'byTest'
+                                ? 'Faint traces: the trip from each of the vehicle\u2019s range tests; the finish range is printed at the end of the lane'
+                                : 'Shading: fastest to slowest trip across each vehicle\u2019s range tests'}{' '}
+                            ({correctionMode === 'none' ? 'speed re-priced, otherwise as tested' : 'corrected'}), charging curve held fixed.
+                            {(() => {
+                                const spread = spreadSweep ?? spreadTimeline;
+                                const single = validEntries.filter((e, i) => spread[i] && !spread[i].steps);
+                                return single.length > 0 && ` No shading for ${single.map(e => vehicleLabel(e.vehicle)).join(', ')}: fewer than two range tests with measured energy${spreadTimeline ? ' that finish the trip' : ''}.`;
+                            })()}
+                        </p>
+                    )}
+                    {roadTripConfig.towingMode && showTestSpread && (
+                        <p className="text-note text-center mt-1">No test spread while towing: every vehicle uses the one towing efficiency.</p>
+                    )}
                     {isSweepMode && hasUnrealisticPoints && (
                         <p className="text-note text-center mt-1">
                             Lines end where a charge stop would exceed {CHARGE_CEIL_SOC}% SoC — unrealistic at that {isSpeedMode ? 'speed' : 'leg distance'}.

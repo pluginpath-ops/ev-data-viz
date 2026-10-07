@@ -345,6 +345,18 @@ says to stop and ask when the right name is not obvious.
 | The thing | Where it lands | Candidates | Leaning |
 |---|---|---|---|
 | The shrinkage weight that trades a vehicle's own spread against the fleet's | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314) | — | undecided |
+| The mark showing how far apart a vehicle's range tests landed — every test's figure, not a summary of them | Range & Efficiency and Charge Stop bars, Road Trip ([rangeTestSpread.js](../src/utils/rangeTestSpread.js), [roadTripSpread.js](../src/utils/roadTripSpread.js)); labelled "Test spread" meanwhile | test spread (widened to cover both charts) · tested span · spread of tests | **test spread**, widened — see below |
+
+**Range tests and "test spread."** #313 defines test spread for a curve: the
+best test at each SoC down to one SD below the mean, lopsided on purpose. A range
+test is one figure, and at the n the fleet has (most vehicles 1, a handful 2–3)
+a mean and an SD say nothing a reader can use, so the range mark is every test
+itself — its extent is lowest to highest. Same idea for the reader ("how far
+apart this car's tests landed"), different construction. Widening the term to
+cover both keeps one word for one idea; a second word ("tested span") keeps one
+word per construction. Not "range" in any form — it already means distance — and
+never "error bar" or "confidence band", which #314 keeps for where a repeat
+would land.
 
 **Why not "nominal curve"** (settled for #313 as **composite curve**, in the table
 above). In this codebase *nominal* already means **rated**,

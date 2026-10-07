@@ -44,6 +44,7 @@ import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE, withAlpha } from '../
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import { compositeConditions, compositeExplainer, THIN_SUPPORT } from '../utils/compositeCurve';
+import { reportedRangeRun } from '../utils/testedRange';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
@@ -111,13 +112,21 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // its newest test). A dozen overlapping curves is not a chart, and the
     // per-vehicle "all" link is there for when you want the rest.
     //
-    // Range arrives with all of them: those are bars, not curves, and a vehicle's
-    // own tests are usually the comparison being made.
+    // Range arrives with ONE bar per vehicle too — its reported range test, the
+    // one its card and the vehicle table quote (testedRange.reportedRangeRun:
+    // the curator's DEF, else the newest full-pack test, ...). It used to arrive
+    // with every test, but each bar now carries the test spread, which already
+    // shows where the rest landed; eight bars each wearing the same spread was
+    // the same answer eight times.
     const bootstrapRuns = useCallback((vehicleId, vehicleRows) => {
-        if (chartMode === 'range') return vehicleRows.map(r => r.key);
+        if (chartMode === 'range') {
+            const vehicle = selectedVehicles.find(v => String(v.id) === String(vehicleId));
+            const pick = reportedRangeRun({ ...vehicle, runs: vehicleRows.map(r => r.run) });
+            return pick ? [pick.id] : vehicleRows.slice(0, 1).map(r => r.key);
+        }
         const pick = defaultChargingRun({ runs: vehicleRows.map(r => r.run) });
         return pick ? [pick.id] : [];
-    }, [chartMode]);
+    }, [chartMode, selectedVehicles]);
 
     // Charging and Range are different populations, not the same rows filtered:
     // a charging run has no counterpart in range mode. `resetKey` is what tells
@@ -858,6 +867,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 // App, so it misses anything App hands the other charts.
                 verboseLabels={chartConfig.verboseLabels ?? false}
                 correctionMode={chartConfig.correctionMode ?? 'none'}
+                testSpread={chartConfig.testSpread ?? true}
             />
         );
     }

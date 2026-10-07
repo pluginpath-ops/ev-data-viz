@@ -10,6 +10,9 @@ import { correctionFactor, correctionNote } from '../utils/conditionCorrection';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
+import TestSpreadToggle from './TestSpreadToggle';
+import { coversPracticalPack } from '../utils/testedRange';
+import { spreadOf, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip } from '../utils/rangeTestSpread';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -69,7 +72,7 @@ const hasDataForType = (run, type) => {
 // used to roll its own toggle against chartConfig — one more copy of the
 // behaviour, and the reason a run could be switched off here and come back.
 export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = VEHICLE_PALETTE,
-    handSet = false, verboseLabels = false, correctionMode = 'none' }) {
+    handSet = false, verboseLabels = false, correctionMode = 'none', testSpread = true }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -195,6 +198,23 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 return verboseLabels ? l.full : l.short;
             };
             const labels = plottableRuns.map(nameFor);
+
+            // The test spread (utils/rangeTestSpread): every range test of the
+            // vehicle, selected or not, on the same basis as the bars — already
+            // corrected, since allRangeRuns carries the corrected distance. A
+            // range figure only from a test that saw the pack: the bar's own
+            // fallback to raw distance would put a 23-mile speed-sweep segment
+            // at the bottom of the spread.
+            const spreadByVehicle = new Map();
+            if (testSpread) {
+                for (const v of selectedVehicles) {
+                    spreadByVehicle.set(v.id, spreadOf(allRangeRuns
+                        .filter(r => r.vehicleId === v.id && !(r.isHidden || r.is_hidden))
+                        .filter(r => hasDataForType(r, chartType) && (!isRange || coversPracticalPack(r)))
+                        .map(r => ({ value: getY(r), run: r }))));
+                }
+            }
+            const spreadMax = Math.max(...[...spreadByVehicle.values()].map(sp => sp?.hi ?? -Infinity));
             const datasets = [{
                 label:           yLabel,
                 data:            plottableRuns.map(r => getY(r)),
@@ -208,11 +228,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 data:     { labels, datasets },
                 xLabel:   '',
                 yLabel,
+                spreadMax: Number.isFinite(spreadMax) ? spreadMax : null,
                 flatRuns: plottableRuns.map(r => ({
                     ...r,
                     name:     nameFor(r),
                     fullName: barLabels.get(r.id)?.full ?? r.name,
                     _yValue: getY(r), _yUnit: yUnit,
+                    _spread: spreadByVehicle.get(r.vehicleId) ?? null,
+                    _spreadBasis: isRange ? 'range tests that saw most of the pack' : 'range tests with measured energy',
                 })),
             };
         }
@@ -317,6 +340,14 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     }
                 });
 
+                // ── Test spread, first pass: the line, under the badges ──────
+                const { ink, background } = chartTheme();
+                const spreadPx = run => run._spread?.values.map(v => chart.scales.y.getPixelForValue(v));
+                runs.forEach((run, i) => {
+                    const bar = meta.data[i];
+                    if (bar && run._spread) drawTestSpread(ctx2, { at: bar.x, px: spreadPx(run), horizontal: false, ink, fill: background, phase: 'line' });
+                });
+
                 // ── Badges inside each bar: value (bold), speed, temp ────────
                 runs.forEach((run, i) => {
                     const bar = meta.data[i];
@@ -337,22 +368,35 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     }
                     if (badges.length === 0) return;
 
-                    const pillH  = 15, pillPad = 5, gap = 3, topPad = 6;
-                    let drawY = bar.y + topPad;
+                    const pillH  = 15, pillPad = 5, gap = 3, pad = 6;
+                    const fontOf = primary => (primary
+                        ? `600 ${fonts.badge}px ${fonts.sans}`
+                        : `${fonts.micro}px ${fonts.sans}`);
 
-                    badges.forEach(({ text, primary }) => {
-                        // Skip if no vertical room left inside the bar
-                        if (drawY + pillH > bar.base - topPad) return;
-
+                    // Stacked against the axis, at the FOOT of the bar — the
+                    // top is where the test spread's dots gather (the bar's own
+                    // test is one of them), and pills hung from it sat under
+                    // them. Same order, read top to bottom; when the bar is too
+                    // short for all of them the first ones win, as they did. A
+                    // pill wider than the bar is skipped.
+                    const fits = [];
+                    let stackH = 0;
+                    for (const b of badges) {
                         ctx2.save();
-                        ctx2.font = primary
-                            ? `600 ${fonts.badge}px ${fonts.sans}`
-                            : `${fonts.micro}px ${fonts.sans}`;
-                        const tw = ctx2.measureText(text).width;
-                        const pw = tw + pillPad * 2;
+                        ctx2.font = fontOf(b.primary);
+                        const pw = ctx2.measureText(b.text).width + pillPad * 2;
+                        ctx2.restore();
+                        if (pw > barW - 4) continue;
+                        const nextH = stackH + (fits.length ? gap : 0) + pillH;
+                        if (nextH > barH - pad * 2) break;
+                        fits.push({ ...b, pw });
+                        stackH = nextH;
+                    }
+                    let drawY = bar.base - pad - stackH;
 
-                        // Skip if pill is wider than the bar
-                        if (pw > barW - 4) { ctx2.restore(); drawY += pillH + gap; return; }
+                    fits.forEach(({ text, primary, pw }) => {
+                        ctx2.save();
+                        ctx2.font = fontOf(primary);
 
                         const px = bar.x - pw / 2;
                         const rr = 3;
@@ -380,6 +424,12 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
                         drawY += pillH + gap;
                     });
+                });
+
+                // ── Test spread, second pass: the dots, over the badges ──────
+                runs.forEach((run, i) => {
+                    const bar = meta.data[i];
+                    if (bar && run._spread) drawTestSpread(ctx2, { at: bar.x, px: spreadPx(run), horizontal: false, ink, fill: background, phase: 'dots' });
                 });
 
                 // ── Vehicle group labels + dashed separators below x-axis ────
@@ -451,7 +501,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
         chartInstance.current = new Chart(chartRef.current.getContext('2d'), {
             type:    built.kind,
             data:    built.data,
-            plugins: built.kind === 'bar' ? [barGroupPlugin] : [],
+            plugins: built.kind === 'bar' ? [barGroupPlugin, testSpreadHoverPlugin(built.flatRuns, {
+                describe: (p, row) => testPointLines(p.run, `${p.value} ${row._yUnit}`, units, p.run._correction?.note),
+            })] : [],
             options: {
                 layout: {
                     padding: {
@@ -468,6 +520,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     title: { display: false },
                     tooltip: {
                         displayColors: false,
+                        filter: suppressBarTooltip,
                         callbacks: {
                             title(items) {
                                 if (built.kind === 'bar' && items.length > 0) {
@@ -502,6 +555,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                                         // which axes moved it leaves the reader to
                                         // infer it from the size of the change.
                                         run._correction?.note ?? null,
+                                        run._spread
+                                            ? `Across ${run._spread.n} ${run._spreadBasis}: ${run._spread.lo}–${run._spread.hi} ${run._yUnit}`
+                                            : null,
                                     ].filter(Boolean), units);
                                 }
                                 // Line charts: run objects are stored parallel to points
@@ -529,6 +585,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         grid: { color: gridColor },
                         ...(yMin != null ? { min: yMin } : {}),
                         ...(yMax != null ? { max: yMax } : {}),
+                        // A test above every bar would otherwise draw off the top.
+                        ...(yMax == null && built.spreadMax != null ? { suggestedMax: built.spreadMax * 1.03 } : {}),
                     },
                 },
             },
@@ -549,7 +607,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // rebuilt every render, so the map is a new object each time while holding
     // the same values — depending on its identity would redraw the chart on
     // every render. Comparing the colors by value redraws only when one moves.
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, palette, correctionMode]);
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, palette, correctionMode, testSpread]);
 
     // ── The frame's caption ──────────────────────────────────────────────────
     // In the frame, so it is in the export: a bar chart pasted into a thread has
@@ -637,6 +695,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                             </label>
                         )}
                         <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
+                        {CHART_TYPES.find(t => t.key === chartType)?.kind === 'bar' && (
+                            <TestSpreadToggle on={testSpread} setChartConfig={setChartConfig} />
+                        )}
                     </div>
                     {/* A select, so it takes a row of its own beside the correction
                         picker rather than a cell of the checkbox grid above — that
