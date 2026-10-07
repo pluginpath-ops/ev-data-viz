@@ -10,7 +10,7 @@ export default function TestSpreadToggle({ on = true, setChartConfig }) {
     return (
         <label
             className="toggle-label"
-            title="Where each of the vehicle's range tests landed: a dot per test on a line from the lowest to the highest, drawn on every bar. Follows the condition correction. None where a vehicle has only one usable test."
+            title="Where each of the vehicle's range tests landed: a dot per test on a line from the lowest to the highest, drawn on every bar. A dashed dot is an estimate: efficiency from the SoC change where a test has no measured energy. Follows the condition correction. None where a vehicle has only one usable test."
         >
             <input
                 type="checkbox"

@@ -6,7 +6,7 @@ import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import { filterTests } from '../utils/runUtils';
 import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
-import { DATA_CATEGORIES, vehicleDataCategories } from '../utils/vehicleDataCategories';
+import { DATA_CATEGORIES, vehicleDataCategories, vehiclePooledCounts } from '../utils/vehicleDataCategories';
 import { distanceValue, distanceUnit } from '../utils/unitConversions';
 import StatCell from './StatCell';
 import VehicleMedia from './vehicles/VehicleMedia';
@@ -23,7 +23,7 @@ import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { EMPTY_VEHICLE_FILTERS, filtersActive } from '../utils/vehicleFilters';
 import VehicleListHeader from './vehicles/VehicleListHeader';
 import VehicleRowMenu from './vehicles/VehicleRowMenu';
-import TestCounts from './vehicles/TestCounts';
+import TestCounts, { countTitle } from './vehicles/TestCounts';
 import LazyBoundary from './LazyBoundary';
 import { EditVehicleForm, ImportVehiclesModal } from './lazyComponents';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
@@ -82,15 +82,18 @@ function ListFigure({ value, unit, basis }) {
  */
 function TestCountPills({ vehicle, performanceCounts = {} }) {
     const counts = vehicleDataCategories(vehicle, performanceCounts);
-    const shown = DATA_CATEGORIES.filter(c => counts[c.key] > 0);
+    const pooled = vehiclePooledCounts(vehicle);
+    const shown = DATA_CATEGORIES.filter(c => counts[c.key] > 0 || pooled[c.key] > 0);
     if (shown.length === 0) return null;
 
+    // "Charging (4/2)": listed tests, then in grey the unlisted ones that still
+    // count in the statistics (#394, the pool).
     return (
         <p className="flex flex-wrap items-baseline gap-x-1.5">
             <span>Tests:</span>
             {shown.map(c => (
-                <span key={c.key} className={`text-[13px] font-medium ${c.colorClass}`}>
-                    {c.label} ({counts[c.key]})
+                <span key={c.key} className={`card-test-count ${c.colorClass}`} title={countTitle(c, counts[c.key], pooled[c.key])}>
+                    {c.label} ({counts[c.key]}{pooled[c.key] > 0 && <span className="test-count-pool">/{pooled[c.key]}</span>})
                 </span>
             ))}
         </p>

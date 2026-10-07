@@ -1,3 +1,4 @@
+import { isListed, isExcluded } from './runListing';
 import { buildEpaCurveFromModel, correctMeasuredConsumption } from './epaDerivations';
 import { curveSubject } from './epaCurveSubjects';
 import { filterRangeRuns } from './runUtils';
@@ -56,7 +57,9 @@ export function modeledEfficiencyPreview(row) {
     if (!curve.length) return null;
 
     const tests = filterRangeRuns(row.runs)
-        .filter(r => !r.synthetic && !r.is_hidden
+        // Cited one by one, so listed tests only — never one a reader cannot
+        // find, nor one kept out of the figures (#394, utils/runListing).
+        .filter(r => !r.synthetic && isListed(r) && !isExcluded(r)
             && r.speed_mph != null && r.distance_miles > 0 && r.energy_kwh != null)
         .map(run => {
             const measured = (run.energy_kwh / run.distance_miles) * 100;

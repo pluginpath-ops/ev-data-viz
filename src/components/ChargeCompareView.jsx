@@ -17,7 +17,7 @@ import CorrectionControl from './CorrectionControl';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import TestSpreadToggle from './TestSpreadToggle';
-import { spreadOf, rangeBasesFor, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip } from '../utils/rangeTestSpread';
+import { spreadOf, rangeBasesFor, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip, spreadSummary } from '../utils/rangeTestSpread';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
@@ -115,6 +115,8 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                 drawTestSpread(ctx2, {
                     at: isHorizontal ? bar.y : bar.x, px: spreadPx(run),
                     horizontal: isHorizontal, ink, fill: background, phase,
+                    own: run._spread.points.map(p => String(p.run?.id) === String(run._rangeRunId)),
+                    ownFill: bar.options?.backgroundColor,
                 });
             });
             drawSpread('line');
@@ -660,6 +662,9 @@ export default function ChargeCompareView({
                 source:          rangeRun.source,
                 _trim:           rangeRun._trim ?? null,
                 _chargingRunName: chargingRun.name,
+                // The range test this bar is priced from — its dot in the test
+                // spread is drawn in the bar's color.
+                _rangeRunId:     rangeRun.id,
                 _yUnit:          chartType === 'range_added' ? distanceLabel(units) : 'min',
                 _rangeUnit:      distanceLabel(units),
                 // Which range basis produced these miles, for the provenance label.
@@ -891,7 +896,7 @@ export default function ChargeCompareView({
                                                 : null,
                                         ...(run._figureSources ?? []).map(s => s.line),
                                         run._spread
-                                            ? `Across ${run._spread.n} range tests: ${run._spread.lo}–${run._spread.hi} ${run._yUnit}`
+                                            ? spreadSummary(run._spread, run._yUnit)
                                             : null,
                                     ].filter(Boolean), units);
                                 },

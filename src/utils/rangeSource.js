@@ -50,6 +50,7 @@
  * and computed by the caller, which is the side that holds the time series.
  */
 
+import { isListed, isExcluded } from './runListing';
 import { correctionFactor, applyCorrection, correctionNote } from './conditionCorrection';
 import { isRangeRun } from './runUtils';
 import { STANDARD_CONDITIONS } from '../constants/epa';
@@ -174,7 +175,10 @@ export function hasUsableRangeData(run, batteryKwh) {
  * when the trigger bug made a curated range default unreliable in practice.
  */
 export function defaultRangeRun(vehicle, batteryKwh = vehicle?.socWindowKwh) {
-    const candidates = (vehicle?.runs || []).filter(r => hasUsableRangeData(r, batteryKwh));
+    // A default names one test: a listed one, never one kept out of the
+    // figures (#394, utils/runListing). A contributor's runs include both.
+    const candidates = (vehicle?.runs || []).filter(r =>
+        isListed(r) && !isExcluded(r) && hasUsableRangeData(r, batteryKwh));
     if (candidates.length === 0) return null;
     return candidates.find(r => r.isDefault || r.is_default)
         ?? [...candidates].sort((a, b) => new Date(b.date) - new Date(a.date))[0]

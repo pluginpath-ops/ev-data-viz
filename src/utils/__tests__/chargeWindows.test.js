@@ -118,10 +118,10 @@ describe('bestChargeWindows', () => {
         expect(best[10]).toBeNull();
     });
 
-    it('leaves out hidden, synthetic, inherited, range and stale sessions', () => {
+    it('leaves out excluded, synthetic, inherited, range and stale sessions', () => {
         const s = summary(300, 300);
         expect(bestChargeWindows([
-            run(1, s, { isHidden: true }),
+            run(1, s, { isExcluded: true }),
             run(2, s, { synthetic: true }),
             run('inherited_4_9', s),
             run(3, s, { kind: 'range' }),
@@ -130,6 +130,14 @@ describe('bestChargeWindows', () => {
         ])[5]).toBeNull();
         expect(isCurrentSummary({ version: CHARGE_SUMMARY_VERSION })).toBe(true);
         expect(countsTowardBest(run(7, s))).toBe(true);
+    });
+
+    it('counts an unlisted session — the pool (#394) — but not an excluded one', () => {
+        const s = summary(300, 300);
+        expect(countsTowardBest(run(1, s, { isHidden: true }))).toBe(true);
+        expect(countsTowardBest(run(2, s, { isHidden: true, isExcluded: true }))).toBe(false);
+        // A local edit sets the camel key while the loaded snake key is stale.
+        expect(countsTowardBest(run(3, s, { is_excluded: true, isExcluded: false }))).toBe(true);
     });
 
     it('still reads the windows of a version-1 summary, which only lacks the curve', () => {

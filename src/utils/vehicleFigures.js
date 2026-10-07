@@ -47,6 +47,7 @@
  * Pure module: no data access, no React.
  */
 
+import { statisticalRuns } from './runListing';
 import { resolveEffectiveSpecs } from './specHelpers';
 import { epaConfigurationFigures, primaryEpaMapping } from './epaConfiguration';
 import { TESTED_CAPACITY_TOLERANCE_PCT } from '../constants/epa';
@@ -242,8 +243,9 @@ export function withVehicleFigures(vehicles = []) {
             epaRange: range,
             // The best 5/10/15-minute charge rate across the vehicle's own
             // charging sessions (#346). Chosen here, on every change to its
-            // runs, and never stored — see chargeWindows.js.
-            chargeBest: bestChargeWindows(vehicle.runs ?? []),
+            // runs, and never stored — see chargeWindows.js. Across the listed
+            // sessions AND the pool (#394): a best is an aggregate.
+            chargeBest: bestChargeWindows(statisticalRuns(vehicle)),
         };
     });
 }

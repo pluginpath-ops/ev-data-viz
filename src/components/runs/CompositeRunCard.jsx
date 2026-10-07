@@ -1,5 +1,7 @@
 import InfoIcon from '../InfoIcon';
 import { compositeExplainer, compositeNote, staleComposites } from '../../utils/compositeCurve';
+import { isUnlisted } from '../../utils/runListing';
+import RunListingBadges from './RunListingBadges';
 
 /**
  * A vehicle's composite curve in Tests & Data (#313): the stored mean of its
@@ -19,25 +21,35 @@ export default function CompositeRunCard({
 }) {
     const note = compositeNote(run.composite, units);
     const stale = staleComposites(vehicle).some(r => r.id === run.id);
+    // How many of the tests behind it are listed, and how many come from the
+    // pool (#394) — the same "listed/unlisted" pair the vehicle card shows.
+    const unlistedIds = new Set([...(vehicle.runs || []), ...(vehicle.pooledRuns || [])]
+        .filter(isUnlisted).map(r => String(r.id)));
+    const built = run.composite?.tests ?? [];
+    const pooled = built.filter(t => unlistedIds.has(String(t.runId))).length;
     return (
         <div className="run-card-header">
             <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="section-title">
                         <span className="run-name-derived">{run.name}</span>
-                        {run.isHidden && (
-                            <span title="Hidden from regular viewers — only admins/contributors can see it" className="ml-1 badge-hidden">
-                                Hidden
-                            </span>
-                        )}
                         <InfoIcon className="run-source-info" title={run.name} text={compositeExplainer(run.composite, units)} />
                     </h3>
+                    <RunListingBadges run={run} />
                     {stale && (
                         <span className="badge-status is-warning" title="One of the tests behind it has changed since it was built, or the method has. Rebuild to bring it up to date.">
                             out of date
                         </span>
                     )}
                 </div>
+                {built.length > 0 && (
+                    <p className="run-meta text-meta"
+                        title={pooled ? `${built.length - pooled} listed tests, and ${pooled} unlisted tests from the pool that still count` : undefined}>
+                        Built from <span className="test-count-n">{built.length - pooled}</span>
+                        {pooled > 0 && <span className="test-count-pool">/{pooled}</span>} {built.length === 1 ? 'test' : 'tests'}
+                        {pooled > 0 && ' (listed/unlisted)'}
+                    </p>
+                )}
                 {note && <p className="run-meta text-meta">{note}</p>}
             </div>
             <div className="run-actions">
@@ -64,11 +76,11 @@ export default function CompositeRunCard({
                     )}
                     {isContributor && (
                         <button
-                            onClick={() => onUpdateRun(run.id, { isHidden: !run.isHidden })}
-                            title={run.isHidden ? 'Make this composite visible to all viewers' : 'Hide this composite from regular viewers'}
+                            onClick={() => onUpdateRun(run.id, { isHidden: !isUnlisted(run) })}
+                            title={isUnlisted(run) ? 'Show this composite to viewers in the lists and charts' : "Keep this composite out of viewers' lists and charts"}
                             className="btn text-sm"
                         >
-                            {run.isHidden ? '◎ Unhide' : '⊘ Hide'}
+                            {isUnlisted(run) ? '◎ List' : '⊘ Unlist'}
                         </button>
                     )}
                 </div>

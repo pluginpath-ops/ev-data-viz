@@ -240,8 +240,8 @@ describe('stored as runs (migration 077)', () => {
     });
 
     it('deletes a stored composite no class supports any more', () => {
-        // Test 4 hidden: the 400 V class is down to one test.
-        const runs = [run(1), run(2), run(3), run(4, { is_hidden: true }), stored(900, 800), stored(901, 400)];
+        // Test 4 excluded: the 400 V class is down to one test.
+        const runs = [run(1), run(2), run(3), run(4, { is_excluded: true }), stored(900, 800), stored(901, 400)];
         const { writes, deletes } = planCompositeRebuild(vehicleOf(800, runs), pts());
         expect(writes.map(w => w.id)).toEqual([900]);
         expect(deletes).toEqual([901]);
@@ -334,7 +334,9 @@ describe('compositeEligible', () => {
     it('takes measured charging tests only', () => {
         expect(compositeEligible(run(1))).toBe(true);
         expect(compositeEligible(run(1, { kind: 'range' }))).toBe(false);
-        expect(compositeEligible(run(1, { is_hidden: true }))).toBe(false);
+        expect(compositeEligible(run(1, { is_excluded: true }))).toBe(false);
+        // Unlisted still counts (#394, the pool).
+        expect(compositeEligible(run(1, { is_hidden: true }))).toBe(true);
         expect(compositeEligible(run(1, { synthetic: true }))).toBe(false);
         expect(compositeEligible(run('inherited_3_9'))).toBe(false);
     });

@@ -2,6 +2,9 @@ import SessionControl from '../SessionControl';
 import RunSpecRows from '../RunSpecRows';
 import { RunVoteButtons } from '../VoteButtons';
 import RunSourceLinks from '../RunSourceLinks';
+import RunListingBadges from './RunListingBadges';
+import { isUnlisted, isExcluded, hasQualityOverride } from '../../utils/runListing';
+import { sessionFor } from '../../utils/testSessions';
 import { RunKindPill, FIELD_META, inferRunFlags } from './runDisplay';
 import { filterChargingRuns, defaultChargingRun, runKindFrom } from '../../utils/runUtils';
 
@@ -107,16 +110,9 @@ export default function RunCard({
                     <RunKindPill run={run} />
                     <h3 className="section-title">
                         {run.name}
-                        {run.isHidden && (
-                            <span
-                                title="Hidden from regular viewers — only admins/contributors can see this test"
-                                className="ml-1 badge-hidden"
-                            >
-                                Hidden
-                            </span>
-                        )}
                         <RunSourceLinks run={run} className="text-sm font-normal" />
                     </h3>
+                    <RunListingBadges run={run} session={sessionFor(testSessions, run)} />
                     {/* The session heading already carries the
                         date for a grouped run; repeating it puts
                         the same fact on screen twice. */}
@@ -235,13 +231,41 @@ export default function RunCard({
                                             ↑ Upload additional data
                                         </button>
                                     )}
+                                    {/* Two questions, two items (#394): whether
+                                        viewers see it, and whether it counts. */}
                                     {isContributor && (
                                         <button
-                                            onClick={() => { onUpdateRun(run.id, { isHidden: !run.isHidden }); setOpenMenuRunId(null); }}
-                                            title={run.isHidden ? 'Make this test visible to all viewers' : 'Hide this test from regular viewers'}
+                                            onClick={() => { onUpdateRun(run.id, { isHidden: !isUnlisted(run) }); setOpenMenuRunId(null); }}
+                                            title={isUnlisted(run)
+                                                ? 'Show this test to viewers in the lists and charts'
+                                                : "Keep this test out of viewers' lists and charts. It still counts in the statistics unless excluded."}
                                             className="dropdown-item w-full text-left"
                                         >
-                                            {run.isHidden ? '◎ Unhide from viewers' : '⊘ Hide from viewers'}
+                                            {isUnlisted(run) ? '◎ List for viewers' : '⊘ Unlist'}
+                                        </button>
+                                    )}
+                                    {isContributor && (
+                                        <button
+                                            onClick={() => { onUpdateRun(run.id, { isExcluded: !isExcluded(run) }); setOpenMenuRunId(null); }}
+                                            title={isExcluded(run)
+                                                ? 'Count this test in the statistics again'
+                                                : 'Leave this test out of the statistics: composite curves, test spreads and best charge windows'}
+                                            className="dropdown-item w-full text-left"
+                                        >
+                                            {isExcluded(run) ? '⊕ Include in statistics' : '⊖ Exclude from statistics'}
+                                        </button>
+                                    )}
+                                    {/* Range tests only: both checks it overrides
+                                        are range checks (runListing). */}
+                                    {isContributor && kindLabel === 'range' && (
+                                        <button
+                                            onClick={() => { onUpdateRun(run.id, { qualityOverride: !hasQualityOverride(run) }); setOpenMenuRunId(null); }}
+                                            title={hasQualityOverride(run)
+                                                ? 'Let the automatic quality checks decide again'
+                                                : 'Count this test in the range spread although it saw only part of the pack, and in the pool without its speed or temperature. Missing data and exclusion still apply.'}
+                                            className="dropdown-item w-full text-left"
+                                        >
+                                            {hasQualityOverride(run) ? '↺ Restore quality checks' : '⚑ Override quality checks'}
                                         </button>
                                     )}
                                 </div>

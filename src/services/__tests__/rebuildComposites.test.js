@@ -80,7 +80,7 @@ describe('rebuildComposites — stored composite curves (#313, migration 077)', 
     });
 
     it('updates in place by charger class, and deletes the class that lost its tests', async () => {
-        given([test(1), test(2), test(3), test(4, { is_hidden: true }), stored(900, 800), stored(901, 400)]);
+        given([test(1), test(2), test(3), test(4, { is_excluded: true }), stored(900, 800), stored(901, 400)]);
         await dataService.rebuildComposites(vehicle);
         expect(runsWrites().filter(c => c.op === 'insert')).toEqual([]);
         expect(runsWrites().filter(c => c.op === 'update').map(c => c.filters.id)).toEqual([900]);
@@ -89,7 +89,7 @@ describe('rebuildComposites — stored composite curves (#313, migration 077)', 
 
     it('fails loudly when a policy silently keeps a composite it was told to delete', async () => {
         rlsHides = [901];
-        given([test(1), test(2), test(3), test(4, { is_hidden: true }), stored(900, 800), stored(901, 400)]);
+        given([test(1), test(2), test(3), test(4, { is_excluded: true }), stored(900, 800), stored(901, 400)]);
         await expect(dataService.rebuildComposites(vehicle)).rejects.toThrow(/could not be deleted/);
     });
 

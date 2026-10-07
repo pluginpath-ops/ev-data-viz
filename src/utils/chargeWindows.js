@@ -41,6 +41,7 @@
  *
  * Pure module: no data access, no React.
  */
+import { isUnlisted, isExcluded } from './runListing';
 import { isInheritedRunId, isCompositeRun, nativeComposite } from './runUtils';
 
 /**
@@ -284,7 +285,7 @@ const CHARGER_LIMITED_SHARE = 0.7;
  * the window: the curator's DEF, else the vehicle's own composite curve (#313)
  * — the mean of its tests, which stands for the car better than any one day —
  * else the newest test. Sessions that could not stand for the car are left
- * out: hidden, synthetic or inherited ones (as for the best windows; a stored
+ * out: unlisted or excluded, synthetic or inherited ones (as for the best windows; a stored
  * composite is synthetic but IS the car's, so it stays), and charger-limited
  * ones.
  *
@@ -298,7 +299,8 @@ export function chargeTimeSession(runs = [], { from, to, maxDcKw = null }) {
     const covering = [];
     for (const run of runs) {
         if (!run || run.kind !== 'charging') continue;
-        if (run.isHidden || run.is_hidden || isInheritedRunId(run.id)) continue;
+        // Quotes one session, so a listed one a reader can find (runListing).
+        if (isUnlisted(run) || isExcluded(run) || isInheritedRunId(run.id)) continue;
         if (run.synthetic && !isCompositeRun(run)) continue;
         const minutes = minutesBetween(run.charge_summary, from, to);
         if (!(minutes > 0)) continue;
@@ -325,7 +327,7 @@ export function chargeTimeSession(runs = [], { from, to, maxDcKw = null }) {
  * Whether a session may set a vehicle's best.
  *
  * Only what could make a figure too HIGH, or not the vehicle's own, excludes:
- * hidden (a curator took it out of view), synthetic (not measured), inherited
+ * excluded (a curator kept it out of the statistics), synthetic (not measured), inherited
  * (another vehicle's session scaled by factors — see buildInheritedRuns).
  * What can only make a figure too LOW — a session starting at 40%, a
  * charger-limited stop — does not exclude: it cannot beat a better session,
@@ -333,7 +335,8 @@ export function chargeTimeSession(runs = [], { from, to, maxDcKw = null }) {
  */
 export function countsTowardBest(run) {
     if (!run || run.kind !== 'charging') return false;
-    if (run.isHidden || run.is_hidden || run.synthetic) return false;
+    // An unlisted session still counts (#394, the pool); an excluded one does not.
+    if (isExcluded(run) || run.synthetic) return false;
     if (isInheritedRunId(run.id)) return false;
     return hasReadableWindows(run.charge_summary);
 }

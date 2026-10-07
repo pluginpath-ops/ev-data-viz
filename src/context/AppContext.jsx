@@ -11,7 +11,8 @@ import { mayHaveComposite, staleComposites } from '../utils/compositeCurve';
 const REBUILD_CONCURRENCY = 4;
 import { dataService } from '../services/DataService';
 import { applyDefaultRun, clearDefaultRuns, isCompositeRun } from '../utils/runUtils';
-import { toSessionRow } from '../utils/testSessions';
+import { toSessionRow, sessionFor } from '../utils/testSessions';
+import { isListed, poolOf } from '../utils/runListing';
 import { createWriteGuard } from '../utils/writeGuard';
 
 const AppContext = createContext(null);
@@ -1937,12 +1938,20 @@ export function AppProvider({ children }) {
     // Each vehicle's platform rows go on as `platforms` before the figures are
     // worked out, because a platform is the last fallback for a vehicle's specs
     // (#352) and the figures read specs.
+    //
+    // Unlisted tests (#394) never reach a viewer's `runs` — but the ones that
+    // still count travel beside them as `pooledRuns`, so the statistics a
+    // viewer sees (composites, spreads, best windows) are the ones a
+    // contributor sees. utils/runListing.statisticalRuns is how they are read.
     const visibleVehicles = useMemo(() => {
-        const shown = isContributor
-            ? vehicles
-            : vehicles.map(v => ({ ...v, runs: (v.runs || []).filter(r => !r.isHidden) }));
+        const sessionOf = r => sessionFor(testSessions, r);
+        const shown = vehicles.map(v => ({
+            ...v,
+            runs: isContributor ? v.runs : (v.runs || []).filter(isListed),
+            pooledRuns: poolOf(v.runs, sessionOf),
+        }));
         return withVehicleFigures(withPlatforms(withInheritance(shown), platformsById));
-    }, [vehicles, isContributor, platformsById]);
+    }, [vehicles, isContributor, platformsById, testSessions]);
     useEffect(() => { visibleVehiclesRef.current = visibleVehicles; }, [visibleVehicles]);
 
     const value = {
