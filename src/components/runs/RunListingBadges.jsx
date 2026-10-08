@@ -10,11 +10,16 @@ import { isUnlisted, isExcluded, poolGateMissing, hasQualityOverride } from '../
  *   Checks overridden — a curator counted it past the automatic checks.
  *     Said on the card because nothing else would show it: the test is out of
  *     view AND out of the figures, and the curator thinks it is in the pool.
+ *
+ * `withToggles` is for a card that already shows the curator's toggles
+ * (RunCurationToggle): there the toggle states the first three itself, and a
+ * badge beside the title would say it twice. "Not counted" stays — it is a
+ * consequence of missing data, not a decision anything on the card toggles.
  */
-export default function RunListingBadges({ run, session = null }) {
-    const unlisted = isUnlisted(run);
-    const excluded = isExcluded(run);
-    const missing = excluded ? [] : poolGateMissing(run, session);
+export default function RunListingBadges({ run, session = null, withToggles = false }) {
+    const unlisted = !withToggles && isUnlisted(run);
+    const excluded = !withToggles && isExcluded(run);
+    const missing = isExcluded(run) ? [] : poolGateMissing(run, session);
     return (
         <>
             {unlisted && (
@@ -29,7 +34,7 @@ export default function RunListingBadges({ run, session = null }) {
                     Excluded
                 </span>
             )}
-            {hasQualityOverride(run) && (
+            {!withToggles && hasQualityOverride(run) && (
                 <span className="badge-status"
                     title="Quality checks overridden by a curator: this test counts in the range spread even though it saw only part of the pack, and in the pool without its speed or temperature. Missing data and exclusion still apply.">
                     Checks overridden

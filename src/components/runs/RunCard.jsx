@@ -3,6 +3,7 @@ import RunSpecRows from '../RunSpecRows';
 import { RunVoteButtons } from '../VoteButtons';
 import RunSourceLinks from '../RunSourceLinks';
 import RunListingBadges from './RunListingBadges';
+import RunCurationToggle from './RunCurationToggle';
 import { isUnlisted, isExcluded, hasQualityOverride } from '../../utils/runListing';
 import { sessionFor } from '../../utils/testSessions';
 import { RunKindPill, FIELD_META, inferRunFlags } from './runDisplay';
@@ -94,8 +95,8 @@ export default function RunCard({
     run, votes, isPending,
     vehicle, vehicles, units, socRange, testSessions, copyTargetVehicles,
     calcKwhByRun,
-    canEdit, canCreate, isContributor,
-    openMenuRunId, setOpenMenuRunId, exportingRunId, duplicatingRunId,
+    canEdit, isContributor,
+    exportingRunId, duplicatingRunId,
     toggleRunVote, setRunsSession, createTestSession, updateTestSession,
     deleteTestSession, setPairedChargingRun, clearDefaultRun, onSetDefaultRun,
     handleEditRun, restoreItem, queueDelete, handleExportCsv, handleDuplicateRun,
@@ -104,175 +105,179 @@ export default function RunCard({
 }) {
     const kindLabel = runKindFrom(run) === 'range' ? 'range' : 'charging';
     return (
-        <div className="run-card-header">
-            <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                    <RunKindPill run={run} />
-                    <h3 className="section-title">
-                        {run.name}
-                        <RunSourceLinks run={run} className="text-sm font-normal" />
-                    </h3>
-                    <RunListingBadges run={run} session={sessionFor(testSessions, run)} />
-                    {/* The session heading already carries the
-                        date for a grouped run; repeating it puts
-                        the same fact on screen twice. */}
-                    {run.date && run.session_id == null && (
-                        <span className="text-sm text-meta">{run.date}</span>
-                    )}
-                    <RunVoteButtons
-                        vouch={votes.vouch}
-                        flag={votes.flag}
-                        myVote={votes.myVote}
-                        onVote={(voteType) => toggleRunVote(run.id, voteType)}
-                    />
-                </div>
-                <div className="run-meta">
-                    <RunSpecRows
-                        run={run}
-                        units={units}
-                        socRange={socRange}
-                        fieldMeta={FIELD_META}
-                        calcKwhByRun={calcKwhByRun}
-                        onCheckKwh={handleCheckKwh}
-                    />
-                    {canEdit(vehicle) && (
-                        <SessionControl
+        <div>
+            {/* The identity line runs the card's full width, Edit and Delete
+                at its right end, so the action column below starts level with
+                the bands rather than with the title (.run-card-body). */}
+            <div className="flex items-center gap-2 flex-wrap">
+                <RunKindPill run={run} />
+                <h3 className="section-title">
+                    {run.name}
+                    <RunSourceLinks run={run} className="text-sm font-normal" />
+                </h3>
+                <RunListingBadges run={run} session={sessionFor(testSessions, run)} withToggles={isContributor} />
+                {/* The session heading already carries the
+                    date for a grouped run; repeating it puts
+                    the same fact on screen twice. */}
+                {run.date && run.session_id == null && (
+                    <span className="text-sm text-meta">{run.date}</span>
+                )}
+                <RunVoteButtons
+                    vouch={votes.vouch}
+                    flag={votes.flag}
+                    myVote={votes.myVote}
+                    onVote={(voteType) => toggleRunVote(run.id, voteType)}
+                />
+                {/* Top right, on the title's line: the card's own verbs, apart
+                    from the column of what it says about the test. Curators
+                    only, like the column below — see .run-actions there. */}
+                {canEdit(vehicle) && (
+                    <div className="run-edit-actions ml-auto">
+                        <button onClick={() => handleEditRun(run)} className="btn btn-edit text-sm">Edit</button>
+                        <button
+                            onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
+                            className={`btn text-sm ${isPending ? 'btn-restore' : 'btn-danger'}`}
+                        >
+                            {isPending ? '↩ Restore' : 'Delete'}
+                        </button>
+                    </div>
+                )}
+            </div>
+            <div className="run-card-body">
+                <div className="flex-1 min-w-0">
+                    <div className="run-meta">
+                        <RunSpecRows
+                            run={run}
+                            units={units}
+                            socRange={socRange}
+                            fieldMeta={FIELD_META}
+                            calcKwhByRun={calcKwhByRun}
+                            onCheckKwh={handleCheckKwh}
+                        />
+                        {canEdit(vehicle) && (
+                            <SessionControl
+                                run={run}
+                                vehicle={vehicle}
+                                vehicles={vehicles}
+                                sessions={testSessions}
+                                onAssign={sessionId => setRunsSession([run.id], sessionId)}
+                                onCreate={createTestSession}
+                                onUpdate={updateTestSession}
+                                onDelete={deleteTestSession}
+                            />
+                        )}
+                    </div>
+                    {/* Under the bands, not in them — see PairedChargingControl. */}
+                    {(inferRunFlags(run).includes('range') || run.distance_miles != null) && canEdit(vehicle) && (
+                        <PairedChargingControl
                             run={run}
                             vehicle={vehicle}
-                            vehicles={vehicles}
-                            sessions={testSessions}
-                            onAssign={sessionId => setRunsSession([run.id], sessionId)}
-                            onCreate={createTestSession}
-                            onUpdate={updateTestSession}
-                            onDelete={deleteTestSession}
+                            onSet={chargingId => setPairedChargingRun(vehicle.id, run.id, chargingId)}
                         />
                     )}
                 </div>
-                {/* Under the bands, not in them — see PairedChargingControl. */}
-                {(inferRunFlags(run).includes('range') || run.distance_miles != null) && canEdit(vehicle) && (
-                    <PairedChargingControl
-                        run={run}
-                        vehicle={vehicle}
-                        onSet={chargingId => setPairedChargingRun(vehicle.id, run.id, chargingId)}
-                    />
-                )}
-            </div>
-            <div className="run-actions">
-                <div className="run-actions-row">
-                    {/* Says WHICH default. A vehicle carries one default
-                        charging test AND one default range test — the service
-                        has scoped them per kind since migration 046 — but the
-                        button said a bare "Default", so setting one looked like
-                        it must have unset the other. The star is the state; the
-                        kind is the fact that was missing. */}
-                    <button
-                        onClick={() => run.isDefault ? clearDefaultRun(vehicle.id, run.id) : onSetDefaultRun(run.id)}
-                        title={!canCreate
-                            ? 'Sign in to save changes'
-                            : run.isDefault
-                                ? `Click to clear — this vehicle would then have no default ${kindLabel} test`
-                                : `Set as this vehicle's default ${kindLabel} test for charts`}
-                        className={`btn btn-toggle${run.isDefault ? ' active' : ''}`
-                            + (!canCreate ? ' opacity-50 cursor-not-allowed' : '')}
-                    >
-                        {run.isDefault
-                            ? <>★ Default {kindLabel} <span className="btn-toggle-clear">×</span></>
-                            : '☆ Set default'}
-                    </button>
-                    {canEdit(vehicle) && (
-                        <button onClick={() => handleEditRun(run)} className="btn btn-edit text-sm">Edit</button>
-                    )}
-                    <button
-                        onClick={() => isPending ? restoreItem(run.id) : queueDelete(run.id)}
-                        title={!canCreate && !isPending ? 'Sign in to save changes' : undefined}
-                        className={`btn text-sm ${isPending ? 'btn-restore' : 'btn-danger'}${!canCreate && !isPending ? ' opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                        {isPending ? '↩ Restore' : 'Delete'}
-                    </button>
-                    {/* More ▾ overflow menu */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setOpenMenuRunId(openMenuRunId === run.id ? null : run.id)}
-                            className="btn btn-primary text-sm"
-                        >More ▾</button>
-                        {openMenuRunId === run.id && (
-                            <>
-                                <div className="fixed inset-0 z-10" onClick={() => setOpenMenuRunId(null)} />
-                                <div className="popover popover--end dropdown-menu w-52">
-                                    <button
-                                        onClick={() => { handleExportCsv(run); setOpenMenuRunId(null); }}
-                                        disabled={exportingRunId === run.id}
-                                        className="dropdown-item w-full text-left disabled:opacity-50"
-                                    >
-                                        {exportingRunId === run.id ? '↓ Exporting…' : '↓ Download CSV'}
-                                    </button>
-                                    {canEdit(vehicle) && (
-                                        <button
-                                            onClick={() => { handleDuplicateRun(run); setOpenMenuRunId(null); }}
-                                            disabled={duplicatingRunId !== null}
-                                            className="dropdown-item w-full text-left disabled:opacity-50"
-                                        >
-                                            {duplicatingRunId === run.id ? '⧉ Copying…' : '⧉ Copy'}
-                                        </button>
-                                    )}
-                                    {canEdit(vehicle) && copyTargetVehicles.length > 0 && (
-                                        <button
-                                            onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); setOpenMenuRunId(null); }}
-                                            className="dropdown-item w-full text-left"
-                                        >
-                                            ↪ Copy to…
-                                        </button>
-                                    )}
-                                    {canEdit(vehicle) && (
-                                        <button
-                                            onClick={() => { handleUpdateData(run); setOpenMenuRunId(null); }}
-                                            className="dropdown-item w-full text-left"
-                                        >
-                                            ↑ Upload additional data
-                                        </button>
-                                    )}
-                                    {/* Two questions, two items (#394): whether
-                                        viewers see it, and whether it counts. */}
-                                    {isContributor && (
-                                        <button
-                                            onClick={() => { onUpdateRun(run.id, { isHidden: !isUnlisted(run) }); setOpenMenuRunId(null); }}
-                                            title={isUnlisted(run)
-                                                ? 'Show this test to viewers in the lists and charts'
-                                                : "Keep this test out of viewers' lists and charts. It still counts in the statistics unless excluded."}
-                                            className="dropdown-item w-full text-left"
-                                        >
-                                            {isUnlisted(run) ? '◎ List for viewers' : '⊘ Unlist'}
-                                        </button>
-                                    )}
-                                    {isContributor && (
-                                        <button
-                                            onClick={() => { onUpdateRun(run.id, { isExcluded: !isExcluded(run) }); setOpenMenuRunId(null); }}
-                                            title={isExcluded(run)
-                                                ? 'Count this test in the statistics again'
-                                                : 'Leave this test out of the statistics: composite curves, test spreads and best charge windows'}
-                                            className="dropdown-item w-full text-left"
-                                        >
-                                            {isExcluded(run) ? '⊕ Include in statistics' : '⊖ Exclude from statistics'}
-                                        </button>
-                                    )}
-                                    {/* Range tests only: both checks it overrides
-                                        are range checks (runListing). */}
-                                    {isContributor && kindLabel === 'range' && (
-                                        <button
-                                            onClick={() => { onUpdateRun(run.id, { qualityOverride: !hasQualityOverride(run) }); setOpenMenuRunId(null); }}
-                                            title={hasQualityOverride(run)
-                                                ? 'Let the automatic quality checks decide again'
-                                                : 'Count this test in the range spread although it saw only part of the pack, and in the pool without its speed or temperature. Missing data and exclusion still apply.'}
-                                            className="dropdown-item w-full text-left"
-                                        >
-                                            {hasQualityOverride(run) ? '↺ Restore quality checks' : '⚑ Override quality checks'}
-                                        </button>
-                                    )}
-                                </div>
-                            </>
-                        )}
+                {/* One column, two groups — where the test stands, and what can
+                    be done with its data; Edit and Delete sit on the title's
+                    line above. It was one row of four buttons with everything
+                    else in a More menu, which left the column empty below the
+                    row and the curator's decisions out of sight until opened.
+
+                    Curators only, the whole column. It used to show to anyone,
+                    signed out included, with Set default and Delete drawn
+                    disabled — left over from a plan for viewers to hold their
+                    own data, which is shelved. A viewer has nothing to do
+                    here, and a disabled button reads as a broken one. */}
+                {canEdit(vehicle) && (
+                    <div className="run-actions">
+                        <div className="run-curation-grid">
+                            {/* Says WHICH default. A vehicle carries one default
+                                charging test AND one default range test — the service
+                                has scoped them per kind since migration 046 — but the
+                                button said a bare "Default", so setting one looked like
+                                it must have unset the other. The star is the state; the
+                                kind is the fact that was missing. */}
+                            <button
+                                onClick={() => run.isDefault ? clearDefaultRun(vehicle.id, run.id) : onSetDefaultRun(run.id)}
+                                title={run.isDefault
+                                    ? `Click to clear — this vehicle would then have no default ${kindLabel} test`
+                                    : `Set as this vehicle's default ${kindLabel} test for charts`}
+                                className={`btn btn-toggle run-curation-toggle${run.isDefault ? ' active' : ''}`}
+                            >
+                                {run.isDefault
+                                    ? <>★ Default {kindLabel} <span className="btn-toggle-clear">×</span></>
+                                    : '☆ Set default'}
+                            </button>
+                            {/* Two questions, two toggles (#394): whether viewers see
+                                it, and whether it counts. */}
+                            {isContributor && (
+                                <RunCurationToggle
+                                    isSet={isUnlisted(run)}
+                                    glyph="⊘" action="Unlist" state="Unlisted"
+                                    onClick={() => onUpdateRun(run.id, { isHidden: !isUnlisted(run) })}
+                                    title={isUnlisted(run)
+                                        ? "Unlisted: kept out of viewers' lists and charts. It still counts in the statistics unless it is excluded. Click to list it."
+                                        : "Keep this test out of viewers' lists and charts. It still counts in the statistics unless excluded."}
+                                />
+                            )}
+                            {isContributor && (
+                                <RunCurationToggle
+                                    isSet={isExcluded(run)}
+                                    glyph="⊖" action="Exclude" state="Excluded"
+                                    onClick={() => onUpdateRun(run.id, { isExcluded: !isExcluded(run) })}
+                                    title={isExcluded(run)
+                                        ? 'Excluded: left out of the statistics — composite curves, test spreads and best charge windows. Click to include it.'
+                                        : 'Leave this test out of the statistics: composite curves, test spreads and best charge windows'}
+                                />
+                            )}
+                            {/* Range tests only: both checks it overrides are range
+                                checks (runListing). */}
+                            {isContributor && kindLabel === 'range' && (
+                                <RunCurationToggle
+                                    isSet={hasQualityOverride(run)}
+                                    glyph="⚑" action="Override checks" state="Checks overridden"
+                                    onClick={() => onUpdateRun(run.id, { qualityOverride: !hasQualityOverride(run) })}
+                                    title={hasQualityOverride(run)
+                                        ? 'Quality checks overridden: this test counts in the range spread although it saw only part of the pack, and in the pool without its speed or temperature. Missing data and exclusion still apply. Click to let the automatic checks decide again.'
+                                        : 'Count this test in the range spread although it saw only part of the pack, and in the pool without its speed or temperature. Missing data and exclusion still apply.'}
+                                />
+                            )}
+                        </div>
+                        <div className="run-data-actions">
+                            <button
+                                onClick={() => handleExportCsv(run)}
+                                disabled={exportingRunId === run.id}
+                                title="Download this test's data points as CSV"
+                                className="btn btn-toggle disabled:opacity-50"
+                            >
+                                {exportingRunId === run.id ? '↓ Exporting…' : '↓ CSV'}
+                            </button>
+                            <button
+                                onClick={() => handleDuplicateRun(run)}
+                                disabled={duplicatingRunId !== null}
+                                title="Make a copy of this test on this vehicle"
+                                className="btn btn-toggle disabled:opacity-50"
+                            >
+                                {duplicatingRunId === run.id ? '⧉ Copying…' : '⧉ Copy'}
+                            </button>
+                            {copyTargetVehicles.length > 0 && (
+                                <button
+                                    onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); }}
+                                    title="Copy this test to another vehicle"
+                                    className="btn btn-toggle"
+                                >
+                                    ↪ Copy to…
+                                </button>
+                            )}
+                            <button
+                                onClick={() => handleUpdateData(run)}
+                                title="Upload additional data points to this test"
+                                className="btn btn-toggle"
+                            >
+                                ↑ Upload
+                            </button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

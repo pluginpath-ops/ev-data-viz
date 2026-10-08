@@ -2,6 +2,7 @@ import InfoIcon from '../InfoIcon';
 import { compositeExplainer, compositeNote, staleComposites } from '../../utils/compositeCurve';
 import { isUnlisted } from '../../utils/runListing';
 import RunListingBadges from './RunListingBadges';
+import RunCurationToggle from './RunCurationToggle';
 
 /**
  * A vehicle's composite curve in Tests & Data (#313): the stored mean of its
@@ -16,7 +17,7 @@ import RunListingBadges from './RunListingBadges';
  * what it is, what it was drawn from, the default toggle, and hiding.
  */
 export default function CompositeRunCard({
-    run, vehicle, units, canEdit, canCreate, isContributor,
+    run, vehicle, units, canEdit, isContributor,
     clearDefaultRun, onSetDefaultRun, onUpdateRun, onRebuild,
 }) {
     const note = compositeNote(run.composite, units);
@@ -35,7 +36,7 @@ export default function CompositeRunCard({
                         <span className="run-name-derived">{run.name}</span>
                         <InfoIcon className="run-source-info" title={run.name} text={compositeExplainer(run.composite, units)} />
                     </h3>
-                    <RunListingBadges run={run} />
+                    <RunListingBadges run={run} withToggles={isContributor} />
                     {stale && (
                         <span className="badge-status is-warning" title="One of the tests behind it has changed since it was built, or the method has. Rebuild to bring it up to date.">
                             out of date
@@ -52,39 +53,42 @@ export default function CompositeRunCard({
                 )}
                 {note && <p className="run-meta text-meta">{note}</p>}
             </div>
-            <div className="run-actions">
-                <div className="run-actions-row">
-                    <button
-                        onClick={() => run.isDefault ? clearDefaultRun(vehicle.id, run.id) : onSetDefaultRun(run.id)}
-                        title={!canCreate
-                            ? 'Sign in to save changes'
-                            : run.isDefault
-                                ? 'Click to clear — the vehicle then falls back to its own composite curve, else its newest test'
-                                : "Set as this vehicle's default charging curve for charts"}
-                        className={`btn btn-toggle${run.isDefault ? ' active' : ''}`
-                            + (!canCreate ? ' opacity-50 cursor-not-allowed' : '')}
-                    >
-                        {run.isDefault
-                            ? <>★ Default charging <span className="btn-toggle-clear">×</span></>
-                            : '☆ Set default'}
-                    </button>
-                    {canEdit(vehicle) && (
+            {/* Curators only, as on a test's card (RunCard). */}
+            {canEdit(vehicle) && (
+                <div className="run-actions">
+                    <div className="run-actions-row">
                         <button onClick={() => onRebuild(vehicle.id)} className="btn text-sm"
                             title="Rebuild this vehicle's composite curves from its tests now. It happens on its own whenever a test changes.">
                             ↻ Rebuild
                         </button>
-                    )}
-                    {isContributor && (
+                    </div>
+                    {/* The same grid as a test's card (RunCard), so a curator finds
+                        Default and Unlist in the same place on both. */}
+                    <div className="run-curation-grid">
                         <button
-                            onClick={() => onUpdateRun(run.id, { isHidden: !isUnlisted(run) })}
-                            title={isUnlisted(run) ? 'Show this composite to viewers in the lists and charts' : "Keep this composite out of viewers' lists and charts"}
-                            className="btn text-sm"
+                            onClick={() => run.isDefault ? clearDefaultRun(vehicle.id, run.id) : onSetDefaultRun(run.id)}
+                            title={run.isDefault
+                                ? 'Click to clear — the vehicle then falls back to its own composite curve, else its newest test'
+                                : "Set as this vehicle's default charging curve for charts"}
+                            className={`btn btn-toggle run-curation-toggle${run.isDefault ? ' active' : ''}`}
                         >
-                            {isUnlisted(run) ? '◎ List' : '⊘ Unlist'}
+                            {run.isDefault
+                                ? <>★ Default charging <span className="btn-toggle-clear">×</span></>
+                                : '☆ Set default'}
                         </button>
-                    )}
+                        {isContributor && (
+                            <RunCurationToggle
+                                isSet={isUnlisted(run)}
+                                glyph="⊘" action="Unlist" state="Unlisted"
+                                onClick={() => onUpdateRun(run.id, { isHidden: !isUnlisted(run) })}
+                                title={isUnlisted(run)
+                                    ? "Unlisted: kept out of viewers' lists and charts. Click to list it."
+                                    : "Keep this composite out of viewers' lists and charts"}
+                            />
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }
