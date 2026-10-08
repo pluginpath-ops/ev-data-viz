@@ -60,7 +60,7 @@ export default function PreferredTestPicker({
                 Derive from
             </div>
             <p className="text-note mb-2">
-                This testVehicle holds {mcts.length} multi-cycle tests and every figure above comes from
+                This test vehicle holds {mcts.length} multi-cycle tests and every figure above comes from
                 one of them. More than one run can be legitimate — the same vehicle is sometimes
                 tested at two laboratories — so this is a choice, not a fault, and the others are
                 not wrong.

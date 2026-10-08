@@ -166,7 +166,7 @@ export default function EpaDerivationChecks({
                 the figures above deserve, and both are fixable from this view. */}
             {competingMctTests > 1 && (
                 <p className="text-xs" style={{ color: 'var(--color-warning)' }}>
-                    This testVehicle holds {competingMctTests} multi-cycle tests, and every figure above
+                    This test vehicle holds {competingMctTests} multi-cycle tests, and every figure above
                     was derived from
                     {derivedFrom?.basis === 'selected' ? ' the one its guide row identifies' : ' the most recent'}
                     {derivedFrom?.testNumber && <> — <span className="font-mono">{derivedFrom.testNumber}</span></>}

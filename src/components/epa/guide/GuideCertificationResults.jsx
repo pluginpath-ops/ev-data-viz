@@ -79,7 +79,7 @@ function TestVehicleResults({ testVehicle, configCount }) {
             )}
 
             {tests.length === 0 ? (
-                <div className="text-note">No tests imported for this testVehicle.</div>
+                <div className="text-note">No tests imported for this test vehicle.</div>
             ) : (
                 <div className="epa-phase-table">
                     <table>

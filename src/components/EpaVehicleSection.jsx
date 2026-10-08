@@ -599,7 +599,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                             </div>
                             {createError && <p className="text-xs text-red-500 mt-1">{createError}</p>}
                             <p className="text-[11px] text-meta mt-1">
-                                Creates and links the testVehicle; add coefficients, tests and phases in the curator fields afterward.
+                                Creates and links the test vehicle; add coefficients, tests and phases in the curator fields afterward.
                             </p>
                             <div className="flex gap-2 mt-2">
                                 <button type="button" onClick={handleCreate} disabled={creating}
