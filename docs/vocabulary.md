@@ -256,8 +256,11 @@ a gap is written out, "MY2022, MY2024 to MY2025"), **From MY2024** (a figure or
 certification standing in from another year — like "from *platform*" for a
 provided value, and not "flag", which is the accuracy signal), **Basis** (how a
 certification record came to exist: a CSI file, the Test Car List, a Guide
-link, by hand) and **Recertified** (the same Test Group filed again, changed or
-not).
+link, by hand — `epa_certifications.basis` csi / csv / guide / manual) and
+**Recertified** (the same Test Group filed again, changed or not). The
+certificate states it: EPA's own field is the **Certificate Revision Date**
+(`certificate_revision_date`, migration 082), and the UI word is Recertified
+because "revised" reads as "something changed", which a resubmission need not.
 
 **Unlisted and excluded are two questions, not one.** Listing asks whether
 viewers see a test; excluding asks whether it counts. All four answers are

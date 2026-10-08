@@ -9,6 +9,7 @@ import { rankFeCandidates } from '../utils/feGuideMatch';
 import { promotionUpdates, demotionUpdates, acceptGuideUpdates, isCuratorOwned } from '../utils/feGuidePromotion';
 import { selectTestForGuide } from '../utils/epaTestSelection';
 import { planTestVehicleImport, uniqueCoveredModels } from '../utils/epaImportMerge';
+import { planCertificationImport, guideLinkTarget, testGroupYear, isTestGroup } from '../utils/epaCertifications';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, isCompositeRun, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
 import { planCompositeRebuild, compositeEligible, mayHaveComposite } from '../utils/compositeCurve';
@@ -2195,6 +2196,10 @@ class DataService {
         .upsert(coeffRows, { onConflict: 'test_vehicle_id,category', ignoreDuplicates: false });
       if (coeffErr) throw coeffErr;
     }
+
+    // 3. Their certifications (#374). The Test Car List names the Test Group
+    //    each test vehicle was certified under.
+    await this.recordEpaCertifications(testVehicleRows, 'csv');
   }
 
   /**
@@ -2250,6 +2255,11 @@ class DataService {
       .select()
       .single();
     if (error) throw error;
+    // A record made by hand from a lab PDF often uses the Test Group as its ID;
+    // that is a certification too (#374), as migration 082 recorded for the
+    // three made before it.
+    const tg = testVehicle.test_group ?? (isTestGroup(testVehicle.test_vehicle_id) ? testVehicle.test_vehicle_id : null);
+    if (tg) await this.recordEpaCertifications([{ test_vehicle_id: testVehicle.test_vehicle_id, test_group: tg }], 'manual');
     return data;
   }
 
@@ -2272,6 +2282,207 @@ class DataService {
       found.push(...(data || []).map(r => r.test_vehicle_id));
     }
     return found;
+  }
+
+  // ── EPA Certifications (#374, migration 082) ─────────────────────────────────
+  //
+  // One row per Test Group, many-to-many with test vehicles. Written alongside
+  // the test vehicle's own identity and Guide-link columns until #374 layer 3
+  // switches the readers. Every write here is non-fatal before migration 082
+  // is applied: a missing table must not fail an import or a link that worked.
+
+  /**
+   * The certifications each of these test vehicles is already in, for the
+   * import review: test_vehicle_id → [{ test_group, model_year }]. Empty before
+   * migration 082.
+   */
+  async getEpaCertificationsFor(testVehicleIds) {
+    const out = {};
+    if (!this.useSupabase || !testVehicleIds?.length) return out;
+    for (let i = 0; i < testVehicleIds.length; i += 100) {
+      const { data, error } = await getSupabase()
+        .from('epa_certification_test_vehicles')
+        .select('test_vehicle_id, epa_certifications(test_group, model_year)')
+        .in('test_vehicle_id', testVehicleIds.slice(i, i + 100));
+      if (error) {
+        if (isMissingRelation(error) || error.code === 'PGRST200') return {};
+        throw error;
+      }
+      for (const r of data || []) {
+        if (!r.epa_certifications) continue;
+        (out[r.test_vehicle_id] ??= []).push(r.epa_certifications);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Import one CSI file's certification: the Test Group's row, its covered
+   * models, and a link row per test vehicle the file names. Runs after the
+   * test vehicles themselves, which the link rows point at.
+   *
+   * The rules — an earlier filing never replaces a later one, a row no file
+   * stood behind takes the file whole — are planCertificationImport's.
+   *
+   * @param {Object} certification  parseEpaCsiText().certification, plus source_file
+   * @param {Array}  members  [{ test_vehicle_id, carryover_test_group, carryover_model_year }]
+   * @returns {Promise<{ action, recertified } | { action: 'unavailable' }>}
+   */
+  async importEpaCertification(certification, members = []) {
+    if (!this.useSupabase || !certification?.test_group) return { action: 'unavailable' };
+    const supabase = getSupabase();
+    const check = ({ error }) => { if (error) throw error; };
+
+    const stored = await supabase.from('epa_certifications')
+      .select('*').eq('test_group', certification.test_group).maybeSingle();
+    if (stored.error) {
+      if (isMissingRelation(stored.error)) return { action: 'unavailable' };
+      throw stored.error;
+    }
+
+    const plan = planCertificationImport(stored.data, certification);
+    let id = stored.data?.id ?? null;
+    if (plan.action === 'insert') {
+      const res = await supabase.from('epa_certifications').insert(plan.payload).select('id').single();
+      check(res);
+      id = res.data.id;
+    } else if (plan.action === 'update') {
+      check(await supabase.from('epa_certifications')
+        .update({ ...plan.payload, updated_at: new Date().toISOString() }).eq('id', id));
+    }
+
+    if (plan.replaceCoveredModels) {
+      check(await supabase.from('epa_covered_models').delete().eq('certification_id', id));
+      const rows = uniqueCoveredModels(certification.covered_models ?? [])
+        .map(cm => ({ certification_id: id, ...cm }));
+      if (rows.length) check(await supabase.from('epa_covered_models').insert(rows));
+    }
+
+    // Upsert writes only the columns given, so a Guide link or a skip already
+    // on the row is left alone.
+    const links = members.map(m => ({
+      certification_id:     id,
+      test_vehicle_id:      m.test_vehicle_id,
+      carryover_test_group: m.carryover_test_group ?? null,
+      carryover_model_year: m.carryover_model_year ?? null,
+    }));
+    if (links.length) {
+      check(await supabase.from('epa_certification_test_vehicles')
+        .upsert(links, { onConflict: 'certification_id,test_vehicle_id', ignoreDuplicates: false }));
+    }
+    return { action: plan.action, recertified: plan.recertified };
+  }
+
+  /**
+   * Certifications for records that did not come from a CSI file: the Test Car
+   * List import (basis 'csv') and a record made by hand whose Vehicle ID is a
+   * Test Group ('manual'). Never downgrades a certification a file already
+   * stands behind — an existing Test Group is left as it is.
+   *
+   * @param {Array<{ test_vehicle_id, test_group }>} rows
+   * @param {'csv'|'manual'} basis
+   */
+  async recordEpaCertifications(rows, basis) {
+    if (!this.useSupabase) return;
+    const usable = (rows || []).filter(r => r.test_vehicle_id && testGroupYear(r.test_group) != null);
+    if (!usable.length) return;
+    const supabase = getSupabase();
+    const groups = [...new Set(usable.map(r => r.test_group))];
+
+    const ins = await supabase.from('epa_certifications')
+      .upsert(groups.map(tg => ({ test_group: tg, model_year: testGroupYear(tg), basis })),
+              { onConflict: 'test_group', ignoreDuplicates: true });
+    if (ins.error) {
+      if (isMissingRelation(ins.error)) return;
+      throw ins.error;
+    }
+    const ids = {};
+    for (let i = 0; i < groups.length; i += 100) {
+      const { data, error } = await supabase.from('epa_certifications')
+        .select('id, test_group').in('test_group', groups.slice(i, i + 100));
+      if (error) throw error;
+      for (const c of data || []) ids[c.test_group] = c.id;
+    }
+    const links = usable
+      .filter(r => ids[r.test_group] != null)
+      .map(r => ({ certification_id: ids[r.test_group], test_vehicle_id: r.test_vehicle_id }));
+    if (links.length) {
+      const { error } = await supabase.from('epa_certification_test_vehicles')
+        .upsert(links, { onConflict: 'certification_id,test_vehicle_id', ignoreDuplicates: true });
+      if (error) throw error;
+    }
+  }
+
+  /**
+   * Put a Guide link on the certification it belongs to — the Guide row's own
+   * year and Test Group (guideLinkTarget), the same rule migration 082 moved
+   * every existing link by. Written beside the test vehicle's own column until
+   * #374 layer 3 reads it.
+   */
+  async syncCertificationGuideLink(testVehicleId, feRow, statedTestGroup = null) {
+    if (!this.useSupabase || !feRow) return;
+    const supabase = getSupabase();
+    const { data: links, error } = await supabase.from('epa_certification_test_vehicles')
+      .select('id, fe_guide_row_id, certification:epa_certifications(test_group, model_year)')
+      .eq('test_vehicle_id', testVehicleId);
+    if (error) {
+      if (isMissingRelation(error) || error.code === 'PGRST200') return;
+      throw error;
+    }
+
+    // One link per Guide row per test vehicle: a re-link moves it.
+    const stale = (links || []).filter(l => l.fe_guide_row_id === feRow.id).map(l => l.id);
+
+    const target = guideLinkTarget(links || [], feRow, statedTestGroup);
+    if (!target) return;
+    let linkId = target.linkId;
+    if (target.create) {
+      const c = await supabase.from('epa_certifications')
+        .upsert({ ...target.create, basis: 'guide' }, { onConflict: 'test_group', ignoreDuplicates: true });
+      if (c.error) throw c.error;
+      const { data: cert, error: cErr } = await supabase.from('epa_certifications')
+        .select('id').eq('test_group', target.create.test_group).single();
+      if (cErr) throw cErr;
+      const l = await supabase.from('epa_certification_test_vehicles')
+        .upsert({ certification_id: cert.id, test_vehicle_id: testVehicleId },
+                { onConflict: 'certification_id,test_vehicle_id', ignoreDuplicates: false })
+        .select('id').single();
+      if (l.error) throw l.error;
+      linkId = l.data.id;
+    }
+    const others = stale.filter(id => id !== linkId);
+    if (others.length) {
+      const { error: e1 } = await supabase.from('epa_certification_test_vehicles')
+        .update({ fe_guide_row_id: null }).in('id', others);
+      if (e1) throw e1;
+    }
+    const { error: e2 } = await supabase.from('epa_certification_test_vehicles')
+      .update({ fe_guide_row_id: feRow.id }).eq('id', linkId);
+    if (e2) throw e2;
+  }
+
+  /** Take a Guide row off every certification of this test vehicle it was on. */
+  async clearCertificationGuideLink(testVehicleId, feRowId) {
+    if (!this.useSupabase || feRowId == null) return;
+    const { error } = await getSupabase().from('epa_certification_test_vehicles')
+      .update({ fe_guide_row_id: null })
+      .eq('test_vehicle_id', testVehicleId).eq('fe_guide_row_id', feRowId);
+    if (error && !isMissingRelation(error)) throw error;
+  }
+
+  /**
+   * A skip says "this record has no Guide row", so it holds for each of the
+   * record's unlinked years — as migration 082 carried the existing ones over.
+   */
+  async setCertificationSkips(testVehicleId, skipped, note = null) {
+    if (!this.useSupabase) return;
+    const { error } = await getSupabase().from('epa_certification_test_vehicles')
+      .update(skipped
+        ? { fe_guide_skipped_at: new Date().toISOString(), fe_guide_skip_note: note }
+        : { fe_guide_skipped_at: null, fe_guide_skip_note: null })
+      .eq('test_vehicle_id', testVehicleId)
+      .is('fe_guide_row_id', null);
+    if (error && !isMissingRelation(error)) throw error;
   }
 
   /**
@@ -2550,6 +2761,10 @@ class DataService {
     const { error } = await supabase
       .from('epa_test_vehicles').update(updates).eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
+    // The same link, on the certification it belongs to (#374).
+    if (updates.fe_guide_row_id != null) {
+      await this.syncCertificationGuideLink(testVehicleId, feRow, testVehicle?.test_group ?? null);
+    }
     return { promoted, skipped, selection };
   }
 
@@ -2643,6 +2858,7 @@ class DataService {
         : { fe_guide_skipped_at: null, fe_guide_skip_note: null })
       .eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
+    await this.setCertificationSkips(testVehicleId, skipped, note);
   }
 
   /**
@@ -2932,6 +3148,7 @@ class DataService {
     const { error } = await supabase
       .from('epa_test_vehicles').update(updates).eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
+    await this.clearCertificationGuideLink(testVehicleId, testVehicle?.fe_guide_row_id);
     return { restored };
   }
 

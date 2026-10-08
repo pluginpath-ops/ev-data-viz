@@ -52,7 +52,8 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
-                     'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js'];
+                     'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js',
+                     'epaCertifications.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -68,6 +69,12 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Reached through planRow; exported so duplicate detection is tested on its own.',
         'publishedResultsBatch.rolloutBasisFor':
             'Reached through planRow; exported so the basis order is tested on its own.',
+        'epaCertifications.compareFilings':
+            'Reached through planCertificationImport; exported so filing order is tested on its own.',
+        'epaCertifications.testGroupIn':
+            'The JS twin of migration 082\'s test_group_in — tested against real file names so the backfill and the importer agree. Layer 3 reads it.',
+        'epaCertifications.MODEL_YEAR_CODES':
+            'Exported so a test can assert migration 082 states the same year table.',
         'publishedResultsBatch.TABLE_COLUMNS':
             'The templates are built from it; exported so a test holds them to the same columns.',
         'vehicleFigures.resolveSocWindow':
@@ -1749,5 +1756,40 @@ describe('the EPA test vehicle rename holds (#374, migration 081)', () => {
         const fn = svc.slice(svc.indexOf('async getVehicles'), svc.indexOf('// Pass 1', svc.indexOf('async getVehicles')));
         expect(fn).toMatch(/isMissingEpaEmbed\(error\)/);
         expect(fn).toMatch(/await query\(base\)/);
+    });
+});
+
+describe('every write of a test vehicle or its Guide link reaches its certification (#374 layer 2)', () => {
+    const svc = read('src/services/DataService.js');
+    const body = (name) => svc.slice(svc.indexOf(`async ${name}(`), svc.indexOf('\n  }\n', svc.indexOf(`async ${name}(`)));
+
+    it('the parser hands over the certificate, and the modal passes every file\'s on', () => {
+        expect(read('src/utils/parseEpaCsiPdf.js')).toMatch(/return \{ testVehicles, certification, warnings \}/);
+        const modal = read('src/components/EpaPdfImportModal.jsx');
+        expect(modal).toMatch(/const \{ testVehicles: g, certification, warnings: w \} = parseEpaCsiText/);
+        expect(modal).toMatch(/certifications: certs,/);
+    });
+
+    it('the import writes each certification after the test vehicles it names', () => {
+        const ctx = read('src/context/AppContext.jsx');
+        const fn = ctx.slice(ctx.indexOf('const importEpaCsiTestVehicles'), ctx.indexOf('const updateEpaMapping'));
+        expect(fn.indexOf('importEpaTestVehicleFull')).toBeLessThan(fn.indexOf('importEpaCertification'));
+        expect(fn).toMatch(/dataService\.importEpaCertification\(certification, members\)/);
+    });
+
+    it('a Guide link, an unlink and a skip are written to the certification too', () => {
+        expect(body('linkFeGuideRow')).toMatch(/this\.syncCertificationGuideLink\(/);
+        expect(body('unlinkFeGuideRow')).toMatch(/this\.clearCertificationGuideLink\(/);
+        expect(body('setFeLinkSkipped')).toMatch(/this\.setCertificationSkips\(/);
+    });
+
+    it('records made without a CSI file get their certification too', () => {
+        expect(body('bulkUpsertEpaTestVehicles')).toMatch(/this\.recordEpaCertifications\(testVehicleRows, 'csv'\)/);
+        expect(body('createEpaTestVehicle')).toMatch(/this\.recordEpaCertifications\(.*'manual'\)/);
+    });
+
+    it('the importer and the backfill share one rule for a Guide link and one for a filing', () => {
+        expect(body('syncCertificationGuideLink')).toMatch(/guideLinkTarget\(/);
+        expect(body('importEpaCertification')).toMatch(/planCertificationImport\(/);
     });
 });

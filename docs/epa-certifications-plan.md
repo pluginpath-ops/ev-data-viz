@@ -295,6 +295,20 @@ be open meanwhile.
 
 ### Layer 2 — certifications: tables, backfill, importer
 
+> **As built (2026-10-08).** The plan's `document_date` / `recertified_on` became
+> the dates the certificate itself states: `certificate_issue_date`,
+> `certificate_revision_date` (EPA's own field, shown as Recertified) and
+> `csi_submitted_at`, which orders two filings exactly — all read from page 1 of
+> 459 of 459 corpus files. Filings are ordered by that timestamp, then by EPA
+> document id, then dated-over-undated (`compareFilings`; the document id has to
+> come before a date, or importing the Jaguar's earlier filing replaced the
+> later one the backfill held). Covered models live on the certification as
+> rows with `certification_id` set and `test_vehicle_id` null; the legacy
+> per-test-vehicle rows stay until layer 3. The parser now also reads Nissan's
+> dotless Test Groups (`SNSXV0000TL2`), which it never did. Backfill on the
+> 2026-10-08 11:11 backup: 475 certifications, 943 rows, 0 test vehicles
+> without one, 0 Guide links lost, all 676 carryover origins placed.
+
 Additive; nothing reads the new tables yet.
 
 **Files:** `supabase/migrations/082_epa_certifications.sql`;

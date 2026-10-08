@@ -1369,6 +1369,8 @@ export function AppProvider({ children }) {
 
     /** Which of these test_vehicle_ids already exist (for overwrite confirmation). */
     const getExistingEpaTestVehicleIds = (ids) => dataService.getExistingEpaTestVehicleIds(ids);
+    /** Which certifications these test vehicles are already in, for the import review (#374). */
+    const getEpaCertificationsFor = (ids) => dataService.getEpaCertificationsFor(ids);
 
     /**
      * Import parsed CSI-PDF test vehicles (clean-replace each), optionally linking one
@@ -1494,7 +1496,7 @@ export function AppProvider({ children }) {
         }
     };
 
-    const importEpaCsiTestVehicles = async (testVehicles, { linkVehicleId, linkTestVehicleIds = [], onProgress } = {}) => {
+    const importEpaCsiTestVehicles = async (testVehicles, { certifications = [], linkVehicleId, linkTestVehicleIds = [], onProgress } = {}) => {
         try {
             let keptCount = 0;
             let guardedCount = 0;
@@ -1503,6 +1505,15 @@ export function AppProvider({ children }) {
                 const res = await dataService.importEpaTestVehicleFull(g);
                 keptCount += res?.kept?.length ?? 0;
                 if (res?.guarded?.length) guardedCount += 1;
+            }
+            // One certification per file, after the test vehicles it names
+            // exist (#374). Before migration 082 this is a no-op.
+            let certAdded = 0;
+            let recertified = 0;
+            for (const { certification, members } of certifications) {
+                const res = await dataService.importEpaCertification(certification, members);
+                if (res?.action === 'insert') certAdded += 1;
+                if (res?.recertified) recertified += 1;
             }
             onProgress?.({ done: testVehicles.length, total: testVehicles.length, name: null });
             if (linkVehicleId) {
@@ -1515,8 +1526,10 @@ export function AppProvider({ children }) {
             setVehicles(updated);
             showSuccess(`Imported ${testVehicles.length} EPA config(s) from PDF.`
                 + (keptCount ? ` Kept ${keptCount} hand-edited value(s) that differ from the PDF.` : '')
-                + (guardedCount ? ` ${guardedCount} config(s) already held a newer model year's certification, so its year, test family and covered models were kept.` : ''));
-            return { count: testVehicles.length, kept: keptCount, guarded: guardedCount };
+                + (guardedCount ? ` ${guardedCount} config(s) already held a newer model year's certification, so its year, Test Group and covered models were kept.` : '')
+                + (certAdded ? ` ${certAdded} new certification(s).` : '')
+                + (recertified ? ` ${recertified} recertified.` : ''));
+            return { count: testVehicles.length, kept: keptCount, guarded: guardedCount, certifications: certAdded, recertified };
         } catch (error) {
             showError('PDF import failed: ' + error.message);
             throw error;
@@ -2080,6 +2093,7 @@ export function AppProvider({ children }) {
         mergeTags,
         acceptFeGuideValues,
         getExistingEpaTestVehicleIds,
+        getEpaCertificationsFor,
         updateEpaMapping,
         setPrimaryEpaMapping,
         unlinkEpaTestVehicle,

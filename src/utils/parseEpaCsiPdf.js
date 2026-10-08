@@ -14,7 +14,13 @@
  *                total_voltage, battery_specific_energy, useable_kwh,
  *                carryover_test_group, carryover_model_year,
  *                coefficient_sets: [...], tests: [{ ..., phases: [...] }] }],
+ *     certification: { test_group, model_year, certificate_issue_date,
+ *                      certificate_revision_date, csi_submitted_at,
+ *                      covered_models: [...] } | null,
  *     warnings: [...] }
+ *
+ * One file is one EPA Certification (one Test Group, one model year) naming one
+ * or more EPA test vehicles (#374, migration 082).
  *
  * `model_year` / `test_group` are the CERTIFICATION's, from page 1. The
  * `carryover_*` pair is where the emission data vehicles were tested, which on a
@@ -28,6 +34,7 @@
  */
 
 import { resolvePhaseTypes } from './phaseTypes';
+import { isTestGroup } from './epaCertifications';
 
 /** MM/DD/YYYY → YYYY-MM-DD (Postgres date); pass through anything else. */
 function toIsoDate(s) {
@@ -82,6 +89,10 @@ function mapCoeffCategory(label) {
  * value from a footer.
  */
 const TEST_GROUP_ID = /^[A-Z0-9]{3,}\.[A-Z0-9]{3,}$/i;
+// Nissan's Test Groups have no dot (`SNSXV0000TL2`), so the shape above never
+// matched one and every Nissan certificate fell back to its carryover Test
+// Group. isTestGroup knows both forms; the loose shape stays as a fallback.
+const looksLikeTestGroup = (v) => isTestGroup(v) || TEST_GROUP_ID.test(v);
 const YEAR = /^(19|20)\d{2}$/;
 
 /**
@@ -140,16 +151,57 @@ function certGroupFrom(items) {
         for (let j = i + 1; j < Math.min(i + 5, items.length); j++) {
             const v = String(items[j] ?? '').trim();
             if (!v) continue;
-            if (TEST_GROUP_ID.test(v)) return v;
+            if (looksLikeTestGroup(v)) return v;
             break;   // first non-blank was not an ID: wrong occurrence, try the next
         }
     }
     return null;
 }
 
+/**
+ * The first non-blank value after a page-1 label, as certYearFrom reads one.
+ * "--" is how a CSI writes "none" (an unrevised certificate's revision date).
+ */
+function headerValue(items, label) {
+    const i = items.findIndex(s => String(s ?? '').trim() === label);
+    if (i < 0) return null;
+    for (let j = i + 1; j < Math.min(i + 5, items.length); j++) {
+        const v = String(items[j] ?? '').trim();
+        if (!v) continue;
+        return v === '--' ? null : v;
+    }
+    return null;
+}
+
+/** "MM/DD/YYYY hh:mm:ss AM" → "YYYY-MM-DDTHH:mm:ss" (a timestamp, EPA's clock). */
+function toIsoTimestamp(s) {
+    const m = String(s ?? '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)?$/i);
+    if (!m) return null;
+    let h = Number(m[4]);
+    if (m[7]) h = (h % 12) + (/pm/i.test(m[7]) ? 12 : 0);
+    const p2 = (n) => String(n).padStart(2, '0');
+    return `${m[3]}-${p2(m[1])}-${p2(m[2])}T${p2(h)}:${m[5]}:${m[6]}`;
+}
+
+const isoDateOrNull = (s) => { const d = toIsoDate(s); return /^\d{4}-\d{2}-\d{2}$/.test(d ?? '') ? d : null; };
+
+/**
+ * The certificate's own dates, from page 1 (#374). Every CSI in the corpus
+ * states an Issue date and a Submission/Revision timestamp (459 of 459); 16
+ * state a Revision date, the rest "--". A revised certificate is shown as
+ * "Recertified", and the timestamp orders two filings of one Test Group.
+ */
+function certDatesFrom(items) {
+    return {
+        certificate_issue_date:    isoDateOrNull(headerValue(items, 'Certificate Issue Date')),
+        certificate_revision_date: isoDateOrNull(headerValue(items, 'Certificate Revision Date')),
+        csi_submitted_at:          toIsoTimestamp(headerValue(items, 'CSI Submission/Revision Date')),
+    };
+}
+
 function parseCertHeader(rawItems) {
     const items = rawItems || [];
-    return { certTestGroup: certGroupFrom(items), certModelYear: certYearFrom(items) };
+    return { certTestGroup: certGroupFrom(items), certModelYear: certYearFrom(items), certDates: certDatesFrom(items) };
 }
 
 /**
@@ -538,17 +590,17 @@ function parseTests(items, start, end) {
 
 /**
  * @param {string[]} rawItems  Ordered text items from the CSI PDF.
- * @returns {{ testVehicles: Array, warnings: string[] }}
+ * @returns {{ testVehicles: Array, certification: Object|null, warnings: string[] }}
  */
 export function parseEpaCsiText(rawItems) {
-    const { certTestGroup, certModelYear } = parseCertHeader(rawItems);
+    const { certTestGroup, certModelYear, certDates } = parseCertHeader(rawItems);
     const items = stripNoise(rawItems || []);
     const warnings = [];
 
     // Each config begins at a "Vehicle ID / Configuration" anchor.
     const cfgIdx = indicesWhere(items, s => s === 'Vehicle ID / Configuration');
     if (!cfgIdx.length) {
-        return { testVehicles: [], warnings: ['No vehicle configurations found — is this an EPA CSI PDF?'] };
+        return { testVehicles: [], certification: null, warnings: ['No vehicle configurations found — is this an EPA CSI PDF?'] };
     }
 
     // Certificate-wide fields live in the preamble before the first config and are
@@ -682,5 +734,15 @@ export function parseEpaCsiText(rawItems) {
             warnings.push(`${g.test_vehicle_id}: no DC energy in this PDF (often in an external EPA spreadsheet) — enter Total DC / phase energy manually for a measured η.`);
         }
     }
-    return { testVehicles, warnings };
+    // The certificate itself (#374): one per file, for exactly one model year.
+    // Null when page 1 gave no Test Group — a certification is named by it,
+    // and the carryover source a test vehicle falls back to is a different one.
+    const certification = certTestGroup == null ? null : {
+        test_group:   certTestGroup,
+        model_year:   certModelYear ?? testVehicles[0]?.model_year ?? null,
+        ...certDates,
+        covered_models: coveredModels,
+    };
+
+    return { testVehicles, certification, warnings };
 }

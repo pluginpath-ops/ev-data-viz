@@ -251,6 +251,61 @@ describe('the certification\'s own model year', () => {
     });
 });
 
+describe('the certificate itself (#374)', () => {
+    /** Page 1 as pdf.js emits it: a separator between every label and value. */
+    const page1 = ({ tg = 'VVVXT00.0ZVG', year = 2027, revision = '--' } = {}) => [
+        'Manufacturer', ' ', 'Volvo', '',
+        'Test Group', ' ', tg, '',
+        'Model Year', ' ', String(year), '',
+        'Certificate Issue Date', ' ', '07/22/2026', '',
+        'Certificate Revision Date', ' ', revision, '',
+        'Certificate Effective Date', ' ', '07/22/2026', '',
+        'CSI Submission/Revision Date', ' ', '07/13/2026 05:36:48 PM', '',
+        'Test Group Information', '',
+    ];
+    const config = (id = '202625-2') => [
+        'Vehicle ID / Configuration', ' ', id, '',
+        'Represented Test Vehicle Model', ' ', 'EX90 Twin Motor', '',
+        'Original Test Group Name', ' ', 'TVVXT00.0ZVG', '',
+        'Original Test Vehicle Model Year', ' ', '2026', '',
+    ];
+
+    it('is one certification for one model year, naming every test vehicle', () => {
+        const { testVehicles, certification } = parseEpaCsiText([...page1(), ...config('202625-2'), ...config('202625-3')]);
+        expect(testVehicles.map(t => t.test_vehicle_id)).toEqual(['202625-2', '202625-3']);
+        expect(certification).toMatchObject({ test_group: 'VVVXT00.0ZVG', model_year: 2027 });
+    });
+
+    it('reads the dates the certificate states, past the separators', () => {
+        const { certification } = parseEpaCsiText([...page1(), ...config()]);
+        expect(certification.certificate_issue_date).toBe('2026-07-22');
+        expect(certification.csi_submitted_at).toBe('2026-07-13T17:36:48');
+    });
+
+    it('reads "--" as never revised, and a date as recertified', () => {
+        expect(parseEpaCsiText([...page1(), ...config()]).certification.certificate_revision_date).toBeNull();
+        expect(parseEpaCsiText([...page1({ revision: '08/09/2026' }), ...config()]).certification.certificate_revision_date)
+            .toBe('2026-08-09');
+    });
+
+    it('reads a Nissan Test Group, which has no dot', () => {
+        // The old shape check required a dot, so every Nissan certificate fell
+        // back to its carryover Test Group.
+        const { certification, testVehicles, warnings } = parseEpaCsiText([...page1({ tg: 'SNSXV0000TL2', year: 2025 }), ...config('KWB115')]);
+        expect(certification.test_group).toBe('SNSXV0000TL2');
+        expect(testVehicles[0].test_group).toBe('SNSXV0000TL2');
+        expect(warnings.some(w => w.includes('No Test Group on page 1'))).toBe(false);
+    });
+
+    it('has no certification when page 1 names no Test Group', () => {
+        // The carryover Test Group a test vehicle falls back to is a DIFFERENT
+        // certification, so it cannot stand in for this one.
+        const noTg = page1().filter(s => s !== 'VVVXT00.0ZVG');
+        const { certification } = parseEpaCsiText([...noTg, ...config()]);
+        expect(certification).toBeNull();
+    });
+});
+
 /**
  * A multi-cycle test's eight bags, as an item stream.
  *
