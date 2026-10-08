@@ -96,12 +96,15 @@ export default function SeriesColorPicker({
     return (
         <Popover
             className={className}
-            // No "Color —" prefix: a panel of swatches and a hue slider is not
-            // ambiguous about what it is, and the words cost the room the
-            // vehicle needs. The vehicle IS worth carrying — a test called
-            // "Supercharger (EST)" says nothing about which car it belongs to,
-            // and the wider scopes act on a vehicle by name.
-            title={[vehicleName, label].filter(Boolean).join(' · ') || 'Series color'}
+            // Where the scope control shows, IT names the test and the vehicle,
+            // each under the scope that reaches it, so the header saying both
+            // again only cost the room the names need. Without it (the vehicle
+            // form, a pairing colored on its own) the header is the one place
+            // that says what is being colored, and it carries the vehicle: a
+            // test called "Supercharger (EST)" says nothing about which car.
+            title={scoped
+                ? 'Color'
+                : [vehicleName, label].filter(Boolean).join(' · ') || 'Series color'}
             // One width everywhere: the rail, Tests & Data and a chip all get
             // the same panel, so it never reflows to suit its anchor.
             width="300px"
@@ -137,6 +140,8 @@ export default function SeriesColorPicker({
             {({ close }) => (
                 <PickerPanel
                     close={close}
+                    label={label}
+                    vehicleName={vehicleName}
                     plotted={plotted}
                     stored={stored}
                     autoInForce={isAuto ?? isUnsetColor(stored)}
@@ -156,12 +161,37 @@ export default function SeriesColorPicker({
 }
 
 /**
+ * The three scopes, each with WHO it reaches on a second line.
+ *
+ * "This vehicle" with no vehicle named made you work out which one from the
+ * header, and the header could only say it by spending the panel's whole top
+ * line on two names. Under each scope, the name sits where the decision is.
+ *
+ * The widest scope stays "All tests" (docs/vocabulary.md): it reseeds the
+ * TICKED tests, which is not every test of every vehicle, so its second line
+ * is a count rather than a name — how far it reaches is the thing to know.
+ */
+function scopeOptions(label, vehicleName, series) {
+    const tests = series?.length ?? 0;
+    const vehicles = new Set((series ?? []).map(s => s.vehicleId).filter(v => v != null)).size;
+    const reach = [
+        `${tests} test${tests === 1 ? '' : 's'}`,
+        vehicles > 0 && `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
+    ].filter(Boolean).join(' · ');
+    return [
+        ['test', 'This test', label || 'this test'],
+        ['vehicle', 'This vehicle', vehicleName || 'this vehicle'],
+        ['all', 'All tests', reach],
+    ];
+}
+
+/**
  * The panel body, mounted fresh each time the popover opens — which is what
  * makes "the draft starts from what is on the chart" true without an effect
  * watching for it.
  */
 function PickerPanel({
-    close, plotted, stored, onChange, onReset, autoInForce,
+    close, label, vehicleName, plotted, stored, onChange, onReset, autoInForce,
     scoped, chartPalette, onChartPaletteChange, seriesId, vehicleId, series, onApplyMany,
 }) {
     // Radios group by `name`, so two pickers open at once would share a group
@@ -178,20 +208,29 @@ function PickerPanel({
      * picker read Okabe-Ito again. A palette is a property of the PLOT, not of
      * one pick, so it is held at chart level and this reflects it.
      *
-     * Local state remains the fallback, which keeps the pickers with no plot
-     * behind them working: the vehicle form and the vehicle card edit one
-     * durable colour, and there is no chart for a palette to belong to.
+     * It OPENS on the plot's palette, but switching it is a draft, like every
+     * other control in this panel (#382). It wrote straight through to the
+     * chart, so picking an ice chip for "This vehicle" repainted every vehicle
+     * the moment the dropdown changed, before Apply, whatever the scope said. The
+     * chart's palette reaches every series by definition, so only the scope that
+     * reaches every series commits it, and only on Apply or Back to auto.
+     *
+     * With no plot behind the picker (the vehicle form, the vehicle card) there
+     * is no chart palette to open on or commit to, and the draft is all there is.
      *
      * VEHICLE_PALETTE is not a set of swatches, so when the plot is drawn from
      * curated vehicle colours the GRID falls back to the default set while the
      * dropdown still reads "Vehicle color". Those answer different questions:
      * where the plot's colours come from, and which set to pick a new one from.
      */
-    const [localPaletteId, setLocalPaletteId] = useState(SERIES_PALETTES[0].id);
     const lifted = Boolean(onChartPaletteChange);
-    const selectedPaletteId = lifted ? chartPalette : localPaletteId;
+    const [selectedPaletteId, setPaletteId] = useState(
+        () => (lifted && chartPalette) || SERIES_PALETTES[0].id);
     const paletteId = paletteColorsById(selectedPaletteId) ? selectedPaletteId : SERIES_PALETTES[0].id;
-    const setPaletteId = lifted ? onChartPaletteChange : setLocalPaletteId;
+    // Committed alongside an All-tests apply, and only if it actually moved.
+    const commitPalette = () => {
+        if (lifted && selectedPaletteId !== chartPalette) onChartPaletteChange(selectedPaletteId);
+    };
 
     // Two axes, not one. SCOPE says who a pick reaches; DERIVATION says what it
     // does to them. They were welded — one vehicle always got shades, everything
@@ -288,7 +327,11 @@ function PickerPanel({
     const scopeAuto = scope === 'test' || !targets.length
         ? autoInForce
         : targets.every(t => t.auto);
-    const auto = scopeAuto && !touched;
+    // A different palette at All-tests scope is a change Back to auto would
+    // commit, so the button has to be pressable for it — choosing "Vehicle
+    // color" touches no swatch and would otherwise leave it disabled.
+    const paletteMoved = scope === 'all' && lifted && selectedPaletteId !== chartPalette;
+    const auto = scopeAuto && !touched && !paletteMoved;
 
     const derived = useMemo(
         () => (targets.length ? seedPlot(base, targets, how, palette.colors) : null),
@@ -305,6 +348,7 @@ function PickerPanel({
     const commit = () => {
         if (scope === 'test' || !derived) onChange(base);
         else onApplyMany(derived);
+        if (scope === 'all') commitPalette();
         close();
     };
 
@@ -315,6 +359,8 @@ function PickerPanel({
     const goAuto = () => {
         if (scope === 'test' || !targets.length) onReset();
         else onApplyMany(Object.fromEntries(targets.map(t => [t.id, null])));
+        // Handing everything back to "the palette" means the one chosen here.
+        if (scope === 'all') commitPalette();
         close();
     };
 
@@ -325,18 +371,21 @@ function PickerPanel({
             <div className="color-picker-body">
                 {scoped && (
                     <div className="stats-segmented color-scope" role="group" aria-label="Apply to">
-                        {[['test', 'This test'], ['vehicle', 'This vehicle'], ['all', 'All tests']]
-                            .map(([id, text]) => (
-                                <button
-                                    key={id}
-                                    type="button"
-                                    className={scope === id ? 'active' : ''}
-                                    aria-pressed={scope === id}
-                                    onClick={() => pickScope(id)}
-                                >
-                                    {text}
-                                </button>
-                            ))}
+                        {scopeOptions(label, vehicleName, series).map(([id, text, subject]) => (
+                            <button
+                                key={id}
+                                type="button"
+                                className={scope === id ? 'active' : ''}
+                                aria-pressed={scope === id}
+                                // The second line truncates; the full name is
+                                // a hover away.
+                                title={subject}
+                                onClick={() => pickScope(id)}
+                            >
+                                <span className="color-scope-label">{text}</span>
+                                <span className="color-scope-subject">{subject}</span>
+                            </button>
+                        ))}
                     </div>
                 )}
 
