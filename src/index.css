@@ -3945,6 +3945,62 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-radius: var(--radius-mark);
     cursor: pointer;
 }
+/* The vehicle swatch on a selected-vehicle chip — the same control as the series
+ * swatch button, as small as a chip can carry (#308). Sized in em so it follows
+ * the chip's type rather than a number of its own, and its hit area is the
+ * ::after: the square you see is not the square you can press, because 10px is
+ * not a touch target and the chip around it is a drag handle. */
+.vehicle-swatch {
+    position: relative;
+    width: 0.8em;
+    height: 0.8em;
+    flex: none;
+    padding: 0;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-track);
+    cursor: pointer;
+}
+.vehicle-swatch::after {
+    content: '';
+    position: absolute;
+    inset: -0.55em;
+}
+.vehicle-swatch:hover { border-color: var(--color-text-secondary); }
+.vehicle-swatch:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* The same control on a run group, where the color is the accent border and the
+ * border is only 3px of painted strip. This is the press target over it: wider
+ * than the strip, reaching to where the group's content begins, and painting
+ * nothing of its own — the strip keeps saying which colors the vehicle is drawn
+ * in, which may be several, and this opens the panel for the one base they all
+ * come from. Hover only brightens, so a group with nothing ticked (a transparent
+ * strip) still shows where to press. */
+.vehicle-edge-anchor.popover-anchor {
+    /* The popover's wrapper, not the button, is what must leave the flow: an
+       inline-flex span left in it opened a blank line above every group. */
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -3px;
+    width: 12px;
+}
+.vehicle-edge-button {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+.vehicle-edge-button:hover { background-color: var(--color-hover-lift); }
+.vehicle-edge-button:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
 /* A hand-set color this run is holding while a palette draws it — parked.
  *
  * A chip peeking out behind the swatch, not a replacement for it: the face of
@@ -5110,7 +5166,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  *
  * It also states rather than only acts: on means the palette is choosing, and
  * the control is then inert because there is nothing left to hand back. */
-.color-auto {
+.color-auto,
+.color-save {
     @apply block w-full;
     padding: 6px 10px;
     border: 1px solid var(--color-border-strong);
@@ -5121,7 +5178,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-secondary);
     cursor: pointer;
 }
-.color-auto:hover:not(:disabled) {
+.color-auto:hover:not(:disabled),
+.color-save:hover {
     background-color: var(--color-hover-lift);
     color: var(--color-text-primary);
 }
@@ -5131,7 +5189,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-primary-text, #fff);
     cursor: default;
 }
-.color-auto:focus-visible {
+.color-auto:focus-visible,
+.color-save:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }

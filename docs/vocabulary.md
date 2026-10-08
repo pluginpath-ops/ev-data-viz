@@ -74,6 +74,8 @@ Renaming it is [tracked separately](#deferred-renames).
 | The small square REPORTING that color | **series swatch** | common web | `.series-swatch` — 10px, read-only |
 | The bigger one that CHANGES it | **series color picker** | — | [SeriesColorPicker.jsx](../src/components/SeriesColorPicker.jsx), `.series-swatch--button` |
 | The color a pick becomes slot 1 of | **the base** | — | the rest of the set is re-derived from it |
+| The base asked of one car for this session, without editing the car | **a session base** | — | `chartConfig.vehicleBases`, [vehicleBase.js](../src/utils/vehicleBase.js); applied to the vehicles the charts are given, so it travels to the pop-out window |
+| The control that sets a vehicle's base — a tiny swatch on a chip, or the hit area over a run group's accent border | **vehicle swatch** | — | [VehicleSwatch.jsx](../src/components/VehicleSwatch.jsx), `.vehicle-swatch`, `.vehicle-edge-button`. It opens the series color picker with no scope control: a base belongs to the car |
 | Re-ordering a palette to lead with the base | **rotation** | — | `rotatePaletteFrom()` — different hues, for unrelated tests |
 | One hue in lightness steps from the base | **the ramp**, or light→dark | — | `rampFrom()` — one vehicle's runs, handoff 3c |
 | How much of the plot a pick recolors | **scope** | — | this test · this vehicle · all tests |
@@ -106,11 +108,20 @@ the picks are parked — kept, invisible, and absent from the swatches too, beca
 the swatch reports what is drawn. Parking is not discarding: only **Back to
 auto**, at whichever scope, removes a pick.
 
+A session base is the layer between the palette and the picks: palette → base
+(curated, or this) → shades across the vehicle's tests → a test's hand-set pick
+on top. Setting a base does not clear the vehicle's picks. It holds under any
+palette, where a curated color only does under Vehicle color. **Save to
+vehicle**, offered to whoever may edit the vehicle, is the one way a vehicle
+swatch reaches the database, and it is its own button so Apply stays a session
+action.
+
 Say **all tests**, never "all vehicles" — the widest scope reseeds every run
 currently ticked in the run picker, which is a set of tests and may be several
 per vehicle. Nothing at any scope writes to the database: the charting page has
-no durable color path, whatever role you hold. The durable preference is edited
-in Tests & Data, which is the screen that owns it.
+no durable color path, whatever role you hold, except a vehicle swatch's Save to
+vehicle. The durable preference is otherwise edited in Tests & Data, which is
+the screen that owns it.
 
 **Careful with "rail."** Material Design 3 has a *navigation rail* — a slim
 vertical strip of navigation icons. We do not have one. Our `.chart-rail` is a

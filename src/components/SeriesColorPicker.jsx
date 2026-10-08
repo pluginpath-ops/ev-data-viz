@@ -81,6 +81,19 @@ export default function SeriesColorPicker({
     // and the vehicle card.
     chartPalette = null,
     onChartPaletteChange = null,
+    // Writing the picked color somewhere durable, offered beside Apply when the
+    // caller can (a curator, from a chart). Receives the color in the panel.
+    onSave = null,
+    saveLabel = 'Save to vehicle',
+    // The button that opens the panel, when it is not the usual swatch: its
+    // class, and whether it paints the plotted color itself. `bare` is for a
+    // trigger that sits over something else which already shows the color — the
+    // accent border — and is only the hit area.
+    triggerClassName = 'series-swatch--button',
+    bare = false,
+    // Hover glosses the color. Off where the trigger is tiny and a floating
+    // note would only compete with what is beside it.
+    peeks = true,
     className = '',
 }) {
     const plotted = value || DEFAULT_RUN_COLOR;
@@ -108,18 +121,18 @@ export default function SeriesColorPicker({
             // One width everywhere: the rail, Tests & Data and a chip all get
             // the same panel, so it never reflows to suit its anchor.
             width="300px"
-            peek={
+            peek={peeks ? (
                 <>
                     <ColorNote note={seriesColorNote(stored, plotted)} />
                     <span className="popover-more">Click for the palette</span>
                 </>
-            }
+            ) : undefined}
             trigger={({ onClick, ...props }) => (
                 <button
                     {...props}
                     type="button"
-                    className={`series-swatch--button${showParked ? ' has-parked' : ''}`}
-                    style={{
+                    className={`${triggerClassName}${showParked ? ' has-parked' : ''}`}
+                    style={bare ? undefined : {
                         backgroundColor: plotted,
                         ...(showParked ? { '--swatch-parked': parkedColor } : {}),
                     }}
@@ -154,6 +167,8 @@ export default function SeriesColorPicker({
                     vehicleId={vehicleId}
                     series={series}
                     onApplyMany={onApplyMany}
+                    onSave={onSave}
+                    saveLabel={saveLabel}
                 />
             )}
         </Popover>
@@ -193,6 +208,7 @@ function scopeOptions(label, vehicleName, series) {
 function PickerPanel({
     close, label, vehicleName, plotted, stored, onChange, onReset, autoInForce,
     scoped, chartPalette, onChartPaletteChange, seriesId, vehicleId, series, onApplyMany,
+    onSave, saveLabel,
 }) {
     // Radios group by `name`, so two pickers open at once would share a group
     // and fight. They cannot both be open today — the popover is one at a time
@@ -508,6 +524,17 @@ function PickerPanel({
                     <p className="color-warning">
                         {handSet} hand-set color{handSet === 1 ? '' : 's'} will be overwritten
                     </p>
+                )}
+
+                {onSave && (
+                    <button
+                        type="button"
+                        className="color-save"
+                        onClick={() => { onSave(base); close(); }}
+                        title="Make this the vehicle's own color for everyone, not just this session"
+                    >
+                        {saveLabel}
+                    </button>
                 )}
             </div>
 

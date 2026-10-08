@@ -154,7 +154,19 @@ export function useStickyChartColors(runs, {
         // there is nothing to hold still — but an override still wins, since
         // the user asked for it in this session.
         const assigning = palette !== VEHICLE_PALETTE;
-        const seed = assigning ? { ...assigned.current, ...overrides } : overrides;
+
+        // Runs of a vehicle carrying a SESSION base (vehicleBase.js) are drawn
+        // from that base under any palette, so they are not the palette's to
+        // assign and not this map's to hold still: a remembered assignment
+        // would seed ahead of the base and the base could never reach a run
+        // that had already been colored. Recomputed each time, they follow the
+        // base for free.
+        const basedRuns = new Set((vehicles ?? [])
+            .filter(v => v.sessionBase)
+            .flatMap(v => (v.runs ?? []).map(r => String(r.id))));
+        const held = Object.fromEntries(
+            Object.entries(assigned.current).filter(([id]) => !basedRuns.has(String(id))));
+        const seed = assigning ? { ...held, ...overrides } : overrides;
 
         const resolved = resolveChartColors(runs, seed, palette, vehicles, plottedIds);
 
@@ -178,7 +190,7 @@ export function useStickyChartColors(runs, {
             // waiting for the override to be cleared.
             assigned.current = Object.fromEntries(
                 Object.entries({ ...assigned.current, ...resolved })
-                    .filter(([runId]) => !(runId in overrides)),
+                    .filter(([runId]) => !(runId in overrides) && !basedRuns.has(String(runId))),
             );
         }
         return resolved;
