@@ -195,7 +195,7 @@ export const SECTIONS = [
               note: 'The 10px sibling of the picker\'s trigger: it REPORTS which line a row is, it does not change it. Hollow when the row is not plotted, so it says "not on the chart" rather than claiming a color it does not have; orange dot when the series rests on an assumption.' },
             { composite: 'series-color-picker', label: 'Series color picker (live)',
               covers: ['popover-anchor', 'popover-foot', 'series-swatch--button',
-                       'color-picker-body', 'color-row', 'color-scope', 'color-switch',
+                       'color-picker-body', 'color-row', 'color-scope', 'color-scope-label', 'color-scope-subject', 'color-switch',
                        'color-slots', 'color-slot', 'color-hex', 'color-hex-chip',
                        'color-auto', 'color-manual', 'color-seed-radio', 'color-seed-name',
                        'color-slider', 'color-slider-input', 'color-seed', 'color-seed-row',

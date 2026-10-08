@@ -27,6 +27,20 @@ describe('placePopover', () => {
         expect(placement).toBe('below');
     });
 
+    it('slides up until its bottom is on screen when neither side fits (#382)', () => {
+        // Measured live: a 517px color picker under a swatch at y≈333 of a
+        // 748px window ended at 856, with Apply 100px below the edge.
+        const short = { width: 1000, height: 748 };
+        const { top, placement } = placePopover(glyph(160, 317), { width: 300, height: 517 }, short);
+        expect(placement).toBe('below');
+        expect(top + 517).toBe(748 - MARGIN);
+    });
+
+    it('keeps the header on screen when the panel is taller than the viewport', () => {
+        const { top } = placePopover(glyph(200, 300), { width: 276, height: 900 }, view);
+        expect(top).toBe(MARGIN);
+    });
+
     it('slides back from the right edge rather than flipping', () => {
         const { left } = placePopover(glyph(900, 100), { width: 276, height: 120 }, view);
         expect(left).toBe(1000 - 276 - MARGIN);

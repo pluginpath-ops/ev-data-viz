@@ -1465,6 +1465,19 @@ describe('every chart hands the colour panel its palette', () => {
         expect((sel.match(/onChartPaletteChange=\{onChartPaletteChange\}/g) || []).length)
             .toBeGreaterThanOrEqual(4);
     });
+
+    // #382: the panel's dropdown wrote straight through to the chart, so
+    // switching it for "This vehicle" repainted every vehicle before Apply. The
+    // chart palette reaches every series, so it is committed in one place, and
+    // only the All-tests scope calls that place.
+    it('the picker commits the chart palette only from an All-tests commit', () => {
+        const picker = ALL.find(x => x.file === 'src/components/SeriesColorPicker.jsx').text;
+        expect((picker.match(/onChartPaletteChange\(/g) || []).length).toBe(1);
+        expect(picker).toMatch(/const commitPalette = \(\) => \{[^}]*onChartPaletteChange\(/);
+        const calls = picker.match(/^.*commitPalette\(\);.*$/gm) || [];
+        expect(calls.length).toBeGreaterThan(0);
+        for (const line of calls) expect(line).toMatch(/scope === 'all'/);
+    });
 });
 
 /**
