@@ -27,6 +27,18 @@
  * touched. (114 groups in the live data were created from the CSV; treating
  * their tags as held would have stopped a PDF ever correcting them.)
  *
+ * One more thing is held, and it is not a curator's: a NEWER certification's
+ * identity. A carryover certification reuses its test vehicle, so one
+ * epa_test_groups row (keyed by Vehicle ID) is the target of several model years'
+ * files, and the row has room for only one certification's identity. Importing
+ * oldest → newest left the newest on the record; importing backwards left the
+ * OLDEST and quietly replaced the newer certification's test family, source
+ * file, carryover pair and covered-models list. So an older file no longer
+ * overwrites those (IDENTITY_FIELDS, plus the covered models the executor
+ * handles via `plan.holdIdentity`). Lab data still merges as above — it is the
+ * same physical test either way. The proper home for several certifications is
+ * an epa_certifications child table (#374); this is the guard until then.
+ *
  * Pure — no database — so the rules can be tested without one.
  */
 
@@ -35,6 +47,25 @@ const NEVER_NULLED = ['useable_kwh'];
 
 /** Sources written by an automatic ingest — a later PDF import may replace these. */
 const MACHINE_SOURCES = ['pdf', 'csv', 'j1634'];
+
+/** Group columns that name WHICH certification the row stands for. */
+const IDENTITY_FIELDS = [
+    'model_year', 'epa_test_family_id', 'source_file',
+    'carryover_test_group_id', 'carryover_model_year',
+];
+
+/**
+ * True when the incoming certification is strictly OLDER than the stored one.
+ * A missing year on either side is not evidence of age, so it never blocks: the
+ * import proceeds as it always did (a null stored year has nothing to protect;
+ * a null incoming year cannot be shown to be older).
+ */
+export function isOlderCertification(storedGroup, incomingGroup) {
+    if (storedGroup?.model_year == null || incomingGroup?.model_year == null) return false;
+    const a = Number(storedGroup.model_year);
+    const b = Number(incomingGroup.model_year);
+    return Number.isFinite(a) && Number.isFinite(b) && b < a;
+}
 
 /** True when a person (or a deliberate promotion), not an ingest, last set this field. */
 export function isHeld(overrides, field) {
@@ -125,13 +156,32 @@ export const phaseKey = (row) => row.phase_index;
  *        what the database holds now; tests carry `epa_test_phases`.
  * @param {{ group: Object, coefficient_sets: Array, tests: Array }} incoming
  *        the parse, tests carrying `phases`.
- * @returns {{ group, coefficients, tests, kept }} — `kept` is every held value the PDF disagreed with.
+ * @returns {{ group, coefficients, tests, kept, guarded, holdIdentity }} — `kept` is every
+ *   held value the PDF disagreed with; `guarded` the identity fields an older
+ *   certification was stopped from overwriting; `holdIdentity` tells the executor
+ *   to leave the certificate-wide covered-models list alone too.
  */
 export function planGroupImport(stored, incoming) {
     const kept = [];
     const note = (where, list) => list.forEach(k => kept.push({ where, ...k }));
 
-    const groupMerge = mergeRow(stored.group, incoming.group, { neverNull: NEVER_NULLED });
+    // An older certification must not displace a newer one's identity.
+    const holdIdentity = !!stored.group && isOlderCertification(stored.group, incoming.group);
+    const guarded = [];
+    let incomingGroup = incoming.group;
+    if (holdIdentity) {
+        incomingGroup = { ...incoming.group };
+        for (const field of IDENTITY_FIELDS) {
+            if (field in incomingGroup) {
+                if (!sameValue(stored.group[field], incomingGroup[field])) {
+                    guarded.push({ where: 'group', field, kept: stored.group[field], pdf: incomingGroup[field] });
+                }
+                delete incomingGroup[field];
+            }
+        }
+    }
+
+    const groupMerge = mergeRow(stored.group, incomingGroup, { neverNull: NEVER_NULLED });
     note('group', groupMerge.kept);
 
     const coefPlan = planChildren(stored.coefficient_sets, incoming.coefficient_sets, coefficientKey);
@@ -187,7 +237,7 @@ export function planGroupImport(stored, incoming) {
 
     return {
         group: { payload: groupMerge.payload, overrides: groupMerge.overrides },
-        coefficients, tests, kept,
+        coefficients, tests, kept, guarded, holdIdentity,
     };
 }
 
