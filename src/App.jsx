@@ -33,6 +33,9 @@ import { decodeVehicleFilters, encodeVehicleFilters } from './utils/vehicleFilte
 import ReferenceSection, { REFERENCE_SUBTABS, DEFAULT_REFERENCE_SUBTAB, referenceSubtabFromParam } from './components/reference/ReferenceSection';
 import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
+import { applyVehicleBases, withVehicleBase, NO_VEHICLE_BASES } from './utils/vehicleBase';
+import { VehicleBaseContext } from './context/VehicleBaseContext';
+import VehicleSwatch from './components/VehicleSwatch';
 
 /* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
    read by name in several places, so it is mapped here rather than renamed. */
@@ -234,10 +237,34 @@ export default function App() {
         // Whether hand-set colors are in force over that base. Choosing a
         // palette parks them; selecting Hand-set brings them back.
         handSet: false,
+        // { [vehicleId]: hex } — a color asked of one car for this session
+        // (utils/vehicleBase.js). Lives here so the pop-out window gets it with
+        // the rest of the chart's state.
+        vehicleBases: NO_VEHICLE_BASES,
         specsField:     null,   // selected field key for Spec Chart mode
         scatterXField:  null,   // selected X field key for Spec Scatter mode
         scatterYField:  null,   // selected Y field key for Spec Scatter mode
     });
+    // The vehicles as the charts should draw them: a session base replaces the
+    // vehicle's color on the copy, so every chart, sidebar accent and swatch
+    // that reads `vehicle.color` follows without knowing a second layer exists.
+    const vehicleBases = chartConfig.vehicleBases ?? NO_VEHICLE_BASES;
+    const chartVehicles = useMemo(
+        () => applyVehicleBases(vehicles, vehicleBases), [vehicles, vehicleBases]);
+    const vehicleBaseApi = useMemo(() => ({
+        bases: vehicleBases,
+        setBase: (vehicleId, color) => setChartConfig(prev => ({
+            ...prev, vehicleBases: withVehicleBase(prev.vehicleBases, vehicleId, color),
+        })),
+        canSave: (vehicle) => Boolean(canEdit?.(vehicle)),
+        save: async (vehicle, color) => {
+            await updateVehicle(vehicle.id, { color });
+            setChartConfig(prev => ({
+                ...prev, vehicleBases: withVehicleBase(prev.vehicleBases, vehicle.id, null),
+            }));
+        },
+    }), [vehicleBases, canEdit, updateVehicle]);
+
     // Each chart category is its own top-level tab, so `view` holds the category
     // key directly ('efficiency', 'specifications', …) and this is non-null
     // exactly when one of them is showing.
@@ -916,7 +943,7 @@ export default function App() {
         return (
             <ScaleSyncContext.Provider value={scaleSync}>
             <PopoutView
-                vehicles={vehicles}
+                vehicles={chartVehicles}
                 selectedVehicles={selectedVehicles}
                 chartMode={chartMode}
                 chartConfig={chartConfig}
@@ -934,6 +961,7 @@ export default function App() {
     return (
         <ScaleSyncContext.Provider value={scaleSync}>
         <NavigationContext.Provider value={{ openPlatform, openExplainer }}>
+        <VehicleBaseContext.Provider value={vehicleBaseApi}>
             {showAuthModal && (
                 <AuthModal
                     onClose={() => setShowAuthModal(false)}
@@ -1069,12 +1097,14 @@ export default function App() {
                                                         setVehicleSelection(next);
                                                     }}
                                                     className="selected-vehicle-chip cursor-grab active:cursor-grabbing"
-                                                    // The vehicle's curated color, or nothing — an
-                                                    // unset variable falls back inside the rule rather
-                                                    // than being decided here.
-                                                    style={{ '--chip-accent': vehicle.color || undefined }}
+                                                    // The vehicle's base — a session one if somebody set
+                                                    // it, else the curated color — or nothing: an unset
+                                                    // variable falls back inside the rule rather than
+                                                    // being decided here.
+                                                    style={{ '--chip-accent': vehicleBases[vehicleId] || vehicle.color || undefined }}
                                                     title="Drag to reorder"
                                                 >
+                                                    <VehicleSwatch vehicle={vehicle} />
                                                     <span>{vehicle.name}</span>
                                                     <button
                                                         onClick={() => removeVehicleSelection(vehicleId)}
@@ -1201,7 +1231,7 @@ export default function App() {
                       * instead of itself. */}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
                         <ChargingView
-                            vehicles={vehicles}
+                            vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                             chartConfig={chartConfig}
                             setChartConfig={setChartConfig}
@@ -1212,7 +1242,7 @@ export default function App() {
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'roadtrip' && (
                         <RoadTripView
-                            vehicles={vehicles}
+                            vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                             roadTripConfig={roadTripConfig}
                             setRoadTripConfig={setRoadTripConfig}
@@ -1227,7 +1257,7 @@ export default function App() {
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'compare' && (
                         <ChargeCompareView
-                            vehicles={vehicles}
+                            vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                             xMinutes={compareConfig.xMinutes}
                             mMiles={compareConfig.mMiles}
@@ -1265,7 +1295,7 @@ export default function App() {
                     )}
                     {activeChartCategory && chartMode === 'epacurves' && (
                         <EpaCurvesView
-                            vehicles={vehicles}
+                            vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                             epaConfig={epaConfig}
                             setEpaConfig={setEpaConfig}
@@ -1278,13 +1308,13 @@ export default function App() {
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'perfcompare' && (
                         <PerformanceCompareView
-                            vehicles={vehicles}
+                            vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'perfcurve' && (
                         <PerformanceCurveView
-                            vehicles={vehicles}
+                            vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}
@@ -1380,6 +1410,7 @@ export default function App() {
                     </div>
                 </div>
             )}
+        </VehicleBaseContext.Provider>
         </NavigationContext.Provider>
         </ScaleSyncContext.Provider>
     );

@@ -17,7 +17,7 @@ import { dataService } from '../services/DataService';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { useTheme } from '../hooks/useTheme';
-import { resolveChartColors } from '../utils/colorUtils';
+import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import PerformanceCompareChart from './performance/PerformanceCompareChart';
@@ -141,10 +141,18 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
 
     /**
      * Color per vehicle, shared across all four charts so a car is the same
-     * color everywhere — the whole point of stacking them.
+     * color everywhere — the whole point of stacking them. A vehicle's own
+     * color (curated, or the session base set from its chip) is the color; the
+     * palette only assigns to cars that have none. The vehicle stands in as its
+     * own single "run", which is what makes the resolver treat it as a car.
      */
     const vehicleColors = useMemo(
-        () => resolveChartColors(selected.map(v => ({ id: v.id, color: null, created_at: v.created_at })), {}, 'manual'),
+        () => resolveChartColors(
+            selected.map(v => ({ id: v.id, created_at: v.created_at })),
+            {},
+            VEHICLE_PALETTE,
+            selected.map(v => ({ ...v, runs: [{ id: v.id }] })),
+        ),
         [selected],
     );
 

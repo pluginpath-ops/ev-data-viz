@@ -1682,3 +1682,37 @@ describe('a pop-out receives every setting the chart it was opened from does (#3
         });
     }
 });
+
+
+describe('the vehicle swatch is connected (#308, #317)', () => {
+    const app = read('src/App.jsx');
+
+    it('the chip strip and the run selector both render it', () => {
+        expect(app).toMatch(/<VehicleSwatch vehicle=\{vehicle\} \/>/);
+        expect(read('src/components/RunSelector.jsx')).toMatch(/<VehicleSwatch vehicle=\{vehicle\} variant="edge" \/>/);
+    });
+
+    it('session bases live in chartConfig, so the pop-out window receives them', () => {
+        expect(app).toMatch(/vehicleBases: NO_VEHICLE_BASES/);
+        // useChartSync ships the whole chartConfig; if that ever narrows to named
+        // fields, this is where it is noticed.
+        expect(read('src/hooks/useChartSync.js')).toMatch(/chartConfig,/);
+    });
+
+    it('every chart that draws series is handed the vehicles WITH the bases applied', () => {
+        for (const tag of ['PopoutView', 'ChargingView', 'RoadTripView', 'ChargeCompareView', 'EpaCurvesView', 'PerformanceCompareView', 'PerformanceCurveView']) {
+            expect(app, tag).toMatch(new RegExp(`<${tag}\\s*\\n\\s*vehicles=\\{chartVehicles\\}`));
+        }
+    });
+
+    it('the performance views color from the vehicles, not from a bare palette', () => {
+        for (const f of ['PerformanceCompareView', 'PerformanceCurveView']) {
+            expect(read(`src/components/${f}.jsx`), f).toMatch(/resolveChartColors\([\s\S]*VEHICLE_PALETTE/);
+        }
+    });
+
+    it('the provider wraps the app and the sticky hook exempts based runs from its memory', () => {
+        expect(app).toMatch(/<VehicleBaseContext\.Provider value=\{vehicleBaseApi\}>/);
+        expect(read('src/hooks/useStickyChartColors.js')).toMatch(/v\.sessionBase/);
+    });
+});

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { pairKey, partnersFor } from '../utils/pairings';
 import RunSourceLinks from './RunSourceLinks';
 import SeriesColorPicker from './SeriesColorPicker';
+import VehicleSwatch from './VehicleSwatch';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import { compositesFirst } from '../utils/runUtils';
 
@@ -290,6 +291,7 @@ export default function RunSelector({
                                     className="vehicle-run-group"
                                     style={{ '--group-accent': accentFor(vehicle, filteredRuns) ?? 'transparent' }}
                                 >
+                                    <VehicleSwatch vehicle={vehicle} variant="edge" />
                                     {/* mb-1.5, not mb-2: this margin is a third of
                                         the distance between the accent strip's top
                                         and the first row it is describing. */}

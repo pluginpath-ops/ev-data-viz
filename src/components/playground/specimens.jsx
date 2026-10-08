@@ -112,7 +112,24 @@ function SeriesSwatches() {
     );
 }
 
+/** The vehicle swatch's two looks, static — the live control needs the app's provider. */
+function VehicleSwatchLooks() {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+            <span className="selected-vehicle-chip" style={{ '--chip-accent': OKABE_ITO[1] }}>
+                <button type="button" className="vehicle-swatch" style={{ backgroundColor: OKABE_ITO[1] }} aria-label="Color" />
+                <span>Rivian R1S</span>
+            </span>
+            <div className="vehicle-run-group" style={{ '--group-accent': OKABE_ITO[2], minWidth: 160, marginLeft: 12 }}>
+                <span className="popover-anchor vehicle-edge-anchor"><button type="button" className="vehicle-edge-button" aria-label="Color" /></span>
+                <span className="text-sm font-semibold text-secondary">Lucid Air</span>
+            </div>
+        </div>
+    );
+}
+
 export const COMPOSITES = {
+    'vehicle-swatch': () => <VehicleSwatchLooks />,
     'series-color-picker': () => <ColorPickerSeams />,
     'series-swatch': () => <SeriesSwatches />,
 

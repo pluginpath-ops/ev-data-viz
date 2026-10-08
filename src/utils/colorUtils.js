@@ -280,8 +280,9 @@ function pickBestSlot(orderedCandidates, placed) {
  *
  * Priority per run:
  *   1. sessionOverrides[runId]   — always wins (transient user pick)
- *   2. (VEHICLE_PALETTE only) the run's VEHICLE color, shaded across that
- *      vehicle's tests on this chart — one test takes the base exactly
+ *   2. (VEHICLE_PALETTE only — or any palette, for a vehicle carrying a
+ *      session base) the run's VEHICLE color, shaded across that vehicle's
+ *      tests on this chart — one test takes the base exactly
  *   3. A slot from the chosen palette via greedy max-min-ΔE.
  *      With a palette chosen over a curated vehicle, candidates are sorted by
  *      proximity to its color first (hue-family bias) before the greedy pass.
@@ -347,6 +348,11 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
     // answer. It returns the base first, so a vehicle contributing one test is
     // drawn in exactly the color the curator picked rather than a shade off it.
     const curated = new Map();
+    // Runs whose vehicle carries a SESSION base (vehicleBase.js). A base somebody
+    // set on purpose for this car reaches the chart under any palette, where a
+    // curated color only does under Vehicle color: choosing a palette overrides
+    // what a curator stored, never what you just asked this one car to be.
+    const based = new Set();
     const plotted = plottedIds ? new Set(plottedIds.map(String)) : null;
     if (vehicles?.length) {
         const onChart = new Set(sorted.map(r => String(r.id)));
@@ -380,7 +386,10 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
                 + Number(!(r.isDefault || r.is_default));
             const ranked = [...plottedMine].sort((a, b) => rank(a) - rank(b));
             const shades = rampFrom(vehicle.color, ranked.length);
-            ranked.forEach((run, i) => curated.set(String(run.id), shades[i]));
+            ranked.forEach((run, i) => {
+                curated.set(String(run.id), shades[i]);
+                if (vehicle.sessionBase) based.add(String(run.id));
+            });
         }
     }
 
@@ -393,8 +402,9 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
             result[run.id] = sessionOverrides[run.id];
             continue;
 
-        } else if (palette === VEHICLE_PALETTE && curated.has(String(run.id))) {
-            // 2. The vehicle's curated color, shaded across its tests.
+        } else if ((palette === VEHICLE_PALETTE || based.has(String(run.id))) && curated.has(String(run.id))) {
+            // 2. The vehicle's curated color, or the base set for it this session,
+            //    shaded across its tests.
             //
             //    Honoured EXACTLY, with no clash nudge — which is the one place
             //    this departs from the per-run behaviour it replaces. A stored

@@ -21,7 +21,7 @@ import AxisScaleControls from './AxisScaleControls';
 import { useSyncedScale } from '../hooks/useSyncedScale';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve, tracedCurvePoints, segmentAccelerationG } from '../utils/performanceDerivations';
-import { resolveChartColors } from '../utils/colorUtils';
+import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
@@ -131,11 +131,16 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
      * maximally distinct hues rather than a fixed rotation.
      */
     const colorMap = useMemo(() => {
-        const runs = (sessionsByVehicle ? Object.values(sessionsByVehicle).flat() : [])
-            .flatMap(s => s.performance_runs || [])
-            .map(r => ({ id: r.id, color: colorEdits[r.id] ?? null, created_at: r.created_at }));
-        return resolveChartColors(runs, colorEdits, 'manual');
-    }, [sessionsByVehicle, colorEdits]);
+        // Each vehicle's runs, so a car's own color (curated, or the session base
+        // set from its chip) is the family its runs are shaded from.
+        const colorVehicles = selected.map(v => ({
+            ...v,
+            runs: ((sessionsByVehicle ?? {})[v.id] || []).flatMap(s => s.performance_runs || []),
+        }));
+        const runs = colorVehicles.flatMap(v => v.runs)
+            .map(r => ({ id: r.id, created_at: r.created_at }));
+        return resolveChartColors(runs, colorEdits, VEHICLE_PALETTE, colorVehicles);
+    }, [sessionsByVehicle, colorEdits, selected]);
 
     const handleRunColor = (runId, hex) => {
         setColorEdits(prev => {
