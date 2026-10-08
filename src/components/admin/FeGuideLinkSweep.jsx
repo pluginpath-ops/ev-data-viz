@@ -135,7 +135,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         <div className="text-note">matched as “{g.epa_carline_name}”</div>
                     )}
                     <div className="text-meta">
-                        {g.model_year} {g.make} · {g.test_vehicle_id}
+                        MY{g.model_year} {g.make} · {g.test_vehicle_id}
                         {/* A carryover states which year the test actually came
                             from, which is usually why a candidate's year differs. */}
                         {g.carryover_model_year && ` · carried over from ${g.carryover_model_year}`}
@@ -218,7 +218,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                 <div className="sweep-actions">
                     {item.proposal && !skipped && (
                         <button className="btn btn-primary" disabled={busy}
-                            onClick={() => onLink(g.test_vehicle_id, item.proposal.row.id)}>
+                            onClick={() => onLink(g, item.proposal.row.id)}>
                             Link
                         </button>
                     )}
@@ -229,7 +229,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                     )}
                     {skipped ? (
                         <button className="btn btn-secondary" disabled={busy}
-                            onClick={() => onUnskip(g.test_vehicle_id)}>Un-skip</button>
+                            onClick={() => onUnskip(g)}>Un-skip</button>
                     ) : (
                         <button className="btn btn-secondary" disabled={busy}
                             onClick={() => setAsking(a => !a)}>Skip</button>
@@ -246,7 +246,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                     <input className="form-input brand-input" value={note} onChange={e => setNote(e.target.value)}
                         placeholder="Why is there nothing to link? (optional)" />
                     <button className="btn btn-warning" disabled={busy}
-                        onClick={async () => { await onSkip(g.test_vehicle_id, note.trim() || null); setAsking(false); }}>
+                        onClick={async () => { await onSkip(g, note.trim() || null); setAsking(false); }}>
                         Record skip
                     </button>
                     <button className="btn btn-secondary" onClick={() => setAsking(false)}>Cancel</button>
@@ -292,7 +292,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                                 <CandidateFacts row={c.row} score={c.score} exactYear={c.exactYear} />
                             </div>
                             <button className="btn btn-secondary" disabled={busy}
-                                onClick={() => onLink(g.test_vehicle_id, c.row.id)}>Link this</button>
+                                onClick={() => onLink(g, c.row.id)}>Link this</button>
                         </div>
                     ))}
                     {/* A borrowed year is a legitimate link, not a weaker one:
@@ -354,8 +354,10 @@ export default function FeGuideLinkSweep() {
         finally { setBusy(false); }
     };
 
-    const linkOne = (groupId, rowId) =>
-        run(() => linkFeGuideRow(groupId, rowId), 'Linked.');
+    // One item per test vehicle per certification (#374): every action names
+    // the certification it acts on.
+    const linkOne = (testVehicle, rowId) =>
+        run(() => linkFeGuideRow(testVehicle.test_vehicle_id, rowId, { linkRowId: testVehicle._linkRowId }), 'Linked.');
 
     /**
      * The batch goes through `linkFeGuideRows`, not a loop over the single-link
@@ -367,6 +369,7 @@ export default function FeGuideLinkSweep() {
         const pairs = batch.map(it => ({
             testVehicleId: it.testVehicle.test_vehicle_id,
             feRowId: it.proposal.row.id,
+            linkRowId: it.testVehicle._linkRowId,
         }));
         const res = await linkFeGuideRows(pairs);
         setResult(res);
@@ -386,7 +389,8 @@ export default function FeGuideLinkSweep() {
                         <div className="text-note">
                             {progress.linked} linked · {progress.awaiting} awaiting a decision
                             {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
-                            {' '}of {progress.total}
+                            {' '}of {progress.total} certifications
+                            {progress.testVehicles != null && ` across ${progress.testVehicles} test vehicles`}
                         </div>
                     )}
                     {progress === null && (
@@ -468,12 +472,12 @@ export default function FeGuideLinkSweep() {
             <div className="brand-list">
                 {shown.map(item => (
                     <SweepRow
-                        key={item.testVehicle.test_vehicle_id}
+                        key={item.testVehicle._linkRowId ?? item.testVehicle.test_vehicle_id}
                         item={item}
                         busy={busy}
                         onLink={linkOne}
-                        onSkip={(id, n) => run(() => setFeLinkSkipped(id, true, n), 'Skip recorded.')}
-                        onUnskip={(id) => run(() => setFeLinkSkipped(id, false), 'Skip cleared.')}
+                        onSkip={(g, n) => run(() => setFeLinkSkipped(g.test_vehicle_id, true, n, { linkRowId: g._linkRowId }), 'Skip recorded.')}
+                        onUnskip={(g) => run(() => setFeLinkSkipped(g.test_vehicle_id, false, null, { linkRowId: g._linkRowId }), 'Skip cleared.')}
                     />
                 ))}
                 {shown.length === 0 && (

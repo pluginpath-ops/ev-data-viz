@@ -238,19 +238,32 @@ export function coveredModelMatches(testVehicle, feRows = []) {
 }
 
 /**
- * A guide row whose smog Test Group IS our test vehicle id.
+ * Guide rows in the certification's own year and Test Group.
  *
- * Migration 053 dismissed this join because it matched 1 of 87 linked test vehicles,
- * and as a general key it is still useless — the guide's Test Group is not
- * unique per configuration and usually carries EPA's own smog identifier rather
- * than the manufacturer's Vehicle ID. But where the two DO coincide, and they
- * do for 10 test vehicles in the current corpus, it is not a similarity score. It is
- * the same identifier, and it outranks any name match.
+ * The Guide keys its rows by year and the smog-rating Test Group — the
+ * certification. Migration 053 dismissed the join because, compared with our
+ * record's Vehicle ID, it matched 1 of 87 linked records: the record was the
+ * test vehicle, not the certification, and the two identifiers are different
+ * things (#374). Compared with the certification's Test Group in its year, it
+ * is the Guide's own key — for 163 of 809 unlinked certifications after a full
+ * corpus import, exactly one row.
+ *
+ * Still not unique per configuration: a certificate covering four wheel sizes
+ * matches four rows, which is why a proposal takes it only when there is one.
+ * A record whose Vehicle ID IS a Test Group (made by hand from a lab PDF) still
+ * matches on that.
  */
 export function exactTestGroupMatches(testVehicle, feRows = []) {
-    const id = String(testVehicle?.test_vehicle_id ?? '').trim().toUpperCase();
-    if (!id) return [];
-    return feRows.filter(r => String(r.smog_test_group ?? '').trim().toUpperCase() === id);
+    const norm = (v) => String(v ?? '').trim().toUpperCase();
+    const tg = norm(testVehicle?.test_group);
+    const id = norm(testVehicle?.test_vehicle_id);
+    const year = Number(testVehicle?.model_year);
+    return feRows.filter(r => {
+        const s = norm(r.smog_test_group);
+        if (!s) return false;
+        if (tg && s === tg) return !year || Number(r.model_year) === year;
+        return !!id && s === id;
+    });
 }
 
 /**
@@ -389,7 +402,8 @@ export function buildSweep(testVehicles, feRows) {
             tierRank[a.tier] - tierRank[b.tier]
             || (a.proposal ? 0 : 1) - (b.proposal ? 0 : 1)
             || (b.proposal?.score ?? 0) - (a.proposal?.score ?? 0)
-            || String(a.testVehicle.test_vehicle_id).localeCompare(String(b.testVehicle.test_vehicle_id)));
+            || String(a.testVehicle.test_vehicle_id).localeCompare(String(b.testVehicle.test_vehicle_id))
+            || Number(a.testVehicle.model_year) - Number(b.testVehicle.model_year));
 }
 
 /** Counts per tier, for the progress the view reports against. */

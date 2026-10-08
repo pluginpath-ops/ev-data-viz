@@ -363,6 +363,17 @@ describe('the primary configuration (#322)', () => {
         expect(f.text).toMatch(/2 linked EPA configurations/);
     });
 
+    it('puts a configuration two or more years from the vehicle in front of a curator (#374)', () => {
+        // The 2022 Mach-E mapped to a MY2024 configuration. A year off is marked
+        // "From MY…" beside the figure; two or more is a mapping to check.
+        const far = group({ _certification: { yearsOff: 2, fromYear: 2024, years: [2024] } });
+        const f = findingsFor(vehicle({ year: '2022' }, [far])).find(x => x.check === 'certification-year');
+        expect(f.kind).toBe('disagrees');
+        expect(f.text).toMatch(/certified for MY2024; the vehicle is 2022/);
+        const near = group({ _certification: { yearsOff: 1, fromYear: 2024, years: [2024] } });
+        expect(checksFor(vehicle({ year: '2023' }, [near]))).not.toContain('certification-year');
+    });
+
     it('does not ask for a choice when there is nothing to choose between', () => {
         expect(checksFor(vehicle({}, [group()]))).not.toContain('no-primary');
     });

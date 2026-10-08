@@ -75,6 +75,16 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The JS twin of migration 082\'s test_group_in — tested against real file names so the backfill and the importer agree. Layer 3 reads it.',
         'epaCertifications.MODEL_YEAR_CODES':
             'Exported so a test can assert migration 082 states the same year table.',
+        'epaCertifications.resolveCertification':
+            'Reached through viewForVehicle (getVehicles, the curator form, suggestions); exported so the rule is tested on its own.',
+        'epaCertifications.newestLinkedCertification':
+            'Reached through viewForTestVehicle (statistics, curves, audit); exported so the choice is tested on its own.',
+        'epaCertifications.certificationsOf':
+            'Reached through every view; exported so the flattening is tested on its own.',
+        'epaCertifications.vehicleModelYears':
+            'Reached through resolveCertification; exported so year parsing is tested on its own.',
+        'epaCertifications.sinceYear':
+            'Reached through viewForTestVehicle; the EPA sub-tab shows it in #374 layer 4.',
         'publishedResultsBatch.TABLE_COLUMNS':
             'The templates are built from it; exported so a test holds them to the same columns.',
         'vehicleFigures.resolveSocWindow':
@@ -1046,7 +1056,7 @@ describe('the seams that broke before', () => {
         const q = svc.slice(svc.indexOf('async getEpaTestVehiclesForAudit'));
         expect(q.slice(0, q.indexOf('\n  }')), 'getEpaTestVehiclesForAudit must select preferred_test_number')
             .toMatch(/preferred_test_number/);
-        const fields = svc.match(/const EPA_TEST_VEHICLE_FIELDS = '([^']*)'/)?.[1] ?? '';
+        const fields = svc.match(/const EPA_TEST_VEHICLE_FIELDS = `([^`]*)`/)?.[1] ?? '';
         expect(fields, 'EPA_TEST_VEHICLE_FIELDS must select preferred_test_number').toMatch(/preferred_test_number/);
         const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
         expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }')), 'getVehicles must read EPA_TEST_VEHICLE_FIELDS')
@@ -1244,7 +1254,7 @@ describe('the seams that broke before', () => {
         // lists can be held together.
         // The list is EPA_TEST_VEHICLE_FIELDS, which getVehicles reads the record through.
         const svc = read('src/services/DataService.js');
-        const fields = svc.match(/const EPA_TEST_VEHICLE_FIELDS = '([^']*)'/)?.[1] ?? '';
+        const fields = svc.match(/const EPA_TEST_VEHICLE_FIELDS = `([^`]*)`/)?.[1] ?? '';
         const columns = fields.slice(0, fields.indexOf('epa_coefficient_sets'));
         const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
         expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }'))).toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
@@ -1779,7 +1789,8 @@ describe('every write of a test vehicle or its Guide link reaches its certificat
 
     it('a Guide link, an unlink and a skip are written to the certification too', () => {
         expect(body('linkFeGuideRow')).toMatch(/this\.syncCertificationGuideLink\(/);
-        expect(body('unlinkFeGuideRow')).toMatch(/this\.clearCertificationGuideLink\(/);
+        // Layer 3 (#374): the link IS the certification's, so unlinking clears it there.
+        expect(body('unlinkFeGuideRow')).toMatch(/from\('epa_certification_test_vehicles'\)\s*\n?\s*\.update\(\{ fe_guide_row_id: null \}\)/);
         expect(body('setFeLinkSkipped')).toMatch(/this\.setCertificationSkips\(/);
     });
 

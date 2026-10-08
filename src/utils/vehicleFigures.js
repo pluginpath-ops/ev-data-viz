@@ -143,7 +143,7 @@ export function resolveSocWindow(vehicle, vehicles = [], { tolerancePct = TESTED
 export function resolveEpaRange(vehicle, vehicles = []) {
     const links = (vehicle?.epa_mappings ?? []).filter(m => m.epaTestVehicle);
     const pick = primaryEpaMapping(links);
-    const none = { mi: null, basis: null, cityMi: null, hwyMi: null, combinedMpge: null, spanMi: null, expectedSource: null };
+    const none = { mi: null, basis: null, cityMi: null, hwyMi: null, combinedMpge: null, spanMi: null, expectedSource: null, fromYear: null, certification: null };
 
     const fromLabel = (testVehicle) => ({
         ...none,
@@ -153,6 +153,10 @@ export function resolveEpaRange(vehicle, vehicles = []) {
         hwyMi:  positive(testVehicle.label_hwy_range_mi),
         // The label's efficiency, for the vehicle table's EPA efficiency (#335).
         combinedMpge: positive(testVehicle.label_combined_mpge),
+        // The certification it came from, and "From MY…" when that is not the
+        // vehicle's own year (#374). Nothing silent: the card says so.
+        fromYear: testVehicle._certification?.fromYear ?? null,
+        certification: testVehicle._certification ?? null,
     });
 
     let spanMi = null;

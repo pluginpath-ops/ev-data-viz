@@ -106,15 +106,18 @@ export default function EpaCuratorEditor({ testVehicleId, canEdit, onDirtyChange
     const [edits, setEdits] = useState({ testVehicle: {}, coeff: {}, tests: {}, phases: {} });
     const resetEdits = () => setEdits({ testVehicle: {}, coeff: {}, tests: {}, phases: {} });
 
+    const vehicleYear = vehicle?.year ?? null;
     const reload = useCallback(async () => {
         try {
-            setDbTestVehicle(await getEpaTestVehicleFull(testVehicleId));
+            // As the vehicle it was opened from reads it: that year's
+            // certification and Guide figures, the card's own (#374).
+            setDbTestVehicle(await getEpaTestVehicleFull(testVehicleId, { vehicleYear }));
         } catch (e) {
             setError(e.message);
         } finally {
             setLoading(false);
         }
-    }, [getEpaTestVehicleFull, testVehicleId]);
+    }, [getEpaTestVehicleFull, testVehicleId, vehicleYear]);
 
     useEffect(() => { reload(); }, [reload]);
 

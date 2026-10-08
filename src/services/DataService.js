@@ -6,10 +6,10 @@ import { passDown } from '../utils/vehicleDeletion';
 import { roundTo, } from '../utils/unitConversions';
 import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
-import { promotionUpdates, demotionUpdates, acceptGuideUpdates, isCuratorOwned } from '../utils/feGuidePromotion';
+import { demotionUpdates, acceptGuideTags, guideOverlay, isCuratorOwned } from '../utils/feGuidePromotion';
 import { selectTestForGuide } from '../utils/epaTestSelection';
 import { planTestVehicleImport, uniqueCoveredModels } from '../utils/epaImportMerge';
-import { planCertificationImport, guideLinkTarget, testGroupYear, isTestGroup } from '../utils/epaCertifications';
+import { planCertificationImport, guideLinkTarget, testGroupYear, isTestGroup, viewForVehicle, viewForTestVehicle, certifiedYears } from '../utils/epaCertifications';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, isCompositeRun, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
 import { planCompositeRebuild, compositeEligible, mayHaveComposite } from '../utils/compositeCurve';
@@ -239,12 +239,27 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
 }
 
 /**
+ * The Guide row's fields a view of a test vehicle reads (#374): the overlay's,
+ * the adjustment signature the derivations need, and what statistics and
+ * curves group by. One list, so every reader of a certification's Guide row
+ * reads the same row.
+ */
+const GUIDE_VIEW_FIELDS = 'id, model_year, smog_test_group, division, carline, carline_class, drive_desc, label_comb_range_mi, label_city_range_mi, label_hwy_range_mi, label_comb_mpge, label_city_mpge, label_hwy_mpge, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, calc_approach, total_voltage_v, batt_specific_energy_wh_kg, nominal_pack_kwh, adjustment_signature';
+
+/**
+ * A test vehicle's certifications (migration 082), each with its Guide row —
+ * what epaCertifications.viewForVehicle / viewForTestVehicle read. Named
+ * `certifications` on the row.
+ */
+const CERTIFICATIONS_EMBED = `certifications:epa_certification_test_vehicles(id, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note, carryover_test_group, carryover_model_year, certification:epa_certifications(id, test_group, model_year, basis, certificate_issue_date, certificate_revision_date), guide:epa_fe_guide(${GUIDE_VIEW_FIELDS}))`;
+
+/**
  * Everything the EPA views read from a certification record: the curve, its
  * η, the methodology card. One list, shared by getVehicles and
  * getModeledEfficiencyPreview, so an explainer's preview can never be built
  * from less of the record than the chart it links to.
  */
-const EPA_TEST_VEHICLE_FIELDS = 'test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi)), epa_fe_guide!epa_test_vehicles_fe_guide_row_id_fkey(adjustment_signature)';
+const EPA_TEST_VEHICLE_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi)), ${CERTIFICATIONS_EMBED}`;
 
 class DataService {
   constructor() {
@@ -351,7 +366,9 @@ class DataService {
           // Undefined before migration 067, which reads as not primary;
           // primaryEpaMapping still treats a sole link as the vehicle's.
           isPrimary: m.is_primary === true,
-          epaTestVehicle:  m.epa_test_vehicles,
+          // The test vehicle as THIS vehicle reads it: the certification of
+          // the vehicle's year, with that year's Guide figures (#374).
+          epaTestVehicle:  viewForVehicle(v.year, m.epa_test_vehicles),
         })),
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
         runs:  (v.runs || []).map(shapeRun),
@@ -1551,7 +1568,7 @@ class DataService {
     if (!ids.length) return [];
     const { data, error } = await getSupabase()
       .from('epa_vehicle_mappings')
-      .select(`id, vehicle_id, vehicles(id, name, runs(id, name, kind, synthetic, is_hidden, is_excluded, speed_mph, distance_miles, energy_kwh, temperature_f, altitude_ft, avg_wind_speed_mph, wind_direction_deg, elevation_gain_ft, source)), epa_test_vehicles(${EPA_TEST_VEHICLE_FIELDS})`)
+      .select(`id, vehicle_id, vehicles(id, name, year, runs(id, name, kind, synthetic, is_hidden, is_excluded, speed_mph, distance_miles, energy_kwh, temperature_f, altitude_ft, avg_wind_speed_mph, wind_direction_deg, elevation_gain_ft, source)), epa_test_vehicles(${EPA_TEST_VEHICLE_FIELDS})`)
       .in('id', ids);
     if (error) throw error;
     const byId = new Map((data || []).map(m => [m.id, m]));
@@ -1559,7 +1576,7 @@ class DataService {
       mappingId: m.id,
       vehicleId: m.vehicle_id,
       vehicleName: m.vehicles?.name ?? null,
-      epaTestVehicle: m.epa_test_vehicles,
+      epaTestVehicle: viewForVehicle(m.vehicles?.year, m.epa_test_vehicles),
       runs: m.vehicles?.runs ?? [],
     }));
   }
@@ -2067,15 +2084,14 @@ class DataService {
     if (!this.useSupabase) return [];
     let q = getSupabase()
       .from('epa_test_vehicles')
-      .select('test_vehicle_id, test_group, model_year, make, epa_carline_name, transmission, drive, fuel_type')
+      .select('test_vehicle_id, test_group, model_year, make, epa_carline_name, transmission, drive, fuel_type, certifications:epa_certification_test_vehicles(certification:epa_certifications(model_year))')
       .order('make')
       .order('epa_carline_name')
-      .limit(50);
-    if (year) q = q.eq('model_year', year);
+      .limit(year ? 300 : 50);
     if (query?.trim()) {
       const escaped = query.trim().replace(/[%_]/g, '\\$&');
       // Also search test_vehicle_id and test_group so users can look up
-      // by vehicle config code (e.g. "R1S247") or EPA family ID
+      // by Vehicle ID (e.g. "R1S247") or EPA Test Group
       q = q.or(
         `make.ilike.%${escaped}%,epa_carline_name.ilike.%${escaped}%,` +
         `test_vehicle_id.ilike.%${escaped}%,test_group.ilike.%${escaped}%`
@@ -2083,7 +2099,11 @@ class DataService {
     }
     const { data, error } = await q;
     if (error) throw error;
-    return data || [];
+    // A year is any year the test vehicle is certified for (#374), not the
+    // one its record last stored.
+    const rows = (data || []).filter(t => !year || certifiedYears(t).includes(Number(year))
+      || (!t.certifications?.length && Number(t.model_year) === Number(year)));
+    return rows.slice(0, 50).map(({ certifications, ...t }) => ({ ...t, certifiedYears: certifiedYears({ certifications }) }));
   }
 
   /**
@@ -2101,12 +2121,17 @@ class DataService {
       .join(',');
     const { data, error } = await getSupabase()
       .from('epa_test_vehicles')
-      .select('test_vehicle_id, model_year, make, epa_carline_name, drive, display_name, label_range_published, preferred_test_number, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh)')
-      .in('model_year', years)
+      .select(`test_vehicle_id, model_year, make, epa_carline_name, drive, display_name, label_range_published, overrides, preferred_test_number, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh), ${CERTIFICATIONS_EMBED}`)
       .or(makeFilter)
-      .limit(200);
+      .limit(1000);
     if (error) throw error;
-    return data || [];
+    // Certified in one of the vehicle's years (#374), read as a vehicle of
+    // those years reads it — its label is that year's.
+    const span = `${Math.min(...years)}-${Math.max(...years)}`;
+    return (data || [])
+      .filter(t => certifiedYears(t).some(y => years.includes(y))
+        || (!t.certifications?.length && years.includes(Number(t.model_year))))
+      .map(t => viewForVehicle(span, t));
   }
 
   /**
@@ -2724,8 +2749,8 @@ class DataService {
    * land together — a partial promotion would leave fields the curator cannot
    * attribute and unlink cannot undo.
    */
-  async linkFeGuideRow(testVehicleId, feRowId) {
-    if (!this.useSupabase) return { promoted: [], skipped: [] };
+  async linkFeGuideRow(testVehicleId, feRowId, { linkRowId = null } = {}) {
+    if (!this.useSupabase) return { applied: [], held: [], selection: null };
     const supabase = getSupabase();
 
     const [{ data: testVehicle, error: gErr }, { data: feRow, error: fErr }] = await Promise.all([
@@ -2738,34 +2763,50 @@ class DataService {
     if (gErr) throw gErr;
     if (fErr) throw fErr;
 
-    const { updates, promoted, skipped } = promotionUpdates(testVehicle, feRow);
+    // 1. The link, on the certification it belongs to (#374). Nothing is
+    //    copied onto the test vehicle any more: its readers get the Guide's
+    //    figures laid over its own (feGuidePromotion.guideOverlay).
+    if (linkRowId != null) {
+      // One Guide row per test vehicle per year: linking it here moves it.
+      const { error: e1 } = await supabase.from('epa_certification_test_vehicles')
+        .update({ fe_guide_row_id: null })
+        .eq('test_vehicle_id', testVehicleId).eq('fe_guide_row_id', feRowId).neq('id', linkRowId);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from('epa_certification_test_vehicles')
+        .update({ fe_guide_row_id: feRowId })
+        .eq('id', linkRowId).eq('test_vehicle_id', testVehicleId);
+      if (e2) throw e2;
+    } else {
+      await this.syncCertificationGuideLink(testVehicleId, feRow, testVehicle?.test_group ?? null);
+    }
 
-    // Which test the figures should come from, now that there is something to
+    // 2. Which test the figures should come from, now that there is something to
     // decide it with. EPA published one pair of unadjusted figures and we hold
     // the tests, so the published highway figure identifies the run — see
     // utils/epaTestSelection.js for why highway, and why the score is a ratio
-    // measured against two targets rather than a plain difference.
+    // measured against two targets rather than a plain difference. The tests
+    // are the test vehicle's, so the choice is too.
     //
     // Declines rather than guesses: one test is not a choice, and two runs too
     // alike to separate leave the most-recent default standing. A declined
     // selection writes null, so re-linking never leaves a stale winner behind.
+    // A choice the curator made by hand is theirs, not the link's.
     const selection = selectTestForGuide(testVehicle?.epa_tests ?? [], {
       unadjHwyMpge:     feRow?.unadj_hwy_mpge,
       labelCityRangeMi: feRow?.label_city_range_mi,
       labelHwyRangeMi:  feRow?.label_hwy_range_mi,
     });
-    updates.preferred_test_number = selection.testNumber;
-    // No early return on an empty `promoted`. `updates` always carries
-    // fe_guide_row_id, and skipping the write when the guide happened to add no
-    // new values left the test vehicle unlinked while reporting success.
-    const { error } = await supabase
-      .from('epa_test_vehicles').update(updates).eq('test_vehicle_id', testVehicleId);
-    if (error) throw error;
-    // The same link, on the certification it belongs to (#374).
-    if (updates.fe_guide_row_id != null) {
-      await this.syncCertificationGuideLink(testVehicleId, feRow, testVehicle?.test_group ?? null);
+    if (!isCuratorOwned(testVehicle?.overrides, 'preferred_test_number')) {
+      const { error } = await supabase.from('epa_test_vehicles')
+        .update({ preferred_test_number: selection.testNumber })
+        .eq('test_vehicle_id', testVehicleId);
+      if (error) throw error;
     }
-    return { promoted, skipped, selection };
+
+    // What the curator is told: which fields now read the Guide, and which a
+    // hand-set value keeps.
+    const { applied, held } = guideOverlay(testVehicle, feRow);
+    return { applied, held, selection };
   }
 
   /**
@@ -2783,60 +2824,61 @@ class DataService {
    */
   async getTestVehiclesAwaitingFeLink({ includeSkipped = false } = {}) {
     if (!this.useSupabase) return [];
-    let q = getSupabase()
-      .from('epa_test_vehicles')
-      .select(`
-        test_vehicle_id, model_year, make, epa_carline_name, display_name,
-        vehicle_config_number, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note, useable_kwh,
-        carryover_model_year, cd_range_combined_calc, derived_5cycle_coefficient,
-        epa_coefficient_sets(target_a, equiv_test_weight_lbs),
-        epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh, mfr_test_vehicle_comments),
-        epa_covered_models(carline_number, carline_name, certification_region, drive_system),
-        epa_vehicle_mappings(vehicles(id, name, year))
-      `)
-      .is('fe_guide_row_id', null)
-      .order('test_vehicle_id');
-    if (!includeSkipped) q = q.is('fe_guide_skipped_at', null);
-
-    const { data, error } = await q;
-    if (error) {
-      // The skip columns arrive in migration 058. Without them the sweep still
-      // works; it simply cannot remember a decision yet, which is better than
-      // an admin panel that will not render.
-      if (isMissingColumn(error)) {
-        const { data: fallback, error: e2 } = await getSupabase()
-          .from('epa_test_vehicles')
-          .select(`
-            test_vehicle_id, model_year, make, epa_carline_name, display_name,
-            vehicle_config_number, fe_guide_row_id, useable_kwh,
-            carryover_model_year, cd_range_combined_calc, derived_5cycle_coefficient,
+    // One item per test vehicle PER CERTIFICATION (#374): the Guide is
+    // published by year, so a test vehicle certified in three years has three
+    // links to make. Each item is shaped as the test vehicle in that year — its
+    // year and Test Group are the certification's, its covered models the
+    // certificate's — so the matching reads it as it read a record before.
+    const rows = await fetchAllRows(() => {
+      let q = getSupabase()
+        .from('epa_certification_test_vehicles')
+        .select(`
+          id, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note,
+          carryover_test_group, carryover_model_year,
+          certification:epa_certifications(id, test_group, model_year, basis,
+            epa_covered_models(carline_number, carline_name, certification_region, drive_system)),
+          test_vehicle:epa_test_vehicles(
+            test_vehicle_id, make, epa_carline_name, display_name,
+            vehicle_config_number, useable_kwh, cd_range_combined_calc, derived_5cycle_coefficient,
             epa_coefficient_sets(target_a, equiv_test_weight_lbs),
-            epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh),
-            epa_vehicle_mappings(vehicles(id, name, year))
-          `)
-          .is('fe_guide_row_id', null)
-          .order('test_vehicle_id');
-        if (e2) throw e2;
-        return fallback || [];
-      }
-      throw error;
-    }
-    return data || [];
+            epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh, mfr_test_vehicle_comments),
+            epa_vehicle_mappings(vehicles(id, name, year)))
+        `)
+        .is('fe_guide_row_id', null)
+        .order('id', { ascending: true });
+      if (!includeSkipped) q = q.is('fe_guide_skipped_at', null);
+      return q;
+    });
+    return rows
+      .filter(r => r.test_vehicle && r.certification)
+      .map(r => ({
+        ...r.test_vehicle,
+        model_year:           r.certification.model_year,
+        test_group:           r.certification.test_group,
+        carryover_test_group: r.carryover_test_group,
+        carryover_model_year: r.carryover_model_year,
+        fe_guide_row_id:      null,
+        fe_guide_skipped_at:  r.fe_guide_skipped_at,
+        fe_guide_skip_note:   r.fe_guide_skip_note,
+        epa_covered_models:   r.certification.epa_covered_models ?? [],
+        _linkRowId:           r.id,
+        _certificationBasis:  r.certification.basis,
+      }))
+      .sort((a, b) => String(a.test_vehicle_id).localeCompare(String(b.test_vehicle_id)) || a.model_year - b.model_year);
   }
 
   /** How far the sweep has got: linked, skipped, still awaiting a decision. */
   async getFeLinkProgress() {
     if (!this.useSupabase) return null;
-    const { data, error } = await getSupabase()
-      .from('epa_test_vehicles')
-      .select('test_vehicle_id, fe_guide_row_id, fe_guide_skipped_at');
-    if (error) {
-      if (isMissingColumn(error)) return null;
-      throw error;
-    }
-    const rows = data || [];
+    // Counted in certifications — a test vehicle per certification — since a
+    // Guide link is made per year (#374).
+    const rows = await fetchAllRows(() => getSupabase()
+      .from('epa_certification_test_vehicles')
+      .select('id, test_vehicle_id, fe_guide_row_id, fe_guide_skipped_at')
+      .order('id', { ascending: true }));
     return {
-      total:    rows.length,
+      total:        rows.length,
+      testVehicles: new Set(rows.map(r => r.test_vehicle_id)).size,
       linked:   rows.filter(r => r.fe_guide_row_id != null).length,
       skipped:  rows.filter(r => r.fe_guide_row_id == null && r.fe_guide_skipped_at != null).length,
       awaiting: rows.filter(r => r.fe_guide_row_id == null && r.fe_guide_skipped_at == null).length,
@@ -2849,16 +2891,18 @@ class DataService {
    * Deliberately not a link and not a deletion: the test vehicle stays unlinked and
    * stays findable, because a curator having looked is worth knowing.
    */
-  async setFeLinkSkipped(testVehicleId, skipped, note = null) {
+  async setFeLinkSkipped(testVehicleId, skipped, note = null, { linkRowId = null } = {}) {
     if (!this.useSupabase) return;
+    // One certification when the sweep names it; otherwise every unlinked
+    // year of the test vehicle, as a skip of the whole record meant.
+    if (linkRowId == null) return this.setCertificationSkips(testVehicleId, skipped, note);
     const { error } = await getSupabase()
-      .from('epa_test_vehicles')
+      .from('epa_certification_test_vehicles')
       .update(skipped
         ? { fe_guide_skipped_at: new Date().toISOString(), fe_guide_skip_note: note }
         : { fe_guide_skipped_at: null, fe_guide_skip_note: null })
-      .eq('test_vehicle_id', testVehicleId);
+      .eq('id', linkRowId).eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
-    await this.setCertificationSkips(testVehicleId, skipped, note);
   }
 
   /**
@@ -2948,15 +2992,15 @@ class DataService {
    * with everything that did work.
    */
   async linkFeGuideRows(pairs) {
-    const result = { linked: 0, promoted: 0, skipped: 0, failures: [] };
+    const result = { linked: 0, applied: 0, held: 0, failures: [] };
     if (!this.useSupabase || !pairs?.length) return result;
 
-    for (const { testVehicleId, feRowId } of pairs) {
+    for (const { testVehicleId, feRowId, linkRowId = null } of pairs) {
       try {
-        const res = await this.linkFeGuideRow(testVehicleId, feRowId);
-        result.linked   += 1;
-        result.promoted += res.promoted.length;
-        result.skipped  += res.skipped.length;
+        const res = await this.linkFeGuideRow(testVehicleId, feRowId, { linkRowId });
+        result.linked += 1;
+        result.applied += res.applied.length;
+        result.held    += res.held.length;
       } catch (error) {
         result.failures.push({ testVehicleId, message: error.message });
       }
@@ -3004,7 +3048,7 @@ class DataService {
         source_file, fe_guide_row_id,
         useable_kwh, nominal_pack_kwh, total_voltage,
         cd_range_combined_calc, cd_range_hwy_calc,
-        label_range_published, label_adjustment_factor, label_calc_approach,
+        label_range_published, label_adjustment_factor, label_calc_approach, overrides,
         preferred_test_number,
         unadj_city_mpge, unadj_hwy_mpge,
         accessory_load_w_override, charger_efficiency_override,
@@ -3015,9 +3059,11 @@ class DataService {
                   cd_range_combined_calc, cd_range_hwy_calc,
                   epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
         epa_vehicle_mappings(id, confidence, vehicles(id, name, year)),
-        epa_fe_guide!epa_test_vehicles_fe_guide_row_id_fkey(adjustment_signature)
+        ${CERTIFICATIONS_EMBED}
       `)
-      .order('test_vehicle_id', { ascending: true }));
+      .order('test_vehicle_id', { ascending: true }))
+      // Checked against its newest linked year's Guide row (#374, D3).
+      .then(rows => rows.map(viewForTestVehicle));
   }
 
   /**
@@ -3037,7 +3083,9 @@ class DataService {
    */
   async getTestVehiclesForCertStats() {
     if (!this.useSupabase) return [];
-    const { data, error } = await getSupabase()
+    // Paged: 794 test vehicles is under PostgREST's 1000-row cap, and that is
+    // not a thing to be under by luck.
+    const data = await fetchAllRows(() => getSupabase()
       .from('epa_test_vehicles')
       .select(`
         test_vehicle_id, model_year, make, epa_carline_name, display_name,
@@ -3047,14 +3095,11 @@ class DataService {
                              set_a, set_b, set_c, equiv_test_weight_lbs),
         epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh,
                   epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
-        epa_fe_guide!epa_test_vehicles_fe_guide_row_id_fkey(
-          division, carline, carline_class, drive_desc, nominal_pack_kwh,
-          label_comb_range_mi, label_comb_mpge, model_year, adjustment_signature
-        )
+        overrides, ${CERTIFICATIONS_EMBED}
       `)
-      .order('test_vehicle_id');
-    if (error) throw error;
-    return data || [];
+      .order('test_vehicle_id', { ascending: true }));
+    // Grouped by its newest linked year's Guide row; its year is Since (#374).
+    return (data || []).map(viewForTestVehicle);
   }
 
   /**
@@ -3068,7 +3113,9 @@ class DataService {
    */
   async getTestVehiclesForCurves() {
     if (!this.useSupabase) return [];
-    const { data, error } = await getSupabase()
+    // Paged: 794 test vehicles is under PostgREST's 1000-row cap, and that is
+    // not a thing to be under by luck.
+    const data = await fetchAllRows(() => getSupabase()
       .from('epa_test_vehicles')
       .select(`
         test_vehicle_id, model_year, make, epa_carline_name, display_name,
@@ -3077,13 +3124,10 @@ class DataService {
                              set_a, set_b, set_c, equiv_test_weight_lbs),
         epa_tests(procedure_code, total_dc_energy_kwh,
                   epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
-        epa_fe_guide!epa_test_vehicles_fe_guide_row_id_fkey(
-          carline, division, carline_class, drive_desc, nominal_pack_kwh
-        )
+        overrides, ${CERTIFICATIONS_EMBED}
       `)
-      .order('test_vehicle_id');
-    if (error) throw error;
-    return data || [];
+      .order('test_vehicle_id', { ascending: true }));
+    return (data || []).map(viewForTestVehicle);
   }
 
   /** One staged guide row by id — the linked row, for showing what it holds. */
@@ -3104,24 +3148,22 @@ class DataService {
   async acceptFeGuideValues(testVehicleId, columns) {
     if (!this.useSupabase || !columns?.length) return { accepted: [] };
     const supabase = getSupabase();
-
     const { data: testVehicle, error: gErr } = await supabase
-      .from('epa_test_vehicles').select('*').eq('test_vehicle_id', testVehicleId).single();
+      .from('epa_test_vehicles').select('test_vehicle_id, overrides').eq('test_vehicle_id', testVehicleId).single();
     if (gErr) throw gErr;
-    const feRow = await this.getFeGuideRow(testVehicle.fe_guide_row_id);
-    if (!feRow) return { accepted: [] };
 
-    const { updates, accepted } = acceptGuideUpdates(testVehicle, feRow, columns);
+    // Accepting is letting go: the field is no longer held, so the Guide's
+    // value is read for it again. Nothing is copied.
+    const { overrides, accepted } = acceptGuideTags(testVehicle, columns);
     if (!accepted.length) return { accepted };
-
     const { error } = await supabase
-      .from('epa_test_vehicles').update(updates).eq('test_vehicle_id', testVehicleId);
+      .from('epa_test_vehicles').update({ overrides }).eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
     return { accepted };
   }
 
   /** Unlink, restoring every value the promotion displaced. */
-  async unlinkFeGuideRow(testVehicleId) {
+  async unlinkFeGuideRow(testVehicleId, { linkRowId = null } = {}) {
     if (!this.useSupabase) return { restored: [] };
     const supabase = getSupabase();
 
@@ -3129,26 +3171,34 @@ class DataService {
       .from('epa_test_vehicles').select('*').eq('test_vehicle_id', testVehicleId).single();
     if (gErr) throw gErr;
 
-    const { updates, restored } = demotionUpdates(testVehicle);
+    // The certification's link — one, when named; every one otherwise.
+    let q = supabase.from('epa_certification_test_vehicles')
+      .update({ fe_guide_row_id: null }).eq('test_vehicle_id', testVehicleId);
+    if (linkRowId != null) q = q.eq('id', linkRowId);
+    const { error: uErr } = await q;
+    if (uErr) throw uErr;
 
-    // The selection was evidence from the guide row, so it goes when the row
-    // does. Leaving it would keep steering every derived figure from a source
-    // the record no longer has — and unlink is exactly what a curator does when
-    // they decide the link was wrong.
+    const { data: remaining, error: rErr } = await supabase.from('epa_certification_test_vehicles')
+      .select('id').eq('test_vehicle_id', testVehicleId).not('fe_guide_row_id', 'is', null);
+    if (rErr) throw rErr;
+    if (remaining?.length) return { restored: [] };
+
+    // The last link gone: forget what the old promotion copied (migration 083
+    // does this for every record; this covers a record unlinked before 083 is
+    // applied), and the test selection that was evidence from the Guide.
     //
     // A curator-set choice is NOT collateral here. Uses the same predicate
-    // promotion does rather than a second spelling of it: hand-set fields carry
-    // source 'manual', and an earlier version of this guard looked for
+    // the overlay does rather than a second spelling of it: hand-set fields
+    // carry source 'manual', and an earlier version of this guard looked for
     // 'curator', which nothing writes — so it never fired and would have wiped
     // exactly the choice it was meant to protect.
+    const { updates, restored } = demotionUpdates(testVehicle);
     if (!isCuratorOwned(testVehicle?.overrides, 'preferred_test_number')) {
         updates.preferred_test_number = null;
     }
-
     const { error } = await supabase
       .from('epa_test_vehicles').update(updates).eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
-    await this.clearCertificationGuideLink(testVehicleId, testVehicle?.fe_guide_row_id);
     return { restored };
   }
 
@@ -3223,20 +3273,20 @@ class DataService {
    */
   async getFeGuideVehicleLinks() {
     if (!this.useSupabase) return {};
-    const { data, error } = await getSupabase()
-      .from('epa_test_vehicles')
-      .select('test_vehicle_id, fe_guide_row_id, epa_vehicle_mappings(vehicles(id, name, year))')
-      .not('fe_guide_row_id', 'is', null);
-    if (error) throw error;
+    // Through the certifications (#374): a Guide row is linked to a test
+    // vehicle in one year, and the test vehicle reaches the vehicles.
+    const rows = await fetchAllRows(() => getSupabase()
+      .from('epa_certification_test_vehicles')
+      .select('id, test_vehicle_id, fe_guide_row_id, test_vehicle:epa_test_vehicles(epa_vehicle_mappings(vehicles(id, name, year)))')
+      .not('fe_guide_row_id', 'is', null)
+      .order('id', { ascending: true }));
 
     const byRow = {};
-    for (const g of data || []) {
-      const vehicles = (g.epa_vehicle_mappings || [])
-        .map(m => m.vehicles)
-        .filter(Boolean);
-      if (!byRow[g.fe_guide_row_id]) byRow[g.fe_guide_row_id] = { testVehicleIds: [], vehicles: [] };
-      byRow[g.fe_guide_row_id].testVehicleIds.push(g.test_vehicle_id);
-      byRow[g.fe_guide_row_id].vehicles.push(...vehicles);
+    for (const r of rows) {
+      const entry = (byRow[r.fe_guide_row_id] ??= { testVehicleIds: [], vehicles: [] });
+      if (entry.testVehicleIds.includes(r.test_vehicle_id)) continue;
+      entry.testVehicleIds.push(r.test_vehicle_id);
+      entry.vehicles.push(...(r.test_vehicle?.epa_vehicle_mappings || []).map(m => m.vehicles).filter(Boolean));
     }
     return byRow;
   }
@@ -3252,19 +3302,24 @@ class DataService {
    * @returns {Object|null} test vehicle row with nested epa_coefficient_sets and
    *   epa_tests(epa_test_phases), or null if not found.
    */
-  async getEpaTestVehicleFull(testVehicleId) {
+  async getEpaTestVehicleFull(testVehicleId, { vehicleYear = null } = {}) {
     if (!this.useSupabase) return null;
     const { data, error } = await getSupabase()
       .from('epa_test_vehicles')
       .select(`
         *,
         epa_coefficient_sets(*),
-        epa_tests(*, epa_test_phases(*))
+        epa_tests(*, epa_test_phases(*)),
+        ${CERTIFICATIONS_EMBED}
       `)
       .eq('test_vehicle_id', testVehicleId)
       .single();
     if (error) throw error;
-    return data || null;
+    if (!data) return null;
+    // Opened from a vehicle, it is that vehicle's year's certification and
+    // Guide figures — the same the vehicle's card shows. Opened on its own
+    // (the Guide browser), the newest linked year (#374).
+    return vehicleYear != null ? viewForVehicle(vehicleYear, data) : viewForTestVehicle(data);
   }
 
   /**

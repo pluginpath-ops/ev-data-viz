@@ -13,6 +13,7 @@ import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { packKwh, vehicleDetailLabel, vehicleSearchText } from '../utils/specHelpers';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
+import { fromYearNote } from '../utils/epaCertifications';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
@@ -1350,8 +1351,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             </span>
                         )}
                         {vehicle.epaRangeMi && (
-                            <span title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note}>
+                            <span title={fromYearNote(vehicle.epaRange?.certification)?.long ?? EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note}>
                                 {EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.label} range: {vehicle.epaRangeMi} mi
+                                {fromYearNote(vehicle.epaRange?.certification) && ` (${fromYearNote(vehicle.epaRange.certification).short})`}
                             </span>
                         )}
                     </div>

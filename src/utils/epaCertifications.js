@@ -19,6 +19,8 @@
  * Pure module: no data access.
  */
 
+import { guideOverlay } from './feGuidePromotion';
+
 // ── Test Groups and their years ─────────────────────────────────────────────
 
 /**
@@ -210,4 +212,249 @@ export function guideLinkTarget(links = [], guideRow, statedTestGroup = null) {
 
     if (!tg || !isTestGroup(tg)) return null;
     return { create: { test_group: tg, model_year: testGroupYear(tg) ?? year } };
+}
+
+// ── Reading: a test vehicle's certifications, and the one a vehicle reads ────
+
+/**
+ * An EVBench vehicle's model years, from its `year` text: "2025", or a range
+ * "2022-2024" (all 109 vehicles parse today). Empty when it says nothing usable.
+ */
+export function vehicleModelYears(yearText) {
+    const m = String(yearText ?? '').trim().match(/^(\d{4})(?:\s*[-–]\s*(\d{4}))?$/);
+    if (!m) return [];
+    const a = Number(m[1]), b = m[2] ? Number(m[2]) : a;
+    if (b < a || b - a > 20) return [a];
+    return Array.from({ length: b - a + 1 }, (_, i) => a + i);
+}
+
+/**
+ * A test vehicle's certifications, flattened from the embed DataService reads
+ * (`certifications: epa_certification_test_vehicles(…, certification, guide)`),
+ * oldest first. Each is one certification as THIS test vehicle is in it: the
+ * link row's id, its Guide link and skip, and its carryover origin.
+ */
+export function certificationsOf(testVehicle) {
+    return (testVehicle?.certifications ?? [])
+        .filter(l => l?.certification)
+        .map(l => ({
+            linkId:               l.id,
+            id:                   l.certification.id ?? null,
+            test_group:           l.certification.test_group,
+            model_year:           Number(l.certification.model_year),
+            basis:                l.certification.basis ?? null,
+            certificate_issue_date:    l.certification.certificate_issue_date ?? null,
+            certificate_revision_date: l.certification.certificate_revision_date ?? null,
+            carryover_test_group: l.carryover_test_group ?? null,
+            carryover_model_year: l.carryover_model_year ?? null,
+            fe_guide_row_id:      l.fe_guide_row_id ?? null,
+            fe_guide_skipped_at:  l.fe_guide_skipped_at ?? null,
+            fe_guide_skip_note:   l.fe_guide_skip_note ?? null,
+            guide:                l.guide ?? null,
+        }))
+        .sort((a, b) => a.model_year - b.model_year || String(a.test_group).localeCompare(String(b.test_group)));
+}
+
+/** The distinct years a test vehicle is certified for, ascending. */
+export function certifiedYears(testVehicle) {
+    return [...new Set(certificationsOf(testVehicle).map(c => c.model_year))].sort((a, b) => a - b);
+}
+
+/**
+ * "Since MY2023": the first year the test vehicle appears in a certification
+ * we hold — the year it is anchored on (owner, #374). The corpus starts at
+ * MY2021, so it is the first year in the data, not necessarily the first year
+ * EPA certified it. Falls back to the record's stored year when no
+ * certification is held (none, after migration 082's backfill).
+ */
+export function sinceYear(testVehicle) {
+    const years = certifiedYears(testVehicle);
+    if (years.length) return years[0];
+    const y = Number(testVehicle?.model_year);
+    return Number.isFinite(y) && y > 0 ? y : null;
+}
+
+/**
+ * The years line: "MY2023 to MY2025", and a gap written out rather than
+ * hidden inside a range — "MY2022, MY2024 to MY2025" (4 Vehicle IDs skip a
+ * year in the corpus).
+ */
+export function formatYears(years = []) {
+    const ys = [...new Set(years.map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
+    if (!ys.length) return '';
+    const runs = [];
+    for (const y of ys) {
+        const last = runs[runs.length - 1];
+        if (last && y === last[1] + 1) last[1] = y; else runs.push([y, y]);
+    }
+    return runs.map(([a, b]) => (a === b ? `MY${a}` : `MY${a} to MY${b}`)).join(', ');
+}
+
+const yearDistance = (year, years) => Math.min(...years.map(y => Math.abs(y - year)));
+
+/** Nearest to the vehicle's years; a tie goes to the newer certification. */
+function nearest(certs, years) {
+    return [...certs].sort((a, b) => yearDistance(a.model_year, years) - yearDistance(b.model_year, years)
+        || b.model_year - a.model_year)[0] ?? null;
+}
+
+/** Within one year: a linked certification first, then the latest issued. */
+const withinYear = (a, b) => (b.fe_guide_row_id != null) - (a.fe_guide_row_id != null)
+    || String(b.certificate_issue_date ?? '').localeCompare(String(a.certificate_issue_date ?? ''))
+    || (b.id ?? 0) - (a.id ?? 0);
+
+/**
+ * The test vehicle's newest certification carrying a Guide link — the one
+ * lab-side readers (statistics, curves, the audit, the Guide browser's links)
+ * take their Guide row from (owner, D3). Null when none is linked.
+ */
+export function newestLinkedCertification(testVehicle) {
+    return certificationsOf(testVehicle)
+        .filter(c => c.fe_guide_row_id != null && c.guide)
+        .sort((a, b) => b.model_year - a.model_year || withinYear(a, b))[0] ?? null;
+}
+
+/**
+ * Which certification a vehicle reads, chosen automatically — never a picker,
+ * never silent (owner, #374):
+ *
+ *   exact          a certification in one of the vehicle's years; several, the
+ *                  newest. `partly` when the vehicle's years run past what is
+ *                  certified ("2025-2026" with only MY2025 held).
+ *   carryover      none in its years, but a certification carries over lab
+ *                  work from one of them
+ *   other-year     else the nearest year; a tie goes to the newer
+ *   none           the test vehicle holds no certification
+ *
+ * `ambiguous` when one test vehicle holds two certifications in the chosen
+ * year (2 test vehicles in the corpus, none mapped); the linked one, then the
+ * latest issued, is taken.
+ *
+ * Then the Guide figures: the chosen certification's own link, else the
+ * nearest LINKED certification of the same test vehicle. `fromYear` is the
+ * year the figures come from whenever that is not one of the vehicle's years —
+ * what "From MY2024" says on screen. `yearsOff` is how far that is; 2 or more
+ * is a Data Checks finding.
+ *
+ * @param {string} vehicleYearText  vehicles.year
+ * @param {Object} testVehicle      with the `certifications` embed
+ */
+export function resolveCertification(vehicleYearText, testVehicle) {
+    const certs = certificationsOf(testVehicle);
+    const years = vehicleModelYears(vehicleYearText);
+    const none = { certification: null, guideCertification: null, match: 'none', partly: false, ambiguous: false, fromYear: null, yearsOff: 0, vehicleYears: years };
+    if (!certs.length) return none;
+
+    let certification, match, partly = false;
+    const inYears = years.length ? certs.filter(c => years.includes(c.model_year)) : [];
+    if (inYears.length) {
+        const top = Math.max(...inYears.map(c => c.model_year));
+        certification = inYears.filter(c => c.model_year === top).sort(withinYear)[0];
+        match = 'exact';
+        const held = new Set(inYears.map(c => c.model_year));
+        partly = years.some(y => !held.has(y));
+    } else if (years.length && certs.some(c => years.includes(Number(c.carryover_model_year)))) {
+        const carrying = certs.filter(c => years.includes(Number(c.carryover_model_year)));
+        certification = nearest(carrying, years);
+        match = 'carryover';
+    } else {
+        certification = years.length ? nearest(certs, years) : certs[certs.length - 1];
+        match = years.length ? 'other-year' : 'none';
+    }
+    const ambiguous = certs.filter(c => c.model_year === certification.model_year).length > 1;
+
+    const linked = certs.filter(c => c.fe_guide_row_id != null && c.guide);
+    const guideCertification = certification.fe_guide_row_id != null && certification.guide
+        ? certification
+        : (linked.length ? (years.length ? nearest(linked, years) : linked[linked.length - 1]) : null);
+
+    const figuresYear = (guideCertification ?? certification).model_year;
+    const off = years.length ? yearDistance(figuresYear, years) : 0;
+    return {
+        certification, guideCertification, match, partly, ambiguous,
+        fromYear: off > 0 ? figuresYear : null,
+        yearsOff: off,
+        vehicleYears: years,
+    };
+}
+
+// ── The view of a test vehicle a reader gets ────────────────────────────────
+
+/**
+ * A test vehicle as one certification shows it: the stored record with that
+ * year's identity and that year's Guide figures laid over it.
+ *
+ * Every reader of the record — the curve, η, the methodology card, the vehicle
+ * figures, the audit — keeps reading the same field names. What changes is
+ * which year's Guide row filled them, and that is now chosen per reader:
+ * a vehicle's own year (`viewForVehicle`), or for lab-side readers the newest
+ * linked year (`viewForTestVehicle`).
+ *
+ *   model_year       the certification's year (for a test-vehicle view, Since)
+ *   test_group       that certification's Test Group
+ *   fe_guide_row_id, epa_fe_guide   the Guide row the figures came from
+ *   carryover_*      as that certification names them
+ *   _certification   what was chosen and why — see resolveCertification
+ */
+export function testVehicleView(testVehicle, { certification = null, guideCertification = null, year = null, resolution = null } = {}) {
+    if (!testVehicle) return testVehicle;
+    const guide = guideCertification?.guide ?? null;
+    const { values, overrides } = guideOverlay(testVehicle, guide);
+    return {
+        ...testVehicle,
+        ...values,
+        overrides,
+        model_year:           year ?? certification?.model_year ?? testVehicle.model_year ?? null,
+        test_group:           certification?.test_group ?? testVehicle.test_group ?? null,
+        carryover_test_group: certification ? certification.carryover_test_group : (testVehicle.carryover_test_group ?? null),
+        carryover_model_year: certification ? certification.carryover_model_year : (testVehicle.carryover_model_year ?? null),
+        fe_guide_row_id:      guide?.id ?? null,
+        epa_fe_guide:         guide,
+        _certification: {
+            linkId:          certification?.linkId ?? null,
+            test_group:      certification?.test_group ?? null,
+            model_year:      certification?.model_year ?? null,
+            ownGuideRowId:   certification?.fe_guide_row_id ?? null,
+            skipped:         certification?.fe_guide_skipped_at != null,
+            guideYear:       guideCertification?.model_year ?? null,
+            match:           resolution?.match ?? null,
+            partly:          resolution?.partly ?? false,
+            ambiguous:       resolution?.ambiguous ?? false,
+            fromYear:        resolution?.fromYear ?? null,
+            yearsOff:        resolution?.yearsOff ?? 0,
+            years:           certifiedYears(testVehicle),
+        },
+    };
+}
+
+/** The test vehicle as a vehicle of this `year` reads it. */
+export function viewForVehicle(vehicleYearText, testVehicle) {
+    if (!testVehicle) return testVehicle;
+    const resolution = resolveCertification(vehicleYearText, testVehicle);
+    return testVehicleView(testVehicle, { ...resolution, resolution });
+}
+
+/** The test vehicle on its own: Since as its year, the newest linked year's Guide row. */
+export function viewForTestVehicle(testVehicle) {
+    if (!testVehicle) return testVehicle;
+    const guideCertification = newestLinkedCertification(testVehicle);
+    return testVehicleView(testVehicle, {
+        certification: guideCertification,
+        guideCertification,
+        year: sinceYear(testVehicle),
+    });
+}
+
+/**
+ * "From MY2024" — the words for a figure from another year, or null when the
+ * figures are the vehicle's own year's. The longer sentence goes in a title.
+ */
+export function fromYearNote(cert) {
+    if (!cert?.fromYear) return null;
+    return {
+        short: `From MY${cert.fromYear}`,
+        long: cert.match === 'carryover'
+            ? `From MY${cert.fromYear}: the MY${cert.model_year} certification carries over this vehicle's year's lab work, and its EPA figures are that certification's.`
+            : `From MY${cert.fromYear}: no certification of this test vehicle is held for the vehicle's year, so its EPA figures are the MY${cert.fromYear} ones.`,
+    };
 }

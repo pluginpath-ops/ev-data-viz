@@ -1410,18 +1410,23 @@ export function AppProvider({ children }) {
      * overridden by hand is deliberately left alone, and a silent skip reads as
      * a bug rather than as the rule working.
      */
-    const linkFeGuideRow = async (testVehicleId, feRowId) => {
+    /**
+     * Link a Guide row to a test vehicle in one certification (#374).
+     * `linkRowId` names the certification; without it the link goes to the
+     * one the Guide row's own year and Test Group name.
+     */
+    const linkFeGuideRow = async (testVehicleId, feRowId, opts = {}) => {
         try {
-            const res = await dataService.linkFeGuideRow(testVehicleId, feRowId);
-            // The promoted figures land on the test vehicle, which reaches the UI
-            // through the vehicle's epa_vehicle_mappings — so without this the
-            // card keeps rendering the pre-link values and the curator cannot
-            // see whether the row they picked was the right one until they
-            // reload. Same reason every sibling EPA mutation here refreshes.
+            const res = await dataService.linkFeGuideRow(testVehicleId, feRowId, opts);
+            // The Guide's figures reach the UI through the vehicle's
+            // epa_vehicle_mappings — so without this the card keeps rendering
+            // the pre-link values and the curator cannot see whether the row
+            // they picked was the right one until they reload. Same reason
+            // every sibling EPA mutation here refreshes.
             await softRefreshVehicles();
-            const note = res.skipped.length
-                ? `${res.promoted.length} field(s) filled, ${res.skipped.length} left as curator-set.`
-                : `${res.promoted.length} field(s) filled from the guide.`;
+            const note = res.held.length
+                ? `${res.applied.length} field(s) read from the guide, ${res.held.length} left as curator-set.`
+                : `${res.applied.length} field(s) read from the guide.`;
             showSuccess(note);
             return res;
         } catch (error) {
@@ -1460,7 +1465,7 @@ export function AppProvider({ children }) {
     // The linking sweep (#238).
     const getTestVehiclesAwaitingFeLink = (opts) => dataService.getTestVehiclesAwaitingFeLink(opts);
     const getFeLinkProgress = () => dataService.getFeLinkProgress();
-    const setFeLinkSkipped = (id, skipped, note) => dataService.setFeLinkSkipped(id, skipped, note);
+    const setFeLinkSkipped = (id, skipped, note, opts) => dataService.setFeLinkSkipped(id, skipped, note, opts);
     // Data Checks skips (#321, migration 066).
     const getDataCheckSkips = () => dataService.getDataCheckSkips();
     const setDataCheckSkip = (vehicleId, checkKey, fingerprint, note) =>
@@ -1484,11 +1489,11 @@ export function AppProvider({ children }) {
         }
     };
 
-    const unlinkFeGuideRow = async (testVehicleId) => {
+    const unlinkFeGuideRow = async (testVehicleId, opts = {}) => {
         try {
-            const res = await dataService.unlinkFeGuideRow(testVehicleId);
+            const res = await dataService.unlinkFeGuideRow(testVehicleId, opts);
             await softRefreshVehicles();
-            showSuccess(`Unlinked; ${res.restored.length} field(s) restored.`);
+            showSuccess('Unlinked.');
             return res;
         } catch (error) {
             showError('Could not unlink: ' + error.message);
@@ -1607,7 +1612,7 @@ export function AppProvider({ children }) {
     // via getEpaTestVehicleFull as needed.
 
     /** Pass-through: fetch a test vehicle with its coefficient sets, tests and phases. */
-    const getEpaTestVehicleFull = (testVehicleId) => dataService.getEpaTestVehicleFull(testVehicleId);
+    const getEpaTestVehicleFull = (testVehicleId, opts) => dataService.getEpaTestVehicleFull(testVehicleId, opts);
 
     const saveEpaCoefficientSet = async (row) => {
         try {

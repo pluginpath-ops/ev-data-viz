@@ -170,6 +170,22 @@ describe('identifier matches and shared certifications', () => {
         expect(c.exactIdMatch).toBe(true);
         expect(c.proposal.row.id).toBe(1);
     });
+    it('matches the certification\'s own Test Group in its year (#374)', () => {
+        // The Guide's key is (year, smog Test Group) — the certification's.
+        // Compared with a Vehicle ID it matched 1 linked record in 87.
+        const rows = [
+            row({ id: 1, carline: 'Completely Different Car', tg: 'RHYXV00.0W51', year: 2024 }),
+            row({ id: 2, carline: 'Air Touring AWD', tg: 'SHYXV00.0W51', year: 2025 }),
+        ];
+        const c = classifyTestVehicle({ ...g({ id: 'NE-U168EA135R', year: 2024 }), test_group: 'RHYXV00.0W51' }, rows);
+        expect(c.exactIdMatch).toBe(true);
+        expect(c.proposal.row.id).toBe(1);
+    });
+    it('does not take the same Test Group from another year', () => {
+        const rows = [row({ id: 1, carline: 'X', tg: 'RHYXV00.0W51', year: 2025 })];
+        expect(classifyTestVehicle({ ...g({ id: 'NE-U168EA135R', year: 2024 }), test_group: 'RHYXV00.0W51' }, rows).exactIdMatch)
+            .toBe(false);
+    });
     it('declines an identifier match that is not unique', () => {
         // The guide's Test Group is not unique per configuration, so several
         // rows can carry it — that is a choice, not an answer.

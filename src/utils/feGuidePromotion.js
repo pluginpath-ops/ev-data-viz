@@ -1,34 +1,31 @@
 /**
- * Copying a staged Fuel Economy Guide row onto an EPA test vehicle, and undoing it
- * (#206, phase 3).
+ * What a Fuel Economy Guide row says about an EPA test vehicle, laid over its
+ * stored values at read time (#206, reworked for #374).
  *
- * Promotion is what makes the guide useful without teaching anything a new
- * source: `epaDerivations`, the methodology diagram, the curator form and the
- * mismatch badge all keep reading `epa_test_vehicles`, and the guide fills it.
+ * Until #374 a link COPIED the Guide's figures onto the test vehicle row
+ * ("promotion") and unlinking copied them back. That cannot survive a test
+ * vehicle certified in several years: the Guide is published by year, each
+ * certification links its own row, and one row of columns cannot hold three
+ * years' figures. So the Guide row is now read alongside the record and laid
+ * over it — `guideOverlay` — and nothing is copied. Migration 083 restored the
+ * values promotion had displaced.
  *
- * ── The two rules that govern it ─────────────────────────────────────────────
+ * Readers did not have to learn a new source: `epaDerivations`, the
+ * methodology diagram, the curator form and the vehicle figures all keep
+ * reading the same fields, from a view of the test vehicle that already
+ * carries its Guide figures (epaCertifications.testVehicleView).
+ *
+ * ── The two rules, unchanged ─────────────────────────────────────────────────
  *
  * THE GUIDE BEATS THE CERT RECORD. It is the published figure by definition;
  * a CSI value is manufacturer-delivered and not necessarily what reached the
- * window sticker. So a value sourced 'csv' or 'pdf' is overwritten.
+ * window sticker.
  *
- * THE CURATOR BEATS THE GUIDE. A field a human has deliberately set is left
- * alone — that is the whole point of an override, and an import silently
- * undoing one would make the override worthless.
+ * THE CURATOR BEATS THE GUIDE. A field a human has deliberately set (source
+ * 'manual') is left alone, and its disagreement with the Guide is reported
+ * (`guideConflicts`) rather than silently resolved either way.
  *
- * ── Why the previous value is carried in `overrides` ─────────────────────────
- *
- * Unlinking has to restore what promotion displaced, and the only place that
- * knows is the promotion itself. Rather than a second table or a snapshot
- * column, each promoted field records its own previous value beside its source
- * marker — the shape the overrides column already has:
- *
- *     label_range_published: { source: 'fe_guide', previous: 306 }
- *
- * Unlink reads that back. A field promoted onto nothing restores to null, which
- * is correct and distinguishable from "never promoted" because the entry exists.
- *
- * Pure module: takes rows, returns the writes to make. No data access.
+ * Pure module: takes rows, returns values. No data access.
  */
 
 /**
@@ -36,9 +33,9 @@
  *
  * Deliberately explicit rather than derived from a naming convention: five of
  * these differ on both sides, and a convention that silently skips a mismatched
- * pair is how a field stops being promoted without anyone noticing.
+ * pair is how a field stops being read without anyone noticing.
  */
-export const PROMOTION_MAP = {
+export const GUIDE_FIELD_MAP = {
     label_comb_range_mi:        'label_range_published',
     label_city_range_mi:        'label_city_range_mi',
     label_hwy_range_mi:         'label_hwy_range_mi',
@@ -58,12 +55,13 @@ export const PROMOTION_MAP = {
     nominal_pack_kwh:           'nominal_pack_kwh',
 };
 
-export const PROMOTION_SOURCE = 'fe_guide';
+/** The source tag a Guide value carries in a view's `overrides`. */
+export const GUIDE_SOURCE = 'fe_guide';
 
 /**
- * A field a human set by hand is not the import's to overwrite.
+ * A field a human set by hand is not the Guide's to replace.
  *
- * Exported because the same question is asked outside promotion: unlinking
+ * Exported because the same question is asked outside the overlay: unlinking
  * clears the guide-derived test selection, and must leave a hand-set one alone.
  * A second spelling of this rule is how one of them ends up wrong — the first
  * version of that guard checked for source 'curator', which nothing writes, so
@@ -72,69 +70,46 @@ export const PROMOTION_SOURCE = 'fe_guide';
 export const isCuratorOwned = (overrides, column) => overrides?.[column]?.source === 'manual';
 
 /**
- * What linking this guide row to this test vehicle should write.
+ * The test vehicle's fields as the Guide row fills them.
  *
- * @param {Object} testVehicle   current epa_test_vehicles row (values + overrides)
- * @param {Object} feRow   staged epa_fe_guide row
- * @returns {{ updates: Object, promoted: string[], skipped: string[] }}
- *          `updates` is ready to send; `promoted` and `skipped` are for telling
- *          the curator what happened, since a silent skip looks like a bug.
+ * `values` holds every mapped field the Guide states and the curator has not
+ * set by hand. `overrides` is the test vehicle's own, with those fields tagged
+ * 'fe_guide' so the curator form and the audit can say where a figure came
+ * from — as promotion's tags did.
+ *
+ * @param {Object} testVehicle  stored epa_test_vehicles row (values + overrides)
+ * @param {Object} guideRow     epa_fe_guide row, or null
+ * @returns {{ values: Object, overrides: Object, applied: string[], held: string[] }}
  */
-export function promotionUpdates(testVehicle, feRow) {
-    if (!testVehicle || !feRow) return { updates: {}, promoted: [], skipped: [] };
+export function guideOverlay(testVehicle, guideRow) {
+    const overrides = { ...(testVehicle?.overrides ?? {}) };
+    const values = {};
+    const applied = [];
+    const held = [];
+    if (!testVehicle || !guideRow) return { values, overrides, applied, held };
 
-    const overrides = { ...(testVehicle.overrides ?? {}) };
-    const updates = {};
-    const promoted = [];
-    const skipped = [];
-
-    for (const [from, to] of Object.entries(PROMOTION_MAP)) {
-        const value = feRow[from];
-        if (value == null) continue;              // nothing to say about this field
-
-        if (isCuratorOwned(testVehicle.overrides, to)) {
-            skipped.push(to);
-            continue;
-        }
-
-        updates[to] = value;
-        // The displaced value, so unlink can put it back. Captured from the
-        // test vehicle as it is NOW, before this write lands.
-        overrides[to] = { source: PROMOTION_SOURCE, previous: testVehicle[to] ?? null };
-        promoted.push(to);
+    for (const [from, to] of Object.entries(GUIDE_FIELD_MAP)) {
+        const value = guideRow[from];
+        if (value == null) continue;
+        if (isCuratorOwned(testVehicle.overrides, to)) { held.push(to); continue; }
+        values[to] = value;
+        overrides[to] = { source: GUIDE_SOURCE };
+        applied.push(to);
     }
-
-    // The LINK is recorded unconditionally; only the displaced-value bookkeeping
-    // depends on something actually having been promoted.
-    //
-    // These are two different facts and conflating them was a bug: a test vehicle whose
-    // promotable fields were all curator-owned produced an empty `promoted`, the
-    // caller returned before writing, and the test vehicle came back from "Link"
-    // reporting success with nothing written at all. It stayed unlinked, so it
-    // reappeared in the sweep while the toast said it had worked.
-    //
-    // "This test vehicle corresponds to that guide row" is worth recording even when
-    // the guide has nothing to add to it — that is what makes the row's figures
-    // available for comparison later, and what stops the sweep re-asking.
-    if (promoted.length) updates.overrides = overrides;
-    // Linked whenever the guide row had something to say — whether it landed
-    // (`promoted`) or was held off by a curator value (`skipped`). Both mean the
-    // row is real and corresponds to this test vehicle.
-    //
-    // An empty promotion AND an empty skip list is the other case: a guide row
-    // carrying none of the promotable fields at all. Linking to that records a
-    // correspondence with nothing behind it, so it stays unlinked.
-    if (promoted.length || skipped.length) updates.fe_guide_row_id = feRow.id;
-
-    return { updates, promoted, skipped };
+    return { values, overrides, applied, held };
 }
 
 /**
- * What unlinking should write: every field this guide row displaced, restored.
+ * What a stored record should write to forget an old promotion: every field
+ * still tagged as copied from the Guide, restored to the value it displaced.
  *
- * Only fields still marked as guide-sourced are touched. One the curator has
- * since edited by hand carries source 'manual' and is left exactly as it is —
- * unlinking a source should not discard work done after it.
+ * Kept for the records promoted before #374. Migration 083 restores them all
+ * at once; this does the same for one record when its last Guide link is
+ * removed, so the result is right whether or not 083 has been applied yet.
+ * After 083 no stored record carries the tag and this writes nothing new.
+ *
+ * Only fields still tagged are touched. One the curator has since edited by
+ * hand carries 'manual' and is left exactly as it is.
  */
 export function demotionUpdates(testVehicle) {
     if (!testVehicle) return { updates: {}, restored: [] };
@@ -143,9 +118,9 @@ export function demotionUpdates(testVehicle) {
     const updates = {};
     const restored = [];
 
-    for (const column of Object.values(PROMOTION_MAP)) {
+    for (const column of Object.values(GUIDE_FIELD_MAP)) {
         const entry = overrides[column];
-        if (entry?.source !== PROMOTION_SOURCE) continue;
+        if (entry?.source !== GUIDE_SOURCE) continue;
         // `previous` is null for a field that was empty before promotion, which
         // restores correctly — the entry's existence is what marks it promoted.
         updates[column] = entry.previous ?? null;
@@ -154,7 +129,6 @@ export function demotionUpdates(testVehicle) {
     }
 
     updates.overrides = overrides;
-    updates.fe_guide_row_id = null;
     return { updates, restored };
 }
 
@@ -162,12 +136,12 @@ export function demotionUpdates(testVehicle) {
  * Fields the guide would fill differently from what is stored, and was not
  * allowed to.
  *
- * Promotion reports `skipped` at the moment it runs and then that knowledge is
- * gone — but the disagreement persists, and the curator may well want the
- * published figure after all. A value protected from an import is not the same
- * as a value the curator has re-examined since.
+ * The overlay holds a curator's value over the Guide's without a word — but
+ * the disagreement persists, and the curator may well want the published
+ * figure after all. A value protected from the Guide is not the same as a
+ * value the curator has re-examined since.
  *
- * Only curator-owned fields appear: anything else was already overwritten.
+ * Only curator-owned fields appear: anything else already reads the Guide.
  *
  * @returns {Array<{ column, guideColumn, ours, theirs }>}
  */
@@ -175,7 +149,7 @@ export function guideConflicts(testVehicle, feRow) {
     if (!testVehicle || !feRow) return [];
     const out = [];
 
-    for (const [from, to] of Object.entries(PROMOTION_MAP)) {
+    for (const [from, to] of Object.entries(GUIDE_FIELD_MAP)) {
         const theirs = feRow[from];
         if (theirs == null) continue;
         if (!isCuratorOwned(testVehicle.overrides, to)) continue;
@@ -195,29 +169,21 @@ export function guideConflicts(testVehicle, feRow) {
 }
 
 /**
- * Take the guide's value for specific fields the curator had been holding.
+ * Take the guide's value for fields the curator had been holding: drop the
+ * 'manual' tag, so the overlay reads the Guide for them again. The stored
+ * value stays where it is (and in the audit trail) — it is simply no longer
+ * held over the Guide.
  *
- * A deliberate override of an override: the previous value is recorded the same
- * way promotion records it, so unlinking still restores what was there before.
+ * @returns {{ overrides: Object, accepted: string[] }}
  */
-export function acceptGuideUpdates(testVehicle, feRow, columns = []) {
-    if (!testVehicle || !feRow || !columns.length) return { updates: {}, accepted: [] };
-
-    const overrides = { ...(testVehicle.overrides ?? {}) };
-    const updates = {};
+export function acceptGuideTags(testVehicle, columns = []) {
+    const overrides = { ...(testVehicle?.overrides ?? {}) };
     const accepted = [];
-    const wanted = new Set(columns);
-
-    for (const [from, to] of Object.entries(PROMOTION_MAP)) {
-        if (!wanted.has(to)) continue;
-        const value = feRow[from];
-        if (value == null) continue;
-
-        updates[to] = value;
-        overrides[to] = { source: PROMOTION_SOURCE, previous: testVehicle[to] ?? null };
+    const mapped = new Set(Object.values(GUIDE_FIELD_MAP));
+    for (const to of new Set(columns)) {
+        if (!mapped.has(to) || !isCuratorOwned(overrides, to)) continue;
+        delete overrides[to];
         accepted.push(to);
     }
-
-    if (accepted.length) updates.overrides = overrides;
-    return { updates, accepted };
+    return { overrides, accepted };
 }

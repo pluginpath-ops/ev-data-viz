@@ -50,6 +50,7 @@
 
 import { specProvenance, vehicleLabel } from './specHelpers';
 import { epaConfigurationFigures, primaryEpaMapping } from './epaConfiguration';
+import { formatYears } from './epaCertifications';
 // The same agreement test the capacity resolver uses, so a vehicle Data Checks
 // passes is one whose EPA tested the calculations actually use.
 import { testedAgreement } from './vehicleFigures';
@@ -78,6 +79,7 @@ export const CHECK_FIGURES = [
 /** Every per-vehicle check, with the kind of finding it produces. */
 export const DATA_CHECKS = [
     { key: 'no-primary',         figure: 'configuration', kind: 'gap',     label: 'Several EPA configurations, none primary' },
+    { key: 'certification-year', figure: 'configuration', kind: 'disagrees', label: 'EPA configuration certified two or more years from the vehicle' },
     { key: 'range-vs-label',     figure: 'range',       kind: 'disagrees', label: 'Range disagrees with the EPA label' },
     { key: 'label-spread',       figure: 'range',       kind: 'disagrees', label: 'EPA configurations disagree on range' },
     { key: 'range-no-label',     figure: 'range',       kind: 'gap',       label: 'Range with no EPA label' },
@@ -194,11 +196,28 @@ function linkedConfigurations(vehicle) {
         ...epaConfigurationFigures(m.epaTestVehicle),
         driveType:   epaDriveType(m.epaTestVehicle.drive),
         packVoltage: positive(m.epaTestVehicle.total_voltage),
+        certification: m.epaTestVehicle._certification ?? null,
     });
     const all = (vehicle?.epa_mappings ?? []).filter(m => m.epaTestVehicle).map(m => ({ mappingId: m.id, ...figures(m) }));
     const pick = primaryEpaMapping(vehicle?.epa_mappings);
     const primary = pick ? all.find(c => c.mappingId === pick.mapping.id) : null;
     return { all, primary, judged: primary ? [primary] : all, chosen: !!primary && all.length > 1 };
+}
+
+/**
+ * A configuration whose nearest certification is two or more years from the
+ * vehicle (#374). A year off is a carryover or a year not imported yet, and
+ * the vehicle says "From MY…" beside its figures; two or more is, on the live
+ * data, a mapping mistake — a 2022 Mach-E linked to 2024–2026 configurations —
+ * so it is put in front of a curator rather than only marked.
+ */
+function certificationYearFindings(vehicle, links) {
+    return links.judged
+        .filter(c => (c.certification?.yearsOff ?? 0) >= 2)
+        .map(c => finding('certification-year',
+            `${c.name} is certified for ${formatYears(c.certification.years)}; the vehicle is ${vehicle.year}. `
+            + `Its EPA figures are from MY${c.certification.fromYear}. Check the configuration is this vehicle's.`,
+            { configuration: c.id, vehicleYear: String(vehicle.year ?? ''), fromYear: c.certification.fromYear }));
 }
 
 function primaryFindings(links) {
@@ -550,6 +569,7 @@ export function runDataChecks(vehicles = [], {
             const perf = performance ? (performance[vehicle.id] ?? { summaries: [], sessions: [] }) : null;
             const findings = applySkips(vehicle, [
                 ...primaryFindings(links),
+                ...certificationYearFindings(vehicle, links),
                 ...rangeFindings(vehicle, links, ctx, limits),
                 ...capacityFindings(vehicle, links, ctx, limits, testedRule),
                 ...weightFindings(links, ctx, limits),

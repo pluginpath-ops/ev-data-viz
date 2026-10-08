@@ -392,6 +392,34 @@ between layers 2 and 3 would not be written twice.
 
 ### Layer 3 — read path, the resolution rule, From MY…, derivations, sweep, counts
 
+> **As built (2026-10-08).** One function, `testVehicleView`, gives every reader
+> the test vehicle as a certification shows it: that year's identity, and that
+> year's Guide figures laid over the stored values (`guideOverlay`; a curator's
+> hand-set value still wins). `viewForVehicle` uses the vehicle's year
+> (getVehicles, the explainer preview, the curator form opened from a vehicle,
+> variant suggestions); `viewForTestVehicle` uses Since and the newest linked year
+> (statistics, curves, the audit, the Guide browser). So the ~30 readers kept
+> their field names. Link, unlink, skip and accept act on one certification
+> (`linkRowId`); the sweep is one item per test vehicle per certification and
+> counts in certifications (943, across 794 test vehicles). Migration 083 restores
+> what promotion copied (255 records, 3,811 values) and is safe in either order
+> with this code. Visible in this layer: "From MY…" beside the EPA range (19
+> vehicles on the 2026-10-08 data), a line on the Guide picker when the figures
+> are another year's, and a Data Checks finding for 2+ years (6 on the same data).
+>
+> **One deviation from D4.** "Since" is derived from the certifications at read
+> time (`sinceYear`), not kept in a renamed, trigger-maintained column. The answer
+> is the same; a renamed column would have made 083 another deploy-order break
+> like 081, and the stored `model_year` is now only "the year last imported",
+> retired with the other identity columns in layer 4.
+>
+> **Measured.** Every one of the 119 mappings was compared, today's code and data
+> against this code on the migrated data, before and after 083: 109 identical; 10
+> differ only in pack voltage (3) or specific energy (8), where a CSI re-import had
+> overwritten copied Guide values with the PDF's own while the record stayed
+> linked — the Guide-beats-certificate rule now holds there. No range, MPGe or
+> adjustment figure changed.
+
 **Files**
 - New `src/utils/epaCertification.js` (pure): `vehicleModelYears`,
   `certificationYears`, `sinceYear`, `formatYears` ("MY2022, MY2024 to

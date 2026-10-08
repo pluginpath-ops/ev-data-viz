@@ -82,7 +82,12 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
     const [query, setQuery]       = useState('');
     const [error, setError]       = useState(null);
 
-    const linked = testVehicle?.fe_guide_row_id != null;
+    // The certification this picker links: the one the vehicle reads (#374).
+    // Its own link decides "linked" — the figures on the card may be another
+    // year's, borrowed until this year is linked.
+    const cert = testVehicle?._certification ?? null;
+    const ownRowId = cert ? cert.ownGuideRowId : testVehicle?.fe_guide_row_id;
+    const linked = ownRowId != null;
 
     // The PRIMITIVES the search depends on, not the test vehicle object. `testVehicle` in the
     // curator form is a useMemo over the row plus the unsaved edit buffer, so it
@@ -116,7 +121,7 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
     // The linked row itself, so the fields it was not allowed to fill can be
     // named. Promotion reports them once and forgets; the disagreement does not
     // go away, and the published figure may well be the one wanted.
-    const feRowId = testVehicle?.fe_guide_row_id;
+    const feRowId = ownRowId ?? null;
     useEffect(() => {
         // Only the async path sets state. Clearing synchronously on unlink is
         // the same cascading-render shape the loading flag had; deriving it from
@@ -151,7 +156,7 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
         setBusy(true);
         setError(null);
         try {
-            await linkFeGuideRow(testVehicle.test_vehicle_id, feRowId);
+            await linkFeGuideRow(testVehicle.test_vehicle_id, feRowId, { linkRowId: cert?.linkId ?? null });
             onChanged?.();
         } catch (e) { setError(e.message); }
         finally { setBusy(false); }
@@ -171,7 +176,7 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
         setBusy(true);
         setError(null);
         try {
-            await unlinkFeGuideRow(testVehicle.test_vehicle_id);
+            await unlinkFeGuideRow(testVehicle.test_vehicle_id, { linkRowId: cert?.linkId ?? null });
             onChanged?.();
         } catch (e) { setError(e.message); }
         finally { setBusy(false); }
@@ -246,9 +251,19 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
     return (
         <div className="fe-picker">
             <div className="fe-picker-head">
-                <span className="text-xs font-semibold text-secondary">Fuel Economy Guide</span>
+                <span className="text-xs font-semibold text-secondary">
+                    Fuel Economy Guide{cert?.model_year ? ` · MY${cert.model_year}` : ''}
+                </span>
                 {loading && <span className="text-xs text-meta">searching…</span>}
             </div>
+
+            {/* Nothing silent (#374): the card is showing another year's
+                figures until this certification has a Guide row of its own. */}
+            {cert?.guideYear != null && cert.guideYear !== cert.model_year && (
+                <p className="text-note">
+                    Showing the MY{cert.guideYear} Guide figures until MY{cert.model_year} is linked.
+                </p>
+            )}
 
             {!loading && candidates?.length === 0 && (
                 <p className="text-xs text-secondary">
