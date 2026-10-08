@@ -1308,13 +1308,13 @@ export default function App() {
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'perfcompare' && (
                         <PerformanceCompareView
-                            vehicles={vehicles}
+                            vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'perfcurve' && (
                         <PerformanceCurveView
-                            vehicles={vehicles}
+                            vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}

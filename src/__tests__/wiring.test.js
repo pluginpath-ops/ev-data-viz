@@ -1700,8 +1700,14 @@ describe('the vehicle swatch is connected (#308, #317)', () => {
     });
 
     it('every chart that draws series is handed the vehicles WITH the bases applied', () => {
-        for (const tag of ['PopoutView', 'ChargingView', 'RoadTripView', 'ChargeCompareView', 'EpaCurvesView']) {
+        for (const tag of ['PopoutView', 'ChargingView', 'RoadTripView', 'ChargeCompareView', 'EpaCurvesView', 'PerformanceCompareView', 'PerformanceCurveView']) {
             expect(app, tag).toMatch(new RegExp(`<${tag}\\s*\\n\\s*vehicles=\\{chartVehicles\\}`));
+        }
+    });
+
+    it('the performance views color from the vehicles, not from a bare palette', () => {
+        for (const f of ['PerformanceCompareView', 'PerformanceCurveView']) {
+            expect(read(`src/components/${f}.jsx`), f).toMatch(/resolveChartColors\([\s\S]*VEHICLE_PALETTE/);
         }
     });
 
