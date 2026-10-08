@@ -5076,12 +5076,29 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* Three scopes have to fit 300px, so this one runs tighter than the segmented
-   control elsewhere. Same class, same appearance — only the padding gives. */
+   control elsewhere. Same class, same appearance — only the padding gives.
+   Two lines each: the scope, then who it reaches (the test, the vehicle, the
+   count), truncated — the button's title carries the full name. */
 .color-scope.stats-segmented { width: 100%; }
 .color-scope.stats-segmented button {
-    flex: 1;
-    padding: 4px 2px;
+    @apply flex flex-col items-center;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 4px 6px;
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+}
+.color-scope-label,
+.color-scope-subject {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* The name is what you read, the scope is what you click — but the scope is
+   the control's own word, so it keeps the weight and the name steps back. */
+.color-scope-subject {
+    font-weight: 400;
+    opacity: 0.8;
 }
 
 /* ── Auto, at the top and the full width ─────────────────────────────────────
