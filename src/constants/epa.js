@@ -105,8 +105,8 @@ export const DERIVED_5CYCLE = {
  * days / most of a week", which is the comparison the diagram needs anyway.
  *
  * PER CONFIGURATION, which is the multiplier that matters: certification is per
- * test group and vehicle configuration, not per model. Our own schema says so —
- * epa_test_groups is keyed by test_group_id + vehicle_config_number, and the R2
+ * Test Group and vehicle configuration, not per model. Our own schema says so —
+ * epa_test_vehicles is keyed by test_vehicle_id + vehicle_config_number, and the R2
  * fixture is specifically the 20" AT variant. A model line with several packs,
  * drive layouts and wheel sizes multiplies every figure below.
  */
@@ -199,11 +199,11 @@ export const EPA_DEFAULTS = {
     // vehicle, for correcting a record that has no constant-speed phase.
     //
     // MEASURED, not chosen: the fleet median of ss_eta / eta across 210
-    // certification groups that carry both. IQR 1.1162-1.1449, so half the
+    // test vehicles that carry both. IQR 1.1162-1.1449, so half the
     // fleet sits within 2.5% of this and the full observed range is
     // 1.0647-1.2830.
     //
-    // Worth knowing what it is worth. Applying it to a group with no
+    // Worth knowing what it is worth. Applying it to a test vehicle with no
     // constant-speed phase lands within a few percent for the middle of the
     // fleet and 13.7% out at the extreme — against a guaranteed 11.4% low, in
     // one direction, for every such vehicle if it is not applied at all.

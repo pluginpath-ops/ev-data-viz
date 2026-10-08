@@ -43,16 +43,16 @@ const point = (mph, kwh100mi, useableKwh) => {
 };
 
 /**
- * @param {{ mappingId, vehicleId, vehicleName, epaGroup, runs }} row — DataService.getModeledEfficiencyPreview
+ * @param {{ mappingId, vehicleId, vehicleName, epaTestVehicle, runs }} row — DataService.getModeledEfficiencyPreview
  * @returns {null | { mappingId, vehicleId, vehicleName, label, tier, curve: Array, tests: Array }}
  */
 export function modeledEfficiencyPreview(row) {
-    const group = row?.epaGroup;
-    const subject = group ? curveSubject(group) : null;
+    const testVehicle = row?.epaTestVehicle;
+    const subject = testVehicle ? curveSubject(testVehicle) : null;
     if (!subject) return null;
 
     const useableKwh = subject.useableKwh;
-    const curve = buildEpaCurveFromModel(group, useableKwh, STANDARD_VIEW.densityRatio)
+    const curve = buildEpaCurveFromModel(testVehicle, useableKwh, STANDARD_VIEW.densityRatio)
         .map(p => point(p.mph, p.kwh100mi, useableKwh));
     if (!curve.length) return null;
 
@@ -63,7 +63,7 @@ export function modeledEfficiencyPreview(row) {
             && r.speed_mph != null && r.distance_miles > 0 && r.energy_kwh != null)
         .map(run => {
             const measured = (run.energy_kwh / run.distance_miles) * 100;
-            const corrected = correctMeasuredConsumption(group, run.speed_mph, measured, {
+            const corrected = correctMeasuredConsumption(testVehicle, run.speed_mph, measured, {
                 temperatureF: run.temperature_f,
                 altitudeFt: run.altitude_ft,
                 windSpeedMph: run.avg_wind_speed_mph,

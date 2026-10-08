@@ -2,8 +2,8 @@
  * EPA testing data section — shown in the Tests & Data (RunsView) per-vehicle panel.
  *
  * Shows:
- *   • A card for each linked EPA test group (coefficients, cycle results, label values)
- *   • An "Assign EPA Testing Data" combobox for linking additional test groups
+ *   • A card for each linked EPA test vehicle (coefficients, cycle results, label values)
+ *   • An "Assign EPA Testing Data" combobox for linking additional test vehicles
  *   • Unlink controls (contributor+)
  */
 import { useState, useRef, useMemo } from 'react';
@@ -17,7 +17,7 @@ import { suggestionSource, packLabels } from '../utils/variantEpaSuggestions';
 import EpaDerivationChecks from './epa/EpaDerivationChecks';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
 import FeGuidePicker from './epa/FeGuidePicker';
-import { epaRecordFromGroup } from '../utils/epaRecordFromGroup';
+import { epaRecordFromTestVehicle } from '../utils/epaRecordFromTestVehicle';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { checkUnadjustedMpge, checkStatedRanges, checkLabelInvariant } from '../utils/epaDerivationCheck';
 import { checkRecordIntegrity } from '../utils/epaIntegrity';
@@ -45,14 +45,14 @@ const mpge  = (v) => (v != null && v < 500) ? v.toFixed(0) : null;
 const miles = (v) => v != null ? `${v.toFixed(0)} mi` : null;
 
 /**
- * Which EPA cycles this group's stored tests actually drove.
+ * Which EPA cycles this test vehicle's stored tests actually drove.
  *
  * From the phases, not from the label's declared method: `Calc Approach Desc`
  * says "5-cycle label" on records whose adjustment is exactly the flat 0.7
  * factor, so it does not describe what was driven (#206).
  */
-function cyclesTested(group) {
-    const phases = (group?.epa_tests ?? []).flatMap(t => t.epa_test_phases ?? []);
+function cyclesTested(testVehicle) {
+    const phases = (testVehicle?.epa_tests ?? []).flatMap(t => t.epa_test_phases ?? []);
     const counts = new Map();
     for (const p of phases) {
         if (!p.phase_type) continue;
@@ -62,13 +62,13 @@ function cyclesTested(group) {
         return [...counts.entries()].map(([type, n]) => n > 1 ? `${type}x${n}` : type).join(' · ');
     }
     // No phases stored: fall back to naming the procedures that ran.
-    const procs = [...new Set((group?.epa_tests ?? []).map(t => t.procedure_code).filter(Boolean))];
+    const procs = [...new Set((testVehicle?.epa_tests ?? []).map(t => t.procedure_code).filter(Boolean))];
     return procs.length ? procs.map(c => `proc ${c}`).join(' · ') : null;
 }
 
 function DataRow({ label, value, muted, always = false }) {
     // `always` holds the row when the figure is absent, so a column keeps the
-    // shape it was specified with. Without it a group with no label data showed
+    // shape it was specified with. Without it a test vehicle with no label data showed
     // two bare headings and read as broken rather than as empty.
     if (value == null && !always) return null;
     return (
@@ -81,8 +81,8 @@ function DataRow({ label, value, muted, always = false }) {
     );
 }
 
-/** Card displaying the data for one EPA test group mapping. */
-function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName, onGroupChanged }) {
+/** Card displaying the data for one EPA test vehicle mapping. */
+function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName, onTestVehicleChanged }) {
     const [unlinking,    setUnlinking]    = useState(false);
     const [deleting,     setDeleting]     = useState(false);
     const [updatingConf, setUpdatingConf] = useState(false);
@@ -90,16 +90,16 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
     const [savingName,   setSavingName]   = useState(false);
     const [curating,     setCurating]     = useState(false);
     const [curatorDirty, setCuratorDirty] = useState(false);
-    const g = mapping.epaGroup;
+    const g = mapping.epaTestVehicle;
 
     // Recomputed on render like every other derived figure here — nothing is
     // stored, so a corrected phase shows its effect immediately.
     const derivationChecks = useMemo(() => {
         const { record, inferredPhaseTypes, competingMctTests, derivedFrom, statedRanges }
-            = epaRecordFromGroup(g);
+            = epaRecordFromTestVehicle(g);
         const model = record ? buildMethodologyModel(record) : null;
         // The ranges belonging to the test the phases came from, not the
-        // group's headline pair — on a group holding two multi-cycle tests
+        // test vehicle's headline pair — on a test vehicle holding two multi-cycle tests
         // those are different figures (#227).
         const rangeCheck = checkStatedRanges(model, {
             cityMi: statedRanges?.cityMi,
@@ -150,12 +150,12 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
 
     const handleDelete = async () => {
         if (!window.confirm(
-            `Delete EPA test group "${g.test_group_id}" entirely?\n\n` +
+            `Delete EPA test vehicle "${g.test_vehicle_id}" entirely?\n\n` +
             `This removes its coefficients, tests and phases and unlinks it from ALL vehicles. ` +
             `It cannot be undone. (Use "Unlink" to only detach it from this vehicle.)`
         )) return;
         setDeleting(true);
-        try { await onDelete?.(g.test_group_id); } finally { setDeleting(false); }
+        try { await onDelete?.(g.test_vehicle_id); } finally { setDeleting(false); }
     };
 
     const handleConfidence = async (e) => {
@@ -176,7 +176,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
         if (trimmed === current) return;
         setSavingName(true);
         try {
-            await onUpdateDisplayName?.(g.test_group_id, trimmed || null);
+            await onUpdateDisplayName?.(g.test_vehicle_id, trimmed || null);
         } finally {
             setSavingName(false);
         }
@@ -225,9 +225,9 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                         )}
                     </div>
                     <div className="font-mono text-xs text-meta mt-0.5">
-                        {g.test_group_id}
-                        {g.epa_test_family_id && g.epa_test_family_id !== g.test_group_id && (
-                            <span className="ml-1 text-meta">· family: {g.epa_test_family_id}</span>
+                        {g.test_vehicle_id}
+                        {g.test_group && g.test_group !== g.test_vehicle_id && (
+                            <span className="ml-1 text-meta">· family: {g.test_group}</span>
                         )}
                     </div>
                 </div>
@@ -252,7 +252,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                             disabled={unlinking || deleting}
                             onClick={handleUnlink}
                             className="btn btn-secondary text-xs py-0.5 px-2 disabled:opacity-40"
-                            title="Detach this test group from this vehicle (keeps the shared record)"
+                            title="Detach this test vehicle from this vehicle (keeps the shared record)"
                         >
                             {unlinking ? '…' : 'Unlink'}
                         </button>
@@ -263,7 +263,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                             disabled={unlinking || deleting}
                             onClick={handleDelete}
                             className="btn btn-danger text-xs py-0.5 px-2 disabled:opacity-40"
-                            title="Delete the shared test group and all its data (affects every linked vehicle)"
+                            title="Delete the shared test vehicle and all its data (affects every linked vehicle)"
                         >
                             {deleting ? '…' : 'Delete'}
                         </button>
@@ -307,7 +307,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                     <DataRow always label="Range highway"  value={miles(g.label_hwy_range_mi)} />
                 </div>
 
-                <DerivedValues group={g} vehicle={vehicle} />
+                <DerivedValues testVehicle={g} vehicle={vehicle} />
 
                 {/* Does this record reconcile? Beside the data it judges, so a
                     phase can be corrected in the same view it is questioned in. */}
@@ -325,7 +325,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                 contributor-only at the RLS layer anyway — showing the controls
                 to anyone else offers buttons that would be refused. */}
             {canEdit && (
-                <FeGuidePicker group={g} canEdit={canEdit} onChanged={onGroupChanged} />
+                <FeGuidePicker testVehicle={g} canEdit={canEdit} onChanged={onTestVehicleChanged} />
             )}
 
             {mapping.notes && (
@@ -345,7 +345,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
                     </button>
                     {curating && (
                         <EpaCuratorEditor
-                            testGroupId={g.test_group_id}
+                            testVehicleId={g.test_vehicle_id}
                             canEdit={canEdit}
                             onDirtyChange={setCuratorDirty}
                             vehicle={vehicle}
@@ -361,7 +361,7 @@ function EpaGroupCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateC
 
 const EPA_SOURCE_URL = 'https://dis.epa.gov/otaqpub/publist1.jsp';
 
-export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroups, onLink, onCreate, onUnlink, onUpdateConfidence, onSetPrimary, onUpdateDisplayName, onGroupChanged }) {
+export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehicles, onLink, onCreate, onUnlink, onUpdateConfidence, onSetPrimary, onUpdateDisplayName, onTestVehicleChanged }) {
     const [query, setQuery]               = useState('');
     const [results, setResults]           = useState([]);
     const [searching, setSearching]       = useState(false);
@@ -369,9 +369,9 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
     const [showDropdown, setShowDropdown] = useState(false);
     const [linking, setLinking]           = useState(false);
     const [showPdfModal, setShowPdfModal] = useState(false);
-    const { importEpaCsiGroups, getExistingEpaTestGroupIds, deleteEpaTestGroup, vehicles, getEpaSuggestionCandidates } = useAppContext();
+    const { importEpaCsiTestVehicles, getExistingEpaTestVehicleIds, deleteEpaTestVehicle, vehicles, getEpaSuggestionCandidates } = useAppContext();
     const [showCreate, setShowCreate]     = useState(false);
-    const [createDraft, setCreateDraft]   = useState({ test_group_id: '', model_year: '', make: '', epa_carline_name: '' });
+    const [createDraft, setCreateDraft]   = useState({ test_vehicle_id: '', model_year: '', make: '', epa_carline_name: '' });
     const [creating, setCreating]         = useState(false);
     const [createError, setCreateError]   = useState(null);
     const debounceRef = useRef(null);
@@ -388,20 +388,20 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
     );
 
     const handleCreate = async () => {
-        const id = createDraft.test_group_id.trim();
-        if (!id) { setCreateError('Test Group ID is required.'); return; }
+        const id = createDraft.test_vehicle_id.trim();
+        if (!id) { setCreateError('Vehicle ID is required.'); return; }
         setCreating(true);
         setCreateError(null);
         // Mark hand-entered identity fields as curator-sourced.
         const overrides = {};
-        const fields = { test_group_id: id, overrides };
+        const fields = { test_vehicle_id: id, overrides };
         if (createDraft.model_year.trim())       { fields.model_year = Number(createDraft.model_year) || null; overrides.model_year = { source: 'manual' }; }
         if (createDraft.make.trim())             { fields.make = createDraft.make.trim(); overrides.make = { source: 'manual' }; }
         if (createDraft.epa_carline_name.trim()) { fields.epa_carline_name = createDraft.epa_carline_name.trim(); overrides.epa_carline_name = { source: 'manual' }; }
         try {
             await onCreate(vehicle.id, fields);
             setShowCreate(false);
-            setCreateDraft({ test_group_id: '', model_year: '', make: '', epa_carline_name: '' });
+            setCreateDraft({ test_vehicle_id: '', model_year: '', make: '', epa_carline_name: '' });
         } catch (e) {
             setCreateError(e?.message || 'Create failed');
         } finally {
@@ -421,7 +421,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
             try {
                 // No year filter — EPA model years often differ from the vehicle's model year
                 // by 1–2 years; the year is shown in dropdown results for manual verification.
-                const rows = await searchEpaTestGroups?.(q.trim());
+                const rows = await searchEpaTestVehicles?.(q.trim());
                 setResults(rows || []);
             } catch (err) {
                 setSearchError(err?.message || 'Search failed');
@@ -432,14 +432,14 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
         }, 300);
     };
 
-    const handleSelect = async (group) => {
+    const handleSelect = async (testVehicle) => {
         setShowDropdown(false);
         setQuery('');
         setResults([]);
         if (!vehicle?.id || !onLink) return;
         setLinking(true);
         try {
-            await onLink(vehicle.id, group.test_group_id, 'inferred', null);
+            await onLink(vehicle.id, testVehicle.test_vehicle_id, 'inferred', null);
         } finally {
             setLinking(false);
         }
@@ -454,7 +454,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                     <>
                         <SectionAction onClick={() => setShowPdfModal(true)}>📑 Import from EPA lab PDF</SectionAction>
                         <SectionAction onClick={() => { setShowCreate(true); setCreateError(null); }}>
-                            + Create EPA test group from scratch
+                            + Create EPA test vehicle from scratch
                         </SectionAction>
                     </>
                 )}
@@ -499,13 +499,13 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                 )}
                                 {!searching && results.map(g => (
                                     <li
-                                        key={g.test_group_id}
+                                        key={g.test_vehicle_id}
                                         className="option-row"
                                         onMouseDown={e => { e.preventDefault(); handleSelect(g); }}
                                     >
                                         <span className="font-medium">{g.make} · {g.epa_carline_name}</span>
                                         <span className="text-meta ml-2 text-xs">
-                                            {g.model_year}{g.drive ? ` · ${g.drive}` : ''} · {g.test_group_id}
+                                            {g.model_year}{g.drive ? ` · ${g.drive}` : ''} · {g.test_vehicle_id}
                                         </span>
                                     </li>
                                 ))}
@@ -531,8 +531,8 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                         <LazyBoundary>
                             <EpaPdfImportModal
                                 targetVehicle={vehicle}
-                                onImport={importEpaCsiGroups}
-                                getExistingIds={getExistingEpaTestGroupIds}
+                                onImport={importEpaCsiTestVehicles}
+                                getExistingIds={getExistingEpaTestVehicleIds}
                                 onClose={() => setShowPdfModal(false)}
                             />
                         </LazyBoundary>
@@ -545,12 +545,12 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                             onClick={() => { setShowCreate(true); setCreateError(null); }}
                             className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline mt-2"
                         >
-                            + Create EPA test group from scratch
+                            + Create EPA test vehicle from scratch
                         </button>
                     ) : (
                         <div className="mt-2 border rounded-lg p-3 border-[var(--color-border)]">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold">New EPA test group</span>
+                                <span className="text-xs font-semibold">New EPA test vehicle</span>
                                 <a href={EPA_SOURCE_URL} target="_blank" rel="noopener noreferrer"
                                     className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">
                                     Find the Certified Test Group on EPA ↗
@@ -561,8 +561,8 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                                     <span className="text-secondary">Test Group ID *</span>
                                     <input
                                         type="text" autoFocus
-                                        value={createDraft.test_group_id}
-                                        onChange={e => setCreateDraft(d => ({ ...d, test_group_id: e.target.value }))}
+                                        value={createDraft.test_vehicle_id}
+                                        onChange={e => setCreateDraft(d => ({ ...d, test_vehicle_id: e.target.value }))}
                                         placeholder="e.g. SRIVT00.0R2A"
                                         className="form-input form-input w-full mt-0.5"
                                     />
@@ -599,7 +599,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                             </div>
                             {createError && <p className="text-xs text-red-500 mt-1">{createError}</p>}
                             <p className="text-[11px] text-meta mt-1">
-                                Creates and links the group; add coefficients, tests and phases in the curator fields afterward.
+                                Creates and links the testVehicle; add coefficients, tests and phases in the curator fields afterward.
                             </p>
                             <div className="flex gap-2 mt-2">
                                 <button type="button" onClick={handleCreate} disabled={creating}
@@ -636,7 +636,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
             {/* Existing mappings */}
             {mappings.length === 0 ? (
                 <p className="text-sm text-secondary mb-3">
-                    No EPA test group linked yet.
+                    No EPA test vehicle linked yet.
                     {canEdit && !showSuggestions && ' Use the search above to assign one.'}
                 </p>
             ) : (
@@ -648,14 +648,14 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestGroup
                     onChoose={onSetPrimary}
                 />
                 {mappings.map(m => (
-                    <EpaGroupCard
+                    <EpaTestVehicleCard
                         key={m.id}
                         mapping={m}
                         vehicle={vehicle}
                         canEdit={canEdit}
-                        onGroupChanged={onGroupChanged}
+                        onTestVehicleChanged={onTestVehicleChanged}
                         onUnlink={onUnlink}
-                        onDelete={deleteEpaTestGroup}
+                        onDelete={deleteEpaTestVehicle}
                         onUpdateConfidence={onUpdateConfidence}
                         onUpdateDisplayName={onUpdateDisplayName}
                     />

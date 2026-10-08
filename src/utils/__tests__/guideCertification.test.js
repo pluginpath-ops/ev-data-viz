@@ -69,11 +69,11 @@ describe('configurationsInTestGroup', () => {
         { id: 3, smog_test_group: 'R2', model_year: 2026 },
         { id: 4, smog_test_group: null, model_year: 2027 },
     ];
-    it('counts the configurations sharing the test group in the same year', () => {
+    it('counts the configurations sharing the Test Group in the same year', () => {
         expect(configurationsInTestGroup(rows, rows[0])).toBe(2);
         expect(configurationsInTestGroup(rows, rows[2])).toBe(1);
     });
-    it('is 1 with no test group', () => {
+    it('is 1 with no Test Group', () => {
         expect(configurationsInTestGroup(rows, rows[3])).toBe(1);
         expect(configurationsInTestGroup([], null)).toBe(1);
     });

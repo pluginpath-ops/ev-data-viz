@@ -1,14 +1,14 @@
 /**
- * The adapter from a stored EPA group to a methodology record.
+ * The adapter from a stored EPA test vehicle to a methodology record.
  *
- * The load-bearing test is the round trip: a group shaped exactly as the
+ * The load-bearing test is the round trip: a test vehicle shaped exactly as the
  * database returns one, through the adapter, through the model, landing on the
  * R2's published label. Asserting the record's fields alone would pass while
  * feeding the model something it cannot use — which is the failure this whole
  * seam exists to prevent.
  */
 import { describe, it, expect } from 'vitest';
-import { epaRecordFromGroup, NO_RECORD_REASONS } from '../epaRecordFromGroup';
+import { epaRecordFromTestVehicle, NO_RECORD_REASONS } from '../epaRecordFromTestVehicle';
 import { buildMethodologyModel } from '../epaMethodology';
 import { R2_MCT } from '../epaMethodologyFixtures';
 import { PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, HWFET_MI, UDDS_MI } from '../../constants/epa';
@@ -42,9 +42,9 @@ const R2_GROUP = {
     }],
 };
 
-describe('epaRecordFromGroup — MCT', () => {
+describe('epaRecordFromTestVehicle — MCT', () => {
     it('produces a record the model turns into the R2 label', () => {
-        const { record, reason } = epaRecordFromGroup(R2_GROUP);
+        const { record, reason } = epaRecordFromTestVehicle(R2_GROUP);
         expect(reason).toBeNull();
 
         const fromDb = buildMethodologyModel(record);
@@ -58,19 +58,19 @@ describe('epaRecordFromGroup — MCT', () => {
     });
 
     it('derives consumption from energy and distance rather than storing it', () => {
-        const { record } = epaRecordFromGroup(R2_GROUP);
+        const { record } = epaRecordFromTestVehicle(R2_GROUP);
         expect(record.phases[0].whPerMi).toBeCloseTo(235.86, 2);
         expect(record.phases[0].wh).toBeCloseTo(1751.46, 1);
     });
 
     it('converts stored kWh to the Wh the model works in', () => {
-        const { record } = epaRecordFromGroup(R2_GROUP);
+        const { record } = epaRecordFromTestVehicle(R2_GROUP);
         expect(record.totalDcWh).toBeCloseTo(89549.27, 1);
         expect(record.rechargeAcWh).toBeCloseTo(104689, 1);
     });
 
     it('carries the published adjustment factor through', () => {
-        const { record } = epaRecordFromGroup({
+        const { record } = epaRecordFromTestVehicle({
             ...R2_GROUP,
             label_adjustment_factor: 0.7051,
             label_calc_approach: 'Electric Vehicle 5-cycle label',
@@ -87,7 +87,7 @@ describe('epaRecordFromGroup — MCT', () => {
                 epa_test_phases: [...R2_GROUP.epa_tests[0].epa_test_phases].reverse(),
             }],
         };
-        const { record } = epaRecordFromGroup(shuffled);
+        const { record } = epaRecordFromTestVehicle(shuffled);
         expect(record.phases.map(p => p.index)).toEqual([1, 2, 3, 4, 5, 7]);
     });
 
@@ -102,14 +102,14 @@ describe('epaRecordFromGroup — MCT', () => {
                     .map(p => ({ ...p, phase_type: null })),
             }],
         };
-        const { record, inferredPhaseTypes } = epaRecordFromGroup(untyped);
+        const { record, inferredPhaseTypes } = epaRecordFromTestVehicle(untyped);
         expect(record).not.toBeNull();
         expect(inferredPhaseTypes).toBe(6);
         expect(record.phases.map(p => p.cycle))
             .toEqual(['UDDS', 'HWY', 'UDDS', 'HWY', 'UDDS', 'UDDS']);
     });
 
-    it('reports when a group holds more than one MCT', () => {
+    it('reports when a test vehicle holds more than one MCT', () => {
         // A real R2 configuration carried two, whose recharge energies differed
         // by ~5%. Picking silently put the derived MPGe 5.15% out while every
         // bag still reconciled — a confusing place to be sent looking.
@@ -120,10 +120,10 @@ describe('epaRecordFromGroup — MCT', () => {
                 { ...R2_GROUP.epa_tests[0], test_date: '2025-06-01' },
             ],
         };
-        const out = epaRecordFromGroup(two);
+        const out = epaRecordFromTestVehicle(two);
         expect(out.competingMctTests).toBe(2);
         expect(out.record.rechargeAcWh).toBeCloseTo(104689, 0);   // the newer run
-        expect(epaRecordFromGroup(R2_GROUP).competingMctTests).toBe(1);
+        expect(epaRecordFromTestVehicle(R2_GROUP).competingMctTests).toBe(1);
     });
 
     it('derives the same way on every load when several MCTs tie', () => {
@@ -136,8 +136,8 @@ describe('epaRecordFromGroup — MCT', () => {
                 { ...R2_GROUP.epa_tests[0], test_number: '2' },
             ],
         };
-        const a = epaRecordFromGroup(tied).record.rechargeAcWh;
-        const b = epaRecordFromGroup({ ...tied, epa_tests: [...tied.epa_tests].reverse() }).record.rechargeAcWh;
+        const a = epaRecordFromTestVehicle(tied).record.rechargeAcWh;
+        const b = epaRecordFromTestVehicle({ ...tied, epa_tests: [...tied.epa_tests].reverse() }).record.rechargeAcWh;
         expect(a).toBe(b);
     });
 
@@ -150,11 +150,11 @@ describe('epaRecordFromGroup — MCT', () => {
                 ...R2_GROUP.epa_tests,
             ],
         };
-        expect(epaRecordFromGroup(both).record.testMethod).toBe('mct');
+        expect(epaRecordFromTestVehicle(both).record.testMethod).toBe('mct');
     });
 });
 
-describe('epaRecordFromGroup — SCT', () => {
+describe('epaRecordFromTestVehicle — SCT', () => {
     const SCT_GROUP = {
         model_year: 2026,
         display_name: 'Ford F-150 Lightning ER',
@@ -170,28 +170,28 @@ describe('epaRecordFromGroup — SCT', () => {
     it('assigns the combined-named column to the CITY cycle', () => {
         // The trap the epic names: this column is city on SCT, and swapping it
         // yields two plausible wrong ranges rather than an error.
-        const { record } = epaRecordFromGroup(SCT_GROUP);
+        const { record } = epaRecordFromTestVehicle(SCT_GROUP);
         expect(record.runs.find(r => r.cycle === 'UDDS').rangeMi).toBe(504.521);
         expect(record.runs.find(r => r.cycle === 'HWFET').rangeMi).toBe(407.934);
     });
 
     it('leaves DC energy null rather than imputing it', () => {
         // An SCT record has no battery-side energy by construction.
-        expect(epaRecordFromGroup(SCT_GROUP).record.totalDcWh).toBeNull();
+        expect(epaRecordFromTestVehicle(SCT_GROUP).record.totalDcWh).toBeNull();
     });
 
     it('builds a model that reaches the label', () => {
-        const model = buildMethodologyModel(epaRecordFromGroup(SCT_GROUP).record);
+        const model = buildMethodologyModel(epaRecordFromTestVehicle(SCT_GROUP).record);
         expect(model).not.toBeNull();
         expect(model.testMethod).toBe('sct');
         expect(model.labeledMi).toBe(320);
     });
 });
 
-describe('epaRecordFromGroup — why there is no record', () => {
+describe('epaRecordFromTestVehicle — why there is no record', () => {
     it('names a reason for every way it can fail', () => {
         const cases = {
-            'no-group':  undefined,
+            'no-test-vehicle':  undefined,
             'no-tests':  { epa_tests: [] },
             'no-energy': { epa_tests: [{ procedure_code: PROC_MCT, total_dc_energy_kwh: null, epa_test_phases: [] }] },
             'no-phases': { epa_tests: [{ procedure_code: PROC_MCT, total_dc_energy_kwh: 89.5, epa_test_phases: [] }] },
@@ -209,8 +209,8 @@ describe('epaRecordFromGroup — why there is no record', () => {
             ] },
         };
 
-        for (const [expected, group] of Object.entries(cases)) {
-            const { record, reason } = epaRecordFromGroup(group);
+        for (const [expected, testVehicle] of Object.entries(cases)) {
+            const { record, reason } = epaRecordFromTestVehicle(testVehicle);
             expect(record, expected).toBeNull();
             expect(reason, expected).toBe(expected);
             // Every reason must be sayable to a curator, or the UI prints a code.
@@ -220,7 +220,7 @@ describe('epaRecordFromGroup — why there is no record', () => {
 
     it('has wording for every reason it can emit, and no orphans', () => {
         const emitted = new Set([
-            'no-group', 'no-tests', 'no-energy', 'no-phases',
+            'no-test-vehicle', 'no-tests', 'no-energy', 'no-phases',
             'phases-untyped', 'missing-cycle', 'sct-no-ranges',
         ]);
         expect(new Set(Object.keys(NO_RECORD_REASONS))).toEqual(emitted);

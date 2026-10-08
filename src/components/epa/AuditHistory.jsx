@@ -1,14 +1,14 @@
 /**
- * Audit-trail viewer for one EPA test group (Section: cross-cutting audit
+ * Audit-trail viewer for one EPA test vehicle (Section: cross-cutting audit
  * requirement). Lists who changed what, when, prior → new, and any source
- * citation, across the group row and all its child rows (coefficient sets,
- * tests, phases). Read by test_group_id, so it still resolves after a re-import
+ * citation, across the test vehicle row and all its child rows (coefficient sets,
+ * tests, phases). Read by test_vehicle_id, so it still resolves after a re-import
  * has replaced the child rows. Collapsible; loads on first open.
  */
 import { useState } from 'react';
 
 const TABLE_LABEL = {
-    epa_test_groups:     'group',
+    epa_test_vehicles:     'test vehicle',
     epa_coefficient_sets:'coeff',
     epa_tests:           'test',
     epa_test_phases:     'phase',
@@ -20,7 +20,7 @@ function timeAgo(iso) {
     return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export default function AuditHistory({ group, getEpaAuditForGroup }) {
+export default function AuditHistory({ testVehicle, getEpaAuditForTestVehicle }) {
     const [open, setOpen]       = useState(false);
     const [rows, setRows]       = useState(null); // null = not loaded
     const [loading, setLoading] = useState(false);
@@ -29,7 +29,7 @@ export default function AuditHistory({ group, getEpaAuditForGroup }) {
     const load = async () => {
         setLoading(true); setError(null);
         try {
-            setRows(await getEpaAuditForGroup(group.test_group_id));
+            setRows(await getEpaAuditForTestVehicle(testVehicle.test_vehicle_id));
         } catch (e) {
             setError(e.message);
         } finally {

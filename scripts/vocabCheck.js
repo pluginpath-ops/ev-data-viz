@@ -19,7 +19,7 @@
  *
  * ── What is NOT checked, and why ────────────────────────────────────────────
  *
- * Five of the nine Retired rows cannot be matched without flagging correct
+ * Six of the eleven Retired rows cannot be matched without flagging correct
  * code, and driftProbes.js already has this project's position on that: "a
  * ledger that counts legitimate code teaches people to ignore it." These stay
  * with the reader, which is what the pledge in CLAUDE.md is for:
@@ -38,6 +38,9 @@
  *     be the first thing anyone learned to skip.
  *   - "Hidden" for a test (#394, now Unlisted). `hidden` is also an HTML
  *     attribute, a Tailwind class and the column's own name.
+ *   - "test group" for the Vehicle ID record (#374, now EPA test vehicle).
+ *     "Test Group" is EPA's certification identifier and correct; only the
+ *     sentence says which one is meant. The renamed identifiers ARE checked.
  */
 import { execSync } from 'child_process';
 
@@ -65,6 +68,18 @@ const RETIRED = [
         write:   'all tests',
         why:     'the widest recolor scope reseeds every run, not every vehicle',
     },
+    {
+        // The identifiers migration 081 renamed (#374). Each is a name, not a
+        // word, so it cannot be right anywhere new.
+        pattern: /\b(epa_test_groups|test_group_id|epa_test_group_id|testGroupIds?|epaGroup|epa_test_family_id|carryover_test_group_id)\b/g,
+        write:   'epa_test_vehicles · test_vehicle_id · testVehicleId · epaTestVehicle · test_group',
+        why:     'the record is the EPA test vehicle; EPA\'s Test Group is the certification',
+    },
+    {
+        pattern: /\b(certification|cert) groups?\b/gi,
+        write:   'EPA test vehicle(s)',
+        why:     'the Vehicle ID record is a test vehicle; a certification is a Test Group',
+    },
 ];
 
 /**
@@ -76,7 +91,12 @@ const RETIRED = [
  * explicitly rather than pattern-matched, so a third file cannot quietly join
  * them.
  */
-const SELF_EXEMPT = new Set(['scripts/vocabCheck.js', 'docs/vocabulary.md']);
+const SELF_EXEMPT = new Set([
+    'scripts/vocabCheck.js', 'docs/vocabulary.md',
+    // The rename itself, which has to name what it renames, and the plan that
+    // records the names it replaced (#374).
+    'supabase/migrations/081_epa_test_vehicles_rename.sql', 'docs/epa-certifications-plan.md',
+]);
 
 const args    = process.argv.slice(2);
 const flag    = (f) => args.includes(f);
@@ -133,8 +153,9 @@ console.log(`\nvocabulary — ${label}: ${lines.length} added line(s)\n`);
 
 if (!hits.length) {
     console.log('  No retired terms.\n');
-    console.log('  Five Retired rows are not machine-checkable ("chrome" for the header,');
-    console.log('  "Runs" in UI text, "pinning", a bare "band", "Hidden" for a test) — those are on you.');
+    console.log('  Six Retired rows are not machine-checkable ("chrome" for the header,');
+    console.log('  "Runs" in UI text, "pinning", a bare "band", "Hidden" for a test,');
+    console.log('  "test group" for the Vehicle ID record) — those are on you.');
     console.log('  docs/vocabulary.md\n');
     process.exit(0);
 }

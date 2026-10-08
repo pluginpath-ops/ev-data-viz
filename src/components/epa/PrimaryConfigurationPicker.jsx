@@ -13,7 +13,7 @@ const kwh    = (v) => (v != null ? `${Math.round(v * 10) / 10} kWh` : '—');
 const pounds = (v) => (v != null ? `${Math.round(v).toLocaleString('en-US')} lb` : '—');
 
 export default function PrimaryConfigurationPicker({ vehicle, mappings, canEdit, onChoose }) {
-    const linked = mappings.filter(m => m.epaGroup);
+    const linked = mappings.filter(m => m.epaTestVehicle);
     if (linked.length < 2) return null;
     const hasPrimary = linked.some(m => m.isPrimary);
 
@@ -27,7 +27,7 @@ export default function PrimaryConfigurationPicker({ vehicle, mappings, canEdit,
                 <span className="primary-config-figure">Test weight</span>
             </div>
             {linked.map(m => {
-                const c = epaConfigurationFigures(m.epaGroup);
+                const c = epaConfigurationFigures(m.epaTestVehicle);
                 return (
                     <label
                         key={m.id}

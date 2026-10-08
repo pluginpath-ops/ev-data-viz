@@ -5,20 +5,20 @@
  * Input is the ordered list of text items extracted from the PDF (see
  * extractPdfText.js, which uses pdf.js in the browser). CSI reports are
  * iText-generated text PDFs laid out as (label)(value) pairs, so parsing is a
- * label-anchored walk over the item stream, segmented Group → Config → Test →
+ * label-anchored walk over the item stream, segmented certificate → Config → Test →
  * Bag/Phase.
  *
- * Output shape matches getEpaTestGroupFull / the importer contract:
- *   { groups: [{ test_group_id, epa_test_family_id, model_year, make,
+ * Output shape matches getEpaTestVehicleFull / the importer contract:
+ *   { testVehicles: [{ test_vehicle_id, test_group, model_year, make,
  *                epa_carline_name, vehicle_config_number, drive, fuel_type,
  *                total_voltage, battery_specific_energy, useable_kwh,
- *                carryover_test_group_id, carryover_model_year,
+ *                carryover_test_group, carryover_model_year,
  *                coefficient_sets: [...], tests: [{ ..., phases: [...] }] }],
  *     warnings: [...] }
  *
- * `model_year` / `epa_test_family_id` are the CERTIFICATION's, from page 1. The
+ * `model_year` / `test_group` are the CERTIFICATION's, from page 1. The
  * `carryover_*` pair is where the emission data vehicles were tested, which on a
- * carryover certification is a different year and a different group — see
+ * carryover certification is a different year and a different Test Group — see
  * parseCertHeader and migration 056.
  *
  * Phase type is not stated in the PDF, so it's inferred — by `phaseTypes`,
@@ -63,8 +63,8 @@ function mapCoeffCategory(label) {
 /**
  * The certification's OWN identity, read from the page-1 header.
  *
- * Must run on the RAW item stream, before stripNoise: page 1 states the test
- * group as a field, every later page repeats it as a footer, and the two are
+ * Must run on the RAW item stream, before stripNoise: page 1 states the Test
+ * Group as a field, every later page repeats it as a footer, and the two are
  * character-identical, so nothing downstream of the strip can tell them apart.
  *
  * Both values are the certification's, NOT the emission data vehicles'. On a
@@ -119,20 +119,20 @@ function certYearFrom(items) {
 }
 
 /**
- * The certification test group, skipping the same blanks certYearFrom does.
+ * The certification's Test Group, skipping the same blanks certYearFrom does.
  *
  * The previous version read `items[i + 1]` and a comment claimed it escaped the
  * separator problem "by accident" because it scans every occurrence. It does
  * not. EVERY occurrence has the blank, so every candidate was a space, nothing
  * matched the ID shape, and the result was null on every certificate — Volvo,
- * Mercedes and BMW alike. `epa_test_family_id` therefore fell back to the
- * carryover group on every import, which is both the wrong identity and the
+ * Mercedes and BMW alike. `test_group` therefore fell back to the
+ * carryover Test Group on every import, which is both the wrong identity and the
  * loss of a real join: the Fuel Economy Guide carries this exact string as
  * "#1 Smog Rating Test Group".
  *
  * Scanning past empties keeps what the original was actually right about —
  * checking the SHAPE rather than trusting position. The one occurrence that is
- * not a test group is the "Official Test Numbers" column header, whose value
+ * not a Test Group is the "Official Test Numbers" column header, whose value
  * slot holds "Fuel", and an ID has a dot and no spaces.
  */
 function certGroupFrom(items) {
@@ -538,7 +538,7 @@ function parseTests(items, start, end) {
 
 /**
  * @param {string[]} rawItems  Ordered text items from the CSI PDF.
- * @returns {{ groups: Array, warnings: string[] }}
+ * @returns {{ testVehicles: Array, warnings: string[] }}
  */
 export function parseEpaCsiText(rawItems) {
     const { certTestGroup, certModelYear } = parseCertHeader(rawItems);
@@ -548,25 +548,25 @@ export function parseEpaCsiText(rawItems) {
     // Each config begins at a "Vehicle ID / Configuration" anchor.
     const cfgIdx = indicesWhere(items, s => s === 'Vehicle ID / Configuration');
     if (!cfgIdx.length) {
-        return { groups: [], warnings: ['No vehicle configurations found — is this an EPA CSI PDF?'] };
+        return { testVehicles: [], warnings: ['No vehicle configurations found — is this an EPA CSI PDF?'] };
     }
 
-    // Group-level fields live in the preamble before the first config and are
+    // Certificate-wide fields live in the preamble before the first config and are
     // shared across configs (battery pack, certifying manufacturer).
     const preEnd = cfgIdx[0];
-    const groupManufacturer = cleanMake(valAfter(items, 'Manufacturer', 0, preEnd));
-    const groupVoltage = parseNum(valAfter(items, 'Total Voltage of Battery Packs', 0, preEnd));
-    const groupSpecificEnergy = parseNum(valAfter(items, 'Battery Specific Energy', 0, preEnd));
+    const certManufacturer = cleanMake(valAfter(items, 'Manufacturer', 0, preEnd));
+    const certVoltage = parseNum(valAfter(items, 'Total Voltage of Battery Packs', 0, preEnd));
+    const certSpecificEnergy = parseNum(valAfter(items, 'Battery Specific Energy', 0, preEnd));
 
     // First pass: read raw vehicle IDs to detect repeats (BMW/Lucid reuse one ID
-    // across configs; we must disambiguate the test_group_id with the config #).
+    // across configs; we must disambiguate the test_vehicle_id with the config #).
     const rawIds = cfgIdx.map(ci => (items[ci + 1] || '').split('/')[0].trim());
     const idCounts = rawIds.reduce((m, id) => (m[id] = (m[id] || 0) + 1, m), {});
 
     // Read once: the table is certificate-wide, not per configuration.
     const coveredModels = parseCoveredModels(items);
 
-    const groups = cfgIdx.map((ci, k) => {
+    const testVehicles = cfgIdx.map((ci, k) => {
         const end = k + 1 < cfgIdx.length ? cfgIdx[k + 1] : items.length;
         // "Vehicle ID / Configuration" = "<Vehicle ID> / <EPA config index>".
         // The EPA config index distinguishes records under one reused Vehicle ID
@@ -579,12 +579,12 @@ export function parseEpaCsiText(rawItems) {
         // not necessarily unique across configs, so it is NOT used for the key.
         const modeNum = valAfter(items, 'Manufacturer Vehicle Configuration Number', ci, end);
         // Unique key: bare Vehicle ID when unique in this PDF, else suffix the EPA config index.
-        const test_group_id = vehId
+        const test_vehicle_id = vehId
             ? (idCounts[vehId] > 1 ? `${vehId}-${epaConfigIdx || k}` : vehId)
             : null;
 
         const rawMake = valAfter(items, 'Represented Test Vehicle Make', ci, end);
-        const make = (!rawMake || /^\d+$/.test(rawMake)) ? groupManufacturer : cleanMake(rawMake);
+        const make = (!rawMake || /^\d+$/.test(rawMake)) ? certManufacturer : cleanMake(rawMake);
 
         // The dynamometer's inertia setting, and the only mass in the record.
         // Without it the grade term of any road-trip or elevation calculation
@@ -598,13 +598,13 @@ export function parseEpaCsiText(rawItems) {
 
         // The CSI states these PER TEST and parseTests has always read them.
         // They used to be deleted here, because epa_tests had nowhere to put
-        // them — so a group holding two multi-cycle tests kept one test's
+        // them — so a test vehicle holding two multi-cycle tests kept one test's
         // ranges and the derivation then used the OTHER test's phases. Migration
         // 060 adds the columns; they are kept on each test now.
         //
-        // The group still carries a headline figure, from the first procedure-77
+        // The test vehicle still carries a headline figure, from the first procedure-77
         // test, because that is what the guide comparison is stated against.
-        // Which one the checks compare against is decided in epaRecordFromGroup,
+        // Which one the checks compare against is decided in epaRecordFromTestVehicle,
         // where the derivation test is chosen.
         const pref = tests.find(t => t.procedure_code === 77)
             || tests.find(t => t.procedure_code === 84) || tests[0];
@@ -614,23 +614,23 @@ export function parseEpaCsiText(rawItems) {
         // The certification's identity when page 1 gave it, else the carryover
         // source — which is what the two "Original …" fields hold, and which is
         // the same value on a certification that did not carry anything over.
-        const carryoverGroup = valAfter(items, 'Original Test Group Name', ci, end);
+        const carryoverTestGroup = valAfter(items, 'Original Test Group Name', ci, end);
         const carryoverYear = parseNum(valAfter(items, 'Original Test Vehicle Model Year', ci, end));
 
         return {
-            test_group_id,
-            epa_test_family_id: certTestGroup ?? carryoverGroup,
+            test_vehicle_id,
+            test_group: certTestGroup ?? carryoverTestGroup,
             vehicle_config_number: modeNum ?? null,   // mfr "mode" number, captured separately
             model_year: certModelYear ?? carryoverYear,
             // Kept, not discarded: these say which model year's lab work the
             // results actually are, which the certification year does not.
-            carryover_test_group_id: carryoverGroup ?? null,
+            carryover_test_group: carryoverTestGroup ?? null,
             carryover_model_year: carryoverYear,
             make,
             epa_carline_name: valAfter(items, 'Represented Test Vehicle Model', ci, end),
             fuel_type: 'Electricity',
-            total_voltage: groupVoltage,
-            battery_specific_energy: groupSpecificEnergy,
+            total_voltage: certVoltage,
+            battery_specific_energy: certSpecificEnergy,
             // "Battery Energy Capacity" in the CSI is amp-hours, not useable kWh,
             // so it's intentionally not mapped — curator sets useable capacity
             // (best proxy: the MCT total DC to depletion).
@@ -644,15 +644,15 @@ export function parseEpaCsiText(rawItems) {
             // the CERTIFICATE covers, not what one configuration is.
             covered_models: coveredModels,
         };
-    }).filter(g => g.test_group_id);
+    }).filter(g => g.test_vehicle_id);
 
-    if (!groups.length) warnings.push('Configurations found but no Vehicle IDs could be read.');
+    if (!testVehicles.length) warnings.push('Configurations found but no Vehicle IDs could be read.');
     if (!coveredModels.length) {
         warnings.push('No "Models Covered by this Certificate" table found — the configurations this certificate covers will not be recorded.');
     }
 
     if (certTestGroup == null) {
-        warnings.push('No test group on page 1 — falling back to each config\'s "Original Test Group Name", which is the carryover source on a carryover certification.');
+        warnings.push('No Test Group on page 1 — falling back to each config\'s "Original Test Group Name", which is the carryover source on a carryover certification.');
     }
     if (certModelYear == null) {
         warnings.push('No model year on page 1 — falling back to each config\'s "Original Test Vehicle Model Year", which is the carryover source on a carryover certification.');
@@ -661,26 +661,26 @@ export function parseEpaCsiText(rawItems) {
     // A carryover is not a problem, but it IS the thing that makes the two model
     // years disagree, and every downstream comparison against a published guide
     // row turns on which one you are holding. Said once, not per config.
-    const carried = groups.filter(g => g.carryover_model_year != null
+    const carried = testVehicles.filter(g => g.carryover_model_year != null
         && g.carryover_model_year !== g.model_year);
     if (carried.length) {
-        warnings.push(`Carryover certification: MY${carried[0].model_year} certifies vehicles tested under MY${carried[0].carryover_model_year} (${carried[0].carryover_test_group_id ?? 'unknown group'}). Results are the earlier year's; the record is the later year's.`);
+        warnings.push(`Carryover certification: MY${carried[0].model_year} certifies vehicles tested under MY${carried[0].carryover_model_year} (${carried[0].carryover_test_group ?? 'unknown Test Group'}). Results are the earlier year's; the record is the later year's.`);
     }
 
     // Flag configs where no DC energy could be extracted — some PDFs (e.g. Ford)
     // report it only in an external EPA spreadsheet, so η can't be measured until
     // a curator enters Total DC / phase energy by hand.
-    for (const g of groups) {
+    for (const g of testVehicles) {
         // A configuration with no readable test imports as a bare shell: no
         // cd_range_*, no DC energy, nothing to derive an η from. Some
         // certificates carry only a procedure 2 (CVS 75, no canister load) test,
         // which isTestHeader does not read (#371, #230).
         if (!g.tests.length) {
-            warnings.push(`${g.test_group_id}: no readable tests in this PDF (some certificates carry only a procedure 2 test, which is not read) — it will import with no range, energy or η; enter them manually.`);
+            warnings.push(`${g.test_vehicle_id}: no readable tests in this PDF (some certificates carry only a procedure 2 test, which is not read) — it will import with no range, energy or η; enter them manually.`);
         }
         if (g.tests.length && !g.tests.some(t => t.total_dc_energy_kwh != null)) {
-            warnings.push(`${g.test_group_id}: no DC energy in this PDF (often in an external EPA spreadsheet) — enter Total DC / phase energy manually for a measured η.`);
+            warnings.push(`${g.test_vehicle_id}: no DC energy in this PDF (often in an external EPA spreadsheet) — enter Total DC / phase energy manually for a measured η.`);
         }
     }
-    return { groups, warnings };
+    return { testVehicles, warnings };
 }

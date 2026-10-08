@@ -54,19 +54,19 @@ export {
  *   Using set alone would dramatically understate road load at highway speeds
  *   (30–55 % for heavy vehicles), producing falsely optimistic efficiency curves.
  *
- * @param {object} epaGroup — row from epa_test_groups
+ * @param {object} epaTestVehicle — row from epa_test_vehicles
  * @returns {{ a: number, b: number, c: number }}
  */
-export function resolveCoeffs(epaGroup) {
+export function resolveCoeffs(epaTestVehicle) {
     const hasTarget =
-        epaGroup.target_a != null &&
-        epaGroup.target_b != null &&
-        epaGroup.target_c != null;
+        epaTestVehicle.target_a != null &&
+        epaTestVehicle.target_b != null &&
+        epaTestVehicle.target_c != null;
 
     if (hasTarget) {
-        return { a: epaGroup.target_a, b: epaGroup.target_b, c: epaGroup.target_c };
+        return { a: epaTestVehicle.target_a, b: epaTestVehicle.target_b, c: epaTestVehicle.target_c };
     }
-    return { a: epaGroup.set_a, b: epaGroup.set_b, c: epaGroup.set_c };
+    return { a: epaTestVehicle.set_a, b: epaTestVehicle.set_b, c: epaTestVehicle.set_c };
 }
 
 // ── Core physics ──────────────────────────────────────────────────────────────
@@ -146,20 +146,20 @@ export function batteryKwh100mi(speedMph, a, b, c, etaEff) {
  * Build the full steady-state curve from CURVE_SPEED_RANGE[0] to [1] mph
  * at 1-mph intervals.
  *
- * @param {object} epaGroup — row from epa_test_groups
+ * @param {object} epaTestVehicle — row from epa_test_vehicles
  * @param {number|null} useableKwh — battery capacity for range calculation
  * @returns {Array<{ mph, kwh100mi, miPerKwh, mpge, rangeMi }>}
  *   rangeMi is null when useableKwh is null/zero.
  */
-export function buildEpaCurve(epaGroup, useableKwh) {
-    const { a, b, c } = resolveCoeffs(epaGroup);
+export function buildEpaCurve(epaTestVehicle, useableKwh) {
+    const { a, b, c } = resolveCoeffs(epaTestVehicle);
     if (a == null || b == null || c == null) return [];
 
     // Prefer unadjusted HWFET (raw dyno value) for calibration; fall back to
     // adjusted (RND_ADJ_FE kWh/100mi from the test car sheet). Unadj is rarely
     // present in the test car list; adj is populated for every HWFE/HWY row and
     // is accurate enough for the steady-state comparative curve.
-    const hwfetKwh = epaGroup.hwfet_unadj_kwh_100mi ?? epaGroup.hwfet_adj_kwh_100mi;
+    const hwfetKwh = epaTestVehicle.hwfet_unadj_kwh_100mi ?? epaTestVehicle.hwfet_adj_kwh_100mi;
     const eta = calibrateEfficiency(a, b, c, hwfetKwh);
     const results = [];
     const [vMin, vMax] = CURVE_SPEED_RANGE;
@@ -184,20 +184,20 @@ export function buildEpaCurve(epaGroup, useableKwh) {
  * Resolve the best available useable battery capacity (kWh).
  *
  * Priority:
- *   1. epa_test_groups.useable_kwh  — this record's own reported value (often
+ *   1. epa_test_vehicles.useable_kwh  — this record's own reported value (often
  *                                     absent). Kept first for curve work: the
- *                                     curve is drawn for THIS group.
+ *                                     curve is drawn for THIS test vehicle.
  *   2. vehicle.socWindowKwh         — the vehicle's resolved capacity (EPA
  *                                     tested, Usable, Gross), see vehicleFigures.js
  *
  * Returns null when neither yields a positive number.
  *
- * @param {object} epaGroup — row from epa_test_groups
+ * @param {object} epaTestVehicle — row from epa_test_vehicles
  * @param {object} vehicle  — app vehicle object, as AppContext provides it
  * @returns {number|null}
  */
-export function resolveUseableKwh(epaGroup, vehicle) {
-    if (epaGroup?.useable_kwh > 0) return epaGroup.useable_kwh;
+export function resolveUseableKwh(epaTestVehicle, vehicle) {
+    if (epaTestVehicle?.useable_kwh > 0) return epaTestVehicle.useable_kwh;
     if (vehicle?.socWindowKwh > 0) return vehicle.socWindowKwh;
     return null;
 }
@@ -206,10 +206,10 @@ export function resolveUseableKwh(epaGroup, vehicle) {
  * Which source resolveUseableKwh() used. Matches its order exactly.
  *
  * @returns {'EPA'|'epa-tested'|'usable'|'gross'|'unsorted'|null}
- *          'EPA' is the group's own figure; the rest are vehicle.socWindowBasis
+ *          'EPA' is the test vehicle's own figure; the rest are vehicle.socWindowBasis
  */
-export function resolveUseableKwhSource(epaGroup, vehicle) {
-    if (epaGroup?.useable_kwh > 0) return 'EPA';
+export function resolveUseableKwhSource(epaTestVehicle, vehicle) {
+    if (epaTestVehicle?.useable_kwh > 0) return 'EPA';
     if (vehicle?.socWindowKwh > 0) return vehicle.socWindowBasis ?? null;
     return null;
 }

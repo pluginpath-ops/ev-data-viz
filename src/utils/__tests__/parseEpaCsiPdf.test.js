@@ -12,7 +12,7 @@ import { parseEpaCsiText, parseCoveredModels } from '../parseEpaCsiPdf';
  *
  * It is a CARRYOVER certification, which is the only shape where the bug in
  * migration 056 is visible: a MY2027 certificate whose emission data vehicles
- * were tested a year earlier under a different test group. On a normal
+ * were tested a year earlier under a different Test Group. On a normal
  * certification the two agree and nothing distinguishes right from wrong.
  *
  * It deliberately contains, in stream order:
@@ -31,37 +31,37 @@ const ITEMS = JSON.parse(readFileSync(
 ));
 
 describe('parseEpaCsiText — certification identity vs carryover source', () => {
-    const { groups } = parseEpaCsiText(ITEMS);
+    const { testVehicles } = parseEpaCsiText(ITEMS);
 
     it('finds both configurations', () => {
-        expect(groups).toHaveLength(2);
-        expect(groups.map(g => g.test_group_id)).toEqual(['202625-2', '202625-3']);
+        expect(testVehicles).toHaveLength(2);
+        expect(testVehicles.map(g => g.test_vehicle_id)).toEqual(['202625-2', '202625-3']);
     });
 
     it('takes the model year from page 1, not from the carryover source', () => {
         // The failure this exists for: every config states 2026 as its
         // "Original Test Vehicle Model Year", and the certificate is 2027.
-        expect(groups.map(g => g.model_year)).toEqual([2027, 2027]);
+        expect(testVehicles.map(g => g.model_year)).toEqual([2027, 2027]);
     });
 
-    it('takes the test group from page 1, not from the carryover source', () => {
+    it('takes the Test Group from page 1, not from the carryover source', () => {
         // VVVXT00.0ZVG is what the Fuel Economy Guide carries as
         // "#1 Smog Rating Test Group"; TVVXT00.0ZVG joins to nothing.
-        expect(groups.map(g => g.epa_test_family_id))
+        expect(testVehicles.map(g => g.test_group))
             .toEqual(['VVVXT00.0ZVG', 'VVVXT00.0ZVG']);
     });
 
     it('keeps the carryover source rather than discarding it', () => {
-        for (const g of groups) {
-            expect(g.carryover_test_group_id).toBe('TVVXT00.0ZVG');
+        for (const g of testVehicles) {
+            expect(g.carryover_test_group).toBe('TVVXT00.0ZVG');
             expect(g.carryover_model_year).toBe(2026);
         }
     });
 
     it('is not fooled by the "Official Test Numbers" column header', () => {
         // That header is the bare string "Test Group" followed by "Fuel". Taking
-        // it would put a fuel name in the test group column.
-        expect(groups.map(g => g.epa_test_family_id)).not.toContain('Fuel');
+        // it would put a fuel name in the Test Group column.
+        expect(testVehicles.map(g => g.test_group)).not.toContain('Fuel');
     });
 
     it('reads the equivalent test weight onto every coefficient set', () => {
@@ -69,7 +69,7 @@ describe('parseEpaCsiText — certification identity vs carryover source', () =>
         // by every category on it. It was never parsed at all, so the only mass
         // in the record was absent and the grade term of any elevation
         // calculation multiplied by nothing.
-        for (const g of groups) {
+        for (const g of testVehicles) {
             expect(g.coefficient_sets.length).toBeGreaterThan(0);
             for (const set of g.coefficient_sets) {
                 expect(set.equiv_test_weight_lbs).toBe(6000);
@@ -81,13 +81,13 @@ describe('parseEpaCsiText — certification identity vs carryover source', () =>
         // Same test weight, different road load: config 2 is the 20"/22" set and
         // config 3 the 21". A fixture where both configs were identical could
         // not tell a per-config read from a first-occurrence read.
-        expect(groups.map(g => g.coefficient_sets[0].target_a)).toEqual([40.75, 35.74]);
+        expect(testVehicles.map(g => g.coefficient_sets[0].target_a)).toEqual([40.75, 35.74]);
     });
 
     it('still reads the per-config fields', () => {
-        expect(groups[0].make).toBe('Volvo');
-        expect(groups[0].epa_carline_name).toBe('EX90 Twin Motor');
-        expect(groups.map(g => g.vehicle_config_number)).toEqual(['2', '3']);
+        expect(testVehicles[0].make).toBe('Volvo');
+        expect(testVehicles[0].epa_carline_name).toBe('EX90 Twin Motor');
+        expect(testVehicles.map(g => g.vehicle_config_number)).toEqual(['2', '3']);
     });
 });
 
@@ -108,17 +108,17 @@ describe('parseEpaCsiText — warnings', () => {
 
     it('warns for each configuration that has no readable test (#371)', () => {
         // The identity fixture carries no test section, so every config is a bare shell.
-        const { groups, warnings } = parseEpaCsiText(ITEMS);
+        const { testVehicles, warnings } = parseEpaCsiText(ITEMS);
         const bare = warnings.filter(w => w.includes('no readable tests'));
-        expect(bare).toHaveLength(groups.length);
-        expect(bare[0]).toContain(groups[0].test_group_id);
+        expect(bare).toHaveLength(testVehicles.length);
+        expect(bare[0]).toContain(testVehicles[0].test_vehicle_id);
     });
 
     it('stays quiet when the certification did not carry anything over', () => {
         // Same document with the two years agreeing.
         const same = ITEMS.map((s, i) => (ITEMS[i - 1] === 'Original Test Vehicle Model Year' ? '2027' : s));
-        const { groups, warnings } = parseEpaCsiText(same);
-        expect(groups[0].model_year).toBe(2027);
+        const { testVehicles, warnings } = parseEpaCsiText(same);
+        expect(testVehicles[0].model_year).toBe(2027);
         expect(warnings.filter(w => w.startsWith('Carryover certification:'))).toHaveLength(0);
     });
 });
@@ -129,24 +129,24 @@ describe('parseEpaCsiText — falling back when page 1 is unreadable', () => {
     // first page did not extract.
     const noPage1 = ITEMS.slice(34);
 
-    it('recovers the test group from a footer', () => {
+    it('recovers the Test Group from a footer', () => {
         // The first "Test Group" left in the stream is the column header, whose
         // value is "Fuel". Scanning past it reaches the footer's real ID.
-        expect(parseEpaCsiText(noPage1).groups[0].epa_test_family_id).toBe('VVVXT00.0ZVG');
+        expect(parseEpaCsiText(noPage1).testVehicles[0].test_group).toBe('VVVXT00.0ZVG');
     });
 
     it('falls back to the carryover model year and says so', () => {
         // Nothing repeats the model year, so it genuinely cannot be recovered.
-        const { groups, warnings } = parseEpaCsiText(noPage1);
-        expect(groups[0].model_year).toBe(2026);
+        const { testVehicles, warnings } = parseEpaCsiText(noPage1);
+        expect(testVehicles[0].model_year).toBe(2026);
         expect(warnings.some(w => w.includes('No model year on page 1'))).toBe(true);
     });
 
-    it('falls back to the carryover test group when nothing states one', () => {
-        const noGroup = noPage1.filter(s => s !== 'VVVXT00.0ZVG');
-        const { groups, warnings } = parseEpaCsiText(noGroup);
-        expect(groups[0].epa_test_family_id).toBe('TVVXT00.0ZVG');
-        expect(warnings.some(w => w.includes('No test group on page 1'))).toBe(true);
+    it('falls back to the carryover Test Group when nothing states one', () => {
+        const noTestGroup = noPage1.filter(s => s !== 'VVVXT00.0ZVG');
+        const { testVehicles, warnings } = parseEpaCsiText(noTestGroup);
+        expect(testVehicles[0].test_group).toBe('TVVXT00.0ZVG');
+        expect(warnings.some(w => w.includes('No Test Group on page 1'))).toBe(true);
     });
 });
 
@@ -223,8 +223,8 @@ describe('the certification\'s own model year', () => {
     it('reads past the blank between label and value', () => {
         // valAfter returns the separator, parseNum makes that null, and every
         // certificate silently fell back to the carryover year.
-        const { groups, warnings } = parseEpaCsiText([...header(2027), ...config(2026)]);
-        expect(groups[0].model_year).toBe(2027);
+        const { testVehicles, warnings } = parseEpaCsiText([...header(2027), ...config(2026)]);
+        expect(testVehicles[0].model_year).toBe(2027);
         expect(warnings.some(w => w.includes('No model year'))).toBe(false);
     });
 
@@ -232,22 +232,22 @@ describe('the certification\'s own model year', () => {
         // The whole point of migration 056: a 2027 certificate carrying 2026
         // lab work is a 2027 record. Storing 2026 makes the guide-linking sweep
         // reject its own correct same-year candidate as a borrowed year.
-        const { groups } = parseEpaCsiText([...header(2027), ...config(2026)]);
-        expect(groups[0].model_year).toBe(2027);
-        expect(groups[0].carryover_model_year).toBe(2026);
+        const { testVehicles } = parseEpaCsiText([...header(2027), ...config(2026)]);
+        expect(testVehicles[0].model_year).toBe(2027);
+        expect(testVehicles[0].carryover_model_year).toBe(2026);
     });
 
     it('still falls back when page 1 genuinely has no year', () => {
         const noYear = ['Test Group', ' ', 'VVVXT00.0ZVG', '', 'Test Group Information', ''];
-        const { groups, warnings } = parseEpaCsiText([...noYear, ...config(2026)]);
-        expect(groups[0].model_year).toBe(2026);
+        const { testVehicles, warnings } = parseEpaCsiText([...noYear, ...config(2026)]);
+        expect(testVehicles[0].model_year).toBe(2026);
         expect(warnings.some(w => w.includes('No model year'))).toBe(true);
     });
 
     it('does not read a non-year that follows the label', () => {
         const odd = ['Model Year', ' ', 'Fuel', '', 'Test Group', ' ', 'VVVXT00.0ZVG', ''];
-        const { groups } = parseEpaCsiText([...odd, ...config(2026)]);
-        expect(groups[0].model_year).toBe(2026);
+        const { testVehicles } = parseEpaCsiText([...odd, ...config(2026)]);
+        expect(testVehicles[0].model_year).toBe(2026);
     });
 });
 
@@ -270,7 +270,7 @@ const mctItems = (lastBagMi) => [
         ]),
 ];
 
-const phasesOf = (items) => parseEpaCsiText(items).groups[0].tests[0].phases;
+const phasesOf = (items) => parseEpaCsiText(items).testVehicles[0].tests[0].phases;
 
 describe('phase typing on import', () => {
     it('types the eight bags of a multi-cycle test', () => {
@@ -316,7 +316,7 @@ const cdItems = ({ dc, miles, ac }) => [
     'Actual Distance Driven (miles)', String(miles),
     'Integrated DC KW-HRS', String(dc),
 ];
-const testOf = (items) => parseEpaCsiText(items).groups[0].tests[0];
+const testOf = (items) => parseEpaCsiText(items).testVehicles[0].tests[0];
 
 describe('a placeholder is not a measurement', () => {
     it('nulls a test whose energy, distance and recharge are all one number', () => {

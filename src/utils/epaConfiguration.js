@@ -2,14 +2,14 @@
  * A vehicle's linked EPA configurations, and which one stands for it (#322).
  *
  * A vehicle row often spans wheel and trim variants, so it can link to several
- * EPA test groups whose labels differ by a third. The primary configuration is
+ * EPA test vehicles whose labels differ by a third. The primary configuration is
  * the one whose label range, EPA tested capacity and test weight are the
  * vehicle's (`epa_vehicle_mappings.is_primary`, migration 067).
  *
  * Pure module: no data access, no React.
  */
 
-import { preferredMctTest } from './epaRecordFromGroup';
+import { preferredMctTest } from './epaRecordFromTestVehicle';
 
 // Absent stays absent: Number(null) is 0, and a 0 kWh pack is a figure the data
 // never gave.
@@ -27,16 +27,16 @@ const positive = (v) => {
  * different run from the one the curator card shows. Test weight comes from the
  * primary coefficient set, as the card's does.
  */
-export function epaConfigurationFigures(group) {
-    const test = preferredMctTest(group.epa_tests ?? [], group.preferred_test_number);
-    const sets = group.epa_coefficient_sets ?? [];
+export function epaConfigurationFigures(testVehicle) {
+    const test = preferredMctTest(testVehicle.epa_tests ?? [], testVehicle.preferred_test_number);
+    const sets = testVehicle.epa_coefficient_sets ?? [];
     const coeff = sets.find(c => c.is_primary) ?? sets[0] ?? null;
     return {
-        id: group.test_group_id,
-        name: group.display_name
-            || [group.model_year, group.make, group.epa_carline_name].filter(Boolean).join(' ')
-            || group.test_group_id,
-        labelRangeMi:  positive(group.label_range_published),
+        id: testVehicle.test_vehicle_id,
+        name: testVehicle.display_name
+            || [testVehicle.model_year, testVehicle.make, testVehicle.epa_carline_name].filter(Boolean).join(' ')
+            || testVehicle.test_vehicle_id,
+        labelRangeMi:  positive(testVehicle.label_range_published),
         testedKwh:     positive(test?.total_dc_energy_kwh),
         testWeightLbs: positive(coeff?.equiv_test_weight_lbs),
     };
@@ -53,14 +53,14 @@ export function epaConfigurationFigures(group) {
  * Null when there are several links and none is primary. Nothing is picked
  * silently: a vehicle in that state shows the span of its configurations.
  *
- * Mappings without a group are ignored, as everywhere else they are read — a
- * link to a deleted or unreadable group has nothing to stand for.
+ * Mappings without a test vehicle are ignored, as everywhere else they are read — a
+ * link to a deleted or unreadable test vehicle has nothing to stand for.
  *
- * @param {Array} mappings  vehicle.epa_mappings ({ id, isPrimary, epaGroup })
+ * @param {Array} mappings  vehicle.epa_mappings ({ id, isPrimary, epaTestVehicle })
  * @returns {{ mapping, basis: 'chosen'|'only' } | null}
  */
 export function primaryEpaMapping(mappings = []) {
-    const usable = mappings.filter(m => m?.epaGroup);
+    const usable = mappings.filter(m => m?.epaTestVehicle);
     const chosen = usable.find(m => m.isPrimary);
     if (chosen) return { mapping: chosen, basis: 'chosen' };
     if (usable.length === 1) return { mapping: usable[0], basis: 'only' };

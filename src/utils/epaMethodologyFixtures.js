@@ -91,7 +91,7 @@ export const LIGHTNING_SCT = {
  * reproduces none of them.
  *
  * Deliberately NOT on `R2_MCT`. That fixture is the certification record on its
- * own — a group with no guide row linked — which is the fallback case the
+ * own — a test vehicle with no guide row linked — which is the fallback case the
  * derivation still has to handle, and the case most existing tests assert
  * against. The linked variant is composed here instead.
  */

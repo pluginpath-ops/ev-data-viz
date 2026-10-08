@@ -63,6 +63,6 @@ export const EPA_EXPLAINERS = {
     // ── Mapping confidence ────────────────────────────────────────────────────
 
     confidenceBadge:
-        'Confidence indicates how certain the link between this vehicle and the EPA test group is. Verified: a contributor confirmed the test group ID against the EPA certification document. Likely: matched by make, model, and year with high confidence but not manually verified. Inferred: matched automatically; may not be exact, especially for multi-trim submissions.',
+        'Confidence indicates how certain the link between this vehicle and the EPA test vehicle is. Verified: a contributor confirmed the Vehicle ID against the EPA certification document. Likely: matched by make, model, and year with high confidence but not manually verified. Inferred: matched automatically; may not be exact, especially for multi-trim submissions.',
 
 };

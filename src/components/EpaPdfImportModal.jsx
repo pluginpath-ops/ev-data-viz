@@ -30,10 +30,10 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
     const [importProgress, setImportProgress] = useState(null); // { done, total, name, startedAt }
     const [error, setError]     = useState(null);
     const [dragOver, setDragOver] = useState(false);
-    const [groups, setGroups]   = useState([]);
+    const [testVehicles, setTestVehicles]   = useState([]);
     const [warnings, setWarnings] = useState([]);
     const [existing, setExisting] = useState(new Set());
-    const [selected, setSelected] = useState(new Set());   // test_group_ids to import
+    const [selected, setSelected] = useState(new Set());   // test_vehicle_ids to import
     const [linkIds, setLinkIds]   = useState(new Set());   // configs to link (per-vehicle mode)
     const [result, setResult]   = useState(null);
 
@@ -53,16 +53,16 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         setError(null);
         setProgress({ done: 0, total: list.length, name: list[0].name });
 
-        const allGroups = [];
+        const allTestVehicles = [];
         const allWarnings = [];
         const statuses = [];
-        const seen = new Map();   // test_group_id → the file that claimed it
+        const seen = new Map();   // test_vehicle_id → the file that claimed it
 
         for (const [i, file] of list.entries()) {
             setProgress({ done: i, total: list.length, name: file.name });
             try {
                 const items = await extractPdfText(file);
-                const { groups: g, warnings: w } = parseEpaCsiText(items);
+                const { testVehicles: g, warnings: w } = parseEpaCsiText(items);
                 if (!g.length) {
                     statuses.push({ name: file.name, configs: 0, error: w[0] || 'No EPA configurations found.' });
                     continue;
@@ -75,18 +75,18 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                     // first and naming the loser is predictable; letting the
                     // last silently win is not, because which file is "last"
                     // depends on the order the picker happened to hand them over.
-                    if (seen.has(grp.test_group_id)) {
-                        allWarnings.push(`${file.name}: ${grp.test_group_id} also appears in ${seen.get(grp.test_group_id)} — keeping the first.`);
+                    if (seen.has(grp.test_vehicle_id)) {
+                        allWarnings.push(`${file.name}: ${grp.test_vehicle_id} also appears in ${seen.get(grp.test_vehicle_id)} — keeping the first.`);
                         continue;
                     }
-                    seen.set(grp.test_group_id, file.name);
+                    seen.set(grp.test_vehicle_id, file.name);
                     // Provenance, which nothing was setting before: the column
-                    // exists and importEpaGroupFull writes it, but the modal
-                    // never supplied a name, so every imported group recorded
+                    // exists and importEpaTestVehicleFull writes it, but the modal
+                    // never supplied a name, so every imported test vehicle recorded
                     // null for the file it came from.
                     kept.push({ ...grp, source_file: file.name });
                 }
-                allGroups.push(...kept);
+                allTestVehicles.push(...kept);
                 allWarnings.push(...w.map(x => list.length > 1 ? `${file.name}: ${x}` : x));
                 // Is what we just read internally possible? A bulk load of every
                 // MY2026 certification wrote 2-5 kWh packs and 1% charging
@@ -107,24 +107,24 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         setProgress(null);
         setFiles(statuses);
 
-        if (!allGroups.length) {
+        if (!allTestVehicles.length) {
             setError(statuses.find(s2 => s2.error)?.error || 'No EPA configurations found in these PDFs.');
             setBusy(false);
             return;
         }
 
-        const ids = allGroups.map(x => x.test_group_id);
+        const ids = allTestVehicles.map(x => x.test_vehicle_id);
         let exists = [];
         try { exists = await getExistingIds(ids); } catch { /* non-fatal */ }
 
-        setGroups(allGroups);
+        setTestVehicles(allTestVehicles);
         setWarnings(allWarnings);
         setExisting(new Set(exists));
         setSelected(new Set(ids));
         if (targetVehicle) {
             const vn = (targetVehicle.name || '').toLowerCase();
-            const best = allGroups.find(x => vn && (x.epa_carline_name || '').toLowerCase().includes(vn.split(' ')[0]));
-            setLinkIds(new Set([(best || allGroups[0]).test_group_id]));
+            const best = allTestVehicles.find(x => vn && (x.epa_carline_name || '').toLowerCase().includes(vn.split(' ')[0]));
+            setLinkIds(new Set([(best || allTestVehicles[0]).test_vehicle_id]));
         }
         setStep('review');
         setBusy(false);
@@ -144,7 +144,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         setLinkIds(p => { const s = new Set(p); willLink ? s.add(id) : s.delete(id); return s; });
         if (willLink) setSelected(p => new Set(p).add(id));
     };
-    const allIds = groups.map(g => g.test_group_id);
+    const allIds = testVehicles.map(g => g.test_vehicle_id);
     const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id));
     const allLinked   = allIds.length > 0 && allIds.every(id => linkIds.has(id));
     const toggleAllSelect = () => {
@@ -171,7 +171,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
     };
 
     const handleImport = async () => {
-        const toImport = groups.filter(g => selected.has(g.test_group_id));
+        const toImport = testVehicles.filter(g => selected.has(g.test_vehicle_id));
         if (!toImport.length) return;
         if (overwriteCount > 0 &&
             !window.confirm(`${overwriteCount} of these configuration(s) already exist and will be overwritten with the PDF data. Continue?`)) {
@@ -183,7 +183,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         try {
             const res = await onImport(toImport, {
                 ...(targetVehicle
-                    ? { linkVehicleId: targetVehicle.id, linkTestGroupIds: [...linkIds].filter(id => selected.has(id)) }
+                    ? { linkVehicleId: targetVehicle.id, linkTestVehicleIds: [...linkIds].filter(id => selected.has(id)) }
                     : {}),
                 onProgress: p => setImportProgress({ ...p, startedAt }),
             });
@@ -240,8 +240,8 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                     <>
                         <p className="text-sm text-secondary mb-2">
                             {files.length === 1
-                                ? <><span className="font-medium">{files[0].name}</span> — {groups.length} configuration(s) found.</>
-                                : <>{files.length} files — {groups.length} configuration(s) found.</>}
+                                ? <><span className="font-medium">{files[0].name}</span> — {testVehicles.length} configuration(s) found.</>
+                                : <>{files.length} files — {testVehicles.length} configuration(s) found.</>}
                         </p>
 
                         {/* Per-file outcome, so a file that yielded nothing is
@@ -284,8 +284,8 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {groups.map(g => {
-                                        const id = g.test_group_id;
+                                    {testVehicles.map(g => {
+                                        const id = g.test_vehicle_id;
                                         const phaseCount = g.tests.reduce((n, t) => n + t.phases.length, 0);
                                         return (
                                             <tr key={id} className={selected.has(id) ? '' : 'opacity-40'}>

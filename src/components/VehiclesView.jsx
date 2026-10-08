@@ -470,7 +470,7 @@ export default function VehiclesView({
         // Manufacturer
         manufacturers,
         onAddManufacturer: addManufacturer,
-        // EPA test groups are assigned in Tests & Data, not in this edit modal.
+        // EPA test vehicles are assigned in Tests & Data, not in this edit modal.
     };
 
     const handleMoveVehicle = (vehicleId, direction) => {

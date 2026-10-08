@@ -2,9 +2,9 @@
  * Does the EPA label range agree with the vehicle's spec range? (#206)
  *
  * The two should normally match — `vehicle.range` is captured as "EPA Range" in
- * the spec schema, and `epa_test_groups.label_range_published` is that same
+ * the spec schema, and `epa_test_vehicles.label_range_published` is that same
  * window-sticker figure arriving by a different route. When they disagree by a
- * lot, something is wrong: the wrong test group is linked, or one of them was
+ * lot, something is wrong: the wrong test vehicle is linked, or one of them was
  * mistyped.
  *
  * ── Why this flags rather than ties ──────────────────────────────────────────
@@ -25,7 +25,7 @@ import { LABEL_RANGE_TOLERANCE_PCT } from '../constants/epa';
 /**
  * Compare the two, when both exist.
  *
- * @param {number|string|null} labelMi  epa_test_groups.label_range_published
+ * @param {number|string|null} labelMi  epa_test_vehicles.label_range_published
  * @param {number|string|null} specMi   vehicle.range
  * @param {number} [tolerancePct]       percentage gap treated as agreement
  * @returns {{ labelMi, specMi, deltaMi, deltaPct, mismatch }|null}
@@ -59,5 +59,5 @@ export function labelRangeCheckNote(check) {
     return `Specs list ${specMi} mi — this is ${Math.abs(deltaMi).toFixed(0)} mi `
          + `(${Math.abs(deltaPct).toFixed(1)}%) ${dir} it. One trim can map to several EPA `
          + `configurations, so a small gap is normal; a large one usually means the wrong `
-         + `test group is linked.`;
+         + `test vehicle is linked.`;
 }

@@ -415,7 +415,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, onFocused, onBack, onClose }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -3011,14 +3011,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <EpaVehicleSection
                     vehicle={vehicle}
                     canEdit={isContributor && canEdit(vehicle)}
-                    searchEpaTestGroups={searchEpaTestGroups}
-                    onLink={linkEpaTestGroup}
-                    onCreate={createAndLinkEpaTestGroup}
-                    onUnlink={unlinkEpaTestGroup}
+                    searchEpaTestVehicles={searchEpaTestVehicles}
+                    onLink={linkEpaTestVehicle}
+                    onCreate={createAndLinkEpaTestVehicle}
+                    onUnlink={unlinkEpaTestVehicle}
                     onUpdateConfidence={updateEpaMapping}
                     onSetPrimary={setPrimaryEpaMapping}
-                    onUpdateDisplayName={(testGroupId, name) =>
-                        updateEpaTestGroup(testGroupId, { display_name: name || null })
+                    onUpdateDisplayName={(testVehicleId, name) =>
+                        updateEpaTestVehicle(testVehicleId, { display_name: name || null })
                     }
                 />
             )}

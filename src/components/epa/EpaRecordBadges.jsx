@@ -15,7 +15,7 @@
  * lives in the badge's title, where it is read once by whoever wonders.
  */
 
-/** How sure we are that this group is the car it is linked to. */
+/** How sure we are that this test vehicle is the car it is linked to. */
 const CONFIDENCE_INTENT = { verified: 'is-good', likely: 'is-qualified' };
 
 export function ConfidenceBadge({ confidence }) {
@@ -63,13 +63,13 @@ const KWH_SOURCE = {
 };
 
 export default function EpaRecordMeta({ row }) {
-    const { group, eta, useableKwh, useableKwhSource } = row;
+    const { testVehicle, eta, useableKwh, useableKwhSource } = row;
 
     // Combined is the rated figure; a record certified on procedures 81 and 84
     // never ran a combined cycle and has only the highway one, which is a
     // different claim rather than the same claim measured differently.
-    const combined = group.label_combined_mpge < 500 ? group.label_combined_mpge : null;
-    const hwyOnly  = !combined && group.label_hwy_mpge < 500 ? group.label_hwy_mpge : null;
+    const combined = testVehicle.label_combined_mpge < 500 ? testVehicle.label_combined_mpge : null;
+    const hwyOnly  = !combined && testVehicle.label_hwy_mpge < 500 ? testVehicle.label_hwy_mpge : null;
 
     const etaSource = ETA_SOURCE[eta?.source];
     // Correcting a highway η can land above 1, in which case the default is
@@ -81,8 +81,8 @@ export default function EpaRecordMeta({ row }) {
         <>
             {/* The record's own coordinates, in the caption voice the
                 certification browser uses for the same pair. */}
-            <span className="text-caption truncate" title={group.test_group_id}>
-                {group.model_year} · {group.test_group_id}
+            <span className="text-caption truncate" title={testVehicle.test_vehicle_id}>
+                {testVehicle.model_year} · {testVehicle.test_vehicle_id}
             </span>
 
             {(combined || hwyOnly) && (

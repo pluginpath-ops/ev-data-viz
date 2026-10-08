@@ -1,14 +1,14 @@
 /**
- * Finding the Fuel Economy Guide row that belongs to an EPA test group (#206).
+ * Finding the Fuel Economy Guide row that belongs to an EPA test vehicle (#206).
  *
  * There is no key to join on. The guide's `#1 Smog Rating Test Group` matches
- * 1 of our 89 linked groups — our CSI importer stores the manufacturer's
- * Vehicle ID (`R2-159XR20AT`) where the guide carries the EPA smog test group
+ * 1 of our 89 linked test vehicles — our CSI importer stores the manufacturer's
+ * Vehicle ID (`R2-159XR20AT`) where the guide carries the EPA smog Test Group
  * (`TRIVT00.0232`) — and it is not unique per configuration anyway. So the link
  * is a curator decision, and this exists to make that decision one click rather
  * than a search.
  *
- * Measured against the staged MY2025 rows and our 41 MY2025 linked groups:
+ * Measured against the staged MY2025 rows and our 41 MY2025 linked test vehicles:
  *
  *   • filtering by make alone still leaves ~19 candidates — too many to eyeball,
  *     which is what makes ranking load-bearing rather than a nicety
@@ -63,11 +63,11 @@ export function carlineScore(ours, theirs) {
 }
 
 /**
- * Rank staged guide rows as candidates for one test group.
+ * Rank staged guide rows as candidates for one test vehicle.
  *
  * Filtered by make only. Model year ORDERS rather than excludes: a vehicle that
- * carries over spans two guide years, and our group's year need not be the year
- * that happens to be staged. Excluding on it told a 2026 Model Y group there
+ * carries over spans two guide years, and our test vehicle's year need not be the year
+ * that happens to be staged. Excluding on it told a 2026 Model Y test vehicle there
  * were "no staged rows for Tesla in 2026" while sixteen Tesla rows sat in the
  * 2025 guide — technically true and useless.
  *
@@ -75,20 +75,20 @@ export function carlineScore(ours, theirs) {
  * automatically (see bestFeCandidate) — EPA figures move between years, so
  * borrowing one is a decision the curator makes with the year in front of them.
  *
- * @param {Object} group    epa_test_groups row (make, model_year, epa_carline_name)
+ * @param {Object} testVehicle    epa_test_vehicles row (make, model_year, epa_carline_name)
  * @param {Array}  feRows   staged epa_fe_guide rows
  * @returns {Array} candidates, best first, each { row, score, exactYear }
  */
-export function rankFeCandidates(group, feRows = []) {
-    if (!group) return [];
-    const groupYear = Number(group.model_year);
+export function rankFeCandidates(testVehicle, feRows = []) {
+    if (!testVehicle) return [];
+    const testVehicleYear = Number(testVehicle.model_year);
 
     return feRows
-        .filter(r => sameMake(group.make, r.division))
+        .filter(r => sameMake(testVehicle.make, r.division))
         .map(row => ({
             row,
-            score: carlineScore(group.epa_carline_name, row.carline),
-            exactYear: !groupYear || Number(row.model_year) === groupYear,
+            score: carlineScore(testVehicle.epa_carline_name, row.carline),
+            exactYear: !testVehicleYear || Number(row.model_year) === testVehicleYear,
         }))
         // Exact year first, then score, then the shorter name. This orders the
         // LIST only — a tie at the top disqualifies a proposal entirely (see
@@ -103,7 +103,7 @@ export function rankFeCandidates(group, feRows = []) {
  *
  * Two ways to decline, and the second was learned from the data:
  *
- * TOO WEAK. Below the floor the make matched but the car did not, and a group
+ * TOO WEAK. Below the floor the make matched but the car did not, and a test vehicle
  * would otherwise arrive pre-filled with a confident-looking wrong answer.
  *
  * WRONG YEAR. A cross-year row can be linked, but not without being looked at:
@@ -114,15 +114,15 @@ export function rankFeCandidates(group, feRows = []) {
  * `Ioniq 5 N`, `Ioniq 5 RWD` and every other variant — and those are 221 and
  * ~300 miles apart. Any tie-break there is arbitrary dressed as a judgement;
  * the first version picked the shortest name and proposed the 221-mile N for a
- * group that was almost certainly neither.
+ * test vehicle that was almost certainly neither.
  *
  * A tie is information: it says our carline does not distinguish the variants,
  * so the curator has to. They get the ranked list instead.
  */
 export const MATCH_FLOOR = 0.34;
 
-export function bestFeCandidate(group, feRows = []) {
-    const ranked = rankFeCandidates(group, feRows);
+export function bestFeCandidate(testVehicle, feRows = []) {
+    const ranked = rankFeCandidates(testVehicle, feRows);
     const [top, next] = ranked;
     if (!top || top.score < MATCH_FLOOR) return null;
     if (!top.exactYear) return null;

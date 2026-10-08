@@ -2,11 +2,11 @@
  * Certification records as chart subjects (#237).
  *
  * `EpaCurvesView` plots curve-per-MAPPING: it walks selected vehicles, follows
- * `epa_mappings` to a certification group, and hands the group to
+ * `epa_mappings` to a test vehicle, and hands the test vehicle to
  * `buildEpaCurveFromModel`. The maths never sees the vehicle — it contributes a
  * label, a color, and a battery fallback.
  *
- * So a certification group can be a subject on its own, and 210 of 211 carry
+ * So a test vehicle can be a subject on its own, and 210 of 211 carry
  * the coefficients a curve needs. This module is that subject: what to call it,
  * what energy to give it, and — the part that matters — how much of the result
  * is measured and how much is assumed.
@@ -28,10 +28,10 @@ const num = (v) => {
  * How much of a curve is measurement.
  *
  * The shape of every curve is real: road-load coefficients are the lab's own
- * numbers and 210 of 211 groups carry them. What varies is the ENERGY, and the
+ * numbers and 210 of 211 test vehicles carry them. What varies is the ENERGY, and the
  * energy is what turns a consumption curve into a range curve.
  *
- *   measured    η back-solved from this group's own constant-speed phases, and
+ *   measured    η back-solved from this test vehicle's own constant-speed phases, and
  *               usable energy taken from the DC actually discharged to
  *               depletion. Both halves are this vehicle's.
  *   corrected   the capacity is still this vehicle's, but it never ran a
@@ -73,41 +73,41 @@ export const CURVE_TIERS = [
 export const tierByKey = (key) => CURVE_TIERS.find(t => t.key === key) ?? null;
 
 /** The energy a curve should use, and where it came from. */
-export function resolveCurveEnergy(group) {
-    const explicit = num(group?.useable_kwh);
+export function resolveCurveEnergy(testVehicle) {
+    const explicit = num(testVehicle?.useable_kwh);
     if (explicit != null) return { kwh: explicit, source: 'curator' };
 
     // Procedure decides. Proc 86 is a short cycle whose DC energy is not a pack
     // capacity — it is where the 0.037 charger efficiency came from.
-    const test = pickDerivationTest(group?.epa_tests || []);
+    const test = pickDerivationTest(testVehicle?.epa_tests || []);
     const measured = num(test?.total_dc_energy_kwh);
     if (measured != null) return { kwh: measured, source: 'measured' };
 
-    const nominal = num(group?.epa_fe_guide?.nominal_pack_kwh);
+    const nominal = num(testVehicle?.epa_fe_guide?.nominal_pack_kwh);
     if (nominal != null) return { kwh: nominal, source: 'nominal' };
 
     return { kwh: null, source: null };
 }
 
 /**
- * One certification group as a plottable subject, or null if it cannot be one.
+ * One test vehicle as a plottable subject, or null if it cannot be one.
  *
- * A group with no coefficients has no curve at all — one of 211 — and is
+ * A test vehicle with no coefficients has no curve at all — one of 211 — and is
  * returned as null rather than as an empty subject, so a caller cannot offer it
  * and then draw nothing.
  */
-export function curveSubject(group) {
-    const coeffs = resolvePrimaryCoeffs(group);
+export function curveSubject(testVehicle) {
+    const coeffs = resolvePrimaryCoeffs(testVehicle);
     if (!coeffs) return null;
 
     // The curve predicts steady cruise, so it uses the steady-state basis —
     // measured where the phases allow, corrected from the fleet ratio where
     // they do not. See resolveCurveEta.
-    const eta = resolveCurveEta(group);
+    const eta = resolveCurveEta(testVehicle);
     // 'corrected' is not measured. It is a real improvement on the HWFET value
     // for a cruise curve and still an estimate, and the tier below says so.
     const etaMeasured = eta?.source === 'measured';
-    const energy = resolveCurveEnergy(group);
+    const energy = resolveCurveEnergy(testVehicle);
 
     // Three questions, in order: is there energy at all, is the energy this
     // vehicle's, and is the efficiency this vehicle's. A corrected η with a
@@ -120,14 +120,14 @@ export function curveSubject(group) {
                 : eta?.source === 'corrected' ? 'corrected'
                     : 'nominal';
 
-    const guide = group.epa_fe_guide ?? null;
+    const guide = testVehicle.epa_fe_guide ?? null;
     return {
-        key: group.test_group_id,
-        group,
+        key: testVehicle.test_vehicle_id,
+        testVehicle,
         // The guide's carline is the fuller name where a link exists — it names
         // the wheel variant, which the represented-vehicle name usually does not.
-        label: guide?.carline || group.display_name || group.epa_carline_name || group.test_group_id,
-        sublabel: [group.model_year, guide?.division || group.make].filter(Boolean).join(' '),
+        label: guide?.carline || testVehicle.display_name || testVehicle.epa_carline_name || testVehicle.test_vehicle_id,
+        sublabel: [testVehicle.model_year, guide?.division || testVehicle.make].filter(Boolean).join(' '),
         useableKwh: energy.kwh,
         energySource: energy.source,
         etaValue: eta?.value ?? null,
@@ -138,10 +138,10 @@ export function curveSubject(group) {
     };
 }
 
-/** Every group that can be plotted, best-grounded first. */
-export function curveSubjects(groups) {
+/** Every test vehicle that can be plotted, best-grounded first. */
+export function curveSubjects(testVehicles) {
     const rank = Object.fromEntries(CURVE_TIERS.map((t, i) => [t.key, i]));
-    return (groups ?? [])
+    return (testVehicles ?? [])
         .map(curveSubject)
         .filter(Boolean)
         .sort((a, b) => rank[a.tier] - rank[b.tier] || a.label.localeCompare(b.label));
@@ -184,6 +184,6 @@ export function disambiguateLabels(subjects) {
     for (const s of subjects) counts.set(s.label, (counts.get(s.label) ?? 0) + 1);
     return new Map(subjects.map(s => [
         s.key,
-        counts.get(s.label) > 1 ? `${s.label} (${s.group?.model_year ?? '—'})` : s.label,
+        counts.get(s.label) > 1 ? `${s.label} (${s.testVehicle?.model_year ?? '—'})` : s.label,
     ]));
 }

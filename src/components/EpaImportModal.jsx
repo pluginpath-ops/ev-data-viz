@@ -1,22 +1,22 @@
 import { useState, useRef } from 'react';
-import { parseEpaTestCarSheet, summariseEpaGroups } from '../utils/parseEpaTestCarSheet';
+import { parseEpaTestCarSheet, summariseEpaTestVehicles } from '../utils/parseEpaTestCarSheet';
 
 /**
  * Admin-only modal for importing EPA Test Car List data.
  *
  * Workflow:
  *  1. Upload a pre-filtered EPA testcar TSV
- *  2. Parser groups rows → one record per test group
- *  3. User optionally links each test group to a vehicle via a pick list
- *  4. "Import" upserts epa_test_groups + creates epa_vehicle_mappings
+ *  2. Parser groups rows → one record per test vehicle
+ *  3. User optionally links each test vehicle to a vehicle via a pick list
+ *  4. "Import" upserts epa_test_vehicles + creates epa_vehicle_mappings
  */
 export default function EpaImportModal({ vehicles, onImport, onClose }) {
     const [step, setStep]           = useState('upload'); // 'upload' | 'map' | 'done'
     const [parsed, setParsed]       = useState([]);
     const [fileName, setFileName]   = useState('');
-    // Set of test_group_ids to include in the import (all checked by default)
+    // Set of test_vehicle_ids to include in the import (all checked by default)
     const [selected, setSelected]   = useState(new Set());
-    // Map: test_group_id → vehicle id (string) for the link
+    // Map: test_vehicle_id → vehicle id (string) for the link
     const [linkMap, setLinkMap]     = useState({});
     const [importing, setImporting] = useState(false);
     const [result, setResult]       = useState(null);
@@ -31,9 +31,9 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
         setFileName(file.name);
         const reader = new FileReader();
         reader.onload = (e) => {
-            const groups = parseEpaTestCarSheet(e.target.result, file.name);
-            setParsed(groups);
-            setSelected(new Set(groups.map(g => g.test_group_id)));
+            const testVehicles = parseEpaTestCarSheet(e.target.result, file.name);
+            setParsed(testVehicles);
+            setSelected(new Set(testVehicles.map(g => g.test_vehicle_id)));
             setLinkMap({});
             setError(null);
             setStep('map');
@@ -50,23 +50,23 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
     // ── Pick-list helpers ─────────────────────────────────────────────────────
 
     const toggleAll = (checked) =>
-        setSelected(checked ? new Set(parsed.map(g => g.test_group_id)) : new Set());
+        setSelected(checked ? new Set(parsed.map(g => g.test_vehicle_id)) : new Set());
 
     const toggleOne = (id, checked) =>
         setSelected(prev => { const s = new Set(prev); checked ? s.add(id) : s.delete(id); return s; });
 
-    const setVehicleLink = (testGroupId, vehicleId) =>
-        setLinkMap(prev => ({ ...prev, [testGroupId]: vehicleId }));
+    const setVehicleLink = (testVehicleId, vehicleId) =>
+        setLinkMap(prev => ({ ...prev, [testVehicleId]: vehicleId }));
 
     // ── Import ────────────────────────────────────────────────────────────────
-    // Parsed groups carry private _coefficientSet / _has* helpers; the service
-    // (bulkUpsertEpaTestGroups) strips them and writes the coefficient set.
+    // Parsed test vehicles carry private _coefficientSet / _has* helpers; the service
+    // (bulkUpsertEpaTestVehicles) strips them and writes the coefficient set.
 
     const handleImport = async () => {
-        const toImport = parsed.filter(g => selected.has(g.test_group_id));
+        const toImport = parsed.filter(g => selected.has(g.test_vehicle_id));
         const mappings = Object.entries(linkMap)
             .filter(([tgid, vid]) => selected.has(tgid) && vid)
-            .map(([testGroupId, vehicleId]) => ({ vehicleId: parseInt(vehicleId, 10), testGroupId }));
+            .map(([testVehicleId, vehicleId]) => ({ vehicleId: parseInt(vehicleId, 10), testVehicleId }));
 
         setImporting(true);
         setError(null);
@@ -83,7 +83,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
 
     // ── Derived state ─────────────────────────────────────────────────────────
 
-    const summary = parsed.length ? summariseEpaGroups(parsed) : null;
+    const summary = parsed.length ? summariseEpaTestVehicles(parsed) : null;
     const selectedCount = selected.size;
     const linkedCount   = Object.entries(linkMap).filter(([tgid, vid]) => selected.has(tgid) && vid).length;
 
@@ -134,7 +134,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                     <li>Download the EPA Test Car List (testcar_yymmdd.txt) from <span className="font-mono">epa.gov</span></li>
                                     <li>Open in Excel and filter to the manufacturers and models you care about</li>
                                     <li>Save As → CSV (.csv) or Tab-delimited text (.txt / .tsv)</li>
-                                    <li>Upload here — the app will group rows by test group and show a pick list</li>
+                                    <li>Upload here — the app will group rows by test vehicle and show a pick list</li>
                                 </ol>
                             </div>
                         </div>
@@ -145,7 +145,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                         <>
                             {/* Summary banner */}
                             <div className="flex flex-wrap gap-4 mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-lg text-sm">
-                                <span><strong>{summary.total}</strong> test group{summary.total !== 1 ? 's' : ''} found</span>
+                                <span><strong>{summary.total}</strong> test vehicle{summary.total !== 1 ? 's' : ''} found</span>
                                 {summary.yearMin && <span>MY {summary.yearMin}{summary.yearMax !== summary.yearMin ? `–${summary.yearMax}` : ''}</span>}
                                 <span>{summary.makes.join(', ')}</span>
                                 <span className="text-meta">·</span>
@@ -185,8 +185,8 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                     </thead>
                                     <tbody className="divide-y">
                                         {parsed.map(g => {
-                                            const isSelected = selected.has(g.test_group_id);
-                                            const linkedVid  = linkMap[g.test_group_id] || '';
+                                            const isSelected = selected.has(g.test_vehicle_id);
+                                            const linkedVid  = linkMap[g.test_vehicle_id] || '';
                                             // Coefficients live on the primary set; prefer target, fall back to set —
                                             // the order the derivations use (resolvePrimaryCoeffs).
                                             const cs = g._coefficientSet || {};
@@ -194,13 +194,13 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                             const b = cs.target_b ?? cs.set_b;
                                             const c = cs.target_c ?? cs.set_c;
                                             return (
-                                                <tr key={g.test_group_id} className={`transition ${isSelected ? '' : 'opacity-40'}`}>
+                                                <tr key={g.test_vehicle_id} className={`transition ${isSelected ? '' : 'opacity-40'}`}>
                                                     <td className="py-2 pr-2">
                                                         <input type="checkbox" checked={isSelected}
-                                                            onChange={e => toggleOne(g.test_group_id, e.target.checked)} />
+                                                            onChange={e => toggleOne(g.test_vehicle_id, e.target.checked)} />
                                                     </td>
                                                     <td className="py-2 pr-3 font-mono text-secondary whitespace-nowrap">
-                                                        {g.test_group_id}
+                                                        {g.test_vehicle_id}
                                                     </td>
                                                     <td className="py-2 pr-3">
                                                         <span className="font-medium">{g.model_year}</span>
@@ -243,7 +243,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                     <td className="py-2">
                                                         <select
                                                             value={linkedVid}
-                                                            onChange={e => setVehicleLink(g.test_group_id, e.target.value)}
+                                                            onChange={e => setVehicleLink(g.test_vehicle_id, e.target.value)}
                                                             disabled={!isSelected}
                                                             className="form-input form-input w-52"
                                                         >
@@ -268,7 +268,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                             <div className="text-5xl mb-4">✅</div>
                             <p className="text-lg font-semibold mb-2">Import complete</p>
                             <p className="text-secondary">
-                                <strong>{result.testGroupsCount}</strong> test group{result.testGroupsCount !== 1 ? 's' : ''} upserted
+                                <strong>{result.testVehiclesCount}</strong> test vehicle{result.testVehiclesCount !== 1 ? 's' : ''} upserted
                                 {result.mappingsCount > 0 && <>, <strong>{result.mappingsCount}</strong> vehicle link{result.mappingsCount !== 1 ? 's' : ''} created</>}
                             </p>
                             <p className="text-sm text-meta mt-2">
@@ -311,7 +311,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 disabled={importing || selectedCount === 0}
                                 className="btn btn-primary text-sm disabled:opacity-40"
                             >
-                                {importing ? 'Importing…' : `Import ${selectedCount} test group${selectedCount !== 1 ? 's' : ''}${linkedCount > 0 ? ` + ${linkedCount} link${linkedCount !== 1 ? 's' : ''}` : ''}`}
+                                {importing ? 'Importing…' : `Import ${selectedCount} test vehicle${selectedCount !== 1 ? 's' : ''}${linkedCount > 0 ? ` + ${linkedCount} link${linkedCount !== 1 ? 's' : ''}` : ''}`}
                             </button>
                         )}
                         {step === 'done' && (

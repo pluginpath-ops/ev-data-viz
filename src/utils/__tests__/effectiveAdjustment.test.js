@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { deriveEffectiveAdjustmentFactor } from '../epaDerivations';
 import { resolveAdjustment } from '../epaMethodology';
-import { epaRecordFromGroup } from '../epaRecordFromGroup';
+import { epaRecordFromTestVehicle } from '../epaRecordFromTestVehicle';
 
 // 0.72 is "vehicle-specific" by the old size threshold; 0.68 is "default".
 const group = (published, calc, signature) => ({
@@ -36,7 +36,7 @@ describe('the signature reaches the methodology record', () => {
         expect(resolveAdjustment({})).toMatchObject({ source: 'default', signature: null });
     });
 
-    it('epaRecordFromGroup reads it off the linked guide row', () => {
+    it('epaRecordFromTestVehicle reads it off the linked guide row', () => {
         const g = {
             model_year: 2027, label_adjustment_factor: 0.7051,
             epa_fe_guide: { adjustment_signature: 'per-vehicle' },
@@ -46,7 +46,7 @@ describe('the signature reaches the methodology record', () => {
                     { phase_index: 2, phase_type: 'HWY', distance_mi: 10.26, dc_energy_kwh: 3 },
                 ] }],
         };
-        const { record } = epaRecordFromGroup(g);
+        const { record } = epaRecordFromTestVehicle(g);
         expect(record?.adjustmentSignature).toBe('per-vehicle');
     });
 });

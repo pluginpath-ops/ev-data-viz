@@ -23,7 +23,7 @@
  *
  * MPGe is wall-to-wheels. An MCT record reports DC-side energy, so the model
  * divides by the charging efficiency to reach the wall — which makes this check
- * largely a check ON that efficiency. Two groups for the same car currently
+ * largely a check ON that efficiency. Two test vehicles for the same car currently
  * derive 76.8% and 83.7%; at most one can be right, and a ~9% error in η moves
  * MPGe by ~9%. That is the size of discrepancy this is built to surface.
  *
@@ -111,10 +111,10 @@ function shapeOf(cycles) {
  * Compare computed unadjusted MPGe against EPA's published figures.
  *
  * @param {Object} model      output of buildMethodologyModel
- * @param {Object} published  { city, hwy } — the group's unadj_*_mpge columns
+ * @param {Object} published  { city, hwy } — the test vehicle's unadj_*_mpge columns
  * @returns {{ cycles: Array, worst: string|null, checked: boolean }}
  *          `checked` is false when there is nothing to compare against, which is
- *          NOT a pass — a group with no linked guide row is unverified, and the
+ *          NOT a pass — a test vehicle with no linked guide row is unverified, and the
  *          UI must not present it as agreeing.
  */
 export function checkUnadjustedMpge(model, published = {}) {
@@ -179,7 +179,7 @@ export const RANGE_AGREEMENT_TOLERANCE = 0.01;
  * a record against itself: EPA states `Charge Depleting Range (Calculated)` and
  * `…Highway (Calculated)`, we recompute both from the phase bags, and any
  * disagreement is unambiguously our phase data. No link, no second source, and
- * it works on every imported group.
+ * it works on every imported test vehicle.
  *
  * It is the epic's validation gate #1 — "recompute from bags, must match
  * reported" — and it localises a fault to one cycle. The Model Y Performance
@@ -187,7 +187,7 @@ export const RANGE_AGREEMENT_TOLERANCE = 0.01;
  * that 8% gap was diagnosed only after working backwards from MPGe.
  *
  * ⚠ `cd_range_combined_calc` is the CITY range on an MCT record despite its
- * name — see epaRecordFromGroup. Passing it as the highway figure would compare
+ * name — see epaRecordFromTestVehicle. Passing it as the highway figure would compare
  * two different cycles and report a fault in a correct record.
  *
  * @param {Object} model   output of buildMethodologyModel

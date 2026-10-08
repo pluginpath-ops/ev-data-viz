@@ -15,7 +15,7 @@
  * RECOMPUTED RANGE is the strongest, because it compares a record against
  * ITSELF: EPA states its own charge-depleting ranges, we recompute them from
  * the bags, and a gap is our phase data with nothing else in the frame. No
- * Fuel Economy Guide link needed, so it covers every imported group.
+ * Fuel Economy Guide link needed, so it covers every imported test vehicle.
  *
  * UNADJUSTED MPGe compares against EPA's published figures, so it needs a
  * linked guide row — but it catches what the record cannot check about itself,
@@ -37,7 +37,7 @@ const mi = (v) => (v == null ? '—' : `${v.toFixed(1)} mi`);
  * @param {Object}  props.invariant    checkLabelInvariant result
  * @param {number}  props.adjustmentFixed  the flat factor, for the implied-factor message
  * @param {number}  props.inferredPhaseTypes  phases whose cycle was guessed from distance
- * @param {number}  props.competingMctTests   multi-cycle tests in this group
+ * @param {number}  props.competingMctTests   multi-cycle tests in this test vehicle
  */
 export default function EpaDerivationChecks({
     check = null, rangeCheck = null, invariant = null,
@@ -131,7 +131,7 @@ export default function EpaDerivationChecks({
     {/* Our derivation against EPA's own published unadjusted figures.
         Shown for every configuration with a linked guide row, because
         until now the chain was verified against exactly one vehicle by
-        hand — and two groups for the same car currently derive charging
+        hand — and two test vehicles for the same car currently derive charging
         efficiencies 7 points apart, so at least one reading in the fleet
         is wrong and nothing said which.
 
@@ -166,7 +166,7 @@ export default function EpaDerivationChecks({
                 the figures above deserve, and both are fixable from this view. */}
             {competingMctTests > 1 && (
                 <p className="text-xs" style={{ color: 'var(--color-warning)' }}>
-                    This group holds {competingMctTests} multi-cycle tests, and every figure above
+                    This testVehicle holds {competingMctTests} multi-cycle tests, and every figure above
                     was derived from
                     {derivedFrom?.basis === 'selected' ? ' the one its guide row identifies' : ' the most recent'}
                     {derivedFrom?.testNumber && <> — <span className="font-mono">{derivedFrom.testNumber}</span></>}

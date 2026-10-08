@@ -183,8 +183,11 @@ status and is never chrome.
 | One recorded test with its data points | **a run** | `runs`, `run_data_points` |
 | A range run tied to a charging run | **a pairing** | [pairings.js](../src/utils/pairings.js) |
 | Several runs from one outing | **a session** | [testSessions.js](../src/utils/testSessions.js) |
-| An EPA config with its coefficients and tests | **a test group** | `epa_test_groups` |
-| A test group as linked to a vehicle — one vehicle can link several | **a configuration**, or **EPA configuration** | `epa_vehicle_mappings` |
+| The physical car EPA put in the lab, keyed by EPA's Vehicle ID, with its coefficients, tests and phases | **an EPA test vehicle** — "Test vehicle" in UI text, its identifier the **Vehicle ID**. Never a bare "vehicle", which is an EVBench vehicle. Not "test group" (see below) | `epa_test_vehicles`, `test_vehicle_id` (migration 081, #374) |
+| One EPA filing for one model year, named by EPA's **Test Group** (`RHYXV00.0301`; the first letter is the year) | **an EPA Certification** — "cert" where space is short; **certification record** where "certification" alone could mean the filing or its data. **Test Group** is always capitalised, so it never reads as our old name for the test vehicle | `epa_test_vehicles.test_group` (the last one imported); one row per certification from #374 step 2 |
+| What is read from a CSI document — the certification's identity and the test vehicles' lab results | **certification data** | [parseEpaCsiPdf.js](../src/utils/parseEpaCsiPdf.js) |
+| The figures EPA publishes for a configuration, as on its window sticker | **EPA Label** — capitalised, so it never reads as a form or nav label. "Window sticker" may gloss it once in an explainer. The **Fuel Economy Guide** is the file EPA Label data is imported from, not a second name for the data | `epa_fe_guide`, the `label_*` columns, [parseFeGuide.js](../src/utils/parseFeGuide.js) |
+| An EPA test vehicle as linked to a vehicle — one vehicle can link several | **a configuration**, or **EPA configuration** | `epa_vehicle_mappings` |
 | The linked configuration whose label range, EPA tested and test weight are the vehicle's | **the primary configuration** | `epa_vehicle_mappings.is_primary`, [epaConfiguration.js](../src/utils/epaConfiguration.js), [PrimaryConfigurationPicker.jsx](../src/components/epa/PrimaryConfigurationPicker.jsx) |
 | The person maintaining EPA records | **the curator** | admin + contributor |
 | Who published or recorded a performance result — a magazine, a channel, EVBench itself | **a source**; its other spellings are **aliases** | `sources`, `source_id`, [sources.js](../src/utils/sources.js), [SourcePicker.jsx](../src/components/SourcePicker.jsx) |
@@ -215,7 +218,7 @@ status and is never chrome.
 | Two sources for one figure further apart than a limit | **disagrees**, a disagreement | `.data-check-finding.is-disagrees` |
 | Something missing that would let a figure be checked | **a gap** | `.data-check-finding.is-gap` |
 | A change a curator makes from a finding — a move out of a retiring column, a spec field, the primary | **a fix**; a column fix is **a move** | [dataCheckFixes.js](../src/utils/dataCheckFixes.js), `.data-check-fixes` |
-| A curator's recorded decision that something needs no action, still visible under a filter | **a skip** — skipped, un-skip | `epa_test_groups.fe_guide_skipped_at` (link sweep), `data_check_skips` (Data Checks), `.skip-ask` |
+| A curator's recorded decision that something needs no action, still visible under a filter | **a skip** — skipped, un-skip | `epa_test_vehicles.fe_guide_skipped_at` (link sweep), `data_check_skips` (Data Checks), `.skip-ask` |
 | A vehicle whose specs, tests, color, photo and tags come from another vehicle until set on it — the same car with a stated difference (battery, weight, wheels) | **a variant**; it **inherits from** its source. Created with **＋ Variant** | `spec_source_vehicle_id`, [vehicleInheritance.js](../src/utils/vehicleInheritance.js), [NewVariantButton.jsx](../src/components/NewVariantButton.jsx) |
 | What a variant shows that is not set on it | **inherited** — "Inherited from *source*" | `vehicle.inheritedFrom`, `.vehicle-tag.is-inherited` |
 | What deleting a source does to its variants: its own values are copied onto each variant that has none of its own, and the variant is re-pointed at the source's source, so nothing the variant shows changes | **passed down** — a deleted source's values are passed down to its variants, as an inheritance passes to its children. Not "orphaning" (what the old foreign key did) and not "push down" or "merge down", both considered and set aside as jargon with the wrong picture | `delete_vehicle_passing_down()` (migration 075), [vehicleDeletion.js](../src/utils/vehicleDeletion.js) `passDown` |
@@ -232,6 +235,29 @@ status and is never chrome.
 | A test left out of the statistics — composite curves, test spreads, best charge windows, and #314's error bars — whether listed or not | **excluded** — "Exclude from statistics", "Include". Counting is the default and has no word of its own. Not "verified", which means an EPA link confirmed against the certification document; not the filter chip's **exclude** above, which leaves rows out of a view, not out of a dataset | `runs.is_excluded` (migration 079); `isExcluded`, `countsInStatistics`, `statisticalRuns` in [runListing.js](../src/utils/runListing.js); "⊖ Exclude" on a test card's toggle, reading "⊖ Excluded" once set ([RunCurationToggle.jsx](../src/components/runs/RunCurationToggle.jsx)) |
 | A vehicle's tests that are unlisted but still count | **the pool** — pooled tests. Where `n` grows without cluttering the lists: a curator lists the tests that represent the vehicle (no cap) and pools the rest. An unlisted RANGE test joins the pool only with its speed and temperature recorded; one without says "Not counted: no speed" on its card. Counted after the listed ones in grey: "Charging (4/2)" | `vehicle.pooledRuns`, `poolOf`, `poolGateMissing`; `.test-count-pool`; [RunListingBadges.jsx](../src/components/runs/RunListingBadges.jsx) |
 | A curator's "I have looked; count it" on a test the automatic checks would keep out | **override quality checks** — on the card a toggle, "⚑ Override checks", reading "⚑ Checks overridden" once set; the badge of the same words appears only where the toggle does not. Overrides the range spread's pack-coverage rule and the pool's speed/temperature rule, nothing else: not missing data (no start/end SoC is still no range), not exclusion. Not **Data Checks**, the Admin panel's findings about a vehicle's figures | `runs.quality_override` (migration 080); `hasQualityOverride` in [runListing.js](../src/utils/runListing.js), `rangeCoverageOk` in [rangeTestSpread.js](../src/utils/rangeTestSpread.js) |
+
+**Three EPA sources, named for where the data comes from.** EPA Label (the
+Fuel Economy Guide: one row per configuration), EPA Certification (a CSI
+filing: one per Test Group, so one model year) and the EPA test vehicle inside
+a certification (one per Vehicle ID). Certification and test vehicle are
+many-to-many: one Test Group covers several test vehicles, and a test vehicle
+carried over appears in several years' Test Groups. A tab or heading names the
+source; its description names what one point is — so **Label Statistics**
+counts configurations and **Certification Statistics** counts EPA test
+vehicles, and neither name says "per".
+
+**Why "test group" was retired for the record.** We called the Vehicle ID record
+a test group, and EPA's Test Group is the certification. The overlap is how a
+carryover certification came to look like an overwrite, and why the link sweep
+compared the Guide's Test Group with a Vehicle ID (#374). Names decided for
+#374 step 2, recorded here before the code that uses them: **Since MY2023** (a
+test vehicle's first year in a certification), **MY2023 to MY2025** (its years;
+a gap is written out, "MY2022, MY2024 to MY2025"), **From MY2024** (a figure or
+certification standing in from another year — like "from *platform*" for a
+provided value, and not "flag", which is the accuracy signal), **Basis** (how a
+certification record came to exist: a CSI file, the Test Car List, a Guide
+link, by hand) and **Recertified** (the same Test Group filed again, changed or
+not).
 
 **Unlisted and excluded are two questions, not one.** Listing asks whether
 viewers see a test; excluding asks whether it counts. All four answers are
@@ -364,6 +390,8 @@ series, so nothing here is a sparkline and the word should not appear.
 | "pinning" for choosing vehicles in the specs table | selecting | pin is view-scoped; that click drives every chart |
 | "sparkline" for an in-cell magnitude bar | bar cell | nothing here is a series |
 | a bare "band" | validity band / confidence band | two live meanings, opposite jobs |
+| "test group", "certification group" or "cert group" for the Vehicle ID record | **EPA test vehicle** — and **Test Group**, capitalised, only for EPA's certification identifier | the record is the car; EPA's Test Group is the certification (#374) |
+| `epa_test_groups`, `test_group_id`, `testGroupId`, `epaGroup`, `epa_test_family_id` | `epa_test_vehicles`, `test_vehicle_id`, `testVehicleId`, `epaTestVehicle`, `test_group` | renamed through code and database in migration 081 (#374) |
 | "Hidden" / "Hide" for a test, in UI text | **Unlisted** / Unlist — or **Excluded**, if it is the statistics that are meant | one word carried two questions until #394 split them |
 
 ## Open names

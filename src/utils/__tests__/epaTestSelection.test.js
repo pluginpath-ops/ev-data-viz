@@ -54,7 +54,7 @@ describe('the per-test figures the selection rests on', () => {
 
     it('measures each test\'s own charging efficiency', () => {
         // They differ between runs, which is why the score compares each test
-        // against ITS own efficiency rather than one figure for the group.
+        // against ITS own efficiency rather than one figure for the test vehicle.
         close(chargeEfficiencyOf(JUL), 0.8954, 0.0005);
         close(chargeEfficiencyOf(AUG), 0.9013, 0.0005);
     });
@@ -103,7 +103,7 @@ describe('selectTestForGuide — the CLA 350', () => {
 });
 
 describe('selectTestForGuide — when it must decline', () => {
-    it('declines a group with one test, because that is not a choice', () => {
+    it('declines a test vehicle with one test, because that is not a choice', () => {
         const s = selectTestForGuide([JUL], PUBLISHED_HWY);
         expect(s.testNumber).toBeNull();
         expect(s.reason).toBe('single-test');
@@ -132,7 +132,7 @@ describe('selectTestForGuide — when it must decline', () => {
         expect(selectTestForGuide([JUL, AUG], null).reason).toBe('not-scorable');
     });
 
-    it('declines when the group holds no multi-cycle test', () => {
+    it('declines when the test vehicle holds no multi-cycle test', () => {
         const sct = { ...JUL, procedure_code: 84 };
         expect(selectTestForGuide([sct, { ...AUG, procedure_code: 81 }], PUBLISHED_HWY).reason)
             .toBe('no-mct');
@@ -186,7 +186,7 @@ describe('the range fallback, for guide rows with no unadjusted MPGe', () => {
     });
 
     it('cannot score without the per-test ranges migration 060 added', () => {
-        // Before those, every test in a group carried the group's single pair,
+        // Before those, every test in a test vehicle carried the test vehicle's single pair,
         // so this could not tell them apart at all.
         expect(scoreAgainstGuideRanges(JUL, RANGES)).toBeNull();
     });

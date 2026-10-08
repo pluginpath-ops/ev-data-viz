@@ -7188,7 +7188,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* ── Clusters ───────────────────────────────────────────────────────────────
  *
- * A test group's header. Deliberately NOT a spread bar: inside one carline it
+ * A Test Group's header. Deliberately NOT a spread bar: inside one carline it
  * was decoration, and the per-row sparklines already show the shape.
  */
 .guide-cluster-head td {
@@ -7497,7 +7497,7 @@ a.is-test-link:focus-visible {
 .guide-certification {
     @apply flex flex-col gap-4;
 }
-.guide-certification-group {
+.guide-certification-test-vehicle {
     @apply flex flex-col gap-2 p-3 rounded;
     background-color: var(--color-surface-sunken);
 }
@@ -8039,7 +8039,7 @@ a.is-test-link:focus-visible {
 /* ══════════════════════════════════════════════════════════════════════════
    FE GUIDE LINK SWEEP (#238)
 
-   Working through 159 unlinked certification groups. Three columns per row —
+   Working through 159 unlinked test vehicles. Three columns per row —
    what we hold, what is proposed, what to do — so a curator scans down the
    middle column and only stops where the proposal looks wrong.
    ══════════════════════════════════════════════════════════════════════════ */
@@ -8057,7 +8057,7 @@ a.is-test-link:focus-visible {
 @media (max-width: 48rem) {
     .sweep-row-main { grid-template-columns: 1fr; }
 }
-.sweep-group-name {
+.sweep-test-vehicle-name {
     @apply flex items-center gap-1.5 font-medium;
     color: var(--color-text-primary);
 }

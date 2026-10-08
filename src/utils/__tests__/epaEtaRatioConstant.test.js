@@ -6,7 +6,7 @@ import { KNOB_KEYS, knobDefault } from '../../constants/knobs';
  * The correction factor is a MEASUREMENT, not a chosen value, so what is worth
  * pinning is its provenance rather than its arithmetic.
  *
- * Fleet median of ss_eta / eta across 210 certification groups carrying both,
+ * Fleet median of ss_eta / eta across 210 test vehicles carrying both,
  * after the impossible values were excluded: median 1.1281, IQR 1.1162-1.1449,
  * full range 1.0647-1.2830.
  */
@@ -24,7 +24,7 @@ describe('HWFET_TO_SS_ETA_RATIO', () => {
 
     it('corrects in the right direction, and by more than it can be wrong', () => {
         // A steady-state η runs HIGHER than the HWFET one, so the factor is
-        // above 1. Uncorrected, a group with no constant-speed phase is 11.4%
+        // above 1. Uncorrected, a test vehicle with no constant-speed phase is 11.4%
         // low in one direction for certain; corrected, half the fleet lands
         // within 2.5% and the worst observed case is 13.7% out.
         expect(HWFET_TO_SS_ETA_RATIO).toBeGreaterThan(1);
@@ -34,7 +34,7 @@ describe('HWFET_TO_SS_ETA_RATIO', () => {
     });
 
     it('is a knob, because the corpus moves', () => {
-        // It was derived from 210 groups and the next import changes that.
+        // It was derived from 210 test vehicles and the next import changes that.
         // A measured default that cannot be re-set is a literal with a story.
         expect(KNOB_KEYS).toContain('HWFET_TO_SS_ETA_RATIO');
         expect(knobDefault('HWFET_TO_SS_ETA_RATIO')).toBe(1.1281);
@@ -42,7 +42,7 @@ describe('HWFET_TO_SS_ETA_RATIO', () => {
 
     it('is not yet applied to anything', () => {
         // Step 5. Adding the constant and using it are separate on purpose:
-        // applying it changes every range figure for the groups with no
+        // applying it changes every range figure for the test vehicles with no
         // constant-speed phase, and that deserves its own review.
         expect(HWFET_TO_SS_ETA_RATIO).toBe(EPA_DEFAULTS.HWFET_TO_SS_ETA_RATIO);
     });

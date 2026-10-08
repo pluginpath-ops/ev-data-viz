@@ -66,7 +66,7 @@ export default function CurveSubjectPicker({ subjects, selected, onToggle, onCle
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     placeholder="Filter make, model, or ID"
-                    aria-label="Filter records by make, model, or test group ID"
+                    aria-label="Filter records by make, model, or Vehicle ID"
                     className="form-input guide-search-input"
                 />
             </div>

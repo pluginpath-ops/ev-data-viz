@@ -20,7 +20,7 @@ const LIMITS = {
 
 let nextId = 1;
 const group = (over = {}) => ({
-    test_group_id: `G${nextId++}`, model_year: 2026, make: 'Make', epa_carline_name: 'Carline',
+    test_vehicle_id: `G${nextId++}`, model_year: 2026, make: 'Make', epa_carline_name: 'Carline',
     label_range_published: null, drive: null, total_voltage: null, preferred_test_number: null,
     epa_tests: [], epa_coefficient_sets: [], ...over,
 });
@@ -29,7 +29,7 @@ const mct = (kwhValue, over = {}) => ({
 });
 const vehicle = (over = {}, groups = []) => ({
     id: nextId++, name: 'Test vehicle', specs: {}, runs: [],
-    epa_mappings: groups.map(g => ({ id: nextId++, confidence: 'verified', notes: null, epaGroup: g })),
+    epa_mappings: groups.map(g => ({ id: nextId++, confidence: 'verified', notes: null, epaTestVehicle: g })),
     ...over,
 });
 
@@ -353,7 +353,7 @@ describe('the primary configuration (#322)', () => {
     /** `v` with the link to `g` marked primary and every other link not. */
     const withPrimary = (v, g) => ({
         ...v,
-        epa_mappings: v.epa_mappings.map(m => ({ ...m, isPrimary: m.epaGroup === g })),
+        epa_mappings: v.epa_mappings.map(m => ({ ...m, isPrimary: m.epaTestVehicle === g })),
     });
 
     it('reports several configurations with none primary as a gap', () => {

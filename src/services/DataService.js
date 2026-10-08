@@ -8,7 +8,7 @@ import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
 import { promotionUpdates, demotionUpdates, acceptGuideUpdates, isCuratorOwned } from '../utils/feGuidePromotion';
 import { selectTestForGuide } from '../utils/epaTestSelection';
-import { planGroupImport, uniqueCoveredModels } from '../utils/epaImportMerge';
+import { planTestVehicleImport, uniqueCoveredModels } from '../utils/epaImportMerge';
 import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, isCompositeRun, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
 import { planCompositeRebuild, compositeEligible, mayHaveComposite } from '../utils/compositeCurve';
@@ -28,7 +28,7 @@ const roundField = roundTo;
  * and 2023: the four visible years summed to precisely 1000 rows.
  *
  * Where the answer is an aggregate, the fix is to aggregate in Postgres — see
- * migration 054 — because that returns one row per group and never approaches
+ * migration 054 — because that returns one row per test vehicle and never approaches
  * the cap. Paging is for the reads that genuinely want every row.
  */
 const PAGE_SIZE = 1000;
@@ -85,6 +85,15 @@ function isMissingColumn(error) {
 function isMissingRelation(error) {
   const code = error?.code;
   return code === '42P01' || code === '42883' || code === 'PGRST202';
+}
+
+/**
+ * An embed PostgREST could not resolve: no relationship to that name
+ * (PGRST200), or a table or column the database does not have. getVehicles
+ * uses it to survive the window between a deploy and migration 081.
+ */
+function isMissingEpaEmbed(error) {
+  return error?.code === 'PGRST200' || isMissingRelation(error) || isMissingColumn(error);
 }
 
 /** Normalise a raw data-point object into a clean DB row shape. */
@@ -234,7 +243,7 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
  * getModeledEfficiencyPreview, so an explainer's preview can never be built
  * from less of the record than the chart it links to.
  */
-const EPA_GROUP_FIELDS = 'test_group_id, epa_test_family_id, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi)), epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(adjustment_signature)';
+const EPA_TEST_VEHICLE_FIELDS = 'test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi)), epa_fe_guide!epa_test_vehicles_fe_guide_row_id_fkey(adjustment_signature)';
 
 class DataService {
   constructor() {
@@ -287,10 +296,23 @@ class DataService {
     //
     // epa_vehicle_mappings is a wildcard for the same reason: `is_primary`
     // arrives with migration 067, and naming it would blank the site until then.
-    const { data, error } = await getSupabase()
+    const base = '*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*)';
+    const query = (select) => getSupabase()
       .from('vehicles')
-      .select(`*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), epa_vehicle_mappings(*, epa_test_groups(${EPA_GROUP_FIELDS}))`)
+      .select(select)
       .order('created_at', { ascending: false });
+    let { data, error } = await query(`${base}, epa_vehicle_mappings(*, epa_test_vehicles(${EPA_TEST_VEHICLE_FIELDS}))`);
+
+    // Migration 081 renames the EPA tables, and it is applied by hand after
+    // the deploy. Until it is, the EPA embed names a table that does not exist
+    // yet — and because this one query backs the whole app, that would blank
+    // the site, not just its EPA figures. So an EPA embed the database cannot
+    // resolve is dropped and the vehicles load without it. Remove once 081 is
+    // applied (#374 step 2, layer 4).
+    if (error && isMissingEpaEmbed(error)) {
+      console.warn('getVehicles: EPA tables not readable under their current names; loading without EPA data.', error.message);
+      ({ data, error } = await query(base));
+    }
 
     // Never swallow this. Destructuring only `data` made a failed query look
     // identical to an empty account, which turned a missing migration into a
@@ -328,7 +350,7 @@ class DataService {
           // Undefined before migration 067, which reads as not primary;
           // primaryEpaMapping still treats a sole link as the vehicle's.
           isPrimary: m.is_primary === true,
-          epaGroup:  m.epa_test_groups,
+          epaTestVehicle:  m.epa_test_vehicles,
         })),
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
         runs:  (v.runs || []).map(shapeRun),
@@ -1528,7 +1550,7 @@ class DataService {
     if (!ids.length) return [];
     const { data, error } = await getSupabase()
       .from('epa_vehicle_mappings')
-      .select(`id, vehicle_id, vehicles(id, name, runs(id, name, kind, synthetic, is_hidden, is_excluded, speed_mph, distance_miles, energy_kwh, temperature_f, altitude_ft, avg_wind_speed_mph, wind_direction_deg, elevation_gain_ft, source)), epa_test_groups(${EPA_GROUP_FIELDS})`)
+      .select(`id, vehicle_id, vehicles(id, name, runs(id, name, kind, synthetic, is_hidden, is_excluded, speed_mph, distance_miles, energy_kwh, temperature_f, altitude_ft, avg_wind_speed_mph, wind_direction_deg, elevation_gain_ft, source)), epa_test_vehicles(${EPA_TEST_VEHICLE_FIELDS})`)
       .in('id', ids);
     if (error) throw error;
     const byId = new Map((data || []).map(m => [m.id, m]));
@@ -1536,7 +1558,7 @@ class DataService {
       mappingId: m.id,
       vehicleId: m.vehicle_id,
       vehicleName: m.vehicles?.name ?? null,
-      epaGroup: m.epa_test_groups,
+      epaTestVehicle: m.epa_test_vehicles,
       runs: m.vehicles?.runs ?? [],
     }));
   }
@@ -2033,29 +2055,29 @@ class DataService {
   // ── EPA Test Groups ───────────────────────────────────────────────────────
 
   /**
-   * Search epa_test_groups for the vehicle-linking combobox.
+   * Search epa_test_vehicles for the vehicle-linking combobox.
    * Filters by free-text (matched against make + epa_carline_name) and optional
    * model year. Returns at most 50 results, ordered by make and carline name.
    *
    * @param {string} query — free text search string
    * @param {number|null} year — exact model year filter (optional)
    */
-  async searchEpaTestGroups(query, year = null) {
+  async searchEpaTestVehicles(query, year = null) {
     if (!this.useSupabase) return [];
     let q = getSupabase()
-      .from('epa_test_groups')
-      .select('test_group_id, epa_test_family_id, model_year, make, epa_carline_name, transmission, drive, fuel_type')
+      .from('epa_test_vehicles')
+      .select('test_vehicle_id, test_group, model_year, make, epa_carline_name, transmission, drive, fuel_type')
       .order('make')
       .order('epa_carline_name')
       .limit(50);
     if (year) q = q.eq('model_year', year);
     if (query?.trim()) {
       const escaped = query.trim().replace(/[%_]/g, '\\$&');
-      // Also search test_group_id and epa_test_family_id so users can look up
+      // Also search test_vehicle_id and test_group so users can look up
       // by vehicle config code (e.g. "R1S247") or EPA family ID
       q = q.or(
         `make.ilike.%${escaped}%,epa_carline_name.ilike.%${escaped}%,` +
-        `test_group_id.ilike.%${escaped}%,epa_test_family_id.ilike.%${escaped}%`
+        `test_vehicle_id.ilike.%${escaped}%,test_group.ilike.%${escaped}%`
       );
     }
     const { data, error } = await q;
@@ -2064,7 +2086,7 @@ class DataService {
   }
 
   /**
-   * EPA test groups a variant's configuration might be, for the suggestions on
+   * EPA test vehicles a variant's configuration might be, for the suggestions on
    * its EPA section (#341): its source's makes and model years. Carries what
    * the suggestion shows — label range, and the tests EPA tested is read from —
    * and what it is ranked on. Narrowed to the model and ranked in
@@ -2077,8 +2099,8 @@ class DataService {
       .map(m => `make.ilike.${String(m).replace(/[%_,()]/g, '')}%`)
       .join(',');
     const { data, error } = await getSupabase()
-      .from('epa_test_groups')
-      .select('test_group_id, model_year, make, epa_carline_name, drive, display_name, label_range_published, preferred_test_number, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh)')
+      .from('epa_test_vehicles')
+      .select('test_vehicle_id, model_year, make, epa_carline_name, drive, display_name, label_range_published, preferred_test_number, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh)')
       .in('model_year', years)
       .or(makeFilter)
       .limit(200);
@@ -2087,14 +2109,14 @@ class DataService {
   }
 
   /**
-   * Link a vehicle to an EPA test group.
+   * Link a vehicle to an EPA test vehicle.
    * Contributor-level permission enforced by RLS on epa_vehicle_mappings.
    */
-  async linkEpaTestGroup(vehicleId, epaTestGroupId, confidence = 'inferred', notes = '') {
+  async linkEpaTestVehicle(vehicleId, epaTestVehicleId, confidence = 'inferred', notes = '') {
     if (!this.useSupabase) return null;
     const { data, error } = await getSupabase()
       .from('epa_vehicle_mappings')
-      .insert({ vehicle_id: vehicleId, epa_test_group_id: epaTestGroupId, confidence, notes: notes || null })
+      .insert({ vehicle_id: vehicleId, test_vehicle_id: epaTestVehicleId, confidence, notes: notes || null })
       .select()
       .single();
     if (error) throw error;
@@ -2102,7 +2124,7 @@ class DataService {
   }
 
   /**
-   * Update the confidence or notes on an existing vehicle → EPA test group mapping.
+   * Update the confidence or notes on an existing vehicle → EPA test vehicle mapping.
    */
   async updateEpaMapping(mappingId, updates) {
     if (!this.useSupabase) return;
@@ -2130,10 +2152,10 @@ class DataService {
   }
 
   /**
-   * Remove a vehicle → EPA test group mapping.
+   * Remove a vehicle → EPA test vehicle mapping.
    * Admin permission enforced by RLS.
    */
-  async unlinkEpaTestGroup(mappingId) {
+  async unlinkEpaTestVehicle(mappingId) {
     if (!this.useSupabase) return;
     const { error } = await getSupabase()
       .from('epa_vehicle_mappings')
@@ -2143,48 +2165,48 @@ class DataService {
   }
 
   /**
-   * Bulk upsert parsed EPA groups into the curator model:
-   *   1. epa_test_groups            (identity + Section 6 label fields)
-   *   2. epa_coefficient_sets       (the primary 'City/Highway' set per group)
+   * Bulk upsert parsed EPA test vehicles into the curator model:
+   *   1. epa_test_vehicles            (identity + Section 6 label fields)
+   *   2. epa_coefficient_sets       (the primary 'City/Highway' set per test vehicle)
    *
    * Each parsed row carries a private `_coefficientSet` plus `_hasCoeffs` /
    * `_hasMpge` flags (from parseEpaTestCarSheet) — these are stripped before
-   * the group upsert and used to build the coefficient-set upsert.
+   * the test vehicle upsert and used to build the coefficient-set upsert.
    *
    * @param {Array<Object>} rows  Output of parseEpaTestCarSheet
    */
-  async bulkUpsertEpaTestGroups(rows) {
+  async bulkUpsertEpaTestVehicles(rows) {
     if (!this.useSupabase || !rows.length) return;
 
-    // 1. Group rows — strip private helpers.
-    const groupRows = rows.map(({ _coefficientSet, _hasCoeffs, _hasMpge, ...g }) => g);
+    // 1. Test vehicle rows — strip private helpers.
+    const testVehicleRows = rows.map(({ _coefficientSet, _hasCoeffs, _hasMpge, ...g }) => g);
     const { error } = await getSupabase()
-      .from('epa_test_groups')
-      .upsert(groupRows, { onConflict: 'test_group_id', ignoreDuplicates: false });
+      .from('epa_test_vehicles')
+      .upsert(testVehicleRows, { onConflict: 'test_vehicle_id', ignoreDuplicates: false });
     if (error) throw error;
 
-    // 2. Primary coefficient sets — only for groups that carried coefficients.
+    // 2. Primary coefficient sets — only for test vehicles that carried coefficients.
     const coeffRows = rows
       .filter(r => r._coefficientSet && r._hasCoeffs)
-      .map(r => ({ test_group_id: r.test_group_id, ...r._coefficientSet }));
+      .map(r => ({ test_vehicle_id: r.test_vehicle_id, ...r._coefficientSet }));
     if (coeffRows.length) {
       const { error: coeffErr } = await getSupabase()
         .from('epa_coefficient_sets')
-        .upsert(coeffRows, { onConflict: 'test_group_id,category', ignoreDuplicates: false });
+        .upsert(coeffRows, { onConflict: 'test_vehicle_id,category', ignoreDuplicates: false });
       if (coeffErr) throw coeffErr;
     }
   }
 
   /**
-   * Fetch all EPA test groups for the admin panel, including which vehicles
-   * each group is currently linked to via epa_vehicle_mappings.
+   * Fetch all EPA test vehicles for the admin panel, including which vehicles
+   * each test vehicle is currently linked to via epa_vehicle_mappings.
    */
-  async getEpaTestGroupsAdmin() {
+  async getEpaTestVehiclesAdmin() {
     if (!this.useSupabase) return [];
     const { data, error } = await getSupabase()
-      .from('epa_test_groups')
+      .from('epa_test_vehicles')
       .select(`
-        test_group_id, epa_test_family_id,
+        test_vehicle_id, test_group,
         model_year, make, epa_carline_name, drive, transmission,
         label_combined_mpge, label_hwy_mpge, display_name,
         source_file, ingested_at,
@@ -2201,30 +2223,30 @@ class DataService {
   }
 
   /**
-   * Update one or more fields on an EPA test group.
+   * Update one or more fields on an EPA test vehicle.
    * Accepts any subset of: { label_method, display_name }.
    */
-  async updateEpaTestGroup(testGroupId, updates) {
+  async updateEpaTestVehicle(testVehicleId, updates) {
     if (!this.useSupabase) return;
     const { error } = await getSupabase()
-      .from('epa_test_groups')
+      .from('epa_test_vehicles')
       .update(updates)
-      .eq('test_group_id', testGroupId);
+      .eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
   }
 
   /**
-   * Create a single EPA test group by hand (no CSV) — for vehicles whose data
+   * Create a single EPA test vehicle by hand (no CSV) — for vehicles whose data
    * only exists in a lab-submission PDF. Coefficient sets, tests, and phases
-   * are added afterward via the curator form. Fails on duplicate test_group_id.
+   * are added afterward via the curator form. Fails on duplicate test_vehicle_id.
    *
-   * @param {Object} group  epa_test_groups fields (test_group_id required)
+   * @param {Object} testVehicle  epa_test_vehicles fields (test_vehicle_id required)
    */
-  async createEpaTestGroup(group) {
+  async createEpaTestVehicle(testVehicle) {
     if (!this.useSupabase) return null;
     const { data, error } = await getSupabase()
-      .from('epa_test_groups')
-      .insert(group)
+      .from('epa_test_vehicles')
+      .insert(testVehicle)
       .select()
       .single();
     if (error) throw error;
@@ -2232,28 +2254,28 @@ class DataService {
   }
 
   /**
-   * Which of the given test_group_ids already exist (for overwrite confirmation).
+   * Which of the given test_vehicle_ids already exist (for overwrite confirmation).
    *
    * Chunked: `.in()` puts every id in the request URL, and a bulk drop of a
    * year's certificates is ~460 ids, ~8 KB — at the edge of what the gateway
    * accepts. 100 per request stays far inside it, and inside the row cap.
    */
-  async getExistingEpaTestGroupIds(ids) {
+  async getExistingEpaTestVehicleIds(ids) {
     if (!this.useSupabase || !ids.length) return [];
     const found = [];
     for (let i = 0; i < ids.length; i += 100) {
       const { data, error } = await getSupabase()
-        .from('epa_test_groups')
-        .select('test_group_id')
-        .in('test_group_id', ids.slice(i, i + 100));
+        .from('epa_test_vehicles')
+        .select('test_vehicle_id')
+        .in('test_vehicle_id', ids.slice(i, i + 100));
       if (error) throw error;
-      found.push(...(data || []).map(r => r.test_group_id));
+      found.push(...(data || []).map(r => r.test_vehicle_id));
     }
     return found;
   }
 
   /**
-   * Import one fully-parsed group (from a CSI PDF) into the curator model.
+   * Import one fully-parsed test vehicle (from a CSI PDF) into the curator model.
    *
    * Updates IN PLACE rather than clean-replacing, matching rows on the identity
    * the certificate gives them (coefficient category, EPA test number, phase
@@ -2263,38 +2285,38 @@ class DataService {
    * Everything nobody has touched is still "upload is truth". The rules live in
    * utils/epaImportMerge.js; this method only executes the plan.
    *
-   * @param {Object} group  Output element of parseEpaCsiText().groups
+   * @param {Object} testVehicle  Output element of parseEpaCsiText().testVehicles
    * @returns {Promise<{kept: Array, guarded: Array}>} curator-held values the PDF disagreed with,
    *   and identity fields an older certification was stopped from overwriting (#374)
    */
-  async importEpaGroupFull(group) {
+  async importEpaTestVehicleFull(testVehicle) {
     if (!this.useSupabase) return { kept: [], guarded: [] };
     const supabase = getSupabase();
-    const { coefficient_sets = [], tests = [], covered_models = [], ...g } = group;
-    const tgid = g.test_group_id;
+    const { coefficient_sets = [], tests = [], covered_models = [], ...g } = testVehicle;
+    const tgid = g.test_vehicle_id;
     const check = ({ error }) => { if (error) throw error; };
 
     // What is stored now.
     const [gRes, cRes, tRes] = await Promise.all([
-      supabase.from('epa_test_groups').select('*').eq('test_group_id', tgid).maybeSingle(),
-      supabase.from('epa_coefficient_sets').select('*').eq('test_group_id', tgid),
-      supabase.from('epa_tests').select('*, epa_test_phases(*)').eq('test_group_id', tgid),
+      supabase.from('epa_test_vehicles').select('*').eq('test_vehicle_id', tgid).maybeSingle(),
+      supabase.from('epa_coefficient_sets').select('*').eq('test_vehicle_id', tgid),
+      supabase.from('epa_tests').select('*, epa_test_phases(*)').eq('test_vehicle_id', tgid),
     ]);
     [gRes, cRes, tRes].forEach(check);
 
-    const plan = planGroupImport(
-      { group: gRes.data, coefficient_sets: cRes.data || [], tests: tRes.data || [] },
-      { group: { ...g, source_file: g.source_file ?? null }, coefficient_sets, tests },
+    const plan = planTestVehicleImport(
+      { testVehicle: gRes.data, coefficient_sets: cRes.data || [], tests: tRes.data || [] },
+      { testVehicle: { ...g, source_file: g.source_file ?? null }, coefficient_sets, tests },
     );
 
-    // 1. Group (upsert). Held fields are absent from the payload, so the
+    // 1. Test vehicle (upsert). Held fields are absent from the payload, so the
     //    upsert leaves those columns alone; `overrides` keeps their tags.
-    check(await supabase.from('epa_test_groups')
-      .upsert({ test_group_id: tgid, ...plan.group.payload, overrides: plan.group.overrides },
-              { onConflict: 'test_group_id', ignoreDuplicates: false }));
+    check(await supabase.from('epa_test_vehicles')
+      .upsert({ test_vehicle_id: tgid, ...plan.testVehicle.payload, overrides: plan.testVehicle.overrides },
+              { onConflict: 'test_vehicle_id', ignoreDuplicates: false }));
 
     // 2. Coefficient sets — remove, then update in place, then insert (the
-    //    one-primary-per-group index is checked per statement).
+    //    one-primary-per-test-vehicle index is checked per statement).
     const cp = plan.coefficients;
     if (cp.remove.length) check(await supabase.from('epa_coefficient_sets').delete().in('id', cp.remove));
     for (const u of cp.update) {
@@ -2303,7 +2325,7 @@ class DataService {
     }
     if (cp.insert.length) {
       check(await supabase.from('epa_coefficient_sets')
-        .insert(cp.insert.map(r => ({ test_group_id: tgid, ...r }))));
+        .insert(cp.insert.map(r => ({ test_vehicle_id: tgid, ...r }))));
     }
 
     // 2b. Covered models (clean-replace: certificate-wide, nothing edits them
@@ -2312,9 +2334,9 @@ class DataService {
     //     Skipped when an older certification meets a newer one: the list is
     //     the newer certificate's, not this file's (#374).
     try {
-      if (!plan.holdIdentity) await supabase.from('epa_covered_models').delete().eq('test_group_id', tgid);
+      if (!plan.holdIdentity) await supabase.from('epa_covered_models').delete().eq('test_vehicle_id', tgid);
       if (!plan.holdIdentity && covered_models.length) {
-        const rows = uniqueCoveredModels(covered_models).map(cm => ({ test_group_id: tgid, ...cm }));
+        const rows = uniqueCoveredModels(covered_models).map(cm => ({ test_vehicle_id: tgid, ...cm }));
         const { error } = await supabase.from('epa_covered_models').insert(rows);
         if (error) throw error;
       }
@@ -2355,7 +2377,7 @@ class DataService {
     }
     for (const t of tp.insert) {
       const saved = await writeTest(
-        (row) => supabase.from('epa_tests').insert({ test_group_id: tgid, ...row }).select('id').single(),
+        (row) => supabase.from('epa_tests').insert({ test_vehicle_id: tgid, ...row }).select('id').single(),
         t.row);
       if (t.phases.length) {
         check(await supabase.from('epa_test_phases')
@@ -2366,27 +2388,27 @@ class DataService {
   }
 
   /** Convenience alias kept for back-compat. */
-  async updateEpaLabelMethod(testGroupId, method) {
-    return this.updateEpaTestGroup(testGroupId, { label_method: method || null });
+  async updateEpaLabelMethod(testVehicleId, method) {
+    return this.updateEpaTestVehicle(testVehicleId, { label_method: method || null });
   }
 
   /**
-   * Delete an EPA test group and all its vehicle mappings.
+   * Delete an EPA test vehicle and all its vehicle mappings.
    * The epa_vehicle_mappings FK has no CASCADE so mappings must be deleted first.
    */
-  async deleteEpaTestGroup(testGroupId) {
+  async deleteEpaTestVehicle(testVehicleId) {
     if (!this.useSupabase) return;
-    // Step 1: remove all vehicle→group mappings
+    // Step 1: remove all vehicle→test vehicle mappings
     const { error: mapErr } = await getSupabase()
       .from('epa_vehicle_mappings')
       .delete()
-      .eq('epa_test_group_id', testGroupId);
+      .eq('test_vehicle_id', testVehicleId);
     if (mapErr) throw mapErr;
-    // Step 2: remove the group itself
+    // Step 2: remove the test vehicle itself
     const { error } = await getSupabase()
-      .from('epa_test_groups')
+      .from('epa_test_vehicles')
       .delete()
-      .eq('test_group_id', testGroupId);
+      .eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
   }
 
@@ -2396,7 +2418,7 @@ class DataService {
    * Bulk-import parsed Fuel Economy Guide rows.
    *
    * Upserts on the natural key (model year, division, carline, model type
-   * index) — NOT on the test group, which matches almost nothing of ours and is
+   * index) — NOT on the smog Test Group, which matches almost nothing of ours and is
    * not unique per configuration anyway. The index is part of the key because
    * carline alone is not unique: Audi lists one carline three times at three
    * different ranges. Re-importing the same guide is therefore idempotent,
@@ -2455,10 +2477,10 @@ class DataService {
   }
 
   /**
-   * Staged guide rows that could belong to this group — ranked candidates for
+   * Staged guide rows that could belong to this test vehicle — ranked candidates for
    * the link picker.
    *
-   * EVERY YEAR, not just the group's. This used to filter server-side on the
+   * EVERY YEAR, not just the test vehicle's. This used to filter server-side on the
    * exact model year, which contradicted both the picker's own copy ("no staged
    * rows in any imported year") and the ranker: `rankFeCandidates` treats the
    * year as a SORT key rather than a filter, and `bestFeCandidate` has a
@@ -2475,37 +2497,37 @@ class DataService {
    * grew with each import. Paged, because all years together is past the
    * 1000-row cap; `id` orders it since nothing else here is unique.
    */
-  async getFeGuideCandidates(group) {
-    if (!this.useSupabase || !group) return [];
+  async getFeGuideCandidates(testVehicle) {
+    if (!this.useSupabase || !testVehicle) return [];
     const rows = await fetchAllRows(() => getSupabase()
       .from('epa_fe_guide')
       .select('id, model_year, division, carline, label_comb_range_mi, label_comb_mpge, motor_count')
       .order('id', { ascending: true }));
-    return rankFeCandidates(group, rows);
+    return rankFeCandidates(testVehicle, rows);
   }
 
   /**
-   * Link a guide row to a test group and copy its figures across.
+   * Link a guide row to a test vehicle and copy its figures across.
    *
    * The write is a single update so the values, their provenance and the link
    * land together — a partial promotion would leave fields the curator cannot
    * attribute and unlink cannot undo.
    */
-  async linkFeGuideRow(testGroupId, feRowId) {
+  async linkFeGuideRow(testVehicleId, feRowId) {
     if (!this.useSupabase) return { promoted: [], skipped: [] };
     const supabase = getSupabase();
 
-    const [{ data: group, error: gErr }, { data: feRow, error: fErr }] = await Promise.all([
-      supabase.from('epa_test_groups')
+    const [{ data: testVehicle, error: gErr }, { data: feRow, error: fErr }] = await Promise.all([
+      supabase.from('epa_test_vehicles')
         .select('*, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh, '
                 + 'ac_recharge_kwh, epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh))')
-        .eq('test_group_id', testGroupId).single(),
+        .eq('test_vehicle_id', testVehicleId).single(),
       supabase.from('epa_fe_guide').select('*').eq('id', feRowId).single(),
     ]);
     if (gErr) throw gErr;
     if (fErr) throw fErr;
 
-    const { updates, promoted, skipped } = promotionUpdates(group, feRow);
+    const { updates, promoted, skipped } = promotionUpdates(testVehicle, feRow);
 
     // Which test the figures should come from, now that there is something to
     // decide it with. EPA published one pair of unadjusted figures and we hold
@@ -2516,7 +2538,7 @@ class DataService {
     // Declines rather than guesses: one test is not a choice, and two runs too
     // alike to separate leave the most-recent default standing. A declined
     // selection writes null, so re-linking never leaves a stale winner behind.
-    const selection = selectTestForGuide(group?.epa_tests ?? [], {
+    const selection = selectTestForGuide(testVehicle?.epa_tests ?? [], {
       unadjHwyMpge:     feRow?.unadj_hwy_mpge,
       labelCityRangeMi: feRow?.label_city_range_mi,
       labelHwyRangeMi:  feRow?.label_hwy_range_mi,
@@ -2524,15 +2546,15 @@ class DataService {
     updates.preferred_test_number = selection.testNumber;
     // No early return on an empty `promoted`. `updates` always carries
     // fe_guide_row_id, and skipping the write when the guide happened to add no
-    // new values left the group unlinked while reporting success.
+    // new values left the test vehicle unlinked while reporting success.
     const { error } = await supabase
-      .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
+      .from('epa_test_vehicles').update(updates).eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
     return { promoted, skipped, selection };
   }
 
   /**
-   * Every certification group still awaiting a guide link (#238).
+   * Every test vehicle still awaiting a guide link (#238).
    *
    * Includes what each one would unlock, so the sweep can prioritise: the
    * procedure codes and DC energy that decide whether a link adds a charger
@@ -2540,16 +2562,16 @@ class DataService {
    * road-load figure. Both are read here rather than counted server-side
    * because the sweep needs the values anyway.
    *
-   * Skipped groups are excluded by default. "We looked and there is nothing" is
+   * Skipped test vehicles are excluded by default. "We looked and there is nothing" is
    * a decision, and a sweep that keeps re-asking it never finishes — but the
    * caller can ask for them, because that is different from having no opinion.
    */
-  async getGroupsAwaitingFeLink({ includeSkipped = false } = {}) {
+  async getTestVehiclesAwaitingFeLink({ includeSkipped = false } = {}) {
     if (!this.useSupabase) return [];
     let q = getSupabase()
-      .from('epa_test_groups')
+      .from('epa_test_vehicles')
       .select(`
-        test_group_id, model_year, make, epa_carline_name, display_name,
+        test_vehicle_id, model_year, make, epa_carline_name, display_name,
         vehicle_config_number, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note, useable_kwh,
         carryover_model_year, cd_range_combined_calc, derived_5cycle_coefficient,
         epa_coefficient_sets(target_a, equiv_test_weight_lbs),
@@ -2558,7 +2580,7 @@ class DataService {
         epa_vehicle_mappings(vehicles(id, name, year))
       `)
       .is('fe_guide_row_id', null)
-      .order('test_group_id');
+      .order('test_vehicle_id');
     if (!includeSkipped) q = q.is('fe_guide_skipped_at', null);
 
     const { data, error } = await q;
@@ -2568,9 +2590,9 @@ class DataService {
       // an admin panel that will not render.
       if (isMissingColumn(error)) {
         const { data: fallback, error: e2 } = await getSupabase()
-          .from('epa_test_groups')
+          .from('epa_test_vehicles')
           .select(`
-            test_group_id, model_year, make, epa_carline_name, display_name,
+            test_vehicle_id, model_year, make, epa_carline_name, display_name,
             vehicle_config_number, fe_guide_row_id, useable_kwh,
             carryover_model_year, cd_range_combined_calc, derived_5cycle_coefficient,
             epa_coefficient_sets(target_a, equiv_test_weight_lbs),
@@ -2578,7 +2600,7 @@ class DataService {
             epa_vehicle_mappings(vehicles(id, name, year))
           `)
           .is('fe_guide_row_id', null)
-          .order('test_group_id');
+          .order('test_vehicle_id');
         if (e2) throw e2;
         return fallback || [];
       }
@@ -2591,8 +2613,8 @@ class DataService {
   async getFeLinkProgress() {
     if (!this.useSupabase) return null;
     const { data, error } = await getSupabase()
-      .from('epa_test_groups')
-      .select('test_group_id, fe_guide_row_id, fe_guide_skipped_at');
+      .from('epa_test_vehicles')
+      .select('test_vehicle_id, fe_guide_row_id, fe_guide_skipped_at');
     if (error) {
       if (isMissingColumn(error)) return null;
       throw error;
@@ -2607,19 +2629,19 @@ class DataService {
   }
 
   /**
-   * Record that a group has no guide row to link, or undo that.
+   * Record that a test vehicle has no guide row to link, or undo that.
    *
-   * Deliberately not a link and not a deletion: the group stays unlinked and
+   * Deliberately not a link and not a deletion: the test vehicle stays unlinked and
    * stays findable, because a curator having looked is worth knowing.
    */
-  async setFeLinkSkipped(testGroupId, skipped, note = null) {
+  async setFeLinkSkipped(testVehicleId, skipped, note = null) {
     if (!this.useSupabase) return;
     const { error } = await getSupabase()
-      .from('epa_test_groups')
+      .from('epa_test_vehicles')
       .update(skipped
         ? { fe_guide_skipped_at: new Date().toISOString(), fe_guide_skip_note: note }
         : { fe_guide_skipped_at: null, fe_guide_skip_note: null })
-      .eq('test_group_id', testGroupId);
+      .eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
   }
 
@@ -2692,7 +2714,7 @@ class DataService {
   }
 
   /**
-   * Link many groups in one operation (#238).
+   * Link many test vehicles in one operation (#238).
    *
    * Exists because the per-link path in AppContext refreshes every vehicle in
    * the app afterwards — correct for one link, since the promoted figures reach
@@ -2700,12 +2722,12 @@ class DataService {
    * ninety-eight: that is ninety-eight sequential re-runs of the largest query
    * the app makes, for one refresh's worth of benefit.
    *
-   * Sequential rather than parallel, deliberately. Each link reads its group,
+   * Sequential rather than parallel, deliberately. Each link reads its test vehicle,
    * computes what may be promoted and writes it back; firing them all at once
    * makes a mid-way failure impossible to attribute, and a batch that half
    * worked is exactly what a curator must be able to reason about.
    *
-   * Never throws for a single failure. One group with a stale row should not
+   * Never throws for a single failure. One test vehicle with a stale row should not
    * discard ninety-seven good links, so failures are collected and returned
    * with everything that did work.
    */
@@ -2713,26 +2735,26 @@ class DataService {
     const result = { linked: 0, promoted: 0, skipped: 0, failures: [] };
     if (!this.useSupabase || !pairs?.length) return result;
 
-    for (const { testGroupId, feRowId } of pairs) {
+    for (const { testVehicleId, feRowId } of pairs) {
       try {
-        const res = await this.linkFeGuideRow(testGroupId, feRowId);
+        const res = await this.linkFeGuideRow(testVehicleId, feRowId);
         result.linked   += 1;
         result.promoted += res.promoted.length;
         result.skipped  += res.skipped.length;
       } catch (error) {
-        result.failures.push({ testGroupId, message: error.message });
+        result.failures.push({ testVehicleId, message: error.message });
       }
     }
     return result;
   }
 
   /**
-   * Certification groups with everything the statistics derive from (#236).
+   * Test vehicles with everything the statistics derive from (#236).
    *
-   * Only groups carrying a guide link, and that is the point rather than a
+   * Only test vehicles carrying a guide link, and that is the point rather than a
    * convenience: a cert-side figure has to be groupable by class, brand, parent
    * or drive to be a statistic at all, and those dimensions live on the guide
-   * row. An unlinked group can produce a number but nothing to compare it
+   * row. An unlinked test vehicle can produce a number but nothing to compare it
    * against — which is why #238 came first and took this population from 45 to
    * 181.
    *
@@ -2740,28 +2762,28 @@ class DataService {
    * `nominal_pack_kwh`, which the usable-vs-gross buffer ratio needs.
    */
   /**
-   * Every EPA test group with everything the reconciliation checks read (#229).
+   * Every EPA test vehicle with everything the reconciliation checks read (#229).
    *
-   * Deliberately NOT filtered to linked groups, unlike getCertGroupsForStats.
+   * Deliberately NOT filtered to linked test vehicles, unlike getTestVehiclesForCertStats.
    * The question this answers is "which of my records do not reconcile?", and a
-   * group with no guide row still has phases that can contradict its own stated
+   * test vehicle with no guide row still has phases that can contradict its own stated
    * ranges — in fact those are the ones nobody has looked at.
    *
-   * Wide, because the checks are wide: epaRecordFromGroup needs the phases,
+   * Wide, because the checks are wide: epaRecordFromTestVehicle needs the phases,
    * checkUnadjustedMpge needs the promoted unadjusted figures, checkLabelInvariant
    * needs the label range and adjustment factor, and checkRecordIntegrity needs
    * the energies and the coefficient sets. Fetching them separately would mean
-   * one round trip per group.
+   * one round trip per test vehicle.
    *
-   * Paged: 211 groups is under PostgREST's 1000-row cap today and the cap is not
+   * Paged: 211 test vehicles is under PostgREST's 1000-row cap today and the cap is not
    * a thing to be under by luck.
    */
-  async getEpaGroupsForAudit() {
+  async getEpaTestVehiclesForAudit() {
     if (!this.useSupabase) return [];
     return fetchAllRows(() => getSupabase()
-      .from('epa_test_groups')
+      .from('epa_test_vehicles')
       .select(`
-        test_group_id, epa_test_family_id, carryover_test_group_id, carryover_model_year,
+        test_vehicle_id, test_group, carryover_test_group, carryover_model_year,
         model_year, make, epa_carline_name, display_name, vehicle_config_number,
         source_file, fe_guide_row_id,
         useable_kwh, nominal_pack_kwh, total_voltage,
@@ -2777,17 +2799,17 @@ class DataService {
                   cd_range_combined_calc, cd_range_hwy_calc,
                   epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
         epa_vehicle_mappings(id, confidence, vehicles(id, name, year)),
-        epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(adjustment_signature)
+        epa_fe_guide!epa_test_vehicles_fe_guide_row_id_fkey(adjustment_signature)
       `)
-      .order('test_group_id', { ascending: true }));
+      .order('test_vehicle_id', { ascending: true }));
   }
 
   /**
-   * Every certification group, for the cert-side statistics.
+   * Every test vehicle, for the cert-side statistics.
    *
-   * NOT filtered to guide-linked groups any more. It was, because the
+   * NOT filtered to guide-linked test vehicles any more. It was, because the
    * statistics group by class and drivetrain and those live on the guide row —
-   * but a group with no link still knows its make and still carries the lab's
+   * but a test vehicle with no link still knows its make and still carries the lab's
    * own measurements, and dropping it here meant nothing downstream could even
    * report that it existed. 90 of 413 were being filtered out, taking every GM
    * truck with a 180 kWh pack with them and leaving Chevrolet's usable energy
@@ -2797,53 +2819,53 @@ class DataService {
    * class and drivetrain read `Unknown`, and `_guideLinked` says which is
    * which.
    */
-  async getCertGroupsForStats() {
+  async getTestVehiclesForCertStats() {
     if (!this.useSupabase) return [];
     const { data, error } = await getSupabase()
-      .from('epa_test_groups')
+      .from('epa_test_vehicles')
       .select(`
-        test_group_id, model_year, make, epa_carline_name, display_name,
+        test_vehicle_id, model_year, make, epa_carline_name, display_name,
         useable_kwh, cd_range_combined_calc, label_range_published,
         derived_5cycle_coefficient, accessory_load_w_override, charger_efficiency_override,
         epa_coefficient_sets(is_primary, category, target_a, target_b, target_c,
                              set_a, set_b, set_c, equiv_test_weight_lbs),
         epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh,
                   epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
-        epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(
+        epa_fe_guide!epa_test_vehicles_fe_guide_row_id_fkey(
           division, carline, carline_class, drive_desc, nominal_pack_kwh,
           label_comb_range_mi, label_comb_mpge, model_year, adjustment_signature
         )
       `)
-      .order('test_group_id');
+      .order('test_vehicle_id');
     if (error) throw error;
     return data || [];
   }
 
   /**
-   * Every certification group that could be plotted (#237).
+   * Every test vehicle that could be plotted (#237).
    *
-   * Unlike getCertGroupsForStats this does NOT require a guide link: 210 of 211
-   * groups carry road-load coefficients, and a curve's shape needs nothing else.
+   * Unlike getTestVehiclesForCertStats this does NOT require a guide link: 210 of 211
+   * test vehicles carry road-load coefficients, and a curve's shape needs nothing else.
    * The link matters for the ENERGY — without it there is no gross pack to fall
    * back on — which is what separates a curve with a range axis from one
    * without, and is surfaced as a tier rather than as a filter applied here.
    */
-  async getCertGroupsForCurves() {
+  async getTestVehiclesForCurves() {
     if (!this.useSupabase) return [];
     const { data, error } = await getSupabase()
-      .from('epa_test_groups')
+      .from('epa_test_vehicles')
       .select(`
-        test_group_id, model_year, make, epa_carline_name, display_name,
+        test_vehicle_id, model_year, make, epa_carline_name, display_name,
         useable_kwh, accessory_load_w_override, derived_5cycle_coefficient,
         epa_coefficient_sets(is_primary, category, target_a, target_b, target_c,
                              set_a, set_b, set_c, equiv_test_weight_lbs),
         epa_tests(procedure_code, total_dc_energy_kwh,
                   epa_test_phases(phase_index, phase_type, distance_mi, dc_energy_kwh)),
-        epa_fe_guide!epa_test_groups_fe_guide_row_id_fkey(
+        epa_fe_guide!epa_test_vehicles_fe_guide_row_id_fkey(
           carline, division, carline_class, drive_desc, nominal_pack_kwh
         )
       `)
-      .order('test_group_id');
+      .order('test_vehicle_id');
     if (error) throw error;
     return data || [];
   }
@@ -2863,35 +2885,35 @@ class DataService {
    * Deliberately overriding an override, so it is an explicit action rather than
    * something the link does on its own.
    */
-  async acceptFeGuideValues(testGroupId, columns) {
+  async acceptFeGuideValues(testVehicleId, columns) {
     if (!this.useSupabase || !columns?.length) return { accepted: [] };
     const supabase = getSupabase();
 
-    const { data: group, error: gErr } = await supabase
-      .from('epa_test_groups').select('*').eq('test_group_id', testGroupId).single();
+    const { data: testVehicle, error: gErr } = await supabase
+      .from('epa_test_vehicles').select('*').eq('test_vehicle_id', testVehicleId).single();
     if (gErr) throw gErr;
-    const feRow = await this.getFeGuideRow(group.fe_guide_row_id);
+    const feRow = await this.getFeGuideRow(testVehicle.fe_guide_row_id);
     if (!feRow) return { accepted: [] };
 
-    const { updates, accepted } = acceptGuideUpdates(group, feRow, columns);
+    const { updates, accepted } = acceptGuideUpdates(testVehicle, feRow, columns);
     if (!accepted.length) return { accepted };
 
     const { error } = await supabase
-      .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
+      .from('epa_test_vehicles').update(updates).eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
     return { accepted };
   }
 
   /** Unlink, restoring every value the promotion displaced. */
-  async unlinkFeGuideRow(testGroupId) {
+  async unlinkFeGuideRow(testVehicleId) {
     if (!this.useSupabase) return { restored: [] };
     const supabase = getSupabase();
 
-    const { data: group, error: gErr } = await supabase
-      .from('epa_test_groups').select('*').eq('test_group_id', testGroupId).single();
+    const { data: testVehicle, error: gErr } = await supabase
+      .from('epa_test_vehicles').select('*').eq('test_vehicle_id', testVehicleId).single();
     if (gErr) throw gErr;
 
-    const { updates, restored } = demotionUpdates(group);
+    const { updates, restored } = demotionUpdates(testVehicle);
 
     // The selection was evidence from the guide row, so it goes when the row
     // does. Leaving it would keep steering every derived figure from a source
@@ -2903,12 +2925,12 @@ class DataService {
     // source 'manual', and an earlier version of this guard looked for
     // 'curator', which nothing writes — so it never fired and would have wiped
     // exactly the choice it was meant to protect.
-    if (!isCuratorOwned(group?.overrides, 'preferred_test_number')) {
+    if (!isCuratorOwned(testVehicle?.overrides, 'preferred_test_number')) {
         updates.preferred_test_number = null;
     }
 
     const { error } = await supabase
-      .from('epa_test_groups').update(updates).eq('test_group_id', testGroupId);
+      .from('epa_test_vehicles').update(updates).eq('test_vehicle_id', testVehicleId);
     if (error) throw error;
     return { restored };
   }
@@ -2977,16 +2999,16 @@ class DataService {
   /**
    * Guide row id → the vehicles we hold test data for.
    *
-   * Two indexed hops: `epa_test_groups.fe_guide_row_id` is a foreign key with a
-   * partial index, and `epa_vehicle_mappings` joins a group to its vehicles.
-   * Only 45 of 204 groups are linked today, so this is a small map fetched once
+   * Two indexed hops: `epa_test_vehicles.fe_guide_row_id` is a foreign key with a
+   * partial index, and `epa_vehicle_mappings` joins a test vehicle to its vehicles.
+   * Only 45 of 204 test vehicles are linked today, so this is a small map fetched once
    * and keyed in memory rather than a lookup per displayed row.
    */
   async getFeGuideVehicleLinks() {
     if (!this.useSupabase) return {};
     const { data, error } = await getSupabase()
-      .from('epa_test_groups')
-      .select('test_group_id, fe_guide_row_id, epa_vehicle_mappings(vehicles(id, name, year))')
+      .from('epa_test_vehicles')
+      .select('test_vehicle_id, fe_guide_row_id, epa_vehicle_mappings(vehicles(id, name, year))')
       .not('fe_guide_row_id', 'is', null);
     if (error) throw error;
 
@@ -2995,8 +3017,8 @@ class DataService {
       const vehicles = (g.epa_vehicle_mappings || [])
         .map(m => m.vehicles)
         .filter(Boolean);
-      if (!byRow[g.fe_guide_row_id]) byRow[g.fe_guide_row_id] = { testGroupIds: [], vehicles: [] };
-      byRow[g.fe_guide_row_id].testGroupIds.push(g.test_group_id);
+      if (!byRow[g.fe_guide_row_id]) byRow[g.fe_guide_row_id] = { testVehicleIds: [], vehicles: [] };
+      byRow[g.fe_guide_row_id].testVehicleIds.push(g.test_vehicle_id);
       byRow[g.fe_guide_row_id].vehicles.push(...vehicles);
     }
     return byRow;
@@ -3005,24 +3027,24 @@ class DataService {
   // ── EPA curator model: coefficient sets, tests, phases, audit ─────────────────
 
   /**
-   * Fetch a single EPA test group with its full curator hierarchy:
+   * Fetch a single EPA test vehicle with its full curator hierarchy:
    * coefficient sets, tests, and each test's phases. Used by the curator
    * form in Tests & Data.
    *
-   * @param {string} testGroupId
-   * @returns {Object|null} group row with nested epa_coefficient_sets and
+   * @param {string} testVehicleId
+   * @returns {Object|null} test vehicle row with nested epa_coefficient_sets and
    *   epa_tests(epa_test_phases), or null if not found.
    */
-  async getEpaTestGroupFull(testGroupId) {
+  async getEpaTestVehicleFull(testVehicleId) {
     if (!this.useSupabase) return null;
     const { data, error } = await getSupabase()
-      .from('epa_test_groups')
+      .from('epa_test_vehicles')
       .select(`
         *,
         epa_coefficient_sets(*),
         epa_tests(*, epa_test_phases(*))
       `)
-      .eq('test_group_id', testGroupId)
+      .eq('test_vehicle_id', testVehicleId)
       .single();
     if (error) throw error;
     return data || null;
@@ -3095,21 +3117,21 @@ class DataService {
    * Append a row to the field-edit audit trail. Records who/when/prior/new
    * plus an optional source citation. Insert-only (immutable history).
    *
-   * `testGroupId` is what the history is read back by; `rowKey` is the child's
+   * `testVehicleId` is what the history is read back by; `rowKey` is the child's
    * stable identity (coefficient category, EPA test number, "<test> #<phase>")
    * so an entry still says what it was about after a re-import has replaced
    * the row id. See migration 074.
    *
-   * @param {{ tableName, rowId, testGroupId, rowKey, field, priorValue, newValue, sourceCitation }} entry
+   * @param {{ tableName, rowId, testVehicleId, rowKey, field, priorValue, newValue, sourceCitation }} entry
    */
-  async logEpaFieldEdit({ tableName, rowId, testGroupId, rowKey, field, priorValue, newValue, sourceCitation }) {
+  async logEpaFieldEdit({ tableName, rowId, testVehicleId, rowKey, field, priorValue, newValue, sourceCitation }) {
     if (!this.useSupabase) return;
     const { error } = await getSupabase()
       .from('epa_field_audit')
       .insert({
         table_name:      tableName,
         row_id:          String(rowId),
-        test_group_id:   testGroupId ?? null,
+        test_vehicle_id:   testVehicleId ?? null,
         row_key:         rowKey ?? null,
         field,
         prior_value:     priorValue != null ? String(priorValue) : null,
@@ -3139,19 +3161,19 @@ class DataService {
   }
 
   /**
-   * The audit trail for a whole test group — the group row and everything under
-   * it — most recent first. Keyed by `test_group_id`, not by the ids of the
+   * The audit trail for a whole test vehicle — the test vehicle row and everything under
+   * it — most recent first. Keyed by `test_vehicle_id`, not by the ids of the
    * children that exist today: those change when rows are replaced, and history
    * that only resolves through live ids goes quiet the moment they do.
    *
-   * @param {string} testGroupId
+   * @param {string} testVehicleId
    */
-  async getEpaAuditForGroup(testGroupId) {
+  async getEpaAuditForTestVehicle(testVehicleId) {
     if (!this.useSupabase) return [];
     const { data, error } = await getSupabase()
       .from('epa_field_audit')
       .select('*')
-      .eq('test_group_id', testGroupId)
+      .eq('test_vehicle_id', testVehicleId)
       .order('edited_at', { ascending: false })
       .limit(200);
     if (error) throw error;
@@ -3166,7 +3188,7 @@ class DataService {
 
   /**
    * Performance sessions with runs and split points nested, for one vehicle or
-   * a list of them. Single relational query, same shape as getEpaTestGroupFull().
+   * a list of them. Single relational query, same shape as getEpaTestVehicleFull().
    *
    * Accepts an array so the comparison charts can load every selected vehicle in
    * ONE round trip — fetching per vehicle meant ~50 queries on a wide selection.

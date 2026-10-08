@@ -22,7 +22,7 @@ const feRow = {
 };
 
 describe('promotionUpdates', () => {
-    it('fills an empty group and records the link', () => {
+    it('fills an empty test vehicle and records the link', () => {
         const { updates, promoted } = promotionUpdates({ overrides: {} }, feRow);
         expect(updates.label_range_published).toBe(307);
         expect(updates.label_combined_mpge).toBe(99);
@@ -34,11 +34,11 @@ describe('promotionUpdates', () => {
     it('overwrites a cert-derived value, because the guide is the published one', () => {
         // A CSI figure is manufacturer-delivered and not necessarily what
         // reached the window sticker.
-        const group = {
+        const testVehicle = {
             label_range_published: 306,
             overrides: { label_range_published: { source: 'pdf' } },
         };
-        const { updates, promoted, skipped } = promotionUpdates(group, feRow);
+        const { updates, promoted, skipped } = promotionUpdates(testVehicle, feRow);
         expect(updates.label_range_published).toBe(307);
         expect(promoted).toContain('label_range_published');
         expect(skipped).toEqual([]);
@@ -47,11 +47,11 @@ describe('promotionUpdates', () => {
     it('leaves a curator-set value alone', () => {
         // An import silently undoing a deliberate override would make the
         // override worthless.
-        const group = {
+        const testVehicle = {
             label_range_published: 300,
             overrides: { label_range_published: { source: 'manual' } },
         };
-        const { updates, promoted, skipped } = promotionUpdates(group, feRow);
+        const { updates, promoted, skipped } = promotionUpdates(testVehicle, feRow);
         expect(updates.label_range_published).toBeUndefined();
         expect(skipped).toContain('label_range_published');
         expect(promoted).not.toContain('label_range_published');
@@ -60,8 +60,8 @@ describe('promotionUpdates', () => {
     });
 
     it('remembers what it displaced, so unlink can undo it', () => {
-        const group = { label_range_published: 306, overrides: {} };
-        const { updates } = promotionUpdates(group, feRow);
+        const testVehicle = { label_range_published: 306, overrides: {} };
+        const { updates } = promotionUpdates(testVehicle, feRow);
         expect(updates.overrides.label_range_published)
             .toEqual({ source: PROMOTION_SOURCE, previous: 306 });
     });
@@ -104,9 +104,9 @@ describe('promotionUpdates', () => {
 
 describe('demotionUpdates', () => {
     it('restores what promotion displaced', () => {
-        const group = { label_range_published: 306, overrides: {} };
-        const promoted = promotionUpdates(group, feRow).updates;
-        const after = { ...group, ...promoted };
+        const testVehicle = { label_range_published: 306, overrides: {} };
+        const promoted = promotionUpdates(testVehicle, feRow).updates;
+        const after = { ...testVehicle, ...promoted };
 
         const { updates, restored } = demotionUpdates(after);
         expect(updates.label_range_published).toBe(306);
@@ -137,7 +137,7 @@ describe('demotionUpdates', () => {
         expect(updates.overrides.label_range_published).toEqual({ source: 'manual' });
     });
 
-    it('is a no-op on a group that was never linked', () => {
+    it('is a no-op on a test vehicle that was never linked', () => {
         const { updates, restored } = demotionUpdates({ overrides: { total_voltage: { source: 'pdf' } } });
         expect(restored).toEqual([]);
         expect(updates.fe_guide_row_id).toBeNull();
@@ -233,14 +233,14 @@ describe('acceptGuideUpdates', () => {
 
 describe('linking is not conditional on promoting', () => {
     // A link and a promotion are two different facts. Conflating them meant a
-    // group whose promotable fields were all curator-owned came back from
+    // test vehicle whose promotable fields were all curator-owned came back from
     // "Link" reporting success with NOTHING written — no fe_guide_row_id, so
-    // the group stayed unlinked and reappeared in the sweep, and the toast said
+    // the test vehicle stayed unlinked and reappeared in the sweep, and the toast said
     // it had worked.
     const feRow = { id: 42, label_comb_range_mi: 300, label_comb_mpge: 95 };
 
     it('records the link even when every field is curator-owned', () => {
-        const group = {
+        const testVehicle = {
             label_range_published: 111,
             label_combined_mpge: 99,
             overrides: {
@@ -248,7 +248,7 @@ describe('linking is not conditional on promoting', () => {
                 label_combined_mpge:   { source: 'manual' },
             },
         };
-        const { updates, promoted, skipped } = promotionUpdates(group, feRow);
+        const { updates, promoted, skipped } = promotionUpdates(testVehicle, feRow);
         expect(promoted).toEqual([]);
         expect(skipped.length).toBeGreaterThan(0);
         expect(updates.fe_guide_row_id).toBe(42);
@@ -261,8 +261,8 @@ describe('linking is not conditional on promoting', () => {
     });
 
     it('leaves curator values alone while linking', () => {
-        const group = { overrides: { label_range_published: { source: 'manual' } }, label_range_published: 111 };
-        const { updates } = promotionUpdates(group, feRow);
+        const testVehicle = { overrides: { label_range_published: { source: 'manual' } }, label_range_published: 111 };
+        const { updates } = promotionUpdates(testVehicle, feRow);
         expect(updates).not.toHaveProperty('label_range_published');
         expect(updates.fe_guide_row_id).toBe(42);
     });

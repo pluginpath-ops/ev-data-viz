@@ -46,8 +46,8 @@ function DerivedRow({ label, tooltip, result, format }) {
     );
 }
 
-export default function DerivedValues({ group, vehicle = null }) {
-    const d = deriveAll(group);
+export default function DerivedValues({ testVehicle, vehicle = null }) {
+    const d = deriveAll(testVehicle);
     return (
         <div>
             <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
@@ -83,10 +83,10 @@ export default function DerivedValues({ group, vehicle = null }) {
             <DerivedRow
                 label="Battery kWh"
                 result={{
-                    value: resolveUseableKwh(group, vehicle),
-                    source: SOC_WINDOW_BASIS[resolveUseableKwhSource(group, vehicle)]?.label
-                        ?? resolveUseableKwhSource(group, vehicle),
-                    certain: ['EPA', 'epa-tested'].includes(resolveUseableKwhSource(group, vehicle)),
+                    value: resolveUseableKwh(testVehicle, vehicle),
+                    source: SOC_WINDOW_BASIS[resolveUseableKwhSource(testVehicle, vehicle)]?.label
+                        ?? resolveUseableKwhSource(testVehicle, vehicle),
+                    certain: ['EPA', 'epa-tested'].includes(resolveUseableKwhSource(testVehicle, vehicle)),
                 }}
                 format={v => `${v.toFixed(1)} kWh`}
             />

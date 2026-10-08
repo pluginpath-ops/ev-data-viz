@@ -12,7 +12,7 @@
  * A certification record identifies itself by a manufacturer's Vehicle ID. It
  * knows nothing about class, brand or drivetrain — those live on the Fuel
  * Economy Guide row, and only a curator can connect the two. Before the linking
- * sweep 45 groups had that link; now 181 do, which is the difference between a
+ * sweep 45 test vehicles had that link; now 181 do, which is the difference between a
  * figure describing a dozen makes and one describing the fleet.
  *
  * ── Derivations are not recomputed here ─────────────────────────────────────
@@ -34,9 +34,9 @@ import {
 import { bodyClassLabel, driveGroup, resolveBrand } from './feGuideBrowse';
 
 /**
- * The bucket for a dimension a group cannot report.
+ * The bucket for a dimension a test vehicle cannot report.
  *
- * A named bucket rather than null, because `bucketise` skips null and the group
+ * A named bucket rather than null, because `bucketise` skips null and the test vehicle
  * would leave the table without appearing anywhere in it. "Unknown" is an
  * answer; a silently shorter table is not.
  */
@@ -55,7 +55,7 @@ const num = (v) => {
 // ── Measures ─────────────────────────────────────────────────────────────────
 
 /**
- * The source values that mean "this was not derived from the group's own
+ * The source values that mean "this was not derived from the test vehicle's own
  * numbers" — a constant standing in for a measurement that could not be made.
  *
  * Listed per derivation because they DIFFER, and that difference already caused
@@ -92,17 +92,17 @@ export const CERT_MEASURES = [
     { key: 'rolling_a', label: 'Rolling resistance (A)', unit: 'lbf', digits: 2,
       hint: 'The speed-independent road-load term: tyres and driveline drag.' },
     { key: 'aero_c', label: 'Aero drag (C)', unit: 'lbf/mph\u00b2', digits: 4,
-      hint: 'The road-load coefficient that scales with the square of speed \u2014 the aerodynamic term. Present on 203 of 204 groups, so it is the highest-coverage figure the certification side has.' },
+      hint: 'The road-load coefficient that scales with the square of speed \u2014 the aerodynamic term. Present on 203 of 204 test vehicles, so it is the highest-coverage figure the certification side has.' },
     { key: 'eta', label: 'Drivetrain efficiency (\u03b7, HWFET)', unit: '', axisLabel: '\u03b7', digits: 3, assumedIsNotData: true,
-      hint: 'Back-solved from the HWY phase against road load at the cycle\'s 48.3 mph average. A transient cycle measured with a steady-state formula, so it absorbs braking losses and the convexity of the drag term \u2014 which is why it reads about 13% below the steady-state figure. Groups where it could not be derived fall back to a default and are excluded rather than counted as measurements.' },
+      hint: 'Back-solved from the HWY phase against road load at the cycle\'s 48.3 mph average. A transient cycle measured with a steady-state formula, so it absorbs braking losses and the convexity of the drag term \u2014 which is why it reads about 13% below the steady-state figure. Test vehicles where it could not be derived fall back to a default and are excluded rather than counted as measurements.' },
     { key: 'ss_eta', label: 'Drivetrain efficiency (\u03b7, steady state)', unit: '', axisLabel: '\u03b7', digits: 3,
       hint: 'Back-solved from the constant-speed phases at the 65 mph J1634 specifies. Only a multi-cycle test has those phases, so the coverage here against the HWFET measure is exactly how much of the fleet a steady-state basis could describe.' },
     { key: 'ss_eta_ratio', label: 'Steady-state \u00f7 HWFET \u03b7', unit: '', axisLabel: 'ratio', digits: 4,
-      hint: 'Computed PER GROUP, on the groups carrying both. Its spread is what decides whether one fleet-wide factor can stand in for a missing steady-state measurement \u2014 and it is tight, median 1.128 with an interquartile range of 2.5%, which is what HWFET_TO_SS_ETA_RATIO is set from.' },
+      hint: 'Computed PER TEST VEHICLE, on the test vehicles carrying both. Its spread is what decides whether one fleet-wide factor can stand in for a missing steady-state measurement \u2014 and it is tight, median 1.128 with an interquartile range of 2.5%, which is what HWFET_TO_SS_ETA_RATIO is set from.' },
     { key: 'usable_kwh', label: 'Usable energy', unit: 'kWh', digits: 1,
       hint: 'Total DC energy discharged to depletion on the derivation test \u2014 the pack\'s measured usable capacity.' },
     { key: 'usable_fraction', label: 'Usable \u00f7 gross pack', unit: '', axisLabel: 'fraction', digits: 3,
-      hint: 'Measured usable energy against the guide\'s gross pack figure. Migration 053 cited 0.939\u20130.955 from four packs by hand; this is the same quantity across every linked group. Ratios above 1 are dropped \u2014 a pack cannot deliver more than it holds, so the two sources disagree and the gross figure is the softer of them.' },
+      hint: 'Measured usable energy against the guide\'s gross pack figure. Migration 053 cited 0.939\u20130.955 from four packs by hand; this is the same quantity across every linked test vehicle. Ratios above 1 are dropped \u2014 a pack cannot deliver more than it holds, so the two sources disagree and the gross figure is the softer of them.' },
     { key: 'charger_eff', label: 'Charger efficiency', unit: '', axisLabel: 'ratio', digits: 3, assumedIsNotData: true,
       hint: 'DC energy discharged \u00f7 AC energy to refill. Read only from a procedure the derivations use \u2014 77 or 84, never 86, where a short cycle against a full recharge reads 0.04.' },
     { key: 'etw_lbs', label: 'Test weight', unit: 'lb', digits: 0,
@@ -113,22 +113,22 @@ export const CERT_MEASURES = [
 export const certMeasureByKey = (key) => CERT_MEASURES.find(m => m.key === key) ?? null;
 
 /** Usable energy: the DC discharged to depletion on the test the model uses. */
-export function derivedUsableKwh(group) {
-    const explicit = num(group?.useable_kwh);
+export function derivedUsableKwh(testVehicle) {
+    const explicit = num(testVehicle?.useable_kwh);
     if (explicit != null) return explicit;
-    const test = pickDerivationTest(group?.epa_tests || []);
+    const test = pickDerivationTest(testVehicle?.epa_tests || []);
     return num(test?.total_dc_energy_kwh);
 }
 
 /**
- * One certification group, flattened to measures and the dimensions it can be
+ * One test vehicle, flattened to measures and the dimensions it can be
  * grouped by.
  *
  * The dimensions come from the LINKED GUIDE ROW where there is one, because a
  * certification record does not carry class or drivetrain. That is the shape of
  * this dataset: the lab measured it, the guide says what it is.
  *
- * ── What an unlinked group still knows ──────────────────────────────────────
+ * ── What an unlinked test vehicle still knows ──────────────────────────────────────
  *
  * It knows its BRAND. `make` is on the certification record — it is how the
  * manufacturer filed — so brand does not depend on the link, and resolving it
@@ -137,34 +137,34 @@ export function derivedUsableKwh(group) {
  *
  * Class and drivetrain it genuinely does not know, and those read `Unknown`
  * instead of null. Null is not a neutral choice here: `bucketise` skips an
- * observation whose dimension is null, so a null would drop the group from the
+ * observation whose dimension is null, so a null would drop the test vehicle from the
  * table with nothing said, which is the failure this whole change is about.
  *
- * Requiring the link cost more than it looked like. 90 of 413 groups have none,
+ * Requiring the link cost more than it looked like. 90 of 413 test vehicles have none,
  * and because they were filtered out before any of this ran, Chevrolet's usable
  * energy was three cars — a Bolt and a Blazer in two drivetrains — while the
  * 180 kWh GM trucks sat in the database unread. A distribution over three
  * points still draws a box.
  */
-export function certObservation(group, brandIndex) {
-    const guide = group?.epa_fe_guide ?? null;
-    const coeffs = resolvePrimaryCoeffs(group);
-    const eta = deriveDrivetrainEta(group);
-    const ssEta = deriveSteadyStateEta(group);
-    const charger = deriveChargerEfficiency(group);
-    const adjustment = deriveEffectiveAdjustmentFactor(group);
+export function certObservation(testVehicle, brandIndex) {
+    const guide = testVehicle?.epa_fe_guide ?? null;
+    const coeffs = resolvePrimaryCoeffs(testVehicle);
+    const eta = deriveDrivetrainEta(testVehicle);
+    const ssEta = deriveSteadyStateEta(testVehicle);
+    const charger = deriveChargerEfficiency(testVehicle);
+    const adjustment = deriveEffectiveAdjustmentFactor(testVehicle);
 
-    const usable = derivedUsableKwh(group);
+    const usable = derivedUsableKwh(testVehicle);
     const gross = num(guide?.nominal_pack_kwh);
     // The division when there is one, the manufacturer's own filing when there
     // is not. Both go through the registry, so the two spellings land on one
     // brand instead of splitting it — the bug #243 exists to prevent.
-    const { brand, parent } = resolveBrand(guide?.division ?? group?.make, brandIndex);
+    const { brand, parent } = resolveBrand(guide?.division ?? testVehicle?.make, brandIndex);
 
     return {
-        test_group_id: group.test_group_id,
-        model_year:    group.model_year,
-        carline:       guide?.carline ?? group.epa_carline_name ?? group.display_name ?? null,
+        test_vehicle_id: testVehicle.test_vehicle_id,
+        model_year:    testVehicle.model_year,
+        carline:       guide?.carline ?? testVehicle.epa_carline_name ?? testVehicle.display_name ?? null,
         division:      guide?.division ?? null,
 
         // Dimensions. Brand survives without a link; the other two do not, and
@@ -197,7 +197,7 @@ export function certObservation(group, brandIndex) {
             return f > 1 ? null : f;
         })(),
         ss_eta: isPossible(ssEta) ? (ssEta?.value ?? null) : null,
-        // Per group, and only where BOTH exist. A ratio of two fleet medians
+        // Per test vehicle, and only where BOTH exist. A ratio of two fleet medians
         // would answer a different question — whether the typical car's two
         // figures differ — when what decides a correction factor is whether the
         // SAME car's two figures differ by a consistent amount.
@@ -224,7 +224,7 @@ export function certObservation(group, brandIndex) {
  * `isMeasured` asks where a value came from; this asks whether it can be true.
  * They are different questions and both have to pass. A steady-state η above 1
  * is a drivetrain returning more energy than it was given — the inputs
- * contradict each other — and Nissan's six groups did exactly that, inflating
+ * contradict each other — and Nissan's six test vehicles did exactly that, inflating
  * their ratio to 1.53 against a fleet median of 1.13 and pulling the fleet
  * figures with them.
  *
@@ -272,7 +272,7 @@ export function isPossibleValue(measureKey, value) {
  * Observations with an impossible `measureKey` nulled, ready to plot.
  *
  * Nulled rather than dropped, and nulled rather than clamped — the same rule
- * the flag-based check above states. The group is still a group: it keeps its
+ * the flag-based check above states. The test vehicle is still a test vehicle: it keeps its
  * place in the population, contributes to every other measure, and is counted
  * by `coverageFor` under its own heading so the caption can say what happened
  * rather than quietly showing a shorter table.
@@ -291,14 +291,14 @@ export function nullImpossible(observations, measureKey) {
     ));
 }
 
-/** Every linked group as an observation. */
-export const certObservations = (groups, brandIndex) =>
-    (groups ?? []).map(g => certObservation(g, brandIndex));
+/** Every linked test vehicle as an observation. */
+export const certObservations = (testVehicles, brandIndex) =>
+    (testVehicles ?? []).map(g => certObservation(g, brandIndex));
 
 /**
  * How many observations a measure actually has, and how many were set aside.
  *
- * Reported beside every figure. "Median η 0.87 (n=61; 28 groups could not be
+ * Reported beside every figure. "Median η 0.87 (n=61; 28 test vehicles could not be
  * derived)" is a statistic; "median η 0.87" over a population padded with the
  * default constant is not, and the two are indistinguishable on screen unless
  * the second number is there.
@@ -320,7 +320,7 @@ export function coverageFor(observations, measureKey) {
     }
     // Counted alongside the rest rather than left to the caller, because it is
     // the same question — how much of this population is not what it looks
-    // like. `unlinked` cuts ACROSS usable/assumed/missing: an unlinked group
+    // like. `unlinked` cuts ACROSS usable/assumed/missing: an unlinked test vehicle
     // usually carries the measure perfectly well and is only missing the guide
     // half that says what the car is.
     return { usable, assumed, missing, impossible, unlinked, total: observations.length };

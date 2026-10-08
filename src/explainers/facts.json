@@ -1354,7 +1354,7 @@
           1.1162,
           1.1449
         ],
-        "groups": 210
+        "test_vehicles": 210
       },
       "sources": [],
       "status": "unverified",
@@ -1371,7 +1371,7 @@
       },
       "sources": [],
       "status": "unverified",
-      "note": "Migration 053 cited 0.939–0.955 from four packs by hand; the Certification Statistics tab computes it across every linked group (epaCertStats.js). To verify: record the current distribution and the query."
+      "note": "Migration 053 cited 0.939–0.955 from four packs by hand; the Certification Statistics tab computes it across every linked test vehicle (epaCertStats.js). To verify: record the current distribution and the query."
     },
     {
       "id": "epa-gross-pack-v-ah",
@@ -1600,9 +1600,9 @@
     },
     {
       "id": "evbench-test-route-shares",
-      "claim": "Of the 297 EV certification groups with a range test in EVBench's database of EPA records, most of them model year 2026, 265 (89%) report the Multi-Cycle Test and 32 report single-cycle (city and highway) tests.",
+      "claim": "Of the 297 EPA test vehicles with a range test in EVBench's database of EPA records, most of them model year 2026, 265 (89%) report the Multi-Cycle Test and 32 report single-cycle (city and highway) tests.",
       "value": {
-        "groups": 297,
+        "test_vehicles": 297,
         "mct": 265,
         "single_cycle": 32,
         "model_years": {
@@ -1626,19 +1626,19 @@
       "sources": [
         {
           "rank": "A",
-          "title": "EPA certification test records (epa_test_groups, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "title": "EPA certification test records (epa_test_vehicles, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
           "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
           "accessed": "2026-09-29"
         },
         {
           "rank": "C",
-          "title": "Test groups classified by procedure: any procedure-77 test = multi-cycle; otherwise any 81/84 = single-cycle (arithmetic)",
+          "title": "Test vehicles classified by procedure: any procedure-77 test = multi-cycle; otherwise any 81/84 = single-cycle (arithmetic)",
           "url": null,
           "accessed": "2026-09-29"
         }
       ],
       "status": "verified",
-      "note": "What is in EVBench's database as of the 2026-09-15 dump, not the whole fleet: EPA records are imported by hand, and 262 of these 297 groups (88%) are model year 2026, with 21 from 2027 and 10 from 2025 (414 groups in the table in all, 266 of them MY2026). By route: MY2025 8 multi-cycle / 2 single; MY2026 236 / 26; MY2027 21 / 0. Classification: any procedure-77 test = multi-cycle; otherwise any 81/84 = single-cycle; one group with only procedure 86 is left out. Makers appear on both sides (Tesla: 15 multi-cycle groups, 9 single-cycle), so the route is chosen per test group, not per maker. 'Report' on purpose: the single-cycle records may not be separate runs to empty (evbench-single-cycle-records). Corrected 2026-09-29 from 291 / 260 / 31: the first count keyed tests by test number, which repeats across groups."
+      "note": "What is in EVBench's database as of the 2026-09-15 dump, not the whole fleet: EPA records are imported by hand, and 262 of these 297 test vehicles (88%) are model year 2026, with 21 from 2027 and 10 from 2025 (414 groups in the table in all, 266 of them MY2026). By route: MY2025 8 multi-cycle / 2 single; MY2026 236 / 26; MY2027 21 / 0. Classification: any procedure-77 test = multi-cycle; otherwise any 81/84 = single-cycle; one group with only procedure 86 is left out. Makers appear on both sides (Tesla: 15 multi-cycle groups, 9 single-cycle), so the route is chosen per test group, not per maker. 'Report' on purpose: the single-cycle records may not be separate runs to empty (evbench-single-cycle-records). Corrected 2026-09-29 from 291 / 260 / 31: the first count keyed tests by test number, which repeats across groups."
     },
     {
       "id": "evbench-test-durations",
@@ -1660,7 +1660,7 @@
       "sources": [
         {
           "rank": "A",
-          "title": "EPA certification test records (epa_test_groups, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "title": "EPA certification test records (epa_test_vehicles, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
           "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
           "accessed": "2026-09-29"
         },
@@ -1693,7 +1693,7 @@
       "sources": [
         {
           "rank": "A",
-          "title": "EPA certification test records (epa_test_groups, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "title": "EPA certification test records (epa_test_vehicles, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
           "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
           "accessed": "2026-09-29"
         },
@@ -1721,7 +1721,7 @@
       "sources": [
         {
           "rank": "A",
-          "title": "EPA certification test records (epa_test_groups, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
+          "title": "EPA certification test records (epa_test_vehicles, epa_tests, epa_test_phases) as imported into EVBench, from EPA's annual certification data; 2026-09-15 dump",
           "url": "https://dis.epa.gov/otaqpub/publist1.jsp",
           "accessed": "2026-09-29"
         }

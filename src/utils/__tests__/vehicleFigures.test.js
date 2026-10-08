@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { resolveSocWindow, resolveEpaRange, withVehicleFigures, testedAgreement, figureSources, fieldFigureSource } from '../vehicleFigures';
 
 let nextId = 1;
-const group = (over = {}) => ({
-    test_group_id: `G${nextId++}`, model_year: 2026, make: 'Make', epa_carline_name: 'Carline',
+const testVehicle = (over = {}) => ({
+    test_vehicle_id: `G${nextId++}`, model_year: 2026, make: 'Make', epa_carline_name: 'Carline',
     label_range_published: null, label_city_range_mi: null, label_hwy_range_mi: null,
     preferred_test_number: null, epa_tests: [], epa_coefficient_sets: [], ...over,
 });
 const mct = (kwh) => ({ procedure_code: 77, total_dc_energy_kwh: kwh, test_number: `T${nextId++}`, test_date: '2026-01-01' });
-const link = (g, over = {}) => ({ id: nextId++, isPrimary: false, epaGroup: g, ...over });
+const link = (g, over = {}) => ({ id: nextId++, isPrimary: false, epaTestVehicle: g, ...over });
 const vehicle = (over = {}) => ({ id: nextId++, name: 'V', specs: {}, epa_mappings: [], ...over });
 const specs = ({ usable, gross, expected, basis } = {}) => ({
     charging:   { battery_usable_kwh: usable ?? null },
@@ -19,23 +19,23 @@ const specs = ({ usable, gross, expected, basis } = {}) => ({
 describe('resolveSocWindow', () => {
     it('uses EPA tested when it sits within tolerance of the nearer label', () => {
         // Taycan: tested 89.5 against Usable 89 / Gross 97.
-        const v = vehicle({ specs: specs({ usable: 89, gross: 97 }), epa_mappings: [link(group({ epa_tests: [mct(89.5)] }))] });
+        const v = vehicle({ specs: specs({ usable: 89, gross: 97 }), epa_mappings: [link(testVehicle({ epa_tests: [mct(89.5)] }))] });
         expect(resolveSocWindow(v, [v])).toMatchObject({ kwh: 89.5, basis: 'epa-tested', testedSetAside: false });
     });
 
     it('uses EPA tested when there is no label to hold it against', () => {
-        const v = vehicle({ epa_mappings: [link(group({ epa_tests: [mct(76)] }))] });
+        const v = vehicle({ epa_mappings: [link(testVehicle({ epa_tests: [mct(76)] }))] });
         expect(resolveSocWindow(v, [v])).toMatchObject({ kwh: 76, basis: 'epa-tested' });
     });
 
     it('sets EPA tested aside when it disagrees with both labels — a wrong link', () => {
-        const v = vehicle({ specs: specs({ usable: 100, gross: 106 }), epa_mappings: [link(group({ epa_tests: [mct(80)] }))] });
+        const v = vehicle({ specs: specs({ usable: 100, gross: 106 }), epa_mappings: [link(testVehicle({ epa_tests: [mct(80)] }))] });
         expect(resolveSocWindow(v, [v])).toMatchObject({ kwh: 100, basis: 'usable', testedKwh: 80, testedSetAside: true });
     });
 
     it('reads EPA tested from the primary configuration only', () => {
-        const small = group({ epa_tests: [mct(60)] });
-        const big = group({ epa_tests: [mct(100)] });
+        const small = testVehicle({ epa_tests: [mct(60)] });
+        const big = testVehicle({ epa_tests: [mct(100)] });
         const v = vehicle({ epa_mappings: [link(small), link(big, { isPrimary: true })] });
         expect(resolveSocWindow(v, [v]).kwh).toBe(100);
         // Several links, none primary: no EPA tested is picked.
@@ -51,7 +51,7 @@ describe('resolveSocWindow', () => {
     });
 
     it('inherits Usable and Gross, never EPA tested', () => {
-        const parent = vehicle({ specs: specs({ usable: 91 }), epa_mappings: [link(group({ epa_tests: [mct(91.2)] }))] });
+        const parent = vehicle({ specs: specs({ usable: 91 }), epa_mappings: [link(testVehicle({ epa_tests: [mct(91.2)] }))] });
         const child = vehicle({ spec_source_vehicle_id: parent.id });
         expect(resolveSocWindow(child, [parent, child])).toMatchObject({ kwh: 91, basis: 'usable' });
     });
@@ -59,23 +59,23 @@ describe('resolveSocWindow', () => {
 
 describe('resolveEpaRange', () => {
     it('uses the primary configuration’s label, with city and highway', () => {
-        const g = group({ label_range_published: 311, label_city_range_mi: 330, label_hwy_range_mi: 290 });
-        const v = vehicle({ range: 337, epa_mappings: [link(g, { isPrimary: true }), link(group({ label_range_published: 280 }))] });
+        const g = testVehicle({ label_range_published: 311, label_city_range_mi: 330, label_hwy_range_mi: 290 });
+        const v = vehicle({ range: 337, epa_mappings: [link(g, { isPrimary: true }), link(testVehicle({ label_range_published: 280 }))] });
         expect(resolveEpaRange(v, [v])).toMatchObject({ mi: 311, basis: 'epa-label', cityMi: 330, hwyMi: 290 });
     });
 
     it('treats a sole link as the primary', () => {
-        const v = vehicle({ epa_mappings: [link(group({ label_range_published: 300 }))] });
+        const v = vehicle({ epa_mappings: [link(testVehicle({ label_range_published: 300 }))] });
         expect(resolveEpaRange(v, [v])).toMatchObject({ mi: 300, basis: 'epa-label' });
     });
 
     it('picks nothing among several labels with no primary: a span, then the tiers below', () => {
-        const v = vehicle({ range: 340, epa_mappings: [link(group({ label_range_published: 337 })), link(group({ label_range_published: 450 }))] });
+        const v = vehicle({ range: 340, epa_mappings: [link(testVehicle({ label_range_published: 337 })), link(testVehicle({ label_range_published: 450 }))] });
         expect(resolveEpaRange(v, [v])).toMatchObject({ mi: 340, basis: 'unsorted', spanMi: [337, 450] });
     });
 
     it('uses the label when every configuration reads the same', () => {
-        const v = vehicle({ epa_mappings: [link(group({ label_range_published: 311 })), link(group({ label_range_published: 311 }))] });
+        const v = vehicle({ epa_mappings: [link(testVehicle({ label_range_published: 311 })), link(testVehicle({ label_range_published: 311 }))] });
         expect(resolveEpaRange(v, [v])).toMatchObject({ mi: 311, basis: 'epa-label', spanMi: null });
     });
 
@@ -85,7 +85,7 @@ describe('resolveEpaRange', () => {
     });
 
     it('lets the label win over an Expected EPA Range', () => {
-        const v = vehicle({ specs: specs({ expected: 320 }), epa_mappings: [link(group({ label_range_published: 300 }))] });
+        const v = vehicle({ specs: specs({ expected: 320 }), epa_mappings: [link(testVehicle({ label_range_published: 300 }))] });
         expect(resolveEpaRange(v, [v]).basis).toBe('epa-label');
     });
 

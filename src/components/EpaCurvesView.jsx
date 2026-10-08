@@ -26,7 +26,7 @@ import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
 import CollapsibleSection from './CollapsibleSection';
 import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
-import { epaRecordFromGroup, NO_RECORD_REASONS } from '../utils/epaRecordFromGroup';
+import { epaRecordFromTestVehicle, NO_RECORD_REASONS } from '../utils/epaRecordFromTestVehicle';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
@@ -300,10 +300,10 @@ export default function EpaCurvesView({
     const selectableRows = useMemo(
         () => vehiclesWithEpa.flatMap(v =>
             (v.epa_mappings ?? [])
-                // A mapping with no group draws nothing. Selecting it would put
+                // A mapping with no test vehicle draws nothing. Selecting it would put
                 // a key in the selection that no row can clear, and PRUNE would
                 // strip it on the next render — a toggle that appears to fail.
-                .filter(m => m.epaGroup)
+                .filter(m => m.epaTestVehicle)
                 .map(m => ({ key: m.id, vehicleId: v.id, groupId: m.id }))),
         [vehiclesWithEpa],
     );
@@ -387,20 +387,20 @@ export default function EpaCurvesView({
             ...vehicle,
             name: vehicleLabel(vehicle),
             runs: (vehicle.epa_mappings ?? []).map((mapping) => {
-                const group = mapping.epaGroup;
-                if (!group) return null;
+                const testVehicle = mapping.epaTestVehicle;
+                if (!testVehicle) return null;
                 const isShown = shown.has(mapping.id);
                 const autoColor = isShown ? mappingColor(baseColor, shownIdx) : baseColor;
                 if (isShown) shownIdx++;
                 return {
                     id: mapping.id,
-                    name: group.display_name || group.epa_carline_name,
+                    name: testVehicle.display_name || testVehicle.epa_carline_name,
                     autoColor,
                     confidence: mapping.confidence,
-                    group,
-                    eta: resolveCurveEta(group),
-                    useableKwh: resolveUseableKwh(group, effectiveVehicle),
-                    useableKwhSource: resolveUseableKwhSource(group, effectiveVehicle),
+                    testVehicle,
+                    eta: resolveCurveEta(testVehicle),
+                    useableKwh: resolveUseableKwh(testVehicle, effectiveVehicle),
+                    useableKwhSource: resolveUseableKwhSource(testVehicle, effectiveVehicle),
                 };
             }).filter(Boolean),
         };
@@ -449,31 +449,31 @@ export default function EpaCurvesView({
                 specs: resolveEffectiveSpecs(vehicle, vehicles),
             };
             vehicle.epa_mappings.forEach((mapping, mi) => {
-                const { epaGroup, confidence } = mapping;
-                if (!epaGroup) return;
+                const { epaTestVehicle, confidence } = mapping;
+                if (!epaTestVehicle) return;
                 if (!shown.has(mapping.id)) return;
 
-                // An elevation adjustment needs the group's own EPA equivalent test
+                // An elevation adjustment needs the test vehicle's own EPA equivalent test
                 // weight (see gradeEnergyKwh100mi) — some imports never captured it.
                 // Rather than silently drawing an unadjusted curve as if there were
                 // no grade, drop the curve (and its overlay) entirely and flag it.
-                if (gradeAdjusted && !resolvePrimaryCoeffs(epaGroup)?.equivTestWeightLbs) {
+                if (gradeAdjusted && !resolvePrimaryCoeffs(epaTestVehicle)?.equivTestWeightLbs) {
                     missingWeightWarnings.push({
                         vehicleName: vehicleLabel(vehicle),
-                        epaLabel: epaGroup.display_name || epaGroup.epa_carline_name,
+                        epaLabel: epaTestVehicle.display_name || epaTestVehicle.epa_carline_name,
                     });
                     return;
                 }
 
-                const useableKwh       = resolveUseableKwh(epaGroup, effectiveVehicle);
-                const useableKwhSource = resolveUseableKwhSource(epaGroup, effectiveVehicle);
-                const curve            = buildEpaCurveFromModel(epaGroup, useableKwh, densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum);
+                const useableKwh       = resolveUseableKwh(epaTestVehicle, effectiveVehicle);
+                const useableKwhSource = resolveUseableKwhSource(epaTestVehicle, effectiveVehicle);
+                const curve            = buildEpaCurveFromModel(epaTestVehicle, useableKwh, densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
                 const baseColor = vehicleColorMap[vehicle.id] || vehicle.color || PALETTE[vi % PALETTE.length];
                 const color = mappingColors[mapping.id] ?? mappingColor(baseColor, mi);
-                const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name;
+                const epaLabel = epaTestVehicle.display_name || epaTestVehicle.epa_carline_name;
                 const baseLabel = vehiclesWithEpa.length > 1 || mi > 0
                     ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
                     : vehicleLabel(vehicle);
@@ -496,7 +496,7 @@ export default function EpaCurvesView({
                     _vehicleId:        vehicle.id,
                     _mappingId:        mapping.id,
                     _confidence:       confidence,
-                    _epaGroup:         epaGroup,
+                    _epaTestVehicle:         epaTestVehicle,
                     _useableKwh:       useableKwh,
                     _useableKwhSource: useableKwhSource,
                     _curve:            curve,
@@ -530,7 +530,7 @@ export default function EpaCurvesView({
                                     elevationGainFt:  run.elevation_gain_ft,
                                     distanceMiles:    run.distance_miles,
                                 };
-                                kwh100mi = correctMeasuredConsumption(epaGroup, run.speed_mph, measuredKwh100mi, runConditions, viewConditions);
+                                kwh100mi = correctMeasuredConsumption(epaTestVehicle, run.speed_mph, measuredKwh100mi, runConditions, viewConditions);
                                 if (kwh100mi == null) return null;
                             }
                             const miPerKwh = 100 / kwh100mi;
@@ -750,7 +750,7 @@ export default function EpaCurvesView({
      * vehicles — the same set the chart above plots, so the two never disagree
      * about which configurations are on screen.
      *
-     * Entries with no model are KEPT and carry their reason. Most linked groups
+     * Entries with no model are KEPT and carry their reason. Most linked test vehicles
      * cannot produce a derivation yet, and dropping them silently would leave a
      * curator with a shorter list than they selected and no idea why — which is
      * the state this section was in when it ran on sample records.
@@ -759,14 +759,14 @@ export default function EpaCurvesView({
         const out = [];
         for (const vehicle of vehiclesWithEpa) {
             for (const mapping of vehicle.epa_mappings ?? []) {
-                const { epaGroup } = mapping;
-                if (!epaGroup) continue;
+                const { epaTestVehicle } = mapping;
+                if (!epaTestVehicle) continue;
                 if (!shown.has(mapping.id)) continue;
 
                 const vehicleName = vehicleLabel(vehicle);
-                const epaLabel = epaGroup.display_name || epaGroup.epa_carline_name || null;
+                const epaLabel = epaTestVehicle.display_name || epaTestVehicle.epa_carline_name || null;
                 const { record, reason } =
-                    epaRecordFromGroup(epaGroup, { vehicleName, configuration: epaLabel });
+                    epaRecordFromTestVehicle(epaTestVehicle, { vehicleName, configuration: epaLabel });
 
                 // A record can still fail the model — the adapter checks its
                 // inputs are present, not that they resolve to a consumption.
@@ -778,9 +778,9 @@ export default function EpaCurvesView({
                     epaLabel,
                     // Always carried, because it is the only identifier that
                     // cannot degrade — see methodologyTitle.
-                    testGroupId: epaGroup.test_group_id ?? null,
-                    modelYear: epaGroup.model_year ?? null,
-                    configCount: (vehicle.epa_mappings ?? []).filter(m => m.epaGroup).length,
+                    testVehicleId: epaTestVehicle.test_vehicle_id ?? null,
+                    modelYear: epaTestVehicle.model_year ?? null,
+                    configCount: (vehicle.epa_mappings ?? []).filter(m => m.epaTestVehicle).length,
                     model,
                     reason: model ? null : (reason ?? 'no-derivation'),
 
@@ -809,7 +809,7 @@ export default function EpaCurvesView({
     return (
         <div className="chart-layout">
             {/* ── Left rail: the same rig as the four charts beside it. The
-              * subject list is EPA test groups rather than runs, but the shape
+              * subject list is EPA test vehicles rather than runs, but the shape
               * of the screen is the same — pick on the left, plot on the
               * right. */}
             {!presentationMode && (
@@ -963,7 +963,7 @@ export default function EpaCurvesView({
                             {vehiclesWithoutEpa.length > 0 && (
                                 <p className="text-note">
                                     No EPA data: {vehiclesWithoutEpa.map(v => vehicleLabel(v)).join(', ')}
-                                    {' '}— link a test group via Edit Vehicle.
+                                    {' '}— link a test vehicle via Edit Vehicle.
                                 </p>
                             )}
                         </div>
@@ -971,7 +971,7 @@ export default function EpaCurvesView({
                     {/* All selected vehicles lack EPA data */}
                     {vehiclesWithEpa.length === 0 && vehiclesWithoutEpa.length > 0 && (
                         <div className="mt-4 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                            No EPA test group linked for the selected vehicles. Link one via Edit Vehicle.
+                            No EPA test vehicle linked for the selected vehicles. Link one via Edit Vehicle.
                         </div>
                     )}
                 </aside>
@@ -1013,9 +1013,9 @@ export default function EpaCurvesView({
                 </PlotFrame>
             ) : (
                 <div className="empty-state">
-                    <p>No EPA test group data available for the selected vehicles.</p>
+                    <p>No EPA test vehicle data available for the selected vehicles.</p>
                     <p className="text-sm mt-2" style={{ color: 'var(--color-text-secondary)' }}>
-                        Link an EPA test group via Edit Vehicle to enable this chart.
+                        Link an EPA test vehicle via Edit Vehicle to enable this chart.
                     </p>
                 </div>
             )}
@@ -1110,7 +1110,7 @@ export default function EpaCurvesView({
 
                     {methodologyEntries.length === 0 && (
                         <p className="text-sm text-secondary">
-                            None of the selected vehicles has an EPA test group linked. Link one from
+                            None of the selected vehicles has an EPA test vehicle linked. Link one from
                             Tests &amp; Data to see how its label range was produced.
                         </p>
                     )}

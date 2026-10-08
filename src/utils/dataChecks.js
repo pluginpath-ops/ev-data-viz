@@ -191,11 +191,11 @@ function epaDriveType(drive) {
  */
 function linkedConfigurations(vehicle) {
     const figures = (m) => ({
-        ...epaConfigurationFigures(m.epaGroup),
-        driveType:   epaDriveType(m.epaGroup.drive),
-        packVoltage: positive(m.epaGroup.total_voltage),
+        ...epaConfigurationFigures(m.epaTestVehicle),
+        driveType:   epaDriveType(m.epaTestVehicle.drive),
+        packVoltage: positive(m.epaTestVehicle.total_voltage),
     });
-    const all = (vehicle?.epa_mappings ?? []).filter(m => m.epaGroup).map(m => ({ mappingId: m.id, ...figures(m) }));
+    const all = (vehicle?.epa_mappings ?? []).filter(m => m.epaTestVehicle).map(m => ({ mappingId: m.id, ...figures(m) }));
     const pick = primaryEpaMapping(vehicle?.epa_mappings);
     const primary = pick ? all.find(c => c.mappingId === pick.mapping.id) : null;
     return { all, primary, judged: primary ? [primary] : all, chosen: !!primary && all.length > 1 };
@@ -387,7 +387,7 @@ function weightFindings(links, ctx, limits) {
 
 function driveFindings(links, ctx) {
     const spec = specValue(ctx, 'powertrain', 'drive_type');
-    // A blank EPA drive is not a disagreement — it is blank on many linked groups.
+    // A blank EPA drive is not a disagreement — it is blank on many linked test vehicles.
     const epa = [...new Set(links.judged.map(c => c.driveType).filter(Boolean))].sort();
     if (!spec || !epa.length || epa.includes(spec)) return [];
     return [finding('drive-vs-epa',

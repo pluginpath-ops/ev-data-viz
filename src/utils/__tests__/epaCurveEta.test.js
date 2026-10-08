@@ -42,7 +42,7 @@ describe('resolveCurveEta — one basis for every vehicle', () => {
     it('corrects the HWFET value where they do not', () => {
         // The two-thirds/one-third split is the whole reason the constant
         // exists: without it a steady-state curve could only describe the
-        // groups that ran a constant-speed section.
+        // test vehicles that ran a constant-speed section.
         const r = resolveCurveEta(noSs());
         expect(r.source).toBe('corrected');
         expect(r.basis.corrected).toBe(true);

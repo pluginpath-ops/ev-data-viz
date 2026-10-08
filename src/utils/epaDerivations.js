@@ -3,10 +3,10 @@
  *
  * Read-time, provenance-tagged derivations for the curator model described in
  * LocalDev/curator-fields-spec.md (Section 8). Every derivation is a pure
- * function of a "full" EPA test group — the shape returned by
- * DataService.getEpaTestGroupFull():
+ * function of a "full" EPA test vehicle — the shape returned by
+ * DataService.getEpaTestVehicleFull():
  *
- *   group = {
+ *   testVehicle = {
  *     ...config fields (accessory_load_w_override, charger_efficiency_override,
  *                       label_range_published, cd_range_combined_calc, …),
  *     epa_coefficient_sets: [{ category, is_primary, target_a/b/c, set_a/b/c, … }],
@@ -68,8 +68,8 @@ const inBand = (v, [lo, hi]) => v != null && v >= lo && v <= hi;
  *
  * @returns {{ a, b, c, source: 'target'|'set', category, equivTestWeightLbs }|null}
  */
-export function resolvePrimaryCoeffs(group) {
-    const sets = group?.epa_coefficient_sets || [];
+export function resolvePrimaryCoeffs(testVehicle) {
+    const sets = testVehicle?.epa_coefficient_sets || [];
     if (!sets.length) return null;
     const primary = sets.find(s => s.is_primary)
         || sets.find(s => s.category === 'City/Highway')
@@ -109,9 +109,9 @@ function phaseConsumptionKwh100mi(phases) {
     return dist > 0 ? (dc / dist) * 100 : null;
 }
 
-/** Accessory load in kW from the group override, defaulting to 300 W. */
-function accessoryKw(group) {
-    const w = num(group?.accessory_load_w_override);
+/** Accessory load in kW from the test vehicle override, defaulting to 300 W. */
+function accessoryKw(testVehicle) {
+    const w = num(testVehicle?.accessory_load_w_override);
     return (w != null && w > 0 ? w : DEFAULT_ACCESSORY_W) / 1000;
 }
 
@@ -139,14 +139,14 @@ function batteryConsumptionAt(speedMph, a, b, c, eta, accKw, windSpeedMph = 0, w
  * source: 'measured' (proc 77) | 'measured-fallback' (proc 84) | 'estimated'
  * certain: true only when measured AND inside ETA_BAND.
  */
-export function deriveDrivetrainEta(group) {
-    const coeffs = resolvePrimaryCoeffs(group);
+export function deriveDrivetrainEta(testVehicle) {
+    const coeffs = resolvePrimaryCoeffs(testVehicle);
     if (!coeffs) {
         return { value: DEFAULT_ETA, source: 'estimated', certain: false,
             flags: ['no-coefficients'] };
     }
 
-    const test = pickDerivationTest(group?.epa_tests || []);
+    const test = pickDerivationTest(testVehicle?.epa_tests || []);
     const hwyPhases = (test?.epa_test_phases || []).filter(p => p.phase_type === 'HWY');
     const dcConsumption = phaseConsumptionKwh100mi(hwyPhases);
 
@@ -157,7 +157,7 @@ export function deriveDrivetrainEta(group) {
 
     const { a, b, c } = coeffs;
     const eWheel = roadLoadForce(HWFET_AVG_MPH, a, b, c) * LBF_MILE_TO_KWH * 100;
-    const eAcc   = accessoryKw(group) * 100 / HWFET_AVG_MPH;
+    const eAcc   = accessoryKw(testVehicle) * 100 / HWFET_AVG_MPH;
     const denom  = dcConsumption - eAcc;
 
     if (denom <= 0) {
@@ -193,14 +193,14 @@ export function deriveDrivetrainEta(group) {
  *
  * source: 'manual' | 'measured' | 'assumed'
  */
-export function deriveChargerEfficiency(group) {
-    const override = num(group?.charger_efficiency_override);
+export function deriveChargerEfficiency(testVehicle) {
+    const override = num(testVehicle?.charger_efficiency_override);
     if (override != null && override > 0 && override <= 1) {
         const flags = inBand(override, CHARGER_EFF_BAND) ? [] : ['charger-out-of-band'];
         return { value: override, source: 'manual', certain: false, flags };
     }
 
-    const test = pickDerivationTest(group?.epa_tests || []);
+    const test = pickDerivationTest(testVehicle?.epa_tests || []);
     const dc = num(test?.total_dc_energy_kwh);
     const ac = num(test?.ac_recharge_kwh);
 
@@ -237,9 +237,9 @@ const SIGNATURE_METHOD = {
     'per-cycle':   'per-cycle factors',
 };
 
-export function deriveEffectiveAdjustmentFactor(group) {
-    const published = num(group?.label_range_published);
-    const calc      = num(group?.cd_range_combined_calc);
+export function deriveEffectiveAdjustmentFactor(testVehicle) {
+    const published = num(testVehicle?.label_range_published);
+    const calc      = num(testVehicle?.cd_range_combined_calc);
 
     if (published == null || calc == null || calc <= 0) {
         return { value: null, source: null, certain: false, flags: ['no-range-data'] };
@@ -248,11 +248,11 @@ export function deriveEffectiveAdjustmentFactor(group) {
     const factor = published / calc;
     // Plausible adjustment factors sit in ~0.6–0.8; flag anything well outside.
     const flags = factor >= 0.55 && factor <= 0.85 ? [] : ['adj-factor-implausible'];
-    // The guide states outright what the factor is, so use that when the group is
+    // The guide states outright what the factor is, so use that when the test vehicle is
     // linked to a row that does; the size threshold is only the fallback for a
-    // group with no guide row (#222). 0.715 is a proxy for a distinction the
+    // test vehicle with no guide row (#222). 0.715 is a proxy for a distinction the
     // data now carries.
-    const signature = group?.epa_fe_guide?.adjustment_signature ?? null;
+    const signature = testVehicle?.epa_fe_guide?.adjustment_signature ?? null;
     const method = SIGNATURE_METHOD[signature]
         ?? (factor >= 0.715 ? 'vehicle-specific 5-cycle' : 'default 2-cycle');
     const methodSource = SIGNATURE_METHOD[signature] ? 'signature' : 'threshold';
@@ -295,14 +295,14 @@ function steadyStatePhases(test) {
  *
  * source: 'computed' | null
  */
-export function deriveImpliedSsSpeed(group, etaResult = deriveDrivetrainEta(group)) {
-    const coeffs = resolvePrimaryCoeffs(group);
+export function deriveImpliedSsSpeed(testVehicle, etaResult = deriveDrivetrainEta(testVehicle)) {
+    const coeffs = resolvePrimaryCoeffs(testVehicle);
     const eta = etaResult?.value;
     if (!coeffs || !eta) {
         return { value: null, source: null, certain: false, flags: ['no-eta-or-coeffs'] };
     }
 
-    const test = pickDerivationTest(group?.epa_tests || []);
+    const test = pickDerivationTest(testVehicle?.epa_tests || []);
     const ssPhases = steadyStatePhases(test);
     const ssConsumption = phaseConsumptionKwh100mi(ssPhases);
     if (ssConsumption == null) {
@@ -310,7 +310,7 @@ export function deriveImpliedSsSpeed(group, etaResult = deriveDrivetrainEta(grou
     }
 
     const { a, b, c } = coeffs;
-    const accKw = accessoryKw(group);
+    const accKw = accessoryKw(testVehicle);
 
     // Scan the plausible speed range for the best match (monotonic above ~10 mph,
     // so a fine linear scan is sufficient and avoids derivative edge cases).
@@ -372,20 +372,20 @@ export function deriveImpliedSsSpeed(group, etaResult = deriveDrivetrainEta(grou
  * ETA_BAND does NOT apply here — see the note at the return. It is calibrated
  * on HWFET values and a steady-state η sits systematically above them.
  *
- * NOT yet what the curves run on. Coverage decides that — a group tested on
+ * NOT yet what the curves run on. Coverage decides that — a test vehicle tested on
  * procedures 81 and 84 has no constant-speed phase at all, and a chart mixing
  * a steady-state η against a cycle-average one would compare two different
  * quantities and call it a difference between cars.
  *
  * source: 'measured' | null
  */
-export function deriveSteadyStateEta(group, speedMph = SS_CYCLE_SPEED_MPH) {
-    const coeffs = resolvePrimaryCoeffs(group);
+export function deriveSteadyStateEta(testVehicle, speedMph = SS_CYCLE_SPEED_MPH) {
+    const coeffs = resolvePrimaryCoeffs(testVehicle);
     if (!coeffs) {
         return { value: null, source: null, certain: false, flags: ['no-coefficients'] };
     }
 
-    const test = pickDerivationTest(group?.epa_tests || []);
+    const test = pickDerivationTest(testVehicle?.epa_tests || []);
     const ssPhases = steadyStatePhases(test);
     const dcConsumption = phaseConsumptionKwh100mi(ssPhases);
     if (dcConsumption == null) {
@@ -399,7 +399,7 @@ export function deriveSteadyStateEta(group, speedMph = SS_CYCLE_SPEED_MPH) {
 
     const { a, b, c } = coeffs;
     const eWheel = roadLoadForce(v, a, b, c) * LBF_MILE_TO_KWH * 100;
-    const eAcc   = accessoryKw(group) * 100 / v;
+    const eAcc   = accessoryKw(testVehicle) * 100 / v;
     const denom  = dcConsumption - eAcc;
 
     if (denom <= 0) {
@@ -469,7 +469,7 @@ export function deriveSteadyStateEta(group, speedMph = SS_CYCLE_SPEED_MPH) {
  *
  * ── The precedence ─────────────────────────────────────────────────────────
  *
- *   measured   the group has constant-speed phases, so η is back-solved at the
+ *   measured   the test vehicle has constant-speed phases, so η is back-solved at the
  *              65 mph J1634 specifies. The real thing.
  *   corrected  it does not — a test run on procedures 81 and 84 has no such
  *              phase — so the HWFET value is scaled by the fleet median of the
@@ -493,13 +493,13 @@ export function deriveSteadyStateEta(group, speedMph = SS_CYCLE_SPEED_MPH) {
  * own source for that reason: `corrected` is not `measured`, and nothing should
  * render it as though it were.
  */
-export function resolveCurveEta(group) {
-    const ss = deriveSteadyStateEta(group);
+export function resolveCurveEta(testVehicle) {
+    const ss = deriveSteadyStateEta(testVehicle);
     if (ss?.value != null && !(ss.flags ?? []).includes('nonphysical-eta')) {
         return { ...ss, basis: { ...ss.basis, corrected: false } };
     }
 
-    const hwfet = deriveDrivetrainEta(group);
+    const hwfet = deriveDrivetrainEta(testVehicle);
     // Only a MEASURED highway value is worth correcting. Scaling DEFAULT_ETA
     // would dress the assumption up as a derivation, and the result would look
     // more specific than the constant it came from.
@@ -544,23 +544,23 @@ export function resolveCurveEta(group) {
 // ── Convenience: all derivations at once ────────────────────────────────────
 
 /**
- * Compute every Section-8 derivation for a group in one pass, sharing the η
+ * Compute every Section-8 derivation for a test vehicle in one pass, sharing the η
  * result with the implied-SS-speed calculation.
  *
  * @returns {{ eta, chargerEfficiency, effectiveAdjustmentFactor, impliedSsSpeed }}
  *   each a provenance record from the functions above.
  */
-export function deriveAll(group) {
-    const eta = deriveDrivetrainEta(group);
+export function deriveAll(testVehicle) {
+    const eta = deriveDrivetrainEta(testVehicle);
     return {
         eta,
-        chargerEfficiency:          deriveChargerEfficiency(group),
-        effectiveAdjustmentFactor:  deriveEffectiveAdjustmentFactor(group),
-        impliedSsSpeed:             deriveImpliedSsSpeed(group, eta),
+        chargerEfficiency:          deriveChargerEfficiency(testVehicle),
+        effectiveAdjustmentFactor:  deriveEffectiveAdjustmentFactor(testVehicle),
+        impliedSsSpeed:             deriveImpliedSsSpeed(testVehicle, eta),
         // Surfaced beside `eta`, not instead of it — the two measure the same
         // quantity at different operating points and a gap between them is
         // information, not a fault. See deriveSteadyStateEta.
-        steadyStateEta:             deriveSteadyStateEta(group),
+        steadyStateEta:             deriveSteadyStateEta(testVehicle),
     };
 }
 
@@ -708,19 +708,19 @@ export function gradeEnergyKwh100mi(weightLbs, elevationGainFt, distanceMiles, e
  * isolate the flat-ground-equivalent measured value), then the view's grade
  * contribution is added back in after scaling.
  *
- * @param {object} group             — EPA group (coefficients + tests), same as buildEpaCurveFromModel
+ * @param {object} testVehicle             — EPA test vehicle (coefficients + tests), same as buildEpaCurveFromModel
  * @param {number} speedMph          — the run's recorded test speed
  * @param {number} measuredKwh100mi  — the run's measured consumption (kWh/100mi)
  * @param {object} runConditions     — { temperatureF, altitudeFt, windSpeedMph, windDirectionDeg, elevationGainFt, distanceMiles } as recorded on the run
  * @param {object} viewConditions    — { densityRatio, accessoryOverrideW, windSpeedMph, windDirectionDeg, elevationGainFt, elevationDistanceMiles } — the SAME values driving the curve
  * @returns {number|null} corrected kWh/100mi, or null if the model can't be evaluated
  */
-export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, runConditions, viewConditions) {
-    const coeffs = resolvePrimaryCoeffs(group);
+export function correctMeasuredConsumption(testVehicle, speedMph, measuredKwh100mi, runConditions, viewConditions) {
+    const coeffs = resolvePrimaryCoeffs(testVehicle);
     if (!coeffs || !speedMph || !measuredKwh100mi) return null;
 
-    const eta   = deriveDrivetrainEta(group).value;
-    const accKw = viewConditions.accessoryOverrideW != null ? viewConditions.accessoryOverrideW / 1000 : accessoryKw(group);
+    const eta   = deriveDrivetrainEta(testVehicle).value;
+    const accKw = viewConditions.accessoryOverrideW != null ? viewConditions.accessoryOverrideW / 1000 : accessoryKw(testVehicle);
     const { a, b, c, equivTestWeightLbs } = coeffs;
 
     // Altitude AND temperature, matching how the view side builds its ratio.
@@ -762,8 +762,8 @@ export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, ru
  * sea-level curve exactly.
  *
  * Accessory load (viewing condition): `accessoryOverrideW`, when given, replaces
- * the group's stored accessory load for THIS curve only, at plot time. η (which
- * was derived using the group's own accessory load) is never recomputed.
+ * the test vehicle's stored accessory load for THIS curve only, at plot time. η (which
+ * was derived using the test vehicle's own accessory load) is never recomputed.
  *
  * Side wind (viewing condition): `windSpeedMph`/`windDirectionDeg`, when given,
  * scale the aerodynamic (C) term by apparent airspeed at EACH point (see
@@ -774,32 +774,32 @@ export function correctMeasuredConsumption(group, speedMph, measuredKwh100mi, ru
  * Elevation gain/loss (viewing condition): `elevationGainFt`/`elevationDistanceMiles`
  * add a constant kWh/100mi offset (see gradeEnergyKwh100mi) — unlike density/wind,
  * grade doesn't vary with speed, so it's the same shift at every point. Uses the
- * EPA coefficient set's own equivalent test weight; a group with no weight on
+ * EPA coefficient set's own equivalent test weight; a test vehicle with no weight on
  * file has no grade effect (gradeEnergyKwh100mi returns 0).
  *
- * @param {object} group       — full group (with epa_coefficient_sets + epa_tests)
+ * @param {object} testVehicle       — full test vehicle (with epa_coefficient_sets + epa_tests)
  * @param {number|null} useableKwh — battery capacity for range; null ⇒ rangeMi null
  * @param {number} densityRatio   — ρ_altitude / ρ_sea_level (default 1 = sea level)
- * @param {number|null} accessoryOverrideW — override accessory draw in watts; null ⇒ use the group's own value
+ * @param {number|null} accessoryOverrideW — override accessory draw in watts; null ⇒ use the test vehicle's own value
  * @param {number} windSpeedMph      — ambient wind speed; 0 ⇒ no wind effect
  * @param {number} windDirectionDeg  — wind direction relative to travel (0=tailwind, 180=headwind)
  * @param {number} elevationGainFt          — net elevation change (ft) over elevationDistanceMiles; + = net climb
  * @param {number} elevationDistanceMiles   — horizontal distance the gain is spread over
  * @returns {Array<{ mph, kwh100mi, miPerKwh, mpge, rangeMi }>}
  */
-export function buildEpaCurveFromModel(group, useableKwh, densityRatio = 1, accessoryOverrideW = null, windSpeedMph = 0, windDirectionDeg = 0, elevationGainFt = 0, elevationDistanceMiles = 0) {
-    const coeffs = resolvePrimaryCoeffs(group);
+export function buildEpaCurveFromModel(testVehicle, useableKwh, densityRatio = 1, accessoryOverrideW = null, windSpeedMph = 0, windDirectionDeg = 0, elevationGainFt = 0, elevationDistanceMiles = 0) {
+    const coeffs = resolvePrimaryCoeffs(testVehicle);
     if (!coeffs) return [];
 
     // The steady-state basis, because that is what this curve predicts: every
     // point on it is a constant speed. Measured from the constant-speed phases
-    // where a group has them, corrected from the fleet ratio where it does not,
+    // where a test vehicle has them, corrected from the fleet ratio where it does not,
     // so one basis covers the whole corpus — see resolveCurveEta.
     //
     // This is the line that moves the numbers. On the HWFET value the MY2027
     // CLA 350 drew ~285 miles at 70 mph against a 385-mile road test.
-    const eta   = resolveCurveEta(group).value;
-    const accKw = accessoryOverrideW != null ? accessoryOverrideW / 1000 : accessoryKw(group);
+    const eta   = resolveCurveEta(testVehicle).value;
+    const accKw = accessoryOverrideW != null ? accessoryOverrideW / 1000 : accessoryKw(testVehicle);
     const { a, b } = coeffs;
     const c = coeffs.c * densityRatio; // aerodynamic term only, display-time scale
     const gradeKwh100mi = gradeEnergyKwh100mi(coeffs.equivTestWeightLbs, elevationGainFt, elevationDistanceMiles, eta);

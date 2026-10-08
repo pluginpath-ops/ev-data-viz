@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isOlderCertification, isHeld, mergeRow, planChildren, planGroupImport, uniqueCoveredModels } from '../epaImportMerge';
+import { isOlderCertification, isHeld, mergeRow, planChildren, planTestVehicleImport, uniqueCoveredModels } from '../epaImportMerge';
 
 const manual = { source: 'manual', at: '2026-09-01T00:00:00Z' };
 
@@ -75,9 +75,9 @@ describe('planChildren', () => {
     });
 });
 
-describe('planGroupImport', () => {
+describe('planTestVehicleImport', () => {
     const stored = {
-        group: { test_group_id: 'G', useable_kwh: 80, model_year: 2024, overrides: { useable_kwh: manual } },
+        testVehicle: { test_vehicle_id: 'G', useable_kwh: 80, model_year: 2024, overrides: { useable_kwh: manual } },
         coefficient_sets: [{ id: 10, category: 'City/Highway', target_a: 30, overrides: { target_a: { source: 'pdf' } } }],
         tests: [{
             id: 20, test_number: 'T1', total_dc_energy_kwh: 99, overrides: { total_dc_energy_kwh: manual },
@@ -85,15 +85,15 @@ describe('planGroupImport', () => {
         }],
     };
     const incoming = {
-        group: { test_group_id: 'G', model_year: 2025, useable_kwh: null },
+        testVehicle: { test_vehicle_id: 'G', model_year: 2025, useable_kwh: null },
         coefficient_sets: [{ category: 'City/Highway', target_a: 31 }],
         tests: [{ test_number: 'T1', total_dc_energy_kwh: null, phases: [{ phase_index: 1, dc_energy_kwh: null, distance_mi: 7.5 }] }],
     };
 
     it('updates in place and keeps every curator-held value', () => {
-        const plan = planGroupImport(stored, incoming);
-        expect(plan.group.payload).toEqual({ test_group_id: 'G', model_year: 2025 });
-        expect(plan.group.overrides.useable_kwh).toEqual(manual);
+        const plan = planTestVehicleImport(stored, incoming);
+        expect(plan.testVehicle.payload).toEqual({ test_vehicle_id: 'G', model_year: 2025 });
+        expect(plan.testVehicle.overrides.useable_kwh).toEqual(manual);
         expect(plan.coefficients.update[0]).toMatchObject({ id: 10, payload: { target_a: 31 } });
         const t = plan.tests.update[0];
         expect(t.id).toBe(20);
@@ -107,13 +107,13 @@ describe('planGroupImport', () => {
     it('reports where the PDF disagreed with a held value', () => {
         const disagree = structuredClone(incoming);
         disagree.tests[0].total_dc_energy_kwh = 101.2;
-        const plan = planGroupImport(stored, disagree);
+        const plan = planTestVehicleImport(stored, disagree);
         expect(plan.kept).toEqual([{ where: 'test T1', field: 'total_dc_energy_kwh', kept: 99, pdf: 101.2 }]);
     });
 
-    it('is a plain insert for a group that does not exist yet', () => {
-        const plan = planGroupImport({ group: null, coefficient_sets: [], tests: [] }, incoming);
-        expect(plan.group.overrides.model_year).toEqual({ source: 'pdf' });
+    it('is a plain insert for a test vehicle that does not exist yet', () => {
+        const plan = planTestVehicleImport({ testVehicle: null, coefficient_sets: [], tests: [] }, incoming);
+        expect(plan.testVehicle.overrides.model_year).toEqual({ source: 'pdf' });
         expect(plan.coefficients.insert).toHaveLength(1);
         expect(plan.tests.insert[0].phases).toHaveLength(1);
         expect(plan.kept).toEqual([]);
@@ -122,27 +122,27 @@ describe('planGroupImport', () => {
 
 describe('older certification guard (#374)', () => {
     const stored = (year) => ({
-        group: {
-            test_group_id: 'G', model_year: year, epa_test_family_id: `F${year}`, source_file: `${year}.pdf`,
-            carryover_test_group_id: `C${year}`, carryover_model_year: year - 1, overrides: {},
+        testVehicle: {
+            test_vehicle_id: 'G', model_year: year, test_group: `F${year}`, source_file: `${year}.pdf`,
+            carryover_test_group: `C${year}`, carryover_model_year: year - 1, overrides: {},
         },
         coefficient_sets: [{ id: 10, category: 'City/Highway', target_a: 30, overrides: {} }],
         tests: [],
     });
     const incoming = (year) => ({
-        group: {
-            test_group_id: 'G', model_year: year, epa_test_family_id: `F${year}`, source_file: `${year}.pdf`,
-            carryover_test_group_id: `C${year}`, carryover_model_year: year - 1, battery_kwh: 77,
+        testVehicle: {
+            test_vehicle_id: 'G', model_year: year, test_group: `F${year}`, source_file: `${year}.pdf`,
+            carryover_test_group: `C${year}`, carryover_model_year: year - 1, battery_kwh: 77,
         },
         coefficient_sets: [{ category: 'City/Highway', target_a: 31 }],
         tests: [],
     });
-    const IDENTITY = ['model_year', 'epa_test_family_id', 'source_file', 'carryover_test_group_id', 'carryover_model_year'];
+    const IDENTITY = ['model_year', 'test_group', 'source_file', 'carryover_test_group', 'carryover_model_year'];
 
     it('keeps the newer identity when an older file arrives, but still merges lab data', () => {
-        const plan = planGroupImport(stored(2025), incoming(2024));
-        for (const f of IDENTITY) expect(f in plan.group.payload).toBe(false);
-        expect(plan.group.payload.battery_kwh).toBe(77);
+        const plan = planTestVehicleImport(stored(2025), incoming(2024));
+        for (const f of IDENTITY) expect(f in plan.testVehicle.payload).toBe(false);
+        expect(plan.testVehicle.payload.battery_kwh).toBe(77);
         expect(plan.coefficients.update[0].payload.target_a).toBe(31);
         expect(plan.holdIdentity).toBe(true);
         expect(plan.guarded.map(g => g.field).sort()).toEqual([...IDENTITY].sort());
@@ -150,37 +150,37 @@ describe('older certification guard (#374)', () => {
     });
 
     it('replaces the identity when a newer file arrives', () => {
-        const plan = planGroupImport(stored(2024), incoming(2025));
-        expect(plan.group.payload).toMatchObject({ model_year: 2025, epa_test_family_id: 'F2025', source_file: '2025.pdf' });
+        const plan = planTestVehicleImport(stored(2024), incoming(2025));
+        expect(plan.testVehicle.payload).toMatchObject({ model_year: 2025, test_group: 'F2025', source_file: '2025.pdf' });
         expect(plan.holdIdentity).toBe(false);
         expect(plan.guarded).toEqual([]);
     });
 
     it('replaces the identity on a same-year re-import', () => {
-        const plan = planGroupImport(stored(2025), incoming(2025));
-        expect(plan.group.payload).toMatchObject({ model_year: 2025, source_file: '2025.pdf' });
+        const plan = planTestVehicleImport(stored(2025), incoming(2025));
+        expect(plan.testVehicle.payload).toMatchObject({ model_year: 2025, source_file: '2025.pdf' });
         expect(plan.holdIdentity).toBe(false);
     });
 
     it('never blocks when either year is missing', () => {
-        expect(planGroupImport(stored(null), incoming(2024)).holdIdentity).toBe(false);
+        expect(planTestVehicleImport(stored(null), incoming(2024)).holdIdentity).toBe(false);
         const noYear = incoming(2024);
-        noYear.group.model_year = null;
-        const plan = planGroupImport(stored(2025), noYear);
+        noYear.testVehicle.model_year = null;
+        const plan = planTestVehicleImport(stored(2025), noYear);
         expect(plan.holdIdentity).toBe(false);
-        expect('epa_test_family_id' in plan.group.payload).toBe(true);
+        expect('test_group' in plan.testVehicle.payload).toBe(true);
         expect(isOlderCertification({ model_year: 2025 }, {})).toBe(false);
     });
 
-    it('does not guard a brand-new group', () => {
-        const plan = planGroupImport({ group: null, coefficient_sets: [], tests: [] }, incoming(2024));
+    it('does not guard a brand-new test vehicle', () => {
+        const plan = planTestVehicleImport({ testVehicle: null, coefficient_sets: [], tests: [] }, incoming(2024));
         expect(plan.holdIdentity).toBe(false);
-        expect(plan.group.payload.model_year).toBe(2024);
+        expect(plan.testVehicle.payload.model_year).toBe(2024);
     });
 
     it('tells the executor to leave the covered-models list alone only when held', () => {
-        expect(planGroupImport(stored(2025), incoming(2023)).holdIdentity).toBe(true);
-        expect(planGroupImport(stored(2023), incoming(2025)).holdIdentity).toBe(false);
+        expect(planTestVehicleImport(stored(2025), incoming(2023)).holdIdentity).toBe(true);
+        expect(planTestVehicleImport(stored(2023), incoming(2025)).holdIdentity).toBe(false);
     });
 });
 

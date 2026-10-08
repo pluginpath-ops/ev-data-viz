@@ -10,9 +10,9 @@ import { PLAUSIBILITY_MESSAGES } from '../../utils/feGuidePlausibility';
  * `label_range_published` — which the A1 audit found set on 7 of 87 linked test
  * groups, and without which the `computed >= labeled` gate cannot run.
  *
- * This stages rows only. Nothing is written to `epa_test_groups` here: no key
- * joins the two automatically (the guide's smog test group matches 1 of our 87,
- * and is not unique per configuration), so attaching a guide row to a group is a
+ * This stages rows only. Nothing is written to `epa_test_vehicles` here: no key
+ * joins the two automatically (the guide's smog Test Group matches 1 of our 87 test vehicles,
+ * and is not unique per configuration), so attaching a guide row to a test vehicle is a
  * separate curator step. Most staged rows will never be linked, and that is the
  * point — a vehicle added next month finds its label already here.
  *
@@ -88,7 +88,7 @@ export default function FeGuideImport() {
             <h3 className="text-lg font-semibold mb-1">Fuel Economy Guide import</h3>
             <p className="text-sm text-secondary mb-4">
                 EPA publishes one guide per model year. Staged here as published-label
-                candidates; attaching one to a test group is a separate step.
+                candidates; attaching one to a test vehicle is a separate step.
             </p>
 
             <div

@@ -1,10 +1,10 @@
 /**
- * Copying a staged Fuel Economy Guide row onto an EPA test group, and undoing it
+ * Copying a staged Fuel Economy Guide row onto an EPA test vehicle, and undoing it
  * (#206, phase 3).
  *
  * Promotion is what makes the guide useful without teaching anything a new
  * source: `epaDerivations`, the methodology diagram, the curator form and the
- * mismatch badge all keep reading `epa_test_groups`, and the guide fills it.
+ * mismatch badge all keep reading `epa_test_vehicles`, and the guide fills it.
  *
  * ── The two rules that govern it ─────────────────────────────────────────────
  *
@@ -32,7 +32,7 @@
  */
 
 /**
- * Guide column → test-group column.
+ * Guide column → test vehicle column.
  *
  * Deliberately explicit rather than derived from a naming convention: five of
  * these differ on both sides, and a convention that silently skips a mismatched
@@ -72,18 +72,18 @@ export const PROMOTION_SOURCE = 'fe_guide';
 export const isCuratorOwned = (overrides, column) => overrides?.[column]?.source === 'manual';
 
 /**
- * What linking this guide row to this group should write.
+ * What linking this guide row to this test vehicle should write.
  *
- * @param {Object} group   current epa_test_groups row (values + overrides)
+ * @param {Object} testVehicle   current epa_test_vehicles row (values + overrides)
  * @param {Object} feRow   staged epa_fe_guide row
  * @returns {{ updates: Object, promoted: string[], skipped: string[] }}
  *          `updates` is ready to send; `promoted` and `skipped` are for telling
  *          the curator what happened, since a silent skip looks like a bug.
  */
-export function promotionUpdates(group, feRow) {
-    if (!group || !feRow) return { updates: {}, promoted: [], skipped: [] };
+export function promotionUpdates(testVehicle, feRow) {
+    if (!testVehicle || !feRow) return { updates: {}, promoted: [], skipped: [] };
 
-    const overrides = { ...(group.overrides ?? {}) };
+    const overrides = { ...(testVehicle.overrides ?? {}) };
     const updates = {};
     const promoted = [];
     const skipped = [];
@@ -92,34 +92,34 @@ export function promotionUpdates(group, feRow) {
         const value = feRow[from];
         if (value == null) continue;              // nothing to say about this field
 
-        if (isCuratorOwned(group.overrides, to)) {
+        if (isCuratorOwned(testVehicle.overrides, to)) {
             skipped.push(to);
             continue;
         }
 
         updates[to] = value;
         // The displaced value, so unlink can put it back. Captured from the
-        // group as it is NOW, before this write lands.
-        overrides[to] = { source: PROMOTION_SOURCE, previous: group[to] ?? null };
+        // test vehicle as it is NOW, before this write lands.
+        overrides[to] = { source: PROMOTION_SOURCE, previous: testVehicle[to] ?? null };
         promoted.push(to);
     }
 
     // The LINK is recorded unconditionally; only the displaced-value bookkeeping
     // depends on something actually having been promoted.
     //
-    // These are two different facts and conflating them was a bug: a group whose
+    // These are two different facts and conflating them was a bug: a test vehicle whose
     // promotable fields were all curator-owned produced an empty `promoted`, the
-    // caller returned before writing, and the group came back from "Link"
+    // caller returned before writing, and the test vehicle came back from "Link"
     // reporting success with nothing written at all. It stayed unlinked, so it
     // reappeared in the sweep while the toast said it had worked.
     //
-    // "This group corresponds to that guide row" is worth recording even when
+    // "This test vehicle corresponds to that guide row" is worth recording even when
     // the guide has nothing to add to it — that is what makes the row's figures
     // available for comparison later, and what stops the sweep re-asking.
     if (promoted.length) updates.overrides = overrides;
     // Linked whenever the guide row had something to say — whether it landed
     // (`promoted`) or was held off by a curator value (`skipped`). Both mean the
-    // row is real and corresponds to this group.
+    // row is real and corresponds to this test vehicle.
     //
     // An empty promotion AND an empty skip list is the other case: a guide row
     // carrying none of the promotable fields at all. Linking to that records a
@@ -136,10 +136,10 @@ export function promotionUpdates(group, feRow) {
  * since edited by hand carries source 'manual' and is left exactly as it is —
  * unlinking a source should not discard work done after it.
  */
-export function demotionUpdates(group) {
-    if (!group) return { updates: {}, restored: [] };
+export function demotionUpdates(testVehicle) {
+    if (!testVehicle) return { updates: {}, restored: [] };
 
-    const overrides = { ...(group.overrides ?? {}) };
+    const overrides = { ...(testVehicle.overrides ?? {}) };
     const updates = {};
     const restored = [];
 
@@ -171,16 +171,16 @@ export function demotionUpdates(group) {
  *
  * @returns {Array<{ column, guideColumn, ours, theirs }>}
  */
-export function guideConflicts(group, feRow) {
-    if (!group || !feRow) return [];
+export function guideConflicts(testVehicle, feRow) {
+    if (!testVehicle || !feRow) return [];
     const out = [];
 
     for (const [from, to] of Object.entries(PROMOTION_MAP)) {
         const theirs = feRow[from];
         if (theirs == null) continue;
-        if (!isCuratorOwned(group.overrides, to)) continue;
+        if (!isCuratorOwned(testVehicle.overrides, to)) continue;
 
-        const ours = group[to] ?? null;
+        const ours = testVehicle[to] ?? null;
         // Numbers compared loosely: 307 and "307.00" out of a numeric column
         // are the same figure, and flagging that as a disagreement would train
         // the curator to ignore the flag.
@@ -200,10 +200,10 @@ export function guideConflicts(group, feRow) {
  * A deliberate override of an override: the previous value is recorded the same
  * way promotion records it, so unlinking still restores what was there before.
  */
-export function acceptGuideUpdates(group, feRow, columns = []) {
-    if (!group || !feRow || !columns.length) return { updates: {}, accepted: [] };
+export function acceptGuideUpdates(testVehicle, feRow, columns = []) {
+    if (!testVehicle || !feRow || !columns.length) return { updates: {}, accepted: [] };
 
-    const overrides = { ...(group.overrides ?? {}) };
+    const overrides = { ...(testVehicle.overrides ?? {}) };
     const updates = {};
     const accepted = [];
     const wanted = new Set(columns);
@@ -214,7 +214,7 @@ export function acceptGuideUpdates(group, feRow, columns = []) {
         if (value == null) continue;
 
         updates[to] = value;
-        overrides[to] = { source: PROMOTION_SOURCE, previous: group[to] ?? null };
+        overrides[to] = { source: PROMOTION_SOURCE, previous: testVehicle[to] ?? null };
         accepted.push(to);
     }
 

@@ -66,23 +66,23 @@ describe('rankFeCandidates', () => {
         fe('Ford',   'Mustang Mach-E GT'),
         fe('Rivian', 'R1T Performance Dual Max (22in)', 2026),   // right car, wrong year
     ];
-    const group = { make: 'Rivian', model_year: 2025, epa_carline_name: 'R1T Performance Dual Max (22in)' };
+    const testVehicle = { make: 'Rivian', model_year: 2025, epa_carline_name: 'R1T Performance Dual Max (22in)' };
 
     it('puts the correct row first', () => {
-        const [top] = rankFeCandidates(group, rows);
+        const [top] = rankFeCandidates(testVehicle, rows);
         expect(top.row.carline).toBe('R1T Performance Dual Max (22in)');
         expect(top.score).toBe(1);
     });
 
     it('excludes other makes', () => {
-        expect(rankFeCandidates(group, rows).some(c => c.row.division === 'Ford')).toBe(false);
+        expect(rankFeCandidates(testVehicle, rows).some(c => c.row.division === 'Ford')).toBe(false);
     });
 
     it('keeps other model years but sorts them below', () => {
-        // Excluding them told a 2026 Model Y group there were "no staged rows
+        // Excluding them told a 2026 Model Y test vehicle there were "no staged rows
         // for Tesla in 2026" while sixteen Tesla rows sat in the 2025 guide.
         // A vehicle that carries over spans two guide years.
-        const ranked = rankFeCandidates(group, rows);
+        const ranked = rankFeCandidates(testVehicle, rows);
         expect(ranked.some(c => c.row.model_year === 2026)).toBe(true);
         expect(ranked[0].exactYear).toBe(true);
         expect(ranked[ranked.length - 1].exactYear).toBe(false);
@@ -102,15 +102,15 @@ describe('rankFeCandidates', () => {
             fe('Rivian', 'R1T Performance Dual Max (22in) with the long qualifier'),
             fe('Rivian', 'R1T Performance Dual Max (22in)'),
         ];
-        expect(rankFeCandidates(group, tie)[0].row.carline).toBe('R1T Performance Dual Max (22in)');
+        expect(rankFeCandidates(testVehicle, tie)[0].row.carline).toBe('R1T Performance Dual Max (22in)');
     });
 
-    it('returns nothing for a group with no make', () => {
+    it('returns nothing for a test vehicle with no make', () => {
         expect(rankFeCandidates({ model_year: 2025 }, rows)).toEqual([]);
         expect(rankFeCandidates(null, rows)).toEqual([]);
     });
 
-    it('ranks every candidate when the group states no year', () => {
+    it('ranks every candidate when the test vehicle states no year', () => {
         const undated = { make: 'Rivian', epa_carline_name: 'R1T Performance Dual Max (22in)' };
         expect(rankFeCandidates(undated, rows).length).toBe(4);
     });
@@ -120,15 +120,15 @@ describe('bestFeCandidate', () => {
     const rows = [fe('Rivian', 'R1S Dual Large (21in)'), fe('Rivian', 'R1T Performance Dual Max (22in)')];
 
     it('proposes the top row when it is close enough', () => {
-        const group = { make: 'Rivian', model_year: 2025, epa_carline_name: 'R1T Performance Dual Max (22in)' };
-        expect(bestFeCandidate(group, rows).row.carline).toBe('R1T Performance Dual Max (22in)');
+        const testVehicle = { make: 'Rivian', model_year: 2025, epa_carline_name: 'R1T Performance Dual Max (22in)' };
+        expect(bestFeCandidate(testVehicle, rows).row.carline).toBe('R1T Performance Dual Max (22in)');
     });
 
     it('proposes nothing when the make matches but the car does not', () => {
-        // Otherwise a group arrives pre-filled with a confident-looking wrong
+        // Otherwise a test vehicle arrives pre-filled with a confident-looking wrong
         // answer, which is worse than an empty picker.
-        const group = { make: 'Rivian', model_year: 2025, epa_carline_name: 'Something Else Entirely' };
-        expect(bestFeCandidate(group, rows)).toBeNull();
+        const testVehicle = { make: 'Rivian', model_year: 2025, epa_carline_name: 'Something Else Entirely' };
+        expect(bestFeCandidate(testVehicle, rows)).toBeNull();
     });
 
     it('has a floor low enough for the real short-form case', () => {
@@ -154,11 +154,11 @@ describe('bestFeCandidate', () => {
     });
 
     it('still proposes when the winner is strictly better', () => {
-        const group = { make: 'Hyundai', model_year: 2025, epa_carline_name: 'Ioniq 5 RWD' };
+        const testVehicle = { make: 'Hyundai', model_year: 2025, epa_carline_name: 'Ioniq 5 RWD' };
         const variants = [
             fe('HYUNDAI MOTOR COMPANY', 'Ioniq 5 N',   2025),
             fe('HYUNDAI MOTOR COMPANY', 'Ioniq 5 RWD', 2025),
         ];
-        expect(bestFeCandidate(group, variants).row.carline).toBe('Ioniq 5 RWD');
+        expect(bestFeCandidate(testVehicle, variants).row.carline).toBe('Ioniq 5 RWD');
     });
 });

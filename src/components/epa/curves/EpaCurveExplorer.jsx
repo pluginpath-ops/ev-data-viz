@@ -26,12 +26,12 @@ import { fmtTemp, fmtSpeed } from '../../../utils/unitConversions';
  * A separate variant from EPA Curves, deliberately. That one is driven by the
  * site-wide vehicle selection and plots the records those vehicles link to;
  * this one is driven by the records themselves, so there is no "Selected:" bar
- * and no vehicle need exist. 210 of 211 certification groups carry the
+ * and no vehicle need exist. 210 of 211 test vehicles carry the
  * road-load coefficients a curve needs, where only ~90 belong to a vehicle in
  * the database — most of what can be plotted has no vehicle to reach it from.
  *
  * The curve maths is `buildEpaCurveFromModel`, unchanged and shared with the
- * vehicle-driven view. What differs is only what supplies the group and the
+ * vehicle-driven view. What differs is only what supplies the test vehicle and the
  * energy — which is the whole argument of the subject model.
  */
 /**
@@ -157,13 +157,13 @@ export function explorerStateFromUrl(search = window.location.search) {
 const NO_SCALE = { xMin: null, xMax: null, yMin: null, yMax: null };
 
 export default function EpaCurveExplorer({ presentationMode = false, synced = null, onStateChange = null }) {
-    const { getCertGroupsForCurves, units } = useAppContext();
+    const { getTestVehiclesForCurves, units } = useAppContext();
     const { isDark } = useTheme();
     const canvasRef = useRef(null);
     const chartRef = useRef(null);
 
-    const load = useCallback(() => getCertGroupsForCurves(), [getCertGroupsForCurves]);
-    const { data: groups, loading, error } = useAsyncResource(load, []);
+    const load = useCallback(() => getTestVehiclesForCurves(), [getTestVehiclesForCurves]);
+    const { data: testVehicles, loading, error } = useAsyncResource(load, []);
 
     const [initial] = useState(() => explorerStateFromUrl());
     const [selectedOwn, setSelected] = useState(initial.selected);
@@ -186,7 +186,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
         gradeGainFtNum, gradeDistanceMilesNum,
     } = conditions.derived;
 
-    const subjects = useMemo(() => curveSubjects(groups ?? []), [groups]);
+    const subjects = useMemo(() => curveSubjects(testVehicles ?? []), [testVehicles]);
     const byKey = useMemo(() => new Map(subjects.map(s => [s.key, s])), [subjects]);
     const plotted = useMemo(
         () => selected.map(k => byKey.get(k)).filter(Boolean),
@@ -274,7 +274,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
 
         const datasets = plotted.map((s) => {
             const curve = buildEpaCurveFromModel(
-                s.group, s.useableKwh ?? 0, densityRatio, accessoryOverrideWNum,
+                s.testVehicle, s.useableKwh ?? 0, densityRatio, accessoryOverrideWNum,
                 windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum,
             );
             return {

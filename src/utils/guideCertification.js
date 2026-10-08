@@ -21,12 +21,12 @@ export const procedureLabel = (code) => {
 const num = (v) => (v == null || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
 
 /**
- * A group's tests as display rows. The multi-cycle test leads: it is what the
+ * A test vehicle's tests as display rows. The multi-cycle test leads: it is what the
  * app calls EPA tested, so it is the one a reader came for. The rest keep test
  * number order, and phases keep their own.
  */
-export function certificationTests(group) {
-    const rows = (group?.epa_tests ?? []).map((t, i) => ({
+export function certificationTests(testVehicle) {
+    const rows = (testVehicle?.epa_tests ?? []).map((t, i) => ({
         id: t.id ?? `t${i}`,
         number: t.test_number ?? null,
         date: t.test_date ?? null,
@@ -48,8 +48,8 @@ export function certificationTests(group) {
 }
 
 /** Coefficient sets, primary first. */
-export function certificationCoefficients(group) {
-    return [...(group?.epa_coefficient_sets ?? [])]
+export function certificationCoefficients(testVehicle) {
+    return [...(testVehicle?.epa_coefficient_sets ?? [])]
         .sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0)
             || String(a.category ?? '').localeCompare(String(b.category ?? '')))
         .map(c => {
@@ -68,9 +68,9 @@ export function certificationCoefficients(group) {
 }
 
 /**
- * How many guide configurations were certified under this row's test group in
- * its model year — 1 when it has no test group, or stands alone in it. EPA
- * certifies a test group once and rates each configuration in it, so a lab
+ * How many guide configurations were certified under this row's Test Group in
+ * its model year — 1 when it has no Test Group, or stands alone in it. EPA
+ * certifies a Test Group once and rates each configuration in it, so a lab
  * result is not specific to one of them (both 2027 R2 rows share one while
  * reading 307 and 330 miles).
  */

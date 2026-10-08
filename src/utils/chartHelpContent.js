@@ -141,10 +141,10 @@ export const CHART_HELP_DEFAULTS = {
         data_source:
             'A theoretical efficiency-vs-speed curve built from a vehicle’s official EPA ' +
             'lab data — the road-load coefficients and test phases stored in the linked ' +
-            'EPA test group (from EPA’s CSI lab documents, the Test Car List, or curator ' +
+            'EPA test vehicle (from EPA’s CSI lab documents, the Test Car List, or curator ' +
             'entry). It is not plotted from your own driving tests; it’s computed from ' +
             'physics. The “confidence” badge shows how certain the link between the ' +
-            'vehicle and the EPA test group is, and a second badge names the curve’s ' +
+            'vehicle and the EPA test vehicle is, and a second badge names the curve’s ' +
             'tier — how much of the energy model is the vehicle’s own.',
         how_to_read:
             'Use it to see how a car’s energy use and range change with steady cruising ' +

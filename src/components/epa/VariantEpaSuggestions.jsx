@@ -49,17 +49,17 @@ export default function VariantEpaSuggestions({ vehicle, source, labels = [], st
     const own = suggestions.filter(s => s.fromSource);
     const shownSiblings = showAll ? siblings : siblings.slice(0, SUGGESTION_LIMIT);
 
-    const link = async (group) => {
-        setLinking(group.test_group_id);
+    const link = async (testVehicle) => {
+        setLinking(testVehicle.test_vehicle_id);
         try {
-            await onLink(vehicle.id, group.test_group_id, 'inferred', null);
+            await onLink(vehicle.id, testVehicle.test_vehicle_id, 'inferred', null);
         } finally {
             setLinking(null);
         }
     };
 
     const row = (s) => (
-        <div key={s.group.test_group_id} className={`primary-config-option config-suggestion option-row ${s.linked ? 'is-selected' : ''}`}>
+        <div key={s.testVehicle.test_vehicle_id} className={`primary-config-option config-suggestion option-row ${s.linked ? 'is-selected' : ''}`}>
             <span className="min-w-0">
                 <span className="block truncate">
                     {s.figures.name}
@@ -68,7 +68,7 @@ export default function VariantEpaSuggestions({ vehicle, source, labels = [], st
                     )}
                 </span>
                 <span className="block font-mono text-caption truncate">
-                    {s.figures.id}{s.group.drive ? ` · ${s.group.drive}` : ''}
+                    {s.figures.id}{s.testVehicle.drive ? ` · ${s.testVehicle.drive}` : ''}
                 </span>
             </span>
             <span className="primary-config-figure">{miles(s.figures.labelRangeMi)}</span>
@@ -86,9 +86,9 @@ export default function VariantEpaSuggestions({ vehicle, source, labels = [], st
                     type="button"
                     className="btn btn-primary disabled:opacity-60"
                     disabled={linking != null}
-                    onClick={() => link(s.group)}
+                    onClick={() => link(s.testVehicle)}
                 >
-                    {linking === s.group.test_group_id ? 'Linking…' : 'Link'}
+                    {linking === s.testVehicle.test_vehicle_id ? 'Linking…' : 'Link'}
                 </button>
             )}
         </div>

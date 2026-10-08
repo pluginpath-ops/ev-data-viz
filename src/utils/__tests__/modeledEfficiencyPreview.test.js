@@ -4,8 +4,8 @@ import { buildEpaCurveFromModel } from '../epaDerivations';
 
 // A record with a constant-speed section, so η is measured (see
 // epaCurveSubjects.test.js for why these figures have to agree).
-const group = {
-    test_group_id: 'TG1', model_year: 2025, make: 'Porsche', epa_carline_name: 'Taycan 4 Cross Turismo',
+const testVehicle = {
+    test_vehicle_id: 'TG1', model_year: 2025, make: 'Porsche', epa_carline_name: 'Taycan 4 Cross Turismo',
     useable_kwh: 90,
     epa_coefficient_sets: [{ is_primary: true, target_a: 37, target_b: 0.2, target_c: 0.02, equiv_test_weight_lbs: 5500 }],
     epa_tests: [{
@@ -21,12 +21,12 @@ const run = (o = {}) => ({
     id: 171, name: 'State of Charge', kind: 'range', synthetic: false, is_hidden: false,
     speed_mph: 70, distance_miles: 302, energy_kwh: 97, temperature_f: 50, ...o,
 });
-const row = (runs = [run()]) => ({ mappingId: 69, vehicleId: 28, vehicleName: 'Taycan J1.2', epaGroup: group, runs });
+const row = (runs = [run()]) => ({ mappingId: 69, vehicleId: 28, vehicleName: 'Taycan J1.2', epaTestVehicle: testVehicle, runs });
 
 describe('modeledEfficiencyPreview', () => {
     it('draws the same curve the chart draws at standard conditions', () => {
         const preview = modeledEfficiencyPreview(row());
-        const chart = buildEpaCurveFromModel(group, 90);
+        const chart = buildEpaCurveFromModel(testVehicle, 90);
         expect(preview.curve.map(p => p.kwh100mi)).toEqual(chart.map(p => p.kwh100mi));
         expect(preview.curve[0].miPerKwh).toBeCloseTo(100 / chart[0].kwh100mi, 10);
         expect(preview).toMatchObject({ mappingId: 69, vehicleId: 28, vehicleName: 'Taycan J1.2', tier: 'measured' });
@@ -51,7 +51,7 @@ describe('modeledEfficiencyPreview', () => {
     });
 
     it('returns null for a link with no record, or a record with no coefficients', () => {
-        expect(modeledEfficiencyPreview({ ...row(), epaGroup: null })).toBeNull();
-        expect(modeledEfficiencyPreview({ ...row(), epaGroup: { ...group, epa_coefficient_sets: [] } })).toBeNull();
+        expect(modeledEfficiencyPreview({ ...row(), epaTestVehicle: null })).toBeNull();
+        expect(modeledEfficiencyPreview({ ...row(), epaTestVehicle: { ...testVehicle, epa_coefficient_sets: [] } })).toBeNull();
     });
 });

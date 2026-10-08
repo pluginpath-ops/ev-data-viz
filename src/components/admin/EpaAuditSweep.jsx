@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
-import { auditGroups, auditSummary, auditFindings, AUDIT_VERDICTS } from '../../utils/epaAudit';
+import { auditTestVehicles, auditSummary, auditFindings, AUDIT_VERDICTS } from '../../utils/epaAudit';
 
 /**
  * Which of our EPA records do not reconcile? (#229)
@@ -16,8 +16,8 @@ import { auditGroups, auditSummary, auditFindings, AUDIT_VERDICTS } from '../../
  * on reload. There is nothing here to re-run; what was missing is the ability
  * to see the result across the fleet at once.
  *
- * It also reaches records the per-vehicle view cannot. Most groups are linked
- * to no vehicle, and a group with no vehicle has no Tests & Data tab — so for
+ * It also reaches records the per-vehicle view cannot. Most test vehicles are linked
+ * to no vehicle, and a test vehicle with no vehicle has no Tests & Data tab — so for
  * those, this is the only place a verdict is ever shown.
  */
 
@@ -59,15 +59,15 @@ function Findings({ row }) {
 }
 
 export default function EpaAuditSweep() {
-    const { getEpaGroupsForAudit } = useAppContext();
-    const load = useCallback(() => getEpaGroupsForAudit(), [getEpaGroupsForAudit]);
-    const { data: groups, loading, error } = useAsyncResource(load, []);
+    const { getEpaTestVehiclesForAudit } = useAppContext();
+    const load = useCallback(() => getEpaTestVehiclesForAudit(), [getEpaTestVehiclesForAudit]);
+    const { data: testVehicles, loading, error } = useAsyncResource(load, []);
 
     const [only, setOnly]   = useState(null);   // verdict key, or null for all
     const [query, setQuery] = useState('');
     const [open, setOpen]   = useState(() => new Set());
 
-    const rows    = useMemo(() => auditGroups(groups ?? []), [groups]);
+    const rows    = useMemo(() => auditTestVehicles(testVehicles ?? []), [testVehicles]);
     const summary = useMemo(() => auditSummary(rows), [rows]);
 
     const shown = useMemo(() => {
@@ -75,7 +75,7 @@ export default function EpaAuditSweep() {
         return rows.filter(r => {
             if (only && r.verdict !== only) return false;
             if (!q) return true;
-            return [r.testGroupId, r.make, r.carline, ...r.vehicles.map(v => v.name)]
+            return [r.testVehicleId, r.make, r.carline, ...r.vehicles.map(v => v.name)]
                 .some(v => String(v ?? '').toLowerCase().includes(q));
         });
     }, [rows, only, query]);
@@ -93,7 +93,7 @@ export default function EpaAuditSweep() {
         <div className="card p-4">
             <h3 className="section-title mb-1">Reconciliation sweep</h3>
             <p className="text-note mb-3">
-                Every EPA test group against the same four checks the curator card runs, worst
+                Every EPA test vehicle against the same four checks the curator card runs, worst
                 first. Read-only — nothing here recomputes or writes, because derivations are
                 already computed at read time.
             </p>
@@ -126,7 +126,7 @@ export default function EpaAuditSweep() {
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Filter by group, make, carline or vehicle…"
+                placeholder="Filter by test vehicle, make, carline or vehicle…"
                 className="form-input form-input w-full mb-3"
             />
 
@@ -136,10 +136,10 @@ export default function EpaAuditSweep() {
 
             <div className="flex flex-col gap-1">
                 {shown.map(r => (
-                    <div key={r.testGroupId} className="epa-audit-row">
+                    <div key={r.testVehicleId} className="epa-audit-row">
                         <button
                             type="button"
-                            onClick={() => toggle(r.testGroupId)}
+                            onClick={() => toggle(r.testVehicleId)}
                             className="w-full text-left flex items-start justify-between gap-3 py-1"
                         >
                             <span className="min-w-0">
@@ -148,14 +148,14 @@ export default function EpaAuditSweep() {
                                     {r.modelYear && <span className="text-meta"> · {r.modelYear}</span>}
                                 </span>
                                 <span className="text-meta block truncate">
-                                    <span className="font-mono">{r.testGroupId}</span>
+                                    <span className="font-mono">{r.testVehicleId}</span>
                                     {r.vehicles.length > 0 && ` · ${r.vehicles.map(v => v.name).join(', ')}`}
                                     {r.notes.length > 0 && ` · ${r.notes.join(' · ')}`}
                                 </span>
                             </span>
                             <VerdictPill verdict={r.verdict} />
                         </button>
-                        {open.has(r.testGroupId) && (
+                        {open.has(r.testVehicleId) && (
                             <div className="pl-2 pb-2"><Findings row={r} /></div>
                         )}
                     </div>

@@ -5,13 +5,13 @@
  * The quarterly CSV only carries identity, road-load coefficients/weight, and
  * AC-side label efficiency — it does NOT contain DC-side phase energy, AC
  * recharge, or per-test records. So the importer seeds:
- *   • Section 1 (identity)  → epa_test_groups columns
+ *   • Section 1 (identity)  → epa_test_vehicles columns
  *   • Section 2 (road load) → ONE primary 'City/Highway' epa_coefficient_sets row
  *   • Section 6 (label)     → label_combined_mpge (AC-side, from RND_ADJ_FE)
  * Sections 3–5 (tests/phases) are entered later by the curator; η and charger
  * efficiency are read-time derivations, NOT computed here.
  *
- * Returns an array of group objects shaped for the import flow. Each carries a
+ * Returns an array of test vehicle objects shaped for the import flow. Each carries a
  * private `_coefficientSet` (written to epa_coefficient_sets by the service)
  * and `_hasCoeffs` / `_hasMpge` summary flags. Every populated field is tagged
  * in `overrides` with `{ source: 'csv' }` so the curator form can flag values
@@ -124,7 +124,7 @@ function deriveCycleCategory(row, get) {
 /**
  * @param {string} text  Raw file text (UTF-8, may include BOM)
  * @param {string} [sourceFileName]  Stored in source_file
- * @returns {Array<Object>}  Group objects (see file header for shape)
+ * @returns {Array<Object>}  Test vehicle objects (see file header for shape)
  */
 export function parseEpaTestCarSheet(text, sourceFileName = null) {
     const cleanText = text.replace(/^/, ''); // strip UTF-8 BOM (MEL files)
@@ -150,7 +150,7 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
     const getNum    = (row, col)     => numOrNull(get(row, col));
     const getNumAny = (row, ...cols) => numOrNull(getAny(row, ...cols));
 
-    const groups = new Map();
+    const testVehicles = new Map();
     const seenTestNumbers = new Set(); // MEL: same Test Number repeats per cert region
 
     for (let i = 1; i < lines.length; i++) {
@@ -171,12 +171,14 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         }
 
         // Unique key per configuration: Test Vehicle ID; fall back to family id.
-        const testVehicleId = getAny(row, 'Test Vehicle ID', 'Vehicle ID');
-        const testFamilyId  = getAny(row, 'Actual Tested Testgroup', 'Certified Test Group');
-        const testGroupId   = testVehicleId || testFamilyId;
-        if (!testGroupId) continue;
+        // The record's key is EPA's Vehicle ID; the Test Group (the
+        // certification) stands in when a sheet has no Vehicle ID column.
+        const vehicleIdCol = getAny(row, 'Test Vehicle ID', 'Vehicle ID');
+        const testGroup    = getAny(row, 'Actual Tested Testgroup', 'Certified Test Group');
+        const testVehicleId = vehicleIdCol || testGroup;
+        if (!testVehicleId) continue;
 
-        if (!groups.has(testGroupId)) {
+        if (!testVehicles.has(testVehicleId)) {
             // Make: skip mis-filed numeric values (some files put the year here),
             // and trim verbose legal suffixes ("Lucid USA, Inc" → "Lucid").
             let make = null;
@@ -201,9 +203,9 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
             const fuelDesc = getAny(row,
                 'Test Fuel Type Description', 'Test Fuel Description') || 'BEV';
 
-            groups.set(testGroupId, {
-                test_group_id:      testGroupId,
-                epa_test_family_id: testFamilyId || null,
+            testVehicles.set(testVehicleId, {
+                test_vehicle_id:    testVehicleId,
+                test_group:         testGroup || null,
                 model_year:         getNum(row, 'Model Year'),
                 make,
                 epa_carline_name:   model,
@@ -233,7 +235,7 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
             });
         }
 
-        const g = groups.get(testGroupId);
+        const g = testVehicles.get(testVehicleId);
         const cs = g._coefficientSet;
 
         // Road-load coefficients (same across the config's rows; first non-null wins).
@@ -270,7 +272,7 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
     const COEFF_CSV_FIELDS = ['equiv_test_weight_lbs',
         'target_a', 'target_b', 'target_c', 'set_a', 'set_b', 'set_c'];
 
-    for (const g of groups.values()) {
+    for (const g of testVehicles.values()) {
         const cs = g._coefficientSet;
         g._hasCoeffs = cs.target_a != null || cs.set_a != null;
         g._hasMpge   = g.label_combined_mpge != null || g.label_hwy_mpge != null;
@@ -278,23 +280,23 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         cs.overrides = csvOverrides(cs, COEFF_CSV_FIELDS);
     }
 
-    return Array.from(groups.values());
+    return Array.from(testVehicles.values());
 }
 
 /**
  * Summarise what was parsed, for the import preview.
- * @param {Array} groups  Output of parseEpaTestCarSheet
+ * @param {Array} testVehicles  Output of parseEpaTestCarSheet
  */
-export function summariseEpaGroups(groups) {
-    const makes = [...new Set(groups.map(g => g.make).filter(Boolean))].sort();
-    const years = groups.map(g => g.model_year).filter(Boolean);
+export function summariseEpaTestVehicles(testVehicles) {
+    const makes = [...new Set(testVehicles.map(g => g.make).filter(Boolean))].sort();
+    const years = testVehicles.map(g => g.model_year).filter(Boolean);
     return {
-        total: groups.length,
+        total: testVehicles.length,
         makes,
         yearMin: years.length ? Math.min(...years) : null,
         yearMax: years.length ? Math.max(...years) : null,
-        withCoeffs: groups.filter(g => g._hasCoeffs).length,
-        withMpge:   groups.filter(g => g._hasMpge).length,
-        isMasterList: groups.length > 0 && !groups.some(g => g._hasMpge),
+        withCoeffs: testVehicles.filter(g => g._hasCoeffs).length,
+        withMpge:   testVehicles.filter(g => g._hasMpge).length,
+        isMasterList: testVehicles.length > 0 && !testVehicles.some(g => g._hasMpge),
     };
 }

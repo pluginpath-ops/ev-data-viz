@@ -157,8 +157,8 @@ export default function GuideFilterBar({
                     type="search"
                     value={filters.search}
                     onChange={e => onChange({ search: e.target.value })}
-                    placeholder="Search carline or test group…"
-                    aria-label="Search carline or test group"
+                    placeholder="Search carline or Test Group…"
+                    aria-label="Search carline or Test Group"
                     className="form-input guide-search-input"
                 />
 
@@ -221,7 +221,7 @@ export default function GuideFilterBar({
                     {onToggleClustered && (
                         <label className="guide-cluster-toggle">
                             <input type="checkbox" checked={clustered} onChange={onToggleClustered} />
-                            Cluster by EPA test group
+                            Cluster by Test Group
                         </label>
                     )}
                 </div>

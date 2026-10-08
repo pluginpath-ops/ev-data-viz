@@ -98,7 +98,7 @@ function GuideRow({ row, cols, selectedIds, onToggleSelect, onOpenRow, vehicleLi
 }
 
 /**
- * Rows of one test group, with the tail folded away until asked for.
+ * Rows of one Test Group, with the tail folded away until asked for.
  *
  * The header IS the control. It used to carry a caret that did nothing while a
  * separate "N more…" button sat at the FOOT of the group — on the same cluster
@@ -162,7 +162,7 @@ function Cluster({ group, span, rowProps }) {
                             left edge, so the flex and the sticky live in here. */}
                         <span className="guide-band-content">
                             <span className="disclosure-caret guide-cluster-caret" aria-hidden="true">{caret}</span>
-                            {/* The test group leads, in mono, because it is the
+                            {/* The Test Group leads, in mono, because it is the
                                 identity EPA actually assigned — the marketing
                                 names beneath it are what vary. */}
                             <span className="guide-cluster-id">{group.testGroup ?? '\u2014'}</span>
@@ -174,7 +174,7 @@ function Cluster({ group, span, rowProps }) {
                             <span className="guide-cluster-meta">
                                 {total} config{total === 1 ? '' : 's'}
                                 {/* The one thing that makes configurations in a
-                                    single test group NOT interchangeable. */}
+                                    single Test Group NOT interchangeable. */}
                                 {group.packVaries && <span className="badge-micro is-qualified">pack varies</span>}
                             </span>
                         </span>

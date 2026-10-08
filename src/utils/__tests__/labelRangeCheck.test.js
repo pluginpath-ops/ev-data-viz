@@ -26,7 +26,7 @@ describe('labelRangeCheck', () => {
         expect(Math.abs(c.deltaPct)).toBeLessThan(2);
     });
 
-    it('flags a gap that suggests the wrong test group', () => {
+    it('flags a gap that suggests the wrong test vehicle', () => {
         // R2: the 20" AT config is 307 mi, the 21" is 330. Linking the wrong
         // one is the mistake this exists to catch.
         const c = labelRangeCheck(330, 307);
