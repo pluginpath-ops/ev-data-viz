@@ -1645,3 +1645,27 @@ describe('the Fuel Economy Guide importer recovers from a renamed column (#214)'
         expect(ui, 'and a note for a column read under another name').toMatch(/parsed\?\.renamed\?\.length > 0/);
     });
 });
+
+describe('a pop-out receives every setting the chart it was opened from does (#396)', () => {
+    // Prop names written on a JSX element, found by walking to its closing `/>`
+    // at the same nesting depth. Enough for these flat prop lists.
+    const propsOf = (src, tag) => {
+        const at = src.indexOf(`<${tag}\n`);
+        if (at < 0) return null;
+        const end = src.indexOf('/>', at);
+        return [...src.slice(at, end).matchAll(/^\s+([A-Za-z]+)(?==|\s*$)/gm)].map(m => m[1]);
+    };
+    // The pop-out is read-only, so setters are left out on purpose.
+    const READ_ONLY = (p) => /^set[A-Z]/.test(p);
+
+    for (const tag of ['ChargeCompareView', 'RoadTripView']) {
+        it(`${tag}: the pop-out passes every non-setter prop the main tab does`, () => {
+            const main = propsOf(read('src/App.jsx'), tag);
+            const popout = propsOf(read('src/components/PopoutView.jsx'), tag);
+            expect(main, `${tag} in App.jsx`).toBeTruthy();
+            expect(popout, `${tag} in PopoutView.jsx`).toBeTruthy();
+            const missing = main.filter(p => !READ_ONLY(p) && !popout.includes(p));
+            expect(missing, `props App passes to ${tag} that PopoutView does not`).toEqual([]);
+        });
+    }
+});

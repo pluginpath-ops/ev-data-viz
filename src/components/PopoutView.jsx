@@ -84,6 +84,8 @@ export default function PopoutView({
                     roadTripConfig={roadTripConfig}
                     pairings={pairings}
                     setRoadTripConfig={() => {}}
+                    correctionMode={chartConfig?.correctionMode ?? 'none'}
+                    handSet={chartConfig?.handSet ?? false}
                     verboseLabels={chartConfig?.verboseLabels ?? false}
                     palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
                     presentationMode
@@ -116,6 +118,8 @@ export default function PopoutView({
                     verboseLabels={chartConfig?.verboseLabels ?? false}
                     palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
                     testSpread={chartConfig?.testSpread ?? true}
+                    correctionMode={chartConfig?.correctionMode ?? 'none'}
+                    handSet={chartConfig?.handSet ?? false}
                     presentationMode
                 />
             )}
