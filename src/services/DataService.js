@@ -2264,10 +2264,11 @@ class DataService {
    * utils/epaImportMerge.js; this method only executes the plan.
    *
    * @param {Object} group  Output element of parseEpaCsiText().groups
-   * @returns {Promise<{kept: Array}>} curator-held values the PDF disagreed with
+   * @returns {Promise<{kept: Array, guarded: Array}>} curator-held values the PDF disagreed with,
+   *   and identity fields an older certification was stopped from overwriting (#374)
    */
   async importEpaGroupFull(group) {
-    if (!this.useSupabase) return { kept: [] };
+    if (!this.useSupabase) return { kept: [], guarded: [] };
     const supabase = getSupabase();
     const { coefficient_sets = [], tests = [], covered_models = [], ...g } = group;
     const tgid = g.test_group_id;
@@ -2308,9 +2309,11 @@ class DataService {
     // 2b. Covered models (clean-replace: certificate-wide, nothing edits them
     //     and nothing refers to their ids). Non-fatal: migration 059 may not be
     //     applied, and a missing table must not fail an import that worked.
+    //     Skipped when an older certification meets a newer one: the list is
+    //     the newer certificate's, not this file's (#374).
     try {
-      await supabase.from('epa_covered_models').delete().eq('test_group_id', tgid);
-      if (covered_models.length) {
+      if (!plan.holdIdentity) await supabase.from('epa_covered_models').delete().eq('test_group_id', tgid);
+      if (!plan.holdIdentity && covered_models.length) {
         const rows = uniqueCoveredModels(covered_models).map(cm => ({ test_group_id: tgid, ...cm }));
         const { error } = await supabase.from('epa_covered_models').insert(rows);
         if (error) throw error;
@@ -2359,7 +2362,7 @@ class DataService {
           .insert(t.phases.map(p => ({ test_id: saved.id, ...p }))));
       }
     }
-    return { kept: plan.kept };
+    return { kept: plan.kept, guarded: plan.guarded };
   }
 
   /** Convenience alias kept for back-compat. */

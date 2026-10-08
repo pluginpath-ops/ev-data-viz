@@ -1497,9 +1497,12 @@ export function AppProvider({ children }) {
     const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [], onProgress } = {}) => {
         try {
             let keptCount = 0;
+            let guardedCount = 0;
             for (const [i, g] of groups.entries()) {
                 onProgress?.({ done: i, total: groups.length, name: g.test_group_id });
-                keptCount += (await dataService.importEpaGroupFull(g))?.kept?.length ?? 0;
+                const res = await dataService.importEpaGroupFull(g);
+                keptCount += res?.kept?.length ?? 0;
+                if (res?.guarded?.length) guardedCount += 1;
             }
             onProgress?.({ done: groups.length, total: groups.length, name: null });
             if (linkVehicleId) {
@@ -1511,8 +1514,9 @@ export function AppProvider({ children }) {
             const updated = await dataService.getVehicles();
             setVehicles(updated);
             showSuccess(`Imported ${groups.length} EPA config(s) from PDF.`
-                + (keptCount ? ` Kept ${keptCount} hand-edited value(s) that differ from the PDF.` : ''));
-            return { count: groups.length, kept: keptCount };
+                + (keptCount ? ` Kept ${keptCount} hand-edited value(s) that differ from the PDF.` : '')
+                + (guardedCount ? ` ${guardedCount} config(s) already held a newer model year's certification, so its year, test family and covered models were kept.` : ''));
+            return { count: groups.length, kept: keptCount, guarded: guardedCount };
         } catch (error) {
             showError('PDF import failed: ' + error.message);
             throw error;

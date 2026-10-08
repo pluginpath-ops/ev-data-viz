@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isHeld, mergeRow, planChildren, planGroupImport, uniqueCoveredModels } from '../epaImportMerge';
+import { isOlderCertification, isHeld, mergeRow, planChildren, planGroupImport, uniqueCoveredModels } from '../epaImportMerge';
 
 const manual = { source: 'manual', at: '2026-09-01T00:00:00Z' };
 
@@ -117,6 +117,70 @@ describe('planGroupImport', () => {
         expect(plan.coefficients.insert).toHaveLength(1);
         expect(plan.tests.insert[0].phases).toHaveLength(1);
         expect(plan.kept).toEqual([]);
+    });
+});
+
+describe('older certification guard (#374)', () => {
+    const stored = (year) => ({
+        group: {
+            test_group_id: 'G', model_year: year, epa_test_family_id: `F${year}`, source_file: `${year}.pdf`,
+            carryover_test_group_id: `C${year}`, carryover_model_year: year - 1, overrides: {},
+        },
+        coefficient_sets: [{ id: 10, category: 'City/Highway', target_a: 30, overrides: {} }],
+        tests: [],
+    });
+    const incoming = (year) => ({
+        group: {
+            test_group_id: 'G', model_year: year, epa_test_family_id: `F${year}`, source_file: `${year}.pdf`,
+            carryover_test_group_id: `C${year}`, carryover_model_year: year - 1, battery_kwh: 77,
+        },
+        coefficient_sets: [{ category: 'City/Highway', target_a: 31 }],
+        tests: [],
+    });
+    const IDENTITY = ['model_year', 'epa_test_family_id', 'source_file', 'carryover_test_group_id', 'carryover_model_year'];
+
+    it('keeps the newer identity when an older file arrives, but still merges lab data', () => {
+        const plan = planGroupImport(stored(2025), incoming(2024));
+        for (const f of IDENTITY) expect(f in plan.group.payload).toBe(false);
+        expect(plan.group.payload.battery_kwh).toBe(77);
+        expect(plan.coefficients.update[0].payload.target_a).toBe(31);
+        expect(plan.holdIdentity).toBe(true);
+        expect(plan.guarded.map(g => g.field).sort()).toEqual([...IDENTITY].sort());
+        expect(plan.guarded.find(g => g.field === 'model_year')).toMatchObject({ kept: 2025, pdf: 2024 });
+    });
+
+    it('replaces the identity when a newer file arrives', () => {
+        const plan = planGroupImport(stored(2024), incoming(2025));
+        expect(plan.group.payload).toMatchObject({ model_year: 2025, epa_test_family_id: 'F2025', source_file: '2025.pdf' });
+        expect(plan.holdIdentity).toBe(false);
+        expect(plan.guarded).toEqual([]);
+    });
+
+    it('replaces the identity on a same-year re-import', () => {
+        const plan = planGroupImport(stored(2025), incoming(2025));
+        expect(plan.group.payload).toMatchObject({ model_year: 2025, source_file: '2025.pdf' });
+        expect(plan.holdIdentity).toBe(false);
+    });
+
+    it('never blocks when either year is missing', () => {
+        expect(planGroupImport(stored(null), incoming(2024)).holdIdentity).toBe(false);
+        const noYear = incoming(2024);
+        noYear.group.model_year = null;
+        const plan = planGroupImport(stored(2025), noYear);
+        expect(plan.holdIdentity).toBe(false);
+        expect('epa_test_family_id' in plan.group.payload).toBe(true);
+        expect(isOlderCertification({ model_year: 2025 }, {})).toBe(false);
+    });
+
+    it('does not guard a brand-new group', () => {
+        const plan = planGroupImport({ group: null, coefficient_sets: [], tests: [] }, incoming(2024));
+        expect(plan.holdIdentity).toBe(false);
+        expect(plan.group.payload.model_year).toBe(2024);
+    });
+
+    it('tells the executor to leave the covered-models list alone only when held', () => {
+        expect(planGroupImport(stored(2025), incoming(2023)).holdIdentity).toBe(true);
+        expect(planGroupImport(stored(2023), incoming(2025)).holdIdentity).toBe(false);
     });
 });
 
