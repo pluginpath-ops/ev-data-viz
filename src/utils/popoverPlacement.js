@@ -33,6 +33,15 @@ export const MARGIN = 8;
  * space that is also too small trades one clipped panel for another, and the
  * one below at least opens in the direction the reader is travelling.
  *
+ * When NEITHER side holds it, the chosen side is only a starting point: the
+ * panel then slides back up until its bottom edge is on screen, covering its
+ * own anchor if it has to (#382). Placed below with nothing stopping it, the
+ * color picker ran its foot — and its Apply button — off the bottom of the
+ * window, and a panel whose commit you cannot reach is broken however well it
+ * is aligned. Covering the swatch costs nothing: the panel's title names what
+ * it is editing. The top margin still wins over the bottom one, so a panel
+ * taller than the viewport keeps its header, which is where it is read from.
+ *
  * Horizontal is a clamp, not a flip. A panel that jumped to right-aligned near
  * the edge would move by its own width — a big, surprising displacement to fix
  * an overhang that is usually a few pixels. Sliding it back in place keeps the
@@ -57,8 +66,11 @@ export function placePopover(anchor, panel, viewport, { gap = GAP, margin = MARG
     // the RENDERED panel, the width arriving here is already clamped.
     const rightmost = viewport.width - panel.width - margin;
 
+    // The lowest top that still shows the bottom edge.
+    const lowest = viewport.height - panel.height - margin;
+
     return {
-        top: Math.max(margin, rawTop),
+        top: Math.max(margin, Math.min(rawTop, lowest)),
         left: Math.max(margin, Math.min(anchor.left, rightmost)),
         placement: below ? 'below' : 'above',
     };
