@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import GuideCandidateCheck from '../epa/GuideCandidateCheck';
 import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import {
@@ -38,10 +39,13 @@ import { wheelSizeIn } from '../../utils/feGuideBrowse';
  * Motor count stays for the ties it separates: MY25 lists HUMMER EV SUV twice
  * and the rows are the 2X and the 3X.
  */
-function CandidateFacts({ row, score, exactYear }) {
+function CandidateFacts({ row, score, exactYear, testVehicle }) {
     const implied = impliedUsableKwh(row);
     return (
         <span className="text-meta">
+            {/* The EPA tab's check, on this row before it is linked: the same
+                name can be very different figures (#374). */}
+            <GuideCandidateCheck testVehicle={testVehicle} row={row} />{' '}
             {row.label_comb_range_mi} mi
             {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
             {/* Pulled out of the carline, where it is easy to miss when three
@@ -195,7 +199,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                             </div>
                             <CandidateFacts row={item.proposal.row}
                                 score={(item.exactIdMatch || item.coveredMatch) ? null : item.proposal.score}
-                                exactYear={item.proposal.exactYear} />
+                                exactYear={item.proposal.exactYear} testVehicle={g} />
                         </>
                     ) : (
                         <div className="text-note">
@@ -289,7 +293,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         <div key={c.row.id} className="sweep-candidate">
                             <div>
                                 <div>{c.row.carline}</div>
-                                <CandidateFacts row={c.row} score={c.score} exactYear={c.exactYear} />
+                                <CandidateFacts row={c.row} score={c.score} exactYear={c.exactYear} testVehicle={g} />
                             </div>
                             <button className="btn btn-secondary" disabled={busy}
                                 onClick={() => onLink(g, c.row.id)}>Link this</button>
@@ -338,6 +342,11 @@ export default function FeGuideLinkSweep() {
     const counts = useMemo(() => sweepProgress(items), [items]);
     const shown = useMemo(() => items.filter(i => i.tier === tier), [items, tier]);
     const batch = useMemo(() => batchable(shown), [shown]);
+    // MPGe matches, so the record is right; the label is a data, import or
+    // assumption error to look at after linking — a batch of its own (#374).
+    const impossibleBatch = useMemo(() => batchable(shown, 'impossible-label'), [shown]);
+    // Proposed by name but not confirmed by the check: left for a curator.
+    const unconfirmed = shown.filter(i => i.proposal).length - batch.length - impossibleBatch.length;
     // Ambiguous AND without a certificate to consult: the ones a CSI import
     // would actually help, as opposed to the ones already decided.
     const needsCsi = useMemo(
@@ -365,8 +374,8 @@ export default function FeGuideLinkSweep() {
      * each one — right for one, ninety-eight times over for a batch, which is
      * why this appeared to do nothing but churn.
      */
-    const linkBatch = () => run(async () => {
-        const pairs = batch.map(it => ({
+    const linkBatch = (items) => run(async () => {
+        const pairs = items.map(it => ({
             testVehicleId: it.testVehicle.test_vehicle_id,
             feRowId: it.proposal.row.id,
             linkRowId: it.testVehicle._linkRowId,
@@ -445,15 +454,34 @@ export default function FeGuideLinkSweep() {
                 )}
             </div>
 
-            {batch.length > 0 && (
+            {(batch.length > 0 || impossibleBatch.length > 0 || unconfirmed > 0) && (
                 <div className="sweep-batch">
                     <div className="text-note">
                         <strong>{batch.length}</strong> of these have a single unambiguous same-year
-                        match. Ties, borrowed years and weak matches are excluded and need a look.
+                        match whose MPGe matches EPA. Ties, borrowed years and weak matches are
+                        excluded and need a look.
+                        {impossibleBatch.length > 0 && (
+                            <> {impossibleBatch.length} more match EPA&apos;s MPGe but carry an impossible
+                            label — the right record, with a data, import or assumption error to look
+                            at after linking.</>
+                        )}
+                        {unconfirmed > 0 && (
+                            <> {unconfirmed} {unconfirmed === 1 ? 'has a match' : 'have matches'} the
+                            check does not confirm — link {unconfirmed === 1 ? 'it' : 'them'} one at a
+                            time if you judge {unconfirmed === 1 ? 'it' : 'them'} right.</>
+                        )}
                     </div>
-                    <button className="btn btn-primary" disabled={busy} onClick={linkBatch}>
-                        {busy ? 'Linking…' : `Link all ${batch.length}`}
-                    </button>
+                    {batch.length > 0 && (
+                        <button className="btn btn-primary" disabled={busy} onClick={() => linkBatch(batch)}>
+                            {busy ? 'Linking…' : `Link all ${batch.length}`}
+                        </button>
+                    )}
+                    {impossibleBatch.length > 0 && (
+                        <button className="btn btn-secondary" disabled={busy} onClick={() => linkBatch(impossibleBatch)}
+                            title="MPGe matches EPA, so these are the right records; their labels need a look after linking">
+                            {busy ? 'Linking…' : `Link ${impossibleBatch.length} with impossible labels`}
+                        </button>
+                    )}
                 </div>
             )}
 

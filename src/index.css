@@ -6009,10 +6009,17 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
 }
 
-/* The curator's block of reconciliation checks in Tests & Data. Stacked, with
-   each check keeping its own status edge. */
+/* The curator's block of reconciliation checks in Tests & Data: side by side
+   across the card, wrapping down when they do not fit, each keeping its own
+   status edge. A check narrower than ~16rem would wrap its numbers, so that is
+   where a row breaks. */
 .epa-checks {
-    @apply flex flex-col gap-2 mt-3;
+    @apply flex flex-wrap items-stretch gap-2 mt-3;
+}
+.epa-checks > .epa-check {
+    flex: 1 1 16rem;
+    min-width: 0;
+    margin-top: 0;
 }
 
 /* Our derivation measured against EPA's published unadjusted MPGe. Bordered on
@@ -6073,6 +6080,39 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply px-3 py-2 border-t;
     border-color: var(--color-border);
 }
+/* ── The EPA Certifications of one test vehicle (#374) ──────────────────────
+   One row per certification, so one per model year, each with its own Guide
+   link. A table to read, not a list to pick from: rows do not react to hover.
+   The row the vehicle reads is filled in the primary surface; the year the
+   Guide picker below is aimed at (a curator's "Link" button) is outlined, so
+   the two never read as one. */
+.certification-list {
+    @apply mt-2 mb-3 rounded-lg border overflow-x-auto;
+    border-color: var(--color-border);
+}
+.certification-row {
+    display: grid;
+    /* Fixed widths, as in the primary picker: each row is its own grid. */
+    grid-template-columns: 4.5rem minmax(7rem, 9rem) minmax(0, 1fr) 4.5rem;
+    align-items: center;
+    column-gap: 0.75rem;
+    @apply px-3 py-2 text-sm;
+}
+.certification-row.is-read {
+    font-weight: 600;
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+.certification-row.has-action {
+    grid-template-columns: 4.5rem minmax(7rem, 9rem) minmax(0, 1fr) 4.5rem 4rem;
+}
+.certification-row.is-header {
+    @apply px-3 pt-2 pb-1;
+    color: var(--color-text-meta);
+}
+.certification-row.is-targeted { box-shadow: inset 0 0 0 1px var(--color-primary-border); }
+.certification-guide { @apply text-right whitespace-nowrap; }
+
 /* The same rows as suggestions for a variant with nothing linked (#341): no
    radio, a Link button last, and no test weight — the label range and EPA tested
    are what the link would give the vehicle, so they are what a fit is judged by. */

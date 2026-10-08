@@ -259,7 +259,14 @@ const CERTIFICATIONS_EMBED = `certifications:epa_certification_test_vehicles(id,
  * getModeledEfficiencyPreview, so an explainer's preview can never be built
  * from less of the record than the chart it links to.
  */
-const EPA_TEST_VEHICLE_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi)), ${CERTIFICATIONS_EMBED}`;
+/**
+ * The record's own lab data: what the curve, η, the methodology card and the
+ * Guide candidate check derive from. Shared with the link sweep, so a
+ * suggestion is checked against exactly what the EPA tab will read.
+ */
+const EPA_LAB_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
+
+const EPA_TEST_VEHICLE_FIELDS = `${EPA_LAB_FIELDS}, ${CERTIFICATIONS_EMBED}`;
 
 class DataService {
   constructor() {
@@ -2233,23 +2240,27 @@ class DataService {
    */
   async getEpaTestVehiclesAdmin() {
     if (!this.useSupabase) return [];
-    const { data, error } = await getSupabase()
+    // Paged (794 test vehicles, the cap is 1000), and read as each test vehicle
+    // shows on its own: Since as its year, its newest linked year's Guide
+    // figures, its certifications for the years column (#374).
+    const data = await fetchAllRows(() => getSupabase()
       .from('epa_test_vehicles')
       .select(`
         test_vehicle_id, test_group,
         model_year, make, epa_carline_name, drive, transmission,
-        label_combined_mpge, label_hwy_mpge, display_name,
+        label_combined_mpge, label_hwy_mpge, display_name, overrides,
         source_file, ingested_at,
         epa_coefficient_sets(category, is_primary, target_a, target_b, target_c, equiv_test_weight_lbs),
         epa_vehicle_mappings(
           id, confidence,
           vehicles(id, name, year)
-        )
+        ),
+        ${CERTIFICATIONS_EMBED}
       `)
       .order('make')
-      .order('epa_carline_name');
-    if (error) throw error;
-    return data || [];
+      .order('epa_carline_name')
+      .order('test_vehicle_id'));
+    return data.map(viewForTestVehicle);
   }
 
   /**
@@ -2737,7 +2748,9 @@ class DataService {
     if (!this.useSupabase || !testVehicle) return [];
     const rows = await fetchAllRows(() => getSupabase()
       .from('epa_fe_guide')
-      .select('id, model_year, division, carline, label_comb_range_mi, label_comb_mpge, motor_count')
+      // The Guide row as a view reads it, so each candidate can be checked
+      // against the lab data before it is linked (guideCandidateCheck).
+      .select(`${GUIDE_VIEW_FIELDS}, motor_count`)
       .order('id', { ascending: true }));
     return rankFeCandidates(testVehicle, rows);
   }
@@ -2837,12 +2850,7 @@ class DataService {
           carryover_test_group, carryover_model_year,
           certification:epa_certifications(id, test_group, model_year, basis,
             epa_covered_models(carline_number, carline_name, certification_region, drive_system)),
-          test_vehicle:epa_test_vehicles(
-            test_vehicle_id, make, epa_carline_name, display_name,
-            vehicle_config_number, useable_kwh, cd_range_combined_calc, derived_5cycle_coefficient,
-            epa_coefficient_sets(target_a, equiv_test_weight_lbs),
-            epa_tests(procedure_code, total_dc_energy_kwh, ac_recharge_kwh, mfr_test_vehicle_comments),
-            epa_vehicle_mappings(vehicles(id, name, year)))
+          test_vehicle:epa_test_vehicles(${EPA_LAB_FIELDS}, epa_vehicle_mappings(vehicles(id, name, year)))
         `)
         .is('fe_guide_row_id', null)
         .order('id', { ascending: true });

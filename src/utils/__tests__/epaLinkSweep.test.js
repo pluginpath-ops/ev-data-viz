@@ -5,6 +5,9 @@ import {
     impliedUsableKwh, testVehicleEnergyFacts, estimatedAdjustedRange, coveredModelMatches,
     wheelMentions, coveredWheelSizes, hasCsiDetail,
 } from '../epaLinkSweep';
+import { epaRecordFromTestVehicle } from '../epaRecordFromTestVehicle';
+import { buildMethodologyModel } from '../epaMethodology';
+import { PROC_MCT, HWFET_MI, UDDS_MI } from '../../constants/epa';
 
 const testVehicle = (o = {}) => ({
     test_vehicle_id: o.id ?? 'TG1',
@@ -105,11 +108,58 @@ describe('ordering', () => {
         expect(p.energy).toEqual({ total: 2, proposed: 1, manual: 1 });
         expect(p.coefficients).toEqual({ total: 1, proposed: 1, manual: 0 });
     });
-    it('batches only what has a safe proposal', () => {
+    it('never batches a proposal on its name alone', () => {
+        // These records have proposals but no lab data, so the check cannot
+        // confirm one — and a name match is not enough to link unseen (#374).
         const out = buildSweep([plain, coeffProposed, energyManual, energyProposed], rows);
-        expect(batchable(out).map(i => i.testVehicle.test_vehicle_id)).toEqual(['A', 'C', 'D']);
-        // The tie and wrong-year cases must never reach a batch confirm.
-        expect(batchable(out).every(i => i.proposal)).toBe(true);
+        expect(out.filter(i => i.proposal).map(i => i.testVehicle.test_vehicle_id)).toEqual(['A', 'C', 'D']);
+        expect(batchable(out)).toEqual([]);
+    });
+});
+
+describe('the batch links only what the check confirms (#374)', () => {
+    const phase = (index, phase_type, whPerMi, distance_mi) => ({
+        phase_index: index, phase_type, distance_mi, dc_energy_kwh: (whPerMi * distance_mi) / 1000,
+    });
+    // The Rivian R2 as the database holds it (see epaRecordFromTestVehicle.test).
+    const r2 = {
+        test_vehicle_id: 'R2-159XR20AT', model_year: 2027, overrides: {},
+        epa_tests: [{
+            procedure_code: PROC_MCT, total_dc_energy_kwh: 89.54927, ac_recharge_kwh: 104.689,
+            epa_test_phases: [
+                phase(1, 'UDDS', 235.86, 1751.46 / 235.86), phase(2, 'HWY', 231.77, HWFET_MI),
+                phase(3, 'UDDS', 189.87, UDDS_MI), phase(4, 'HWY', 225.00, HWFET_MI),
+                phase(5, 'UDDS', 184.62, UDDS_MI), phase(7, 'UDDS', 183.46, UDDS_MI),
+            ],
+        }],
+    };
+    const model = buildMethodologyModel(epaRecordFromTestVehicle(r2).record);
+    const item = (over = {}) => ({
+        testVehicle: r2,
+        proposal: { score: 1, exactYear: true, row: {
+            id: 1, model_year: 2027, carline: 'R2 Performance', label_comb_range_mi: 300,
+            unadj_city_mpge: model.cycles.city.mpgeUnadj, unadj_hwy_mpge: model.cycles.hwy.mpgeUnadj, ...over,
+        } },
+    });
+
+    it('batches a proposal whose MPGe matches EPA', () => {
+        expect(batchable([item()])).toHaveLength(1);
+    });
+    it('gives a matching MPGe with an impossible label a batch of its own', () => {
+        // The MPGe says it is the right record; the label is an error to look
+        // at, not a wrong match (owner, #374).
+        const impossible = item({ label_comb_range_mi: Math.round(model.combinedMi) + 40 });
+        expect(batchable([impossible])).toEqual([]);
+        expect(batchable([impossible, item()], 'impossible-label')).toEqual([impossible]);
+    });
+    it('leaves a disagreeing or uncheckable proposal for a curator', () => {
+        const disagrees = item({ unadj_city_mpge: model.cycles.city.mpgeUnadj * 1.15 });
+        const unchecked = item({ unadj_city_mpge: null, unadj_hwy_mpge: null });
+        expect(batchable([disagrees, unchecked])).toEqual([]);
+        expect(batchable([disagrees, unchecked], 'impossible-label')).toEqual([]);
+    });
+    it('never batches an item without a proposal', () => {
+        expect(batchable([{ testVehicle: r2, proposal: null }])).toEqual([]);
     });
 });
 

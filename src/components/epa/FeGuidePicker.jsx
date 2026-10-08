@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import GuideCandidateCheck from './GuideCandidateCheck';
 import { useAppContext } from '../../context/AppContext';
 import { MATCH_FLOOR } from '../../utils/feGuideMatch';
 import { guideConflicts } from '../../utils/feGuidePromotion';
@@ -37,9 +38,12 @@ import { guideConflicts } from '../../utils/feGuidePromotion';
  * across the two — and facts that appear in one and not the other are facts
  * they have to hold in their head.
  */
-function CandidateFacts({ row, exactYear, score }) {
+function CandidateFacts({ row, exactYear, score, testVehicle }) {
     return (
         <div className="text-xs text-meta">
+            {/* The EPA tab's check, on this row before it is linked: the same
+                name can be very different figures (#374). */}
+            <GuideCandidateCheck testVehicle={testVehicle} row={row} />{' '}
             {row.label_comb_range_mi} mi
             {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
             {row.motor_count != null && ` · ${row.motor_count} motor${row.motor_count === 1 ? '' : 's'}`}
@@ -276,7 +280,7 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
                 <div className="fe-candidate fe-candidate-best">
                     <div className="min-w-0">
                         <div className="text-sm font-medium text-secondary truncate">{best.row.carline}</div>
-                        <CandidateFacts row={best.row} exactYear={best.exactYear} score={best.score} />
+                        <CandidateFacts row={best.row} exactYear={best.exactYear} score={best.score} testVehicle={testVehicle} />
                     </div>
                     {canEdit && (
                         <button
@@ -315,7 +319,7 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
                                     <div key={c.row.id} className="fe-candidate">
                                         <div className="min-w-0">
                                             <div className="text-xs text-secondary truncate">{c.row.carline}</div>
-                                            <CandidateFacts row={c.row} exactYear={c.exactYear} score={c.score} />
+                                            <CandidateFacts row={c.row} exactYear={c.exactYear} score={c.score} testVehicle={testVehicle} />
                                         </div>
                                         {canEdit && (
                                             <button

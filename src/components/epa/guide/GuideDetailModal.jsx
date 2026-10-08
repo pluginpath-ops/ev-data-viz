@@ -110,6 +110,7 @@ export default function GuideDetailModal({ row, vehicles, testVehicleIds = [], c
                     <div className="guide-detail-group">
                         <div className="text-label guide-detail-group-title">Certification results</div>
                         <GuideCertificationResults
+                            guideRowId={row.id}
                             testVehicleIds={testVehicleIds}
                             vehicles={vehicles}
                             configCount={configCount}

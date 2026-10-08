@@ -7,6 +7,13 @@
  * ends up represented by a trim it is not.
  */
 import { epaConfigurationFigures } from '../../utils/epaConfiguration';
+import { certifiedYears, formatYears, fromYearNote } from '../../utils/epaCertifications';
+
+/** " · MY2023 to MY2025" — the years a configuration's test vehicle is certified for (#374). */
+const yearsOf = (testVehicle) => {
+    const years = certifiedYears(testVehicle);
+    return years.length ? ` · ${formatYears(years)}` : '';
+};
 
 const miles  = (v) => (v != null ? `${Math.round(v)} mi` : '—');
 const kwh    = (v) => (v != null ? `${Math.round(v * 10) / 10} kWh` : '—');
@@ -42,9 +49,16 @@ export default function PrimaryConfigurationPicker({ vehicle, mappings, canEdit,
                         />
                         <span className="min-w-0">
                             <span className="block truncate">{c.name}</span>
-                            <span className="block font-mono text-caption truncate">{c.id}</span>
+                            <span className="block font-mono text-caption truncate">
+                                {c.id}{yearsOf(m.epaTestVehicle)}
+                            </span>
                         </span>
-                        <span className="primary-config-figure">{miles(c.labelRangeMi)}</span>
+                        <span className="primary-config-figure" title={fromYearNote(m.epaTestVehicle._certification)?.long}>
+                            {miles(c.labelRangeMi)}
+                            {fromYearNote(m.epaTestVehicle._certification) && (
+                                <span className="block text-caption">{fromYearNote(m.epaTestVehicle._certification).short}</span>
+                            )}
+                        </span>
                         <span className="primary-config-figure">{kwh(c.testedKwh)}</span>
                         <span className="primary-config-figure">{pounds(c.testWeightLbs)}</span>
                     </label>

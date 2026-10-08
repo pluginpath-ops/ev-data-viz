@@ -486,6 +486,23 @@ moves bucket in Certification Statistics.
 
 ### Layer 4 — UI: years, per-certification linking, the Guide detail
 
+> **As built (2026-10-09).** Each EPA card on a vehicle's EPA sub-tab says
+> "Vehicle ID … · Since MY… · MY… to MY…" and lists its certifications in a
+> table (year, Test Group, Recertified / carryover / Basis, Guide state); the row
+> the vehicle reads is filled, rows do not react to hover, and a curator's
+> **Link** / **Change** button aims the Guide picker at another year. The picker
+> sits above the reconciliation checks, which now run across the card and wrap.
+> Every suggested Guide row — in the picker and the link sweep — carries the EPA
+> tab's verdict before linking (`guideCandidateCheck`: unadjusted MPGe and an
+> impossible label, as two badges). The sweep's batch links only proposals whose
+> MPGe matches EPA; matching-MPGe rows with an impossible label have their own
+> button, and everything the check does not confirm is left to a curator. The
+> Guide-row detail names the certification each test vehicle is linked through;
+> the Admin list and the primary picker show the years; the curator form's model
+> year is a read-only "Since". **Not in this layer:** dropping the retired
+> columns (084) and the getVehicles fallback — both wait until 081 is applied in
+> production.
+
 - **`EpaVehicleSection.jsx`** (the vehicle's EPA sub-tab): each configuration
   shows "Test vehicle NE-U568EA011A-0 · Since MY2025 · MY2025 to MY2026", its
   certifications (Test Group, year, Recertified, Basis), each one's Guide link

@@ -5,20 +5,25 @@ import DerivedValues from '../DerivedValues';
 import InfoIcon from '../../InfoIcon';
 import { EPA_EXPLAINERS } from '../../../utils/epaExplainers';
 import { certificationTests, certificationCoefficients, linkedVehicleLinks } from '../../../utils/guideCertification';
+import { certificationsOf, certifiedYears, formatYears, sinceYear, testVehicleView } from '../../../utils/epaCertifications';
 
 const fmt = (v, digits = 2) => (v == null ? '—' : Number(v).toFixed(digits));
 
 /**
  * The CSI lab results behind a guide row's label (#337).
  *
- * One block per test vehicle a curator has linked to the row. A test vehicle is
- * certified once and rated per configuration, so the block says how many
- * configurations share it — the lab result is not specific to this one.
+ * The modal above is the Fuel Economy Guide row as imported; this is what links
+ * add to it (#374, owner D5). One block per EPA test vehicle a curator has
+ * linked to the row, each naming the EPA Certification it is linked through —
+ * the Test Group and model year the Guide row belongs to — and the test
+ * vehicle's years. A test vehicle is certified once and rated per
+ * configuration, so the block says how many configurations share it — the lab
+ * result is not specific to this one.
  *
  * Read-only: editing stays in Tests & Data, and so does everything that needs a
  * vehicle, so the modal links there rather than reproducing it.
  */
-export default function GuideCertificationResults({ testVehicleIds, vehicles, configCount }) {
+export default function GuideCertificationResults({ testVehicleIds, vehicles, configCount, guideRowId = null }) {
     const { getEpaTestVehicleFull } = useAppContext();
     const idsKey = testVehicleIds.join('|');
 
@@ -46,7 +51,7 @@ export default function GuideCertificationResults({ testVehicleIds, vehicles, co
     return (
         <div className="guide-certification">
             {testVehicles.filter(Boolean).map(testVehicle => (
-                <TestVehicleResults key={testVehicle.test_vehicle_id} testVehicle={testVehicle} configCount={configCount} />
+                <TestVehicleResults key={testVehicle.test_vehicle_id} testVehicle={testVehicle} configCount={configCount} guideRowId={guideRowId} />
             ))}
             {links.length > 0 && (
                 <div className="text-note">
@@ -60,16 +65,28 @@ export default function GuideCertificationResults({ testVehicleIds, vehicles, co
     );
 }
 
-function TestVehicleResults({ testVehicle, configCount }) {
+function TestVehicleResults({ testVehicle: stored, configCount, guideRowId }) {
+    // The certification this Guide row is linked through, and the record as
+    // that year shows it — so the derived values below are this row's year's.
+    const cert = certificationsOf(stored).find(c => guideRowId != null && c.fe_guide_row_id === guideRowId) ?? null;
+    const testVehicle = cert ? testVehicleView(stored, { certification: cert, guideCertification: cert }) : stored;
     const tests = certificationTests(testVehicle);
     const coefficients = certificationCoefficients(testVehicle);
+    const years = certifiedYears(stored);
 
     return (
         <div className="guide-certification-test-vehicle">
             <div className="text-label">
                 Test vehicle {testVehicle.test_vehicle_id}
                 {testVehicle.epa_carline_name && ` · ${testVehicle.epa_carline_name}`}
-                {testVehicle.model_year && ` · MY${testVehicle.model_year}`}
+            </div>
+            <div className="text-note">
+                {cert
+                    ? `EPA Certification MY${cert.model_year} · Test Group ${cert.test_group}`
+                        + (cert.certificate_revision_date ? ` · Recertified ${cert.certificate_revision_date}` : '')
+                    : 'Linked to this row'}
+                {sinceYear(stored) != null && ` · Since MY${sinceYear(stored)}`}
+                {years.length > 1 && ` · ${formatYears(years)}`}
             </div>
             {configCount > 1 && (
                 <div className="text-note">

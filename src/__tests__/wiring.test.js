@@ -483,7 +483,12 @@ describe('the seams that broke before', () => {
         // The select is narrowed, so anything the ranker or picker reads off a
         // candidate has to be named in it or it arrives undefined.
         const selected = new Set(
-            (fn.match(/\.select\(\s*['"]([^'"]+)['"]/)?.[1] ?? '').split(',').map(s => s.trim()),
+            // The select is GUIDE_VIEW_FIELDS plus what only the picker shows
+            // (#374: candidates are checked against the lab data before linking).
+            [
+                ...(svc.match(/const GUIDE_VIEW_FIELDS = '([^']*)'/)?.[1] ?? '').split(','),
+                ...(fn.match(/\.select\(`\$\{GUIDE_VIEW_FIELDS\}((?:, [a-z_]+)*)`\)/)?.[1] ?? '').split(','),
+            ].map(s => s.trim()).filter(Boolean),
         );
         const match = read('src/utils/feGuideMatch.js');
         const picker = read('src/components/epa/FeGuidePicker.jsx');
@@ -1056,7 +1061,7 @@ describe('the seams that broke before', () => {
         const q = svc.slice(svc.indexOf('async getEpaTestVehiclesForAudit'));
         expect(q.slice(0, q.indexOf('\n  }')), 'getEpaTestVehiclesForAudit must select preferred_test_number')
             .toMatch(/preferred_test_number/);
-        const fields = svc.match(/const EPA_TEST_VEHICLE_FIELDS = `([^`]*)`/)?.[1] ?? '';
+        const fields = svc.match(/const EPA_LAB_FIELDS = `([^`]*)`/)?.[1] ?? '';
         expect(fields, 'EPA_TEST_VEHICLE_FIELDS must select preferred_test_number').toMatch(/preferred_test_number/);
         const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
         expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }')), 'getVehicles must read EPA_TEST_VEHICLE_FIELDS')
@@ -1254,7 +1259,7 @@ describe('the seams that broke before', () => {
         // lists can be held together.
         // The list is EPA_TEST_VEHICLE_FIELDS, which getVehicles reads the record through.
         const svc = read('src/services/DataService.js');
-        const fields = svc.match(/const EPA_TEST_VEHICLE_FIELDS = `([^`]*)`/)?.[1] ?? '';
+        const fields = svc.match(/const EPA_LAB_FIELDS = `([^`]*)`/)?.[1] ?? '';
         const columns = fields.slice(0, fields.indexOf('epa_coefficient_sets'));
         const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
         expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }'))).toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
@@ -1802,5 +1807,39 @@ describe('every write of a test vehicle or its Guide link reaches its certificat
     it('the importer and the backfill share one rule for a Guide link and one for a filing', () => {
         expect(body('syncCertificationGuideLink')).toMatch(/guideLinkTarget\(/);
         expect(body('importEpaCertification')).toMatch(/planCertificationImport\(/);
+    });
+});
+
+describe('the years and certifications reach both surfaces the owner named (#374 layer 4)', () => {
+    const section = read('src/components/EpaVehicleSection.jsx');
+
+    it('the vehicle\'s EPA sub-tab shows Since, the years line and the certifications', () => {
+        expect(section).toMatch(/Since MY\$\{sinceYear\(g\)\}/);
+        expect(section).toMatch(/formatYears\(certifiedYears\(g\)\)/);
+        expect(section).toMatch(/<EpaCertificationList[\s\S]*?testVehicle=\{g\}/);
+    });
+
+    it('the Guide picker links whichever certification the curator picked in the list', () => {
+        expect(section).toMatch(/onTarget=\{setPickerLinkId\}/);
+        expect(section).toMatch(/<FeGuidePicker[^>]*testVehicle=\{pickerTestVehicle\}/);
+        expect(read('src/components/epa/FeGuidePicker.jsx')).toMatch(/linkRowId: cert\?\.linkId/);
+    });
+
+    it('the Guide-row detail names the certification each test vehicle is linked through', () => {
+        expect(read('src/components/epa/guide/GuideDetailModal.jsx')).toMatch(/guideRowId=\{row\.id\}/);
+        const results = read('src/components/epa/guide/GuideCertificationResults.jsx');
+        expect(results).toMatch(/c\.fe_guide_row_id === guideRowId/);
+        expect(results).toMatch(/EPA Certification MY\$\{cert\.model_year\} · Test Group/);
+    });
+
+    it('the Admin list and the primary picker show the years', () => {
+        expect(read('src/components/EpaDataCard.jsx')).toMatch(/formatYears\(certifiedYears\(g\)\)/);
+        expect(read('src/components/epa/PrimaryConfigurationPicker.jsx')).toMatch(/yearsOf\(m\.epaTestVehicle\)/);
+    });
+
+    it('the curator form no longer edits a year it does not own', () => {
+        const editor = read('src/components/epa/EpaCuratorEditor.jsx');
+        expect(editor).not.toMatch(/saveTestVehicle\('model_year'/);
+        expect(editor).toMatch(/label="Since"[^>]*canEdit=\{false\}/);
     });
 });

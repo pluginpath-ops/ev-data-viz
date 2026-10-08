@@ -12,6 +12,7 @@
  * into the carline column to avoid horizontal scroll.
  */
 import { useState, useEffect } from 'react';
+import { certifiedYears, formatYears } from '../utils/epaCertifications';
 
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
@@ -156,7 +157,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="border-b bg-[var(--color-surface-muted)] text-left">
-                                <th className="px-3 py-2 text-secondary font-semibold whitespace-nowrap">Config ID</th>
+                                <th className="px-3 py-2 text-secondary font-semibold whitespace-nowrap">Vehicle ID</th>
                                 <th className="px-3 py-2 text-secondary font-semibold">Year · Make · Carline</th>
                                 <th className="px-3 py-2 text-secondary font-semibold whitespace-nowrap">Drive / ETW</th>
                                 <th className="px-3 py-2 text-secondary font-semibold whitespace-nowrap">A · B · C</th>
@@ -178,13 +179,11 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
                                         key={g.test_vehicle_id}
                                         className={`transition hover:bg-[var(--color-surface-muted)] ${isDel ? 'opacity-40 pointer-events-none' : ''}`}
                                     >
-                                        {/* Config ID + family ID */}
+                                        {/* Vehicle ID, and the years it is certified for (#374) */}
                                         <td className="px-3 py-2 font-mono whitespace-nowrap">
                                             <div className="text-secondary">{g.test_vehicle_id}</div>
-                                            {g.test_group && g.test_group !== g.test_vehicle_id && (
-                                                <div className="text-[10px] text-meta mt-0.5">
-                                                    fam: {g.test_group}
-                                                </div>
+                                            {certifiedYears(g).length > 1 && (
+                                                <div className="text-caption mt-0.5">{formatYears(certifiedYears(g))}</div>
                                             )}
                                         </td>
 
@@ -195,7 +194,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
                                                 {g.epa_carline_name}
                                             </div>
                                             <div className="text-meta mt-0.5 whitespace-nowrap">
-                                                {g.model_year}{g.make ? ` · ${g.make}` : ''}
+                                                {g.model_year ? `Since MY${g.model_year}` : ''}{g.make ? ` · ${g.make}` : ''}
                                             </div>
                                             {/* Display name input — inline below the carline */}
                                             <input

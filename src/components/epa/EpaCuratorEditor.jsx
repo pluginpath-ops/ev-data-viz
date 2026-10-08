@@ -9,6 +9,7 @@
  * recompute live from the edited model.
  */
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { sinceYear } from '../../utils/epaCertifications';
 import { useAppContext } from '../../context/AppContext';
 import CuratorField from './CuratorField';
 import { fuelEconomySearchUrl, baseModelFor } from '../../utils/fuelEconomyLink';
@@ -59,7 +60,7 @@ function Section({ title, children }) {
 
 // Field tooltips, verbatim from LocalDev/curator-fields-spec.md.
 const TIP = {
-    model_year:        'EPA active model year. May differ from marketing year.',
+    since:             'The first model year this test vehicle appears in a certification we hold. Each certification\'s year comes from its Test Group, so it is not typed here.',
     make:              'Certificate Manufacturer Name — the certifying manufacturer entity.',
     carline:           "EPA's model name (Represented Test Vehicle Model) — frequently differs from the marketing name. Preserve verbatim.",
     config:            'Specific tested configuration. One test vehicle can cover multiple configs (e.g. different wheel/tire packages).',
@@ -333,7 +334,10 @@ export default function EpaCuratorEditor({ testVehicleId, canEdit, onDirtyChange
 
             {/* Section 1: Identity */}
             <Section title="Identity & Configuration">
-                <CuratorField label="Model year" type="number" tooltip={TIP.model_year} value={testVehicle.model_year} canEdit={canEdit} overrideSource={gOv('model_year')} onSave={v => saveTestVehicle('model_year', v)} />
+                {/* Not edited here (#374): a certification's year is its Test
+                    Group's first letter, and the test vehicle's is its first
+                    certified year. */}
+                <CuratorField label="Since" tooltip={TIP.since} value={sinceYear(testVehicle) != null ? `MY${sinceYear(testVehicle)}` : null} canEdit={false} />
                 <CuratorField label="Manufacturer" tooltip={TIP.make} value={testVehicle.make} canEdit={canEdit} overrideSource={gOv('make')} onSave={v => saveTestVehicle('make', v)} />
                 <CuratorField label="Carline" tooltip={TIP.carline} value={testVehicle.epa_carline_name} canEdit={canEdit} overrideSource={gOv('epa_carline_name')} onSave={v => saveTestVehicle('epa_carline_name', v)} />
                 <CuratorField label="Config #" tooltip={TIP.config} value={testVehicle.vehicle_config_number} canEdit={canEdit} overrideSource={gOv('vehicle_config_number')} onSave={v => saveTestVehicle('vehicle_config_number', v)} />

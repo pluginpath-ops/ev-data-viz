@@ -12,6 +12,7 @@
  */
 import { rankFeCandidates, bestFeCandidate, MATCH_FLOOR } from './feGuideMatch';
 import { PROC_MCT, PROC_CD_HWY, MPG_E_CONVERSION, LABEL_ADJUSTMENT } from '../constants/epa';
+import { checkGuideCandidate } from './guideCandidateCheck';
 
 // ── Priority ─────────────────────────────────────────────────────────────────
 
@@ -418,5 +419,35 @@ export function sweepProgress(items) {
     return byTier;
 }
 
-/** The subset a batch confirm would act on — every safe proposal, nothing else. */
-export const batchable = (items) => items.filter(i => i.proposal);
+/**
+ * Where a proposal stands against the EPA tab's check, run on the proposed row
+ * before linking (guideCandidateCheck):
+ *
+ *   confirmed          its unadjusted MPGe matches EPA and its label is possible
+ *   impossible-label   its MPGe matches EPA, but its label range is above what
+ *                      the lab data can produce. The MPGe says it IS the right
+ *                      record; the label points at a data, import or assumption
+ *                      error worth a look after linking, not at a wrong match
+ *                      (owner, #374) — so it has a batch of its own.
+ *   unconfirmed        near, disagreeing, or nothing to compare
+ *   null               no proposal
+ *
+ * A name match alone is not enough to link unseen: the same carline can carry
+ * very different figures. Only the first two can be batch-linked; anything
+ * unconfirmed stays in the list for a curator to choose one at a time, against
+ * the check if they judge it right.
+ */
+function proposalStanding(item) {
+    if (!item?.proposal) return null;
+    const { mpge, invariant } = checkGuideCandidate(item.testVehicle, item.proposal.row);
+    if (!mpge?.checked || mpge.worst !== 'agrees') return 'unconfirmed';
+    return invariant?.violated ? 'impossible-label' : 'confirmed';
+}
+
+/**
+ * The subset a batch confirm would act on: by default the confirmed
+ * proposals; `'impossible-label'` for the matching-MPGe ones with an
+ * impossible label, which are linked by their own button.
+ */
+export const batchable = (items, standing = 'confirmed') =>
+    items.filter(i => proposalStanding(i) === standing);

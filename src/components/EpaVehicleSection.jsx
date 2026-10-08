@@ -17,6 +17,8 @@ import { suggestionSource, packLabels } from '../utils/variantEpaSuggestions';
 import EpaDerivationChecks from './epa/EpaDerivationChecks';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
 import FeGuidePicker from './epa/FeGuidePicker';
+import EpaCertificationList from './epa/EpaCertificationList';
+import { certificationsOf, certifiedYears, formatYears, sinceYear, testVehicleView } from '../utils/epaCertifications';
 import { epaRecordFromTestVehicle } from '../utils/epaRecordFromTestVehicle';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { checkUnadjustedMpge, checkStatedRanges, checkLabelInvariant } from '../utils/epaDerivationCheck';
@@ -91,6 +93,17 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
     const [curating,     setCurating]     = useState(false);
     const [curatorDirty, setCuratorDirty] = useState(false);
     const g = mapping.epaTestVehicle;
+
+    // Which certification the Guide picker links (#374): the one this
+    // vehicle reads unless a curator points it at another year in the list.
+    const [pickerLinkId, setPickerLinkId] = useState(null);
+    const readLinkId = g?._certification?.linkId ?? null;
+    const targetLinkId = pickerLinkId ?? readLinkId;
+    const pickerTestVehicle = useMemo(() => {
+        if (!g || targetLinkId === readLinkId) return g;
+        const c = certificationsOf(g).find(x => x.linkId === targetLinkId);
+        return c ? testVehicleView(g, { certification: c, guideCertification: c.guide ? c : null }) : g;
+    }, [g, targetLinkId, readLinkId]);
 
     // Recomputed on render like every other derived figure here — nothing is
     // stored, so a corrected phase shows its effect immediately.
@@ -216,7 +229,7 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                         <div className="text-xs text-meta italic truncate mt-0.5">{g.epa_carline_name}</div>
                     )}
                     <div className="text-xs text-secondary mt-0.5">
-                        {g.model_year}{g.make ? ` · ${g.make}` : ''}{g.drive ? ` · ${g.drive}` : ''}
+                        {g.model_year ? `MY${g.model_year}` : ''}{g.make ? ` · ${g.make}` : ''}{g.drive ? ` · ${g.drive}` : ''}
                         {g.transmission ? ` · ${g.transmission}` : ''}
                         {/* After the text, so a primary moving between cards
                             never shifts anything a curator is about to click. */}
@@ -224,11 +237,13 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                             <span className="badge-micro is-accent ml-2" title="The configuration that stands for this vehicle">PRIMARY</span>
                         )}
                     </div>
+                    {/* The test vehicle, anchored on its first certified year, and
+                        every year it is certified for (#374). Its Test Groups
+                        are in the list below. */}
                     <div className="font-mono text-xs text-meta mt-0.5">
-                        {g.test_vehicle_id}
-                        {g.test_group && g.test_group !== g.test_vehicle_id && (
-                            <span className="ml-1 text-meta">· family: {g.test_group}</span>
-                        )}
+                        Vehicle ID {g.test_vehicle_id}
+                        {sinceYear(g) != null && ` · Since MY${sinceYear(g)}`}
+                        {certifiedYears(g).length > 1 && ` · ${formatYears(certifiedYears(g))}`}
                     </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -271,6 +286,13 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                 </div>
             </div>
 
+            <EpaCertificationList
+                testVehicle={g}
+                canEdit={canEdit}
+                targetLinkId={targetLinkId}
+                onTarget={setPickerLinkId}
+            />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1 text-xs">
 
                 <div>
@@ -308,15 +330,12 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                 </div>
 
                 <DerivedValues testVehicle={g} vehicle={vehicle} />
-
-                {/* Does this record reconcile? Beside the data it judges, so a
-                    phase can be corrected in the same view it is questioned in. */}
-                <EpaDerivationChecks {...derivationChecks} />
             </div>
 
             {/* The link that fills Label Results, beside the figures it fills —
                 it was behind the curator disclosure, which is two clicks from
-                the only place its effect is visible.
+                the only place its effect is visible. Above the checks, because
+                several of them compare against the Guide row it links.
 
                 Curators only. It is a curation tool: a reader gets nothing from
                 a list of candidate guide rows, and rendering it for everyone
@@ -325,8 +344,14 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                 contributor-only at the RLS layer anyway — showing the controls
                 to anyone else offers buttons that would be refused. */}
             {canEdit && (
-                <FeGuidePicker testVehicle={g} canEdit={canEdit} onChanged={onTestVehicleChanged} />
+                <FeGuidePicker key={targetLinkId ?? 'none'} testVehicle={pickerTestVehicle} canEdit={canEdit} onChanged={onTestVehicleChanged} />
             )}
+
+            {/* Does this record reconcile? Below the data it judges, so a phase
+                can be corrected in the same view it is questioned in — and the
+                card's full width, not one column of the figures grid, which
+                stacked every check into a narrow tower. */}
+            <EpaDerivationChecks {...derivationChecks} />
 
             {mapping.notes && (
                 <p className="mt-2 text-xs text-secondary italic border-t pt-2">{mapping.notes}</p>
