@@ -60,6 +60,40 @@ Three seeded users, one per role, with fixed UUIDs:
 Inside a session, switch identity with `SET test.user_id = '…';` or `RESET
 test.user_id;` for anonymous.
 
+### Serving it to the app — the standard for database and privileged work
+
+Anything that changes the database (a migration, a backfill, a new write path)
+or needs a privileged role (admin or contributor UI) is tested this way before
+it reaches production:
+
+```bash
+scripts/localdb.sh up                          # the newest complete backup
+scripts/localdb.sh migrate 081 082             # the migrations under test
+scripts/localdb.sh serve                       # PostgREST + local sign-in + .env.local
+scripts/localdb.sh env ../path/to/worktree     # point another checkout's app at it
+```
+
+`serve` starts PostgREST on `127.0.0.1:3999` and, in front of it on
+`localhost:3998`, a small stand-in for Supabase
+([localdb-auth-proxy.mjs](localdb-auth-proxy.mjs)): `/rest/v1` goes to
+PostgREST, and `/auth/v1` fakes Supabase Auth's OAuth flow with a local page
+offering the three seeded users. It then writes `.env.local` (git-ignored) so
+`npm run dev` and the browser preview read the local database. Sign in from the
+account menu as usual — GitHub or Google opens the local page instead; pick
+**Local admin**, **Local contributor** or **Local viewer**. No real account and
+no password is involved.
+
+The tokens are HS256 JWTs signed with a local-only secret. PostgREST verifies
+them and `auth.uid()` reads their `sub`, so — as everywhere in this tool — only
+the identity is stubbed and the real RLS policies decide.
+
+**Leave it running.** The owner's standing preference is that the cluster,
+`serve` and `.env.local` stay up between sessions unless they say otherwise.
+`scripts/localdb.sh unserve` stops serving and removes `.env.local`; restart the
+dev server afterwards so it points back at production.
+
+Requires `brew install postgrest` (16.x) and Node.
+
 ### How the fidelity works, and where it stops
 
 **`auth.uid()` is stubbed. Authorisation is not.** `public.current_user_role()`
@@ -79,8 +113,10 @@ Signed-in roles map to `authenticated` and anonymous to `anon`, mirroring
 Supabase, where the app-level role lives in `profiles` and Postgres only
 distinguishes signed-in from not.
 
-**Not covered:** GoTrue's login, refresh and session handling, and the JWT path
-that populates `auth.uid()` for real. Those are Supabase's code, not ours. The
+**Not covered:** GoTrue itself — its login, refresh and session handling are
+Supabase's code, not ours. `serve` replaces it with a stand-in that issues the
+same kind of token, so everything from the token onward (PostgREST, `auth.uid()`,
+RLS) is the real path. The
 `auth.users` stub carries only the columns something in `public` actually reads.
 
 ### Notes

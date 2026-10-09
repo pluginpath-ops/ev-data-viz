@@ -64,9 +64,16 @@ CREATE TABLE IF NOT EXISTS auth.users (
 -- `true` as the second argument to current_setting means "return NULL if unset"
 -- rather than raising, so an unauthenticated session — the anonymous visitor —
 -- is the natural default rather than an error.
+--
+-- Through the API (`localdb.sh serve`) the identity arrives the way it does in
+-- Supabase: PostgREST verifies the token and sets request.jwt.claims, whose
+-- `sub` is the user. A psql session's test.user_id wins when both are set.
 CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
     LANGUAGE sql STABLE
-AS $$ SELECT nullif(current_setting('test.user_id', true), '')::uuid $$;
+AS $$ SELECT coalesce(
+    nullif(current_setting('test.user_id', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'
+)::uuid $$;
 
 CREATE OR REPLACE FUNCTION auth.role() RETURNS text
     LANGUAGE sql STABLE
