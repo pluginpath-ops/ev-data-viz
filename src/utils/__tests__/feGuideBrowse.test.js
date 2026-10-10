@@ -128,7 +128,7 @@ describe('filterRows', () => {
         expect(filterRows(rows, { minRange: 350 })).toHaveLength(1);
         expect(filterRows(rows, { maxMpge: 85 })[0].division).toBe('Rivian');
     });
-    it('searches make, carline and test group', () => {
+    it('searches make, carline and Test Group', () => {
         expect(filterRows(rows, { search: 'r1s' })).toHaveLength(1);
         expect(filterRows(rows, { search: 'xdrive' })).toHaveLength(1);
     });
@@ -349,7 +349,7 @@ describe('clusterByTestGroup', () => {
     const row = (id, group, pack) => ({ id, smog_test_group: group, nominal_pack_kwh: pack });
 
     it('gathers configurations EPA certified together', () => {
-        // The whole point: 3 rows under one test group are one measurement.
+        // The whole point: 3 rows under one Test Group are one measurement.
         const c = clusterByTestGroup([row(1, 'A'), row(2, 'A'), row(3, 'A')]);
         expect(c).toHaveLength(1);
         expect(c[0].rows.map(r => r.id)).toEqual([1, 2, 3]);
@@ -360,7 +360,7 @@ describe('clusterByTestGroup', () => {
         expect(c.map(g => g.testGroup)).toEqual(['B', 'A']);
     });
 
-    it('gives a row with no test group a cluster of its own', () => {
+    it('gives a row with no Test Group a cluster of its own', () => {
         // NOT one "ungrouped" heading: EPA did not group these, and collecting
         // them would claim a shared measurement that does not exist.
         const c = clusterByTestGroup([row(1, null), row(2, null)]);

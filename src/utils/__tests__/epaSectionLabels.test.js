@@ -58,20 +58,20 @@ describe('methodologyTitle', () => {
 });
 
 describe('methodologySubtitle', () => {
-    it('pairs the year with the test group, as the run selector does', () => {
-        expect(methodologySubtitle({ modelYear: 2026, testGroupId: 'YD226-00180' }))
+    it('pairs the year with the test vehicle, as the run selector does', () => {
+        expect(methodologySubtitle({ modelYear: 2026, testVehicleId: 'YD226-00180' }))
             .toBe('2026 · YD226-00180');
     });
 
     it('is what actually separates two same-named configurations', () => {
-        const a = methodologySubtitle({ modelYear: 2026, testGroupId: 'YD226-00180' });
-        const b = methodologySubtitle({ modelYear: 2026, testGroupId: 'YD226-765263' });
+        const a = methodologySubtitle({ modelYear: 2026, testVehicleId: 'YD226-00180' });
+        const b = methodologySubtitle({ modelYear: 2026, testVehicleId: 'YD226-765263' });
         expect(a).not.toBe(b);
     });
 
     it('degrades rather than printing a stray separator', () => {
-        expect(methodologySubtitle({ modelYear: 2026, testGroupId: null })).toBe('2026');
-        expect(methodologySubtitle({ modelYear: null, testGroupId: 'X1' })).toBe('X1');
+        expect(methodologySubtitle({ modelYear: 2026, testVehicleId: null })).toBe('2026');
+        expect(methodologySubtitle({ modelYear: null, testVehicleId: 'X1' })).toBe('X1');
         expect(methodologySubtitle({})).toBeNull();
     });
 });

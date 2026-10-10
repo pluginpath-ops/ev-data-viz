@@ -13,6 +13,7 @@ import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
 import { packKwh, vehicleDetailLabel, vehicleSearchText } from '../utils/specHelpers';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
+import { fromYearNote } from '../utils/epaCertifications';
 import { dataService } from '../services/DataService';
 import { useDeleteQueue } from '../hooks/useDeleteQueue';
 import DeleteQueueBar from './DeleteQueueBar';
@@ -415,7 +416,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, onFocused, onBack, onClose }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestGroups, linkEpaTestGroup, createAndLinkEpaTestGroup, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestGroup, updateEpaTestGroup } = useAppContext();
+    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -1350,8 +1351,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             </span>
                         )}
                         {vehicle.epaRangeMi && (
-                            <span title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note}>
+                            <span title={fromYearNote(vehicle.epaRange?.certification)?.long ?? EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note}>
                                 {EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.label} range: {vehicle.epaRangeMi} mi
+                                {fromYearNote(vehicle.epaRange?.certification) && ` (${fromYearNote(vehicle.epaRange.certification).short})`}
                             </span>
                         )}
                     </div>
@@ -3011,14 +3013,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <EpaVehicleSection
                     vehicle={vehicle}
                     canEdit={isContributor && canEdit(vehicle)}
-                    searchEpaTestGroups={searchEpaTestGroups}
-                    onLink={linkEpaTestGroup}
-                    onCreate={createAndLinkEpaTestGroup}
-                    onUnlink={unlinkEpaTestGroup}
+                    searchEpaTestVehicles={searchEpaTestVehicles}
+                    onLink={linkEpaTestVehicle}
+                    onCreate={createAndLinkEpaTestVehicle}
+                    onUnlink={unlinkEpaTestVehicle}
                     onUpdateConfidence={updateEpaMapping}
                     onSetPrimary={setPrimaryEpaMapping}
-                    onUpdateDisplayName={(testGroupId, name) =>
-                        updateEpaTestGroup(testGroupId, { display_name: name || null })
+                    onUpdateDisplayName={(testVehicleId, name) =>
+                        updateEpaTestVehicle(testVehicleId, { display_name: name || null })
                     }
                 />
             )}

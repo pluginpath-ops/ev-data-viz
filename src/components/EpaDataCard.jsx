@@ -1,17 +1,18 @@
 /**
- * Admin panel card — lists all imported EPA test groups with filter + delete.
+ * Admin panel card — lists all imported EPA test vehicles with filter + delete.
  *
  * Filter is client-side (the full list loads once on mount) and matches on
  * make, carline name, vehicle config ID, EPA family ID, display name, and
  * linked vehicle names — the same fields visible in the table.
  *
  * Delete removes the vehicle mapping(s) first (no CASCADE on the FK) then the
- * test group row, and shows a confirmation that names any linked vehicles.
+ * test vehicle row, and shows a confirmation that names any linked vehicles.
  *
  * Display name and label method are inline-editable. Display name is folded
  * into the carline column to avoid horizontal scroll.
  */
 import { useState, useEffect } from 'react';
+import { certifiedYears, formatYears } from '../utils/epaCertifications';
 
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
@@ -20,29 +21,29 @@ const CONFIDENCE_COLORS = {
 };
 
 // Short labels keep the select narrow; full names shown in title tooltip
-export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaTestGroup }) {
-    const [groups,         setGroups]         = useState([]);
+export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehicle, updateEpaTestVehicle }) {
+    const [testVehicles,         setTestVehicles]         = useState([]);
     const [loading,        setLoading]        = useState(true);
     const [query,          setQuery]          = useState('');
     const [deleting,       setDeleting]       = useState(new Set());
-    const [draftNames,     setDraftNames]     = useState({});   // keyed by test_group_id
+    const [draftNames,     setDraftNames]     = useState({});   // keyed by test_vehicle_id
     const [savingName,     setSavingName]     = useState(new Set());
     const [error,          setError]          = useState(null);
 
     useEffect(() => { load(); }, []);
 
-    // Seed drafts whenever the group list changes
+    // Seed drafts whenever the test vehicle list changes
     useEffect(() => {
         const seed = {};
-        groups.forEach(g => { seed[g.test_group_id] = g.display_name ?? ''; });
+        testVehicles.forEach(g => { seed[g.test_vehicle_id] = g.display_name ?? ''; });
         setDraftNames(seed);
-    }, [groups]);
+    }, [testVehicles]);
 
     async function load() {
         setLoading(true);
         setError(null);
         try {
-            setGroups(await getEpaTestGroupsAdmin());
+            setTestVehicles(await getEpaTestVehiclesAdmin());
         } catch (e) {
             setError(e.message);
         } finally {
@@ -50,42 +51,42 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
         }
     }
 
-    async function handleDelete(group) {
-        const linked = (group.epa_vehicle_mappings || [])
+    async function handleDelete(testVehicle) {
+        const linked = (testVehicle.epa_vehicle_mappings || [])
             .map(m => m.vehicles?.name).filter(Boolean);
         const suffix = linked.length
             ? `\n\nThis will also unlink it from: ${linked.join(', ')}.`
             : '';
-        if (!window.confirm(`Delete "${group.epa_carline_name}" (${group.test_group_id})?${suffix}`)) return;
+        if (!window.confirm(`Delete "${testVehicle.epa_carline_name}" (${testVehicle.test_vehicle_id})?${suffix}`)) return;
 
-        setDeleting(prev => new Set(prev).add(group.test_group_id));
+        setDeleting(prev => new Set(prev).add(testVehicle.test_vehicle_id));
         try {
-            await deleteEpaTestGroup(group.test_group_id);
-            setGroups(prev => prev.filter(g => g.test_group_id !== group.test_group_id));
+            await deleteEpaTestVehicle(testVehicle.test_vehicle_id);
+            setTestVehicles(prev => prev.filter(g => g.test_vehicle_id !== testVehicle.test_vehicle_id));
         } catch (e) {
             setError('Delete failed: ' + e.message);
         } finally {
-            setDeleting(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
+            setDeleting(prev => { const s = new Set(prev); s.delete(testVehicle.test_vehicle_id); return s; });
         }
     }
 
-    async function handleDisplayNameSave(group) {
-        const draft   = (draftNames[group.test_group_id] ?? '').trim();
-        const current = group.display_name ?? '';
+    async function handleDisplayNameSave(testVehicle) {
+        const draft   = (draftNames[testVehicle.test_vehicle_id] ?? '').trim();
+        const current = testVehicle.display_name ?? '';
         if (draft === current) return;
-        setSavingName(prev => new Set(prev).add(group.test_group_id));
+        setSavingName(prev => new Set(prev).add(testVehicle.test_vehicle_id));
         try {
-            await updateEpaTestGroup?.(group.test_group_id, { display_name: draft || null });
-            setGroups(prev => prev.map(g =>
-                g.test_group_id === group.test_group_id
+            await updateEpaTestVehicle?.(testVehicle.test_vehicle_id, { display_name: draft || null });
+            setTestVehicles(prev => prev.map(g =>
+                g.test_vehicle_id === testVehicle.test_vehicle_id
                     ? { ...g, display_name: draft || null }
                     : g
             ));
         } catch (e) {
             setError('Save failed: ' + e.message);
-            setDraftNames(prev => ({ ...prev, [group.test_group_id]: current }));
+            setDraftNames(prev => ({ ...prev, [testVehicle.test_vehicle_id]: current }));
         } finally {
-            setSavingName(prev => { const s = new Set(prev); s.delete(group.test_group_id); return s; });
+            setSavingName(prev => { const s = new Set(prev); s.delete(testVehicle.test_vehicle_id); return s; });
         }
     }
 
@@ -93,17 +94,17 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
 
     const q = query.trim().toLowerCase();
     const filtered = q
-        ? groups.filter(g =>
+        ? testVehicles.filter(g =>
             g.make?.toLowerCase().includes(q) ||
             g.epa_carline_name?.toLowerCase().includes(q) ||
             g.display_name?.toLowerCase().includes(q) ||
-            g.test_group_id?.toLowerCase().includes(q) ||
-            g.epa_test_family_id?.toLowerCase().includes(q) ||
+            g.test_vehicle_id?.toLowerCase().includes(q) ||
+            g.test_group?.toLowerCase().includes(q) ||
             (g.epa_vehicle_mappings || []).some(m => m.vehicles?.name?.toLowerCase().includes(q))
           )
-        : groups;
+        : testVehicles;
 
-    const linkedCount = groups.filter(g => g.epa_vehicle_mappings?.length > 0).length;
+    const linkedCount = testVehicles.filter(g => g.epa_vehicle_mappings?.length > 0).length;
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                 <div>
                     <h3 className="font-semibold text-sm">EPA Test Groups</h3>
                     <p className="text-xs text-secondary mt-0.5">
-                        {loading ? 'Loading…' : `${groups.length} imported · ${linkedCount} linked to vehicles`}
+                        {loading ? 'Loading…' : `${testVehicles.length} imported · ${linkedCount} linked to vehicles`}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -149,14 +150,14 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                 <div className="px-4 py-8 text-center text-sm text-meta">Loading…</div>
             ) : filtered.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm text-meta">
-                    {q ? 'No test groups match that filter.' : 'No EPA test groups imported yet. Use Import → EPA Test Car Data to add some.'}
+                    {q ? 'No test vehicles match that filter.' : 'No EPA test vehicles imported yet. Use Import → EPA Test Car Data to add some.'}
                 </div>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="border-b bg-[var(--color-surface-muted)] text-left">
-                                <th className="px-3 py-2 text-secondary font-semibold whitespace-nowrap">Config ID</th>
+                                <th className="px-3 py-2 text-secondary font-semibold whitespace-nowrap">Vehicle ID</th>
                                 <th className="px-3 py-2 text-secondary font-semibold">Year · Make · Carline</th>
                                 <th className="px-3 py-2 text-secondary font-semibold whitespace-nowrap">Drive / ETW</th>
                                 <th className="px-3 py-2 text-secondary font-semibold whitespace-nowrap">A · B · C</th>
@@ -168,23 +169,21 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                         <tbody className="divide-y">
                             {filtered.map(g => {
                                 const mappings = g.epa_vehicle_mappings || [];
-                                const isDel    = deleting.has(g.test_group_id);
-                                const isSaving = savingName.has(g.test_group_id);
+                                const isDel    = deleting.has(g.test_vehicle_id);
+                                const isSaving = savingName.has(g.test_vehicle_id);
                                 // Coefficients live on the primary coefficient set now.
                                 const coeff = (g.epa_coefficient_sets || []).find(s => s.is_primary)
                                     || (g.epa_coefficient_sets || [])[0] || {};
                                 return (
                                     <tr
-                                        key={g.test_group_id}
+                                        key={g.test_vehicle_id}
                                         className={`transition hover:bg-[var(--color-surface-muted)] ${isDel ? 'opacity-40 pointer-events-none' : ''}`}
                                     >
-                                        {/* Config ID + family ID */}
+                                        {/* Vehicle ID, and the years it is certified for (#374) */}
                                         <td className="px-3 py-2 font-mono whitespace-nowrap">
-                                            <div className="text-secondary">{g.test_group_id}</div>
-                                            {g.epa_test_family_id && g.epa_test_family_id !== g.test_group_id && (
-                                                <div className="text-[10px] text-meta mt-0.5">
-                                                    fam: {g.epa_test_family_id}
-                                                </div>
+                                            <div className="text-secondary">{g.test_vehicle_id}</div>
+                                            {certifiedYears(g).length > 1 && (
+                                                <div className="text-caption mt-0.5">{formatYears(certifiedYears(g))}</div>
                                             )}
                                         </td>
 
@@ -195,20 +194,20 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
                                                 {g.epa_carline_name}
                                             </div>
                                             <div className="text-meta mt-0.5 whitespace-nowrap">
-                                                {g.model_year}{g.make ? ` · ${g.make}` : ''}
+                                                {g.model_year ? `Since MY${g.model_year}` : ''}{g.make ? ` · ${g.make}` : ''}
                                             </div>
                                             {/* Display name input — inline below the carline */}
                                             <input
                                                 type="text"
-                                                value={draftNames[g.test_group_id] ?? ''}
+                                                value={draftNames[g.test_vehicle_id] ?? ''}
                                                 placeholder="Display name…"
                                                 disabled={isDel || isSaving}
-                                                onChange={e => setDraftNames(prev => ({ ...prev, [g.test_group_id]: e.target.value }))}
+                                                onChange={e => setDraftNames(prev => ({ ...prev, [g.test_vehicle_id]: e.target.value }))}
                                                 onBlur={() => handleDisplayNameSave(g)}
                                                 onKeyDown={e => {
                                                     if (e.key === 'Enter')  { e.target.blur(); }
                                                     if (e.key === 'Escape') {
-                                                        setDraftNames(prev => ({ ...prev, [g.test_group_id]: g.display_name ?? '' }));
+                                                        setDraftNames(prev => ({ ...prev, [g.test_vehicle_id]: g.display_name ?? '' }));
                                                         e.target.blur();
                                                     }
                                                 }}
@@ -301,9 +300,9 @@ export default function EpaDataCard({ getEpaTestGroupsAdmin, deleteEpaTestGroup,
             )}
 
             {/* Footer: row count when filter is active */}
-            {!loading && groups.length > 0 && q && filtered.length !== groups.length && (
+            {!loading && testVehicles.length > 0 && q && filtered.length !== testVehicles.length && (
                 <div className="px-4 py-2 border-t text-xs text-meta">
-                    Showing {filtered.length} of {groups.length} test groups
+                    Showing {filtered.length} of {testVehicles.length} test vehicles
                 </div>
             )}
         </div>

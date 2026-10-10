@@ -6,8 +6,8 @@ import {
 
 /**
  * Observations are the shape `certObservations` produces — one object per
- * certification group with the measured quantities on it. Built directly rather
- * than through a group fixture, because what is under test is the summarising
+ * test vehicle with the measured quantities on it. Built directly rather
+ * than through a test vehicle fixture, because what is under test is the summarising
  * and the verdict, not the derivation that feeds them.
  */
 const obs = (etas) => etas.map(eta => ({ eta, charger_eff: null, usable_kwh: null }));

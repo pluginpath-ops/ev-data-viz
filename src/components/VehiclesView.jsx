@@ -27,6 +27,7 @@ import TestCounts, { countTitle } from './vehicles/TestCounts';
 import LazyBoundary from './LazyBoundary';
 import { EditVehicleForm, ImportVehiclesModal } from './lazyComponents';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
+import { fromYearNote } from '../utils/epaCertifications';
 import { deletionImpact, impactLines } from '../utils/vehicleDeletion';
 
 /**
@@ -40,9 +41,20 @@ function epaRangeValue(vehicle, units) {
     return span ? span.map(mi => distanceValue(mi, units)).join('–') : null;
 }
 
-/** A word beside the range only when it is not an EPA label. */
+/**
+ * A word beside the range only when it is not this vehicle's own EPA label:
+ * an expected or unsorted figure, or a label from another model year's
+ * certification — "From MY2024" (#374).
+ */
 function epaRangeBasisMark(vehicle) {
-    return ['expected', 'unsorted'].includes(vehicle.epaRangeBasis) ? vehicle.epaRangeBasis : null;
+    if (['expected', 'unsorted'].includes(vehicle.epaRangeBasis)) return vehicle.epaRangeBasis;
+    return fromYearNote(vehicle.epaRange?.certification)?.short ?? null;
+}
+
+/** Why the range reads as it does, for a title. */
+function epaRangeTitle(vehicle) {
+    return fromYearNote(vehicle.epaRange?.certification)?.long
+        ?? EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note;
 }
 
 /** Compare two figures in a direction, blanks last whichever way the column sorts. */
@@ -470,7 +482,7 @@ export default function VehiclesView({
         // Manufacturer
         manufacturers,
         onAddManufacturer: addManufacturer,
-        // EPA test groups are assigned in Tests & Data, not in this edit modal.
+        // EPA test vehicles are assigned in Tests & Data, not in this edit modal.
     };
 
     const handleMoveVehicle = (vehicleId, direction) => {
@@ -778,6 +790,7 @@ export default function VehiclesView({
                                                 value={epaRangeValue(vehicle, units)}
                                                 unit={distanceUnit(units)}
                                                 basis={epaRangeBasisMark(vehicle)}
+                                                title={epaRangeTitle(vehicle)}
                                             />
                                             {vehicle.power != null && (
                                                 <StatCell label="Power" value={vehicle.power} unit="kW" />
@@ -923,7 +936,7 @@ export default function VehiclesView({
                                     <span role="cell" className="vehicle-list-figure" title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}>
                                         <ListFigure value={vehicle.socWindowKwh} unit="kWh" basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label} />
                                     </span>
-                                    <span role="cell" className="vehicle-list-figure" title={EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note ?? 'EPA range'}>
+                                    <span role="cell" className="vehicle-list-figure" title={epaRangeTitle(vehicle) ?? 'EPA range'}>
                                         <ListFigure value={epaRangeValue(vehicle, units)} unit={distanceUnit(units)} basis={epaRangeBasisMark(vehicle)} />
                                     </span>
                                     <span role="cell" className="vehicle-list-figure">

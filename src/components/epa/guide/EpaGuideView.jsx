@@ -20,7 +20,7 @@ import CollapsibleSection from '../../CollapsibleSection';
  *
  * EPA's published label data for every EV configuration it has rated has been
  * staged in `epa_fe_guide` since #206 and reachable only by an admin importing
- * it or a curator linking one row to a test group. This is the whole corpus,
+ * it or a curator linking one row to a test vehicle. This is the whole corpus,
  * browsable, filterable and comparable, with no curation required.
  *
  * ── Why the corpus loads in one go ──────────────────────────────────────────
@@ -271,7 +271,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                 <GuideDetailModal
                     row={openRow}
                     vehicles={vehicleLinks[openRow.id]?.vehicles ?? []}
-                    testGroupIds={vehicleLinks[openRow.id]?.testGroupIds ?? []}
+                    testVehicleIds={vehicleLinks[openRow.id]?.testVehicleIds ?? []}
                     configCount={configurationsInTestGroup(rows, openRow)}
                     onClose={() => setOpenRow(null)}
                 />

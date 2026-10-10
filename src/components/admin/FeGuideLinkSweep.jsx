@@ -1,23 +1,24 @@
 import { useState, useMemo, useCallback } from 'react';
+import GuideCandidateCheck from '../epa/GuideCandidateCheck';
 import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import {
     TIERS, buildSweep, sweepProgress, batchable, NO_PROPOSAL_REASONS,
-    impliedUsableKwh, groupEnergyFacts, estimatedAdjustedRange,
+    impliedUsableKwh, testVehicleEnergyFacts, estimatedAdjustedRange,
     wheelMentions, coveredWheelSizes, hasCsiDetail,
 } from '../../utils/epaLinkSweep';
 import { wheelSizeIn } from '../../utils/feGuideBrowse';
 
 /**
- * Work through the certification groups with no Fuel Economy Guide row (#238).
+ * Work through the test vehicles with no Fuel Economy Guide row (#238).
  *
- * 159 of 211 groups are unlinked, and that link is the ceiling on the cert half
+ * 159 of 211 test vehicles are unlinked, and that link is the ceiling on the cert half
  * of #236: without it, drivetrain η and charger efficiency can only be reported
  * against a manufacturer's Vehicle ID rather than by class, brand or drive.
  *
- * `FeGuidePicker` already does this one group at a time, correctly, from the
+ * `FeGuidePicker` already does this one test vehicle at a time, correctly, from the
  * vehicle's Tests & Data tab. What was missing is a way to work through the
- * list — and for the 113 groups linked to no vehicle at all, there is no Tests
+ * list — and for the 113 test vehicles linked to no vehicle at all, there is no Tests
  * & Data tab to reach, so this is the only place they can be linked.
  *
  * The proposal test is `bestFeCandidate`, unchanged. It declines below the
@@ -38,10 +39,13 @@ import { wheelSizeIn } from '../../utils/feGuideBrowse';
  * Motor count stays for the ties it separates: MY25 lists HUMMER EV SUV twice
  * and the rows are the 2X and the 3X.
  */
-function CandidateFacts({ row, score, exactYear }) {
+function CandidateFacts({ row, score, exactYear, testVehicle }) {
     const implied = impliedUsableKwh(row);
     return (
         <span className="text-meta">
+            {/* The EPA tab's check, on this row before it is linked: the same
+                name can be very different figures (#374). */}
+            <GuideCandidateCheck testVehicle={testVehicle} row={row} />{' '}
             {row.label_comb_range_mi} mi
             {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
             {/* Pulled out of the carline, where it is easy to miss when three
@@ -65,21 +69,21 @@ function CandidateFacts({ row, score, exactYear }) {
  * What the certification record knows about its own pack and mass.
  *
  * The other half of the disambiguation, shown beside the candidates rather than
- * differenced against them: the group's DC energy and the candidates' implied
+ * differenced against them: the test vehicle's DC energy and the candidates' implied
  * energy are on different bases (DC against AC), so a subtraction would look
- * precise and be wrong. Side by side, a 144 kWh group against candidates at
+ * precise and be wrong. Side by side, a 144 kWh test vehicle against candidates at
  * 128, 137 and 160 is still an easy call.
  */
-function GroupEnergyFacts({ group }) {
-    const f = groupEnergyFacts(group);
-    const est = estimatedAdjustedRange(group);
+function TestVehicleEnergyFacts({ testVehicle }) {
+    const f = testVehicleEnergyFacts(testVehicle);
+    const est = estimatedAdjustedRange(testVehicle);
     if (f.dcEnergyKwh == null && f.etwLbs == null && f.useableKwh == null && est == null) return null;
     return (
         <div className="text-note">
-            {/* The strongest hint when it exists: the group's own unadjusted
+            {/* The strongest hint when it exists: the test vehicle's own unadjusted
                 range on a label basis, directly comparable with a candidate's. */}
             {est && (
-                <span title={`${est.factor.toFixed(4)} adjustment ${est.factorIsDerived ? 'derived for this group' : '— the fixed default, since this group states none'}`}>
+                <span title={`${est.factor.toFixed(4)} adjustment ${est.factorIsDerived ? 'derived for this test vehicle' : '— the fixed default, since this test vehicle states none'}`}>
                     ~{est.miles.toFixed(0)} mi est. label range
                     {!est.factorIsDerived && '*'}
                     {' · '}
@@ -100,7 +104,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
     const [open, setOpen] = useState(false);
     const [note, setNote] = useState('');
     const [asking, setAsking] = useState(false);
-    const g = item.group;
+    const g = item.testVehicle;
     const vehicles = (g.epa_vehicle_mappings ?? []).map(m => m.vehicles).filter(Boolean);
     const skipped = g.fe_guide_skipped_at != null;
     // Deduplicated: a certificate's tests often repeat the same note.
@@ -118,9 +122,9 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
     return (
         <div className={`sweep-row ${skipped ? 'skipped' : ''}`}>
             <div className="sweep-row-main">
-                <div className="sweep-group">
-                    <div className="sweep-group-name">
-                        {g.display_name || g.epa_carline_name || g.test_group_id}
+                <div className="sweep-test-vehicle">
+                    <div className="sweep-test-vehicle-name">
+                        {g.display_name || g.epa_carline_name || g.test_vehicle_id}
                         {vehicles.length > 0 && (
                             <span className="guide-badge guide-badge-tested"
                                 title={vehicles.map(v => `${v.year} ${v.name}`).join(', ')}>tested</span>
@@ -135,12 +139,12 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         <div className="text-note">matched as “{g.epa_carline_name}”</div>
                     )}
                     <div className="text-meta">
-                        {g.model_year} {g.make} · {g.test_group_id}
+                        MY{g.model_year} {g.make} · {g.test_vehicle_id}
                         {/* A carryover states which year the test actually came
                             from, which is usually why a candidate's year differs. */}
                         {g.carryover_model_year && ` · carried over from ${g.carryover_model_year}`}
                     </div>
-                    <GroupEnergyFacts group={g} />
+                    <TestVehicleEnergyFacts testVehicle={g} />
                     {/* The certificate's own detail, on the row rather than
                         behind the expand. It is the most decisive thing we hold
                         and a curator working through 39 rows should not have to
@@ -157,7 +161,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         already won cleanly, the absence of certificate detail is
                         not what the curator is stuck on. */}
                     {!item.proposal && !hasCsiDetail(g) && (
-                        <div className="sweep-needs-csi" title="The covered-models table and the manufacturer's note come from a CSI PDF. This group was imported from the certification CSV, so neither exists for it.">
+                        <div className="sweep-needs-csi" title="The covered-models table and the manufacturer's note come from a CSI PDF. This test vehicle was imported from the certification CSV, so neither exists for it.">
                             no CSI detail — import this certificate for wheel and trim clues
                         </div>
                     )}
@@ -179,9 +183,9 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                             <div className="sweep-proposal-name">
                                 {item.proposal.row.carline}
                                 {/* Not a similarity score — the guide row carries
-                                    this group's own identifier. */}
+                                    this test vehicle's own identifier. */}
                                 {item.exactIdMatch && (
-                                    <span className="guide-badge guide-badge-tested" title="The guide row's test group is this group's id — an identifier match, not a name score">
+                                    <span className="guide-badge guide-badge-tested" title="The guide row's Test Group is this test vehicle's ID — an identifier match, not a name score">
                                         exact id
                                     </span>
                                 )}
@@ -195,7 +199,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                             </div>
                             <CandidateFacts row={item.proposal.row}
                                 score={(item.exactIdMatch || item.coveredMatch) ? null : item.proposal.score}
-                                exactYear={item.proposal.exactYear} />
+                                exactYear={item.proposal.exactYear} testVehicle={g} />
                         </>
                     ) : (
                         <div className="text-note">
@@ -218,7 +222,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                 <div className="sweep-actions">
                     {item.proposal && !skipped && (
                         <button className="btn btn-primary" disabled={busy}
-                            onClick={() => onLink(g.test_group_id, item.proposal.row.id)}>
+                            onClick={() => onLink(g, item.proposal.row.id)}>
                             Link
                         </button>
                     )}
@@ -229,7 +233,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                     )}
                     {skipped ? (
                         <button className="btn btn-secondary" disabled={busy}
-                            onClick={() => onUnskip(g.test_group_id)}>Un-skip</button>
+                            onClick={() => onUnskip(g)}>Un-skip</button>
                     ) : (
                         <button className="btn btn-secondary" disabled={busy}
                             onClick={() => setAsking(a => !a)}>Skip</button>
@@ -246,7 +250,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                     <input className="form-input brand-input" value={note} onChange={e => setNote(e.target.value)}
                         placeholder="Why is there nothing to link? (optional)" />
                     <button className="btn btn-warning" disabled={busy}
-                        onClick={async () => { await onSkip(g.test_group_id, note.trim() || null); setAsking(false); }}>
+                        onClick={async () => { await onSkip(g, note.trim() || null); setAsking(false); }}>
                         Record skip
                     </button>
                     <button className="btn btn-secondary" onClick={() => setAsking(false)}>Cancel</button>
@@ -289,10 +293,10 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
                         <div key={c.row.id} className="sweep-candidate">
                             <div>
                                 <div>{c.row.carline}</div>
-                                <CandidateFacts row={c.row} score={c.score} exactYear={c.exactYear} />
+                                <CandidateFacts row={c.row} score={c.score} exactYear={c.exactYear} testVehicle={g} />
                             </div>
                             <button className="btn btn-secondary" disabled={busy}
-                                onClick={() => onLink(g.test_group_id, c.row.id)}>Link this</button>
+                                onClick={() => onLink(g, c.row.id)}>Link this</button>
                         </div>
                     ))}
                     {/* A borrowed year is a legitimate link, not a weaker one:
@@ -311,7 +315,7 @@ function SweepRow({ item, busy, onLink, onSkip, onUnskip }) {
 
 export default function FeGuideLinkSweep() {
     const {
-        getGroupsAwaitingFeLink, getFeLinkProgress, getFeGuideRows,
+        getTestVehiclesAwaitingFeLink, getFeLinkProgress, getFeGuideRows,
         linkFeGuideRow, linkFeGuideRows, setFeLinkSkipped,
     } = useAppContext();
 
@@ -321,31 +325,36 @@ export default function FeGuideLinkSweep() {
     const [note, setNote] = useState(null);
     const [result, setResult] = useState(null);
 
-    const loadGroups   = useCallback(() => getGroupsAwaitingFeLink({ includeSkipped }), [getGroupsAwaitingFeLink, includeSkipped]);
+    const loadTestVehicles   = useCallback(() => getTestVehiclesAwaitingFeLink({ includeSkipped }), [getTestVehiclesAwaitingFeLink, includeSkipped]);
     const loadRows     = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
     const loadProgress = useCallback(() => getFeLinkProgress(), [getFeLinkProgress]);
 
-    const { data: groups, loading, error, reload: reloadGroups } = useAsyncResource(loadGroups, [includeSkipped]);
+    const { data: testVehicles, loading, error, reload: reloadTestVehicles } = useAsyncResource(loadTestVehicles, [includeSkipped]);
     // Fetched ONCE and ranked in memory. FeGuidePicker fetches the corpus per
-    // group, which is right for one group and 159 full-corpus reads here.
+    // test vehicle, which is right for one test vehicle and 159 full-corpus reads here.
     const { data: feRows } = useAsyncResource(loadRows, []);
     const { data: progress, reload: reloadProgress } = useAsyncResource(loadProgress, []);
 
     const items = useMemo(
-        () => buildSweep(groups ?? [], feRows ?? []),
-        [groups, feRows],
+        () => buildSweep(testVehicles ?? [], feRows ?? []),
+        [testVehicles, feRows],
     );
     const counts = useMemo(() => sweepProgress(items), [items]);
     const shown = useMemo(() => items.filter(i => i.tier === tier), [items, tier]);
     const batch = useMemo(() => batchable(shown), [shown]);
+    // MPGe matches, so the record is right; the label is a data, import or
+    // assumption error to look at after linking — a batch of its own (#374).
+    const impossibleBatch = useMemo(() => batchable(shown, 'impossible-label'), [shown]);
+    // Proposed by name but not confirmed by the check: left for a curator.
+    const unconfirmed = shown.filter(i => i.proposal).length - batch.length - impossibleBatch.length;
     // Ambiguous AND without a certificate to consult: the ones a CSI import
     // would actually help, as opposed to the ones already decided.
     const needsCsi = useMemo(
-        () => shown.filter(i => !i.proposal && !hasCsiDetail(i.group)).length,
+        () => shown.filter(i => !i.proposal && !hasCsiDetail(i.testVehicle)).length,
         [shown],
     );
 
-    const refresh = () => { reloadGroups(); reloadProgress(); };
+    const refresh = () => { reloadTestVehicles(); reloadProgress(); };
 
     const run = async (fn, message) => {
         setBusy(true); setNote(null); setResult(null);
@@ -354,8 +363,10 @@ export default function FeGuideLinkSweep() {
         finally { setBusy(false); }
     };
 
-    const linkOne = (groupId, rowId) =>
-        run(() => linkFeGuideRow(groupId, rowId), 'Linked.');
+    // One item per test vehicle per certification (#374): every action names
+    // the certification it acts on.
+    const linkOne = (testVehicle, rowId) =>
+        run(() => linkFeGuideRow(testVehicle.test_vehicle_id, rowId, { linkRowId: testVehicle._linkRowId }), 'Linked.');
 
     /**
      * The batch goes through `linkFeGuideRows`, not a loop over the single-link
@@ -363,16 +374,17 @@ export default function FeGuideLinkSweep() {
      * each one — right for one, ninety-eight times over for a batch, which is
      * why this appeared to do nothing but churn.
      */
-    const linkBatch = () => run(async () => {
-        const pairs = batch.map(it => ({
-            testGroupId: it.group.test_group_id,
+    const linkBatch = (items) => run(async () => {
+        const pairs = items.map(it => ({
+            testVehicleId: it.testVehicle.test_vehicle_id,
             feRowId: it.proposal.row.id,
+            linkRowId: it.testVehicle._linkRowId,
         }));
         const res = await linkFeGuideRows(pairs);
         setResult(res);
     });
 
-    if (loading) return <div className="text-note">Loading groups…</div>;
+    if (loading) return <div className="text-note">Loading test vehicles…</div>;
     if (error) return <div className="empty-state">Could not load the sweep: {String(error.message ?? error)}</div>;
 
     const tierDef = TIERS.find(t => t.key === tier);
@@ -381,12 +393,13 @@ export default function FeGuideLinkSweep() {
         <div className="flex flex-col gap-4">
             <div className="section-header">
                 <div>
-                    <div className="section-header-title">Link certification groups to guide rows</div>
+                    <div className="section-header-title">Link test vehicles to guide rows</div>
                     {progress && (
                         <div className="text-note">
                             {progress.linked} linked · {progress.awaiting} awaiting a decision
                             {progress.skipped > 0 && ` · ${progress.skipped} skipped`}
-                            {' '}of {progress.total}
+                            {' '}of {progress.total} certifications
+                            {progress.testVehicles != null && ` across ${progress.testVehicles} test vehicles`}
                         </div>
                     )}
                     {progress === null && (
@@ -411,11 +424,11 @@ export default function FeGuideLinkSweep() {
                 only the last one survived anyway. */}
             {result && (
                 <div className={result.failures.length ? 'guide-warning' : 'guide-tested-note'}>
-                    Linked {result.linked} group{result.linked === 1 ? '' : 's'};
+                    Linked {result.linked} testVehicle{result.linked === 1 ? '' : 's'};
                     {' '}{result.promoted} field{result.promoted === 1 ? '' : 's'} filled
                     {result.skipped > 0 && `, ${result.skipped} left as curator-set`}.
                     {result.failures.length > 0 && (
-                        <> {result.failures.length} failed: {result.failures.slice(0, 5).map(f => f.testGroupId).join(', ')}.</>
+                        <> {result.failures.length} failed: {result.failures.slice(0, 5).map(f => f.testVehicleId).join(', ')}.</>
                     )}
                 </div>
             )}
@@ -441,15 +454,34 @@ export default function FeGuideLinkSweep() {
                 )}
             </div>
 
-            {batch.length > 0 && (
+            {(batch.length > 0 || impossibleBatch.length > 0 || unconfirmed > 0) && (
                 <div className="sweep-batch">
                     <div className="text-note">
                         <strong>{batch.length}</strong> of these have a single unambiguous same-year
-                        match. Ties, borrowed years and weak matches are excluded and need a look.
+                        match whose MPGe matches EPA. Ties, borrowed years and weak matches are
+                        excluded and need a look.
+                        {impossibleBatch.length > 0 && (
+                            <> {impossibleBatch.length} more match EPA&apos;s MPGe but carry an impossible
+                            label — the right record, with a data, import or assumption error to look
+                            at after linking.</>
+                        )}
+                        {unconfirmed > 0 && (
+                            <> {unconfirmed} {unconfirmed === 1 ? 'has a match' : 'have matches'} the
+                            check does not confirm — link {unconfirmed === 1 ? 'it' : 'them'} one at a
+                            time if you judge {unconfirmed === 1 ? 'it' : 'them'} right.</>
+                        )}
                     </div>
-                    <button className="btn btn-primary" disabled={busy} onClick={linkBatch}>
-                        {busy ? 'Linking…' : `Link all ${batch.length}`}
-                    </button>
+                    {batch.length > 0 && (
+                        <button className="btn btn-primary" disabled={busy} onClick={() => linkBatch(batch)}>
+                            {busy ? 'Linking…' : `Link all ${batch.length}`}
+                        </button>
+                    )}
+                    {impossibleBatch.length > 0 && (
+                        <button className="btn btn-secondary" disabled={busy} onClick={() => linkBatch(impossibleBatch)}
+                            title="MPGe matches EPA, so these are the right records; their labels need a look after linking">
+                            {busy ? 'Linking…' : `Link ${impossibleBatch.length} with impossible labels`}
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -468,12 +500,12 @@ export default function FeGuideLinkSweep() {
             <div className="brand-list">
                 {shown.map(item => (
                     <SweepRow
-                        key={item.group.test_group_id}
+                        key={item.testVehicle._linkRowId ?? item.testVehicle.test_vehicle_id}
                         item={item}
                         busy={busy}
                         onLink={linkOne}
-                        onSkip={(id, n) => run(() => setFeLinkSkipped(id, true, n), 'Skip recorded.')}
-                        onUnskip={(id) => run(() => setFeLinkSkipped(id, false), 'Skip cleared.')}
+                        onSkip={(g, n) => run(() => setFeLinkSkipped(g.test_vehicle_id, true, n, { linkRowId: g._linkRowId }), 'Skip recorded.')}
+                        onUnskip={(g) => run(() => setFeLinkSkipped(g.test_vehicle_id, false, null, { linkRowId: g._linkRowId }), 'Skip cleared.')}
                     />
                 ))}
                 {shown.length === 0 && (

@@ -4,7 +4,7 @@
  * The guide is the published-label side of the EPA picture: what reached the
  * window sticker, as against the certification records which say what a lab
  * measured. It is the source for `label_range_published`, which the A1 audit
- * found set on 7 of 87 linked test groups and which the `computed >= labeled`
+ * found set on 7 of 87 linked test vehicles and which the `computed >= labeled`
  * gate cannot run without.
  *
  * Pure module — text in, rows out. No database, no React, no network.
@@ -30,8 +30,8 @@
  *
  * ── What the identifiers do and do not give you ──────────────────────────────
  *
- * `#1 Smog Rating Test Group` is the only test-group-shaped identifier in the
- * file, and it is NOT a usable join key: it matches 1 of our 87 linked groups,
+ * `#1 Smog Rating Test Group` is the only Test-Group-shaped identifier in the
+ * file, and it is NOT a usable join key: it matches 1 of our 87 linked test vehicles,
  * and it is not unique per configuration — both 2027 R2 rows share
  * `VRIVT00.0232` while reading 307 and 330 miles. It is carried for the cases
  * where it does match; the natural key is (model year, division, carline).

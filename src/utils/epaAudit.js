@@ -20,7 +20,7 @@
  * Pure module: no data access, no React.
  */
 
-import { epaRecordFromGroup } from './epaRecordFromGroup';
+import { epaRecordFromTestVehicle } from './epaRecordFromTestVehicle';
 import { buildMethodologyModel } from './epaMethodology';
 import { checkUnadjustedMpge, checkStatedRanges, checkLabelInvariant } from './epaDerivationCheck';
 import { checkRecordIntegrity } from './epaIntegrity';
@@ -64,7 +64,7 @@ const VERDICT_RANK = Object.fromEntries(AUDIT_VERDICTS.map((v, i) => [v.key, i])
 
 /** Why a record could not be derived, in words a curator can act on. */
 const REASON_TEXT = {
-    'no-group':       'No record.',
+    'no-test-vehicle':       'No record.',
     'no-tests':       'No tests imported.',
     'no-energy':      'No DC energy on the test the model would use.',
     'no-phases':      'The test has no phases.',
@@ -74,73 +74,73 @@ const REASON_TEXT = {
 };
 
 /**
- * One group, audited.
+ * One test vehicle, audited.
  *
  * The vehicle names come from the mappings and there may be none: 113 of 211
- * groups are linked to no vehicle at all, and those have no Tests & Data tab to
+ * test vehicles are linked to no vehicle at all, and those have no Tests & Data tab to
  * reach — which makes this the only place their verdict is visible.
  */
-export function auditGroup(group) {
+export function auditTestVehicle(testVehicle) {
     const { record, reason, inferredPhaseTypes, competingMctTests, derivedFrom, statedRanges }
-        = epaRecordFromGroup(group);
+        = epaRecordFromTestVehicle(testVehicle);
 
     // Runs on the raw record, so it answers even when nothing can be derived —
     // and an undrivable record is exactly where a contradiction tends to be.
-    const integrity = checkRecordIntegrity(group);
+    const integrity = checkRecordIntegrity(testVehicle);
 
     const model = record ? buildMethodologyModel(record) : null;
-    // From the test the phases came from (#227). Reading the group's pair
+    // From the test the phases came from (#227). Reading the test vehicle's pair
     // compared one laboratory's phases against another's stated figures.
     const rangeCheck = checkStatedRanges(model, {
         cityMi: statedRanges?.cityMi,
         hwyMi:  statedRanges?.hwyMi,
     });
     const mpgeCheck = checkUnadjustedMpge(model, {
-        city: group?.unadj_city_mpge,
-        hwy:  group?.unadj_hwy_mpge,
+        city: testVehicle?.unadj_city_mpge,
+        hwy:  testVehicle?.unadj_hwy_mpge,
     });
     const invariant = checkLabelInvariant(model, {
         bagsReconcile: rangeCheck.checked ? rangeCheck.worst === 'agrees' : null,
     });
 
-    const vehicles = (group?.epa_vehicle_mappings ?? [])
+    const vehicles = (testVehicle?.epa_vehicle_mappings ?? [])
         .map(m => m.vehicles).filter(Boolean);
 
     const notes = [];
     if (competingMctTests > 1) {
-        // Whether a choice was MADE or merely defaulted to. A group deriving
+        // Whether a choice was MADE or merely defaulted to. A test vehicle deriving
         // from an unsettled default is a different thing to review than one
         // whose guide row identified the run.
         const how = derivedFrom?.basis === 'selected' ? 'selected' : 'default';
         notes.push(`${competingMctTests} multi-cycle tests; derived from `
             + `${derivedFrom?.testNumber ?? 'the most recent'} (${how})`);
     }
-    if (statedRanges?.source === 'group' && competingMctTests > 1) {
+    if (statedRanges?.source === 'test-vehicle' && competingMctTests > 1) {
         // The pre-060 shape: no per-test ranges to compare against, so the
         // check is still crossing tests and its verdict is worth less.
-        notes.push('stated ranges are the group\'s, not this test\'s — re-import to compare like with like');
+        notes.push('stated ranges are the test vehicle\'s, not this test\'s — re-import to compare like with like');
     }
     if (inferredPhaseTypes > 0) {
         notes.push(`${inferredPhaseTypes} phase${inferredPhaseTypes === 1 ? '' : 's'} typed by distance`);
     }
-    if (group?.carryover_model_year != null && group.carryover_model_year !== group.model_year) {
-        notes.push(`carryover from MY${group.carryover_model_year}`);
+    if (testVehicle?.carryover_model_year != null && testVehicle.carryover_model_year !== testVehicle.model_year) {
+        notes.push(`carryover from MY${testVehicle.carryover_model_year}`);
     }
-    if (!group?.fe_guide_row_id) {
+    if (!testVehicle?.fe_guide_row_id) {
         // Not a fault, but it bounds the verdict: two of the four checks need a
-        // published figure, so an unlinked group can only ever be checked
+        // published figure, so an unlinked test vehicle can only ever be checked
         // against itself and 'agrees' means less than it looks.
         notes.push('no guide row linked');
     }
     if (!vehicles.length) notes.push('no vehicle linked');
 
     return {
-        testGroupId: group?.test_group_id ?? null,
-        make:        group?.make ?? null,
-        carline:     group?.display_name || group?.epa_carline_name || null,
-        modelYear:   group?.model_year ?? null,
-        sourceFile:  group?.source_file ?? null,
-        linked:      Boolean(group?.fe_guide_row_id),
+        testVehicleId: testVehicle?.test_vehicle_id ?? null,
+        make:        testVehicle?.make ?? null,
+        carline:     testVehicle?.display_name || testVehicle?.epa_carline_name || null,
+        modelYear:   testVehicle?.model_year ?? null,
+        sourceFile:  testVehicle?.source_file ?? null,
+        linked:      Boolean(testVehicle?.fe_guide_row_id),
         vehicles,
         reason,
         reasonText:  reason ? (REASON_TEXT[reason] ?? reason) : null,
@@ -173,7 +173,7 @@ function verdictFor({ record, integrity, rangeCheck, mpgeCheck, invariant, notes
     if (worstOf.includes('close')) return 'close';
 
     // Nothing compared and nothing wrong is not the same as agreement: an
-    // unlinked group with no stated ranges has simply not been tested by
+    // unlinked test vehicle with no stated ranges has simply not been tested by
     // anything. Saying 'reconciles' there would be reporting a result that was
     // never measured.
     if (!worstOf.length) return 'unchecked';
@@ -184,10 +184,10 @@ function verdictFor({ record, integrity, rangeCheck, mpgeCheck, invariant, notes
         ? 'suspect' : 'agrees';
 }
 
-/** Audit every group, worst first. */
-export function auditGroups(groups = []) {
-    return groups
-        .map(auditGroup)
+/** Audit every test vehicle, worst first. */
+export function auditTestVehicles(testVehicles = []) {
+    return testVehicles
+        .map(auditTestVehicle)
         .sort((a, b) => (VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict])
             || String(a.make ?? '').localeCompare(String(b.make ?? ''))
             || String(a.carline ?? '').localeCompare(String(b.carline ?? '')));

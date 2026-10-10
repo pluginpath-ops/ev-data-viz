@@ -490,7 +490,7 @@ export default function EditVehicleForm({
                     </div>
                 )}
 
-                {/* EPA test groups are assigned in Tests & Data, not here — keeps
+                {/* EPA test vehicles are assigned in Tests & Data, not here — keeps
                     this modal compact regardless of how many are linked. */}
 
                 <div className="form-actions mt-4">

@@ -103,9 +103,10 @@ npm run vocab -- --staged                        # just what is staged
 npm run vocab -- --text "$(gh pr view --json body -q .body)"
 ```
 
-**It only covers four of the nine Retired rows, and it cannot be made to cover
+**It only covers five of the eleven Retired rows, and it cannot be made to cover
 the rest** — `"chrome"` for the header, `"Runs"` in UI text, `"pinning"`, a
-bare `"band"`, and `"Hidden"` for a test are all correct words in their right
+bare `"band"`, `"Hidden"` for a test, and `"test group"` for the EPA test
+vehicle record (EPA's own Test Group is correct) are all right in their right
 place, so only a reader can tell. That is what the pledge is for.
 
 **The pledge: say in the commit or PR body that you checked, and what you

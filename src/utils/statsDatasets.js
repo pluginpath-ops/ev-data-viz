@@ -29,7 +29,7 @@ import {
  *
  * ── Why the summarisers are wrapped rather than called directly ─────────────
  *
- * The guide's take a `unit` — its rows collapse to configurations, test groups
+ * The guide's take a `unit` — its rows collapse to configurations, Test Groups
  * or makes, and which one you count is the whole question. The certification
  * side has no such question: a record IS the unit and there is nothing below it
  * to collapse. Wrapping both behind one signature is what lets the view stop
@@ -122,6 +122,6 @@ export function isKnownMeasure(key) {
  * Here rather than in the view so `observations` above is the only thing that
  * knows which population belongs to which dataset.
  */
-export function certPopulation(certGroups, brandIndex) {
-    return certObservations(certGroups ?? [], brandIndex);
+export function certPopulation(certTestVehicles, brandIndex) {
+    return certObservations(certTestVehicles ?? [], brandIndex);
 }

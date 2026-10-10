@@ -61,7 +61,7 @@ suite('unit of analysis', () => {
     it('per configuration counts every variant', () => {
         expect(toObservations(rows, 'config')).toHaveLength(5);
     });
-    it('per test group collapses the variants EPA certified together', () => {
+    it('per Test Group collapses the variants EPA certified together', () => {
         const obs = toObservations(rows, 'test_group');
         expect(obs).toHaveLength(2);
         // Median of 70/72/74/76, not the first or the mean of a skewed set.
@@ -72,10 +72,10 @@ suite('unit of analysis', () => {
     });
     it('changes the answer, which is why the unit is a visible choice', () => {
         const perConfig = overall(rows, { unit: 'config', measure: 'label_comb_mpge' }).median;
-        const perGroup  = overall(rows, { unit: 'test_group', measure: 'label_comb_mpge' }).median;
+        const perTestGroup  = overall(rows, { unit: 'test_group', measure: 'label_comb_mpge' }).median;
         expect(perConfig).toBe(74);     // dragged toward the make with four rows
-        expect(perGroup).toBe(86.5);    // one vote each
-        expect(perConfig).not.toBe(perGroup);
+        expect(perTestGroup).toBe(86.5);    // one vote each
+        expect(perConfig).not.toBe(perTestGroup);
     });
     it('records how many rows each observation stands for', () => {
         const obs = toObservations(rows, 'test_group');
@@ -85,7 +85,7 @@ suite('unit of analysis', () => {
     it('every declared unit is implemented', () => {
         UNITS.forEach(u => expect(toObservations([row({ id: 1, mpge: 1 })], u.key)).toHaveLength(1));
     });
-    it('defaults to the test group', () => {
+    it('defaults to the Test Group', () => {
         expect(DEFAULT_UNIT).toBe('test_group');
     });
 });
@@ -268,7 +268,7 @@ suite('identity without an id column', () => {
         ];
         expect(toObservations(audi, 'config')).toHaveLength(2);
     });
-    it('does not merge unrelated vehicles that both lack a test group', () => {
+    it('does not merge unrelated vehicles that both lack a Test Group', () => {
         const noTg = [
             bare({ make: 'A', carline: 'one', idx: '1', tg: null, mpge: 50 }),
             bare({ make: 'B', carline: 'two', idx: '2', tg: null, mpge: 150 }),

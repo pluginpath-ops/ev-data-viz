@@ -1,8 +1,19 @@
 /**
  * EPA CSI-PDF import modal. Drop one or many lab Certification Summary PDFs;
  * pdf.js extracts the text (lazy-loaded), parseEpaCsiText builds the config
- * records, and a preview lets the curator review everything before committing
- * (clean-replace upsert).
+ * records, and a preview lets the curator review everything before committing.
+ * A re-import updates in place and keeps values set by hand (epaImportMerge).
+ *
+ * ── One file is one certification ───────────────────────────────────────────
+ *
+ * A CSI is one EPA Certification — one Test Group, one model year — naming one
+ * or more EPA test vehicles (#374). A carryover certification names a test
+ * vehicle an earlier year's file already did, so the same Vehicle ID in a
+ * second file is not an overwrite: its lab results are imported once, from the
+ * first file, and EVERY file's certification is recorded against it. Each row
+ * says which of the three it is — a new test vehicle, a new year's
+ * certification for one already held, or a re-import of a certification
+ * already held.
  *
  * Two modes via `targetVehicle`:
  *   • absent  → Admin bulk import (no auto-link)
@@ -17,6 +28,7 @@
  * read, so a slow certificate looks like work rather than a hang.
  */
 import { useState } from 'react';
+import { useAppContext } from '../context/AppContext';
 import { extractPdfText } from '../utils/extractPdfText';
 import { parseEpaCsiText } from '../utils/parseEpaCsiPdf';
 import { integrityWarnings } from '../utils/epaIntegrity';
@@ -30,12 +42,15 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
     const [importProgress, setImportProgress] = useState(null); // { done, total, name, startedAt }
     const [error, setError]     = useState(null);
     const [dragOver, setDragOver] = useState(false);
-    const [groups, setGroups]   = useState([]);
+    const [testVehicles, setTestVehicles]   = useState([]);
     const [warnings, setWarnings] = useState([]);
     const [existing, setExisting] = useState(new Set());
-    const [selected, setSelected] = useState(new Set());   // test_group_ids to import
+    const [selected, setSelected] = useState(new Set());   // test_vehicle_ids to import
     const [linkIds, setLinkIds]   = useState(new Set());   // configs to link (per-vehicle mode)
     const [result, setResult]   = useState(null);
+    const [certifications, setCertifications] = useState([]);  // one per file: { certification, members }
+    const [heldCerts, setHeldCerts] = useState({});           // test_vehicle_id → [{ test_group, model_year }]
+    const { getEpaCertificationsFor } = useAppContext();
 
     /**
      * Read a list of PDFs, then review them together.
@@ -53,16 +68,17 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         setError(null);
         setProgress({ done: 0, total: list.length, name: list[0].name });
 
-        const allGroups = [];
+        const allTestVehicles = [];
+        const allCertifications = [];
         const allWarnings = [];
         const statuses = [];
-        const seen = new Map();   // test_group_id → the file that claimed it
+        const seen = new Map();   // test_vehicle_id → the file that claimed it
 
         for (const [i, file] of list.entries()) {
             setProgress({ done: i, total: list.length, name: file.name });
             try {
                 const items = await extractPdfText(file);
-                const { groups: g, warnings: w } = parseEpaCsiText(items);
+                const { testVehicles: g, certification, warnings: w } = parseEpaCsiText(items);
                 if (!g.length) {
                     statuses.push({ name: file.name, configs: 0, error: w[0] || 'No EPA configurations found.' });
                     continue;
@@ -75,18 +91,30 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                     // first and naming the loser is predictable; letting the
                     // last silently win is not, because which file is "last"
                     // depends on the order the picker happened to hand them over.
-                    if (seen.has(grp.test_group_id)) {
-                        allWarnings.push(`${file.name}: ${grp.test_group_id} also appears in ${seen.get(grp.test_group_id)} — keeping the first.`);
+                    if (seen.has(grp.test_vehicle_id)) {
+                        allWarnings.push(`${file.name}: ${grp.test_vehicle_id} also appears in ${seen.get(grp.test_vehicle_id)} — its lab results come from the first file; both certifications are recorded.`);
                         continue;
                     }
-                    seen.set(grp.test_group_id, file.name);
+                    seen.set(grp.test_vehicle_id, file.name);
                     // Provenance, which nothing was setting before: the column
-                    // exists and importEpaGroupFull writes it, but the modal
-                    // never supplied a name, so every imported group recorded
+                    // exists and importEpaTestVehicleFull writes it, but the modal
+                    // never supplied a name, so every imported test vehicle recorded
                     // null for the file it came from.
                     kept.push({ ...grp, source_file: file.name });
                 }
-                allGroups.push(...kept);
+                allTestVehicles.push(...kept);
+                // Every test vehicle the file names, including one a previous
+                // file already supplied: the certification is this file's.
+                if (certification) {
+                    allCertifications.push({
+                        certification: { ...certification, source_file: file.name },
+                        members: g.map(t => ({
+                            test_vehicle_id:      t.test_vehicle_id,
+                            carryover_test_group: t.carryover_test_group ?? null,
+                            carryover_model_year: t.carryover_model_year ?? null,
+                        })),
+                    });
+                }
                 allWarnings.push(...w.map(x => list.length > 1 ? `${file.name}: ${x}` : x));
                 // Is what we just read internally possible? A bulk load of every
                 // MY2026 certification wrote 2-5 kWh packs and 1% charging
@@ -107,24 +135,28 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         setProgress(null);
         setFiles(statuses);
 
-        if (!allGroups.length) {
+        if (!allTestVehicles.length) {
             setError(statuses.find(s2 => s2.error)?.error || 'No EPA configurations found in these PDFs.');
             setBusy(false);
             return;
         }
 
-        const ids = allGroups.map(x => x.test_group_id);
+        const ids = allTestVehicles.map(x => x.test_vehicle_id);
         let exists = [];
         try { exists = await getExistingIds(ids); } catch { /* non-fatal */ }
+        let held = {};
+        try { held = await getEpaCertificationsFor(exists); } catch { /* non-fatal */ }
 
-        setGroups(allGroups);
+        setTestVehicles(allTestVehicles);
+        setCertifications(allCertifications);
+        setHeldCerts(held);
         setWarnings(allWarnings);
         setExisting(new Set(exists));
         setSelected(new Set(ids));
         if (targetVehicle) {
             const vn = (targetVehicle.name || '').toLowerCase();
-            const best = allGroups.find(x => vn && (x.epa_carline_name || '').toLowerCase().includes(vn.split(' ')[0]));
-            setLinkIds(new Set([(best || allGroups[0]).test_group_id]));
+            const best = allTestVehicles.find(x => vn && (x.epa_carline_name || '').toLowerCase().includes(vn.split(' ')[0]));
+            setLinkIds(new Set([(best || allTestVehicles[0]).test_vehicle_id]));
         }
         setStep('review');
         setBusy(false);
@@ -144,7 +176,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         setLinkIds(p => { const s = new Set(p); willLink ? s.add(id) : s.delete(id); return s; });
         if (willLink) setSelected(p => new Set(p).add(id));
     };
-    const allIds = groups.map(g => g.test_group_id);
+    const allIds = testVehicles.map(g => g.test_vehicle_id);
     const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id));
     const allLinked   = allIds.length > 0 && allIds.every(id => linkIds.has(id));
     const toggleAllSelect = () => {
@@ -156,14 +188,22 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         else { setLinkIds(new Set(allIds)); setSelected(new Set(allIds)); }
     };
 
-    const overwriteCount = [...selected].filter(id => existing.has(id)).length;
+    // What importing a row does. A Vehicle ID already held is only a re-import
+    // when this file's Test Group is one it is already in; otherwise the file
+    // adds a year's certification to a test vehicle we hold (#374).
+    const rowStatus = (g) => {
+        if (!existing.has(g.test_vehicle_id)) return 'new';
+        return (heldCerts[g.test_vehicle_id] ?? []).some(c => c.test_group === g.test_group) ? 'reimport' : 'adds';
+    };
+    const statusOf = Object.fromEntries(testVehicles.map(g => [g.test_vehicle_id, rowStatus(g)]));
+    const reimportCount = [...selected].filter(id => statusOf[id] === 'reimport').length;
+    const addsCount = [...selected].filter(id => statusOf[id] === 'adds').length;
 
-    // Bulk-accept only what is not in the database yet. A bulk drop that mixes
-    // fresh certifications with carryover IDs already imported (see #374) is
-    // most safely handled by taking the new ones first and deciding the
-    // overwrites separately. Deselected rows drop their link with them, as the
-    // per-row toggle does.
-    const newIds = allIds.filter(id => !existing.has(id));
+    // Bulk-accept only what is not held yet: new test vehicles, and new years'
+    // certifications for ones we hold. Re-imports of a certification already
+    // held are left to decide separately. Deselected rows drop their link with
+    // them, as the per-row toggle does.
+    const newIds = allIds.filter(id => statusOf[id] !== 'reimport');
     const selectOnlyNew = () => {
         const keep = new Set(newIds);
         setSelected(keep);
@@ -171,19 +211,26 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
     };
 
     const handleImport = async () => {
-        const toImport = groups.filter(g => selected.has(g.test_group_id));
+        const toImport = testVehicles.filter(g => selected.has(g.test_vehicle_id));
         if (!toImport.length) return;
-        if (overwriteCount > 0 &&
-            !window.confirm(`${overwriteCount} of these configuration(s) already exist and will be overwritten with the PDF data. Continue?`)) {
+        if (reimportCount > 0 &&
+            !window.confirm(`${reimportCount} of these test vehicle(s) were already imported from the same certification. Re-importing updates them in place and keeps any value set by hand. Continue?`)) {
             return;
         }
         setBusy(true); setError(null);
         const startedAt = Date.now();
         setImportProgress({ done: 0, total: toImport.length, name: null, startedAt });
         try {
+            // Only certifications of test vehicles being imported, and only
+            // those members: a deselected row is not imported, so nothing
+            // may point at it.
+            const certs = certifications
+                .map(c => ({ ...c, members: c.members.filter(m => selected.has(m.test_vehicle_id)) }))
+                .filter(c => c.members.length);
             const res = await onImport(toImport, {
+                certifications: certs,
                 ...(targetVehicle
-                    ? { linkVehicleId: targetVehicle.id, linkTestGroupIds: [...linkIds].filter(id => selected.has(id)) }
+                    ? { linkVehicleId: targetVehicle.id, linkTestVehicleIds: [...linkIds].filter(id => selected.has(id)) }
                     : {}),
                 onProgress: p => setImportProgress({ ...p, startedAt }),
             });
@@ -240,8 +287,8 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                     <>
                         <p className="text-sm text-secondary mb-2">
                             {files.length === 1
-                                ? <><span className="font-medium">{files[0].name}</span> — {groups.length} configuration(s) found.</>
-                                : <>{files.length} files — {groups.length} configuration(s) found.</>}
+                                ? <><span className="font-medium">{files[0].name}</span> — {testVehicles.length} configuration(s) found.</>
+                                : <>{files.length} files — {testVehicles.length} configuration(s) found.</>}
                         </p>
 
                         {/* Per-file outcome, so a file that yielded nothing is
@@ -272,7 +319,8 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                                 <span className="ml-1">Link</span>
                                             </th>
                                         )}
-                                        <th className="p-2">Config ID</th>
+                                        <th className="p-2">Vehicle ID</th>
+                                        <th className="p-2">Certification</th>
                                         <th className="p-2">Make · Carline</th>
                                         <th className="p-2">Coeff / Tests / Phases</th>
                                         {/* Certificate-wide, so every configuration from one PDF
@@ -284,8 +332,8 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {groups.map(g => {
-                                        const id = g.test_group_id;
+                                    {testVehicles.map(g => {
+                                        const id = g.test_vehicle_id;
                                         const phaseCount = g.tests.reduce((n, t) => n + t.phases.length, 0);
                                         return (
                                             <tr key={id} className={selected.has(id) ? '' : 'opacity-40'}>
@@ -297,6 +345,9 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                                     </td>
                                                 )}
                                                 <td className="p-2 font-mono">{id}</td>
+                                                <td className="p-2 font-mono text-secondary" title={g.test_group ? `Test Group ${g.test_group}` : undefined}>
+                                                    {g.model_year ? `MY${g.model_year}` : '—'}
+                                                </td>
                                                 <td className="p-2">{g.make} · <span className="text-secondary">{g.epa_carline_name}</span></td>
                                                 <td className="p-2 font-mono text-secondary">{g.coefficient_sets.length} / {g.tests.length} / {phaseCount}</td>
                                                 <td className="p-2 font-mono text-secondary">
@@ -314,9 +365,13 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                                     <td className="p-2 text-meta truncate" style={{ maxWidth: '11rem' }} title={g.source_file}>{g.source_file}</td>
                                                 )}
                                                 <td className="p-2">
-                                                    {existing.has(id)
-                                                        ? <span className="text-amber-600 dark:text-amber-400">⟳ overwrite</span>
-                                                        : <span className="text-green-600 dark:text-green-400">＋ new</span>}
+                                                    {statusOf[id] === 'new' && <span className="badge-micro is-good">＋ new</span>}
+                                                    {statusOf[id] === 'adds' && (
+                                                        <span className="badge-micro" title="We hold this test vehicle; this file adds its certification for another year.">
+                                                            ＋ MY{g.model_year ?? '?'}
+                                                        </span>
+                                                    )}
+                                                    {statusOf[id] === 'reimport' && <span className="badge-micro is-qualified">⟳ re-import</span>}
                                                 </td>
                                             </tr>
                                         );
@@ -342,13 +397,13 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
 
                         <div className="flex items-center gap-2 mt-4">
                             <span className="text-xs text-secondary flex-1">
-                                {selected.size} selected{overwriteCount ? ` · ${overwriteCount} overwrite` : ''}
+                                {selected.size} selected{addsCount ? ` · ${addsCount} add a year` : ''}{reimportCount ? ` · ${reimportCount} re-import` : ''}
                                 {targetVehicle && linkIds.size ? ` · linking ${linkIds.size} to ${targetVehicle.name}` : ''}
                             </span>
-                            {existing.size > 0 && (
+                            {newIds.length < allIds.length && (
                                 <button onClick={selectOnlyNew} className="btn btn-secondary text-sm"
                                     disabled={busy || !newIds.length}
-                                    title="Select only the configurations that are not in the database yet">
+                                    title="Select only test vehicles and certifications that are not imported yet">
                                     Only new ({newIds.length})
                                 </button>
                             )}

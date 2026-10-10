@@ -1,5 +1,5 @@
 /**
- * When a group holds more than one multi-cycle test, which one did EPA use?
+ * When a test vehicle holds more than one multi-cycle test, which one did EPA use?
  *
  * `preferredMctTest` defaults to the most recent, and its own comment is honest
  * that this is "a defensible default and NOT a resolution" — which run
@@ -75,7 +75,7 @@ const mctsOf = (tests = []) => tests.filter(t => num(t.procedure_code) === PROC_
  * The test used when nothing has selected one: the most recent, falling back to
  * test number and then to position.
  *
- * Lives here rather than inside epaRecordFromGroup because two places need the
+ * Lives here rather than inside epaRecordFromTestVehicle because two places need the
  * same answer — the derivation, and the curator picker that has to say which
  * row "Automatic" would land on. A second copy of a tie-break is how the label
  * and the behaviour drift apart.
@@ -189,7 +189,7 @@ export const RANGE_SELECTION_MIN_MARGIN = 2.5;
  * agree with each other perfectly.
  *
  * Uses the per-test ranges added in migration 060. Before those, every test in a
- * group carried the group's single pair and this could not discriminate at all.
+ * test vehicle carried the test vehicle's single pair and this could not discriminate at all.
  */
 export function scoreAgainstGuideRanges(test, published = {}) {
     const cityUnadj = num(test?.cd_range_combined_calc);

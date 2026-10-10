@@ -1,7 +1,7 @@
 /**
  * The Fuel Economy Guide linking sweep (#238).
  *
- * 159 of 211 certification groups carry no guide row. That link is what lets a
+ * 159 of 211 test vehicles carry no guide row. That link is what lets a
  * cert-side measurement be grouped by any guide dimension — class, corporate
  * parent, drive, pack band — so until it exists, drivetrain η and charger
  * efficiency can only be reported against a manufacturer's Vehicle ID. It is
@@ -12,16 +12,17 @@
  */
 import { rankFeCandidates, bestFeCandidate, MATCH_FLOOR } from './feGuideMatch';
 import { PROC_MCT, PROC_CD_HWY, MPG_E_CONVERSION, LABEL_ADJUSTMENT } from '../constants/epa';
+import { checkGuideCandidate } from './guideCandidateCheck';
 
 // ── Priority ─────────────────────────────────────────────────────────────────
 
 /**
- * Which groups to work through first, ordered by what the link unlocks rather
+ * Which test vehicles to work through first, ordered by what the link unlocks rather
  * than by year or name.
  *
  * A sweep of 159 items will not be finished in one sitting, so the order
  * decides what gets done at all. Energy first because it is the scarcest input
- * — 65 groups in the whole corpus can produce a charger efficiency, and each
+ * — 65 test vehicles in the whole corpus can produce a charger efficiency, and each
  * one that goes unlinked is a measurement that cannot be grouped by anything.
  * Coefficients next because they are the highest-coverage cert statistic we
  * have. Everything else last: still worth linking, but it unblocks nothing
@@ -31,12 +32,12 @@ export const TIERS = [
     {
         key: 'energy',
         label: 'Unlocks charger efficiency and usable kWh',
-        why: 'These groups report DC energy, so linking one adds a measurement that can then be grouped by class, brand or drive.',
+        why: 'These test vehicles report DC energy, so linking one adds a measurement that can then be grouped by class, brand or drive.',
     },
     {
         key: 'coefficients',
         label: 'Unlocks road-load and aero by class',
-        why: 'Coefficients are on 203 of 204 groups — the highest-coverage cert figure — but need a guide link before they can be grouped.',
+        why: 'Coefficients are on 203 of 204 test vehicles — the highest-coverage cert figure — but need a guide link before they can be grouped.',
     },
     {
         key: 'other',
@@ -50,7 +51,7 @@ export const TIERS = [
  *
  * The null check is not decoration. `Number(null)` is `0` and `0` is finite, so
  * a bare `Number.isFinite(Number(v))` reports an ABSENT value as a present zero
- * — which here would have put every group with no recorded DC energy into the
+ * — which here would have put every test vehicle with no recorded DC energy into the
  * top-priority tier, and told a curator that linking it unlocks a measurement
  * that does not exist.
  */
@@ -60,22 +61,22 @@ const num = (v) => {
     return Number.isFinite(n) ? n : null;
 };
 
-/** Whether a group carries DC energy on a test the derivations will actually use. */
-export function hasDerivableEnergy(group) {
+/** Whether a test vehicle carries DC energy on a test the derivations will actually use. */
+export function hasDerivableEnergy(testVehicle) {
     // Procedure code decides, matching pickDerivationTest. A short cycle's DC
     // energy against a full recharge is where the 0.037 charger efficiency came
-    // from, and a group whose only energy is on such a test unlocks nothing.
-    return (group?.epa_tests ?? []).some(t =>
+    // from, and a test vehicle whose only energy is on such a test unlocks nothing.
+    return (testVehicle?.epa_tests ?? []).some(t =>
         [PROC_MCT, PROC_CD_HWY].includes(num(t.procedure_code)) && num(t.total_dc_energy_kwh) != null);
 }
 
-export function hasCoefficients(group) {
-    return (group?.epa_coefficient_sets ?? []).some(c => num(c.target_a) != null);
+export function hasCoefficients(testVehicle) {
+    return (testVehicle?.epa_coefficient_sets ?? []).some(c => num(c.target_a) != null);
 }
 
-export function tierOf(group) {
-    if (hasDerivableEnergy(group)) return 'energy';
-    if (hasCoefficients(group))    return 'coefficients';
+export function tierOf(testVehicle) {
+    if (hasDerivableEnergy(testVehicle)) return 'energy';
+    if (hasCoefficients(testVehicle))    return 'coefficients';
     return 'other';
 }
 
@@ -105,22 +106,22 @@ export function impliedUsableKwh(feRow) {
 /**
  * What the certification record itself knows about its pack and mass.
  *
- * The other half of the same question. A group carrying 144 kWh of measured DC
+ * The other half of the same question. A test vehicle carrying 144 kWh of measured DC
  * energy is a big-pack car whatever its carline says, and the equivalent test
  * weight moves with the pack too.
  */
-export function groupEnergyFacts(group) {
-    const test = (group?.epa_tests ?? [])
+export function testVehicleEnergyFacts(testVehicle) {
+    const test = (testVehicle?.epa_tests ?? [])
         .filter(t => [PROC_MCT, PROC_CD_HWY].includes(num(t.procedure_code)))
         .find(t => num(t.total_dc_energy_kwh) != null);
-    const etw = (group?.epa_coefficient_sets ?? [])
+    const etw = (testVehicle?.epa_coefficient_sets ?? [])
         .map(c => num(c.equiv_test_weight_lbs))
         .find(v => v != null);
     return {
         dcEnergyKwh: test ? num(test.total_dc_energy_kwh) : null,
         procedure:   test ? num(test.procedure_code) : null,
         etwLbs:      etw ?? null,
-        useableKwh:  num(group?.useable_kwh),
+        useableKwh:  num(testVehicle?.useable_kwh),
     };
 }
 
@@ -132,18 +133,18 @@ export function groupEnergyFacts(group) {
  * should say — which is directly comparable to a candidate's `label_comb_range_mi`
  * and settles a set of trims a carline name cannot.
  *
- * Uses the group's own `derived_5cycle_coefficient` where it has one and the
+ * Uses the test vehicle's own `derived_5cycle_coefficient` where it has one and the
  * fixed 0.7 otherwise, and reports which, because the difference between them
  * is several percent and a reader comparing 411 against 382 needs to know how
  * soft the number is.
  *
- * Only ~29 of the 158 unlinked groups carry the unadjusted range, so this is a
+ * Only ~29 of the 158 unlinked test vehicles carry the unadjusted range, so this is a
  * strong hint where it exists rather than a general answer.
  */
-export function estimatedAdjustedRange(group) {
-    const unadjusted = num(group?.cd_range_combined_calc);
+export function estimatedAdjustedRange(testVehicle) {
+    const unadjusted = num(testVehicle?.cd_range_combined_calc);
     if (unadjusted == null) return null;
-    const derived = num(group?.derived_5cycle_coefficient);
+    const derived = num(testVehicle?.derived_5cycle_coefficient);
     const factor = derived != null && derived > 0 ? derived : LABEL_ADJUSTMENT;
     return { miles: unadjusted * factor, factor, factorIsDerived: derived != null && derived > 0 };
 }
@@ -178,25 +179,25 @@ export function wheelMentions(text) {
 }
 
 /**
- * Whether a group carries anything from its CSI certificate.
+ * Whether a test vehicle carries anything from its CSI certificate.
  *
  * The two fields that resolve an ambiguous match — the covered-models table and
- * the manufacturer's note — exist only on groups imported from a CSI PDF. A
- * group that came from the certification CSV has neither, and no amount of
+ * the manufacturer's note — exist only on test vehicles imported from a CSI PDF. A
+ * test vehicle that came from the certification CSV has neither, and no amount of
  * looking at it will produce them.
  *
  * Worth stating rather than leaving as an absence: it turns "there is nothing
  * to go on here" into "fetch this certificate", which is an action.
  */
-export function hasCsiDetail(group) {
-    return (group?.epa_covered_models?.length ?? 0) > 0
-        || (group?.epa_tests ?? []).some(t => t.mfr_test_vehicle_comments);
+export function hasCsiDetail(testVehicle) {
+    return (testVehicle?.epa_covered_models?.length ?? 0) > 0
+        || (testVehicle?.epa_tests ?? []).some(t => t.mfr_test_vehicle_comments);
 }
 
 /** Every wheel size this certificate's covered models name, deduplicated. */
-export function coveredWheelSizes(group) {
+export function coveredWheelSizes(testVehicle) {
     const out = new Set();
-    for (const cm of group?.epa_covered_models ?? []) {
+    for (const cm of testVehicle?.epa_covered_models ?? []) {
         for (const w of wheelMentions(cm.carline_name)) out.add(w);
     }
     return [...out].sort((a, b) => a - b);
@@ -229,28 +230,41 @@ const carlineKey = (v) => String(v ?? '')
  * Returns every match. A certificate covering four configurations legitimately
  * matches four guide rows, and choosing among them is still the curator's.
  */
-export function coveredModelMatches(group, feRows = []) {
+export function coveredModelMatches(testVehicle, feRows = []) {
     const covered = new Set(
-        (group?.epa_covered_models ?? []).map(cm => carlineKey(cm.carline_name)).filter(Boolean),
+        (testVehicle?.epa_covered_models ?? []).map(cm => carlineKey(cm.carline_name)).filter(Boolean),
     );
     if (!covered.size) return [];
     return feRows.filter(r => covered.has(carlineKey(r.carline)));
 }
 
 /**
- * A guide row whose smog test group IS our certification group id.
+ * Guide rows in the certification's own year and Test Group.
  *
- * Migration 053 dismissed this join because it matched 1 of 87 linked groups,
- * and as a general key it is still useless — the guide's test group is not
- * unique per configuration and usually carries EPA's own smog identifier rather
- * than the manufacturer's Vehicle ID. But where the two DO coincide, and they
- * do for 10 groups in the current corpus, it is not a similarity score. It is
- * the same identifier, and it outranks any name match.
+ * The Guide keys its rows by year and the smog-rating Test Group — the
+ * certification. Migration 053 dismissed the join because, compared with our
+ * record's Vehicle ID, it matched 1 of 87 linked records: the record was the
+ * test vehicle, not the certification, and the two identifiers are different
+ * things (#374). Compared with the certification's Test Group in its year, it
+ * is the Guide's own key — for 163 of 809 unlinked certifications after a full
+ * corpus import, exactly one row.
+ *
+ * Still not unique per configuration: a certificate covering four wheel sizes
+ * matches four rows, which is why a proposal takes it only when there is one.
+ * A record whose Vehicle ID IS a Test Group (made by hand from a lab PDF) still
+ * matches on that.
  */
-export function exactTestGroupMatches(group, feRows = []) {
-    const id = String(group?.test_group_id ?? '').trim().toUpperCase();
-    if (!id) return [];
-    return feRows.filter(r => String(r.smog_test_group ?? '').trim().toUpperCase() === id);
+export function exactTestGroupMatches(testVehicle, feRows = []) {
+    const norm = (v) => String(v ?? '').trim().toUpperCase();
+    const tg = norm(testVehicle?.test_group);
+    const id = norm(testVehicle?.test_vehicle_id);
+    const year = Number(testVehicle?.model_year);
+    return feRows.filter(r => {
+        const s = norm(r.smog_test_group);
+        if (!s) return false;
+        if (tg && s === tg) return !year || Number(r.model_year) === year;
+        return !!id && s === id;
+    });
 }
 
 /**
@@ -258,7 +272,7 @@ export function exactTestGroupMatches(group, feRows = []) {
  *
  * The Lucid case: `Air Touring AWD` appears three times in MY2024 at 411, 382
  * and 365 miles for 19, 20 and 21 inch wheels — and all three carry the SAME
- * smog test group, because EPA certified them once and the guide lists the
+ * smog Test Group, because EPA certified them once and the guide lists the
  * wheel options separately.
  *
  * So there is no fact that makes one of them the right answer, and a curator
@@ -266,11 +280,11 @@ export function exactTestGroupMatches(group, feRows = []) {
  * turns an unanswerable question into a choice: pick the wheel you mean.
  */
 export function sharedCertification(ranked) {
-    const groups = ranked
+    const testVehicles = ranked
         .map(c => String(c.row.smog_test_group ?? '').trim())
         .filter(Boolean);
-    if (groups.length < 2) return null;
-    const unique = new Set(groups);
+    if (testVehicles.length < 2) return null;
+    const unique = new Set(testVehicles);
     if (unique.size !== 1) return null;
     return { smogTestGroup: [...unique][0], count: ranked.length };
 }
@@ -278,7 +292,7 @@ export function sharedCertification(ranked) {
 // ── Proposals ────────────────────────────────────────────────────────────────
 
 /**
- * Why a group has no automatic proposal — worded for the person who has to
+ * Why a test vehicle has no automatic proposal — worded for the person who has to
  * resolve it.
  *
  * Naming the reason is the point. "No proposal" is the same output for four
@@ -295,7 +309,7 @@ export const NO_PROPOSAL_REASONS = {
 };
 
 /**
- * Classify one group: its tier, its proposal if there is a safe one, and the
+ * Classify one test vehicle: its tier, its proposal if there is a safe one, and the
  * ranked list either way.
  *
  * The safe-proposal test is `bestFeCandidate`, unchanged and deliberately.
@@ -305,18 +319,18 @@ export const NO_PROPOSAL_REASONS = {
  * miles apart. Inventing a second, looser threshold here would quietly undo
  * that reasoning at the exact moment it is applied in bulk.
  */
-export function classifyGroup(group, feRows) {
-    const ranked = rankFeCandidates(group, feRows);
+export function classifyTestVehicle(testVehicle, feRows) {
+    const ranked = rankFeCandidates(testVehicle, feRows);
 
     // An identifier match is not a guess, so it is taken before the ranker is
     // consulted at all — and only when it is unambiguous, since the guide's
-    // test group is not unique per configuration and several rows can carry it.
-    const exact = exactTestGroupMatches(group, feRows);
+    // Test Group is not unique per configuration and several rows can carry it.
+    const exact = exactTestGroupMatches(testVehicle, feRows);
     if (exact.length === 1) {
         return {
-            group,
-            tier: tierOf(group),
-            proposal: { row: exact[0], score: 1, exactYear: Number(exact[0].model_year) === Number(group.model_year) },
+            testVehicle,
+            tier: tierOf(testVehicle),
+            proposal: { row: exact[0], score: 1, exactYear: Number(exact[0].model_year) === Number(testVehicle.model_year) },
             exactIdMatch: true,
             coveredMatch: false,
             reason: null,
@@ -330,12 +344,12 @@ export function classifyGroup(group, feRows) {
     // the identifier match — a name identity, not a score — and only taken when
     // it is unambiguous, since a certificate covering four configurations
     // matches four guide rows and picking among them is a judgement.
-    const coveredSameYear = coveredModelMatches(group, feRows)
-        .filter(r => Number(r.model_year) === Number(group.model_year));
+    const coveredSameYear = coveredModelMatches(testVehicle, feRows)
+        .filter(r => Number(r.model_year) === Number(testVehicle.model_year));
     if (coveredSameYear.length === 1) {
         return {
-            group,
-            tier: tierOf(group),
+            testVehicle,
+            tier: tierOf(testVehicle),
             proposal: { row: coveredSameYear[0], score: 1, exactYear: true },
             exactIdMatch: false,
             coveredMatch: true,
@@ -346,7 +360,7 @@ export function classifyGroup(group, feRows) {
         };
     }
 
-    const best = bestFeCandidate(group, feRows);
+    const best = bestFeCandidate(testVehicle, feRows);
 
     let reason = null;
     if (!best) {
@@ -359,8 +373,8 @@ export function classifyGroup(group, feRows) {
     }
 
     return {
-        group,
-        tier: tierOf(group),
+        testVehicle,
+        tier: tierOf(testVehicle),
         proposal: best,
         exactIdMatch: false,
         coveredMatch: false,
@@ -375,21 +389,22 @@ export function classifyGroup(group, feRows) {
 }
 
 /**
- * Every group needing a decision, classified and ordered.
+ * Every test vehicle needing a decision, classified and ordered.
  *
- * Within a tier, groups WITH a safe proposal come first: they are the ones a
+ * Within a tier, test vehicles WITH a safe proposal come first: they are the ones a
  * curator can clear in one click, and burying them behind the hard cases is
  * what makes a sweep feel endless.
  */
-export function buildSweep(groups, feRows) {
+export function buildSweep(testVehicles, feRows) {
     const tierRank = Object.fromEntries(TIERS.map((t, i) => [t.key, i]));
-    return groups
-        .map(g => classifyGroup(g, feRows))
+    return testVehicles
+        .map(g => classifyTestVehicle(g, feRows))
         .sort((a, b) =>
             tierRank[a.tier] - tierRank[b.tier]
             || (a.proposal ? 0 : 1) - (b.proposal ? 0 : 1)
             || (b.proposal?.score ?? 0) - (a.proposal?.score ?? 0)
-            || String(a.group.test_group_id).localeCompare(String(b.group.test_group_id)));
+            || String(a.testVehicle.test_vehicle_id).localeCompare(String(b.testVehicle.test_vehicle_id))
+            || Number(a.testVehicle.model_year) - Number(b.testVehicle.model_year));
 }
 
 /** Counts per tier, for the progress the view reports against. */
@@ -404,5 +419,35 @@ export function sweepProgress(items) {
     return byTier;
 }
 
-/** The subset a batch confirm would act on — every safe proposal, nothing else. */
-export const batchable = (items) => items.filter(i => i.proposal);
+/**
+ * Where a proposal stands against the EPA tab's check, run on the proposed row
+ * before linking (guideCandidateCheck):
+ *
+ *   confirmed          its unadjusted MPGe matches EPA and its label is possible
+ *   impossible-label   its MPGe matches EPA, but its label range is above what
+ *                      the lab data can produce. The MPGe says it IS the right
+ *                      record; the label points at a data, import or assumption
+ *                      error worth a look after linking, not at a wrong match
+ *                      (owner, #374) — so it has a batch of its own.
+ *   unconfirmed        near, disagreeing, or nothing to compare
+ *   null               no proposal
+ *
+ * A name match alone is not enough to link unseen: the same carline can carry
+ * very different figures. Only the first two can be batch-linked; anything
+ * unconfirmed stays in the list for a curator to choose one at a time, against
+ * the check if they judge it right.
+ */
+function proposalStanding(item) {
+    if (!item?.proposal) return null;
+    const { mpge, invariant } = checkGuideCandidate(item.testVehicle, item.proposal.row);
+    if (!mpge?.checked || mpge.worst !== 'agrees') return 'unconfirmed';
+    return invariant?.violated ? 'impossible-label' : 'confirmed';
+}
+
+/**
+ * The subset a batch confirm would act on: by default the confirmed
+ * proposals; `'impossible-label'` for the matching-MPGe ones with an
+ * impossible label, which are linked by their own button.
+ */
+export const batchable = (items, standing = 'confirmed') =>
+    items.filter(i => proposalStanding(i) === standing);

@@ -1,5 +1,5 @@
 /**
- * Turning a stored EPA test group into a methodology record (#222).
+ * Turning a stored EPA test vehicle into a methodology record (#222).
  *
  * `buildMethodologyModel` was written against two hand-transcribed fixtures. It
  * is correct — it reproduces both published labels — but it has never been fed a
@@ -13,7 +13,7 @@
  *
  * ── Why a reason, and not just null ─────────────────────────────────────────
  *
- * Most groups cannot produce a model, and for several different reasons: no
+ * Most test vehicles cannot produce a model, and for several different reasons: no
  * test rows, an SCT record with no phase detail by construction, phases whose
  * cycle nobody has recorded. "No diagram" is the same output for all of them
  * and tells a curator nothing about whether it is fixable or what to fix.
@@ -32,10 +32,10 @@ const num = (v) => {
     return Number.isFinite(n) ? n : null;
 };
 
-/** Why a group produced no record. Rendered to a curator, so worded for one. */
+/** Why a test vehicle produced no record. Rendered to a curator, so worded for one. */
 export const NO_RECORD_REASONS = {
-    'no-group':      'No EPA test group is linked to this vehicle.',
-    'no-tests':      'The linked group has no test records yet.',
+    'no-test-vehicle':      'No EPA test vehicle is linked to this vehicle.',
+    'no-tests':      'The linked test vehicle has no test records yet.',
     'no-energy':     'The test reports no total DC energy, so range cannot be computed from consumption.',
     'no-phases':     'The test has no phase rows, so city and highway cannot be separated.',
     'phases-untyped':'The test’s phases have no cycle recorded, and their distances do not identify one.',
@@ -58,7 +58,7 @@ function mctTestsOf(tests) {
 }
 
 /**
- * The multi-cycle test to derive from, when a group holds more than one.
+ * The multi-cycle test to derive from, when a test vehicle holds more than one.
  *
  * Two is not a data error. The R2 21" was tested at two laboratories — FEV
  * Michigan and Ann Arbor — and both runs are legitimate. They simply do not
@@ -72,12 +72,12 @@ function mctTestsOf(tests) {
  * carried out and the UI states that a choice was made.
  *
  * ⚠ `cd_range_*` is stored on the GROUP, set at import from whichever proc-77
- * test was seen first. When a group holds two, the stated ranges the bag check
+ * test was seen first. When a test vehicle holds two, the stated ranges the bag check
  * compares against may belong to the OTHER test — which reads as a ~0.6%
  * disagreement that is really two labs, not an error. Per-test CD ranges would
  * be needed to compare like with like.
  *
- * Ordering falls back to test_number, then position, so the same group always
+ * Ordering falls back to test_number, then position, so the same test vehicle always
  * derives the same way — an arbitrary pick that changes between loads is worse
  * than a wrong one that holds still.
  */
@@ -107,20 +107,20 @@ export function preferredMctTest(tests, preferredTestNumber = null) {
  * Which stated ranges a check should compare against, and where they came from.
  *
  * Per-test when the row has them — that is the same test the phases came from,
- * so the comparison is like with like. Group-level otherwise, which is what
- * every caller did before migration 060 and is still right for a group holding
+ * so the comparison is like with like. Test-vehicle-level otherwise, which is what
+ * every caller did before migration 060 and is still right for a test vehicle holding
  * one test.
  */
-function statedRangesFor(test, group) {
+function statedRangesFor(test, testVehicle) {
     const cityMi = num(test?.cd_range_combined_calc);
     const hwyMi  = num(test?.cd_range_hwy_calc);
     if (cityMi != null || hwyMi != null) {
         return { cityMi, hwyMi, source: 'test', testNumber: test?.test_number ?? null };
     }
     return {
-        cityMi: num(group?.cd_range_combined_calc),
-        hwyMi:  num(group?.cd_range_hwy_calc),
-        source: 'group',
+        cityMi: num(testVehicle?.cd_range_combined_calc),
+        hwyMi:  num(testVehicle?.cd_range_hwy_calc),
+        source: 'test-vehicle',
         testNumber: null,
     };
 }
@@ -165,39 +165,39 @@ function phasesFor(test) {
 }
 
 /**
- * Build a methodology record from one stored group.
+ * Build a methodology record from one stored test vehicle.
  *
- * @param {Object} group  an epa_test_groups row with nested epa_tests →
+ * @param {Object} testVehicle  an epa_test_vehicles row with nested epa_tests →
  *                        epa_test_phases, as `getVehicles` fetches it
  * @param {Object} [meta] { vehicleName, configuration } for display
  * @returns {{ record: Object|null, reason: string|null, inferredPhaseTypes: number }}
  */
-export function epaRecordFromGroup(group, meta = {}) {
+export function epaRecordFromTestVehicle(testVehicle, meta = {}) {
     const fail = (reason) => ({ record: null, reason, inferredPhaseTypes: 0,
         competingMctTests: 0, derivedFrom: null, statedRanges: null });
 
-    if (!group) return fail('no-group');
-    const tests = group.epa_tests ?? [];
+    if (!testVehicle) return fail('no-test-vehicle');
+    const tests = testVehicle.epa_tests ?? [];
     if (!tests.length) return fail('no-tests');
 
     // Shared across both test methods: what the label says, and what EPA
-    // actually adjusted by. Both come off the group rather than the test.
+    // actually adjusted by. Both come off the test vehicle rather than the test.
     const common = {
-        vehicleName:   meta.vehicleName ?? group.display_name ?? group.epa_carline_name ?? null,
-        modelYear:     num(group.model_year),
-        configuration: meta.configuration ?? group.vehicle_config_number ?? null,
-        labeledRangeMi: num(group.label_range_published),
+        vehicleName:   meta.vehicleName ?? testVehicle.display_name ?? testVehicle.epa_carline_name ?? null,
+        modelYear:     num(testVehicle.model_year),
+        configuration: meta.configuration ?? testVehicle.vehicle_config_number ?? null,
+        labeledRangeMi: num(testVehicle.label_range_published),
         // Read, not assumed — see epaMethodology.resolveAdjustment. Absent here
         // simply falls back to the flat factor there.
-        adjustmentFactor: num(group.label_adjustment_factor),
-        calcApproach:     group.label_calc_approach ?? null,
-        // Through the linked guide row rather than copied onto the group: it is
+        adjustmentFactor: num(testVehicle.label_adjustment_factor),
+        calcApproach:     testVehicle.label_calc_approach ?? null,
+        // Through the linked guide row rather than copied onto the test vehicle: it is
         // EPA's statement about that row, and a copy could go stale.
-        adjustmentSignature: group.epa_fe_guide?.adjustment_signature ?? null,
-        adjustmentMethod: group.label_calc_approach ?? null,
+        adjustmentSignature: testVehicle.epa_fe_guide?.adjustment_signature ?? null,
+        adjustmentMethod: testVehicle.label_calc_approach ?? null,
     };
 
-    const mct = preferredMctTest(tests, group?.preferred_test_number);
+    const mct = preferredMctTest(tests, testVehicle?.preferred_test_number);
     const competingMctTests = mctTestsOf(tests).length;
     if (mct) {
         const totalDcWh = kwhToWh(mct.total_dc_energy_kwh);
@@ -234,7 +234,7 @@ export function epaRecordFromGroup(group, meta = {}) {
                     // Which rule chose it. "Selected" means a guide row or a
                     // curator settled it; "most-recent" means nothing did, and
                     // the figures rest on a default.
-                    basis: group?.preferred_test_number === mct.test_number
+                    basis: testVehicle?.preferred_test_number === mct.test_number
                         ? 'selected' : 'most-recent',
                 }
                 : null,
@@ -243,32 +243,32 @@ export function epaRecordFromGroup(group, meta = {}) {
             //
             // Callers used to read these off the GROUP, where they are set at
             // import from the first procedure-77 test. The derivation uses the
-            // most RECENT, so on a group holding two the check compared one
+            // most RECENT, so on a test vehicle holding two the check compared one
             // test's phases against the other test's stated figures and called
             // the difference a fault. Mercedes' CLA 350 holds two a month
             // apart: 461.373/450.544 and 475.482/460.354.
             //
-            // Falling back to the group keeps every record imported before
+            // Falling back to the test vehicle keeps every record imported before
             // migration 060 behaving exactly as it did, and `source` says which
             // happened so nothing has to infer it from a null.
-            statedRanges: statedRangesFor(mct, group),
+            statedRanges: statedRangesFor(mct, testVehicle),
         };
     }
 
     const sct = sctTestsOf(tests);
     if (!sct.length) return fail('no-tests');
 
-    // The group's range columns are ambiguous on an SCT record and the epic
+    // The test vehicle's range columns are ambiguous on an SCT record and the epic
     // called them the single most dangerous pair in the schema: assigning one to
     // the wrong cycle produces two plausible wrong ranges rather than an error.
     //
     // Migration 060 removes the ambiguity where it can. A single-cycle test
     // states the range for the cycle IT drove, so procedure 81 carries the UDDS
     // range and 84 the highway one, each on its own row — BMW's i7 reads 409.29
-    // and 445.14. Read per test first; the group columns stay as the fallback
+    // and 445.14. Read per test first; the test vehicle columns stay as the fallback
     // for rows imported before that, where the old assignment still applies.
-    const cityMi = num(group.cd_range_combined_calc);
-    const hwyMi  = num(group.cd_range_hwy_calc);
+    const cityMi = num(testVehicle.cd_range_combined_calc);
+    const hwyMi  = num(testVehicle.cd_range_hwy_calc);
 
     const runs = sct
         .map(t => {
@@ -277,7 +277,7 @@ export function epaRecordFromGroup(group, meta = {}) {
                 cycle: code === PROC_CD_HWY ? 'HWFET' : 'UDDS',
                 procedureCode: code,
                 rechargeWh: kwhToWh(t.ac_recharge_kwh),
-                // This test's own figure when it has one; otherwise the group's,
+                // This test's own figure when it has one; otherwise the test vehicle's,
                 // split by procedure exactly as before.
                 rangeMi: num(t.cd_range_combined_calc)
                     ?? (code === PROC_CD_HWY ? hwyMi : cityMi),

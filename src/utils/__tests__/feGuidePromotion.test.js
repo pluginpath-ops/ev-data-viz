@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-    promotionUpdates, demotionUpdates, guideConflicts, acceptGuideUpdates,
-    PROMOTION_MAP, PROMOTION_SOURCE, isCuratorOwned,
+    guideOverlay, demotionUpdates, guideConflicts, acceptGuideTags,
+    GUIDE_FIELD_MAP, GUIDE_SOURCE, isCuratorOwned,
 } from '../feGuidePromotion';
 
 const feRow = {
@@ -21,144 +21,84 @@ const feRow = {
     batt_specific_energy_wh_kg: 173,
 };
 
-describe('promotionUpdates', () => {
-    it('fills an empty group and records the link', () => {
-        const { updates, promoted } = promotionUpdates({ overrides: {} }, feRow);
-        expect(updates.label_range_published).toBe(307);
-        expect(updates.label_combined_mpge).toBe(99);
-        expect(updates.label_calc_approach).toBe('Electric Vehicle 5-cycle label');
-        expect(updates.fe_guide_row_id).toBe(42);
-        expect(promoted).toContain('label_range_published');
+describe('guideOverlay — the Guide read over the record, not copied onto it (#374)', () => {
+    it('fills a field the record leaves empty', () => {
+        const { values, applied } = guideOverlay({ overrides: {} }, feRow);
+        expect(values.label_range_published).toBe(307);
+        expect(applied).toContain('label_range_published');
     });
 
-    it('overwrites a cert-derived value, because the guide is the published one', () => {
-        // A CSI figure is manufacturer-delivered and not necessarily what
-        // reached the window sticker.
-        const group = {
-            label_range_published: 306,
-            overrides: { label_range_published: { source: 'pdf' } },
-        };
-        const { updates, promoted, skipped } = promotionUpdates(group, feRow);
-        expect(updates.label_range_published).toBe(307);
-        expect(promoted).toContain('label_range_published');
-        expect(skipped).toEqual([]);
+    it('reads the Guide over a certificate value, because the Guide is the published one', () => {
+        // Found comparing every vehicle before and after: a CSI re-import had
+        // overwritten copied Guide values with the PDF's own pack voltage on
+        // records still linked to the Guide row. The rule is the Guide.
+        const record = { total_voltage: 349, overrides: { total_voltage: { source: 'pdf' } } };
+        expect(guideOverlay(record, { ...feRow, total_voltage_v: 378 }).values.total_voltage).toBe(378);
     });
 
-    it('leaves a curator-set value alone', () => {
-        // An import silently undoing a deliberate override would make the
-        // override worthless.
-        const group = {
-            label_range_published: 300,
-            overrides: { label_range_published: { source: 'manual' } },
-        };
-        const { updates, promoted, skipped } = promotionUpdates(group, feRow);
-        expect(updates.label_range_published).toBeUndefined();
-        expect(skipped).toContain('label_range_published');
-        expect(promoted).not.toContain('label_range_published');
-        // and the rest still promote
-        expect(updates.label_city_range_mi).toBe(338);
+    it('leaves a curator-set value alone, and says so', () => {
+        const record = { label_range_published: 306, overrides: { label_range_published: { source: 'manual' } } };
+        const { values, held, overrides } = guideOverlay(record, feRow);
+        expect(values).not.toHaveProperty('label_range_published');
+        expect(held).toEqual(['label_range_published']);
+        expect(overrides.label_range_published).toEqual({ source: 'manual' });
     });
 
-    it('remembers what it displaced, so unlink can undo it', () => {
-        const group = { label_range_published: 306, overrides: {} };
-        const { updates } = promotionUpdates(group, feRow);
-        expect(updates.overrides.label_range_published)
-            .toEqual({ source: PROMOTION_SOURCE, previous: 306 });
-    });
-
-    it('records a null previous when the field was empty', () => {
-        // Distinguishable from "never promoted" because the entry exists at all,
-        // which is what lets unlink restore it to empty rather than leave 307.
-        const { updates } = promotionUpdates({ overrides: {} }, feRow);
-        expect(updates.overrides.label_range_published)
-            .toEqual({ source: PROMOTION_SOURCE, previous: null });
+    it('tags what it filled, so the curator form can say where a figure came from', () => {
+        const { overrides } = guideOverlay({ overrides: {} }, feRow);
+        expect(overrides.label_hwy_mpge).toEqual({ source: GUIDE_SOURCE });
     });
 
     it('says nothing about fields the guide row does not carry', () => {
-        const sparse = { id: 7, label_comb_range_mi: 250 };
-        const { updates, promoted } = promotionUpdates({ overrides: {} }, sparse);
-        expect(promoted).toEqual(['label_range_published']);
-        expect(updates.label_city_range_mi).toBeUndefined();
-        expect('unadj_city_mpge' in updates).toBe(false);
+        const { values } = guideOverlay({ overrides: {} }, { id: 1, label_comb_range_mi: 300 });
+        expect(Object.keys(values)).toEqual(['label_range_published']);
     });
 
-    it('writes nothing at all for a guide row carrying none of the fields', () => {
-        const { updates, promoted, skipped } = promotionUpdates({ overrides: {} }, { id: 9 });
-        expect(promoted).toEqual([]);
-        expect(skipped).toEqual([]);
-        expect(updates).toEqual({});
-        // No link either. Nothing was promoted AND nothing was held back, so
-        // the row carries none of the promotable fields — a correspondence with
-        // nothing behind it. Distinct from the curator-owned case below, where
-        // the row is real and the link is recorded.
-        expect(updates.fe_guide_row_id).toBeUndefined();
+    it('is empty without a Guide row', () => {
+        expect(guideOverlay({ overrides: {} }, null)).toMatchObject({ values: {}, applied: [] });
     });
 
     it('never targets useable_kwh', () => {
-        // Gross pack energy from the guide is a different quantity from what the
-        // pack delivers after its buffer, which stays with the curator.
-        expect(Object.values(PROMOTION_MAP)).not.toContain('useable_kwh');
-        expect(Object.values(PROMOTION_MAP)).toContain('nominal_pack_kwh');
+        // Gross pack energy is not what the pack delivers after its buffer.
+        expect(Object.values(GUIDE_FIELD_MAP)).not.toContain('useable_kwh');
+        expect(guideOverlay({ overrides: {} }, feRow).values).not.toHaveProperty('useable_kwh');
     });
 });
 
-describe('demotionUpdates', () => {
-    it('restores what promotion displaced', () => {
-        const group = { label_range_published: 306, overrides: {} };
-        const promoted = promotionUpdates(group, feRow).updates;
-        const after = { ...group, ...promoted };
+describe('demotionUpdates — forgetting a pre-#374 promotion', () => {
+    const promoted = {
+        label_range_published: 307,
+        label_hwy_mpge: 89,
+        overrides: {
+            label_range_published: { source: 'fe_guide', previous: 306 },
+            label_hwy_mpge:        { source: 'fe_guide', previous: null },
+            useable_kwh:           { source: 'manual' },
+        },
+    };
 
-        const { updates, restored } = demotionUpdates(after);
+    it('restores what promotion displaced, and drops the tag', () => {
+        const { updates, restored } = demotionUpdates(promoted);
         expect(updates.label_range_published).toBe(306);
-        expect(restored).toContain('label_range_published');
-        expect(updates.fe_guide_row_id).toBeNull();
-        expect(updates.overrides.label_range_published).toBeUndefined();
+        expect(updates.overrides).not.toHaveProperty('label_range_published');
+        expect(restored).toEqual(expect.arrayContaining(['label_range_published', 'label_hwy_mpge']));
     });
 
     it('restores an empty field to empty, not to the promoted value', () => {
-        const after = { ...promotionUpdates({ overrides: {} }, feRow).updates };
-        const { updates } = demotionUpdates(after);
-        expect(updates.label_range_published).toBeNull();
-        expect(updates.label_city_range_mi).toBeNull();
+        expect(demotionUpdates(promoted).updates.label_hwy_mpge).toBeNull();
     });
 
-    it('leaves alone a field the curator edited after promotion', () => {
-        // Unlinking a source should not discard work done after it.
-        const after = {
-            label_range_published: 311,
-            overrides: {
-                label_range_published: { source: 'manual' },
-                label_city_range_mi:   { source: PROMOTION_SOURCE, previous: null },
-            },
-        };
-        const { updates, restored } = demotionUpdates(after);
-        expect('label_range_published' in updates).toBe(false);
-        expect(restored).toEqual(['label_city_range_mi']);
-        expect(updates.overrides.label_range_published).toEqual({ source: 'manual' });
+    it('leaves alone a field the curator owns', () => {
+        expect(demotionUpdates(promoted).updates.overrides.useable_kwh).toEqual({ source: 'manual' });
     });
 
-    it('is a no-op on a group that was never linked', () => {
-        const { updates, restored } = demotionUpdates({ overrides: { total_voltage: { source: 'pdf' } } });
+    it('writes no Guide link any more — that lives on the certification', () => {
+        expect(demotionUpdates(promoted).updates).not.toHaveProperty('fe_guide_row_id');
+    });
+
+    it('is a no-op on a record that was never promoted', () => {
+        const { updates, restored } = demotionUpdates({ overrides: { useable_kwh: { source: 'manual' } } });
         expect(restored).toEqual([]);
-        expect(updates.fe_guide_row_id).toBeNull();
-        // The pdf entry survives untouched.
-        expect(updates.overrides.total_voltage).toEqual({ source: 'pdf' });
-    });
-
-    it('round-trips: promote then demote returns the original values', () => {
-        const original = {
-            label_range_published: 306,
-            label_combined_mpge: 97,
-            total_voltage: 350,
-            overrides: { label_range_published: { source: 'pdf' } },
-        };
-        const linked = { ...original, ...promotionUpdates(original, feRow).updates };
-        const back   = { ...linked,   ...demotionUpdates(linked).updates };
-
-        expect(back.label_range_published).toBe(306);
-        expect(back.label_combined_mpge).toBe(97);
-        expect(back.total_voltage).toBe(350);
-        expect(back.fe_guide_row_id).toBeNull();
+        expect(Object.keys(updates)).toEqual(['overrides']);
     });
 });
 
@@ -173,8 +113,8 @@ describe('guideConflicts', () => {
     };
 
     it('names the fields the guide was not allowed to fill', () => {
-        // Promotion reports these once and then forgets; the disagreement does
-        // not go away, and the curator may want the published figure after all.
+        // The overlay holds these without a word; the disagreement does not go
+        // away, and the curator may want the published figure after all.
         const conflicts = guideConflicts(held, feRow);
         expect(conflicts.map(c => c.column)).toEqual(['label_range_published']);
         expect(conflicts[0]).toMatchObject({ ours: 306, theirs: 307 });
@@ -195,76 +135,37 @@ describe('guideConflicts', () => {
     });
 
     it('ignores fields that were not curator-held', () => {
-        const promoted = {
+        const fromGuide = {
             label_range_published: 999,
-            overrides: { label_range_published: { source: 'fe_guide', previous: null } },
+            overrides: { label_range_published: { source: 'fe_guide' } },
         };
-        expect(guideConflicts(promoted, feRow)).toEqual([]);
+        expect(guideConflicts(fromGuide, feRow)).toEqual([]);
     });
 });
 
-describe('acceptGuideUpdates', () => {
+describe('acceptGuideTags — letting go of a held value', () => {
     const held = {
         label_range_published: 306,
-        overrides: { label_range_published: { source: 'manual' } },
+        useable_kwh: 80,
+        overrides: {
+            label_range_published: { source: 'manual' },
+            useable_kwh:           { source: 'manual' },
+        },
     };
 
-    it('takes the guide value for the named field only', () => {
-        const { updates, accepted } = acceptGuideUpdates(held, feRow, ['label_range_published']);
-        expect(updates.label_range_published).toBe(307);
+    it('drops the hand-set tag, so the Guide is read for that field again', () => {
+        const { overrides, accepted } = acceptGuideTags(held, ['label_range_published']);
         expect(accepted).toEqual(['label_range_published']);
-        expect(updates.label_city_range_mi).toBeUndefined();
+        expect(overrides).not.toHaveProperty('label_range_published');
+        expect(guideOverlay({ ...held, overrides }, feRow).values.label_range_published).toBe(307);
     });
 
-    it('records the displaced value, so unlink still restores it', () => {
-        const { updates } = acceptGuideUpdates(held, feRow, ['label_range_published']);
-        expect(updates.overrides.label_range_published)
-            .toEqual({ source: PROMOTION_SOURCE, previous: 306 });
-
-        const back = demotionUpdates({ ...held, ...updates });
-        expect(back.updates.label_range_published).toBe(306);
+    it('touches only fields the Guide fills', () => {
+        expect(acceptGuideTags(held, ['useable_kwh']).accepted).toEqual([]);
     });
 
     it('does nothing when asked for nothing', () => {
-        expect(acceptGuideUpdates(held, feRow, []).accepted).toEqual([]);
-        expect(acceptGuideUpdates(held, feRow, ['not_a_column']).accepted).toEqual([]);
-    });
-});
-
-describe('linking is not conditional on promoting', () => {
-    // A link and a promotion are two different facts. Conflating them meant a
-    // group whose promotable fields were all curator-owned came back from
-    // "Link" reporting success with NOTHING written — no fe_guide_row_id, so
-    // the group stayed unlinked and reappeared in the sweep, and the toast said
-    // it had worked.
-    const feRow = { id: 42, label_comb_range_mi: 300, label_comb_mpge: 95 };
-
-    it('records the link even when every field is curator-owned', () => {
-        const group = {
-            label_range_published: 111,
-            label_combined_mpge: 99,
-            overrides: {
-                label_range_published: { source: 'manual' },
-                label_combined_mpge:   { source: 'manual' },
-            },
-        };
-        const { updates, promoted, skipped } = promotionUpdates(group, feRow);
-        expect(promoted).toEqual([]);
-        expect(skipped.length).toBeGreaterThan(0);
-        expect(updates.fe_guide_row_id).toBe(42);
-    });
-
-    it('still promotes and links together in the ordinary case', () => {
-        const { updates, promoted } = promotionUpdates({ overrides: {} }, feRow);
-        expect(promoted.length).toBeGreaterThan(0);
-        expect(updates.fe_guide_row_id).toBe(42);
-    });
-
-    it('leaves curator values alone while linking', () => {
-        const group = { overrides: { label_range_published: { source: 'manual' } }, label_range_published: 111 };
-        const { updates } = promotionUpdates(group, feRow);
-        expect(updates).not.toHaveProperty('label_range_published');
-        expect(updates.fe_guide_row_id).toBe(42);
+        expect(acceptGuideTags(held, []).accepted).toEqual([]);
     });
 });
 
@@ -284,8 +185,8 @@ describe('isCuratorOwned — one spelling of "a human set this"', () => {
         expect(isCuratorOwned(null, 'preferred_test_number')).toBe(false);
     });
 
-    it('says no for a value the guide promoted', () => {
-        expect(isCuratorOwned({ label_hwy_mpge: { source: PROMOTION_SOURCE } }, 'label_hwy_mpge'))
+    it('says no for a value the Guide fills', () => {
+        expect(isCuratorOwned({ label_hwy_mpge: { source: GUIDE_SOURCE } }, 'label_hwy_mpge'))
             .toBe(false);
     });
 });

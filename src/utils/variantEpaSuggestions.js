@@ -27,7 +27,7 @@
  * ── Battery size, where the names run out ───────────────────────────────────
  *
  * EPA often names every configuration of a model the same — five `Ioniq 5`s,
- * told apart only by test group ID — and the pack is what differs. So after
+ * told apart only by Vehicle ID — and the pack is what differs. So after
  * the words, a configuration whose EPA tested capacity sits within tolerance of
  * the nearer of the vehicle's own Usable and Gross ranks first: the same rule,
  * and the same knob, `resolveSocWindow` uses to accept EPA tested at all.
@@ -54,7 +54,7 @@ import { TESTED_CAPACITY_TOLERANCE_PCT } from '../constants/epa';
 
 const tokens = (value) => String(value ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? [];
 const years = (value) => (String(value ?? '').match(/\d{4}/g) ?? []).map(Number);
-const linkedGroups = (v) => (v?.epa_mappings ?? []).map(m => m.epaGroup).filter(Boolean);
+const linkedTestVehicles = (v) => (v?.epa_mappings ?? []).map(m => m.epaTestVehicle).filter(Boolean);
 
 /** Shown before the rest are tucked away: enough to hold the answer, few enough to scan. */
 export const SUGGESTION_LIMIT = 5;
@@ -75,7 +75,7 @@ export function suggestionSource(vehicle, vehicles = []) {
     const seen = new Set([vehicle.id]);
     let next = byId.get(vehicle.spec_source_vehicle_id);
     while (next && !seen.has(next.id)) {
-        if (linkedGroups(next).length) return next;
+        if (linkedTestVehicles(next).length) return next;
         seen.add(next.id);
         next = next.spec_source_vehicle_id != null ? byId.get(next.spec_source_vehicle_id) : null;
     }
@@ -92,17 +92,17 @@ export function suggestionSource(vehicle, vehicles = []) {
 export function candidateQuery(variant, source = null) {
     // With no source, the vehicle's own links set the years too: the IONIQ5 is
     // recorded as 2025 and certified as 2024, and its siblings are 2024s.
-    const groups = linkedGroups(source ?? variant);
+    const testVehicles = linkedTestVehicles(source ?? variant);
     const ownMake = variant?.manufacturer?.name || variant?.make;
     return {
-        makes: [...new Set(source ? groups.map(g => g.make) : [ownMake])].filter(Boolean),
+        makes: [...new Set(source ? testVehicles.map(g => g.make) : [ownMake])].filter(Boolean),
         // A year either side of the vehicle's own: model years in our records and
         // in EPA's drift by one, and the IONIQ5 Base (2025) sits between EPA's
         // 2024 and 2026 Ioniq 5s with no 2025 of its own. The ranking still puts
         // the exact year first — year orders here, it does not exclude, as in
         // feGuideMatch.
         years: [...new Set([
-            ...groups.map(g => Number(g.model_year)),
+            ...testVehicles.map(g => Number(g.model_year)),
             ...years(variant?.year).flatMap(y => [y - 1, y, y + 1]),
         ].filter(Boolean))].sort((a, b) => a - b),
     };
@@ -128,11 +128,11 @@ function distinguishingTokens(variant, source) {
  * `Ioniq 5` in `Ioniq 5` and not in `Ioniq 6`. With no model recorded, any
  * word shared with a source configuration's carline will do.
  */
-function sameModel(group, basis) {
-    const carline = new Set(tokens(group.epa_carline_name));
+function sameModel(testVehicle, basis) {
+    const carline = new Set(tokens(testVehicle.epa_carline_name));
     const model = tokens(basis.model);
     if (model.length) return model.every(t => carline.has(t));
-    const sourceWords = new Set(linkedGroups(basis).flatMap(g => tokens(g.epa_carline_name)));
+    const sourceWords = new Set(linkedTestVehicles(basis).flatMap(g => tokens(g.epa_carline_name)));
     return [...carline].some(t => sourceWords.has(t));
 }
 
@@ -171,11 +171,11 @@ function packFit(testedKwh, labels, tolerancePct) {
  *
  * @param {Object} variant     the vehicle the suggestions are for
  * @param {Object|null} source  from suggestionSource; null ranks by the vehicle's own make and model
- * @param {Array}  candidates  epa_test_groups rows fetched by candidateQuery
+ * @param {Array}  candidates  epa_test_vehicles rows fetched by candidateQuery
  * @param {Object} [options]
  * @param {Array<{name, kwh}>} [options.labels]  the vehicle's pack figures (packLabels)
  * @param {number} [options.tolerancePct]
- * @returns {Array<{ group, figures, fromSource: boolean, linked: boolean, matched: string[], pack: {ok, label, kwh, pct}|null }>}
+ * @returns {Array<{ testVehicle, figures, fromSource: boolean, linked: boolean, matched: string[], pack: {ok, label, kwh, pct}|null }>}
  *          `figures` as epaConfigurationFigures gives them; `fromSource` marks
  *          a configuration the source itself links; `linked` one the variant
  *          already links, kept in its place so the list does not reshuffle
@@ -185,28 +185,28 @@ function packFit(testedKwh, labels, tolerancePct) {
  */
 export function rankSuggestions(variant, source = null, candidates = [], { labels = [], tolerancePct = TESTED_CAPACITY_TOLERANCE_PCT } = {}) {
     if (!variant) return [];
-    const sourceGroups = linkedGroups(source);
-    const sourceIds = new Set(sourceGroups.map(g => g.test_group_id));
+    const sourceGroups = linkedTestVehicles(source);
+    const sourceIds = new Set(sourceGroups.map(g => g.test_vehicle_id));
     const makes = source ? sourceGroups.map(g => g.make) : candidateQuery(variant).makes;
     const distinct = distinguishingTokens(variant, source);
     const variantYears = new Set(years(variant.year));
-    const variantIds = new Set(linkedGroups(variant).map(g => g.test_group_id));
+    const variantIds = new Set(linkedTestVehicles(variant).map(g => g.test_vehicle_id));
 
     const siblings = candidates
-        .filter(g => !sourceIds.has(g.test_group_id))
+        .filter(g => !sourceIds.has(g.test_vehicle_id))
         .filter(g => makes.some(m => sameMake(m, g.make)))
         .filter(g => sameModel(g, source ?? variant))
-        .map(group => {
-            const words = new Set(tokens(`${group.epa_carline_name} ${group.drive ?? ''} ${group.display_name ?? ''}`));
-            const figures = epaConfigurationFigures(group);
+        .map(testVehicle => {
+            const words = new Set(tokens(`${testVehicle.epa_carline_name} ${testVehicle.drive ?? ''} ${testVehicle.display_name ?? ''}`));
+            const figures = epaConfigurationFigures(testVehicle);
             return {
-                group,
+                testVehicle,
                 figures,
                 pack: packFit(figures.testedKwh, labels, tolerancePct),
                 fromSource: false,
-                linked: variantIds.has(group.test_group_id),
+                linked: variantIds.has(testVehicle.test_vehicle_id),
                 matched: distinct.filter(t => words.has(t)),
-                sameYear: variantYears.has(Number(group.model_year)),
+                sameYear: variantYears.has(Number(testVehicle.model_year)),
             };
         })
         // Most distinguishing words first; then a pack that fits; then the
@@ -217,13 +217,13 @@ export function rankSuggestions(variant, source = null, candidates = [], { label
             || (Boolean(b.pack?.ok) - Boolean(a.pack?.ok))
             || (b.sameYear - a.sameYear)
             || ((a.pack?.pct ?? Infinity) - (b.pack?.pct ?? Infinity))
-            || String(a.group.epa_carline_name ?? '').length - String(b.group.epa_carline_name ?? '').length);
+            || String(a.testVehicle.epa_carline_name ?? '').length - String(b.testVehicle.epa_carline_name ?? '').length);
 
-    const own = sourceGroups.map(group => {
-        const figures = epaConfigurationFigures(group);
+    const own = sourceGroups.map(testVehicle => {
+        const figures = epaConfigurationFigures(testVehicle);
         return {
-            group, figures, fromSource: true,
-            linked: variantIds.has(group.test_group_id), matched: [],
+            testVehicle, figures, fromSource: true,
+            linked: variantIds.has(testVehicle.test_vehicle_id), matched: [],
             pack: packFit(figures.testedKwh, labels, tolerancePct),
         };
     });

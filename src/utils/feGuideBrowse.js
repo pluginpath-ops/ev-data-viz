@@ -260,8 +260,8 @@ export const GUIDE_COLUMNS = [
     { key: 'model_year',       label: 'Year',        group: 'Identity',   numeric: true,  digits: 0, default: true, holds: 'short-values' },
     { key: 'model_type_index', label: 'Model type',  group: 'Identity',   holds: 'short-values',
       hint: 'EPA’s own index for a model type. Part of the natural key — carline alone is not unique.' },
-    { key: 'smog_test_group',  label: 'Test group',  group: 'Identity',
-      hint: 'EPA’s smog test group. Configurations certified together share one; it is not unique per configuration.' },
+    { key: 'smog_test_group',  label: 'Test Group',  group: 'Identity',
+      hint: 'EPA’s smog Test Group. Configurations certified together share one; it is not unique per configuration.' },
 
     // Label figures — the window sticker. Range first: it is what people come for.
     { key: 'label_comb_range_mi', label: 'Range',      unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true },
@@ -275,7 +275,7 @@ export const GUIDE_COLUMNS = [
 
     // Battery
     { key: 'nominal_pack_kwh', label: 'Pack', unit: 'kWh', group: 'Battery', numeric: true, digits: 1, default: true, bar: true,
-      hint: 'GROSS pack energy — voltage × amp-hours. Not usable capacity, which is smaller and is a curator judgement. Reported per test group, so every configuration in a group shares one value.' },
+      hint: 'GROSS pack energy — voltage × amp-hours. Not usable capacity, which is smaller and is a curator judgement. Reported per Test Group, so every configuration in a Test Group shares one value.' },
     { key: 'total_voltage_v',  label: 'Voltage', unit: 'V',    group: 'Battery', numeric: true, digits: 0 },
     { key: 'batt_capacity_ah', label: 'Capacity', unit: 'Ah',  group: 'Battery', numeric: true, digits: 0 },
     { key: 'batt_specific_energy_wh_kg', label: 'Specific energy', unit: 'Wh/kg', group: 'Battery', numeric: true, digits: 0 },
@@ -582,10 +582,10 @@ export function computeBarMaxima(rows) {
 }
 
 /**
- * Group rows under the EPA test group that certified them (#235, phase 5c).
+ * Group rows under the EPA Test Group that certified them (#235, phase 5c).
  *
  * Fifty rows are not fifty measurements. EPA certifies configurations together
- * and files them under one smog test group, so twenty-four Rivian rows can be
+ * and files them under one smog Test Group, so twenty-four Rivian rows can be
  * one measurement wearing many marketing names — and a flat list presents them
  * as twenty-four independent results, which is the single most misleading
  * thing this table can do.
@@ -593,7 +593,7 @@ export function computeBarMaxima(rows) {
  * Clusters come out in the order their first member appeared, so whatever sort
  * the reader chose still governs which group leads.
  *
- * A configuration with no test group becomes its own cluster rather than
+ * A configuration with no Test Group becomes its own cluster rather than
  * joining a shared "ungrouped" heading. EPA did not group them; collecting them
  * under one header would claim a shared measurement that does not exist.
  */
@@ -612,7 +612,7 @@ export function clusterByTestGroup(rows) {
             key,
             rows: members,
             testGroup: members[0].smog_test_group ?? null,
-            // The one thing that makes configurations in a single test group
+            // The one thing that makes configurations in a single Test Group
             // NOT interchangeable, so it is the one thing the header adds.
             packVaries: packs.size > 1,
         };

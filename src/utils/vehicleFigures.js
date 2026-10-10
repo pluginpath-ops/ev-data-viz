@@ -112,7 +112,7 @@ export function resolveSocWindow(vehicle, vehicles = [], { tolerancePct = TESTED
     const gross  = positive(specs?.powertrain?.battery_gross_kwh);
 
     const pick = primaryEpaMapping(vehicle?.epa_mappings);
-    const testedKwh = pick ? epaConfigurationFigures(pick.mapping.epaGroup).testedKwh : null;
+    const testedKwh = pick ? epaConfigurationFigures(pick.mapping.epaTestVehicle).testedKwh : null;
     const labels = [usable && { name: 'Usable', kwh: usable }, gross && { name: 'Gross', kwh: gross }].filter(Boolean);
     const testedAgrees = testedKwh != null
         && (!labels.length || testedAgreement(testedKwh, labels, tolerancePct).ok);
@@ -141,28 +141,32 @@ export function resolveSocWindow(vehicle, vehicles = [], { tolerancePct = TESTED
  * }}
  */
 export function resolveEpaRange(vehicle, vehicles = []) {
-    const links = (vehicle?.epa_mappings ?? []).filter(m => m.epaGroup);
+    const links = (vehicle?.epa_mappings ?? []).filter(m => m.epaTestVehicle);
     const pick = primaryEpaMapping(links);
-    const none = { mi: null, basis: null, cityMi: null, hwyMi: null, combinedMpge: null, spanMi: null, expectedSource: null };
+    const none = { mi: null, basis: null, cityMi: null, hwyMi: null, combinedMpge: null, spanMi: null, expectedSource: null, fromYear: null, certification: null };
 
-    const fromLabel = (group) => ({
+    const fromLabel = (testVehicle) => ({
         ...none,
-        mi: positive(group.label_range_published),
+        mi: positive(testVehicle.label_range_published),
         basis: 'epa-label',
-        cityMi: positive(group.label_city_range_mi),
-        hwyMi:  positive(group.label_hwy_range_mi),
+        cityMi: positive(testVehicle.label_city_range_mi),
+        hwyMi:  positive(testVehicle.label_hwy_range_mi),
         // The label's efficiency, for the vehicle table's EPA efficiency (#335).
-        combinedMpge: positive(group.label_combined_mpge),
+        combinedMpge: positive(testVehicle.label_combined_mpge),
+        // The certification it came from, and "From MY…" when that is not the
+        // vehicle's own year (#374). Nothing silent: the card says so.
+        fromYear: testVehicle._certification?.fromYear ?? null,
+        certification: testVehicle._certification ?? null,
     });
 
     let spanMi = null;
     if (pick) {
-        if (positive(pick.mapping.epaGroup.label_range_published)) return fromLabel(pick.mapping.epaGroup);
+        if (positive(pick.mapping.epaTestVehicle.label_range_published)) return fromLabel(pick.mapping.epaTestVehicle);
     } else {
-        const labelled = links.filter(m => positive(m.epaGroup.label_range_published));
-        const values = [...new Set(labelled.map(m => positive(m.epaGroup.label_range_published)))].sort((a, b) => a - b);
+        const labelled = links.filter(m => positive(m.epaTestVehicle.label_range_published));
+        const values = [...new Set(labelled.map(m => positive(m.epaTestVehicle.label_range_published)))].sort((a, b) => a - b);
         // Every configuration reads the same: there is nothing to choose.
-        if (values.length === 1) return fromLabel(labelled[0].epaGroup);
+        if (values.length === 1) return fromLabel(labelled[0].epaTestVehicle);
         if (values.length > 1) spanMi = [values[0], values[values.length - 1]];
     }
 

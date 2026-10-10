@@ -40,7 +40,7 @@ is driving.
 The Multi-Cycle Test gets the same city and highway numbers from just two laps of each. It burns off the
 rest of the battery on the steady stretches, which cover a median 84% of its distance and 88% of its
 energy [[fact:mct-steady-share]], and it finishes in about 6 hours [[fact:evbench-test-durations]]. It's no
-surprise that 89% of the certification groups in EVBench's database report it [[fact:evbench-test-route-shares]].
+surprise that 89% of the EPA test vehicles in EVBench's database report it [[fact:evbench-test-route-shares]].
 
 ::: held
 Owner: add color. As batteries got bigger, running each cycle to empty got longer and longer; the
@@ -52,7 +52,7 @@ summary) and whether anyone still does a true 20-hour city run.
 
 EVBench holds a copy of EPA's certification test records, which is where the lab's distances and the
 figures below come from. They describe what's in EVBench's database today, not every EV ever certified,
-and today that's mostly the current crop: 262 of the 297 certification groups with a range test are model
+and today that's mostly the current crop: 262 of the 297 EPA test vehicles with a range test are model
 year 2026 [[fact:evbench-test-route-shares]].
 - **The route:** 265 of 297 report the Multi-Cycle Test, and 32 report single-cycle tests, led by Tesla
   (9), Mercedes-Benz (5), BMW (5) and Hyundai (4) [[fact:evbench-test-route-shares]].

@@ -23,7 +23,7 @@ const LABEL_COLUMNS = LABEL_KEYS.map(columnByKey).filter(Boolean);
  * a re-import to answer", and the disclosure below is where that pays off — it
  * is the only place a reader can see a field we never mapped.
  */
-export default function GuideDetailModal({ row, vehicles, testGroupIds = [], configCount = 1, onClose }) {
+export default function GuideDetailModal({ row, vehicles, testVehicleIds = [], configCount = 1, onClose }) {
     const { getFeGuideRow } = useAppContext();
     const [showRaw, setShowRaw] = useState(false);
     const [showAll, setShowAll] = useState(false);
@@ -61,7 +61,7 @@ export default function GuideDetailModal({ row, vehicles, testGroupIds = [], con
                         <div className="text-note">
                             {row.model_year} {row.division}
                             {row.body_class && ` · ${row.body_class}`}
-                            {row.smog_test_group && ` · test group ${row.smog_test_group}`}
+                            {row.smog_test_group && ` · Test Group ${row.smog_test_group}`}
                         </div>
                     </div>
                     <button onClick={onClose} className="btn btn-secondary">Close</button>
@@ -110,7 +110,8 @@ export default function GuideDetailModal({ row, vehicles, testGroupIds = [], con
                     <div className="guide-detail-group">
                         <div className="text-label guide-detail-group-title">Certification results</div>
                         <GuideCertificationResults
-                            testGroupIds={testGroupIds}
+                            guideRowId={row.id}
+                            testVehicleIds={testVehicleIds}
                             vehicles={vehicles}
                             configCount={configCount}
                         />

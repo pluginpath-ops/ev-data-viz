@@ -1,8 +1,8 @@
 /**
  * What a CSI re-import may overwrite, and what it must leave alone.
  *
- * importEpaGroupFull used to CLEAN-REPLACE a group's coefficient sets, tests and
- * phases — delete them all, insert the parse — and to write the group row with
+ * importEpaTestVehicleFull used to CLEAN-REPLACE a test vehicle's coefficient sets, tests and
+ * phases — delete them all, insert the parse — and to write the test vehicle row with
  * `overrides` rebuilt from scratch. That made a re-import destroy three things
  * a curator had put there:
  *
@@ -24,12 +24,12 @@
  * its tag). A held field keeps its value and its tag. Everything else — 'pdf'
  * and also 'csv' / 'j1634', which a certificate PDF supersedes — is written from
  * the PDF as before, so "upload is truth" still holds for everything nobody has
- * touched. (114 groups in the live data were created from the CSV; treating
+ * touched. (114 test vehicles in the live data were created from the CSV; treating
  * their tags as held would have stopped a PDF ever correcting them.)
  *
  * One more thing is held, and it is not a curator's: a NEWER certification's
  * identity. A carryover certification reuses its test vehicle, so one
- * epa_test_groups row (keyed by Vehicle ID) is the target of several model years'
+ * epa_test_vehicles row (keyed by Vehicle ID) is the target of several model years'
  * files, and the row has room for only one certification's identity. Importing
  * oldest → newest left the newest on the record; importing backwards left the
  * OLDEST and quietly replaced the newer certification's test family, source
@@ -48,10 +48,10 @@ const NEVER_NULLED = ['useable_kwh'];
 /** Sources written by an automatic ingest — a later PDF import may replace these. */
 const MACHINE_SOURCES = ['pdf', 'csv', 'j1634'];
 
-/** Group columns that name WHICH certification the row stands for. */
+/** Test vehicle columns that name WHICH certification the row stands for. */
 const IDENTITY_FIELDS = [
-    'model_year', 'epa_test_family_id', 'source_file',
-    'carryover_test_group_id', 'carryover_model_year',
+    'model_year', 'test_group', 'source_file',
+    'carryover_test_group', 'carryover_model_year',
 ];
 
 /**
@@ -60,10 +60,10 @@ const IDENTITY_FIELDS = [
  * import proceeds as it always did (a null stored year has nothing to protect;
  * a null incoming year cannot be shown to be older).
  */
-export function isOlderCertification(storedGroup, incomingGroup) {
-    if (storedGroup?.model_year == null || incomingGroup?.model_year == null) return false;
-    const a = Number(storedGroup.model_year);
-    const b = Number(incomingGroup.model_year);
+export function isOlderCertification(storedTestVehicle, incomingTestVehicle) {
+    if (storedTestVehicle?.model_year == null || incomingTestVehicle?.model_year == null) return false;
+    const a = Number(storedTestVehicle.model_year);
+    const b = Number(incomingTestVehicle.model_year);
     return Number.isFinite(a) && Number.isFinite(b) && b < a;
 }
 
@@ -150,39 +150,39 @@ export const testKey = (row, i) => row.test_number || `#${i}`;
 export const phaseKey = (row) => row.phase_index;
 
 /**
- * Plan a whole group's import.
+ * Plan a whole test vehicle's import.
  *
- * @param {{ group: Object|null, coefficient_sets: Array, tests: Array }} stored
+ * @param {{ testVehicle: Object|null, coefficient_sets: Array, tests: Array }} stored
  *        what the database holds now; tests carry `epa_test_phases`.
- * @param {{ group: Object, coefficient_sets: Array, tests: Array }} incoming
+ * @param {{ testVehicle: Object, coefficient_sets: Array, tests: Array }} incoming
  *        the parse, tests carrying `phases`.
- * @returns {{ group, coefficients, tests, kept, guarded, holdIdentity }} — `kept` is every
+ * @returns {{ testVehicle, coefficients, tests, kept, guarded, holdIdentity }} — `kept` is every
  *   held value the PDF disagreed with; `guarded` the identity fields an older
  *   certification was stopped from overwriting; `holdIdentity` tells the executor
  *   to leave the certificate-wide covered-models list alone too.
  */
-export function planGroupImport(stored, incoming) {
+export function planTestVehicleImport(stored, incoming) {
     const kept = [];
     const note = (where, list) => list.forEach(k => kept.push({ where, ...k }));
 
     // An older certification must not displace a newer one's identity.
-    const holdIdentity = !!stored.group && isOlderCertification(stored.group, incoming.group);
+    const holdIdentity = !!stored.testVehicle && isOlderCertification(stored.testVehicle, incoming.testVehicle);
     const guarded = [];
-    let incomingGroup = incoming.group;
+    let incomingTestVehicle = incoming.testVehicle;
     if (holdIdentity) {
-        incomingGroup = { ...incoming.group };
+        incomingTestVehicle = { ...incoming.testVehicle };
         for (const field of IDENTITY_FIELDS) {
-            if (field in incomingGroup) {
-                if (!sameValue(stored.group[field], incomingGroup[field])) {
-                    guarded.push({ where: 'group', field, kept: stored.group[field], pdf: incomingGroup[field] });
+            if (field in incomingTestVehicle) {
+                if (!sameValue(stored.testVehicle[field], incomingTestVehicle[field])) {
+                    guarded.push({ where: 'test-vehicle', field, kept: stored.testVehicle[field], pdf: incomingTestVehicle[field] });
                 }
-                delete incomingGroup[field];
+                delete incomingTestVehicle[field];
             }
         }
     }
 
-    const groupMerge = mergeRow(stored.group, incomingGroup, { neverNull: NEVER_NULLED });
-    note('group', groupMerge.kept);
+    const testVehicleMerge = mergeRow(stored.testVehicle, incomingTestVehicle, { neverNull: NEVER_NULLED });
+    note('test-vehicle', testVehicleMerge.kept);
 
     const coefPlan = planChildren(stored.coefficient_sets, incoming.coefficient_sets, coefficientKey);
     const coefficients = {
@@ -236,7 +236,7 @@ export function planGroupImport(stored, incoming) {
     };
 
     return {
-        group: { payload: groupMerge.payload, overrides: groupMerge.overrides },
+        testVehicle: { payload: testVehicleMerge.payload, overrides: testVehicleMerge.overrides },
         coefficients, tests, kept, guarded, holdIdentity,
     };
 }
@@ -244,7 +244,7 @@ export function planGroupImport(stored, incoming) {
 /**
  * Collapse covered-model rows to the table's unique key.
  *
- * epa_covered_models is unique on (test_group_id, carline_name,
+ * epa_covered_models is unique on (test_vehicle_id, carline_name,
  * certification_region), NULL region counting as a value (migration 059). A
  * certificate can legitimately list the same carline name more than once:
  * Rivian's RCV-Delivery (carlines 502 and 702, each twice) and Karsan's bus

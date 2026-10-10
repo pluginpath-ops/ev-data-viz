@@ -145,7 +145,7 @@ describe('deriveSteadyStateEta — the same quantity, a different operating poin
 
     it('declines when there is no steady-state phase', () => {
         // The coverage problem, and the reason the curves do not run on this
-        // yet: a group tested on procedures 81 and 84 has no SS phase at all.
+        // yet: a test vehicle tested on procedures 81 and 84 has no SS phase at all.
         const g = cla();
         g.epa_tests[0].epa_test_phases = g.epa_tests[0].epa_test_phases.filter(p => p.phase_type !== 'SS');
         const r = deriveSteadyStateEta(g);

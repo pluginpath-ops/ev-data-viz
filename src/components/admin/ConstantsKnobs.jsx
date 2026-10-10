@@ -37,8 +37,8 @@ export default function ConstantsKnobs() {
     // The corpus, once, on an admin page. Nothing on a vehicle card pays for
     // this — showing a band's evidence beside a knob costs one fetch on the
     // panel that sets it, which is the same trade the statistics view makes.
-    const { getCertGroupsForStats, publishModelConstant, clearPublishedConstants, isAdmin } = useAppContext();
-    const loadCert = useCallback(() => getCertGroupsForStats(), [getCertGroupsForStats]);
+    const { getTestVehiclesForCertStats, publishModelConstant, clearPublishedConstants, isAdmin } = useAppContext();
+    const loadCert = useCallback(() => getTestVehiclesForCertStats(), [getTestVehiclesForCertStats]);
     const { data: certGroups } = useAsyncResource(loadCert, []);
     const evidence = useMemo(() => allBandEvidence(certGroups ?? [], null), [certGroups]);
 

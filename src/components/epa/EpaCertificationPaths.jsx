@@ -184,7 +184,7 @@ export default function EpaCertificationPaths({ models = [] }) {
 
             <p className="text-xs text-meta mt-3">
                 Lab times are approximate and <strong>per configuration</strong>, not per model —
-                certification is keyed to a test group and vehicle configuration, so a model line
+                certification is keyed to a Test Group and vehicle configuration, so a model line
                 with several packs, drive layouts and wheel sizes multiplies every figure above.
             </p>
         </div>

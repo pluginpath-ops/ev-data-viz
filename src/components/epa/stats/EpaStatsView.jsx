@@ -26,21 +26,21 @@ import LoadingSpinner from '../../LoadingSpinner';
  *
  * Guide-side only for now. The certification-side figures — drivetrain η,
  * charger efficiency, weight against consumption — need a guide link to be
- * grouped by anything here, and only 45 of 204 groups have one. That is #238,
+ * grouped by anything here, and only 45 of 204 test vehicles have one. That is #238,
  * and until it lands those statistics would describe a dozen makes and read as
  * though they described the fleet.
  */
 const MIN_N = 3;
 
 export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' }) {
-    const { getFeGuideRows, getBrandAliases, getCertGroupsForStats } = useAppContext();
+    const { getFeGuideRows, getBrandAliases, getTestVehiclesForCertStats } = useAppContext();
 
     const loadRows    = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
     const loadAliases = useCallback(() => getBrandAliases(), [getBrandAliases]);
     const { data: rawRows, loading, error } = useAsyncResource(loadRows, []);
     const { data: aliases } = useAsyncResource(loadAliases, []);
-    const loadCert = useCallback(() => getCertGroupsForStats(), [getCertGroupsForStats]);
-    const { data: certGroups } = useAsyncResource(loadCert, []);
+    const loadCert = useCallback(() => getTestVehiclesForCertStats(), [getTestVehiclesForCertStats]);
+    const { data: certTestVehicles } = useAsyncResource(loadCert, []);
 
     const [initial] = useState(() => {
         const p = new URLSearchParams(window.location.search);
@@ -65,7 +65,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
             // an explicitly empty list means every year.
             // `filter(Boolean)` BEFORE the map, not after: `Number('')` is 0
             // and 0 is finite, so `?yr=` alone decoded to the year zero and the
-            // view reported "0 of 0 groups" for a filter nobody set.
+            // view reported "0 of 0 test vehicles" for a filter nobody set.
             years: p.has('yr')
                 ? p.get('yr').split(',').filter(Boolean).map(Number).filter(Number.isFinite)
                 : null,
@@ -104,14 +104,14 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     );
 
     /**
-     * Certification observations: one per test group, already flat, so they are
+     * Certification observations: one per test vehicle, already flat, so they are
      * bucketed directly rather than clustered. The unit-of-analysis question
      * does not arise — a certification record IS the unit, and there is nothing
      * below it to collapse.
      */
     const certObs = useMemo(
-        () => certPopulation(certGroups, brandIndex),
-        [certGroups, brandIndex],
+        () => certPopulation(certTestVehicles, brandIndex),
+        [certTestVehicles, brandIndex],
     );
 
     /**
@@ -132,7 +132,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
 
 
     // One year by default, because the same configuration recurs across years
-    // at identical figures — the 2025 and 2026 Rivian groups are the same 24
+    // at identical figures — the 2025 and 2026 Rivian test vehicles are the same 24
     // rows — so a multi-year "what is typical" counts those cars more than
     // once. Selecting several is allowed and sometimes wanted; the view says
     // what it costs rather than refusing.
@@ -166,10 +166,10 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
      * guide.
      *
      * These read `allRows` whichever tab was open, which offered the
-     * certification tab classes no certification group has. That became a real
-     * hole once unlinked groups joined it: they read `Unknown`, the guide has
+     * certification tab classes no test vehicle has. That became a real
+     * hole once unlinked test vehicles joined it: they read `Unknown`, the guide has
      * no such class, so `Unknown` could never be offered — and picking any
-     * class chip then dropped every unlinked group with nothing on screen
+     * class chip then dropped every unlinked test vehicle with nothing on screen
      * saying so.
      *
      * `Unknown` sorts last rather than alphabetically. It is not a class.
@@ -330,11 +330,11 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
                 like one over 73 real derivations. */}
             {coverage && (
                 <div className="text-note">
-                    {coverage.usable} of {coverage.total} certification groups carry this figure
+                    {coverage.usable} of {coverage.total} test vehicles carry this figure
                     {coverage.assumed > 0 && `; ${coverage.assumed} could not be derived and fall back to a default, so they are excluded rather than counted`}
                     {coverage.missing > 0 && `; ${coverage.missing} do not report it`}
                     {coverage.impossible > 0 && `; ${coverage.impossible} reported a value that cannot be one and were set aside, not clamped`}.
-                    {/* The other half of the population question. These groups
+                    {/* The other half of the population question. These test vehicles
                         used to be filtered out before this caption ran, so the
                         total read as the whole corpus when 90 of 413 were not
                         in it. */}

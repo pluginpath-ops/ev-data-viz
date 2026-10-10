@@ -46,13 +46,14 @@ describe('utilities built for the UI are reached by the UI', () => {
     // #238 wired it in. Exactly the "built, tested, never connected" shape this
     // suite exists to catch, and the one module doing that work was not watched.
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
-                     'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromGroup.js',
+                     'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromTestVehicle.js',
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
                      'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
-                     'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js'];
+                     'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js',
+                     'epaCertifications.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
@@ -68,6 +69,22 @@ describe('utilities built for the UI are reached by the UI', () => {
             'Reached through planRow; exported so duplicate detection is tested on its own.',
         'publishedResultsBatch.rolloutBasisFor':
             'Reached through planRow; exported so the basis order is tested on its own.',
+        'epaCertifications.compareFilings':
+            'Reached through planCertificationImport; exported so filing order is tested on its own.',
+        'epaCertifications.testGroupIn':
+            'The JS twin of migration 082\'s test_group_in — tested against real file names so the backfill and the importer agree. Layer 3 reads it.',
+        'epaCertifications.MODEL_YEAR_CODES':
+            'Exported so a test can assert migration 082 states the same year table.',
+        'epaCertifications.resolveCertification':
+            'Reached through viewForVehicle (getVehicles, the curator form, suggestions); exported so the rule is tested on its own.',
+        'epaCertifications.newestLinkedCertification':
+            'Reached through viewForTestVehicle (statistics, curves, audit); exported so the choice is tested on its own.',
+        'epaCertifications.certificationsOf':
+            'Reached through every view; exported so the flattening is tested on its own.',
+        'epaCertifications.vehicleModelYears':
+            'Reached through resolveCertification; exported so year parsing is tested on its own.',
+        'epaCertifications.sinceYear':
+            'Reached through viewForTestVehicle; the EPA sub-tab shows it in #374 layer 4.',
         'publishedResultsBatch.TABLE_COLUMNS':
             'The templates are built from it; exported so a test holds them to the same columns.',
         'vehicleFigures.resolveSocWindow':
@@ -123,7 +140,7 @@ describe('utilities built for the UI are reached by the UI', () => {
         'epaLinkSweep.hasCoefficients':
             'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
         'epaLinkSweep.tierOf':
-            'Consumed inside the module by classifyGroup. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
+            'Consumed inside the module by classifyTestVehicle. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
         'epaCurveSubjects.curveSubject':
             'Consumed inside the module by curveSubjects, which the explorer calls. Exported so one record\'s tier and energy source are assertable without building a whole list.',
         'epaCurveSubjects.resolveCurveEnergy':
@@ -135,7 +152,7 @@ describe('utilities built for the UI are reached by the UI', () => {
         'epaCertStats.derivedUsableKwh':
             'Consumed inside the module by certObservation. Exported so the precedence — a curator value first, then DC discharged on procedure 77 or 84, never 86 — is asserted directly rather than inferred from a ratio.',
         'epaCertStats.certObservation':
-            'Consumed inside the module by certObservations, which the statistics view calls. Exported so one group\'s flattening — dimensions from the guide row, a fallback derivation dropped — is asserted without building a whole set.',
+            'Consumed inside the module by certObservations, which the statistics view calls. Exported so one test vehicle\'s flattening — dimensions from the guide row, a fallback derivation dropped — is asserted without building a whole set.',
         'epaBandEvidence.BAND_EVIDENCE':
             'The band-to-measure mapping. Consumed inside the module by bandEvidence and allBandEvidence, and exported so a test can assert every band points at a measure that exists — a band shown against the wrong distribution is worse than none, because it looks like evidence.',
         'epaBandEvidence.SCALAR_ON_MEDIAN':
@@ -152,8 +169,8 @@ describe('utilities built for the UI are reached by the UI', () => {
             'How much better the winner must be than the runner-up before a selection is persisted. Consumed inside the module by selectTestForGuide, and exported so a threshold that decides whether a choice is recorded at all is named rather than a literal.',
         'epaTestSelection.RANGE_SELECTION_MIN_MARGIN':
             'The same guard for the range fallback, deliberately stricter because published ranges are whole miles. Exported alongside its sibling so the two can be asserted against each other.',
-        'epaAudit.auditGroup':
-            'Consumed inside the module by auditGroups, which the sweep calls. Exported so one record\'s verdict is assertable without building a whole list.',
+        'epaAudit.auditTestVehicle':
+            'Consumed inside the module by auditTestVehicles, which the sweep calls. Exported so one record\'s verdict is assertable without building a whole list.',
         'epaIntegrity.integrityWarnings':
             'The import-time form of checkRecordIntegrity, called by EpaPdfImportModal. Listed because the checks it wraps are also read directly by the curator card, and only this spelling reaches the import path.',
         'epaCertStats.NOT_MEASURED_SOURCES':
@@ -161,13 +178,13 @@ describe('utilities built for the UI are reached by the UI', () => {
         'epaLinkSweep.wheelMentions':
             'Called by the sweep view to distil a manufacturer note, and inside the module by coveredWheelSizes. Exported so the four real notations — inch, in, doubled quote, and Lucid\'s 20F21R pair — are pinned by name.',
         'epaLinkSweep.coveredModelMatches':
-            'Consumed inside the module by classifyGroup. Exported so the certificate-covers-this-carline match, and its refusal when a certificate covers several candidates, are asserted directly.',
+            'Consumed inside the module by classifyTestVehicle. Exported so the certificate-covers-this-carline match, and its refusal when a certificate covers several candidates, are asserted directly.',
         'epaLinkSweep.exactTestGroupMatches':
-            'Consumed inside the module by classifyGroup. Exported so the identifier match — and its refusal to fire when several rows share the id — is asserted directly.',
+            'Consumed inside the module by classifyTestVehicle. Exported so the identifier match — and its refusal to fire when several rows share the id — is asserted directly.',
         'epaLinkSweep.sharedCertification':
-            'Consumed inside the module by classifyGroup. Exported so the one-certification-several-wheels case is pinned against the real Lucid data on its own.',
-        'epaLinkSweep.classifyGroup':
-            'Consumed inside the module by buildSweep, which the sweep view calls. Exported so one group\'s proposal and decline reason can be asserted without building a whole sweep.',
+            'Consumed inside the module by classifyTestVehicle. Exported so the one-certification-several-wheels case is pinned against the real Lucid data on its own.',
+        'epaLinkSweep.classifyTestVehicle':
+            'Consumed inside the module by buildSweep, which the sweep view calls. Exported so one test vehicle\'s proposal and decline reason can be asserted without building a whole sweep.',
     };
 
     for (const mod of WATCHED) {
@@ -427,7 +444,7 @@ describe('the seams that broke before', () => {
     it('links a batch through the batch path, not a loop over the single-link one', () => {
         // AppContext.linkFeGuideRow refreshes every vehicle in the app after
         // each call — correct for one link, since the promoted figures reach a
-        // vehicle card through epa_vehicle_mappings. Looping it over 98 groups
+        // vehicle card through epa_vehicle_mappings. Looping it over 98 test vehicles
         // ran the app's largest query 98 times, so the sweep appeared to hang
         // and only the last of 98 toasts survived. The batch path refreshes
         // once. Nothing about that is visible from either file alone.
@@ -451,7 +468,7 @@ describe('the seams that broke before', () => {
     it('lets the FE guide ranker see every year, and fetches what it ranks on', () => {
         // rankFeCandidates treats the model year as a SORT key and
         // bestFeCandidate has a dedicated wrong-year path — both written for
-        // candidates spanning years. The query filtered to the group's exact
+        // candidates spanning years. The query filtered to the test vehicle's exact
         // year, so neither could ever fire, and a 2027 ID. Buzz reported no
         // staged rows while its 2025 and 2026 rows sat in the table. Two modules
         // disagreeing about whether year filters or sorts is invisible unless
@@ -466,7 +483,12 @@ describe('the seams that broke before', () => {
         // The select is narrowed, so anything the ranker or picker reads off a
         // candidate has to be named in it or it arrives undefined.
         const selected = new Set(
-            (fn.match(/\.select\(\s*['"]([^'"]+)['"]/)?.[1] ?? '').split(',').map(s => s.trim()),
+            // The select is GUIDE_VIEW_FIELDS plus what only the picker shows
+            // (#374: candidates are checked against the lab data before linking).
+            [
+                ...(svc.match(/const GUIDE_VIEW_FIELDS = '([^']*)'/)?.[1] ?? '').split(','),
+                ...(fn.match(/\.select\(`\$\{GUIDE_VIEW_FIELDS\}((?:, [a-z_]+)*)`\)/)?.[1] ?? '').split(','),
+            ].map(s => s.trim()).filter(Boolean),
         );
         const match = read('src/utils/feGuideMatch.js');
         const picker = read('src/components/epa/FeGuidePicker.jsx');
@@ -545,9 +567,12 @@ describe('the seams that broke before', () => {
         // is applied fails the entire query (055), so the mapping is a wildcard
         // and `is_primary` is only ever read off the row.
         const svc = read('src/services/DataService.js');
-        const select = svc.slice(svc.indexOf('async getVehicles'), svc.indexOf('.order(', svc.indexOf('async getVehicles')));
+        // Up to the first use of the rows: the query is built in two halves (the
+        // EPA embed can be dropped while migration 081 is unapplied), so the
+        // select is no longer one string before `.order(`.
+        const select = svc.slice(svc.indexOf('async getVehicles'), svc.indexOf('// Pass 1', svc.indexOf('async getVehicles')));
         // (`epa_coefficient_sets` names its own, older `is_primary` — that one is fine.)
-        expect(select).toMatch(/epa_vehicle_mappings\(\*, epa_test_groups\(/);
+        expect(select).toMatch(/epa_vehicle_mappings\(\*, epa_test_vehicles\(/);
 
         // The client writes one UPDATE; the index and the trigger that make
         // that safe must both be in the migration.
@@ -990,12 +1015,12 @@ describe('the seams that broke before', () => {
         expect(admin, 'AdminView must mount the sweep').toMatch(/<EpaAuditSweep\s*\/>/);
 
         // And it must reach real data. The query is deliberately unfiltered:
-        // a group with no guide row still has phases that can contradict its
+        // a test vehicle with no guide row still has phases that can contradict its
         // own stated ranges, and those are the ones nobody has looked at.
         const svc = read('src/services/DataService.js');
-        const body = svc.slice(svc.indexOf('async getEpaGroupsForAudit'));
+        const body = svc.slice(svc.indexOf('async getEpaTestVehiclesForAudit'));
         const fn = body.slice(0, body.indexOf('\n  }'));
-        expect(fn, 'the audit query must not filter to linked groups')
+        expect(fn, 'the audit query must not filter to linked test vehicles')
             .not.toMatch(/\.not\(\s*['"]fe_guide_row_id['"]/);
 
         // Every column the checks read has to be selected or it arrives
@@ -1008,7 +1033,7 @@ describe('the seams that broke before', () => {
         }
 
         // The per-test ranges specifically (#227). They fall back to the
-        // group's when absent, so forgetting them in a query does not error —
+        // test vehicle's when absent, so forgetting them in a query does not error —
         // it silently reinstates the cross-test comparison the fix removed.
         const testsSelect = fn.slice(fn.indexOf('epa_tests('));
         expect(testsSelect.slice(0, testsSelect.indexOf(')')),
@@ -1032,16 +1057,16 @@ describe('the seams that broke before', () => {
         // when the column is absent, so a query that forgets it silently
         // reinstates the default with nothing to show anything went wrong.
         // getVehicles (and the explainers' modeled-efficiency preview) read the
-        // record through EPA_GROUP_FIELDS, so the column is checked there.
-        const q = svc.slice(svc.indexOf('async getEpaGroupsForAudit'));
-        expect(q.slice(0, q.indexOf('\n  }')), 'getEpaGroupsForAudit must select preferred_test_number')
+        // record through EPA_TEST_VEHICLE_FIELDS, so the column is checked there.
+        const q = svc.slice(svc.indexOf('async getEpaTestVehiclesForAudit'));
+        expect(q.slice(0, q.indexOf('\n  }')), 'getEpaTestVehiclesForAudit must select preferred_test_number')
             .toMatch(/preferred_test_number/);
-        const fields = svc.match(/const EPA_GROUP_FIELDS = '([^']*)'/)?.[1] ?? '';
-        expect(fields, 'EPA_GROUP_FIELDS must select preferred_test_number').toMatch(/preferred_test_number/);
+        const fields = svc.match(/const EPA_LAB_FIELDS = `([^`]*)`/)?.[1] ?? '';
+        expect(fields, 'EPA_TEST_VEHICLE_FIELDS must select preferred_test_number').toMatch(/preferred_test_number/);
         const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
-        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }')), 'getVehicles must read EPA_GROUP_FIELDS')
-            .toMatch(/epa_test_groups\(\$\{EPA_GROUP_FIELDS\}\)/);
-        expect(read('src/utils/epaRecordFromGroup.js'),
+        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }')), 'getVehicles must read EPA_TEST_VEHICLE_FIELDS')
+            .toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
+        expect(read('src/utils/epaRecordFromTestVehicle.js'),
             'the derivation must honour the selection')
             .toMatch(/preferred_test_number/);
     });
@@ -1061,21 +1086,21 @@ describe('the seams that broke before', () => {
         for (const f of ['src/components/EpaVehicleSection.jsx',
                          'src/components/epa/DerivedValues.jsx']) {
             expect(read(f), `${f} must not pull the corpus`)
-                .not.toMatch(/BandEvidence|getCertGroupsForStats/);
+                .not.toMatch(/BandEvidence|getTestVehiclesForCertStats/);
         }
     });
 
     it('lets a curator pick the test, through the path that persists it', () => {
         // #228's own words: the warning "tells you a choice was made without
         // letting you make it". The control has to be mounted, and it has to
-        // write through saveGroup — which is what tags the field `manual` and
+        // write through saveTestVehicle — which is what tags the field `manual` and
         // appends the audit entry. A direct write would skip both, and unlink
         // would then wipe the choice, because isCuratorOwned looks for that tag.
         const editor = read('src/components/epa/EpaCuratorEditor.jsx');
         expect(editor, 'the curator editor must mount the picker')
             .toMatch(/<PreferredTestPicker/);
         expect(editor, 'the picker must write through the buffered save path')
-            .toMatch(/saveGroup\('preferred_test_number'/);
+            .toMatch(/saveTestVehicle\('preferred_test_number'/);
 
         // One copy of the default's rule. The picker labels a row "Automatic";
         // if that label and the derivation disagreed the control would be
@@ -1083,7 +1108,7 @@ describe('the seams that broke before', () => {
         const picker = read('src/components/epa/PreferredTestPicker.jsx');
         expect(picker, 'the picker must use the shared default, not its own copy')
             .toMatch(/defaultMctTest/);
-        expect(read('src/utils/epaRecordFromGroup.js'),
+        expect(read('src/utils/epaRecordFromTestVehicle.js'),
             'the derivation must use the same one').toMatch(/defaultMctTest\(/);
         expect(picker, 'the picker must not re-implement the tie-break')
             .not.toMatch(/localeCompare/);
@@ -1130,15 +1155,15 @@ describe('the seams that broke before', () => {
     });
 
     it('checks a recomputed range against the test it derived from', () => {
-        // The group's cd_range_* is set at import from the FIRST procedure-77
-        // test while the derivation uses the most RECENT, so reading the group
+        // The test vehicle's cd_range_* is set at import from the FIRST procedure-77
+        // test while the derivation uses the most RECENT, so reading the test vehicle
         // compared one laboratory's phases against another's stated figures.
         // On the real CLA 350 that was a 3.06% disagreement that was really two
         // runs a month apart. Both readers must go through statedRanges.
         for (const f of ['src/utils/epaAudit.js', 'src/components/EpaVehicleSection.jsx']) {
             const text = read(f);
-            expect(text, `${f} must not read cd_range off the group`)
-                .not.toMatch(/cityMi:\s*g(roup)?\??\.cd_range_combined_calc/);
+            expect(text, `${f} must not read cd_range off the test vehicle`)
+                .not.toMatch(/cityMi:\s*(g|group|testVehicle)\??\.cd_range_combined_calc/);
             expect(text, `${f} must compare against the derivation test's ranges`)
                 .toMatch(/statedRanges/);
         }
@@ -1158,14 +1183,14 @@ describe('the seams that broke before', () => {
     });
 
     it('refreshes the vehicle after every FE guide mutation', () => {
-        // All three write to epa_test_groups, which reaches the page only through
+        // All three write to epa_test_vehicles, which reaches the page only through
         // the vehicle's epa_vehicle_mappings. Without a refetch the card keeps
         // rendering pre-link values, so the curator cannot see whether the row
         // they picked was right without reloading — which defeats the point of a
         // picker whose whole job is making the link checkable.
         //
         // FeGuidePicker does fire an onChanged callback, but EpaVehicleSection's
-        // onGroupChanged prop is never supplied by RunsView, so that path is
+        // onTestVehicleChanged prop is never supplied by RunsView, so that path is
         // inert. Asserting on the context is asserting on the one that runs.
         const ctx = read('src/context/AppContext.jsx');
         for (const fn of ['linkFeGuideRow', 'unlinkFeGuideRow', 'acceptFeGuideValues']) {
@@ -1208,12 +1233,12 @@ describe('the seams that broke before', () => {
         //
         // Both halves are asserted because either alone passes while broken:
         // importing the adapter proves nothing if the render still maps
-        // fixtures, and dropping the fixtures proves nothing if no real group
+        // fixtures, and dropping the fixtures proves nothing if no real test vehicle
         // reaches the model.
         const view = read('src/components/EpaCurvesView.jsx');
 
-        expect(view, 'the diagram must go through the group adapter')
-            .toMatch(/epaRecordFromGroup\(/);
+        expect(view, 'the diagram must go through the test vehicle adapter')
+            .toMatch(/epaRecordFromTestVehicle\(/);
         expect(view, 'sample records must not feed the rendered diagram')
             .not.toMatch(/METHODOLOGY_FIXTURES/);
         // The adapter's reasons exist to be shown; computing them and dropping
@@ -1227,17 +1252,17 @@ describe('the seams that broke before', () => {
         // eleven more that nothing widened the list for. Promotion wrote them
         // correctly and the card read them as null: six label figures blank on
         // screen while sitting in the database, and `fe_guide_row_id` missing
-        // meant a linked group still rendered the "link me" picker.
+        // meant a linked test vehicle still rendered the "link me" picker.
         //
         // Nothing fails loudly when a column is absent from a Supabase select —
         // the field is simply undefined — so this is the only place the two
         // lists can be held together.
-        // The list is EPA_GROUP_FIELDS, which getVehicles reads the record through.
+        // The list is EPA_TEST_VEHICLE_FIELDS, which getVehicles reads the record through.
         const svc = read('src/services/DataService.js');
-        const fields = svc.match(/const EPA_GROUP_FIELDS = '([^']*)'/)?.[1] ?? '';
+        const fields = svc.match(/const EPA_LAB_FIELDS = `([^`]*)`/)?.[1] ?? '';
         const columns = fields.slice(0, fields.indexOf('epa_coefficient_sets'));
         const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
-        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }'))).toMatch(/epa_test_groups\(\$\{EPA_GROUP_FIELDS\}\)/);
+        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }'))).toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
 
         const promo = read('src/utils/feGuidePromotion.js');
         const targets = [...promo.matchAll(/^\s+\w+:\s+'(\w+)',/gm)].map(m => m[1]);
@@ -1714,5 +1739,107 @@ describe('the vehicle swatch is connected (#308, #317)', () => {
     it('the provider wraps the app and the sticky hook exempts based runs from its memory', () => {
         expect(app).toMatch(/<VehicleBaseContext\.Provider value=\{vehicleBaseApi\}>/);
         expect(read('src/hooks/useStickyChartColors.js')).toMatch(/v\.sessionBase/);
+    });
+});
+
+describe('the EPA test vehicle rename holds (#374, migration 081)', () => {
+    // The record keyed by EPA's Vehicle ID was called a "test group", and EPA's
+    // Test Group is the certification. Migration 081 renamed it through the
+    // database; these are the names it retired. A ratchet at zero: no file in
+    // src may bring one back. (npm run vocab catches them on added lines too;
+    // this catches a revert or a merge that never went through it.)
+    // Assembled from pieces so this file does not itself trip `npm run vocab`,
+    // which rejects the whole names on any added line.
+    const g = 'group';
+    const RETIRED = new RegExp(`\\b(epa_test_${g}s|test_${g}_id|epa_test_${g}_id|test${'G'+g.slice(1)}Ids?|epa${'G'+g.slice(1)}|epa_test_${'fam'}ily_id|carryover_test_${g}_id)\\b`);
+
+    it('no source file uses a retired identifier', () => {
+        const offenders = ALL.filter(({ text }) => RETIRED.test(text)).map(({ file }) => file);
+        expect(offenders).toEqual([]);
+    });
+
+    it('every PostgREST embed names the renamed table', () => {
+        const svc = read('src/services/DataService.js');
+        expect(svc).not.toMatch(/epa_test_groups_fe_guide_row_id_fkey/);
+        expect(svc).toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
+    });
+
+    it('getVehicles survives the window before migration 081 is applied', () => {
+        // The EPA embed is dropped, not the page, when the database still has
+        // the old names — getVehicles backs the whole app.
+        const svc = read('src/services/DataService.js');
+        const fn = svc.slice(svc.indexOf('async getVehicles'), svc.indexOf('// Pass 1', svc.indexOf('async getVehicles')));
+        expect(fn).toMatch(/isMissingEpaEmbed\(error\)/);
+        expect(fn).toMatch(/await query\(base\)/);
+    });
+});
+
+describe('every write of a test vehicle or its Guide link reaches its certification (#374 layer 2)', () => {
+    const svc = read('src/services/DataService.js');
+    const body = (name) => svc.slice(svc.indexOf(`async ${name}(`), svc.indexOf('\n  }\n', svc.indexOf(`async ${name}(`)));
+
+    it('the parser hands over the certificate, and the modal passes every file\'s on', () => {
+        expect(read('src/utils/parseEpaCsiPdf.js')).toMatch(/return \{ testVehicles, certification, warnings \}/);
+        const modal = read('src/components/EpaPdfImportModal.jsx');
+        expect(modal).toMatch(/const \{ testVehicles: g, certification, warnings: w \} = parseEpaCsiText/);
+        expect(modal).toMatch(/certifications: certs,/);
+    });
+
+    it('the import writes each certification after the test vehicles it names', () => {
+        const ctx = read('src/context/AppContext.jsx');
+        const fn = ctx.slice(ctx.indexOf('const importEpaCsiTestVehicles'), ctx.indexOf('const updateEpaMapping'));
+        expect(fn.indexOf('importEpaTestVehicleFull')).toBeLessThan(fn.indexOf('importEpaCertification'));
+        expect(fn).toMatch(/dataService\.importEpaCertification\(certification, members\)/);
+    });
+
+    it('a Guide link, an unlink and a skip are written to the certification too', () => {
+        expect(body('linkFeGuideRow')).toMatch(/this\.syncCertificationGuideLink\(/);
+        // Layer 3 (#374): the link IS the certification's, so unlinking clears it there.
+        expect(body('unlinkFeGuideRow')).toMatch(/from\('epa_certification_test_vehicles'\)\s*\n?\s*\.update\(\{ fe_guide_row_id: null \}\)/);
+        expect(body('setFeLinkSkipped')).toMatch(/this\.setCertificationSkips\(/);
+    });
+
+    it('records made without a CSI file get their certification too', () => {
+        expect(body('bulkUpsertEpaTestVehicles')).toMatch(/this\.recordEpaCertifications\(testVehicleRows, 'csv'\)/);
+        expect(body('createEpaTestVehicle')).toMatch(/this\.recordEpaCertifications\(.*'manual'\)/);
+    });
+
+    it('the importer and the backfill share one rule for a Guide link and one for a filing', () => {
+        expect(body('syncCertificationGuideLink')).toMatch(/guideLinkTarget\(/);
+        expect(body('importEpaCertification')).toMatch(/planCertificationImport\(/);
+    });
+});
+
+describe('the years and certifications reach both surfaces the owner named (#374 layer 4)', () => {
+    const section = read('src/components/EpaVehicleSection.jsx');
+
+    it('the vehicle\'s EPA sub-tab shows Since, the years line and the certifications', () => {
+        expect(section).toMatch(/Since MY\$\{sinceYear\(g\)\}/);
+        expect(section).toMatch(/formatYears\(certifiedYears\(g\)\)/);
+        expect(section).toMatch(/<EpaCertificationList[\s\S]*?testVehicle=\{g\}/);
+    });
+
+    it('the Guide picker links whichever certification the curator picked in the list', () => {
+        expect(section).toMatch(/onTarget=\{setPickerLinkId\}/);
+        expect(section).toMatch(/<FeGuidePicker[^>]*testVehicle=\{pickerTestVehicle\}/);
+        expect(read('src/components/epa/FeGuidePicker.jsx')).toMatch(/linkRowId: cert\?\.linkId/);
+    });
+
+    it('the Guide-row detail names the certification each test vehicle is linked through', () => {
+        expect(read('src/components/epa/guide/GuideDetailModal.jsx')).toMatch(/guideRowId=\{row\.id\}/);
+        const results = read('src/components/epa/guide/GuideCertificationResults.jsx');
+        expect(results).toMatch(/c\.fe_guide_row_id === guideRowId/);
+        expect(results).toMatch(/EPA Certification MY\$\{cert\.model_year\} · Test Group/);
+    });
+
+    it('the Admin list and the primary picker show the years', () => {
+        expect(read('src/components/EpaDataCard.jsx')).toMatch(/formatYears\(certifiedYears\(g\)\)/);
+        expect(read('src/components/epa/PrimaryConfigurationPicker.jsx')).toMatch(/yearsOf\(m\.epaTestVehicle\)/);
+    });
+
+    it('the curator form no longer edits a year it does not own', () => {
+        const editor = read('src/components/epa/EpaCuratorEditor.jsx');
+        expect(editor).not.toMatch(/saveTestVehicle\('model_year'/);
+        expect(editor).toMatch(/label="Since"[^>]*canEdit=\{false\}/);
     });
 });

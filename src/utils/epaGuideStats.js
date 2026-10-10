@@ -37,18 +37,18 @@ import { GUIDE_COLUMNS } from './feGuideBrowse';
  * measures how many variants a manufacturer chose to list, and calls it a fact
  * about the fleet.
  *
- * The test group is EPA's own grouping — the configurations certified together
+ * The Test Group is EPA's own grouping — the configurations certified together
  * — and collapsing onto it takes 1,175 rows to 462 while moving Rivian from
  * rank 1 to rank 10. That is why it is the default.
  *
  * None of the three is wrong. They answer different questions, and the UI says
  * which, because the same query gives materially different answers: MY2026
- * combined MPGe reads 91.0 per configuration, 95.2 per test group, 91.8 per
+ * combined MPGe reads 91.0 per configuration, 95.2 per Test Group, 91.8 per
  * make.
  */
 export const UNITS = [
     { key: 'config',     label: 'Per configuration', answers: 'What can I actually buy?' },
-    { key: 'test_group', label: 'Per test group',    answers: 'What did EPA measure?' },
+    { key: 'test_group', label: 'Per Test Group',    answers: 'What did EPA measure?' },
     { key: 'make',       label: 'Per make',          answers: 'Who builds efficient cars?' },
 ];
 export const DEFAULT_UNIT = 'test_group';
@@ -72,7 +72,7 @@ const naturalKey = (r) =>
 /** How rows are bucketed into one observation, per unit. */
 const UNIT_KEYS = {
     config:     (r) => r.id ?? naturalKey(r),
-    // A row with no test group is its own group rather than joining a shared
+    // A row with no Test Group is its own group rather than joining a shared
     // null bucket, which would merge unrelated vehicles into one observation.
     test_group: (r) => `${r.model_year}|${r.smog_test_group ?? naturalKey(r)}`,
     make:       (r) => r.brand ?? r.division ?? '(unknown)',
@@ -220,7 +220,7 @@ export function describe(values) {
  * clusters. Standard for clustered data, needs no inputs we do not have, and
  * does not pretend to a sales weighting nobody has.
  *
- * The within-cluster summary is a median too, not a mean — a test group holding
+ * The within-cluster summary is a median too, not a mean — a Test Group holding
  * a 20-inch and a 22-inch variant should report the middle of them, and one
  * outlying wheel option should not drag the group.
  */
@@ -263,7 +263,7 @@ export function summarise(rows, { unit = DEFAULT_UNIT, dimension, measure, minN 
  * where an observation came from.
  *
  * Split out so the certification statistics can reuse it: those are one
- * observation per test group and need no clustering, but every rule about
+ * observation per Test Group and need no clustering, but every rule about
  * buckets — suppress rather than drop, sink the suppressed, sort by median —
  * should be the same in both places rather than written twice.
  */
@@ -350,7 +350,7 @@ export function histogram(rows, { unit = DEFAULT_UNIT, measure, bins = 20 } = {}
 /**
  * The same, over observations that are already one per thing.
  *
- * Certification records need this: they are one observation per test group and
+ * Certification records need this: they are one observation per Test Group and
  * must not be clustered again. Passing them through `toObservations` keyed them
  * by the guide's natural key, which a certification record does not have — so
  * 44 groups collapsed to 39 and the histogram quietly disagreed with the table

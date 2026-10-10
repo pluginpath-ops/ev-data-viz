@@ -11,7 +11,7 @@ import MenuButton from '../../shell/MenuButton';
  *
  * ── The unit is a segmented control, not a menu ─────────────────────────────
  *
- * `ONE OBSERVATION PER Configuration | Test group | Make` is the guard against a
+ * `ONE OBSERVATION PER Configuration | Test Group | Make` is the guard against a
  * make with 24 trim rows dominating a distribution, and it changes every number
  * on the screen. It stays open, in words, at the left of the strip: a reader who
  * does not know which one they are looking at cannot use any of the figures, and
@@ -36,7 +36,7 @@ function Segmented({ label, options, value, onChange }) {
                         onClick={() => onChange(o.key)}
                         title={o.answers}
                     >
-                        {/* "Per test group" is the sentence the caption writes;
+                        {/* "Per Test Group" is the sentence the caption writes;
                             in a segment beside two others the "Per" is noise —
                             and what is left has to start a label, not continue
                             a sentence, so it takes the capital with it. */}

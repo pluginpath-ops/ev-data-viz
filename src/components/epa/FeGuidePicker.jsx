@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
+import GuideCandidateCheck from './GuideCandidateCheck';
 import { useAppContext } from '../../context/AppContext';
 import { MATCH_FLOOR } from '../../utils/feGuideMatch';
 import { guideConflicts } from '../../utils/feGuidePromotion';
 
 /**
- * Attach a staged Fuel Economy Guide row to this EPA test group (#206, phase 3).
+ * Attach a staged Fuel Economy Guide row to this EPA test vehicle (#206, phase 3).
  *
  * This is where the curation happens. No key joins the two — the guide's smog
- * test group matches 1 of our 89 linked groups and is not unique per
+ * Test Group matches 1 of our 89 linked test vehicles and is not unique per
  * configuration — so a human decides, and this exists to make that decision a
  * confirmation rather than a search.
  *
@@ -16,7 +17,7 @@ import { guideConflicts } from '../../utils/feGuidePromotion';
  * in all 41 cases measured, so the top one is offered as a proposal and the rest
  * stay one click away. A proposal, not an answer: the curator confirms.
  *
- * Candidates span EVERY imported year, not just the group's. A configuration
+ * Candidates span EVERY imported year, not just the test vehicle's. A configuration
  * often has no row in its own model year — VW has filed nothing for 2027, so a
  * 2027 ID. Buzz has only 2025 and 2026 to draw on — and a borrowed year is a
  * legitimate link, just one the curator has to make knowingly. Same-year rows
@@ -37,9 +38,12 @@ import { guideConflicts } from '../../utils/feGuidePromotion';
  * across the two — and facts that appear in one and not the other are facts
  * they have to hold in their head.
  */
-function CandidateFacts({ row, exactYear, score }) {
+function CandidateFacts({ row, exactYear, score, testVehicle }) {
     return (
         <div className="text-xs text-meta">
+            {/* The EPA tab's check, on this row before it is linked: the same
+                name can be very different figures (#374). */}
+            <GuideCandidateCheck testVehicle={testVehicle} row={row} />{' '}
             {row.label_comb_range_mi} mi
             {row.label_comb_mpge != null && ` · ${row.label_comb_mpge} MPGe`}
             {row.motor_count != null && ` · ${row.motor_count} motor${row.motor_count === 1 ? '' : 's'}`}
@@ -71,7 +75,7 @@ const FIELD_LABELS = {
     label_calc_approach:     'Label method',
 };
 
-export default function FeGuidePicker({ group, canEdit, onChanged }) {
+export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
     const { getFeGuideCandidates, linkFeGuideRow, unlinkFeGuideRow,
             getFeGuideRow, acceptFeGuideValues } = useAppContext();
 
@@ -82,16 +86,21 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
     const [query, setQuery]       = useState('');
     const [error, setError]       = useState(null);
 
-    const linked = group?.fe_guide_row_id != null;
+    // The certification this picker links: the one the vehicle reads (#374).
+    // Its own link decides "linked" — the figures on the card may be another
+    // year's, borrowed until this year is linked.
+    const cert = testVehicle?._certification ?? null;
+    const ownRowId = cert ? cert.ownGuideRowId : testVehicle?.fe_guide_row_id;
+    const linked = ownRowId != null;
 
-    // The PRIMITIVES the search depends on, not the group object. `group` in the
+    // The PRIMITIVES the search depends on, not the test vehicle object. `testVehicle` in the
     // curator form is a useMemo over the row plus the unsaved edit buffer, so it
     // is a new object on every keystroke — depending on it refetched the whole
     // candidate list each time a curator typed a character in any field.
-    const tgid      = group?.test_group_id;
-    const make      = group?.make;
-    const modelYear = group?.model_year;
-    const carline   = group?.epa_carline_name;
+    const tgid      = testVehicle?.test_vehicle_id;
+    const make      = testVehicle?.make;
+    const modelYear = testVehicle?.model_year;
+    const carline   = testVehicle?.epa_carline_name;
 
     // Derived, not stored. Setting a loading flag synchronously in the effect is
     // the cascading-render shape the lint rule exists to catch, and the state it
@@ -102,7 +111,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
         if (!tgid || linked) return;
         let cancelled = false;
         getFeGuideCandidates({
-            test_group_id: tgid, make, model_year: modelYear, epa_carline_name: carline,
+            test_vehicle_id: tgid, make, model_year: modelYear, epa_carline_name: carline,
         })
             .then(c => { if (!cancelled) setCandidates(c); })
             .catch(e => { if (!cancelled) setError(e.message); });
@@ -116,7 +125,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
     // The linked row itself, so the fields it was not allowed to fill can be
     // named. Promotion reports them once and forgets; the disagreement does not
     // go away, and the published figure may well be the one wanted.
-    const feRowId = group?.fe_guide_row_id;
+    const feRowId = ownRowId ?? null;
     useEffect(() => {
         // Only the async path sets state. Clearing synchronously on unlink is
         // the same cascading-render shape the loading flag had; deriving it from
@@ -130,11 +139,11 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [feRowId]);
 
-    // Derived, so an unlinked group shows nothing without a state write: a
+    // Derived, so an unlinked test vehicle shows nothing without a state write: a
     // stale linkedRow from a previous link is simply not consulted.
     const conflicts = useMemo(
-        () => (feRowId != null && linkedRow?.id === feRowId ? guideConflicts(group, linkedRow) : []),
-        [group, linkedRow, feRowId],
+        () => (feRowId != null && linkedRow?.id === feRowId ? guideConflicts(testVehicle, linkedRow) : []),
+        [testVehicle, linkedRow, feRowId],
     );
 
     const filtered = useMemo(() => {
@@ -151,7 +160,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
         setBusy(true);
         setError(null);
         try {
-            await linkFeGuideRow(group.test_group_id, feRowId);
+            await linkFeGuideRow(testVehicle.test_vehicle_id, feRowId, { linkRowId: cert?.linkId ?? null });
             onChanged?.();
         } catch (e) { setError(e.message); }
         finally { setBusy(false); }
@@ -161,7 +170,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
         setBusy(true);
         setError(null);
         try {
-            await acceptFeGuideValues(group.test_group_id, columns);
+            await acceptFeGuideValues(testVehicle.test_vehicle_id, columns);
             onChanged?.();
         } catch (e) { setError(e.message); }
         finally { setBusy(false); }
@@ -171,13 +180,13 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
         setBusy(true);
         setError(null);
         try {
-            await unlinkFeGuideRow(group.test_group_id);
+            await unlinkFeGuideRow(testVehicle.test_vehicle_id, { linkRowId: cert?.linkId ?? null });
             onChanged?.();
         } catch (e) { setError(e.message); }
         finally { setBusy(false); }
     }
 
-    if (!group) return null;
+    if (!testVehicle) return null;
 
     if (linked) {
         return (
@@ -246,13 +255,23 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
     return (
         <div className="fe-picker">
             <div className="fe-picker-head">
-                <span className="text-xs font-semibold text-secondary">Fuel Economy Guide</span>
+                <span className="text-xs font-semibold text-secondary">
+                    Fuel Economy Guide{cert?.model_year ? ` · MY${cert.model_year}` : ''}
+                </span>
                 {loading && <span className="text-xs text-meta">searching…</span>}
             </div>
 
+            {/* Nothing silent (#374): the card is showing another year's
+                figures until this certification has a Guide row of its own. */}
+            {cert?.guideYear != null && cert.guideYear !== cert.model_year && (
+                <p className="text-note">
+                    Showing the MY{cert.guideYear} Guide figures until MY{cert.model_year} is linked.
+                </p>
+            )}
+
             {!loading && candidates?.length === 0 && (
                 <p className="text-xs text-secondary">
-                    No staged guide rows for {group.make || 'this make'} in any imported year.
+                    No staged guide rows for {testVehicle.make || 'this make'} in any imported year.
                     Import a guide under Admin → Fuel Economy Guide.
                 </p>
             )}
@@ -261,7 +280,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                 <div className="fe-candidate fe-candidate-best">
                     <div className="min-w-0">
                         <div className="text-sm font-medium text-secondary truncate">{best.row.carline}</div>
-                        <CandidateFacts row={best.row} exactYear={best.exactYear} score={best.score} />
+                        <CandidateFacts row={best.row} exactYear={best.exactYear} score={best.score} testVehicle={testVehicle} />
                     </div>
                     {canEdit && (
                         <button
@@ -300,7 +319,7 @@ export default function FeGuidePicker({ group, canEdit, onChanged }) {
                                     <div key={c.row.id} className="fe-candidate">
                                         <div className="min-w-0">
                                             <div className="text-xs text-secondary truncate">{c.row.carline}</div>
-                                            <CandidateFacts row={c.row} exactYear={c.exactYear} score={c.score} />
+                                            <CandidateFacts row={c.row} exactYear={c.exactYear} score={c.score} testVehicle={testVehicle} />
                                         </div>
                                         {canEdit && (
                                             <button

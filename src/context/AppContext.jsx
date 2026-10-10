@@ -1329,57 +1329,59 @@ export function AppProvider({ children }) {
         }
     };
 
-    // ── EPA test group linking ────────────────────────────────────────────────
+    // ── EPA test vehicle linking ────────────────────────────────────────────────
 
     /** Pass-through: server-side search used by the linking combobox. */
-    const searchEpaTestGroups = (query, year) => dataService.searchEpaTestGroups(query, year);
+    const searchEpaTestVehicles = (query, year) => dataService.searchEpaTestVehicles(query, year);
 
-    /** Pass-through: the groups a variant's EPA suggestions are ranked from (#341). */
+    /** Pass-through: the test vehicles a variant's EPA suggestions are ranked from (#341). */
     const getEpaSuggestionCandidates = (query) => dataService.getEpaSuggestionCandidates(query);
 
-    const linkEpaTestGroup = async (vehicleId, groupId, confidence, notes) => {
+    const linkEpaTestVehicle = async (vehicleId, groupId, confidence, notes) => {
         try {
-            await dataService.linkEpaTestGroup(vehicleId, groupId, confidence, notes);
+            await dataService.linkEpaTestVehicle(vehicleId, groupId, confidence, notes);
             // Re-fetch vehicles so epa_mappings reflects the new link immediately.
             const updated = await dataService.getVehicles();
             setVehicles(updated);
-            showSuccess('EPA test group linked.');
+            showSuccess('EPA test vehicle linked.');
         } catch (error) {
-            showError('Error linking EPA test group: ' + error.message);
+            showError('Error linking EPA test vehicle: ' + error.message);
         }
     };
 
     /**
-     * Create an EPA test group from scratch (hand-entered, e.g. from a lab PDF)
+     * Create an EPA test vehicle from scratch (hand-entered, e.g. from a lab PDF)
      * and link it to the vehicle, then refresh so the curator form can fill in
      * coefficients, tests and phases.
      */
-    const createAndLinkEpaTestGroup = async (vehicleId, fields) => {
+    const createAndLinkEpaTestVehicle = async (vehicleId, fields) => {
         try {
-            await dataService.createEpaTestGroup(fields);
-            await dataService.linkEpaTestGroup(vehicleId, fields.test_group_id, 'likely', null);
+            await dataService.createEpaTestVehicle(fields);
+            await dataService.linkEpaTestVehicle(vehicleId, fields.test_vehicle_id, 'likely', null);
             const updated = await dataService.getVehicles();
             setVehicles(updated);
-            showSuccess('EPA test group created and linked.');
+            showSuccess('EPA test vehicle created and linked.');
         } catch (error) {
-            showError('Error creating EPA test group: ' + error.message);
+            showError('Error creating EPA test vehicle: ' + error.message);
             throw error;
         }
     };
 
-    /** Which of these test_group_ids already exist (for overwrite confirmation). */
-    const getExistingEpaTestGroupIds = (ids) => dataService.getExistingEpaTestGroupIds(ids);
+    /** Which of these test_vehicle_ids already exist (for overwrite confirmation). */
+    const getExistingEpaTestVehicleIds = (ids) => dataService.getExistingEpaTestVehicleIds(ids);
+    /** Which certifications these test vehicles are already in, for the import review (#374). */
+    const getEpaCertificationsFor = (ids) => dataService.getEpaCertificationsFor(ids);
 
     /**
-     * Import parsed CSI-PDF groups (clean-replace each), optionally linking one
+     * Import parsed CSI-PDF test vehicles (clean-replace each), optionally linking one
      * to a vehicle, then refresh. Used by the PDF import modal from both Admin
      * and the per-vehicle curator section.
      */
     /**
      * Bulk-import a parsed EPA Fuel Economy Guide (#206).
      *
-     * Staged rows only — nothing is written to epa_test_groups here. Promotion
-     * onto a group is a separate, curator-driven step, because no key joins the
+     * Staged rows only — nothing is written to epa_test_vehicles here. Promotion
+     * onto a test vehicle is a separate, curator-driven step, because no key joins the
      * two automatically.
      */
     const importFeGuide = async (rows, sourceFile = null) => {
@@ -1399,27 +1401,32 @@ export function AppProvider({ children }) {
 
     const getFeGuideSummary = () => dataService.getFeGuideSummary();
 
-    const getFeGuideCandidates = (group) => dataService.getFeGuideCandidates(group);
+    const getFeGuideCandidates = (testVehicle) => dataService.getFeGuideCandidates(testVehicle);
 
     /**
-     * Attach a guide row to a test group and copy its figures across (#206).
+     * Attach a guide row to a test vehicle and copy its figures across (#206).
      *
      * Reports what was skipped as well as what landed: a field the curator has
      * overridden by hand is deliberately left alone, and a silent skip reads as
      * a bug rather than as the rule working.
      */
-    const linkFeGuideRow = async (testGroupId, feRowId) => {
+    /**
+     * Link a Guide row to a test vehicle in one certification (#374).
+     * `linkRowId` names the certification; without it the link goes to the
+     * one the Guide row's own year and Test Group name.
+     */
+    const linkFeGuideRow = async (testVehicleId, feRowId, opts = {}) => {
         try {
-            const res = await dataService.linkFeGuideRow(testGroupId, feRowId);
-            // The promoted figures land on the test group, which reaches the UI
-            // through the vehicle's epa_vehicle_mappings — so without this the
-            // card keeps rendering the pre-link values and the curator cannot
-            // see whether the row they picked was the right one until they
-            // reload. Same reason every sibling EPA mutation here refreshes.
+            const res = await dataService.linkFeGuideRow(testVehicleId, feRowId, opts);
+            // The Guide's figures reach the UI through the vehicle's
+            // epa_vehicle_mappings — so without this the card keeps rendering
+            // the pre-link values and the curator cannot see whether the row
+            // they picked was the right one until they reload. Same reason
+            // every sibling EPA mutation here refreshes.
             await softRefreshVehicles();
-            const note = res.skipped.length
-                ? `${res.promoted.length} field(s) filled, ${res.skipped.length} left as curator-set.`
-                : `${res.promoted.length} field(s) filled from the guide.`;
+            const note = res.held.length
+                ? `${res.applied.length} field(s) read from the guide, ${res.held.length} left as curator-set.`
+                : `${res.applied.length} field(s) read from the guide.`;
             showSuccess(note);
             return res;
         } catch (error) {
@@ -1429,7 +1436,7 @@ export function AppProvider({ children }) {
     };
 
     /**
-     * Link many groups, then refresh ONCE (#238).
+     * Link many test vehicles, then refresh ONCE (#238).
      *
      * The single-link wrapper above refreshes every vehicle after each call,
      * which is right for one link and ruinous for a batch — ninety-eight links
@@ -1443,7 +1450,7 @@ export function AppProvider({ children }) {
             if (res.linked > 0) await softRefreshVehicles();
             if (res.failures.length) {
                 showError(`${res.linked} linked, ${res.failures.length} failed — `
-                    + res.failures.slice(0, 3).map(f => f.testGroupId).join(', '));
+                    + res.failures.slice(0, 3).map(f => f.testVehicleId).join(', '));
             }
             return res;
         } catch (error) {
@@ -1453,12 +1460,12 @@ export function AppProvider({ children }) {
     };
 
     const getFeGuideRow = (id) => dataService.getFeGuideRow(id);
-    const getCertGroupsForStats = () => dataService.getCertGroupsForStats();
-    const getCertGroupsForCurves = () => dataService.getCertGroupsForCurves();
+    const getTestVehiclesForCertStats = () => dataService.getTestVehiclesForCertStats();
+    const getTestVehiclesForCurves = () => dataService.getTestVehiclesForCurves();
     // The linking sweep (#238).
-    const getGroupsAwaitingFeLink = (opts) => dataService.getGroupsAwaitingFeLink(opts);
+    const getTestVehiclesAwaitingFeLink = (opts) => dataService.getTestVehiclesAwaitingFeLink(opts);
     const getFeLinkProgress = () => dataService.getFeLinkProgress();
-    const setFeLinkSkipped = (id, skipped, note) => dataService.setFeLinkSkipped(id, skipped, note);
+    const setFeLinkSkipped = (id, skipped, note, opts) => dataService.setFeLinkSkipped(id, skipped, note, opts);
     // Data Checks skips (#321, migration 066).
     const getDataCheckSkips = () => dataService.getDataCheckSkips();
     const setDataCheckSkip = (vehicleId, checkKey, fingerprint, note) =>
@@ -1470,9 +1477,9 @@ export function AppProvider({ children }) {
     const getFeGuideVehicleLinks = () => dataService.getFeGuideVehicleLinks();
 
     /** Take the published value for fields the curator had been holding. */
-    const acceptFeGuideValues = async (testGroupId, columns) => {
+    const acceptFeGuideValues = async (testVehicleId, columns) => {
         try {
-            const res = await dataService.acceptFeGuideValues(testGroupId, columns);
+            const res = await dataService.acceptFeGuideValues(testVehicleId, columns);
             await softRefreshVehicles();
             showSuccess(`${res.accepted.length} field(s) now use the published value.`);
             return res;
@@ -1482,11 +1489,11 @@ export function AppProvider({ children }) {
         }
     };
 
-    const unlinkFeGuideRow = async (testGroupId) => {
+    const unlinkFeGuideRow = async (testVehicleId, opts = {}) => {
         try {
-            const res = await dataService.unlinkFeGuideRow(testGroupId);
+            const res = await dataService.unlinkFeGuideRow(testVehicleId, opts);
             await softRefreshVehicles();
-            showSuccess(`Unlinked; ${res.restored.length} field(s) restored.`);
+            showSuccess('Unlinked.');
             return res;
         } catch (error) {
             showError('Could not unlink: ' + error.message);
@@ -1494,29 +1501,40 @@ export function AppProvider({ children }) {
         }
     };
 
-    const importEpaCsiGroups = async (groups, { linkVehicleId, linkTestGroupIds = [], onProgress } = {}) => {
+    const importEpaCsiTestVehicles = async (testVehicles, { certifications = [], linkVehicleId, linkTestVehicleIds = [], onProgress } = {}) => {
         try {
             let keptCount = 0;
             let guardedCount = 0;
-            for (const [i, g] of groups.entries()) {
-                onProgress?.({ done: i, total: groups.length, name: g.test_group_id });
-                const res = await dataService.importEpaGroupFull(g);
+            for (const [i, g] of testVehicles.entries()) {
+                onProgress?.({ done: i, total: testVehicles.length, name: g.test_vehicle_id });
+                const res = await dataService.importEpaTestVehicleFull(g);
                 keptCount += res?.kept?.length ?? 0;
                 if (res?.guarded?.length) guardedCount += 1;
             }
-            onProgress?.({ done: groups.length, total: groups.length, name: null });
+            // One certification per file, after the test vehicles it names
+            // exist (#374). Before migration 082 this is a no-op.
+            let certAdded = 0;
+            let recertified = 0;
+            for (const { certification, members } of certifications) {
+                const res = await dataService.importEpaCertification(certification, members);
+                if (res?.action === 'insert') certAdded += 1;
+                if (res?.recertified) recertified += 1;
+            }
+            onProgress?.({ done: testVehicles.length, total: testVehicles.length, name: null });
             if (linkVehicleId) {
-                for (const tgid of linkTestGroupIds) {
-                    try { await dataService.linkEpaTestGroup(linkVehicleId, tgid, 'verified', null); }
+                for (const tgid of linkTestVehicleIds) {
+                    try { await dataService.linkEpaTestVehicle(linkVehicleId, tgid, 'verified', null); }
                     catch { /* already linked — ignore UNIQUE conflict */ }
                 }
             }
             const updated = await dataService.getVehicles();
             setVehicles(updated);
-            showSuccess(`Imported ${groups.length} EPA config(s) from PDF.`
+            showSuccess(`Imported ${testVehicles.length} EPA config(s) from PDF.`
                 + (keptCount ? ` Kept ${keptCount} hand-edited value(s) that differ from the PDF.` : '')
-                + (guardedCount ? ` ${guardedCount} config(s) already held a newer model year's certification, so its year, test family and covered models were kept.` : ''));
-            return { count: groups.length, kept: keptCount, guarded: guardedCount };
+                + (guardedCount ? ` ${guardedCount} config(s) already held a newer model year's certification, so its year, Test Group and covered models were kept.` : '')
+                + (certAdded ? ` ${certAdded} new certification(s).` : '')
+                + (recertified ? ` ${recertified} recertified.` : ''));
+            return { count: testVehicles.length, kept: keptCount, guarded: guardedCount, certifications: certAdded, recertified };
         } catch (error) {
             showError('PDF import failed: ' + error.message);
             throw error;
@@ -1556,45 +1574,45 @@ export function AppProvider({ children }) {
         }
     };
 
-    const unlinkEpaTestGroup = async (mappingId) => {
+    const unlinkEpaTestVehicle = async (mappingId) => {
         try {
-            await dataService.unlinkEpaTestGroup(mappingId);
+            await dataService.unlinkEpaTestVehicle(mappingId);
             const updated = await dataService.getVehicles();
             setVehicles(updated);
-            showSuccess('EPA test group unlinked.');
+            showSuccess('EPA test vehicle unlinked.');
         } catch (error) {
-            showError('Error unlinking EPA test group: ' + error.message);
+            showError('Error unlinking EPA test vehicle: ' + error.message);
         }
     };
 
-    /** Pass-through: fetch all test groups with linked vehicles for admin panel. */
-    const getEpaTestGroupsAdmin = () => dataService.getEpaTestGroupsAdmin();
+    /** Pass-through: fetch all test vehicles with linked vehicles for admin panel. */
+    const getEpaTestVehiclesAdmin = () => dataService.getEpaTestVehiclesAdmin();
 
-    /** Every group with what the reconciliation checks read (#229). Read-only. */
-    const getEpaGroupsForAudit = () => dataService.getEpaGroupsForAudit();
+    /** Every test vehicle with what the reconciliation checks read (#229). Read-only. */
+    const getEpaTestVehiclesForAudit = () => dataService.getEpaTestVehiclesForAudit();
 
     /**
-     * Update editable fields on an EPA test group.
+     * Update editable fields on an EPA test vehicle.
      * Accepts any subset of: { label_method, display_name }.
      * Soft-refreshes vehicles so chart labels and vehicle cards reflect the change.
      */
-    const updateEpaTestGroup = async (testGroupId, updates) => {
-        await dataService.updateEpaTestGroup(testGroupId, updates);
+    const updateEpaTestVehicle = async (testVehicleId, updates) => {
+        await dataService.updateEpaTestVehicle(testVehicleId, updates);
         softRefreshVehicles();
     };
 
     /** Convenience alias: update only label_method. */
-    const updateEpaLabelMethod = async (testGroupId, method) => {
-        await dataService.updateEpaLabelMethod(testGroupId, method);
+    const updateEpaLabelMethod = async (testVehicleId, method) => {
+        await dataService.updateEpaLabelMethod(testVehicleId, method);
     };
 
     // ── EPA curator hierarchy (coefficient sets, tests, phases, audit) ──────────
     // Used by the curator form in Tests & Data. Save helpers return the saved row
     // so the form can update local state; the form re-fetches the full hierarchy
-    // via getEpaTestGroupFull as needed.
+    // via getEpaTestVehicleFull as needed.
 
-    /** Pass-through: fetch a group with its coefficient sets, tests and phases. */
-    const getEpaTestGroupFull = (testGroupId) => dataService.getEpaTestGroupFull(testGroupId);
+    /** Pass-through: fetch a test vehicle with its coefficient sets, tests and phases. */
+    const getEpaTestVehicleFull = (testVehicleId, opts) => dataService.getEpaTestVehicleFull(testVehicleId, opts);
 
     const saveEpaCoefficientSet = async (row) => {
         try {
@@ -1667,9 +1685,9 @@ export function AppProvider({ children }) {
     /** Pass-through: read the audit trail for a row. */
     const getEpaFieldAudit = (tableName, rowId) => dataService.getEpaFieldAudit(tableName, rowId);
 
-    /** Pass-through: read the audit trail for a whole group (+ its child rows). */
-    const getEpaAuditForGroup = (testGroupId) =>
-        dataService.getEpaAuditForGroup(testGroupId);
+    /** Pass-through: read the audit trail for a whole test vehicle (+ its child rows). */
+    const getEpaAuditForTestVehicle = (testVehicleId) =>
+        dataService.getEpaAuditForTestVehicle(testVehicleId);
 
     // ── Performance testing (acceleration / braking) ────────────────────────
 
@@ -1866,13 +1884,13 @@ export function AppProvider({ children }) {
         }
     };
 
-    /** Delete an EPA test group and its vehicle mappings, then refresh vehicles. */
-    const deleteEpaTestGroup = async (testGroupId) => {
+    /** Delete an EPA test vehicle and its vehicle mappings, then refresh vehicles. */
+    const deleteEpaTestVehicle = async (testVehicleId) => {
         try {
-            await dataService.deleteEpaTestGroup(testGroupId);
+            await dataService.deleteEpaTestVehicle(testVehicleId);
             const updated = await dataService.getVehicles();
             setVehicles(updated);
-            showSuccess('EPA test group deleted.');
+            showSuccess('EPA test vehicle deleted.');
         } catch (error) {
             showError('Delete failed: ' + error.message);
             throw error;
@@ -1880,27 +1898,27 @@ export function AppProvider({ children }) {
     };
 
     /**
-     * Bulk-import EPA test groups from the parsed testcar sheet, then create
-     * vehicle mappings for any test groups the user linked to a vehicle.
+     * Bulk-import EPA test vehicles from the parsed testcar sheet, then create
+     * vehicle mappings for any test vehicles the user linked to a vehicle.
      *
-     * @param {Array<Object>} testGroups  Rows for epa_test_groups upsert
-     * @param {Array<{vehicleId, testGroupId}>} mappings  Vehicle → test group links to create
+     * @param {Array<Object>} testVehicles  Rows for epa_test_vehicles upsert
+     * @param {Array<{vehicleId, testVehicleId}>} mappings  Vehicle → test vehicle links to create
      */
-    const importEpaTestGroups = async (testGroups, mappings) => {
+    const importEpaTestVehicles = async (testVehicles, mappings) => {
         try {
-            await dataService.bulkUpsertEpaTestGroups(testGroups);
+            await dataService.bulkUpsertEpaTestVehicles(testVehicles);
             // Create mappings sequentially; skip if already linked (upsert would conflict)
-            for (const { vehicleId, testGroupId } of mappings) {
+            for (const { vehicleId, testVehicleId } of mappings) {
                 try {
-                    await dataService.linkEpaTestGroup(vehicleId, testGroupId, 'likely', null);
+                    await dataService.linkEpaTestVehicle(vehicleId, testVehicleId, 'likely', null);
                 } catch {
                     // Ignore duplicate-link errors (UNIQUE constraint) — mapping already exists
                 }
             }
             const updated = await dataService.getVehicles();
             setVehicles(updated);
-            showSuccess(`Imported ${testGroups.length} EPA test group(s), linked ${mappings.length}.`);
-            return { testGroupsCount: testGroups.length, mappingsCount: mappings.length };
+            showSuccess(`Imported ${testVehicles.length} EPA test vehicle(s), linked ${mappings.length}.`);
+            return { testVehiclesCount: testVehicles.length, mappingsCount: mappings.length };
         } catch (error) {
             showError('EPA import failed: ' + error.message);
             throw error;
@@ -2047,11 +2065,11 @@ export function AppProvider({ children }) {
         updateTestSession,
         deleteTestSession,
         setRunsSession,
-        searchEpaTestGroups,
+        searchEpaTestVehicles,
         getEpaSuggestionCandidates,
-        linkEpaTestGroup,
-        createAndLinkEpaTestGroup,
-        importEpaCsiGroups,
+        linkEpaTestVehicle,
+        createAndLinkEpaTestVehicle,
+        importEpaCsiTestVehicles,
         importFeGuide,
         getFeGuideSummary,
         getFeGuideCandidates,
@@ -2060,10 +2078,10 @@ export function AppProvider({ children }) {
         getFeGuideRow,
         getFeGuideRows,
         getFeGuideVehicleLinks,
-        getCertGroupsForStats,
-        getCertGroupsForCurves,
+        getTestVehiclesForCertStats,
+        getTestVehiclesForCurves,
         linkFeGuideRows,
-        getGroupsAwaitingFeLink,
+        getTestVehiclesAwaitingFeLink,
         getFeLinkProgress,
         setFeLinkSkipped,
         getDataCheckSkips,
@@ -2079,16 +2097,17 @@ export function AppProvider({ children }) {
         deleteTag,
         mergeTags,
         acceptFeGuideValues,
-        getExistingEpaTestGroupIds,
+        getExistingEpaTestVehicleIds,
+        getEpaCertificationsFor,
         updateEpaMapping,
         setPrimaryEpaMapping,
-        unlinkEpaTestGroup,
-        importEpaTestGroups,
-        getEpaTestGroupsAdmin,
-        getEpaGroupsForAudit,
-        deleteEpaTestGroup,
+        unlinkEpaTestVehicle,
+        importEpaTestVehicles,
+        getEpaTestVehiclesAdmin,
+        getEpaTestVehiclesForAudit,
+        deleteEpaTestVehicle,
         updateEpaLabelMethod,
-        updateEpaTestGroup,
+        updateEpaTestVehicle,
         // Performance testing (acceleration / braking)
         performanceCounts,
         getPerformanceSessions,
@@ -2109,7 +2128,7 @@ export function AppProvider({ children }) {
         savePerformanceInterval,
         deletePerformanceInterval,
         // EPA curator hierarchy
-        getEpaTestGroupFull,
+        getEpaTestVehicleFull,
         saveEpaCoefficientSet,
         deleteEpaCoefficientSet,
         saveEpaTest,
@@ -2118,7 +2137,7 @@ export function AppProvider({ children }) {
         deleteEpaPhase,
         logEpaFieldEdit,
         getEpaFieldAudit,
-        getEpaAuditForGroup,
+        getEpaAuditForTestVehicle,
     };
 
     return (

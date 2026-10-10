@@ -9,7 +9,7 @@ import { checkRecordIntegrity, integrityWarnings } from '../epaIntegrity';
  * charger efficiencies near 1%, clustered within single manufacturers.
  */
 const clean = () => ({
-    test_group_id: 'C174PSM75f-Z2681',
+    test_vehicle_id: 'C174PSM75f-Z2681',
     total_voltage: 700,
     nominal_pack_kwh: 88.9,
     epa_coefficient_sets: [
@@ -45,7 +45,7 @@ describe('checkRecordIntegrity — a sound record', () => {
     });
 
     it('treats an absent figure as absent, not as zero', () => {
-        // Caught by running the real CLA PDF through it. A parsed group carries
+        // Caught by running the real CLA PDF through it. A parsed test vehicle carries
         // useable_kwh: null and gets nominal_pack_kwh only once a guide row is
         // linked — and Number(null) is 0, which is finite, so the check invented
         // a 0.0 kWh pack and reported it as an impossibility.
@@ -117,7 +117,7 @@ describe('checkRecordIntegrity — the implausibilities', () => {
         expect(codes(g)).toContain('test-weight-missing');
     });
 
-    it('catches a group with no charge-depleting test', () => {
+    it('catches a test vehicle with no charge-depleting test', () => {
         const g = clean();
         g.epa_tests[0].procedure_code = 2;
         expect(codes(g)).toContain('no-cd-test');
@@ -136,7 +136,7 @@ describe('checkRecordIntegrity — single-cycle tests measure a rate and a capac
      * packs came from, and made charging efficiency 2.446/119.873 = 2%.
      */
     const bmw = () => ({
-        test_group_id: 'CL34779-0',
+        test_vehicle_id: 'CL34779-0',
         total_voltage: 376,
         epa_coefficient_sets: [
             { is_primary: true, target_a: 35, target_b: 0.2, target_c: 0.018,
@@ -166,7 +166,7 @@ describe('checkRecordIntegrity — single-cycle tests measure a rate and a capac
         expect(codes(bmw())).not.toContain('phase-sum-mismatch');
     });
 
-    it('does not call a single-cycle group deficient', () => {
+    it('does not call a single-cycle test vehicle deficient', () => {
         // 81 and 84 measure city and highway in separate tests, so this is a
         // different method rather than a missing one. An earlier version said
         // the cycles could not be separated, which was false.
@@ -181,21 +181,21 @@ describe('checkRecordIntegrity — single-cycle tests measure a rate and a capac
         expect(codes(g)).toContain('charger-eff-out-of-band');
     });
 
-    it('flags a group with no charge-depleting test at all', () => {
+    it('flags a test vehicle with no charge-depleting test at all', () => {
         const g = bmw();
         g.epa_tests.forEach(t => { t.procedure_code = 2; });
         expect(codes(g)).toContain('no-cd-test');
     });
 });
 
-describe('checkRecordIntegrity — reading both group shapes', () => {
-    it('reads a parsed group as well as a stored one', () => {
-        // At import a group carries tests[].phases[]; once stored it carries
+describe('checkRecordIntegrity — reading both test vehicle shapes', () => {
+    it('reads a parsed test vehicle as well as a stored one', () => {
+        // At import a test vehicle carries tests[].phases[]; once stored it carries
         // epa_tests[].epa_test_phases[]. The checks are worth running at both
         // ends, so neither spelling may be the only one understood.
         const stored = clean();
         const parsed = {
-            test_group_id: stored.test_group_id,
+            test_vehicle_id: stored.test_vehicle_id,
             nominal_pack_kwh: 3.2,
             coefficient_sets: stored.epa_coefficient_sets,
             tests: stored.epa_tests.map(t => ({ ...t, phases: t.epa_test_phases })),

@@ -45,7 +45,7 @@ export const BAND_EVIDENCE = {
     // of a tail to call suspect. This is a measurement, the fleet median of a
     // measure, and it should read as one rather than as a literal someone
     // chose. It is also the value most likely to go stale: it was derived from
-    // 210 groups and the next import changes that.
+    // 210 test vehicles and the next import changes that.
     HWFET_TO_SS_ETA_RATIO: { measure: 'ss_eta_ratio', label: 'steady-state ÷ HWFET η' },
     // The two fallbacks, each against the measure it stands in for. They are
     // the values most able to drift unnoticed: a fallback only appears on
@@ -61,7 +61,7 @@ export const BAND_EVIDENCE = {
  *
  * Excludes values that were assumed rather than measured — `CERT_MEASURES`
  * marks those with `assumedIsNotData`, and a band derived partly from its own
- * default would be circular. So `n` here is the measured count, not the group
+ * default would be circular. So `n` here is the measured count, not the test vehicle
  * count, and both are reported: "median 0.87 (n=61 of 204)" says something a
  * bare median does not.
  */
@@ -157,9 +157,9 @@ export function bandVerdict(band, evidence) {
     return { key: 'fits', text: 'contains the p5–p95 body and clips the tails' };
 }
 
-/** Convenience: evidence for every band, from one pass over the groups. */
-export function allBandEvidence(groups, brandIndex) {
-    const observations = certObservations(groups ?? [], brandIndex);
+/** Convenience: evidence for every band, from one pass over the test vehicles. */
+export function allBandEvidence(testVehicles, brandIndex) {
+    const observations = certObservations(testVehicles ?? [], brandIndex);
     return Object.fromEntries(
         Object.keys(BAND_EVIDENCE).map(k => [k, bandEvidence(observations, k)]),
     );

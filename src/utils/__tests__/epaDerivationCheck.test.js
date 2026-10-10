@@ -69,7 +69,7 @@ describe('checkUnadjustedMpge — banding', () => {
     });
 
     it('catches a charging-efficiency error the size of the one in the data', () => {
-        // Two groups for the same Model Y derive 76.8% and 83.7%. MPGe is
+        // Two test vehicles for the same Model Y derive 76.8% and 83.7%. MPGe is
         // wall-to-wheels, so a ~9% error in efficiency moves MPGe by ~9% — this
         // is the discrepancy the check exists to surface.
         const out = checkUnadjustedMpge(modelAt(100 * (83.7 / 76.8), 100), { city: 100, hwy: 100 });
@@ -89,7 +89,7 @@ describe('checkUnadjustedMpge — which fault it points at', () => {
 
     it('calls a matched shift on both cycles systematic', () => {
         // Charging efficiency is wall-side: it divides every cycle's
-        // consumption alike. Two live Model Y groups do exactly this,
+        // consumption alike. Two live Model Y test vehicles do exactly this,
         // +1.03/+1.06% and +3.44/+4.02%.
         expect(checkUnadjustedMpge(modelAt(103.44, 104.02), { city: 100, hwy: 100 }).shape)
             .toBe('systematic');
@@ -136,7 +136,7 @@ describe('checkUnadjustedMpge — nothing to check is not a pass', () => {
     const model = buildMethodologyModel(R2_MCT);
 
     it('reports unchecked when no guide figures are linked', () => {
-        // The distinction that matters: a group nobody has linked is UNVERIFIED,
+        // The distinction that matters: a test vehicle nobody has linked is UNVERIFIED,
         // and rendering it as agreeing would be a false assurance on most of the
         // fleet.
         for (const published of [{}, undefined, { city: null, hwy: null }, { city: 0, hwy: 0 }]) {
@@ -191,7 +191,7 @@ describe('checkStatedRanges — a record against itself', () => {
     });
 
     it('needs no Fuel Economy Guide link', () => {
-        // The point of it: the MPGe check only covers linked groups and compares
+        // The point of it: the MPGe check only covers linked test vehicles and compares
         // against a different document. This works on every imported record.
         const out = checkStatedRanges(model, { cityMi: 100, hwyMi: 100 });
         expect(out.checked).toBe(true);

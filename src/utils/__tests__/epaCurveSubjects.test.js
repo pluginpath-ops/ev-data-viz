@@ -32,8 +32,8 @@ const highwayOnlyTest = {
     procedure_code: 84, total_dc_energy_kwh: 90,
     epa_test_phases: HWY_PHASES,
 };
-const group = (o = {}) => ({
-    test_group_id: o.id ?? 'TG1', model_year: 2025, make: 'Rivian',
+const testVehicle = (o = {}) => ({
+    test_vehicle_id: o.id ?? 'TG1', model_year: 2025, make: 'Rivian',
     epa_carline_name: o.carline ?? 'R1S',
     useable_kwh: o.useable ?? null,
     epa_coefficient_sets: 'coeffs' in o ? o.coeffs : coeffs,
@@ -42,13 +42,13 @@ const group = (o = {}) => ({
 });
 
 describe('what can be a subject at all', () => {
-    it('refuses a group with no coefficients rather than offering an empty curve', () => {
+    it('refuses a test vehicle with no coefficients rather than offering an empty curve', () => {
         // One of 211 has none. Returning a subject that draws nothing would let
         // a caller list it and then plot a blank.
-        expect(curveSubject(group({ coeffs: [] }))).toBeNull();
+        expect(curveSubject(testVehicle({ coeffs: [] }))).toBeNull();
     });
-    it('accepts a group with coefficients and nothing else', () => {
-        const s = curveSubject(group());
+    it('accepts a test vehicle with coefficients and nothing else', () => {
+        const s = curveSubject(testVehicle());
         expect(s).not.toBeNull();
         expect(s.tier).toBe('shape');
         expect(s.canPlotRange).toBe(false);
@@ -57,34 +57,34 @@ describe('what can be a subject at all', () => {
 
 describe('where the energy comes from', () => {
     it('prefers a curator value', () => {
-        expect(resolveCurveEnergy(group({ useable: 141, tests: [derivableTest] })))
+        expect(resolveCurveEnergy(testVehicle({ useable: 141, tests: [derivableTest] })))
             .toEqual({ kwh: 141, source: 'curator' });
     });
     it('then the DC discharged on a procedure the model uses', () => {
-        expect(resolveCurveEnergy(group({ tests: [derivableTest] })))
+        expect(resolveCurveEnergy(testVehicle({ tests: [derivableTest] })))
             .toEqual({ kwh: 90, source: 'measured' });
     });
     it('ignores a procedure the model does not use', () => {
         // Proc 86 is a short cycle — its DC energy is not a pack capacity, and
         // it is where the 0.037 charger efficiency came from.
-        expect(resolveCurveEnergy(group({ tests: [{ procedure_code: 86, total_dc_energy_kwh: 6 }] })).kwh)
+        expect(resolveCurveEnergy(testVehicle({ tests: [{ procedure_code: 86, total_dc_energy_kwh: 6 }] })).kwh)
             .toBeNull();
     });
     it('falls back to the guide’s gross pack, which needs the link', () => {
-        expect(resolveCurveEnergy(group({ guide: { nominal_pack_kwh: 149.7 } })))
+        expect(resolveCurveEnergy(testVehicle({ guide: { nominal_pack_kwh: 149.7 } })))
             .toEqual({ kwh: 149.7, source: 'nominal' });
     });
 });
 
 describe('tiers say how much of a curve is measurement', () => {
     it('measured needs a constant-speed η AND a measured energy', () => {
-        expect(curveSubject(group({ tests: [derivableTest] })).tier).toBe('measured');
+        expect(curveSubject(testVehicle({ tests: [derivableTest] })).tier).toBe('measured');
     });
     it('a corrected η with this record’s own pack is not nominal', () => {
         // 'nominal' promises a borrowed CAPACITY. Here the capacity is the
         // record's own and only the efficiency is borrowed, which is a
         // materially better curve and deserves its own name.
-        const s = curveSubject(group({ tests: [highwayOnlyTest] }));
+        const s = curveSubject(testVehicle({ tests: [highwayOnlyTest] }));
         expect(s.tier).toBe('corrected');
         expect(s.canPlotRange).toBe(true);
         expect(s.etaMeasured).toBe(false);
@@ -92,18 +92,18 @@ describe('tiers say how much of a curve is measurement', () => {
     it('a borrowed pack is nominal even though the shape is measured', () => {
         // Road load is the lab's own number either way; only the scale is
         // borrowed, which is why the distinction is named rather than scored.
-        const s = curveSubject(group({ guide: { nominal_pack_kwh: 149.7 } }));
+        const s = curveSubject(testVehicle({ guide: { nominal_pack_kwh: 149.7 } }));
         expect(s.tier).toBe('nominal');
         expect(s.canPlotRange).toBe(true);
         expect(s.etaMeasured).toBe(false);
     });
     it('no energy at all means no range', () => {
-        expect(curveSubject(group()).canPlotRange).toBe(false);
+        expect(curveSubject(testVehicle()).canPlotRange).toBe(false);
     });
     it('every tier a subject can be given is declared', () => {
         const keys = CURVE_TIERS.map(t => t.key);
-        [group({ tests: [derivableTest] }), group({ tests: [highwayOnlyTest] }),
-         group({ guide: { nominal_pack_kwh: 100 } }), group()]
+        [testVehicle({ tests: [derivableTest] }), testVehicle({ tests: [highwayOnlyTest] }),
+         testVehicle({ guide: { nominal_pack_kwh: 100 } }), testVehicle()]
             .forEach(g => expect(keys).toContain(curveSubject(g).tier));
         keys.forEach(k => expect(tierByKey(k)).not.toBeNull());
     });
@@ -111,30 +111,30 @@ describe('tiers say how much of a curve is measurement', () => {
 
 describe('ordering and counts', () => {
     const set = [
-        group({ id: 'D' }),                                        // shape
-        group({ id: 'C', guide: { nominal_pack_kwh: 100 } }),      // nominal
-        group({ id: 'B', tests: [highwayOnlyTest] }),              // corrected
-        group({ id: 'A', tests: [derivableTest] }),                // measured
+        testVehicle({ id: 'D' }),                                        // shape
+        testVehicle({ id: 'C', guide: { nominal_pack_kwh: 100 } }),      // nominal
+        testVehicle({ id: 'B', tests: [highwayOnlyTest] }),              // corrected
+        testVehicle({ id: 'A', tests: [derivableTest] }),                // measured
     ];
     it('puts the best-grounded first', () => {
         expect(curveSubjects(set).map(s => s.tier))
             .toEqual(['measured', 'corrected', 'nominal', 'shape']);
     });
     it('drops the unplottable from the list entirely', () => {
-        expect(curveSubjects([...set, group({ id: 'E', coeffs: [] })])).toHaveLength(4);
+        expect(curveSubjects([...set, testVehicle({ id: 'E', coeffs: [] })])).toHaveLength(4);
     });
 });
 
 describe('labels', () => {
     it('prefers the guide carline, which names the wheel variant', () => {
-        const s = curveSubject(group({
+        const s = curveSubject(testVehicle({
             carline: 'R1T All-Terrain Performance Dual',
             guide: { carline: 'R1T Performance Dual Max (20in)', nominal_pack_kwh: 149.7, division: 'Rivian' },
         }));
         expect(s.label).toBe('R1T Performance Dual Max (20in)');
     });
     it('falls back to the certification name when unlinked', () => {
-        expect(curveSubject(group({ carline: 'R1S' })).label).toBe('R1S');
+        expect(curveSubject(testVehicle({ carline: 'R1S' })).label).toBe('R1S');
     });
 });
 
@@ -151,8 +151,8 @@ describe('chart labelling', () => {
 
     it('leaves distinct names alone', () => {
         const subs = [
-            { key: 'a', label: 'R1S Dual Max', group: { model_year: 2025 } },
-            { key: 'b', label: 'R1T Dual Max', group: { model_year: 2025 } },
+            { key: 'a', label: 'R1S Dual Max', testVehicle: { model_year: 2025 } },
+            { key: 'b', label: 'R1T Dual Max', testVehicle: { model_year: 2025 } },
         ];
         expect([...disambiguateLabels(subs).values()]).toEqual(['R1S Dual Max', 'R1T Dual Max']);
     });
@@ -160,9 +160,9 @@ describe('chart labelling', () => {
         // The same car certified in consecutive years is the common case, and a
         // legend with two identical entries cannot be read.
         const subs = [
-            { key: 'a', label: 'Model Y Long Range AWD', group: { model_year: 2025 } },
-            { key: 'b', label: 'Model Y Long Range AWD', group: { model_year: 2026 } },
-            { key: 'c', label: 'Cybertruck AWD', group: { model_year: 2026 } },
+            { key: 'a', label: 'Model Y Long Range AWD', testVehicle: { model_year: 2025 } },
+            { key: 'b', label: 'Model Y Long Range AWD', testVehicle: { model_year: 2026 } },
+            { key: 'c', label: 'Cybertruck AWD', testVehicle: { model_year: 2026 } },
         ];
         const out = disambiguateLabels(subs);
         expect(out.get('a')).toBe('Model Y Long Range AWD (2025)');

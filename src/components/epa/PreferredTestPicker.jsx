@@ -5,9 +5,9 @@ import {
 import { PROC_MCT } from '../../constants/epa';
 
 /**
- * Which multi-cycle test this group's figures come from (#228).
+ * Which multi-cycle test this test vehicle's figures come from (#228).
  *
- * A group can hold more than one, and every derived figure on the page depends
+ * A test vehicle can hold more than one, and every derived figure on the page depends
  * on which is used. Until now nothing let a curator say: the default takes the
  * most recent, and the warning added in #226 "tells you a choice was made
  * without letting you make it".
@@ -60,7 +60,7 @@ export default function PreferredTestPicker({
                 Derive from
             </div>
             <p className="text-note mb-2">
-                This group holds {mcts.length} multi-cycle tests and every figure above comes from
+                This test vehicle holds {mcts.length} multi-cycle tests and every figure above comes from
                 one of them. More than one run can be legitimate — the same vehicle is sometimes
                 tested at two laboratories — so this is a choice, not a fault, and the others are
                 not wrong.

@@ -7,13 +7,20 @@
  * ends up represented by a trim it is not.
  */
 import { epaConfigurationFigures } from '../../utils/epaConfiguration';
+import { certifiedYears, formatYears, fromYearNote } from '../../utils/epaCertifications';
+
+/** " · MY2023 to MY2025" — the years a configuration's test vehicle is certified for (#374). */
+const yearsOf = (testVehicle) => {
+    const years = certifiedYears(testVehicle);
+    return years.length ? ` · ${formatYears(years)}` : '';
+};
 
 const miles  = (v) => (v != null ? `${Math.round(v)} mi` : '—');
 const kwh    = (v) => (v != null ? `${Math.round(v * 10) / 10} kWh` : '—');
 const pounds = (v) => (v != null ? `${Math.round(v).toLocaleString('en-US')} lb` : '—');
 
 export default function PrimaryConfigurationPicker({ vehicle, mappings, canEdit, onChoose }) {
-    const linked = mappings.filter(m => m.epaGroup);
+    const linked = mappings.filter(m => m.epaTestVehicle);
     if (linked.length < 2) return null;
     const hasPrimary = linked.some(m => m.isPrimary);
 
@@ -27,7 +34,7 @@ export default function PrimaryConfigurationPicker({ vehicle, mappings, canEdit,
                 <span className="primary-config-figure">Test weight</span>
             </div>
             {linked.map(m => {
-                const c = epaConfigurationFigures(m.epaGroup);
+                const c = epaConfigurationFigures(m.epaTestVehicle);
                 return (
                     <label
                         key={m.id}
@@ -42,9 +49,16 @@ export default function PrimaryConfigurationPicker({ vehicle, mappings, canEdit,
                         />
                         <span className="min-w-0">
                             <span className="block truncate">{c.name}</span>
-                            <span className="block font-mono text-caption truncate">{c.id}</span>
+                            <span className="block font-mono text-caption truncate">
+                                {c.id}{yearsOf(m.epaTestVehicle)}
+                            </span>
                         </span>
-                        <span className="primary-config-figure">{miles(c.labelRangeMi)}</span>
+                        <span className="primary-config-figure" title={fromYearNote(m.epaTestVehicle._certification)?.long}>
+                            {miles(c.labelRangeMi)}
+                            {fromYearNote(m.epaTestVehicle._certification) && (
+                                <span className="block text-caption">{fromYearNote(m.epaTestVehicle._certification).short}</span>
+                            )}
+                        </span>
                         <span className="primary-config-figure">{kwh(c.testedKwh)}</span>
                         <span className="primary-config-figure">{pounds(c.testWeightLbs)}</span>
                     </label>

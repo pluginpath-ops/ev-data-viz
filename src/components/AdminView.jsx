@@ -36,8 +36,8 @@ export const DEFAULT_ADMIN_SUBTAB = 'roles';
 
 const SUBTITLES = {
     roles:     'Manage registered users and their roles.',
-    epa:       'Browse, edit, link, and delete imported EPA test groups — and see which of them do not reconcile.',
-    feguide:   'Import EPA\'s published label figures, and link them to certification groups.',
+    epa:       'Browse, edit, link, and delete imported EPA test vehicles — and see which of them do not reconcile.',
+    feguide:   'Import EPA\'s published label figures, and link them to EPA test vehicles.',
     checks:    'Every vehicle against its own sources — range, battery capacity, weight, drive type, voltage and performance — with the limits tunable in place.',
     results:   'Import published performance results in bulk, and keep one list of the sources they come from.',
     brands:    'One brand list for vehicles and EPA filings. Rename, merge, and map EPA\'s division spellings.',
@@ -49,8 +49,8 @@ const SUBTITLES = {
 export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId, subtab, onSubtabChange }) {
     const {
         exportData, importData, importTableauSessions,
-        importEpaTestGroups, getEpaTestGroupsAdmin, deleteEpaTestGroup, updateEpaTestGroup,
-        importEpaCsiGroups, getExistingEpaTestGroupIds,
+        importEpaTestVehicles, getEpaTestVehiclesAdmin, deleteEpaTestVehicle, updateEpaTestVehicle,
+        importEpaCsiTestVehicles, getExistingEpaTestVehicleIds,
         vehicles,
     } = useAppContext();
     const [users, setUsers]           = useState([]);
@@ -107,7 +107,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                 <LazyBoundary>
                     <EpaImportModal
                         vehicles={vehicles}
-                        onImport={importEpaTestGroups}
+                        onImport={importEpaTestVehicles}
                         onClose={() => setShowEpaModal(false)}
                     />
                 </LazyBoundary>
@@ -115,8 +115,8 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
             {showEpaPdfModal && (
                 <LazyBoundary>
                     <EpaPdfImportModal
-                        onImport={importEpaCsiGroups}
-                        getExistingIds={getExistingEpaTestGroupIds}
+                        onImport={importEpaCsiTestVehicles}
+                        getExistingIds={getExistingEpaTestVehicleIds}
                         onClose={() => setShowEpaPdfModal(false)}
                     />
                 </LazyBoundary>
@@ -201,9 +201,9 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
             {subtab === 'epa' && (
                 <div className="flex flex-col gap-6">
                     <EpaDataCard
-                        getEpaTestGroupsAdmin={getEpaTestGroupsAdmin}
-                        deleteEpaTestGroup={deleteEpaTestGroup}
-                        updateEpaTestGroup={updateEpaTestGroup}
+                        getEpaTestVehiclesAdmin={getEpaTestVehiclesAdmin}
+                        deleteEpaTestVehicle={deleteEpaTestVehicle}
+                        updateEpaTestVehicle={updateEpaTestVehicle}
                     />
                     <EpaAuditSweep />
                 </div>

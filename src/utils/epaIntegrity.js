@@ -18,8 +18,8 @@
  * imported.
  *
  * Pure module: no data access, no React, no network. Runs against a parsed
- * group (`parseEpaCsiText` output, at import) or a stored one (the shape
- * `getEpaTestGroupFull` returns, afterwards) — see `normaliseGroup`.
+ * test vehicle (`parseEpaCsiText` output, at import) or a stored one (the shape
+ * `getEpaTestVehicleFull` returns, afterwards) — see `normaliseGroup`.
  */
 
 import {
@@ -46,20 +46,20 @@ const pct = (a, b) => (b > 0 ? ((a - b) / b) * 100 : null);
 /**
  * The two shapes this has to read.
  *
- * At import a group carries `tests[].phases[]`; once stored it carries
+ * At import a test vehicle carries `tests[].phases[]`; once stored it carries
  * `epa_tests[].epa_test_phases[]` and `epa_coefficient_sets[]`. Same data, two
  * spellings, and the checks are worth running at BOTH ends — at import so a bad
  * parse is refused before it lands, and afterwards because the records that
  * prompted this were already in the database.
  */
-function normaliseGroup(group) {
-    if (!group) return null;
-    const tests = group.epa_tests ?? group.tests ?? [];
+function normaliseTestVehicle(testVehicle) {
+    if (!testVehicle) return null;
+    const tests = testVehicle.epa_tests ?? testVehicle.tests ?? [];
     return {
-        testGroupId: group.test_group_id ?? null,
-        totalVoltage: num(group.total_voltage),
-        packKwh: num(group.nominal_pack_kwh) ?? num(group.useable_kwh),
-        coefficientSets: group.epa_coefficient_sets ?? group.coefficient_sets ?? [],
+        testVehicleId: testVehicle.test_vehicle_id ?? null,
+        totalVoltage: num(testVehicle.total_voltage),
+        packKwh: num(testVehicle.nominal_pack_kwh) ?? num(testVehicle.useable_kwh),
+        coefficientSets: testVehicle.epa_coefficient_sets ?? testVehicle.coefficient_sets ?? [],
         tests: tests.map(t => ({
             testNumber: t.test_number ?? null,
             procedureCode: num(t.procedure_code),
@@ -87,11 +87,11 @@ const finding = (code, severity, label, detail, values = {}) =>
  * figure is outside what has ever been observed, which is strong evidence and
  * not proof — a band is a curation judgement and every one of them is a knob.
  *
- * @param {Object} group  parsed or stored EPA test group
+ * @param {Object} testVehicle  parsed or stored EPA test vehicle
  * @returns {{ checked: boolean, findings: Array, worst: 'error'|'warning'|null }}
  */
-export function checkRecordIntegrity(group) {
-    const g = normaliseGroup(group);
+export function checkRecordIntegrity(testVehicle) {
+    const g = normaliseTestVehicle(testVehicle);
     if (!g || !g.tests.length) return { checked: false, findings: [], worst: null };
 
     const findings = [];
@@ -196,8 +196,8 @@ export function checkRecordIntegrity(group) {
         ));
     }
 
-    // A group with NO charge-depleting test of any kind has nothing to derive
-    // from. Single-cycle groups are deliberately not flagged: procedures 81 and
+    // A test vehicle with NO charge-depleting test of any kind has nothing to derive
+    // from. Single-cycle test vehicles are deliberately not flagged: procedures 81 and
     // 84 measure city and highway in separate tests and each states its own
     // depletion energy, so an SCT record is a different method rather than a
     // deficient one. An earlier version reported "no multi-cycle test" on
@@ -206,7 +206,7 @@ export function checkRecordIntegrity(group) {
     if (!g.tests.some(t => CD_PROCEDURES.includes(t.procedureCode))) {
         findings.push(finding(
             'no-cd-test', 'warning', 'No charge-depleting test',
-            'Nothing in this group ran procedure 77, 81 or 84, so there is no measurement of '
+            'Nothing in this test vehicle ran procedure 77, 81 or 84, so there is no measurement of '
             + 'consumption or of pack capacity to derive anything from.',
             {},
         ));
@@ -225,8 +225,8 @@ export function checkRecordIntegrity(group) {
  * open yet — at that moment the only useful form is a sentence saying which
  * configuration is suspect and why, next to the file it came from.
  */
-export function integrityWarnings(group) {
-    const { findings } = checkRecordIntegrity(group);
-    const id = group?.test_group_id ? `${group.test_group_id}: ` : '';
+export function integrityWarnings(testVehicle) {
+    const { findings } = checkRecordIntegrity(testVehicle);
+    const id = testVehicle?.test_vehicle_id ? `${testVehicle.test_vehicle_id}: ` : '';
     return findings.map(f => `${id}${f.label} — ${f.detail}`);
 }

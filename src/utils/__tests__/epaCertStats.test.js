@@ -8,8 +8,8 @@ import { PACK_KWH_BAND } from '../../constants/epa';
 import { deriveDrivetrainEta, deriveChargerEfficiency } from '../epaDerivations';
 
 
-const group = (o = {}) => ({
-    test_group_id: o.id ?? 'TG1',
+const testVehicle = (o = {}) => ({
+    test_vehicle_id: o.id ?? 'TG1',
     model_year: o.year ?? 2025,
     make: o.make ?? 'Rivian',
     useable_kwh: o.useable ?? null,
@@ -27,48 +27,48 @@ describe('dimensions come from the linked guide row', () => {
         // The certification record identifies itself by a manufacturer Vehicle
         // ID and knows nothing about class or drivetrain. That is why #238 had
         // to happen before any of this was groupable.
-        const o = certObservation(group(), undefined);
+        const o = certObservation(testVehicle(), undefined);
         expect(o.body_class).toBe('Standard SUV');
         expect(o.drive_group).toBe('All Wheel Drive');
     });
-    it('buckets them as Unknown when the group has no guide row', () => {
+    it('buckets them as Unknown when the test vehicle has no guide row', () => {
         // Not null. `bucketise` skips an observation whose dimension is null,
-        // so a null drops the group out of the table with nothing said — which
-        // is how 90 unlinked groups, every GM truck among them, were invisible
+        // so a null drops the test vehicle out of the table with nothing said — which
+        // is how 90 unlinked test vehicles, every GM truck among them, were invisible
         // rather than merely unclassified.
-        const o = certObservation(group({ guide: null }), undefined);
+        const o = certObservation(testVehicle({ guide: null }), undefined);
         expect(o.body_class).toBe(UNKNOWN_DIMENSION);
         expect(o.drive_group).toBe(UNKNOWN_DIMENSION);
     });
     it('still reports the measures without a guide row', () => {
-        expect(certObservation(group({ guide: null }), undefined).aero_c).toBe(0.02);
+        expect(certObservation(testVehicle({ guide: null }), undefined).aero_c).toBe(0.02);
     });
     it('takes the brand from the certification record when there is no guide row', () => {
         // `make` is on the certification record — it is how the manufacturer
         // filed — so brand is the one dimension that does not need the link.
-        const o = certObservation(group({ guide: null, make: 'CHEVROLET' }), undefined);
+        const o = certObservation(testVehicle({ guide: null, make: 'CHEVROLET' }), undefined);
         expect(o.brand).toBe('CHEVROLET');
     });
     it('resolves both spellings of a brand to one bucket', () => {
-        // The unlinked group says CHEVROLET and the guide says Chevrolet. Two
+        // The unlinked test vehicle says CHEVROLET and the guide says Chevrolet. Two
         // buckets for one brand is the bug #243 exists to prevent, so both go
         // through the registry rather than only the division.
         const index = new Map([['chevrolet', { brand: 'Chevrolet', parent: 'General Motors' }]]);
-        const unlinked = certObservation(group({ guide: null, make: 'CHEVROLET' }), index);
-        const linked = certObservation(group({
+        const unlinked = certObservation(testVehicle({ guide: null, make: 'CHEVROLET' }), index);
+        const linked = certObservation(testVehicle({
             guide: { division: 'Chevrolet', carline_class: 'Small Station Wagons', drive_desc: 'Front-Wheel Drive' },
         }), index);
         expect(unlinked.brand).toBe('Chevrolet');
         expect(linked.brand).toBe('Chevrolet');
     });
     it('says whether the guide half of the record exists', () => {
-        expect(certObservation(group(), undefined)._guideLinked).toBe(true);
-        expect(certObservation(group({ guide: null }), undefined)._guideLinked).toBe(false);
+        expect(certObservation(testVehicle(), undefined)._guideLinked).toBe(true);
+        expect(certObservation(testVehicle({ guide: null }), undefined)._guideLinked).toBe(false);
     });
 });
 
 describe('an assumption is not a measurement', () => {
-    const noPhases = group({ tests: [{ procedure_code: 77, total_dc_energy_kwh: 90 }] });
+    const noPhases = testVehicle({ tests: [{ procedure_code: 77, total_dc_energy_kwh: 90 }] });
 
     it('the source names the derivations use are what this module checks for', () => {
         // The bug this pins: deriveDrivetrainEta calls its fallback
@@ -86,43 +86,43 @@ describe('an assumption is not a measurement', () => {
         expect(certObservation(noPhases, undefined).charger_eff).toBeNull();
     });
     it('keeps a derived charger efficiency', () => {
-        const derivable = group({ tests: [{ procedure_code: 77, total_dc_energy_kwh: 88, ac_recharge_kwh: 100 }] });
+        const derivable = testVehicle({ tests: [{ procedure_code: 77, total_dc_energy_kwh: 88, ac_recharge_kwh: 100 }] });
         expect(certObservation(derivable, undefined).charger_eff).toBeCloseTo(0.88, 3);
     });
 });
 
 describe('usable energy and the pack buffer', () => {
     it('prefers a curator value over the measured discharge', () => {
-        expect(derivedUsableKwh(group({ useable: 141, tests: [{ procedure_code: 77, total_dc_energy_kwh: 90 }] }))).toBe(141);
+        expect(derivedUsableKwh(testVehicle({ useable: 141, tests: [{ procedure_code: 77, total_dc_energy_kwh: 90 }] }))).toBe(141);
     });
     it('falls back to DC discharged on the derivation test', () => {
-        expect(derivedUsableKwh(group({ tests: [{ procedure_code: 77, total_dc_energy_kwh: 90 }] }))).toBe(90);
+        expect(derivedUsableKwh(testVehicle({ tests: [{ procedure_code: 77, total_dc_energy_kwh: 90 }] }))).toBe(90);
     });
     it('ignores a procedure the derivations do not use', () => {
         // Proc 86 is a short cycle; its DC energy is not a pack capacity.
-        expect(derivedUsableKwh(group({ tests: [{ procedure_code: 86, total_dc_energy_kwh: 6 }] }))).toBeNull();
+        expect(derivedUsableKwh(testVehicle({ tests: [{ procedure_code: 86, total_dc_energy_kwh: 6 }] }))).toBeNull();
     });
     it('drops a usable-to-gross ratio above 1', () => {
         // Three Teslas report more usable energy than the guide's gross pack,
         // at 1.02 to 1.03. A pack cannot deliver more than it holds, so the two
         // sources contradict and the gross figure is the softer one.
-        const impossible = group({
+        const impossible = testVehicle({
             useable: 82.5,
             guide: { division: 'Tesla', carline_class: 'Small SUV 4WD', nominal_pack_kwh: 79.8 },
         });
         expect(certObservation(impossible, undefined).usable_fraction).toBeNull();
     });
     it('keeps a plausible ratio', () => {
-        const ok = group({ useable: 141, guide: { division: 'Rivian', nominal_pack_kwh: 149.7 } });
+        const ok = testVehicle({ useable: 141, guide: { division: 'Rivian', nominal_pack_kwh: 149.7 } });
         expect(certObservation(ok, undefined).usable_fraction).toBeCloseTo(0.942, 3);
     });
 });
 
 describe('coverage', () => {
     const obs = certObservations([
-        group({ id: 'A', tests: [{ procedure_code: 77, total_dc_energy_kwh: 88, ac_recharge_kwh: 100 }] }),
-        group({ id: 'B', tests: [{ procedure_code: 77, total_dc_energy_kwh: 90 }] }),
-        group({ id: 'C', tests: [] }),
+        testVehicle({ id: 'A', tests: [{ procedure_code: 77, total_dc_energy_kwh: 88, ac_recharge_kwh: 100 }] }),
+        testVehicle({ id: 'B', tests: [{ procedure_code: 77, total_dc_energy_kwh: 90 }] }),
+        testVehicle({ id: 'C', tests: [] }),
     ], undefined);
 
     it('separates what was derived from what fell back', () => {
@@ -138,16 +138,16 @@ describe('coverage', () => {
     });
     it('counts how many are missing their guide half', () => {
         // The population question, which the caption used to be unable to ask:
-        // these groups were filtered out upstream, so a total read as the whole
+        // these test vehicles were filtered out upstream, so a total read as the whole
         // corpus when 90 of 413 were not in it.
         const mixed = certObservations([
-            group({ id: 'A', tests: [{ procedure_code: 77, total_dc_energy_kwh: 88 }] }),
-            group({ id: 'B', guide: null, tests: [{ procedure_code: 77, total_dc_energy_kwh: 179 }] }),
+            testVehicle({ id: 'A', tests: [{ procedure_code: 77, total_dc_energy_kwh: 88 }] }),
+            testVehicle({ id: 'B', guide: null, tests: [{ procedure_code: 77, total_dc_energy_kwh: 179 }] }),
         ], undefined);
         expect(coverageFor(mixed, 'usable_kwh')).toMatchObject({ usable: 2, unlinked: 1, total: 2 });
     });
     it('counts unlinked ACROSS the other three, not alongside them', () => {
-        // An unlinked group usually carries the measure perfectly well — it is
+        // An unlinked test vehicle usually carries the measure perfectly well — it is
         // only missing the half that says what the car is. Adding `unlinked`
         // to `usable` would double-count it and the caption would not add up.
         const c = coverageFor(obs, 'usable_kwh');
@@ -172,7 +172,7 @@ describe('the steady-state η measure, and the ratio that decides a correction',
      */
     const MCT_COEFFS = [{ is_primary: true, target_a: 40.69, target_b: 0.0723,
         target_c: 0.01437, equiv_test_weight_lbs: 5000 }];
-    const mct = () => group({
+    const mct = () => testVehicle({
         coeffs: MCT_COEFFS,
         tests: [{
             test_number: 'TMBX10091675', procedure_code: 77,
@@ -187,7 +187,7 @@ describe('the steady-state η measure, and the ratio that decides a correction',
     });
 
     /** BMW's i7 — procedures 81 and 84, so no constant-speed phase exists. */
-    const sct = () => group({
+    const sct = () => testVehicle({
         coeffs: MCT_COEFFS,
         tests: [{
             test_number: 'RBMX10080458', procedure_code: 84,
@@ -224,9 +224,9 @@ describe('the steady-state η measure, and the ratio that decides a correction',
     });
 
     it('refuses a ratio against an ASSUMED HWFET η', () => {
-        // A group with no highway phase falls back to DEFAULT_ETA. Dividing by
+        // A test vehicle with no highway phase falls back to DEFAULT_ETA. Dividing by
         // a constant would manufacture a ratio that describes the constant.
-        const noHwy = group({
+        const noHwy = testVehicle({
             coeffs: MCT_COEFFS,
             tests: [{
                 procedure_code: 77, total_dc_energy_kwh: 90, ac_recharge_kwh: 100,
@@ -248,7 +248,7 @@ describe('the steady-state η measure, and the ratio that decides a correction',
         expect(coverageFor(obs, 'ss_eta')).toMatchObject({ usable: 1, total: 3 });
         expect(coverageFor(obs, 'eta').usable).toBe(3);
 
-        // And the shortfall is `missing`, not `assumed` — a group with no
+        // And the shortfall is `missing`, not `assumed` — a test vehicle with no
         // constant-speed phase has no steady-state figure at all, rather than
         // one that fell back to a constant.
         expect(coverageFor(obs, 'ss_eta').missing).toBe(2);
@@ -265,14 +265,14 @@ describe('the steady-state η measure, and the ratio that decides a correction',
 
 describe('an impossible value is not a measurement either', () => {
     /**
-     * Nissan's six groups derive a steady-state η above 1 — a drivetrain
+     * Nissan's six test vehicles derive a steady-state η above 1 — a drivetrain
      * returning more energy than it was given — which inflated their ratio to
      * 1.53 against a fleet median of 1.13 and pulled the fleet figures with it.
      *
      * `isMeasured` asks where a value came from. That is a different question
      * from whether it can be true, and both have to pass.
      */
-    const impossible = () => group({
+    const impossible = () => testVehicle({
         // Coefficients far above what the phase actually spent, so the
         // back-solve returns more energy out than in.
         coeffs: [{ is_primary: true, target_a: 200, target_b: 0.5, target_c: 0.05 }],
@@ -335,16 +335,16 @@ describe('a value that cannot be a measurement', () => {
     });
 
     it('nulls the value and keeps the observation', () => {
-        // Dropped, the group would leave the population and every other measure
+        // Dropped, the test vehicle would leave the population and every other measure
         // it carries would go with it.
         const [a, b] = nullImpossible(
-            [{ test_group_id: 'A', usable_kwh: 999, aero_c: 0.07 },
-             { test_group_id: 'B', usable_kwh: 89.1, aero_c: 0.02 }],
+            [{ test_vehicle_id: 'A', usable_kwh: 999, aero_c: 0.07 },
+             { test_vehicle_id: 'B', usable_kwh: 89.1, aero_c: 0.02 }],
             'usable_kwh',
         );
         expect(a.usable_kwh).toBeNull();
         expect(a.aero_c).toBe(0.07);
-        expect(a.test_group_id).toBe('A');
+        expect(a.test_vehicle_id).toBe('A');
         expect(b.usable_kwh).toBe(89.1);
     });
 
@@ -365,9 +365,9 @@ describe('a value that cannot be a measurement', () => {
         // The caption has to be able to say what happened. "Does not report it"
         // and "reported 999.0" are different facts about a record.
         const c = coverageFor(nullImpossible([
-            { test_group_id: 'A', usable_kwh: 999 },
-            { test_group_id: 'B', usable_kwh: 89.1 },
-            { test_group_id: 'C', usable_kwh: null },
+            { test_vehicle_id: 'A', usable_kwh: 999 },
+            { test_vehicle_id: 'B', usable_kwh: 89.1 },
+            { test_vehicle_id: 'C', usable_kwh: null },
         ], 'usable_kwh'), 'usable_kwh');
         expect(c).toMatchObject({ usable: 1, impossible: 1, missing: 1, total: 3 });
     });

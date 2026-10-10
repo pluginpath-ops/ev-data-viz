@@ -8,7 +8,7 @@
 /**
  * What to call one methodology section.
  *
- * The obvious answer — vehicle name plus the group's display_name — produced
+ * The obvious answer — vehicle name plus the test vehicle's display_name — produced
  * "2026 Model Y Performance · Performance EPA Range Assessment" twice in a row,
  * separated only by a subtitle reading "Model Y Performance" against "Model Y
  * Performance-B". Three problems at once, and they need different fixes.
@@ -23,11 +23,11 @@
  * all. So it is appended only when the vehicle has more than one configuration
  * AND the name is not already contained in the vehicle's.
  *
- * `test_group_id` is the identifier that cannot degrade — unique, present on
- * every group, occasionally self-describing (`R2-159XR20AT`). It goes in the
+ * `test_vehicle_id` is the identifier that cannot degrade — unique, present on
+ * every test vehicle, occasionally self-describing (`R2-159XR20AT`). It goes in the
  * subtitle unconditionally, which is what actually lets two Model Y Performance
  * sections be told apart. The run selector above already pairs the year and the
- * test group this way; this matches it rather than inventing a second scheme.
+ * test vehicle this way; this matches it rather than inventing a second scheme.
  */
 export function methodologyTitle({ vehicleName, epaLabel, configCount }) {
     if (!epaLabel || configCount <= 1) return vehicleName;
@@ -38,7 +38,7 @@ export function methodologyTitle({ vehicleName, epaLabel, configCount }) {
 }
 
 /** The line beneath it: year and the one identifier guaranteed to be unique. */
-export function methodologySubtitle({ modelYear, testGroupId }) {
-    return [modelYear, testGroupId].filter(Boolean).join(' · ') || null;
+export function methodologySubtitle({ modelYear, testVehicleId }) {
+    return [modelYear, testVehicleId].filter(Boolean).join(' · ') || null;
 }
 
