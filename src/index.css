@@ -1645,6 +1645,15 @@ body {
     outline-offset: -1px;
     border-color: var(--color-primary);
 }
+/* A number the field will not commit (NumberInput): out of range, or not a
+   number yet. Every figure keeps following the last valid value meanwhile,
+   so the field says plainly that what it shows is not what is in use. */
+.form-input[aria-invalid="true"],
+.form-input[aria-invalid="true"]:focus {
+    outline-color: var(--color-danger);
+    border-color: var(--color-danger);
+    color: var(--color-danger);
+}
 
 /* A cell of the editable data-points grid.
    Transparent at rest so the table reads as a table rather than a wall of

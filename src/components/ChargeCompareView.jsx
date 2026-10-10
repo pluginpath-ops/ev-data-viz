@@ -27,6 +27,7 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
+import NumberInput from './NumberInput';
 
 
 /**
@@ -947,39 +948,34 @@ export default function ChargeCompareView({
                     <div className="axis-rows">
                         <label className="scenario-row">
                             <span className="scenario-key">Start</span>
-                            <input
-                                type="number"
+                            <NumberInput
                                 value={startSoc}
                                 min={1}
                                 max={80}
-                                onChange={e => setStartSoc(Math.min(80, Math.max(1, Number(e.target.value))))}
+                                integer
+                                onChange={setStartSoc}
                                 className="form-input"
                             />
                             <span className="scenario-unit">% SoC</span>
                         </label>
                         <label className="scenario-row">
                             <span className="scenario-key">For</span>
-                            <input
-                                type="number"
+                            <NumberInput
                                 value={xMinutes}
                                 min={1}
                                 max={120}
-                                onChange={e => setXMinutes(Math.max(1, Number(e.target.value)))}
+                                onChange={setXMinutes}
                                 className="form-input"
                             />
                             <span className="scenario-unit">min</span>
                         </label>
                         <label className="scenario-row">
                             <span className="scenario-key">Add</span>
-                            <input
-                                type="number"
+                            <NumberInput
                                 value={units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles}
                                 min={1}
                                 max={units === 'metric' ? 650 : 400}
-                                onChange={e => {
-                                    const v = Math.max(1, Number(e.target.value));
-                                    setMMiles(units === 'metric' ? Math.round(v / MI_TO_KM) : v);
-                                }}
+                                onChange={v => setMMiles(units === 'metric' ? Math.round(v / MI_TO_KM) : v)}
                                 className="form-input"
                             />
                             <span className="scenario-unit">{distanceLabel(units)}</span>

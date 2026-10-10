@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries,
-    overExtrapolated, clampSoc, rampLength, trimRamp, extrapolationSlope,
+    overExtrapolated, rampLength, trimRamp, extrapolationSlope,
     RAMP_MAX_TRIM, RAMP_TRIM_MIN_MINUTES,
 } from '../socAlignment';
 
@@ -79,18 +79,6 @@ describe('alignmentOffset', () => {
 
     it('skips an anchor point that has no time', () => {
         expect(alignmentOffset(pts([30, null], [35, 9]), 20)).toBe(9);
-    });
-});
-
-describe('clampSoc', () => {
-    it('keeps a sane percentage and rounds', () => {
-        expect(clampSoc('12.6')).toBe(13);
-        expect(clampSoc(150)).toBe(100);
-        expect(clampSoc(-5)).toBe(0);
-    });
-    it('falls back when the input is not a number', () => {
-        expect(clampSoc('')).toBe(10);
-        expect(clampSoc('abc', 25)).toBe(25);
     });
 });
 

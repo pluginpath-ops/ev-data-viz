@@ -24,7 +24,7 @@ const AXIS_FIGURES = {
 };
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
-import { minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries, overExtrapolated, clampSoc } from '../utils/socAlignment';
+import { minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries, overExtrapolated } from '../utils/socAlignment';
 import { sessionFor } from '../utils/testSessions';
 import { correctionFactor } from '../utils/conditionCorrection';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
@@ -45,6 +45,7 @@ import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import { compositeConditions, compositeExplainer, THIN_SUPPORT } from '../utils/compositeCurve';
 import { reportedRangeRun } from '../utils/testedRange';
+import NumberInput from './NumberInput';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
@@ -946,16 +947,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             <span className="race-mode-label">Race mode</span>
                         </label>
                         <span className="race-mode-start">
-                            <input
+                            {/* Cleared, it follows the data again (commonSoc). */}
+                            <NumberInput
                                 id="align-soc"
-                                type="number"
-                                min="0" max="100"
-                                value={chartConfig.raceThreshold ?? (commonSoc ?? '')}
+                                min={0} max={100} integer allowEmpty
+                                value={chartConfig.raceThreshold ?? commonSoc}
                                 placeholder={commonSoc != null ? String(commonSoc) : '10'}
-                                onChange={e => setChartConfig({
-                                    ...chartConfig,
-                                    raceThreshold: e.target.value === '' ? null : clampSoc(e.target.value, commonSoc ?? 10),
-                                })}
+                                onChange={v => setChartConfig({ ...chartConfig, raceThreshold: v })}
                                 disabled={chartConfig.alignRaw}
                                 className="form-input soc-input"
                                 title={commonSoc != null && chartConfig.raceThreshold == null

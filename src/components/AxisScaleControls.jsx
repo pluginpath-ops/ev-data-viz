@@ -1,3 +1,4 @@
+import NumberInput from './NumberInput';
 /**
  * Shared Y/X axis min-max scale controls.
  * Used below charts in ChargingView, RangeChartView, RoadTripView, EpaCurvesView.
@@ -53,21 +54,21 @@ export default function AxisScaleControls({
                 <div className="axis-scale-group">
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-meta w-7 text-right">Max</span>
-                        <input
-                            type="number"
+                        <NumberInput
+                            allowEmpty
                             placeholder="Auto"
-                            value={yMax ?? ''}
-                            onChange={e => onChange('yMax', e.target.value === '' ? null : Number(e.target.value))}
+                            value={yMax}
+                            onChange={v => onChange('yMax', v)}
                             className="form-input axis-input"
                         />
                     </div>
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-meta w-7 text-right">Min</span>
-                        <input
-                            type="number"
+                        <NumberInput
+                            allowEmpty
                             placeholder="Auto"
-                            value={yMin ?? ''}
-                            onChange={e => onChange('yMin', e.target.value === '' ? null : Number(e.target.value))}
+                            value={yMin}
+                            onChange={v => onChange('yMin', v)}
                             className="form-input axis-input"
                         />
                     </div>
@@ -91,21 +92,21 @@ export default function AxisScaleControls({
                     <div className="axis-scale-group">
                         <div className="inline-row">
                             <span className="text-xs text-meta w-7 text-right">Max</span>
-                            <input
-                                type="number"
+                            <NumberInput
+                                allowEmpty
                                 placeholder="Auto"
-                                value={xMax ?? ''}
-                                onChange={e => onChange('xMax', e.target.value === '' ? null : Number(e.target.value))}
+                                value={xMax}
+                                onChange={v => onChange('xMax', v)}
                                 className="form-input axis-input"
                             />
                         </div>
                         <div className="inline-row">
                             <span className="text-xs text-meta w-7 text-right">Min</span>
-                            <input
-                                type="number"
+                            <NumberInput
+                                allowEmpty
                                 placeholder="Auto"
-                                value={xMin ?? ''}
-                                onChange={e => onChange('xMin', e.target.value === '' ? null : Number(e.target.value))}
+                                value={xMin}
+                                onChange={v => onChange('xMin', v)}
                                 className="form-input axis-input"
                             />
                         </div>
@@ -128,21 +129,21 @@ export default function AxisScaleControls({
                     <div className="axis-scale-group">
                         <div className="inline-row">
                             <span className="text-xs text-meta w-7 text-right">Max</span>
-                            <input
-                                type="number"
+                            <NumberInput
+                                allowEmpty
                                 placeholder="Auto"
-                                value={y2Max ?? ''}
-                                onChange={e => onChange('y2Max', e.target.value === '' ? null : Number(e.target.value))}
+                                value={y2Max}
+                                onChange={v => onChange('y2Max', v)}
                                 className="form-input axis-input"
                             />
                         </div>
                         <div className="inline-row">
                             <span className="text-xs text-meta w-7 text-right">Min</span>
-                            <input
-                                type="number"
+                            <NumberInput
+                                allowEmpty
                                 placeholder="Auto"
-                                value={y2Min ?? ''}
-                                onChange={e => onChange('y2Min', e.target.value === '' ? null : Number(e.target.value))}
+                                value={y2Min}
+                                onChange={v => onChange('y2Min', v)}
                                 className="form-input axis-input"
                             />
                         </div>

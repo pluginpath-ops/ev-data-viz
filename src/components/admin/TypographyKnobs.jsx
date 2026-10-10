@@ -3,6 +3,7 @@ import {
     TYPO_GROUPS, WEIGHT_OPTIONS,
     getTypographyOverrides, setTypographyOverride, clearTypographyOverrides,
 } from '../../styles/typographyKnobs';
+import NumberInput from '../NumberInput';
 
 /**
  * Admin panel for tuning the semantic type system live.
@@ -101,8 +102,8 @@ function KnobRow({ knob, value, modified, onChange }) {
                         {WEIGHT_OPTIONS.map(w => <option key={w} value={w}>{w}</option>)}
                     </select>
                 ) : (
-                    <input type="number" min={min} max={max} step={step} value={value}
-                        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+                    <NumberInput min={min} max={max} step={step} value={value}
+                        onChange={onChange}
                         className="form-input form-input w-24" />
                 )}
                 <span className="text-xs text-meta w-5">{unitFor(kind)}</span>

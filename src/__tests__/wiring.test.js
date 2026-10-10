@@ -203,6 +203,20 @@ describe('utilities built for the UI are reached by the UI', () => {
 });
 
 describe('the seams that broke before', () => {
+    it('commits a typed number only once it is valid — no field snaps to 0, a floor, or its old value', () => {
+        // Backspacing a field to retype it committed Number('') (0) or a
+        // clamp's floor, and the next digits appended: "100" → "1" → "120".
+        const files = ['ChargeCompareView', 'RoadTripView', 'ChargingView', 'AxisScaleControls',
+            'admin/ConstantsKnobs', 'admin/TypographyKnobs', 'epa/ViewingConditions'];
+        for (const f of files) {
+            const src = read(`src/components/${f}.jsx`);
+            expect(src, `${f} uses the shared field`).toMatch(/<NumberInput/);
+            expect(src, `${f} must not keep a raw number input`).not.toMatch(/<input\s[^>]*type="number"/);
+            expect(src, `${f} must not clamp on every keystroke`).not.toMatch(/Math\.max\(\d+, Number\(/);
+        }
+        expect(read('src/index.css'), 'an uncommitted value is shown as such').toMatch(/\.form-input\[aria-invalid="true"\]/);
+    });
+
     it('reads the correction note it writes', () => {
         // It was written to every corrected run and read by nothing, so a
         // corrected bar looked exactly like a measured one.

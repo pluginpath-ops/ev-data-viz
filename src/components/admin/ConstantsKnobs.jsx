@@ -4,6 +4,7 @@ import { getOverrides, setOverride, clearOverrides, getSiteConstants } from '../
 import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import { allBandEvidence, bandVerdict } from '../../utils/epaBandEvidence';
+import NumberInput from '../NumberInput';
 
 /**
  * Admin panel for tuning the EPA model constants.
@@ -29,7 +30,6 @@ const eq = (a, b) =>
 /** Layer-comparison that treats "absent" as its own value. */
 const eqSlot = (a, b) => (a == null || b == null ? a == null && b == null : eq(a, b));
 
-const numOrNull = (s) => (s === '' || s == null ? null : Number(s));
 
 const show = (v) => (Array.isArray(v) ? `${v[0]}–${v[1]}` : String(v));
 
@@ -297,25 +297,25 @@ function KnobRow({
             <div className="flex items-center gap-2 shrink-0">
                 {kind === 'range' ? (
                     <>
-                        <input
-                            type="number" min={min} max={max} step={step}
+                        <NumberInput
+                            min={min} max={max} step={step}
                             value={value[0]}
-                            onChange={(e) => onChange([numOrNull(e.target.value) ?? def[0], value[1]])}
+                            onChange={v => onChange([v, value[1]])}
                             className="form-input form-input w-20"
                         />
                         <span className="text-meta text-sm">–</span>
-                        <input
-                            type="number" min={min} max={max} step={step}
+                        <NumberInput
+                            min={min} max={max} step={step}
                             value={value[1]}
-                            onChange={(e) => onChange([value[0], numOrNull(e.target.value) ?? def[1]])}
+                            onChange={v => onChange([value[0], v])}
                             className="form-input form-input w-20"
                         />
                     </>
                 ) : (
-                    <input
-                        type="number" min={min} max={max} step={step}
+                    <NumberInput
+                        min={min} max={max} step={step}
                         value={value}
-                        onChange={(e) => onChange(numOrNull(e.target.value))}
+                        onChange={onChange}
                         className="form-input form-input w-24"
                     />
                 )}
