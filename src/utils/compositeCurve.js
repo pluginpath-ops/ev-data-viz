@@ -65,7 +65,7 @@
 import { isExcluded } from './runListing';
 import { interpolate } from './interpolate';
 import { trimRamp } from './socAlignment';
-import { isInheritedRunId, isCompositeRun } from './runUtils';
+import { isCompositeRun } from './runUtils';
 import { resolveVoltageClass, VOLTAGE_CLASSES } from './platforms';
 import { convTemp, tempLabel } from './unitConversions';
 
@@ -94,17 +94,29 @@ export const THIN_SUPPORT = 2;
 const finite = (x) => x != null && x !== '' && Number.isFinite(Number(x));
 
 /**
- * Whether a run may feed a composite. The same exclusions as a vehicle's best
- * charge windows (chargeWindows.countsTowardBest): excluded from the
- * statistics (#394 — an UNLISTED test still counts: that is the pool),
- * synthetic (not measured), inherited (another vehicle's test).
+ * Whether a run may feed a composite: a measured charging test, not excluded
+ * from the statistics (#394 — an UNLISTED test still counts: that is the
+ * pool), and not synthetic.
+ *
+ * An INHERITED test counts. A curator linked it because it is this car's
+ * charging behavior too — a variant sharing the pack — and the composite
+ * stands for the car, so leaving it out made a variant with two inherited
+ * tests show no composite at all. It is read as the charts draw it, scaled by
+ * its link's capacity factor (DataService.getPointsForRuns).
+ *
+ * Unlike a best charge window (chargeWindows.countsTowardBest), which still
+ * skips inherited tests: a best is a session this car was measured having.
  */
 export function compositeEligible(run) {
     if (!run || run.kind !== 'charging') return false;
-    // A stored composite is synthetic too; said outright so it never feeds itself.
-    if (isExcluded(run) || run.synthetic || isCompositeRun(run)) return false;
-    return !isInheritedRunId(run.id) && !run._inherited;
+    // A stored composite is synthetic too; said outright so it never feeds
+    // itself — nor, inherited, another vehicle's.
+    return !(isExcluded(run) || run.synthetic || isCompositeRun(run));
 }
+
+/** A vehicle's OWN stored composites — never one it reads through a spec link. */
+export const storedComposites = (vehicle) =>
+    (vehicle?.runs ?? []).filter(r => isCompositeRun(r) && !r._inherited);
 
 /** The vehicle's voltage class in volts (400 | 800), or null when unknown. */
 export function vehicleVoltageClass(vehicle) {
@@ -183,7 +195,11 @@ export function buildComposite(tests) {
     const heldAt = new Map(series.map(s => [s.run.id, []]));   // runId → SoCs set aside
     const used = new Set();
 
-    let clock = 0, clockRunning = true;
+    // The clock starts at the first percent some test timed — a test logged
+    // without a clock (SoC and power only) may reach lower than any that has
+    // one, and must not leave the whole curve without time — and stops at the
+    // first gap after that.
+    let clock = 0, clockState = 'waiting';   // → 'running' → 'stopped'
     const points = [];
     for (let i = 0; i < socs.length; i++) {
         const soc = socs[i];
@@ -207,7 +223,7 @@ export function buildComposite(tests) {
         points.push({
             soc,
             chargeRate: Math.round(kw * 10) / 10,
-            time: clockRunning ? Math.round(clock * 100) / 100 : null,
+            time: clockState === 'running' ? Math.round(clock * 100) / 100 : null,
             n: counted.length,
             spreadHi: spread && Math.round(spread.hi * 10) / 10,
             spreadLo: spread && Math.round(spread.lo * 10) / 10,
@@ -224,8 +240,12 @@ export function buildComposite(tests) {
                 return at.t != null && after?.t != null && after.t > at.t ? after.t - at.t : null;
             })
             .filter(dt => dt != null);
-        if (steps.length) clock += steps.reduce((a, b) => a + b, 0) / steps.length;
-        else clockRunning = false;   // a gap with no clock: say nothing past it rather than guess
+        if (steps.length) {
+            if (clockState === 'waiting') { clockState = 'running'; points[points.length - 1].time = 0; }
+            if (clockState === 'running') clock += steps.reduce((a, b) => a + b, 0) / steps.length;
+        } else if (clockState === 'running') {
+            clockState = 'stopped';   // a gap with no clock: say nothing past it rather than guess
+        }
     }
 
     // Minutes per percent are smoothed with the power, then summed back into
@@ -237,7 +257,7 @@ export function buildComposite(tests) {
     });
     smoothAlongSoc(points, ['chargeRate', 'spreadHi', 'spreadLo', 'step']);
     let resummed = 0;
-    for (const p of points) {
+    for (const p of points.slice(points.findIndex(q => q.time != null))) {
         if (p.time == null) break;
         p.time = Math.round(resummed * 100) / 100;
         if (p.step == null) break;
@@ -260,7 +280,12 @@ export function buildComposite(tests) {
 
     return {
         points,
-        tests: series.filter(s => used.has(s.run.id)).map(s => ({ runId: s.run.id, name: s.run.name })),
+        // `from`: the vehicle an inherited test was measured on, so the ⓘ can
+        // say why a test this car's list marks as inherited stands behind it.
+        tests: series.filter(s => used.has(s.run.id)).map(s => ({
+            runId: s.run.id, name: s.run.name,
+            ...(s.run._inherited ? { from: s.run._sourceVehicleName ?? null } : {}),
+        })),
         heldBack: series.flatMap(s => spans(heldAt.get(s.run.id))
             .map(([from, to]) => ({ runId: s.run.id, name: s.run.name, from, to }))),
         conditions: {
@@ -479,7 +504,7 @@ export function compositeCurves(vehicle, pointsByRunId = {}) {
  * excluded — so Admin → Data checks can say which stored composites were built
  * the old way.
  */
-export const COMPOSITE_VERSION = 1;
+export const COMPOSITE_VERSION = 2;   // 2: inherited tests count; the clock starts at the first timed test
 
 /**
  * What a vehicle's composites are built FROM, as one comparable string. A
@@ -489,11 +514,14 @@ export const COMPOSITE_VERSION = 1;
  * Point count and peak stand in for the points themselves — no stored
  * timestamp moves when a test's points are replaced (runs.updated_at has no
  * trigger), and fetching every point to compare would cost what rebuilding does.
+ * An inherited test's id names its link, and its capacity factor scales every
+ * kW it contributes, so a re-scaled link is a changed test.
  */
 export function compositeFingerprint(vehicle) {
     const tests = (vehicle?.runs ?? []).filter(compositeEligible)
         .map(r => [r.id, r.name ?? '', r.charger_voltage_class ?? '', r.temperature_f ?? '',
-                   r.preconditioned ?? '', r.dataPointCount ?? '', r.charge_summary?.peakKw ?? ''].join(':'))
+                   r.preconditioned ?? '', r.dataPointCount ?? '', r.charge_summary?.peakKw ?? '',
+                   r._capacityFactor ?? ''].join(':'))
         .sort();
     return `class=${vehicleVoltageClass(vehicle) ?? '?'}|${tests.join(',')}`;
 }
@@ -533,7 +561,7 @@ export function compositeRecord(curve, fingerprint) {
 export function planCompositeRebuild(vehicle, pointsByRunId) {
     const { curves } = compositeCurves(vehicle, pointsByRunId);
     const fingerprint = compositeFingerprint(vehicle);
-    const stored = (vehicle?.runs ?? []).filter(isCompositeRun);
+    const stored = storedComposites(vehicle);
     const byClass = new Map(stored.map(r => [r.composite.chargerClassV ?? null, r]));
     const writes = curves.map(curve => ({
         id: byClass.get(curve.chargerClassV ?? null)?.id ?? null,
@@ -551,7 +579,7 @@ export function planCompositeRebuild(vehicle, pointsByRunId) {
  */
 export function staleComposites(vehicle) {
     const fingerprint = compositeFingerprint(vehicle);
-    return (vehicle?.runs ?? []).filter(isCompositeRun)
+    return storedComposites(vehicle)
         .filter(r => r.composite.version !== COMPOSITE_VERSION || r.composite.fingerprint !== fingerprint);
 }
 
@@ -607,7 +635,7 @@ export function compositeNote(curve, units = 'imperial') {
  * this sits where a test's ↗ source link would.
  */
 export function compositeExplainer(curve, units = 'imperial') {
-    const names = curve.tests.map(t => t.name).join(', ');
+    const names = curve.tests.map(t => (t.from ? `${t.name} (inherited from ${t.from})` : t.name)).join(', ');
     const note = compositeNote(curve, units);
     return `The mean of ${curve.tests.length} tests at each SoC, smoothed over ±${SMOOTHING_HALF_WINDOW}%: ${names}.`
         + (note ? ` ${note.charAt(0).toUpperCase()}${note.slice(1)}.` : '')

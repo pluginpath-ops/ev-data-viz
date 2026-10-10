@@ -810,11 +810,36 @@ describe('the seams that broke before', () => {
             // To the next declaration at the provider's own indent — the function's end.
             const start = ctx.indexOf(`    const ${fn} = async`);
             const body = ctx.slice(start, ctx.indexOf('\n    const ', start + 1));
-            expect(body, `${fn} must rebuild composites`).toMatch(/refreshComposites\(/);
+            expect(body, `${fn} must rebuild composites`).toMatch(/refreshComposites(Around)?\(/);
         }
         expect(read('src/services/DataService.js'), 'points carry n + spread').toMatch(/extra_data:\s*\{ n: p\.n/);
         expect(read('src/components/admin/DataChecksPanel.jsx')).toMatch(/<CompositeMaintenance \/>/);
         expect(read('src/components/RunsView.jsx'), 'curators set the default in Tests & Data').toMatch(/<CompositeRunCard/);
+    });
+
+    it('rebuilds the composites of every vehicle that inherits a test, not just its own', () => {
+        const ctx = read('src/context/AppContext.jsx');
+        const body = (fn) => {
+            const start = ctx.indexOf(`    const ${fn} = async`);
+            return ctx.slice(start, ctx.indexOf('\n    const ', start + 1));
+        };
+        // A write to a test that a variant reads through a spec link moves the
+        // variant's composite too.
+        for (const fn of ['updateRun', 'deleteRun', 'replaceRunData', 'mergeRunData']) {
+            expect(body(fn), `${fn} must reach the vehicles inheriting the test`).toMatch(/refreshCompositesAround\(/);
+        }
+        // A delete takes the spec links with it, so who inherited is read first.
+        expect(body('deleteRun')).toMatch(/inheritorsOf\(runId\)[\s\S]*dataService\.deleteRun/);
+        expect(body('deleteVehicle')).toMatch(/inheritorsOf\([\s\S]*dataService\.deleteVehicle[\s\S]*refreshComposites/);
+        // The other end of a link: adding, re-scaling or removing one, and a new variant.
+        for (const fn of ['addSpecLink', 'updateSpecLink', 'deleteSpecLink']) {
+            expect(body(fn), `${fn} must rebuild the target's composites`).toMatch(/refreshComposites\(/);
+        }
+        expect(body('createVariant')).toMatch(/dataService\.rebuildComposites\(/);
+        // The rebuild reads what it inherits, scaled as the chart scales it.
+        const ds = read('src/services/DataService.js');
+        expect(ds).toMatch(/buildInheritedRuns\(\{ spec_links: links\.data \}/);
+        expect(ds).toMatch(/shapePoint\(p, r\._efficiencyFactor \?\? 1, r\._capacityFactor \?\? 1\)/);
     });
 
     it('takes a composite as the default charging curve everywhere: DEF → composite → newest (#313)', () => {

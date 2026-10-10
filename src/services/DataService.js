@@ -10,9 +10,9 @@ import { demotionUpdates, acceptGuideTags, guideOverlay, isCuratorOwned } from '
 import { selectTestForGuide } from '../utils/epaTestSelection';
 import { planTestVehicleImport, uniqueCoveredModels } from '../utils/epaImportMerge';
 import { planCertificationImport, guideLinkTarget, testGroupYear, isTestGroup, viewForVehicle, viewForTestVehicle, certifiedYears } from '../utils/epaCertifications';
-import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, isCompositeRun, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
+import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
-import { planCompositeRebuild, compositeEligible, mayHaveComposite } from '../utils/compositeCurve';
+import { planCompositeRebuild, compositeEligible, mayHaveComposite, storedComposites } from '../utils/compositeCurve';
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
@@ -1256,12 +1256,32 @@ class DataService {
 
   // ── Composite curves (#313, migration 077) ───────────────────────────────
 
-  /** A vehicle's runs straight from the database, shaped as getVehicles shapes them. */
+  /**
+   * A vehicle's runs straight from the database, shaped as getVehicles shapes
+   * them — its own, then those it inherits through spec links, built by the
+   * same buildInheritedRuns so their ids and factors match what is on screen.
+   */
   async getVehicleRuns(vehicleId) {
-    const { data, error } = await getSupabase()
-      .from('runs').select('*, data_points(count)').eq('vehicle_id', vehicleId);
+    const sb = getSupabase();
+    const [own, links] = await Promise.all([
+      sb.from('runs').select('*, data_points(count)').eq('vehicle_id', vehicleId),
+      sb.from('spec_links').select('*').eq('target_vehicle_id', vehicleId),
+    ]);
+    if (own.error) throw own.error;
+    if (links.error) throw links.error;
+    const runs = (own.data ?? []).map(shapeRun);
+    const sourceIds = (links.data ?? []).map(l => Number(l.source_run_id));
+    if (!sourceIds.length) return runs;
+
+    const { data: sources, error } = await sb.from('runs')
+      .select('*, data_points(count), vehicles(name, year, trim)').in('id', sourceIds);
     if (error) throw error;
-    return (data ?? []).map(shapeRun);
+    const runById = new Map(), runToVehicle = new Map();
+    for (const { vehicles: sv, ...r } of sources ?? []) {
+      runById.set(Number(r.id), shapeRun(r));
+      runToVehicle.set(Number(r.id), { vehicleId: r.vehicle_id, vehicleName: vehicleLabel(sv) });
+    }
+    return [...runs, ...buildInheritedRuns({ spec_links: links.data }, runById, runToVehicle)];
   }
 
   /**
@@ -1280,9 +1300,9 @@ class DataService {
     if (!this.useSupabase || !this.isContributor || !vehicle) return null;
     const runs = await this.getVehicleRuns(vehicle.id);
     const withRuns = { ...vehicle, runs };
-    if (!mayHaveComposite(withRuns) && !runs.some(isCompositeRun)) return runs;
+    if (!mayHaveComposite(withRuns) && !storedComposites(withRuns).length) return runs;
 
-    const pointsByRunId = await this.getPointsForRuns(runs.filter(compositeEligible).map(r => r.id));
+    const pointsByRunId = await this.getPointsForRuns(runs.filter(compositeEligible));
     const { writes, deletes } = planCompositeRebuild(withRuns, pointsByRunId);
 
     // A vehicle's composites (800 V and 400 V) are independent, so they are
@@ -1609,20 +1629,32 @@ class DataService {
    * Several runs' points in one paged query, keyed by run id — for a composite
    * rebuild, which needs every test of a vehicle at once. One request (or one
    * per thousand rows) instead of one per test: per-test fetches one after
-   * another were most of a rebuild's time. Real runs only; no inherited
-   * scaling, which a composite never reads.
+   * another were most of a rebuild's time.
+   *
+   * Takes the runs rather than their ids because an inherited test is read
+   * from its source run's points, scaled by its link exactly as getRunData
+   * scales it for a chart — so a composite averages the curves drawn beside it.
    */
-  async getPointsForRuns(runIds) {
-    const out = Object.fromEntries(runIds.map(id => [id, []]));
-    if (!runIds.length) return out;
+  async getPointsForRuns(runs) {
+    const out = Object.fromEntries(runs.map(r => [r.id, []]));
+    const realIds = [...new Set(runs.map(r => Number(r._realRunId ?? r.id)))];
+    if (!realIds.length) return out;
     const data = await fetchAllRows(() => getSupabase()
       .from('data_points')
       .select('*')
-      .in('run_id', runIds)
+      .in('run_id', realIds)
       .order('run_id', { ascending: true })
       .order('frame', { ascending: true })
       .order('id', { ascending: true }));
-    for (const p of data || []) (out[p.run_id] ??= []).push(shapePoint(p));
+    const rowsByRunId = new Map();
+    for (const p of data || []) {
+      if (!rowsByRunId.has(p.run_id)) rowsByRunId.set(p.run_id, []);
+      rowsByRunId.get(p.run_id).push(p);
+    }
+    for (const r of runs) {
+      const rows = rowsByRunId.get(Number(r._realRunId ?? r.id)) ?? [];
+      out[r.id] = rows.map(p => shapePoint(p, r._efficiencyFactor ?? 1, r._capacityFactor ?? 1));
+    }
     return out;
   }
 

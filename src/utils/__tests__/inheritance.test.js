@@ -28,6 +28,11 @@ describe('which runs can be inherited', () => {
         expect(linkableRuns(source()).some(r => r._inherited)).toBe(false);
     });
 
+    it('never offers a stored composite — the target builds its own', () => {
+        const withComposite = { ...source(), runs: [...source().runs, run(99, 'charging', { synthetic: true, composite: { chargerClassV: null } })] };
+        expect(linkableRuns(withComposite).map(r => r.id)).not.toContain(99);
+    });
+
     it('excludes runs already linked to the target', () => {
         expect(linkableRuns(source(), new Set([10, 12])).map(r => r.id)).toEqual([11, 13]);
     });

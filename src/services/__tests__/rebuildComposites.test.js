@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Fake PostgREST that records every runs write. A delete answers with the ids
 // it "removed" — all of them, unless `rlsHides` says a policy filtered some
 // out, which Postgres does silently.
-let log, nextId, rlsHides;
+let log, nextId, rlsHides, selectRows = [];
 const chain = (table, op, payload) => {
     const call = { table, op, payload, filters: {} };
     const api = {
@@ -11,9 +11,12 @@ const chain = (table, op, payload) => {
         in: (k, v) => { call.filters[k] = v; return api; },
         select: () => api,
         single: () => api,
+        order: () => api,
+        range: () => api,
         then: (resolve, reject) => {
             log.push(call);
-            const data = op === 'insert' ? { id: nextId++ }
+            const data = op === 'select' ? selectRows.filter(r => call.filters.run_id.includes(r.run_id))
+                : op === 'insert' ? { id: nextId++ }
                 : op === 'delete' ? call.filters.id.filter(id => !rlsHides.includes(id)).map(id => ({ id }))
                 : null;
             return Promise.resolve({ data, error: null }).then(resolve, reject);
@@ -23,6 +26,7 @@ const chain = (table, op, payload) => {
 };
 const fakeClient = {
     from: (table) => ({
+        select: () => chain(table, 'select'),
         insert: (p) => chain(table, 'insert', p),
         update: (p) => chain(table, 'update', p),
         delete: () => chain(table, 'delete'),
@@ -49,8 +53,8 @@ const vehicle = { id: 48, platforms: { electrical: { voltage_class_v: 800 } }, s
 
 function given(runs) {
     vi.spyOn(dataService, 'getVehicleRuns').mockResolvedValue(runs);
-    vi.spyOn(dataService, 'getPointsForRuns').mockImplementation(async (ids) =>
-        Object.fromEntries(ids.map(id => [id, POINTS[id]])));
+    vi.spyOn(dataService, 'getPointsForRuns').mockImplementation(async (runs) =>
+        Object.fromEntries(runs.map(r => [r.id, POINTS[r._realRunId ?? r.id]])));
     vi.spyOn(dataService, 'writeCompositePoints').mockResolvedValue();
     vi.spyOn(dataService, 'writeChargeSummary').mockResolvedValue({});
 }
@@ -74,7 +78,7 @@ describe('rebuildComposites — stored composite curves (#313, migration 077)', 
         // One query for every test's points, and the summary rides on the row
         // write — the round trips that made a rebuild slow (owner, 2026-10-07).
         expect(dataService.getPointsForRuns).toHaveBeenCalledTimes(1);
-        expect(dataService.getPointsForRuns.mock.calls[0][0]).toEqual([1, 2, 3, 4]);
+        expect(dataService.getPointsForRuns.mock.calls[0][0].map(r => r.id)).toEqual([1, 2, 3, 4]);
         expect(dataService.writeChargeSummary).not.toHaveBeenCalled();
         expect(inserts[0].payload.charge_summary.peakKw).toBe(400);
     });
@@ -91,6 +95,37 @@ describe('rebuildComposites — stored composite curves (#313, migration 077)', 
         rlsHides = [901];
         given([test(1), test(2), test(3), test(4, { is_excluded: true }), stored(900, 800), stored(901, 400)]);
         await expect(dataService.rebuildComposites(vehicle)).rejects.toThrow(/could not be deleted/);
+    });
+
+    it('builds from inherited tests, and never touches a composite read through a link', async () => {
+        const inherited = (realId, linkId) => test(`inherited_${linkId}_${realId}`, {
+            _inherited: true, _realRunId: realId, _capacityFactor: 1, _sourceVehicleName: 'R1S',
+        });
+        const theirs = { ...stored('inherited_9_77', 800), _inherited: true };
+        given([inherited(1, 5), inherited(2, 6), theirs]);
+        await dataService.rebuildComposites(vehicle);
+        const inserts = runsWrites().filter(c => c.op === 'insert');
+        expect(inserts.map(c => c.payload.name)).toEqual(['Composite on 800 V chargers (2 tests)']);
+        expect(inserts[0].payload.composite.tests).toEqual([
+            { runId: 'inherited_5_1', name: 'test inherited_5_1', from: 'R1S' },
+            { runId: 'inherited_6_2', name: 'test inherited_6_2', from: 'R1S' },
+        ]);
+        expect(runsWrites().filter(c => c.op !== 'insert')).toEqual([]);
+    });
+
+    it('reads an inherited test from its source run, scaled by its link as the chart draws it', async () => {
+        selectRows = [
+            { run_id: 7, frame: 0, soc: 10, charge_rate: 200, time_value: 0 },
+            { run_id: 7, frame: 1, soc: 20, charge_rate: 180, time_value: 3 },
+        ];
+        const own = { id: 7 };
+        const inherited = { id: 'inherited_4_7', _inherited: true, _realRunId: 7, _capacityFactor: 0.5, _efficiencyFactor: 1 };
+        const out = await dataService.getPointsForRuns([own, inherited]);
+        // One query for the source run, even read twice.
+        expect(log.filter(c => c.op === 'select').map(c => c.filters.run_id)).toEqual([[7]]);
+        expect(out[7].map(p => p.chargeRate)).toEqual([200, 180]);
+        expect(out.inherited_4_7.map(p => p.chargeRate)).toEqual([100, 90]);
+        expect(out.inherited_4_7.map(p => p.time)).toEqual([0, 3]);
     });
 
     it('writes nothing for a viewer', async () => {

@@ -2659,11 +2659,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         const alreadyLinkedRunIds = new Set(
                             (vehicle.spec_links || []).map(l => Number(l.source_run_id))
                         );
-                        // Source vehicles: any vehicle with at least one non-inherited, not-yet-linked run
+                        // Source vehicles: any vehicle with at least one run it could still lend
                         const sourceVehicles = (vehicles || [])
                             .filter(v =>
                                 Number(v.id) !== Number(vehicle.id) &&
-                                (v.runs || []).some(r => !r._inherited && !alreadyLinkedRunIds.has(Number(r.id)))
+                                linkableRuns(v, alreadyLinkedRunIds).length > 0
                             )
                             .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
