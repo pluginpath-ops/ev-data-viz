@@ -191,11 +191,13 @@ export function clearDefaultRuns(runs, runId = null) {
  * filter rather than new data.
  *
  * Inherited runs are excluded: a link to a link would make the chain's meaning
- * depend on the order the links were created.
+ * depend on the order the links were created. So are stored composites: the
+ * target builds its own from the tests it inherits, and the source's beside it
+ * would be the same curve twice.
  */
 export function linkableRuns(sourceVehicle, alreadyLinkedRunIds = new Set(), kindFilter = 'all') {
     return (sourceVehicle?.runs || []).filter(r => {
-        if (r._inherited) return false;
+        if (r._inherited || isCompositeRun(r)) return false;
         if (alreadyLinkedRunIds.has(Number(r.id))) return false;
         if (kindFilter === 'all') return true;
         return runKindFrom(r) === kindFilter;

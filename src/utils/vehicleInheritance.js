@@ -39,6 +39,7 @@
  * read `own`, and `inheritedFrom` says where each resolved value came from.
  */
 import { vehicleLabel } from './specHelpers';
+import { isCompositeRun } from './runUtils';
 
 /* One unit. The focal point is a property OF the photo -- it says which slice
    of that particular image the card's band shows -- so it can only ever be
@@ -167,9 +168,13 @@ export function withInheritance(vehicles = []) {
  * source's factors, so the variant starts out reading exactly as its source
  * does. Hidden runs are included: hiding is a judgement about the run, and it
  * travels with the run.
+ *
+ * Stored composites are not: the variant builds its own from the tests it
+ * inherits (compositeCurve.compositeEligible), and its source's beside it
+ * would be the same curve twice.
  */
 export function variantLinkPlan(source) {
-    return (source?.runs ?? []).map(run => run._inherited
+    return (source?.runs ?? []).filter(run => !isCompositeRun(run)).map(run => run._inherited
         ? {
             sourceRunId: run._realRunId,
             efficiencyFactor: run._efficiencyFactor !== 1 ? run._efficiencyFactor : null,

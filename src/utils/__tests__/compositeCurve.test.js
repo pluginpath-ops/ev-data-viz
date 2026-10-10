@@ -120,11 +120,32 @@ describe('buildComposite', () => {
         expect(at(c, 20).time).toBeCloseTo(10 * (0.6 + 60 / 110) / 2, 1);
     });
 
-    it('stops the clock rather than guess across a gap no test timed', () => {
+    it('has no clock at all when no test timed it', () => {
         const untimed = test({ kwAt: car }).map(p => ({ ...p, time: null }));
         const c = buildComposite([{ run: run(1), points: untimed }, { run: run(2), points: untimed }]);
+        expect(c.points.every(p => p.time == null)).toBe(true);
+        expect(at(c, 50).chargeRate).toBeCloseTo(car(50));
+    });
+
+    it('starts the clock where the first timed test starts, not at an untimed one below it', () => {
+        // The Mach E: its own test is SoC and power from 0%, its inherited ones timed from 10%.
+        const untimed = test({ from: 0, to: 80, kwAt: car }).map(p => ({ ...p, time: null }));
+        const c = buildComposite([
+            { run: run(1), points: untimed },
+            { run: run(2), points: test({ kwAt: car }) },
+        ]);
+        expect(at(c, 5).time).toBeNull();
         expect(at(c, 10).time).toBe(0);
-        expect(at(c, 11).time).toBeNull();
+        expect(at(c, 50).time).toBeGreaterThan(at(c, 20).time);
+    });
+
+    it('stops the clock rather than guess across a gap no test timed', () => {
+        const timed = test({ from: 10, to: 30, kwAt: car });
+        const untimed = test({ from: 10, to: 80, kwAt: car }).map(p => ({ ...p, time: null }));
+        const c = buildComposite([{ run: run(1), points: timed }, { run: run(2), points: untimed }]);
+        expect(at(c, 10).time).toBe(0);
+        expect(at(c, 30).time).toBeGreaterThan(0);
+        expect(at(c, 31).time).toBeNull();
         expect(at(c, 50).chargeRate).toBeCloseTo(car(50));
     });
 
@@ -338,6 +359,8 @@ describe('compositeEligible', () => {
         // Unlisted still counts (#394, the pool).
         expect(compositeEligible(run(1, { is_hidden: true }))).toBe(true);
         expect(compositeEligible(run(1, { synthetic: true }))).toBe(false);
-        expect(compositeEligible(run('inherited_3_9'))).toBe(false);
+        // An inherited test stands for this car too; an inherited composite never feeds one.
+        expect(compositeEligible(run('inherited_3_9', { _inherited: true }))).toBe(true);
+        expect(compositeEligible(run('inherited_3_9', { _inherited: true, synthetic: true, composite: {} }))).toBe(false);
     });
 });

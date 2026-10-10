@@ -148,4 +148,9 @@ describe('variantLinkPlan', () => {
             { sourceRunId: 202, efficiencyFactor: 0.95, capacityFactor: null },
         ]);
     });
+
+    it('does not link the source’s composites — the variant builds its own', () => {
+        const source = { runs: [{ id: 101 }, { id: 300, synthetic: true, composite: { chargerClassV: null } }] };
+        expect(variantLinkPlan(source).map(l => l.sourceRunId)).toEqual([101]);
+    });
 });

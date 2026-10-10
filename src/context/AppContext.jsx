@@ -4,7 +4,7 @@ import { withInheritance, variantLinkPlan } from '../utils/vehicleInheritance';
 import { withPlatforms } from '../utils/platforms';
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
-import { mayHaveComposite, staleComposites } from '../utils/compositeCurve';
+import { mayHaveComposite, staleComposites, storedComposites } from '../utils/compositeCurve';
 
 /** Vehicles rebuilt at once by Admin → Rebuild composites. Enough to overlap
  *  the round trips; few enough not to flood the database with writes. */
@@ -289,6 +289,14 @@ export function AppProvider({ children }) {
             const source = vehicles.find(v => v.id === sourceId);
             if (!source) throw new Error('Vehicle not found');
             const newVehicle = await dataService.createVariant(source, variantLinkPlan(source));
+            // Its own composites, from the tests it now inherits. It is not in
+            // state yet, but at birth it resolves to its source's platforms and
+            // specs, so the source's visible copy stands in for the voltage class.
+            const resolved = visibleVehiclesRef.current.find(v => v.id === sourceId);
+            if (resolved && isContributor) {
+                await dataService.rebuildComposites({ ...resolved, id: newVehicle.id })
+                    .catch(error => showError('Composite curves not built for the variant: ' + error.message));
+            }
             // Same refresh as Copy, for the same reason: no setLoading, or the
             // edit form unmounts before it opens.
             dataService.getVehicles().then(setVehicles).catch(() => {});
@@ -300,12 +308,18 @@ export function AppProvider({ children }) {
     };
 
     const deleteVehicle = async (vehicleId) => {
+        // Its tests go, and the spec links reading them with them: whoever
+        // inherited one has a composite to rebuild. Worked out before the delete.
+        const ownRunIds = (vehicles.find(v => v.id === vehicleId)?.runs || [])
+            .filter(r => !r._inherited && r.kind === 'charging').map(r => r.id);
+        const inheritors = inheritorsOf(ownRunIds).filter(id => id !== vehicleId);
         try {
             await dataService.deleteVehicle(vehicleId);
             // The same pass-down the database just did, so the variants show what
             // the deleted source said without a refetch.
             setVehicles(prev => passDown(prev, vehicleId));
             setSelectedVehicles(prev => prev.filter(id => id !== vehicleId));
+            if (inheritors.length) await Promise.all(inheritors.map(refreshComposites));
         } catch (error) {
             logIfUnauthorized('delete_vehicle', 'vehicle', vehicleId, error);
             showError('Error deleting vehicle: ' + error.message);
@@ -323,7 +337,21 @@ export function AppProvider({ children }) {
     // The vehicle comes from visibleVehicles, through a ref: it carries the
     // resolved platforms and specs the voltage class needs, which the raw
     // `vehicles` state does not.
+    //
+    // Inherited tests feed a composite too, so the net is wider than "this
+    // vehicle's tests": a write to a test also rebuilds every vehicle that
+    // inherits it (refreshCompositesAround), and adding, re-scaling or removing
+    // a spec link — or deleting the vehicle a link reads from — rebuilds the
+    // vehicle on the other end.
     const visibleVehiclesRef = useRef([]);
+
+    /** Vehicles that read `runId` through a spec link. */
+    const inheritorsOf = (runIds) => {
+        const ids = new Set([].concat(runIds).map(String));
+        return vehicles
+            .filter(v => (v.spec_links || []).some(l => ids.has(String(l.source_run_id))))
+            .map(v => v.id);
+    };
 
     /** Whether a write to this run can change its vehicle's composites. */
     const feedsComposites = (vehicleId, runId, kind) => {
@@ -339,16 +367,28 @@ export function AppProvider({ children }) {
         try {
             const runs = await dataService.rebuildComposites(vehicle);
             if (!runs) return;
-            const composites = runs.filter(isCompositeRun);
+            const composites = storedComposites({ runs });
             setVehicles(prev => prev.map(v => v.id !== vehicleId ? v : {
                 ...v,
-                runs: [...(v.runs || []).filter(r => !isCompositeRun(r)), ...composites],
+                runs: [...(v.runs || []).filter(r => !isCompositeRun(r) || r._inherited), ...composites],
             }));
         } catch (error) {
             logIfUnauthorized('rebuild_composites', 'vehicle', vehicleId, error);
             showError('Composite curves not rebuilt: ' + error.message);
         }
     };
+
+    /**
+     * Rebuild the composites of a test's own vehicle and of every vehicle that
+     * inherits it. `inheritors` is passed when the caller had to work it out
+     * BEFORE the write — a delete takes the spec links with it.
+     */
+    const refreshCompositesAround = (vehicleId, runId, inheritors = inheritorsOf(runId)) =>
+        Promise.all([...new Set([vehicleId, ...inheritors])].map(refreshComposites));
+
+    /** The charging run a spec link reads, wherever it lives in state. */
+    const chargingSource = (runId) => vehicles.flatMap(v => v.runs || [])
+        .find(r => !r._inherited && String(r.id) === String(runId) && r.kind === 'charging');
 
     /**
      * Rebuild vehicles' composites (Admin → Data checks): the first fill after
@@ -365,7 +405,7 @@ export function AppProvider({ children }) {
      */
     const rebuildAllComposites = async ({ onProgress, all = false } = {}) => {
         const todo = visibleVehiclesRef.current.filter(v => {
-            const stored = (v.runs || []).filter(isCompositeRun);
+            const stored = storedComposites(v);
             if (!mayHaveComposite(v) && !stored.length) return false;
             return all || !stored.length || staleComposites(v).length > 0;
         });
@@ -439,6 +479,7 @@ export function AppProvider({ children }) {
         // Decided BEFORE the write: a test switched from charging to range no
         // longer feeds a composite afterwards, but its leaving changes them.
         const feeds = feedsComposites(vehicleId, runId, updates.kind);
+        const inheritors = feeds ? inheritorsOf(runId) : [];
         try {
             await dataService.updateRun(vehicleId, runId, updates);
             // Convert the camelCase editFormData keys back to the snake_case keys that
@@ -470,7 +511,7 @@ export function AppProvider({ children }) {
                     ? { ...v, runs: v.runs.map(r => r.id === runId ? { ...r, ...normalized } : r) }
                     : v
             ));
-            if (feeds) await refreshComposites(vehicleId);
+            if (feeds) await refreshCompositesAround(vehicleId, runId, inheritors);
         } catch (error) {
             logIfUnauthorized('update_run', 'run', runId, error);
             showError('Error updating run: ' + error.message);
@@ -594,6 +635,8 @@ export function AppProvider({ children }) {
 
     const deleteRun = async (vehicleId, runId) => {
         const feeds = feedsComposites(vehicleId, runId);
+        // Before the delete: its spec links cascade away with it.
+        const inheritors = feeds ? inheritorsOf(runId) : [];
         try {
             await dataService.deleteRun(vehicleId, runId);
             setVehicles(prev => prev.map(v =>
@@ -601,7 +644,7 @@ export function AppProvider({ children }) {
                     ? { ...v, runs: v.runs.filter(r => r.id !== runId) }
                     : v
             ));
-            if (feeds) await refreshComposites(vehicleId);
+            if (feeds) await refreshCompositesAround(vehicleId, runId, inheritors);
         } catch (error) {
             logIfUnauthorized('delete_run', 'run', runId, error);
             showError('Error deleting run: ' + error.message);
@@ -619,7 +662,7 @@ export function AppProvider({ children }) {
                         : r) }
                     : v
             ));
-            if (feedsComposites(vehicleId, runId)) await refreshComposites(vehicleId);
+            if (feedsComposites(vehicleId, runId)) await refreshCompositesAround(vehicleId, runId);
             return result;
         } catch (error) {
             logIfUnauthorized('save_run_data', 'run', runId, error);
@@ -645,7 +688,7 @@ export function AppProvider({ children }) {
                         : v
                 ));
             }
-            if (feedsComposites(vehicleId, runId)) await refreshComposites(vehicleId);
+            if (feedsComposites(vehicleId, runId)) await refreshCompositesAround(vehicleId, runId);
             return result;
         } catch (error) {
             logIfUnauthorized('merge_run_data', 'run', runId, error);
@@ -1176,6 +1219,7 @@ export function AppProvider({ children }) {
         try {
             await dataService.addSpecLink({ targetVehicleId, sourceRunId, efficiencyFactor, capacityFactor, notes });
             await softRefreshVehicles();
+            if (chargingSource(sourceRunId)) await refreshComposites(targetVehicleId);
         } catch (error) {
             logIfUnauthorized('add_spec_link', 'spec_link', null, error);
             showError('Error adding spec link: ' + error.message);
@@ -1187,6 +1231,12 @@ export function AppProvider({ children }) {
         try {
             await dataService.updateSpecLink(linkId, changes, targetVehicleId);
             await softRefreshVehicles();
+            // The capacity factor scales every kW an inherited test contributes;
+            // the efficiency factor reaches only distance, which no composite reads.
+            const link = vehicles.flatMap(v => v.spec_links || []).find(l => l.id === linkId);
+            if ('capacityFactor' in changes && link && chargingSource(link.source_run_id)) {
+                await refreshComposites(link.target_vehicle_id);
+            }
         } catch (error) {
             logIfUnauthorized('update_spec_link', 'spec_link', linkId, error);
             showError('Error updating spec link: ' + error.message);
@@ -1195,9 +1245,11 @@ export function AppProvider({ children }) {
     };
 
     const deleteSpecLink = async (linkId) => {
+        const link = vehicles.flatMap(v => v.spec_links || []).find(l => l.id === linkId);
         try {
             await dataService.deleteSpecLink(linkId);
             await softRefreshVehicles();
+            if (link && chargingSource(link.source_run_id)) await refreshComposites(link.target_vehicle_id);
         } catch (error) {
             logIfUnauthorized('delete_spec_link', 'spec_link', linkId, error);
             showError('Error removing spec link: ' + error.message);
