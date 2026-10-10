@@ -5,6 +5,7 @@ import {
     STANDARD_TEMP_F, DEFAULT_ACCESSORY_W,
 } from '../../utils/epaDerivations';
 import { AccessoryLoadReferenceTable, MIN_TEMP_F, MAX_TEMP_F } from './accessoryReference';
+import NumberInput from '../NumberInput';
 
 /**
  * The viewing conditions an EPA curve can be re-plotted under (#237).
@@ -61,19 +62,6 @@ export function useViewingConditions(driven = null) {
     const gradeGainFt        = pick('gradeGainFt', gradeGainFtState);
     const gradeDistanceMiles = pick('gradeDistanceMiles', gradeDistanceMilesState);
 
-    const clampTempF = (raw) => {
-        if (raw === '' || raw === '-') return raw; // mid-typing a negative
-        const n = Number(raw);
-        if (isNaN(n)) return raw;
-        return String(Math.min(MAX_TEMP_F, Math.max(MIN_TEMP_F, n)));
-    };
-    const clampWindDirection = (raw) => {
-        if (raw === '') return raw;
-        const n = Number(raw);
-        if (isNaN(n)) return raw;
-        return String(Math.min(360, Math.max(0, n)));
-    };
-
     const densityRatio = useMemo(
         () => airDensityRatio(elevationFt) * temperatureDensityRatio(tempF === '' ? null : Number(tempF)),
         [elevationFt, tempF],
@@ -94,7 +82,6 @@ export function useViewingConditions(driven = null) {
                   gradeExpanded, gradeGainFt, gradeDistanceMiles },
         set: { setElevationFt, setTempF, setAccessoryOverrideW, setWindSpeedMph,
                setWindDirectionDeg, setGradeExpanded, setGradeGainFt, setGradeDistanceMiles },
-        helpers: { clampTempF, clampWindDirection },
         derived: {
             densityRatio, densityAdjusted, accessoryAdjusted, accessoryOverrideWNum,
             windAdjusted, windSpeedMphNum, windDirectionDegNum,
@@ -108,12 +95,11 @@ export function useViewingConditions(driven = null) {
 }
 
 export default function ViewingConditions({ conditions }) {
-    const { values, set, helpers, derived } = conditions;
+    const { values, set, derived } = conditions;
     const { elevationFt, tempF, accessoryOverrideW, windSpeedMph, windDirectionDeg,
             gradeExpanded, gradeGainFt, gradeDistanceMiles } = values;
     const { setElevationFt, setTempF, setAccessoryOverrideW, setWindSpeedMph,
             setWindDirectionDeg, setGradeExpanded, setGradeGainFt, setGradeDistanceMiles } = set;
-    const { clampTempF, clampWindDirection } = helpers;
     const { densityRatio, densityAdjusted, windAdjusted,
             gradeAdjusted, avgGradePercent } = derived;
 
@@ -128,11 +114,10 @@ export default function ViewingConditions({ conditions }) {
                             text="Adjusts aerodynamic drag for air density at this elevation. Models air density only — does not capture battery, regen, or cabin-heating effects. Curve is the standard-condition baseline scaled for thinner air."
                             className="ml-1" />
                     </span>
-                    <input
-                        type="number"
+                    <NumberInput
                         step="100"
-                        value={elevationFt}
-                        onChange={e => setElevationFt(Number(e.target.value) || 0)}
+                        value={Number(elevationFt)}
+                        onChange={setElevationFt}
                         className="form-input form-input w-24 text-right"
                         aria-label="Elevation in feet"
                     />
@@ -147,13 +132,14 @@ export default function ViewingConditions({ conditions }) {
                             text={`Adjusts aerodynamic drag for air density at this ambient temperature (colder air is denser). Standard condition is ${STANDARD_TEMP_F}°F. Models air density only — does not capture battery, HVAC, or cold-tire effects.`}
                             className="ml-1" />
                     </span>
-                    <input
-                        type="number"
+                    {/* Cleared, it is the standard condition again. */}
+                    <NumberInput
                         step="5"
                         min={MIN_TEMP_F}
                         max={MAX_TEMP_F}
-                        value={tempF}
-                        onChange={e => setTempF(clampTempF(e.target.value))}
+                        allowEmpty
+                        value={tempF === '' ? null : Number(tempF)}
+                        onChange={v => setTempF(v == null ? '' : String(v))}
                         placeholder={String(STANDARD_TEMP_F)}
                         className="form-input form-input w-20 text-right"
                         aria-label="Ambient temperature in °F"
@@ -179,12 +165,12 @@ export default function ViewingConditions({ conditions }) {
                             <AccessoryLoadReferenceTable />
                         </InfoIcon>
                     </span>
-                    <input
-                        type="number"
+                    <NumberInput
                         step="50"
-                        min="0"
-                        value={accessoryOverrideW}
-                        onChange={e => setAccessoryOverrideW(e.target.value)}
+                        min={0}
+                        allowEmpty
+                        value={accessoryOverrideW === '' ? null : Number(accessoryOverrideW)}
+                        onChange={v => setAccessoryOverrideW(v == null ? '' : String(v))}
                         placeholder={String(DEFAULT_ACCESSORY_W)}
                         className="form-input form-input w-24 text-right"
                         aria-label="Accessory load override in watts"
@@ -200,24 +186,24 @@ export default function ViewingConditions({ conditions }) {
                             text="Scales aerodynamic drag by apparent (relative) airspeed — a headwind raises effective drag speed, a tailwind lowers it, a pure crosswind raises it slightly. Direction is relative to travel: 0°=tailwind, 180°=headwind, 90°/270°=crosswind. Models relative-airspeed magnitude only — does not capture yaw-angle sensitivity of drag coefficient."
                             className="ml-1" />
                     </span>
-                    <input
-                        type="number"
+                    <NumberInput
                         step="5"
-                        min="0"
-                        value={windSpeedMph}
-                        onChange={e => setWindSpeedMph(e.target.value)}
+                        min={0}
+                        allowEmpty
+                        value={windSpeedMph === '' ? null : Number(windSpeedMph)}
+                        onChange={v => setWindSpeedMph(v == null ? '' : String(v))}
                         placeholder="0"
                         className="form-input form-input w-16 text-right"
                         aria-label="Wind speed in mph"
                     />
                     <span className="viewing-unit">mph @</span>
-                    <input
-                        type="number"
+                    <NumberInput
                         step="15"
-                        min="0"
-                        max="360"
-                        value={windDirectionDeg}
-                        onChange={e => setWindDirectionDeg(clampWindDirection(e.target.value))}
+                        min={0}
+                        max={360}
+                        allowEmpty
+                        value={windDirectionDeg === '' ? null : Number(windDirectionDeg)}
+                        onChange={v => setWindDirectionDeg(v == null ? '' : String(v))}
                         placeholder="180"
                         className="form-input form-input w-16 text-right"
                         aria-label="Wind direction relative to travel, in degrees"
@@ -272,22 +258,22 @@ export default function ViewingConditions({ conditions }) {
                         from. */}
                     <div className="viewing-row">
                         <span className="viewing-label">Gain</span>
-                        <input
-                            type="number"
+                        <NumberInput
                             step="50"
-                            value={gradeGainFt}
-                            onChange={e => setGradeGainFt(e.target.value)}
+                            allowEmpty
+                            value={gradeGainFt === '' ? null : Number(gradeGainFt)}
+                            onChange={v => setGradeGainFt(v == null ? '' : String(v))}
                             placeholder="0"
                             className="form-input w-20 text-right"
                             aria-label="Net elevation gain in feet (negative for net descent)"
                         />
                         <span className="viewing-unit">ft over</span>
-                        <input
-                            type="number"
+                        <NumberInput
                             step="5"
-                            min="0"
-                            value={gradeDistanceMiles}
-                            onChange={e => setGradeDistanceMiles(e.target.value)}
+                            min={0}
+                            allowEmpty
+                            value={gradeDistanceMiles === '' ? null : Number(gradeDistanceMiles)}
+                            onChange={v => setGradeDistanceMiles(v == null ? '' : String(v))}
                             placeholder="0"
                             className="form-input w-16 text-right"
                             aria-label="Distance in miles the elevation change is spread over"

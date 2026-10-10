@@ -12,7 +12,6 @@ import { resolveRangeSource, pricedAtSpeedMph, epaRangeOption, defaultRangeRun, 
 import { figureSources } from '../utils/vehicleFigures';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels } from '../utils/seriesLabel';
-import { clampSoc } from '../utils/socAlignment';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { sessionFor } from '../utils/testSessions';
@@ -37,6 +36,7 @@ import SpeedBadge from './charts/SpeedBadge';
 import { spreadTestsFor, sweepSpread, timelineSpread } from '../utils/roadTripSpread';
 import { unlistedCount } from '../utils/runListing';
 import { countsAside } from '../utils/rangeTestSpread';
+import NumberInput from './NumberInput';
 
 Chart.register(ZoomPlugin);
 
@@ -321,39 +321,36 @@ function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, d
                                 <div className="routing-row-fields">
                                     <label className="scenario-row">
                                         <span className="scenario-key">Charger</span>
-                                        <input
-                                            type="number" min={0} max={100}
+                                        <NumberInput
+                                            min={0} max={100} allowEmpty
                                             className="form-input"
                                             placeholder={`${global.minSoc}`}
-                                            value={ov.minSoc ?? ''}
-                                            onChange={ev => onChange(e.key, 'minSoc', ev.target.value)}
+                                            value={ov.minSoc ?? null}
+                                            onChange={v => onChange(e.key, 'minSoc', v)}
                                         />
                                         <span className="scenario-unit">% arrival</span>
                                     </label>
                                     {mode === 'distance' ? (
                                         <label className="scenario-row">
                                             <span className="scenario-key">Leg</span>
-                                            <input
-                                                type="number" min={0}
+                                            <NumberInput
+                                                min={0} allowEmpty
                                                 className="form-input"
                                                 placeholder={`${legGlobal}`}
-                                                value={legValue}
-                                                onChange={ev => {
-                                                    const v = ev.target.value;
-                                                    onChange(e.key, 'legDistance', v === '' ? '' : (units === 'metric' ? Number(v) / MI_TO_KM : Number(v)));
-                                                }}
+                                                value={legValue === '' ? null : legValue}
+                                                onChange={v => onChange(e.key, 'legDistance', v == null ? null : (units === 'metric' ? v / MI_TO_KM : v))}
                                             />
                                             <span className="scenario-unit">{dl}</span>
                                         </label>
                                     ) : (
                                         <label className="scenario-row">
                                             <span className="scenario-key">Charge</span>
-                                            <input
-                                                type="number" min={0}
+                                            <NumberInput
+                                                min={0} allowEmpty
                                                 className="form-input"
                                                 placeholder={`${global.chargeTime}`}
-                                                value={ov.chargeTime ?? ''}
-                                                onChange={ev => onChange(e.key, 'chargeTime', ev.target.value)}
+                                                value={ov.chargeTime ?? null}
+                                                onChange={v => onChange(e.key, 'chargeTime', v)}
                                             />
                                             <span className="scenario-unit">min</span>
                                         </label>
@@ -1750,14 +1747,10 @@ export default function RoadTripView({
     const setRunOverride = (runId, key, rawVal) => setRoadTripConfig(prev => {
         const perRun = { ...(prev.perRun || {}) };
         const cur = { ...(perRun[runId] || {}) };
-        if (rawVal === '' || rawVal == null || isNaN(Number(rawVal))) {
-            delete cur[key];
-        } else {
-            // Never below 0; SoC additionally capped at 100.
-            let n = Math.max(0, Number(rawVal));
-            if (key === 'minSoc') n = Math.min(100, n);
-            cur[key] = n;
-        }
+        // Cleared, the global value applies again. The fields commit only a
+        // number in range (NumberInput), so nothing is clamped here.
+        if (rawVal === '' || rawVal == null || isNaN(Number(rawVal))) delete cur[key];
+        else cur[key] = Number(rawVal);
         if (Object.keys(cur).length) perRun[runId] = cur;
         else delete perRun[runId];
         return { ...prev, perRun };
@@ -1922,85 +1915,71 @@ export default function RoadTripView({
                     <div className="chart-rail-group">
                         <span className="text-micro">Trip</span>
                         <div className="axis-rows">
-                            {/* A pack holds 0–100%, so the fields say so: the
-                                spinner stops there, and a typed value is
-                                clamped on the way in. `clampSoc` falls back to
-                                the CURRENT value rather than 0 for an emptied
-                                field — Number('') is 0, which would read as a
-                                flat battery the moment someone cleared a box to
-                                retype it. Falling back leaves state on the last
-                                good number while the box itself sits empty. */}
+                            {/* A pack holds 0–100%, so the fields say so. A
+                                value outside that, or a box emptied to retype,
+                                is marked invalid and not committed
+                                (NumberInput): the trip keeps running on the
+                                last good number rather than on Number('') — a
+                                flat battery — or a clamp's floor. */}
                             <label className="scenario-row">
                                 <span className="scenario-key">Start</span>
-                                <input type="number" className="form-input"
-                                    min="0" max="100"
+                                <NumberInput className="form-input" min={0} max={100} integer
                                     value={startSoc}
-                                    onChange={e => setField('startSoc', clampSoc(e.target.value, startSoc))} />
+                                    onChange={v => setField('startSoc', v)} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             <label className="scenario-row">
                                 <span className="scenario-key">Min</span>
-                                <input type="number" className="form-input"
-                                    min="0" max="100"
+                                <NumberInput className="form-input" min={0} max={100} integer
                                     value={minSoc}
-                                    onChange={e => setField('minSoc', clampSoc(e.target.value, minSoc))} />
+                                    onChange={v => setField('minSoc', v)} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             <label className="scenario-row">
                                 <span className="scenario-key">Dest <InfoIcon text={DEST_SOC_NOTE} /></span>
-                                <input type="number" className="form-input"
-                                    min="0" max="100"
+                                <NumberInput className="form-input" min={0} max={100} integer
                                     value={destinationMinSoc}
-                                    onChange={e => setField('destinationMinSoc', clampSoc(e.target.value, destinationMinSoc))} />
+                                    onChange={v => setField('destinationMinSoc', v)} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
                             {mode === 'distance' ? (
                                 <label className="scenario-row">
                                     <span className="scenario-key">Leg</span>
-                                    <input type="number" className="form-input"
+                                    <NumberInput className="form-input" min={1}
                                         value={dispLeg}
-                                        onChange={e => {
-                                            const val = Number(e.target.value);
-                                            setField('legDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                        }} />
+                                        onChange={val => setField('legDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val)} />
                                     <span className="scenario-unit">{dl}/charge</span>
                                 </label>
                             ) : (
                                 <label className="scenario-row">
                                     <span className="scenario-key">Charge</span>
-                                    <input type="number" className="form-input"
+                                    <NumberInput className="form-input" min={1}
                                         value={chargeTime}
-                                        onChange={e => setField('chargeTime', Number(e.target.value))} />
+                                        onChange={v => setField('chargeTime', v)} />
                                     <span className="scenario-unit">min/stop</span>
                                 </label>
                             )}
                             <label className="scenario-row">
                                 <span className="scenario-key">Total</span>
-                                <input type="number" className="form-input"
+                                <NumberInput className="form-input" min={1}
                                     value={dispTotal}
-                                    onChange={e => {
-                                        const val = Number(e.target.value);
-                                        setField('totalDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                    }} />
+                                    onChange={val => setField('totalDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val)} />
                                 <span className="scenario-unit">{dl}</span>
                             </label>
                             {!isSpeedMode && (
                                 <label className="scenario-row">
                                     <span className="scenario-key">Speed</span>
-                                    <input type="number" className="form-input"
+                                    <NumberInput className="form-input" min={1}
                                         value={dispSpeed}
-                                        onChange={e => {
-                                            const val = Number(e.target.value);
-                                            setField('speed', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                        }} />
+                                        onChange={val => setField('speed', units === 'metric' ? Math.round(val / MI_TO_KM) : val)} />
                                     <span className="scenario-unit">{sl}</span>
                                 </label>
                             )}
                             <label className="scenario-row">
                                 <span className="scenario-key">Stop</span>
-                                <input type="number" className="form-input"
+                                <NumberInput className="form-input" min={0}
                                     value={overhead}
-                                    onChange={e => setField('overhead', Number(e.target.value))} />
+                                    onChange={v => setField('overhead', v)} />
                                 <span className="scenario-unit">min overhead</span>
                             </label>
 
@@ -2014,12 +1993,9 @@ export default function RoadTripView({
                                 <div className="override-panel">
                                     <label className="scenario-row">
                                         <span className="scenario-key">Tow eff</span>
-                                        <input type="number" className="form-input" step="0.1" min="0.3" max="5"
+                                        <NumberInput className="form-input" step="0.1" min={0.3} max={5}
                                             value={dispTowingEff}
-                                            onChange={e => {
-                                                const val = parseFloat(e.target.value);
-                                                setField('towingEfficiency', units === 'metric' ? val / MI_TO_KM : val);
-                                            }} />
+                                            onChange={val => setField('towingEfficiency', units === 'metric' ? val / MI_TO_KM : val)} />
                                         <span className="scenario-unit">
                                             {towingEffLabel}
                                             <InfoIcon className="is-accent" text={TOWING_NOTE} />
@@ -2027,12 +2003,9 @@ export default function RoadTripView({
                                     </label>
                                     <label className="scenario-row">
                                         <span className="scenario-key">At</span>
-                                        <input type="number" className="form-input" min="20"
+                                        <NumberInput className="form-input" min={20}
                                             value={dispTowingRef}
-                                            onChange={e => {
-                                                const val = Number(e.target.value);
-                                                setField('towingRefSpeedMph', units === 'metric' ? Math.round(val / MI_TO_KM) : val);
-                                            }} />
+                                            onChange={val => setField('towingRefSpeedMph', units === 'metric' ? Math.round(val / MI_TO_KM) : val)} />
                                         <span className="scenario-unit">
                                             {sl}
                                             <InfoIcon className="is-accent" text={TOWING_NOTE} />

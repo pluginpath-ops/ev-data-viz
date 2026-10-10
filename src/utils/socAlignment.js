@@ -348,13 +348,3 @@ export const EXTRAPOLATION_SOC_LIMIT = 5;
 export const overExtrapolated = (aligned) =>
     !!aligned?.extrapolated && aligned.gap > EXTRAPOLATION_SOC_LIMIT;
 
-/** Clamp a user-typed threshold to a usable percentage. */
-export function clampSoc(value, fallback = 10) {
-    // An emptied field is not 0%. Number('') is 0 and finite, so testing
-    // Number.isFinite alone would turn a cleared input into "align at 0%",
-    // which silently changes every curve on the chart.
-    if (value === '' || value == null) return fallback;
-    const n = Number(value);
-    if (!Number.isFinite(n)) return fallback;
-    return Math.min(100, Math.max(0, Math.round(n)));
-}
