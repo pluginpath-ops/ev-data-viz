@@ -406,8 +406,8 @@ export function testVehicleView(testVehicle, { certification = null, guideCertif
         overrides,
         model_year:           year ?? certification?.model_year ?? testVehicle.model_year ?? null,
         test_group:           certification?.test_group ?? testVehicle.test_group ?? null,
-        carryover_test_group: certification ? certification.carryover_test_group : (testVehicle.carryover_test_group ?? null),
-        carryover_model_year: certification ? certification.carryover_model_year : (testVehicle.carryover_model_year ?? null),
+        carryover_test_group: certification?.carryover_test_group ?? null,
+        carryover_model_year: certification?.carryover_model_year ?? null,
         fe_guide_row_id:      guide?.id ?? null,
         epa_fe_guide:         guide,
         _certification: {

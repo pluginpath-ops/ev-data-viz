@@ -529,6 +529,25 @@ playground catalogue; owner's visual sign-off in the browser preview before
 commit; contributor paths against the local DB, since the preview is signed
 out.
 
+### After the stack — 084 and the fallback
+
+> **As built (2026-10-11, after 081–083 were applied in production).** A
+> follow-up PR, not a fifth layer. Migration `084` drops `fe_guide_row_id`,
+> `fe_guide_skipped_at`, `fe_guide_skip_note`, `carryover_test_group` and
+> `carryover_model_year` from `epa_test_vehicles`, with their two indexes, the
+> foreign key, and the skip-clearing trigger 058 put on that table (it names
+> `fe_guide_row_id`, so leaving it would fail every update of a test vehicle).
+> `model_year` and `test_group` stay as "last imported", which the older-file
+> guard still reads. The code stops selecting the five (the vehicles query and
+> the audit) and a PDF import no longer sends the carryover pair with the
+> record; it goes with the certification, as it already did. Layer 1's
+> `getVehicles` fallback is removed.
+>
+> On the 2026-10-10 21:37 backup with 083: 324 Guide links, 3 skips and 676
+> carryover pairs held on the test vehicles, every one also on a link row. The
+> migration prints that count before it drops anything. **Order: deploy, then
+> apply 084.**
+
 ## Decisions (owner, 2026-10-08)
 
 - **D1** Keep a certification for every Guide link without a file (Basis

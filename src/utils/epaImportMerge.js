@@ -33,11 +33,12 @@
  * files, and the row has room for only one certification's identity. Importing
  * oldest → newest left the newest on the record; importing backwards left the
  * OLDEST and quietly replaced the newer certification's test family, source
- * file, carryover pair and covered-models list. So an older file no longer
+ * file and covered-models list. So an older file no longer
  * overwrites those (IDENTITY_FIELDS, plus the covered models the executor
  * handles via `plan.holdIdentity`). Lab data still merges as above — it is the
- * same physical test either way. The proper home for several certifications is
- * an epa_certifications child table (#374); this is the guard until then.
+ * same physical test either way. Each certification itself, carryover pair
+ * included, is recorded in epa_certifications (#374), so nothing is lost; the
+ * guard keeps the record's "last imported" identity the newest one.
  *
  * Pure — no database — so the rules can be tested without one.
  */
@@ -49,10 +50,7 @@ const NEVER_NULLED = ['useable_kwh'];
 const MACHINE_SOURCES = ['pdf', 'csv', 'j1634'];
 
 /** Test vehicle columns that name WHICH certification the row stands for. */
-const IDENTITY_FIELDS = [
-    'model_year', 'test_group', 'source_file',
-    'carryover_test_group', 'carryover_model_year',
-];
+const IDENTITY_FIELDS = ['model_year', 'test_group', 'source_file'];
 
 /**
  * True when the incoming certification is strictly OLDER than the stored one.

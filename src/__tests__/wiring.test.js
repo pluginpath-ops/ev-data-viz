@@ -1307,10 +1307,15 @@ describe('the seams that broke before', () => {
         const targets = [...promo.matchAll(/^\s+\w+:\s+'(\w+)',/gm)].map(m => m[1]);
         expect(targets.length).toBeGreaterThan(10);
 
-        // Everything promotion writes, plus the two the UI needs to interpret it.
-        const needed = [...new Set([...targets, 'fe_guide_row_id', 'overrides'])];
+        // Everything the Guide overlay fills, plus the tags the UI needs to interpret it.
+        const needed = [...new Set([...targets, 'overrides'])];
         const missing = needed.filter(c => !new RegExp(`\\b${c}\\b`).test(columns));
         expect(missing, `getVehicles does not fetch: ${missing.join(', ')}`).toEqual([]);
+        // Which Guide row is linked comes through the certifications (#374, 084
+        // dropped the record's own column); without it a linked test vehicle
+        // still renders the "link me" picker.
+        expect(svc.match(/const CERTIFICATIONS_EMBED = `([^`]*)`/)?.[1]).toMatch(/^certifications:epa_certification_test_vehicles\(id, fe_guide_row_id,/);
+        expect(svc).toMatch(/const EPA_TEST_VEHICLE_FIELDS = `\$\{EPA_LAB_FIELDS\}, \$\{CERTIFICATIONS_EMBED\}`/);
     });
 
     it('loads the startup queries in parallel', () => {
@@ -1803,13 +1808,20 @@ describe('the EPA test vehicle rename holds (#374, migration 081)', () => {
         expect(svc).toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
     });
 
-    it('getVehicles survives the window before migration 081 is applied', () => {
-        // The EPA embed is dropped, not the page, when the database still has
-        // the old names — getVehicles backs the whole app.
+    it('nothing reads or writes the test vehicle columns migration 084 drops', () => {
+        // They are the certification's now, on epa_certification_test_vehicles.
+        // A select naming one fails the whole query once 084 is applied, and
+        // the vehicles query backs the whole app.
         const svc = read('src/services/DataService.js');
-        const fn = svc.slice(svc.indexOf('async getVehicles'), svc.indexOf('// Pass 1', svc.indexOf('async getVehicles')));
-        expect(fn).toMatch(/isMissingEpaEmbed\(error\)/);
-        expect(fn).toMatch(/await query\(base\)/);
+        const retired = /\b(fe_guide_row_id|fe_guide_skipped_at|fe_guide_skip_note|carryover_test_group|carryover_model_year)\b/;
+        const labFields = svc.slice(svc.indexOf('const EPA_LAB_FIELDS'), svc.indexOf('\n', svc.indexOf('const EPA_LAB_FIELDS')));
+        expect(labFields).not.toMatch(retired);
+        const audit = svc.slice(svc.indexOf('async getEpaTestVehiclesForAudit'));
+        expect(audit.slice(0, audit.indexOf('${CERTIFICATIONS_EMBED}'))).not.toMatch(retired);
+        // A PDF import sends the carryover pair with the certification, not the record.
+        const imp = svc.slice(svc.indexOf('async importEpaTestVehicleFull'));
+        expect(imp.slice(0, imp.indexOf('const tgid'))).toMatch(/carryover_test_group: _\w+, carryover_model_year: _\w+, \.\.\.g/);
+        expect(read('src/utils/epaImportMerge.js')).not.toMatch(retired);
     });
 });
 
