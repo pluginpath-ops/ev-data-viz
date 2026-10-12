@@ -2406,8 +2406,11 @@ class DataService {
     }
 
     // Upsert writes only the columns given, so a Guide link or a skip already
-    // on the row is left alone.
-    const links = members.map(m => ({
+    // on the row is left alone. One row per test vehicle: Postgres rejects an
+    // upsert that names the same row twice, which is how a file with two
+    // configurations under one key failed whole (MY2027 Mercedes).
+    const unique = [...new Map(members.map(m => [m.test_vehicle_id, m])).values()];
+    const links = unique.map(m => ({
       certification_id:     id,
       test_vehicle_id:      m.test_vehicle_id,
       carryover_test_group: m.carryover_test_group ?? null,

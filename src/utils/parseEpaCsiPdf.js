@@ -50,6 +50,23 @@ const parseNum = (s) => {
     return Number.isNaN(n) ? null : n;
 };
 
+/**
+ * The key for one of several configurations sharing a Vehicle ID: the ID with
+ * its EPA config index, `V297PSM140f-Z2791-1`. Manufacturers use the same
+ * `-0`/`-1` shape in real Vehicle IDs for trim and configuration variants, and
+ * the MY2027 Mercedes EQS file (66073_VMBXV00.0ED5) has both: configurations 0
+ * and 1 of `V297PSM140f-Z2791`, and a third vehicle whose own ID is
+ * `V297PSM140f-Z2791-1`. One key for two vehicles failed the import. When the
+ * usual key is another vehicle's real ID in the same file, EPA's own
+ * "Vehicle ID / Configuration" form is used instead: `V297PSM140f-Z2791/1`.
+ * Only on a collision, so the 465 keys made the usual way stay as stored (two
+ * collisions in 718 files, both MY2027).
+ */
+function repeatedId(vehId, configIdx, idCounts) {
+    const usual = `${vehId}-${configIdx}`;
+    return idCounts[usual] ? `${vehId}/${configIdx}` : usual;
+}
+
 /** Trim verbose legal suffixes from a manufacturer name (Lucid USA, Inc → Lucid). */
 function cleanMake(make) {
     if (!make) return null;
@@ -632,7 +649,7 @@ export function parseEpaCsiText(rawItems) {
         const modeNum = valAfter(items, 'Manufacturer Vehicle Configuration Number', ci, end);
         // Unique key: bare Vehicle ID when unique in this PDF, else suffix the EPA config index.
         const test_vehicle_id = vehId
-            ? (idCounts[vehId] > 1 ? `${vehId}-${epaConfigIdx || k}` : vehId)
+            ? (idCounts[vehId] > 1 ? repeatedId(vehId, epaConfigIdx || String(k), idCounts) : vehId)
             : null;
 
         const rawMake = valAfter(items, 'Represented Test Vehicle Make', ci, end);
@@ -699,6 +716,8 @@ export function parseEpaCsiText(rawItems) {
     }).filter(g => g.test_vehicle_id);
 
     if (!testVehicles.length) warnings.push('Configurations found but no Vehicle IDs could be read.');
+    const dupIds = testVehicles.map(t => t.test_vehicle_id).filter((id, i, all) => id && all.indexOf(id) !== i);
+    if (dupIds.length) warnings.push(`Two configurations share the key ${[...new Set(dupIds)].join(', ')}; only the first is imported.`);
     if (!coveredModels.length) {
         warnings.push('No "Models Covered by this Certificate" table found — the configurations this certificate covers will not be recorded.');
     }
