@@ -83,6 +83,9 @@ export default function GuideFacetMenu({
                             placeholder={`Filter ${label.toLowerCase()}`}
                             aria-label={`Filter ${label} options`}
                             className="form-input guide-facet-panel-search"
+                            // A menu long enough to need a filter box is one
+                            // you open to type in — as the column picker does.
+                            autoFocus
                         />
                     )}
 

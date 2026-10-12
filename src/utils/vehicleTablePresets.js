@@ -115,4 +115,13 @@ export const VEHICLE_TABLE_PRESETS = [
         ],
         sortKey: 'dimensions.length_in', sortDir: 'desc',
     },
+    {
+        key: 'custom',
+        label: 'Custom',
+        description: 'Just the vehicle names — build your own table from Columns.',
+        // A starting point, not a question: adding columns one by one is quicker
+        // than removing a preset's twenty and dragging the rest into order.
+        columns: ['name'],
+        sortKey: 'name', sortDir: 'asc',
+    },
 ];

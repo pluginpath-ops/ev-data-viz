@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import MenuButton from '../shell/MenuButton';
 import useColumnDrag from '../../hooks/useColumnDrag';
 
@@ -23,14 +23,30 @@ import useColumnDrag from '../../hooks/useColumnDrag';
  * @param {string[]} defaults  the keys "reset" restores
  * @param {string}   fixedKey  the row-label column, which cannot be hidden or moved
  * @param {Function} [unitOf]  a column's unit as shown — defaults to `col.unit`
+ *
+ * ── Filtering ───────────────────────────────────────────────────────────────
+ *
+ * The vehicle table offers well over a hundred columns, so the menu carries a
+ * filter box (same threshold as the facet menus: not above eight or fewer).
+ * It narrows both halves — shown and not shown — by name, unit or group, so
+ * "cargo" finds every cargo column whether it is on the table or not. The
+ * fixed column stays put regardless: it is the anchor the list reads from.
  */
 export default function ColumnPicker({ columns, visible, defaults, fixedKey, onChange, unitOf = (col) => col.unit }) {
     // The same drag the table's column headers use (hooks/useColumnDrag).
     const { dragProps, dragClass } = useColumnDrag({ visible, fixedKey, onChange, axis: 'y' });
 
+    const [query, setQuery] = useState('');
+
     const byKey = new Map(columns.map(c => [c.key, c]));
     const shown = visible.map(k => byKey.get(k)).filter(Boolean);
     const hidden = columns.filter(c => !visible.includes(c.key));
+
+    const needle = query.trim().toLowerCase();
+    const matches = (col) => !needle
+        || [col.label, col.fullLabel, unitOf(col), col.group].some(t => t && String(t).toLowerCase().includes(needle));
+    const shownMatching = shown.filter(col => col.key === fixedKey || matches(col));
+    const hiddenMatching = hidden.filter(matches);
 
     const toggle = (key) => {
         if (key === fixedKey) return;
@@ -53,6 +69,18 @@ export default function ColumnPicker({ columns, visible, defaults, fixedKey, onC
         >
             {({ close }) => (
                 <>
+                    {columns.length > 8 && (
+                        <input
+                            type="search"
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            placeholder="Filter columns"
+                            aria-label="Filter columns"
+                            className="form-input guide-facet-panel-search"
+                            autoFocus
+                        />
+                    )}
+
                     <div className="guide-facet-panel-head">
                         <span className="text-nano">Shown · drag to reorder</span>
                         <button type="button" className="section-action" onClick={() => onChange(defaults)}>
@@ -61,7 +89,7 @@ export default function ColumnPicker({ columns, visible, defaults, fixedKey, onC
                     </div>
 
                     <div className="guide-facet-panel-list">
-                        {shown.map(col => {
+                        {shownMatching.map(col => {
                             const fixed = col.key === fixedKey;
                             const unit = unitOf(col);
                             return (
@@ -91,18 +119,18 @@ export default function ColumnPicker({ columns, visible, defaults, fixedKey, onC
                             );
                         })}
 
-                        {hidden.length > 0 && (
+                        {hiddenMatching.length > 0 && (
                             <>
                                 {/* Below the shown ones, not interleaved: the top
                                     of this list is the table you are looking at,
                                     and the bottom is what you could add to it. */}
                                 <div className="guide-column-divider text-nano">Not shown</div>
-                                {hidden.map((col, i) => {
+                                {hiddenMatching.map((col, i) => {
                                     const unit = unitOf(col);
                                     // The group once, as a heading, rather than
                                     // "Tested performance · " on every row — at
                                     // menu width the prefix left the name "0–60 …".
-                                    const heading = col.group && col.group !== hidden[i - 1]?.group;
+                                    const heading = col.group && col.group !== hiddenMatching[i - 1]?.group;
                                     return (
                                         <Fragment key={col.key}>
                                             {heading && <div className="guide-column-group text-nano">{col.group}</div>}
@@ -120,6 +148,9 @@ export default function ColumnPicker({ columns, visible, defaults, fixedKey, onC
                                     );
                                 })}
                             </>
+                        )}
+                        {needle && hiddenMatching.length === 0 && shownMatching.every(c => c.key === fixedKey) && (
+                            <div className="guide-column-divider text-nano">No columns match “{query.trim()}”</div>
                         )}
                     </div>
 
