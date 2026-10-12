@@ -123,21 +123,19 @@ describe('planTestVehicleImport', () => {
 describe('older certification guard (#374)', () => {
     const stored = (year) => ({
         testVehicle: {
-            test_vehicle_id: 'G', model_year: year, test_group: `F${year}`, source_file: `${year}.pdf`,
-            carryover_test_group: `C${year}`, carryover_model_year: year - 1, overrides: {},
+            test_vehicle_id: 'G', model_year: year, test_group: `F${year}`, source_file: `${year}.pdf`, overrides: {},
         },
         coefficient_sets: [{ id: 10, category: 'City/Highway', target_a: 30, overrides: {} }],
         tests: [],
     });
     const incoming = (year) => ({
         testVehicle: {
-            test_vehicle_id: 'G', model_year: year, test_group: `F${year}`, source_file: `${year}.pdf`,
-            carryover_test_group: `C${year}`, carryover_model_year: year - 1, battery_kwh: 77,
+            test_vehicle_id: 'G', model_year: year, test_group: `F${year}`, source_file: `${year}.pdf`, battery_kwh: 77,
         },
         coefficient_sets: [{ category: 'City/Highway', target_a: 31 }],
         tests: [],
     });
-    const IDENTITY = ['model_year', 'test_group', 'source_file', 'carryover_test_group', 'carryover_model_year'];
+    const IDENTITY = ['model_year', 'test_group', 'source_file'];
 
     it('keeps the newer identity when an older file arrives, but still merges lab data', () => {
         const plan = planTestVehicleImport(stored(2025), incoming(2024));

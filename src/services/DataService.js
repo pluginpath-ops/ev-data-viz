@@ -88,15 +88,6 @@ function isMissingRelation(error) {
   return code === '42P01' || code === '42883' || code === 'PGRST202';
 }
 
-/**
- * An embed PostgREST could not resolve: no relationship to that name
- * (PGRST200), or a table or column the database does not have. getVehicles
- * uses it to survive the window between a deploy and migration 081.
- */
-function isMissingEpaEmbed(error) {
-  return error?.code === 'PGRST200' || isMissingRelation(error) || isMissingColumn(error);
-}
-
 /** Normalise a raw data-point object into a clean DB row shape. */
 function normalisePoint(point, runId, frame) {
   return {
@@ -264,7 +255,7 @@ const CERTIFICATIONS_EMBED = `certifications:epa_certification_test_vehicles(id,
  * Guide candidate check derive from. Shared with the link sweep, so a
  * suggestion is checked against exactly what the EPA tab will read.
  */
-const EPA_LAB_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, fe_guide_row_id, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
+const EPA_LAB_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
 
 const EPA_TEST_VEHICLE_FIELDS = `${EPA_LAB_FIELDS}, ${CERTIFICATIONS_EMBED}`;
 
@@ -324,18 +315,7 @@ class DataService {
       .from('vehicles')
       .select(select)
       .order('created_at', { ascending: false });
-    let { data, error } = await query(`${base}, epa_vehicle_mappings(*, epa_test_vehicles(${EPA_TEST_VEHICLE_FIELDS}))`);
-
-    // Migration 081 renames the EPA tables, and it is applied by hand after
-    // the deploy. Until it is, the EPA embed names a table that does not exist
-    // yet — and because this one query backs the whole app, that would blank
-    // the site, not just its EPA figures. So an EPA embed the database cannot
-    // resolve is dropped and the vehicles load without it. Remove once 081 is
-    // applied (#374 step 2, layer 4).
-    if (error && isMissingEpaEmbed(error)) {
-      console.warn('getVehicles: EPA tables not readable under their current names; loading without EPA data.', error.message);
-      ({ data, error } = await query(base));
-    }
+    const { data, error } = await query(`${base}, epa_vehicle_mappings(*, epa_test_vehicles(${EPA_TEST_VEHICLE_FIELDS}))`);
 
     // Never swallow this. Destructuring only `data` made a failed query look
     // identical to an empty account, which turned a missing migration into a
@@ -2354,10 +2334,9 @@ class DataService {
 
   // ── EPA Certifications (#374, migration 082) ─────────────────────────────────
   //
-  // One row per Test Group, many-to-many with test vehicles. Written alongside
-  // the test vehicle's own identity and Guide-link columns until #374 layer 3
-  // switches the readers. Every write here is non-fatal before migration 082
-  // is applied: a missing table must not fail an import or a link that worked.
+  // One row per Test Group, many-to-many with test vehicles. The Guide link,
+  // its skip and the carryover pair live on the link row; migration 084 dropped
+  // the test vehicle's own copies.
 
   /**
    * The certifications each of these test vehicles is already in, for the
@@ -2571,7 +2550,10 @@ class DataService {
   async importEpaTestVehicleFull(testVehicle) {
     if (!this.useSupabase) return { kept: [], guarded: [] };
     const supabase = getSupabase();
-    const { coefficient_sets = [], tests = [], covered_models = [], ...g } = testVehicle;
+    // The carryover pair is the certification's, written with it by
+    // recordEpaCertifications; the test vehicle has no column for it (084).
+    const { coefficient_sets = [], tests = [], covered_models = [],
+            carryover_test_group: _ctg, carryover_model_year: _cmy, ...g } = testVehicle;
     const tgid = g.test_vehicle_id;
     const check = ({ error }) => { if (error) throw error; };
 
@@ -3083,9 +3065,9 @@ class DataService {
     return fetchAllRows(() => getSupabase()
       .from('epa_test_vehicles')
       .select(`
-        test_vehicle_id, test_group, carryover_test_group, carryover_model_year,
+        test_vehicle_id, test_group,
         model_year, make, epa_carline_name, display_name, vehicle_config_number,
-        source_file, fe_guide_row_id,
+        source_file,
         useable_kwh, nominal_pack_kwh, total_voltage,
         cd_range_combined_calc, cd_range_hwy_calc,
         label_range_published, label_adjustment_factor, label_calc_approach, overrides,
