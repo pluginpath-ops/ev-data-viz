@@ -1913,6 +1913,11 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    Tailwind's shadow-lg at z-20 — a fourth answer to the same question. */
 .dropdown-menu {
     padding: 4px;
+    /* `.popover` sizes itself from --popover-w, else `auto`, and an absolutely
+       placed `auto` box shrinks to its anchor's width. The anchor is a ~80px
+       button, so every label wrapped word by word. A menu is as wide as its
+       longest item; `.popover`'s own max-width keeps it inside the viewport. */
+    --popover-w: max-content;
 }
 
 /* Single item inside a dropdown menu */

@@ -138,7 +138,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                         {showImportMenu && (
                             <>
                                 <div className="fixed inset-0 z-10" onClick={() => setShowImportMenu(false)} />
-                                <div className="popover popover--end dropdown-menu w-44">
+                                <div className="popover popover--end dropdown-menu">
                                     <label className="dropdown-item cursor-pointer" onClick={() => setShowImportMenu(false)}>
                                         📄 App JSON
                                         <input ref={jsonImportRef} type="file" accept=".json" className="hidden"
