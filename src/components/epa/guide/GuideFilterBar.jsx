@@ -81,6 +81,7 @@ function RangeMenu({ label, unit, minKey, maxKey, filters, onChange }) {
             <div className="guide-range-inputs">
                 <input type="number" inputMode="numeric" placeholder="min"
                     aria-label={`Minimum ${label}`}
+                    autoFocus
                     value={min ?? ''} onChange={set(minKey)} className="form-input guide-range-input" />
                 <span className="text-meta">–</span>
                 <input type="number" inputMode="numeric" placeholder="max"

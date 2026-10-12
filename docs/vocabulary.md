@@ -52,7 +52,7 @@ a house one, so that a new reader already knows it.
 | Anything that floats above the page | **popover** | common web | `.popover` + one `.popover--<placement>` |
 | Where it opens relative to its anchor | **placement** | Floating UI *placement* | `--above`, `--below`, `--center`, `--right`, `--end`, `--stretch` |
 | A row of them above a table or chart | **controls strip** | — | `.controls-strip` — one class, shared |
-| One choice, always visible, of two or three — or more when every option is a short word and the row may scroll sideways (the preset picker's seven) | **segmented control** | Apple HIG *segmented control* | `.stats-segmented`, `.account-segmented`; `.preset-picker` wraps one |
+| One choice, always visible, of two or three — or more when every option is a short word and the row may scroll sideways (the preset picker's eight) | **segmented control** | Apple HIG *segmented control* | `.stats-segmented`, `.account-segmented`; `.preset-picker` wraps one |
 | Row 3 — the removable selected-vehicle pills | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip` |
 | The capped box the chips scroll inside | **chip scroller** | — | `.selected-chip-scroll` — two rows, then it scrolls |
 | The centred max-width content column | **page container** | — | `.page-container` |
