@@ -127,14 +127,18 @@ export function vehicleVoltageClass(vehicle) {
 }
 
 /**
- * A test's charge rate and clock time at each whole % of SoC it covers.
+ * A test's charge rate, clock time and range at each whole % of SoC it covers.
  *
  * The opening ramp comes off first (socAlignment.trimRamp): the handshake
  * describes the plug, not the car, and would drag the low end down for every
  * test whose logging began at plug-in. Readings are interpolated strictly
  * INSIDE the test's data — never extended past it.
  *
- * @returns {Map<number, {kw: number|null, t: number|null}>}
+ * Range is the test's own range column (a stored test's readout, scaled by
+ * its link when inherited); a composite carries its mean only for compositeFrom,
+ * since a stored composite takes its range from the vehicle's range source.
+ *
+ * @returns {Map<number, {kw: number|null, t: number|null, mi: number|null}>}
  */
 export function resampleBySoc(points) {
     const settled = trimRamp(points ?? []);
@@ -149,6 +153,7 @@ export function resampleBySoc(points) {
             soc,
             kw: finite(p.chargeRate) ? Number(p.chargeRate) : null,
             t:  finite(p.time) ? Number(p.time) : null,
+            mi: finite(p.range) ? Number(p.range) : null,
         });
     }
     const out = new Map();
@@ -163,7 +168,7 @@ export function resampleBySoc(points) {
         const kw = read('kw', b);
         const t  = read('t', b);
         if (kw == null && t == null) continue;
-        out.set(b, { kw, t });
+        out.set(b, { kw, t, mi: read('mi', b) });
     }
     return out;
 }
@@ -219,6 +224,7 @@ export function buildComposite(tests) {
         counted.forEach(r => used.add(r.s.run.id));
         const kw = counted.reduce((sum, r) => sum + r.at.kw, 0) / counted.length;
         const spread = testSpread(counted.map(r => r.at.kw), kw);
+        const ranged = counted.filter(r => r.at.mi != null);
 
         points.push({
             soc,
@@ -227,6 +233,7 @@ export function buildComposite(tests) {
             n: counted.length,
             spreadHi: spread && Math.round(spread.hi * 10) / 10,
             spreadLo: spread && Math.round(spread.lo * 10) / 10,
+            range: ranged.length ? ranged.reduce((sum, r) => sum + r.at.mi, 0) / ranged.length : null,
         });
 
         // Minutes to the next whole percent, from the same tests that counted
@@ -255,7 +262,7 @@ export function buildComposite(tests) {
         const next = points[i + 1];
         p.step = p.time != null && next?.time != null ? next.time - p.time : null;
     });
-    smoothAlongSoc(points, ['chargeRate', 'spreadHi', 'spreadLo', 'step']);
+    smoothAlongSoc(points, ['chargeRate', 'spreadHi', 'spreadLo', 'range', 'step']);
     let resummed = 0;
     for (const p of points.slice(points.findIndex(q => q.time != null))) {
         if (p.time == null) break;
@@ -265,7 +272,7 @@ export function buildComposite(tests) {
     }
     for (const p of points) {
         delete p.step;
-        for (const k of ['chargeRate', 'spreadHi', 'spreadLo']) {
+        for (const k of ['chargeRate', 'spreadHi', 'spreadLo', 'range']) {
             if (p[k] != null) p[k] = Math.round(p[k] * 10) / 10;
         }
     }
@@ -490,6 +497,136 @@ export function compositeCurves(vehicle, pointsByRunId = {}) {
     // Highest class first: the car's own condition, then what slows it.
     curves.sort((a, b) => (b.chargerClassV ?? Infinity) - (a.chargerClassV ?? Infinity));
     return { curves, setAside, missing };
+}
+
+// ── Measured from a start SoC (#408) ────────────────────────────────────────
+
+/** The lowest whole SoC a test counts from in a composite: after its opening
+ *  ramp, as resampleBySoc reads it. Null for a test with nothing to count. */
+export function countsFrom(points) {
+    const socs = [...resampleBySoc(points).keys()];
+    return socs.length ? Math.min(...socs) : null;
+}
+
+/**
+ * The lowest SoC a composite can be measured from: where COMPOSITE_MIN_TESTS
+ * of its tests have begun counting. Lower and the "composite" is one test.
+ * Null when fewer than that many tests count at all.
+ *
+ * @param {Array<{run: Object, points: Array}>} tests
+ */
+export function earliestStart(tests) {
+    const starts = (tests ?? []).map(t => countsFrom(t.points)).filter(s => s != null).sort((a, b) => a - b);
+    return starts.length >= COMPOSITE_MIN_TESTS ? starts[COMPOSITE_MIN_TESTS - 1] : null;
+}
+
+/**
+ * The lowest SoC from which EVERY one of a composite's tests counts: the
+ * start that gives the composite its full context. Null when none count.
+ *
+ * @param {Array<{run: Object, points: Array}>} tests
+ */
+export function fullStart(tests) {
+    const starts = (tests ?? []).map(t => countsFrom(t.points)).filter(s => s != null);
+    return starts.length ? Math.max(...starts) : null;
+}
+
+/**
+ * A composite measured FROM a start SoC: built live from the tests that reach
+ * it, so "SoC added" and "range added" start at zero there.
+ *
+ * The stored composite starts wherever its lowest test began — the R2's at
+ * 12%, the iX3's at 2% — so a delta read off it is absolute SoC less an
+ * accident of which test logged lowest. Slicing it at the start SoC fixes the
+ * zero but not the membership: a test that began above the start still joins
+ * partway up, and the curve "from 10%" is partly a curve from 30%. So the
+ * tests that do not reach the start are left out and NAMED, and the rest are
+ * averaged exactly as the stored composite is (buildComposite).
+ *
+ * With no start given, it is measured from as far back as its tests allow
+ * (earliestStart) — the owner's rule: added is always computed back as far
+ * as the data, or the chart's common start, allows.
+ *
+ * Range is the mean of the tests' own range readings, where they have one.
+ * The chart prefers the vehicle's range source when one exists, as it does
+ * for the stored composite.
+ *
+ * @param {Array<{run: Object, points: Array}>} tests  the composite's members
+ * @param {number} [startSoc]  omitted or null → earliestStart(tests)
+ * `of` is how many of its tests could count from anywhere, and `fullStart`
+ * the start from which all of them do — what a chart needs to say "2 of 4
+ * tests; start at 15% to use all 4".
+ *
+ * @returns {{points: Array, tests: Array, left: Array<{runId, name}>, start: number,
+ *   of: number, fullStart: number|null} | null}
+ *   null when fewer than COMPOSITE_MIN_TESTS reach the start
+ */
+export function compositeFrom(tests, startSoc = null) {
+    const wanted = startSoc ?? earliestStart(tests);
+    if (wanted == null) return null;
+    const start = Math.ceil(Number(wanted));
+    if (!Number.isFinite(start)) return null;
+    const reaching = [], left = [];
+    for (const t of tests ?? []) {
+        const from = countsFrom(t.points);
+        (from != null && from <= start ? reaching : left).push(t);
+    }
+    const built = buildComposite(reaching);
+    if (!built) return null;
+    const from = built.points.filter(p => p.soc >= start);
+    // No clock at the start means no time FROM it: a later zero would read as
+    // minutes from the start SoC when they are not.
+    const t0 = from[0]?.time ?? null;
+    return {
+        ...built,
+        start,
+        of: (tests ?? []).filter(t => countsFrom(t.points) != null).length,
+        fullStart: fullStart(tests),
+        points: from.map(p => ({
+            ...p,
+            time: t0 != null && p.time != null ? Math.round((p.time - t0) * 100) / 100 : null,
+        })),
+        left: left.map(({ run }) => ({ runId: run.id, name: run.name })),
+    };
+}
+
+/**
+ * A test spread built at display time, for an axis the stored spread cannot
+ * serve (#408). The stored spread is of kW at each SoC; on time vs SoC added
+ * the question is how far the tests' SoC added differs at each minute, which
+ * needs the tests themselves, plotted the way the composite is.
+ *
+ * Each test arrives as the {x, y} points it would be drawn with. At each x of
+ * the composite, every test that covers it is read by straight-line
+ * interpolation — strictly inside its own points — and the readings go
+ * through testSpread, so the band means what it means elsewhere: the best
+ * test down to one sample SD below the mean, none where one test covers it.
+ *
+ * Looser than the stored spread, hence off by default: it takes every reading,
+ * including a stretch a charger held back, and the mean it is measured from is
+ * of the readings at that x, not the composite line drawn.
+ *
+ * @param {Array<Array<{x: number, y: number}>>} series  one per test
+ * @param {number[]} xs  where to read it: the composite's x values
+ * @returns {Array<{x: number, hi: number|null, lo: number|null}>}
+ */
+export function spreadAlong(series, xs) {
+    const sorted = (series ?? [])
+        .map(pts => pts.filter(p => finite(p.x) && finite(p.y)).sort((a, b) => a.x - b.x))
+        .filter(pts => pts.length >= 2);
+    const readAt = (pts, x) => {
+        if (x < pts[0].x || x > pts[pts.length - 1].x) return null;
+        const i = pts.findIndex(p => p.x >= x);
+        const b = pts[i];
+        if (b.x === x || i === 0) return b.y;
+        const a = pts[i - 1];
+        return a.y + (b.y - a.y) * (x - a.x) / (b.x - a.x);
+    };
+    return (xs ?? []).map(x => {
+        const ys = sorted.map(pts => readAt(pts, x)).filter(y => y != null);
+        const spread = testSpread(ys);
+        return { x, hi: spread?.hi ?? null, lo: spread?.lo ?? null };
+    });
 }
 
 // ── Stored as runs (migration 077) ──────────────────────────────────────────

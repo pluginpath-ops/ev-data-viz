@@ -3,7 +3,7 @@ import {
     buildComposite, compositeCurves, compositeEligible, chargerClassOf, resampleBySoc, testSpread,
     smoothAlongSoc, SMOOTHING_HALF_WINDOW, SMOOTHING_MAX_GAP, compositeNote,
     planCompositeRebuild, compositeFingerprint, staleComposites, COMPOSITE_VERSION,
-    compositeLabel, compositeConditions, PLATEAU_SHARE, HELD_BACK_MARGIN,
+    compositeLabel, compositeConditions, PLATEAU_SHARE, HELD_BACK_MARGIN, compositeFrom, earliestStart, spreadAlong, fullStart,
 } from '../compositeCurve';
 
 /**
@@ -362,5 +362,104 @@ describe('compositeEligible', () => {
         // An inherited test stands for this car too; an inherited composite never feeds one.
         expect(compositeEligible(run('inherited_3_9', { _inherited: true }))).toBe(true);
         expect(compositeEligible(run('inherited_3_9', { _inherited: true, synthetic: true, composite: {} }))).toBe(false);
+    });
+});
+
+describe('compositeFrom — measured from a start SoC (#408)', () => {
+    /** A test with a range readout: 3 mi per % of SoC. */
+    const ranged = (opts) => test(opts).map(p => ({ ...p, range: p.soc * 3 }));
+
+    it('starts at the start SoC, at minute zero', () => {
+        const c = compositeFrom([
+            { run: run(1), points: test({ from: 5, kwAt: car }) },
+            { run: run(2), points: test({ from: 8, kwAt: car }) },
+        ], 20);
+        expect(c.points[0]).toMatchObject({ soc: 20, time: 0 });
+        expect(at(c, 40).time).toBeGreaterThan(0);
+        expect(c.left).toEqual([]);
+    });
+
+    it('leaves out, and names, a test that begins above the start rather than letting it join partway up', () => {
+        const c = compositeFrom([
+            { run: run(1), points: test({ from: 5, kwAt: car }) },
+            { run: run(2), points: test({ from: 5, kwAt: car }) },
+            { run: run(3), points: test({ from: 30, kwAt: () => 100 }) },
+        ], 10);
+        expect(c.left).toEqual([{ runId: 3, name: 'test 3' }]);
+        expect(at(c, 50).n).toBe(2);
+        expect(at(c, 50).chargeRate).toBeCloseTo(car(50), 0);
+    });
+
+    it('is null when fewer than two tests reach the start', () => {
+        expect(compositeFrom([
+            { run: run(1), points: test({ from: 5, kwAt: car }) },
+            { run: run(2), points: test({ from: 30, kwAt: car }) },
+        ], 10)).toBeNull();
+    });
+
+    it('carries the mean of the tests\' own range readings', () => {
+        const c = compositeFrom([
+            { run: run(1), points: ranged({ from: 5, kwAt: car }) },
+            { run: run(2), points: ranged({ from: 5, kwAt: car }).map(p => ({ ...p, range: p.range + 10 })) },
+        ], 10);
+        expect(at(c, 40).range).toBeCloseTo(40 * 3 + 5, 0);
+    });
+
+    it('has no time from the start when nothing timed it there', () => {
+        const untimed = test({ from: 0, kwAt: car }).map(p => ({ ...p, time: null }));
+        const c = compositeFrom([
+            { run: run(1), points: untimed },
+            // Logged from 0%, but its clock only from 10%.
+            { run: run(2), points: test({ from: 0, kwAt: car }).map(p => (p.soc < 10 ? { ...p, time: null } : p)) },
+        ], 5);
+        expect(c.points[0].soc).toBe(5);
+        expect(c.points.every(p => p.time == null)).toBe(true);
+    });
+
+    it('with no start, measures from as far back as two of its tests reach', () => {
+        const tests = [
+            { run: run(1), points: test({ from: 5, kwAt: car }) },
+            { run: run(2), points: test({ from: 12, kwAt: car }) },
+            { run: run(3), points: test({ from: 30, kwAt: car }) },
+        ];
+        const reach = earliestStart(tests);
+        expect(reach).toBeGreaterThanOrEqual(12);
+        expect(reach).toBeLessThan(30);
+        const c = compositeFrom(tests);
+        expect(c.start).toBe(reach);
+        expect(c.points[0]).toMatchObject({ soc: reach, time: 0 });
+        expect(c.left).toEqual([{ runId: 3, name: 'test 3' }]);
+        // and says what full context would take
+        expect(c.of).toBe(3);
+        expect(c.fullStart).toBe(fullStart(tests));
+        expect(c.fullStart).toBeGreaterThanOrEqual(30);
+    });
+
+    it('has no earliest start with fewer than two tests to count', () => {
+        expect(earliestStart([{ run: run(1), points: test({ from: 5, kwAt: car }) }])).toBeNull();
+        expect(compositeFrom([{ run: run(1), points: test({ from: 5, kwAt: car }) }])).toBeNull();
+    });
+});
+
+describe('spreadAlong — a test spread built at display time (#408)', () => {
+    const line = (k, x0 = 0, x1 = 10) => [{ x: x0, y: k * x0 }, { x: x1, y: k * x1 }];
+
+    it('reads every test at each x and spreads from the best down to mean − 1 SD', () => {
+        const [b] = spreadAlong([line(1), line(3)], [5]);
+        // readings 5 and 15: mean 10, sample SD √50
+        expect(b.hi).toBe(15);
+        expect(b.lo).toBeCloseTo(10 - Math.sqrt(50), 6);
+    });
+
+    it('interpolates inside a test and never past it', () => {
+        const band = spreadAlong([line(1, 0, 10), line(2, 0, 4)], [2, 6]);
+        expect(band[0].hi).toBe(4);
+        // Only one test reaches x = 6: one test has no spread.
+        expect(band[1]).toEqual({ x: 6, hi: null, lo: null });
+    });
+
+    it('ignores a test with nothing to read', () => {
+        const [b] = spreadAlong([line(1), line(3), [{ x: 1, y: null }]], [5]);
+        expect(b.hi).toBe(15);
     });
 });

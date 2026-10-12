@@ -43,7 +43,8 @@ import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE, withAlpha } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
-import { compositeConditions, compositeExplainer, THIN_SUPPORT } from '../utils/compositeCurve';
+import { compositeConditions, compositeExplainer, compositeFrom, earliestStart, spreadAlong, THIN_SUPPORT, COMPOSITE_MIN_TESTS } from '../utils/compositeCurve';
+import { statisticalRuns } from '../utils/runListing';
 import { reportedRangeRun } from '../utils/testedRange';
 import NumberInput from './NumberInput';
 
@@ -55,6 +56,15 @@ const RUN_ATOMS = [{ key: 'test', of: s => s.run?.name }];
  *  two axes that are charge rate scaled by a vehicle figure. On any other Y the
  *  spread in kW has no meaning. */
 const SPREAD_AXES = new Set(['chargeRate', 'cRate', 'rangeRate']);
+
+/** The axes measured from where a curve starts: plotting one measures every
+ *  composite from the start SoC (#408). */
+const ADDED_AXES = new Set(['deltaSoc', 'deltaRange', 'deltaRangeEpa']);
+
+/** Where an "… Added" Y can carry a test spread built at display time (#408):
+ *  X axes every test climbs steadily along, so reading each test at the
+ *  composite's x is a straight-line interpolation. Race mode is time. */
+const ADDED_SPREAD_X = new Set(['time', 'soc', 'deltaSoc']);
 
 
 
@@ -417,18 +427,103 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const isTimeAxis  = chartConfig.xAxis === 'time';
     const raceActive  = isTimeAxis && !chartConfig.alignRaw;
 
+    // ── Composites measured from the start SoC (#408) ────────────────────────
+    //
+    // A stored composite starts wherever its lowest test began — the R2's at
+    // 12% — so a delta read off it is absolute SoC less an accident, and a
+    // test that began above the start joins it partway up. Whenever the chart
+    // measures FROM a SoC — race mode, or any "… Added" axis — each selected
+    // composite is rebuilt from its own tests cut at a start SoC
+    // (compositeCurve.compositeFrom). The owner's rule: added is computed back
+    // as far as the chart or the data allows. In race mode the chart sets it —
+    // the race threshold. Outside race mode nothing is common anyway, so each
+    // composite starts as far back as its tests allow (earliestStart), the
+    // way a test outside race mode keeps its own start.
+    //
+    // The tests' points are fetched once per stored version of the composite;
+    // until they arrive, or if they cannot be read, the stored curve stands in.
+    const plotsAdded = [chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis].some(a => ADDED_AXES.has(a));
+    // The test spread has two kinds. On charge rate it is the stored one, on
+    // by default. On an "… Added" Y it is built from the tests as drawn —
+    // looser, so off by default, and its own setting (`addedSpread`).
+    const spreadOnAdded = ADDED_AXES.has(chartConfig.yAxis) && (raceActive || ADDED_SPREAD_X.has(chartConfig.xAxis));
+    const spreadAvailable = SPREAD_AXES.has(chartConfig.yAxis) || spreadOnAdded;
+    const spreadShown = spreadOnAdded ? (chartConfig.addedSpread ?? false) : (chartConfig.compositeSpread ?? true);
+    const compositesFromStart = raceActive || plotsAdded;
+    const [compositeMembers, setCompositeMembers] = useState({});
+    /** Composite id → the typical width of its test spread with every test
+     *  counted (from its fullStart), measured by the chart effect, which alone
+     *  has the axes. Read by the note under the chart. */
+    const [spreadEstimates, setSpreadEstimates] = useState({});
+    const membersKey = (run) => `${run.id}:${run.composite?.version ?? ''}:${run.composite?.fingerprint ?? ''}`;
+    useEffect(() => {
+        if (!compositesFromStart || !dataService.useSupabase) return;
+        const missing = selectedComposites.filter(({ run }) => !(membersKey(run) in compositeMembers));
+        if (!missing.length) return;
+        (async () => {
+            const updates = {};
+            for (const { vehicle, run } of missing) {
+                const ids = new Set((run.composite.tests || []).map(t => String(t.runId)));
+                // statisticalRuns, so a viewer builds from the same tests a
+                // curator does: unlisted tests in the pool ride beside `runs`.
+                const members = statisticalRuns(vehicle).filter(r => ids.has(String(r.id)));
+                try {
+                    const points = await dataService.getPointsForRuns(members);
+                    updates[membersKey(run)] = members.map(r => ({ run: r, points: points[r.id] ?? [] }));
+                } catch (err) {
+                    console.error(`Failed to load the tests of composite ${run.id}:`, err);
+                    updates[membersKey(run)] = null;
+                }
+            }
+            setCompositeMembers(prev => ({ ...prev, ...updates }));
+        })();
+    }, [compositesFromStart, selectedComposites]); // eslint-disable-line react-hooks/exhaustive-deps
+
     // The lowest SoC every selected run actually reaches. A fixed default —
     // 10% for a long time here — silently drops every run that started above
-    // it; this drops none, because by construction they all reach it.
+    // it; this drops none, because by construction they all reach it. A
+    // composite measured from the start reaches back as far as its tests
+    // allow (earliestStart); a test of it that begins higher is left out and
+    // named, rather than holding every other curve back.
     const commonSoc = useMemo(() => {
-        const series = (selectedRuns || [])
-            .map(id => runDataCache[id])
-            .filter(Boolean);
-        return minimumCommonSoc(series);
-    }, [selectedRuns, runDataCache]);
+        const series = [];
+        let compositesReach = null;
+        for (const id of selectedRuns || []) {
+            const composite = selectedComposites.find(c => c.run.id === id)?.run;
+            const members = composite && compositesFromStart ? compositeMembers[membersKey(composite)] : null;
+            if (members) {
+                const from = earliestStart(members);
+                if (from != null && (compositesReach == null || from > compositesReach)) compositesReach = from;
+                continue;
+            }
+            if (runDataCache[id]) series.push(runDataCache[id]);
+        }
+        const common = minimumCommonSoc(series);
+        return compositesReach == null ? common : Math.max(common ?? compositesReach, compositesReach);
+    }, [selectedRuns, runDataCache, selectedComposites, compositesFromStart, compositeMembers]);
 
     // An explicit choice wins; otherwise follow the data as the selection changes.
     const raceThreshold = chartConfig.raceThreshold ?? commonSoc ?? 10;
+
+    /** Composite id → its live build; null when too few of its tests reach the start. */
+    const liveComposites = useMemo(() => {
+        const out = {};
+        if (!compositesFromStart) return out;
+        for (const { run } of selectedComposites) {
+            const members = compositeMembers[membersKey(run)];
+            if (!members) continue;
+            const built = compositeFrom(members, raceActive ? raceThreshold : null);
+            // Range from the vehicle's range source where one won, as the
+            // stored curve has it (rangeAtFor); the tests' own readings otherwise.
+            const sourced = new Map((runDataCache[run.id] || [])
+                .filter(p => p.soc != null && p.range != null).map(p => [Math.round(p.soc), p.range]));
+            if (built && sourced.size) {
+                built.points = built.points.map(p => ({ ...p, range: sourced.get(p.soc) ?? null }));
+            }
+            out[run.id] = built;
+        }
+        return out;
+    }, [compositesFromStart, selectedComposites, compositeMembers, raceActive, raceThreshold, runDataCache]);
 
     // Runs drawn partly outside their own data, and by how much. Under the
     // limit this is a defensible short projection; past it, it is a guess
@@ -439,12 +534,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         for (const vehicle of selectedVehicles) {
             for (const run of vehicle.runs || []) {
                 if (!selectedRuns.includes(run.id)) continue;
+                if (run.id in liveComposites) continue;   // built from the start, said below
                 const aligned = alignSeries(runDataCache[run.id], raceThreshold);
                 if (overExtrapolated(aligned)) out.push({ name: run.name, gap: Math.round(aligned.gap) });
             }
         }
         return out;
-    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache]);
+    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache, liveComposites]);
 
     const trimmedRuns = useMemo(() => {
         if (!raceActive) return [];
@@ -452,12 +548,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         for (const vehicle of selectedVehicles) {
             for (const run of vehicle.runs || []) {
                 if (!selectedRuns.includes(run.id)) continue;
+                if (run.id in liveComposites) continue;   // built from the start, said below
                 const aligned = alignSeries(runDataCache[run.id], raceThreshold);
                 if (aligned?.rampTrimmed > 0) out.push({ name: run.name, n: aligned.rampTrimmed });
             }
         }
         return out;
-    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache]);
+    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache, liveComposites]);
 
     const excludedRuns = useMemo(() => {
         if (!raceActive) return [];
@@ -465,12 +562,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         for (const vehicle of selectedVehicles) {
             for (const run of vehicle.runs || []) {
                 if (!selectedRuns.includes(run.id)) continue;
+                if (run.id in liveComposites) continue;   // built from the start, said below
                 const reason = alignmentExclusion(runDataCache[run.id], raceThreshold);
                 if (reason) out.push({ name: run.name, reason });
             }
         }
         return out;
-    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache]);
+    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache, liveComposites]);
 
     /**
      * Returns null if the run can participate in race mode, or a short reason
@@ -570,8 +668,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         const axisFigures = new Set(plottedAxes.flatMap(a => AXIS_FIGURES[a] ?? []));
         const plotsTestedRange = plottedAxes.some(a => a === 'range' || a === 'deltaRange');
 
+        const spreadEstimates = {};   // composite id → full-context band width, filled below
         const datasets = allSelectedRuns.flatMap((run) => {
-            const rawData = runDataCache[run.id] ?? run.data ?? [];
+            // A composite measured from the start SoC, when the chart measures
+            // from one; null means too few of its tests reach it (said below).
+            const live = run.composite ? liveComposites[run.id] : undefined;
+            if (live === null) return [];
+            const rawData = live?.points ?? runDataCache[run.id] ?? run.data ?? [];
             const { vehicleBattery, vehicleRange } = run;
             // A tested-range axis priced from the EPA option rests on the EPA
             // range too, the same as the EPA axes do.
@@ -589,7 +692,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // 1. Apply race-mode trim (slice from anchor; exclude if ineligible)
             let workingData = rawData;
             let timeOffset  = 0;
-            if (raceActive) {
+            // A live composite already starts at the threshold, at minute zero.
+            if (raceActive && !live) {
                 // Interpolates the threshold crossing rather than snapping to
                 // the next sample, so every curve is at the same SoC at t = 0
                 // even when a run is coarsely sampled — see alignSeries.
@@ -629,10 +733,45 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // claims an agreement nobody measured. The low edge comes first:
             // the high one fills down to the dataset just before it.
             const spread = [];
-            if (composite && (chartConfig.compositeSpread ?? true) && SPREAD_AXES.has(chartConfig.yAxis)) {
-                const edge = (key) => workingData
-                    .map(d => ({ x: getX(d), y: d[key] != null ? getY({ ...d, chargeRate: d[key] }) : null }))
-                    .filter(p => p.x != null);
+            if (composite && spreadShown && spreadAvailable) {
+                let edge;
+                if (spreadOnAdded) {
+                    // Built here from the tests the live composite used, each
+                    // cut at its start with the clock zeroed there and drawn
+                    // through the same getX/getY (compositeCurve.spreadAlong).
+                    // No live build yet, no band.
+                    const members = compositeMembers[membersKey(run)] ?? [];
+                    const seriesFrom = (tests, start) => tests.map(({ points }) => {
+                        const aligned = alignSeries(points, start);
+                        const cut = aligned
+                            ? aligned.points.map(p => ({ ...p, time: p.time != null ? p.time - aligned.offset : null }))
+                            : points.filter(p => p.soc != null && p.soc >= start).map(p => ({ ...p, time: null }));
+                        return augmentDeltas(cut, vehicleRange).map(d => ({ x: getX(d), y: getY(d) }));
+                    });
+                    const xs = y1Points.map(p => p.x);
+                    const used = new Set((live?.tests ?? []).map(t => String(t.runId)));
+                    const band = live ? spreadAlong(seriesFrom(members.filter(m => used.has(String(m.run.id))), live.start), xs) : [];
+                    edge = (key) => band.map(b => ({ x: b.x, y: key === 'spreadLo' ? b.lo : b.hi }));
+
+                    // When the start leaves tests out, the band rests on the
+                    // few that remain — two near-identical tests draw a hairline
+                    // and look surer than the car is. So estimate the
+                    // variability from the full context: every test, measured
+                    // from the start where all of them count (fullStart), as
+                    // the typical (median) width of that band. Said in the
+                    // note, never drawn: it was measured from another start.
+                    if (live?.left.length && live.fullStart != null) {
+                        const widths = spreadAlong(seriesFrom(members, live.fullStart), xs)
+                            .filter(b => b.hi != null).map(b => b.hi - b.lo).sort((a, b) => a - b);
+                        if (widths.length) {
+                            spreadEstimates[run.id] = Math.round(widths[widths.length >> 1] * 10) / 10;
+                        }
+                    }
+                } else {
+                    edge = (key) => workingData
+                        .map(d => ({ x: getX(d), y: d[key] != null ? getY({ ...d, chargeRate: d[key] }) : null }))
+                        .filter(p => p.x != null);
+                }
                 const lo = edge('spreadLo');
                 if (lo.some(p => p.y != null)) {
                     const edgeStyle = { borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, showLine: true,
@@ -651,7 +790,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 // The legend is the only thing identifying a curve, and it is
                 // what a PNG export keeps — so the source goes in it, not only
                 // in the tooltip.
-                label:            sources.length ? `${runLabel(run)} · ${sources.map(s => s.short).join(' · ')}` : runLabel(run),
+                // A live composite resting on fewer tests than it has says so
+                // here too: the note below is not in a PNG export.
+                label:            [
+                    runLabel(run),
+                    ...sources.map(s => s.short),
+                    ...(live && live.tests.length < live.of ? [`${live.tests.length} of ${live.of} tests`] : []),
+                ].join(' · '),
                 figureSources:    sources,
                 data:             y1Points,
                 backgroundColor:  color,
@@ -699,6 +844,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
             return result;
         });
+        // Only when it changed, so the note re-renders without looping.
+        setSpreadEstimates(prev => (JSON.stringify(prev) === JSON.stringify(spreadEstimates) ? prev : spreadEstimates));
 
         // Axis labels
         const xLabel  = raceActive
@@ -805,7 +952,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 chartInstance.current.destroy();
             }
         };
-    }, [chartConfig, selectedVehicles, runDataCache, units, isDark, colorMap]);
+    }, [chartConfig, selectedVehicles, runDataCache, units, isDark, colorMap, liveComposites, compositeMembers]);
 
     // ── The frame's caption ──────────────────────────────────────────────────
     // Computed here rather than inside the chart effect, because the frame is
@@ -1008,12 +1155,16 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         <VerboseLabelToggle verbose={chartConfig.verboseLabels ?? false} setChartConfig={setChartConfig} />
                         {/* Composites are picked in the test list below, as tests
                             are; how they are drawn is a display choice. */}
-                        {selectedComposites.length > 0 && (
-                            <label className="toggle-label" title="Shading around each composite: from the best test at that SoC down to one standard deviation below the mean. None where the composite rests on a single test — one test has no spread.">
+                        {/* Only where a spread can be drawn: a checkbox that does
+                            nothing reads as broken. */}
+                        {selectedComposites.length > 0 && spreadAvailable && (
+                            <label className="toggle-label" title={spreadOnAdded
+                                ? "Shading around each composite, built from the tests it used as they are drawn here: from the best test down to one standard deviation below the mean. Rougher than the charge-rate spread — it counts stretches a charger held back — so it starts off."
+                                : "Shading around each composite: from the best test at that SoC down to one standard deviation below the mean. None where the composite rests on a single test — one test has no spread."}>
                                 <input
                                     type="checkbox"
-                                    checked={chartConfig.compositeSpread ?? true}
-                                    onChange={e => setChartConfig(prev => ({ ...prev, compositeSpread: e.target.checked }))}
+                                    checked={spreadShown}
+                                    onChange={e => setChartConfig(prev => ({ ...prev, [spreadOnAdded ? 'addedSpread' : 'compositeSpread']: e.target.checked }))}
                                     className="w-4 h-4"
                                 />
                                 <span className="text-sm">Test spread</span>
@@ -1133,6 +1284,52 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     )}
                 </div>
             )}
+
+            {/* What measuring a composite from a start SoC changed (#408): a
+                composite too few of whose tests reach the start is not drawn,
+                and a test that begins above it is left out of the mean. Named
+                for the same reason as the runs above — a screenshot shows
+                neither the selector nor the ⓘ. Outside race mode each
+                composite has its own start, so every one is said. */}
+            {selectedComposites.some(({ run }) => liveComposites[run.id] === null) && (
+                <div className="roadtrip-warning mb-3">
+                    {selectedComposites.filter(({ run }) => liveComposites[run.id] === null).map(({ run }) => (
+                        <p key={run.id}>
+                            ⚠ {run.name}: {raceActive
+                                ? `fewer than ${COMPOSITE_MIN_TESTS} of its tests reach ${raceThreshold}%`
+                                : `fewer than ${COMPOSITE_MIN_TESTS} of its tests can be read`} — not drawn
+                        </p>
+                    ))}
+                    {raceActive && <p className="text-xs mt-1">Lower the start to include it.</p>}
+                </div>
+            )}
+            {(() => {
+                // "SoC Added (%)" → "%": the estimate is in the Y axis's unit.
+                const yUnit = (axisOptions.find(o => o.value === chartConfig.yAxis)?.label ?? '').match(/\(([^)]*)\)\s*$/)?.[1] ?? '';
+                const said = selectedComposites
+                    .map(({ run }) => ({ run, live: liveComposites[run.id] }))
+                    .filter(({ live }) => live && (!raceActive || live.left.length > 0));
+                if (!said.length) return null;
+                return (
+                    <p className="text-xs text-meta mb-2">
+                        {said.map(({ run, live }) => {
+                            const used = `${live.tests.length} of ${live.of} tests`;
+                            const left = live.left.length
+                                ? `; ${live.left.map(t => t.name).join(', ')} begin${live.left.length === 1 ? 's' : ''} above it and ${live.left.length === 1 ? 'is' : 'are'} left out`
+                                : '';
+                            // Where all of them count, and how far they spread
+                            // there — the full context the start gave up.
+                            const full = live.left.length && live.fullStart != null
+                                ? ` · from ${live.fullStart}% all ${live.of} count`
+                                  + (spreadShown && spreadEstimates[run.id] != null
+                                      ? `, and their spread is typically ${spreadEstimates[run.id]}${yUnit === '%' ? '%' : ` ${yUnit}`} wide`
+                                      : '')
+                                : '';
+                            return `${run.name} measured from ${live.start}% (${used})${left}${full}`;
+                        }).join(' · ')}
+                    </p>
+                );
+            })()}
 
             {/* Points held back from the plot, said plainly. A chart quietly
                 missing its first samples is the same failure as one quietly
