@@ -2544,11 +2544,12 @@ class DataService {
    * utils/epaImportMerge.js; this method only executes the plan.
    *
    * @param {Object} testVehicle  Output element of parseEpaCsiText().testVehicles
-   * @returns {Promise<{kept: Array, guarded: Array}>} curator-held values the PDF disagreed with,
-   *   and identity fields an older certification was stopped from overwriting (#374)
+   * @returns {Promise<{kept: Array, guarded: Array, spared: number}>} curator-held values the PDF
+   *   disagreed with, identity fields an older certification was stopped from
+   *   overwriting (#374), and rows another file supplied that this one does not list
    */
   async importEpaTestVehicleFull(testVehicle) {
-    if (!this.useSupabase) return { kept: [], guarded: [] };
+    if (!this.useSupabase) return { kept: [], guarded: [], spared: 0 };
     const supabase = getSupabase();
     // The carryover pair is the certification's, written with it by
     // recordEpaCertifications; the test vehicle has no column for it (084).
@@ -2645,7 +2646,7 @@ class DataService {
           .insert(t.phases.map(p => ({ test_id: saved.id, ...p }))));
       }
     }
-    return { kept: plan.kept, guarded: plan.guarded };
+    return { kept: plan.kept, guarded: plan.guarded, spared: plan.spared };
   }
 
   /** Convenience alias kept for back-compat. */

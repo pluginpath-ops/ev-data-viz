@@ -1557,11 +1557,13 @@ export function AppProvider({ children }) {
         try {
             let keptCount = 0;
             let guardedCount = 0;
+            let sparedCount = 0;
             for (const [i, g] of testVehicles.entries()) {
                 onProgress?.({ done: i, total: testVehicles.length, name: g.test_vehicle_id });
                 const res = await dataService.importEpaTestVehicleFull(g);
                 keptCount += res?.kept?.length ?? 0;
                 if (res?.guarded?.length) guardedCount += 1;
+                sparedCount += res?.spared ?? 0;
             }
             // One certification per file, after the test vehicles it names
             // exist (#374). Before migration 082 this is a no-op.
@@ -1583,10 +1585,11 @@ export function AppProvider({ children }) {
             setVehicles(updated);
             showSuccess(`Imported ${testVehicles.length} EPA config(s) from PDF.`
                 + (keptCount ? ` Kept ${keptCount} hand-edited value(s) that differ from the PDF.` : '')
-                + (guardedCount ? ` ${guardedCount} config(s) already held a newer model year's certification, so its year, Test Group and covered models were kept.` : '')
+                + (guardedCount ? ` ${guardedCount} config(s) already held a newer model year's certification, so its year, Test Group, covered models and every value it already had were kept; the older file only filled blanks.` : '')
+                + (sparedCount ? ` Kept ${sparedCount} test(s), phase(s) or coefficient set(s) another certification's file supplied.` : '')
                 + (certAdded ? ` ${certAdded} new certification(s).` : '')
                 + (recertified ? ` ${recertified} recertified.` : ''));
-            return { count: testVehicles.length, kept: keptCount, guarded: guardedCount, certifications: certAdded, recertified };
+            return { count: testVehicles.length, kept: keptCount, guarded: guardedCount, spared: sparedCount, certifications: certAdded, recertified };
         } catch (error) {
             showError('PDF import failed: ' + error.message);
             throw error;
