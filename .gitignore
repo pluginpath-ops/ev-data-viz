@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .env
+# Written by scripts/localdb.sh serve: points the dev server at the local database.
+.env.local
 DevInfo/
 LocalDev/
 .DS_Store

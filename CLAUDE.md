@@ -183,6 +183,17 @@ wiring suite reads source text to assert the seams hold: that a note written to
 every run is read somewhere, that every chart showing a test speed also marks a
 mixed cycle, that a tunable constant reaches the Admin knobs.
 
+### Database and privileged work: test against the local mirror first
+
+Anything that changes the database (a migration, a backfill, a new write path)
+or needs a privileged role (admin or contributor UI) is tested against the
+newest backup before it reaches production: `scripts/localdb.sh up`, `migrate`
+the migrations under test, then `serve`, which puts PostgREST and a local
+sign-in in front of it and writes `.env.local` so the app and the browser
+preview read it. Signing in offers the three seeded users, and the real RLS
+policies apply. Leave it running between sessions unless the owner says
+otherwise. Details in [scripts/README.md](scripts/README.md).
+
 ### The drift ledger
 
 `npm run drift` prints what the codebase still paints outside the theme —

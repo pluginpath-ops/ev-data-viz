@@ -21,6 +21,11 @@
 #   scripts/localdb.sh migrate 057        apply migration(s) by number or path
 #   scripts/localdb.sh psql --as admin    a shell as admin/contributor/user/anon
 #   scripts/localdb.sh status             is it running, and what is in it
+#   scripts/localdb.sh serve              serve it to the app: PostgREST + a local
+#                                         sign-in, and .env.local pointing at them
+#   scripts/localdb.sh unserve            stop serving; remove .env.local
+#   scripts/localdb.sh env [checkout]     write .env.local into a checkout (default:
+#                                         this one) — each worktree runs its own app
 #   scripts/localdb.sh down               stop
 #   scripts/localdb.sh reset              destroy and start over
 #
@@ -36,12 +41,25 @@ set -euo pipefail
 export LC_ALL=C
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# LocalDev/ is git-ignored, so it exists only in the main checkout — a worktree
+# has none. Its backups are found through the repository the worktree shares.
+LOCALDEV="$REPO/LocalDev"
+if [ ! -d "$LOCALDEV" ]; then
+  LOCALDEV="$(dirname "$(git -C "$REPO" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")/LocalDev"
+fi
 PORT="${EVBENCH_PG_PORT:-55432}"
 DB="${EVBENCH_PG_DB:-evbench}"
 PGDATA_DIR="${EVBENCH_PGDATA:-${TMPDIR:-/tmp}/evbench-localdb}"
 # A unix socket path may not exceed 103 bytes, and the default TMPDIR on macOS
 # is long enough to blow that on its own. Keep it short and predictable.
 SOCK="${EVBENCH_PG_SOCKET:-/tmp/evbench-pg}"
+
+# Serving the app (`serve`): PostgREST on one port, the Supabase stand-in the
+# app talks to on another. Both on 127.0.0.1 only. The secret signs local test
+# tokens and nothing else; it is not, and must never become, a real one.
+API_PORT="${EVBENCH_API_PORT:-3998}"
+PGRST_PORT="${EVBENCH_PGRST_PORT:-3999}"
+JWT_SECRET='localdb-postgrest-secret-not-for-production-0123456789'
 
 ADMIN_UID='00000000-0000-4000-a000-000000000001'
 CONTRIB_UID='00000000-0000-4000-a000-000000000002'
@@ -62,11 +80,16 @@ newest_dump() {
   # "finished" are not the same thing. A dump still being written is the newest
   # file in the directory, and restoring one fails deep inside the process with
   # "input file is too short", which reads like a corrupt backup rather than a
-  # race. pg_restore -l parses the archive's table of contents without touching
-  # the database, so it is a cheap way to ask whether the file is complete.
+  # race.
+  #
+  # The table of contents is not enough to ask whether the file is complete:
+  # it is written first, so a dump cut off mid-data (a backup that stalled on
+  # 2026-10-08) passes `pg_restore -l` and restores as an almost empty database
+  # — 0 vehicles, no error. Reading the whole archive to /dev/null touches no
+  # database and fails on a truncated one with "end of file".
   local f
-  for f in $(ls -t "$REPO"/LocalDev/*.dump 2>/dev/null); do
-    if pg_restore -l "$f" >/dev/null 2>&1; then echo "$f"; return 0; fi
+  for f in $(ls -t "$LOCALDEV"/*.dump 2>/dev/null); do
+    if pg_restore -f /dev/null "$f" >/dev/null 2>&1; then echo "$f"; return 0; fi
     warn "skipping $(basename "$f") — unreadable, still being written?"
   done
   return 1
@@ -215,6 +238,11 @@ cmd_status() {
   psql_raw -d "$DB" -tAc \
     "SELECT '  ' || p.role || '  ' || p.id FROM public.profiles p
       WHERE p.id::text LIKE '00000000-0000-4000-a000-%' ORDER BY p.role" 2>/dev/null || true
+  if pid_alive "$PGDATA_DIR/auth-proxy.pid"; then
+    say "serving  http://localhost:$API_PORT  (PostgREST 127.0.0.1:$PGRST_PORT)"
+  else
+    echo "  not serving — scripts/localdb.sh serve"
+  fi
   cat <<EOS
 
   psql as a role:   scripts/localdb.sh psql --as contributor
@@ -223,8 +251,120 @@ cmd_status() {
 EOS
 }
 
-cmd_down()  { running && pg_ctl -D "$PGDATA_DIR" stop >/dev/null && say "stopped" || say "not running"; }
-cmd_reset() { running && pg_ctl -D "$PGDATA_DIR" stop >/dev/null 2>&1 || true; rm -rf "$PGDATA_DIR" "$SOCK"; say "removed $PGDATA_DIR"; cmd_up; }
+# ── Serving the app ─────────────────────────────────────────────────────────
+#
+# The standard way to test anything that changes the database or needs a
+# privileged role (CLAUDE.md): restore the newest backup (`up`), apply the
+# migrations under test (`migrate`), then `serve` — and run the app against it.
+# Signing in opens a local page offering the three seeded users, and the real
+# RLS policies decide what each may do. Left running between sessions unless
+# the owner says otherwise.
+
+pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
+
+# Whatever already listens on a port. A second `serve` must adopt it rather than
+# start another copy: the copy fails to bind, exits, and its pid would replace
+# the live one in the .pid file — found 2026-10-10, when status said "not
+# serving" over a stand-in that had been answering for a day.
+listener_pid() { lsof -t -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | head -1; }
+
+mint_token() {   # mint_token <role> [sub] — a long-lived local test JWT
+  LOCALDB_JWT_SECRET="$JWT_SECRET" node -e '
+    const c = require("crypto"); const [role, sub] = process.argv.slice(1);
+    const b = o => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const h = b({ alg: "HS256", typ: "JWT" });
+    const p = b({ role, ...(sub ? { sub } : {}), exp: Math.floor(Date.now() / 1000) + 10 * 365 * 86400 });
+    console.log(`${h}.${p}.${c.createHmac("sha256", process.env.LOCALDB_JWT_SECRET).update(`${h}.${p}`).digest("base64url")}`);
+  ' "$@"
+}
+
+# .env.local in this checkout, pointing the dev server at the stand-in. Vite
+# reads it over .env; delete it (or `unserve`) to point back at production.
+cmd_env() {
+  local dir="${1:-$REPO}"
+  [ -d "$dir" ] || die "no such checkout: $dir"
+  local anon; anon="$(mint_token anon)"
+  cat > "$dir/.env.local" <<ENV
+# Written by scripts/localdb.sh serve — the app reads the LOCAL database, not
+# production. \`scripts/localdb.sh unserve\` (or deleting this file) undoes it.
+# Restart the dev server after it changes; Vite reads env only at startup.
+VITE_SUPABASE_URL=http://localhost:$API_PORT
+VITE_SUPABASE_ANON_KEY=$anon
+ENV
+  say "==> wrote $dir/.env.local (restart the dev server to pick it up)"
+}
+
+cmd_serve() {
+  running || die "not running — scripts/localdb.sh up"
+  need node
+  command -v postgrest >/dev/null 2>&1 || die "missing postgrest — brew install postgrest"
+
+  # Signing in through the API: PostgREST verifies the token and puts its
+  # claims in request.jwt.claims, so auth.uid() reads `sub` from there as well
+  # as from test.user_id. Re-applied here so a database restored before this
+  # existed gets it too.
+  PGOPTIONS='-c client_min_messages=warning' \
+    psql_raw -q -d "$DB" -v ON_ERROR_STOP=1 -f "$REPO/scripts/localdb-prelude.sql" >/dev/null
+  psql_raw -q -d "$DB" -v ON_ERROR_STOP=1 <<'GRANTS'
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
+GRANTS
+
+  local conf="$PGDATA_DIR/postgrest.conf"
+  cat > "$conf" <<CONF
+db-uri = "postgres://postgres@/$DB?host=$SOCK&port=$PORT"
+db-schemas = "public"
+db-anon-role = "anon"
+jwt-secret = "$JWT_SECRET"
+server-host = "127.0.0.1"
+server-port = $PGRST_PORT
+CONF
+  local held
+  held="$(listener_pid "$PGRST_PORT")"
+  [ -n "$held" ] && ! pid_alive "$PGDATA_DIR/postgrest.pid" && echo "$held" > "$PGDATA_DIR/postgrest.pid"
+  held="$(listener_pid "$API_PORT")"
+  [ -n "$held" ] && ! pid_alive "$PGDATA_DIR/auth-proxy.pid" && echo "$held" > "$PGDATA_DIR/auth-proxy.pid"
+
+  if pid_alive "$PGDATA_DIR/postgrest.pid"; then
+    kill -USR1 "$(cat "$PGDATA_DIR/postgrest.pid")" 2>/dev/null || true   # reload the schema cache
+    say "==> PostgREST already serving on 127.0.0.1:$PGRST_PORT (schema reloaded)"
+  else
+    nohup postgrest "$conf" > "$PGDATA_DIR/postgrest.log" 2>&1 &
+    echo $! > "$PGDATA_DIR/postgrest.pid"
+    say "==> PostgREST on 127.0.0.1:$PGRST_PORT"
+  fi
+  if pid_alive "$PGDATA_DIR/auth-proxy.pid"; then
+    say "==> stand-in already on http://localhost:$API_PORT"
+  else
+    LOCALDB_JWT_SECRET="$JWT_SECRET" LOCALDB_API_PORT="$API_PORT" LOCALDB_PGRST_PORT="$PGRST_PORT"       nohup node "$REPO/scripts/localdb-auth-proxy.mjs" > "$PGDATA_DIR/auth-proxy.log" 2>&1 &
+    echo $! > "$PGDATA_DIR/auth-proxy.pid"
+    say "==> stand-in on http://localhost:$API_PORT (data + local sign-in)"
+  fi
+  sleep 1
+  curl -sf "http://localhost:$API_PORT/rest/v1/" -o /dev/null -H "apikey: x"     || warn "the API did not answer yet — see $PGDATA_DIR/postgrest.log and auth-proxy.log"
+  cmd_env
+  cat <<EOS
+
+  Run the app as usual (npm run dev / the preview). Sign in opens a local page:
+  pick Local admin, contributor or viewer — no real accounts are involved.
+  Stop with: scripts/localdb.sh unserve
+EOS
+}
+
+cmd_unserve() {
+  for f in postgrest auth-proxy; do
+    pid_alive "$PGDATA_DIR/$f.pid" && kill "$(cat "$PGDATA_DIR/$f.pid")" && say "stopped $f"
+    rm -f "$PGDATA_DIR/$f.pid"
+  done
+  if [ -f "$REPO/.env.local" ] && grep -q "localdb.sh serve" "$REPO/.env.local"; then
+    rm "$REPO/.env.local" && say "removed .env.local — restart the dev server to point back at production"
+  fi
+}
+
+cmd_down()  { cmd_unserve; running && pg_ctl -D "$PGDATA_DIR" stop >/dev/null && say "stopped" || say "not running"; }
+cmd_reset() { cmd_unserve; running && pg_ctl -D "$PGDATA_DIR" stop >/dev/null 2>&1 || true; rm -rf "$PGDATA_DIR" "$SOCK"; say "removed $PGDATA_DIR"; cmd_up; }
 
 case "${1:-help}" in
   up)      shift; cmd_up "$@" ;;
@@ -233,5 +373,8 @@ case "${1:-help}" in
   psql)    shift; cmd_psql "$@" ;;
   migrate) shift; cmd_migrate "$@" ;;
   status)  shift; cmd_status "$@" ;;
-  *) sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+  serve)   shift; cmd_serve "$@" ;;
+  unserve) shift; cmd_unserve "$@" ;;
+  env)     shift; cmd_env "$@" ;;
+  *) sed -n '2,45p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
 esac
