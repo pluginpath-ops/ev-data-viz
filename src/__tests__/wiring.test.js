@@ -856,6 +856,21 @@ describe('the seams that broke before', () => {
         expect(ds).toMatch(/shapePoint\(p, r\._efficiencyFactor \?\? 1, r\._capacityFactor \?\? 1\)/);
     });
 
+    it('measures a composite from the start SoC, built live from its tests (#408)', () => {
+        const view = read('src/components/ChargingView.jsx');
+        expect(view, 'an "… Added" axis measures composites from the start').toMatch(/const compositesFromStart = raceActive \|\| plotsAdded/);
+        expect(view, 'built from the tests that reach it').toMatch(/compositeFrom\(members, raceActive \? raceThreshold : null\)/);
+        expect(view, 'a viewer builds from the same tests as a curator').toMatch(/statisticalRuns\(vehicle\)/);
+        expect(view, 'the plot draws the live build').toMatch(/live\?\.points \?\? runDataCache\[run\.id\]/);
+        expect(view, 'its start, and what it left out, are named').toMatch(/measured from \$\{live\.start\}%/);
+        expect(view, 'the default start reaches back as far as its tests allow').toMatch(/earliestStart\(members\)/);
+        expect(view, 'an "… Added" Y spreads the tests as drawn').toMatch(/spreadAlong\(seriesFrom\(members\.filter\(m => used\.has/);
+        expect(view, 'a thin start estimates the spread from all its tests').toMatch(/spreadAlong\(seriesFrom\(members, live\.fullStart\), xs\)/);
+        expect(view, 'and the legend says how many it rests on').toMatch(/\$\{live\.tests\.length\} of \$\{live\.of\} tests/);
+        expect(view, 'that spread is its own setting, off by default').toMatch(/chartConfig\.addedSpread \?\? false/);
+        expect(read('src/App.jsx'), 'and rides the URL').toMatch(/p\.set\('aspread', '1'\)/);
+    });
+
     it('takes a composite as the default charging curve everywhere: DEF → composite → newest (#313)', () => {
         expect(read('src/components/ChargingView.jsx'), 'the Charging chart').toMatch(/defaultChargingRun\(\{ runs: vehicleRows\.map/);
         expect(read('src/utils/runUtils.js'), 'Charge Stop + Road Trip, via pairedChargingRun').toMatch(/\?\? nativeComposite\(charging\)/);

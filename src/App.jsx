@@ -517,6 +517,7 @@ export default function App() {
             showLine:   p.get('line') !== '0', // default to true if not present, false if explicitly set to 0
             showPoints: p.get('pts') === '1', // default to false if not present, true if explicitly set to 1
             compositeSpread: p.get('cspread') !== '0',
+            addedSpread:     p.get('aspread') === '1',
             // Guard against a stale or hand-edited ?m= — an unknown mode would
             // otherwise fall through to the charging chart with no indication why.
             chartMode:     ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE,
@@ -642,6 +643,7 @@ export default function App() {
             showLine:      s.showLine ?? true, // default to true if not present, false if explicitly set to 0
             showPoints:    s.showPoints ?? false, // default to false if not present, true if explicitly set to 1
             compositeSpread: s.compositeSpread ?? true,
+            addedSpread:     s.addedSpread ?? false,
             ...(s.scatterXField && { scatterXField: s.scatterXField }),
             ...(s.scatterYField && { scatterYField: s.scatterYField }),
         }));
@@ -710,6 +712,7 @@ export default function App() {
         if (chartConfig.showLine === false)       p.set('line',   '0'); // default to true if not present, false if explicitly set to 0
         if (chartConfig.showPoints)               p.set('pts',    '1');
         if (chartConfig.compositeSpread === false) p.set('cspread', '0');
+        if (chartConfig.addedSpread)              p.set('aspread', '1');
         if (chartMode !== 'charging')             p.set('m', chartMode);
 
         // Charge Compare options
