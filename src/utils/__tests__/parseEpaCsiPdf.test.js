@@ -416,3 +416,26 @@ describe('a placeholder is not a measurement', () => {
         expect(t.phases[0].dc_energy_kwh).toBe(78.946);
     });
 });
+
+describe('a Vehicle ID shared by several configurations', () => {
+    // The MY2027 Mercedes EQS file: configurations 0 and 1 of one Vehicle ID,
+    // and a third vehicle whose own ID is that Vehicle ID with "-1" on it.
+    const header = ['Manufacturer', ' ', 'Mercedes-Benz', '', 'Test Group', ' ', 'VMBXV00.0ED5', '', 'Model Year', ' ', '2027', '', 'Test Group Information', ''];
+    const config = (raw, model) => ['Vehicle ID / Configuration', ' ', raw, '', 'Represented Test Vehicle Model', ' ', model, ''];
+
+    it('suffixes the config index as before', () => {
+        const { testVehicles } = parseEpaCsiText([...header, ...config('A1 / 0', 'x'), ...config('A1 / 1', 'y')]);
+        expect(testVehicles.map(t => t.test_vehicle_id)).toEqual(['A1-0', 'A1-1']);
+    });
+
+    it('uses EPA\'s own "/" form when the suffix is another vehicle\'s real ID', () => {
+        const { testVehicles, warnings } = parseEpaCsiText([...header,
+            ...config('V297PSM140f-Z2791 / 0', 'EQS 500 4MATIC'),
+            ...config('V297PSM140f-Z2791 / 1', 'EQS 500 4MATIC'),
+            ...config('V297PSM140f-Z2791-1 / 0', 'EQS 580 4MATIC')]);
+        expect(testVehicles.map(t => t.test_vehicle_id))
+            .toEqual(['V297PSM140f-Z2791-0', 'V297PSM140f-Z2791/1', 'V297PSM140f-Z2791-1']);
+        expect(testVehicles[2].epa_carline_name).toBe('EQS 580 4MATIC');
+        expect(warnings.some(w => w.includes('share the key'))).toBe(false);
+    });
+});
