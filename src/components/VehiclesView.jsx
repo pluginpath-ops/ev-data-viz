@@ -163,7 +163,7 @@ export default function VehiclesView({
 
     const {
         units, manufacturers, addManufacturer, isContributor, addSpecLink, deleteSpecLink, user,
-        performanceCounts,
+        performanceCounts, fleet,
     } = useAppContext();
 
     const {
@@ -269,11 +269,16 @@ export default function VehiclesView({
     const { ctx: filterCtx, filtered: filteredVehicles } = useFilteredVehicles(vehicles, filters, performanceCounts);
     const shownVehicles = filteredVehicles.filter(v => !committedDeletes.has(v.id));
 
-    // Each card's stack reads the whole fleet for its sources, and the
-    // filters to say which of them to show and which are a gap.
-    const lineage = useMemo(() => lineageIndex(vehicles), [vehicles]);
+    // Each card's stack, and the Lineage view, read the whole fleet for
+    // sources, unlisted ones included (AppContext `fleet`): the filters say
+    // which sources to show and which are a gap, and the reader's listing
+    // which are an "Unlisted record" (vehicleListing.js).
+    const lineageFleet = fleet ?? vehicles;
+    const lineage = useMemo(() => lineageIndex(lineageFleet), [lineageFleet]);
     const shownIds = new Set(shownVehicles.map(v => v.id));
     const isShownForStack = (v) => shownIds.has(v.id);
+    const listedIds = new Set(vehicles.map(v => v.id));
+    const isListedForReader = (v) => listedIds.has(v.id);
 
     // Stage 3: sort
     const sortedFilteredVehicles = [...shownVehicles].sort((a, b) => {
@@ -505,12 +510,12 @@ export default function VehiclesView({
         const isPublic = vehicle.visibility === 'public';
         const cls = `vehicle-media-badge ${isPublic ? 'is-public' : 'is-private'}`
             + (onMedia ? '' : ' is-inline');
-        const label = isPublic ? 'PUBLIC' : 'PRIVATE';
+        const label = isPublic ? 'LISTED' : 'UNLISTED';
         if (canPublish()) {
             return (
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggleVisibility(vehicle.id, isPublic ? 'private' : 'public'); }}
-                    title={`Click to make ${isPublic ? 'private' : 'public'}`}
+                    title={isPublic ? 'Click to unlist' : 'Click to list'}
                     className={cls}
                 >
                     {label}
@@ -853,7 +858,7 @@ export default function VehiclesView({
                                 )}
                                 <VehicleStack
                                     vehicle={vehicle}
-                                    stack={vehicleStack(vehicle, lineage, isShownForStack)}
+                                    stack={vehicleStack(vehicle, lineage, isShownForStack, isListedForReader)}
                                     index={lineage}
                                     units={units}
                                     renderCard={renderCard}
@@ -873,7 +878,7 @@ export default function VehiclesView({
                 cut a tree. */}
             {viewMode === 'lineage' && (
                 <LineageTree
-                    trees={lineageTrees(vehicles, lineage, isShownForStack, sortedFilteredVehicles)}
+                    trees={lineageTrees(lineageFleet, lineage, isShownForStack, sortedFilteredVehicles, isListedForReader)}
                     index={lineage}
                     units={units}
                     isSelected={id => selectedVehicles.includes(id)}

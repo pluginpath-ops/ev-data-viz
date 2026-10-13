@@ -308,3 +308,42 @@ describe('lineageTrees connector trails', () => {
         expect([1, 2, 3, 4, 5].map(id => at(id).hasVariants)).toEqual([true, true, false, false, false]);
     });
 });
+
+describe('unlisted sources (in the fleet, not listed for this reader)', () => {
+    // 1 (listed) ← 2 (unlisted) ← 3 ← 4, 2 ← 5; 6 alone
+    const fleet = [
+        v(1), v(2, { spec_source_vehicle_id: 1 }), v(3, { spec_source_vehicle_id: 2 }),
+        v(4, { spec_source_vehicle_id: 3 }), v(5, { spec_source_vehicle_id: 2 }), v(6),
+    ];
+    const index = lineageIndex(fleet);
+    const get = id => fleet.find(x => x.id === id);
+    const listed = x => x.id !== 2;
+    const all = () => true;
+    const kinds = entries => entries.map(e => e.vehicle ? e.vehicle.id : e.unlisted ? `unlisted${e.unlisted}` : `gap${e.gap}`);
+    const flat = trees => trees.map(t => t.rows.map(r => r.vehicle ? `${r.depth}:${r.vehicle.id}` : r.unlisted ? `${r.depth}:unlisted${r.unlisted}` : `${r.depth}:gap${r.gap}`));
+
+    it('carries a stack on past an unlisted source to the listed one beyond it', () => {
+        const s = vehicleStack(get(3), index, all, listed);
+        expect(kinds(s.rolodex)).toEqual([1, 'unlisted1']);
+        expect(s.members.map(m => m.id)).toEqual([1, 3]);
+    });
+
+    it('keeps "filtered out" and "unlisted" apart, folding each run of one kind', () => {
+        const s = vehicleStack(get(4), index, x => x.id !== 3, listed, 5);
+        expect(kinds(s.rolodex)).toEqual([1, 'unlisted1', 'gap1']);
+    });
+
+    it('names an unlisted source to a reader it is listed for', () => {
+        expect(kinds(vehicleStack(get(3), index, all, all).rolodex)).toEqual([1, 2]);
+    });
+
+    it('keeps an unlisted source in the tree as one unnamed row, its variants under it', () => {
+        expect(flat(lineageTrees(fleet, index, all, fleet, listed))).toEqual([
+            ['0:1', '1:unlisted1', '2:3', '3:4', '2:5'], ['0:6'],
+        ]);
+    });
+
+    it('still counts a variant of an unlisted source as a variant', () => {
+        expect(lineageRole(get(3), index)).toBe('has-variants');
+    });
+});

@@ -8,6 +8,7 @@
  * (spans), not a control of its own.
  */
 import LineageIcon from './LineageIcon';
+import UnlistedNote from './UnlistedNote';
 import { distanceValue, distanceUnit } from '../../utils/unitConversions';
 
 export function RolodexCard({ vehicle, role, units, selected = false }) {
@@ -19,6 +20,7 @@ export function RolodexCard({ vehicle, role, units, selected = false }) {
             <span className="rolodex-card-name">
                 {[vehicle.year, vehicle.name].filter(Boolean).join(' · ')}
             </span>
+            <UnlistedNote vehicle={vehicle} />
             <span className="rolodex-card-figures">
                 {vehicle.socWindowKwh != null && <>{vehicle.socWindowKwh}<span className="stat-cell-unit"> kWh</span></>}
                 {vehicle.socWindowKwh != null && range != null && ' · '}
@@ -44,6 +46,19 @@ export function RolodexMore({ count }) {
         <span className="rolodex-card is-gap">
             <span aria-hidden="true">+</span>
             <span className="rolodex-card-name">{count} more up the lineage</span>
+        </span>
+    );
+}
+
+/**
+ * Sources this reader is not shown because they are unlisted: named only as
+ * "Unlisted record", never opened. The lineage carries on past them.
+ */
+export function RolodexUnlisted({ count }) {
+    return (
+        <span className="rolodex-card is-gap" title="Unlisted vehicles are not shown here">
+            <span aria-hidden="true">⋯</span>
+            <span className="rolodex-card-name">{count > 1 ? `${count} unlisted records` : 'Unlisted record'}</span>
         </span>
     );
 }

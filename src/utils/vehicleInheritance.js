@@ -99,8 +99,8 @@ export function lineageIndex(vehicles = []) {
  *   'end'           has a source, no variants
  *   null            neither: not part of a lineage
  *
- * A source that is missing (deleted, or not visible to this reader) counts as
- * none, as it does everywhere else in this module.
+ * Read over the whole fleet, unlisted vehicles included, so a variant of an
+ * unlisted source is still a variant.
  */
 export function lineageRole(vehicle, index) {
     const hasSource = inheritanceChain(vehicle, index.byId).length > 0;
@@ -113,39 +113,53 @@ export function lineageRole(vehicle, index) {
 const STACK_ROLODEX_CAP = 2;
 
 /**
+ * How a source sits in a stack or a lineage tree for this reader: a vehicle
+ * to show, one the filters removed ('gap'), or one this reader is not shown
+ * at all because it is unlisted ('unlisted') — named only as "Unlisted
+ * record", and never opened, though the lineage carries on past it.
+ */
+const lineageKind = (v, isShown, isVisible) =>
+    !isVisible(v) ? 'unlisted' : isShown(v) ? 'vehicle' : 'gap';
+
+/**
  * A vehicle's stack on the Cards grid: the vehicle on top, its source chain
  * above it as rolodex cards.
  *
- * `isShown(v)` says whether a source passes the current filters. A run of
- * sources that do not is ONE gap entry, so a long filtered-out stretch costs
- * one rolodex card, not one each.
+ * `isShown(v)` says whether a source passes the current filters, and
+ * `isVisible(v)` whether it is listed for this reader (unlisted vehicles are
+ * listed for curators and their creator only). A run of sources that fail
+ * either way is ONE entry, so a long stretch costs one rolodex card, not one
+ * each. `index` is built from the whole fleet, unlisted vehicles included, so
+ * the chain carries on past an unlisted source to the listed ones beyond it.
  *
  * Returns
  *   rolodex  entries to draw, furthest first (the order they sit above the
- *            card): { vehicle } or { gap: n }, at most `cap` of them
- *   more     sources that pass the filters but are past the cap
- *   members  every source that passes the filters, furthest first, then the
- *            vehicle: what the fanned-out stack shows, gaps left out
+ *            card): { vehicle }, { gap: n } or { unlisted: n }, at most `cap`
+ *   more     sources this reader can open that are past the cap
+ *   members  every source shown, furthest first, then the vehicle: what the
+ *            fanned-out stack shows, gaps and unlisted records left out
  *
- * A vehicle with no visible source gets an empty stack, and draws as a card.
+ * A vehicle with no source gets an empty stack, and draws as a card.
  */
-export function vehicleStack(vehicle, index, isShown = () => true, cap = STACK_ROLODEX_CAP) {
+export function vehicleStack(vehicle, index, isShown = () => true, isVisible = () => true, cap = STACK_ROLODEX_CAP) {
     const chain = inheritanceChain(vehicle, index.byId);
     const entries = [];
     for (const source of chain) {
-        if (isShown(source)) entries.push({ vehicle: source });
-        else if (entries.at(-1)?.gap) entries.at(-1).gap += 1;
-        else entries.push({ gap: 1 });
+        const kind = lineageKind(source, isShown, isVisible);
+        const last = entries.at(-1);
+        if (kind === 'vehicle') entries.push({ vehicle: source });
+        else if (last?.[kind]) last[kind] += 1;
+        else entries.push({ [kind]: 1 });
     }
 
     let shown = entries.slice(0, cap);
     const hidden = entries.slice(cap);
-    let more = hidden.filter(e => e.vehicle).length;
-    // Nothing past the cap but one filtered-out stretch: show it as the gap it
-    // is rather than as "+0 more".
+    const more = hidden.filter(e => e.vehicle).length;
+    // Nothing past the cap but one stretch of filtered-out or unlisted
+    // sources: show it as what it is rather than as "+0 more".
     if (more === 0 && hidden.length === 1) shown = [...shown, hidden[0]];
 
-    const members = chain.filter(isShown).reverse();
+    const members = chain.filter(v => lineageKind(v, isShown, isVisible) === 'vehicle').reverse();
     return {
         rolodex: shown.reverse(),
         more,
@@ -271,21 +285,27 @@ export function variantLinkPlan(source) {
  * did not match; a run of failing sources in a line is one gap. A branch with
  * nothing that passes is left out entirely.
  *
+ * A vehicle that is not listed for this reader (`isVisible`) is kept the same
+ * way, as an "unlisted" row: never named, but the tree carries on past it, so
+ * the listed variants of an unlisted source stay together under it.
+ *
  * `order` is the fleet in display order (the view's sort). Trees follow the
  * position of their first passing member, and variants under a source follow
- * the same order.
+ * the same order. `vehicles` and `index` are the whole fleet.
  *
  * Returns trees: [{ root, rows }], rows in reading order, each
- * { vehicle, depth, trail, hasVariants } or { gap: n, hidden, depth, trail,
- * hasVariants }, `hidden` being the vehicles the gap stands for, furthest
- * first, so a reader can open it and see what the filters left out.
+ * { vehicle, depth, trail, hasVariants }, { gap: n, hidden, depth, trail,
+ * hasVariants } (`hidden` being the vehicles the gap stands for, furthest
+ * first, so a reader can open it and see what the filters left out), or
+ * { unlisted: n, depth, trail, hasVariants }.
  *
  * `trail` and `hasVariants` are what the connector lines need: trail[k] is
  * true when the row's ancestor at depth k + 1 (or, at the last place, the
  * row itself) has a later sibling, so its line carries on down past this row;
  * `hasVariants` is true when rows hang below this one.
  */
-export function lineageTrees(vehicles, index, isShown = () => true, order = vehicles) {
+export function lineageTrees(vehicles, index, isShown = () => true, order = vehicles, isVisible = () => true) {
+    const passes = v => isVisible(v) && isShown(v);
     const rank = new Map(order.map((v, i) => [v.id, i]));
     const rankOf = v => rank.get(v.id) ?? Infinity;
     const variants = new Map();
@@ -304,7 +324,7 @@ export function lineageTrees(vehicles, index, isShown = () => true, order = vehi
         if (first.has(v.id)) return first.get(v.id);
         if (seen.has(v.id)) return Infinity;
         seen.add(v.id);
-        let best = isShown(v) ? rankOf(v) : Infinity;
+        let best = passes(v) ? rankOf(v) : Infinity;
         for (const c of variants.get(v.id) ?? []) best = Math.min(best, firstShown(c, seen));
         first.set(v.id, best);
         return best;
@@ -314,21 +334,24 @@ export function lineageTrees(vehicles, index, isShown = () => true, order = vehi
     const walk = (v, depth, rows, seen, trail) => {
         if (seen.has(v.id)) return;
         seen.add(v.id);
+        const kind = lineageKind(v, isShown, isVisible);
         let row, node = v;
-        if (isShown(v)) {
+        if (kind === 'vehicle') {
             row = { vehicle: v, depth, trail };
         } else {
-            // A gap: fold a single line of failing sources into one.
+            // Fold a single line of sources of the same kind into one row.
             const hidden = [v];
             for (;;) {
                 const next = kept(node);
-                if (next.length === 1 && !isShown(next[0]) && !seen.has(next[0].id)) {
+                if (next.length === 1 && lineageKind(next[0], isShown, isVisible) === kind && !seen.has(next[0].id)) {
                     node = next[0];
                     seen.add(node.id);
                     hidden.push(node);
                 } else break;
             }
-            row = { gap: hidden.length, hidden, depth, trail };
+            row = kind === 'gap'
+                ? { gap: hidden.length, hidden, depth, trail }
+                : { unlisted: hidden.length, depth, trail };
         }
         const below = kept(node).filter(c => !seen.has(c.id));
         row.hasVariants = below.length > 0;
@@ -336,8 +359,7 @@ export function lineageTrees(vehicles, index, isShown = () => true, order = vehi
         below.forEach((c, i) => walk(c, depth + 1, rows, seen, [...trail, i < below.length - 1]));
     };
 
-    // An origin is a vehicle whose source is missing (or none): the chain walk
-    // stops there too.
+    // A tree starts at an origin: a vehicle whose chain walk finds no source.
     const roots = vehicles.filter(v => inheritanceChain(v, index.byId).length === 0 && firstShown(v) !== Infinity);
     roots.sort((a, b) => firstShown(a) - firstShown(b));
     return roots.map(root => {

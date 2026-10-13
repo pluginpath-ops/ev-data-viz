@@ -8,8 +8,9 @@
  *
  * The rolodex cards are one trigger. Clicking them fans the stack out in a
  * popover, every member a full card as it would be on top, each selectable
- * on its own. Sources the filters removed are a gap above the card and are
- * left out of the fan.
+ * on its own. Sources the filters removed are a gap above the card, and
+ * sources unlisted for this reader an "Unlisted record"; both are left out
+ * of the fan.
  *
  * `stack` is `vehicleStack(...)` from vehicleInheritance.js; `renderCard`
  * draws one full card, the same function the grid uses; `isSelected(id)`
@@ -20,11 +21,31 @@
  * whether or not they carry a stack.
  */
 import Popover from '../Popover';
-import { RolodexCard, RolodexGap, RolodexMore } from './RolodexCard';
+import { RolodexCard, RolodexGap, RolodexMore, RolodexUnlisted } from './RolodexCard';
 import { lineageRole } from '../../utils/vehicleInheritance';
 
 export default function VehicleStack({ vehicle, stack, index, units, renderCard, isSelected, children }) {
     if (stack.members.length === 0) return <div className="vehicle-stack">{children}</div>;
+    const rolodex = (
+        <>
+            {stack.more > 0 && <RolodexMore count={stack.more} />}
+            {stack.rolodex.map((entry, i) => entry.unlisted
+                ? <RolodexUnlisted key={`unlisted-${i}`} count={entry.unlisted} />
+                : entry.gap
+                    ? <RolodexGap key={`gap-${i}`} count={entry.gap} />
+                    : <RolodexCard key={entry.vehicle.id} vehicle={entry.vehicle} role={lineageRole(entry.vehicle, index)} units={units} selected={isSelected(entry.vehicle.id)} />)}
+        </>
+    );
+    // Nothing to fan out (every source is unlisted for this reader): the
+    // rolodex card says so, and is not a control.
+    if (stack.members.length < 2) {
+        return (
+            <div className="vehicle-stack">
+                <div className="vehicle-stack-anchor popover-anchor"><div className="vehicle-stack-rolodex is-static">{rolodex}</div></div>
+                {children}
+            </div>
+        );
+    }
     return (
         <div className="vehicle-stack">
             <Popover
@@ -38,10 +59,7 @@ export default function VehicleStack({ vehicle, stack, index, units, renderCard,
                         aria-label={`Show ${vehicle.name} with its ${stack.members.length - 1} sources`}
                         {...props}
                     >
-                        {stack.more > 0 && <RolodexMore count={stack.more} />}
-                        {stack.rolodex.map((entry, i) => entry.gap
-                            ? <RolodexGap key={`gap-${i}`} count={entry.gap} />
-                            : <RolodexCard key={entry.vehicle.id} vehicle={entry.vehicle} role={lineageRole(entry.vehicle, index)} units={units} selected={isSelected(entry.vehicle.id)} />)}
+                        {rolodex}
                     </button>
                 )}
             >

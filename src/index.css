@@ -2437,7 +2437,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: var(--color-text-secondary);
     transition: border-color 0.15s ease-in-out, color 0.15s ease-in-out;
 }
-.vehicle-stack-rolodex:hover .rolodex-card {
+.vehicle-stack-rolodex:not(.is-static):hover .rolodex-card {
     border-top-color: var(--color-border-strong);
     border-right-color: var(--color-border-strong);
     color: var(--color-text-primary);
@@ -2634,6 +2634,23 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: var(--color-text-meta);
 }
 .lineage-tree-empty { color: var(--color-text-meta); }
+
+/* An unlisted vehicle, named where it appears in another vehicle's lineage
+   (UnlistedNote). Only a curator or its creator sees one by name, and it must
+   not be mistaken for a vehicle visitors are shown, so it is bold and in the
+   warning color. */
+.unlisted-note {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-warning);
+}
+/* A stack whose every source is unlisted for this reader has nothing to fan
+   out. */
+.vehicle-stack-rolodex.is-static { cursor: default; }
 
 /* Origin, has variants, or end of a lineage (LineageIcon), at the size of the
    text it sits in. */

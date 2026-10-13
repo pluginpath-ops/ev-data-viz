@@ -13,6 +13,7 @@
  */
 import { useState } from 'react';
 import LineageIcon from './LineageIcon';
+import UnlistedNote from './UnlistedNote';
 import { lineageRole } from '../../utils/vehicleInheritance';
 import { distanceValue, distanceUnit } from '../../utils/unitConversions';
 
@@ -59,6 +60,7 @@ function LineageRow({ vehicle, depth, trail, hasVariants, role, units, selected,
                 />
                 <span className="rolodex-card-swatch" style={{ backgroundColor: vehicle.color }} aria-hidden="true" />
                 <span className="lineage-row-title">{vehicle.name}</span>
+                <UnlistedNote vehicle={vehicle} />
                 <span className="vehicle-list-meta">
                     {[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' · ')}
                 </span>
@@ -108,13 +110,31 @@ function GapRow({ row }) {
     );
 }
 
+/**
+ * Sources this reader is not shown because they are unlisted: named only as
+ * "Unlisted record", and not opened, though the tree carries on past them.
+ */
+function UnlistedRow({ row }) {
+    return (
+        <div role="row" className="lineage-row is-gap" style={{ '--lineage-depth': row.depth }} title="Unlisted vehicles are not shown here">
+            <Connectors trail={row.trail} hasVariants={row.hasVariants} />
+            <span role="cell" className="lineage-row-name">
+                <span className="lineage-gap-mark" aria-hidden="true">⋯</span>
+                <span>{row.unlisted > 1 ? `${row.unlisted} unlisted records` : 'Unlisted record'}</span>
+            </span>
+        </div>
+    );
+}
+
 export default function LineageTree({ trees, index, units, isSelected, onToggle, onViewRuns }) {
     if (trees.length === 0) return <p className="lineage-tree-empty">No vehicles match these filters.</p>;
     return (
         <div className="lineage-tree" role="table" aria-label="Vehicle lineages">
             {trees.map(({ root, rows }) => (
                 <div key={root.id} role="rowgroup" className="lineage-tree-group">
-                    {rows.map((row, i) => row.gap
+                    {rows.map((row, i) => row.unlisted
+                        ? <UnlistedRow key={`unlisted-${i}`} row={row} />
+                        : row.gap
                         ? <GapRow key={`gap-${i}`} row={row} />
                         : (
                             <LineageRow
