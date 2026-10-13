@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { withInheritance, ownValues, variantLinkPlan } from '../vehicleInheritance';
+import { withInheritance, ownValues, variantLinkPlan, lineageIndex, lineageRole, vehicleStack } from '../vehicleInheritance';
 
 const tag = (id, name) => ({ id, name });
 const v = (id, over = {}) => ({
@@ -152,5 +152,69 @@ describe('variantLinkPlan', () => {
     it('does not link the source’s composites — the variant builds its own', () => {
         const source = { runs: [{ id: 101 }, { id: 300, synthetic: true, composite: { chargerClassV: null } }] };
         expect(variantLinkPlan(source).map(l => l.sourceRunId)).toEqual([101]);
+    });
+});
+
+describe('lineage roles', () => {
+    const fleet = [
+        v(1),
+        v(2, { spec_source_vehicle_id: 1 }),
+        v(3, { spec_source_vehicle_id: 2 }),
+        v(4),
+        v(5, { spec_source_vehicle_id: 99 }),
+    ];
+    const index = lineageIndex(fleet);
+    const role = id => lineageRole(fleet.find(x => x.id === id), index);
+
+    it('names origin, has-variants and end, and nothing for a vehicle outside a lineage', () => {
+        expect(role(1)).toBe('origin');
+        expect(role(2)).toBe('has-variants');
+        expect(role(3)).toBe('end');
+        expect(role(4)).toBeNull();
+    });
+
+    it('treats a missing source as none', () => {
+        expect(role(5)).toBeNull();
+    });
+});
+
+describe('vehicleStack', () => {
+    // 1 ← 2 ← 3 ← 4 ← 5, and 6 a second variant of 4
+    const fleet = [
+        v(1), v(2, { spec_source_vehicle_id: 1 }), v(3, { spec_source_vehicle_id: 2 }),
+        v(4, { spec_source_vehicle_id: 3 }), v(5, { spec_source_vehicle_id: 4 }),
+        v(6, { spec_source_vehicle_id: 4 }),
+    ];
+    const index = lineageIndex(fleet);
+    const get = id => fleet.find(x => x.id === id);
+    const ids = entries => entries.map(e => e.vehicle ? e.vehicle.id : `gap${e.gap}`);
+
+    it('is empty for a vehicle with no source', () => {
+        expect(vehicleStack(get(1), index)).toEqual({ rolodex: [], more: 0, members: [] });
+    });
+
+    it('shows the nearest two sources, furthest first, and counts the rest', () => {
+        const s = vehicleStack(get(5), index);
+        expect(ids(s.rolodex)).toEqual([3, 4]);
+        expect(s.more).toBe(2);
+        expect(s.members.map(m => m.id)).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it('gives each sibling its own stack through the shared source', () => {
+        expect(ids(vehicleStack(get(6), index).rolodex)).toEqual([3, 4]);
+    });
+
+    it('folds a filtered-out stretch into one gap, and leaves it out of the members', () => {
+        const shown = x => ![2, 3].includes(x.id);
+        const s = vehicleStack(get(5), index, shown);
+        expect(ids(s.rolodex)).toEqual(['gap2', 4]);
+        expect(s.more).toBe(1);
+        expect(s.members.map(m => m.id)).toEqual([1, 4, 5]);
+    });
+
+    it('shows a lone gap past the cap as the gap, not as "+0 more"', () => {
+        const s = vehicleStack(get(5), index, x => x.id !== 1 && x.id !== 2);
+        expect(ids(s.rolodex)).toEqual(['gap2', 3, 4]);
+        expect(s.more).toBe(0);
     });
 });

@@ -75,6 +75,84 @@ function inheritanceChain(vehicle, byId) {
     return chain;
 }
 
+/**
+ * The fleet indexed for lineage questions: vehicles by id, and the ids that
+ * are a source to at least one visible vehicle. Build it once per fleet and
+ * pass it to `lineageRole` and `vehicleStack`.
+ */
+export function lineageIndex(vehicles = []) {
+    const byId = new Map(vehicles.map(v => [v.id, v]));
+    const sources = new Set();
+    for (const v of vehicles) {
+        if (v.spec_source_vehicle_id != null && byId.has(v.spec_source_vehicle_id)) {
+            sources.add(v.spec_source_vehicle_id);
+        }
+    }
+    return { byId, sources };
+}
+
+/**
+ * Where a vehicle sits in its lineage, for the role icon:
+ *
+ *   'origin'        no source, has variants
+ *   'has-variants'  has a source and variants of its own
+ *   'end'           has a source, no variants
+ *   null            neither: not part of a lineage
+ *
+ * A source that is missing (deleted, or not visible to this reader) counts as
+ * none, as it does everywhere else in this module.
+ */
+export function lineageRole(vehicle, index) {
+    const hasSource = inheritanceChain(vehicle, index.byId).length > 0;
+    const hasVariants = index.sources.has(vehicle?.id);
+    if (!hasSource) return hasVariants ? 'origin' : null;
+    return hasVariants ? 'has-variants' : 'end';
+}
+
+/** How many rolodex cards a stack shows before the rest fold into "+N more". */
+const STACK_ROLODEX_CAP = 2;
+
+/**
+ * A vehicle's stack on the Cards grid: the vehicle on top, its source chain
+ * above it as rolodex cards.
+ *
+ * `isShown(v)` says whether a source passes the current filters. A run of
+ * sources that do not is ONE gap entry, so a long filtered-out stretch costs
+ * one rolodex card, not one each.
+ *
+ * Returns
+ *   rolodex  entries to draw, furthest first (the order they sit above the
+ *            card): { vehicle } or { gap: n }, at most `cap` of them
+ *   more     sources that pass the filters but are past the cap
+ *   members  every source that passes the filters, furthest first, then the
+ *            vehicle: what the fanned-out stack shows, gaps left out
+ *
+ * A vehicle with no visible source gets an empty stack, and draws as a card.
+ */
+export function vehicleStack(vehicle, index, isShown = () => true, cap = STACK_ROLODEX_CAP) {
+    const chain = inheritanceChain(vehicle, index.byId);
+    const entries = [];
+    for (const source of chain) {
+        if (isShown(source)) entries.push({ vehicle: source });
+        else if (entries.at(-1)?.gap) entries.at(-1).gap += 1;
+        else entries.push({ gap: 1 });
+    }
+
+    let shown = entries.slice(0, cap);
+    const hidden = entries.slice(cap);
+    let more = hidden.filter(e => e.vehicle).length;
+    // Nothing past the cap but one filtered-out stretch: show it as the gap it
+    // is rather than as "+0 more".
+    if (more === 0 && hidden.length === 1) shown = [...shown, hidden[0]];
+
+    const members = chain.filter(isShown).reverse();
+    return {
+        rolodex: shown.reverse(),
+        more,
+        members: chain.length ? [...members, vehicle] : [],
+    };
+}
+
 /** A vehicle's own, un-inherited values: what an editor must read. */
 export function ownValues(vehicle) {
     return vehicle?.own ?? {

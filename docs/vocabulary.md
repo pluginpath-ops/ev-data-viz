@@ -406,6 +406,9 @@ says to stop and ask when the right name is not obvious.
 | The thing | Where it lands | Candidates | Leaning |
 |---|---|---|---|
 | The shrinkage weight that trades a vehicle's own spread against the fleet's | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314) | — | undecided |
+| One source above a vehicle's card on the Cards grid: year, friendly name, battery and range, and a gap when the filters removed a stretch of sources | [RolodexCard.jsx](../src/components/vehicles/RolodexCard.jsx), `.rolodex-card` | rolodex card · peek · spine | **rolodex card**, for now (owner's pick; "tab" already means navigation, "spine" was set aside) |
+| A vehicle's card with its source chain above it as rolodex cards; clicking them fans the stack out in a popover | [VehicleStack.jsx](../src/components/vehicles/VehicleStack.jsx), `.vehicle-stack`, `vehicleStack()` | stack · variant stack | **stack** |
+| Where a vehicle sits in its lineage, as an icon: where it starts, a variant with variants, a variant with none | [LineageIcon.jsx](../src/components/vehicles/LineageIcon.jsx), `lineageRole()` | origin · has variants · end variant | **origin**, **has variants**, **end variant** |
 | The mark showing how far apart a vehicle's range tests landed — every test's figure, not a summary of them | Range & Efficiency and Charge Stop bars, Road Trip ([rangeTestSpread.js](../src/utils/rangeTestSpread.js), [roadTripSpread.js](../src/utils/roadTripSpread.js)); labelled "Test spread" meanwhile | test spread (widened to cover both charts) · tested span · spread of tests | **test spread**, widened — see below |
 
 **Range tests and "test spread."** #313 defines test spread for a curve: the

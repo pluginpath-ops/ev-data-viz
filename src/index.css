@@ -2383,6 +2383,109 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    than as buttons sized by their words. The rows' flex layout is inline. */
 .vehicle-card-curator-actions > * { flex: 1 1 0; min-width: 0; }
 
+/* ── Stack ───────────────────────────────────────────────────────────────────
+ *
+ * A vehicle with its source chain above it as rolodex cards (VehicleStack).
+ * Every card on the grid is wrapped in one, stack or not, and each is a
+ * two-row subgrid of the grid: rolodex cards in the first track, the card in
+ * the second. So the cards in a row start level and share one height whether
+ * or not they carry a stack, and a plain card is never stretched to the
+ * height of its neighbour's stack. */
+.vehicle-stack {
+    display: grid;
+    grid-row: span 2;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+    min-width: 0;
+}
+.vehicle-stack > .vehicle-card { grid-row: 2; }
+.vehicle-stack-anchor.popover-anchor {
+    display: block;
+    grid-row: 1;
+    align-self: end;
+}
+
+/* The rolodex cards are ONE trigger: clicking anywhere on them fans the stack
+   out. */
+.vehicle-stack-rolodex {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+/* A source, saying only enough to recognise it. The card's own edge: the
+   3px left border reserved for the selection bar and the square corner on
+   that side, so a selected source and a selected card draw one continuous
+   bar. Open at the bottom, so it tucks behind the one below. */
+.rolodex-card {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin-bottom: -1px;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid transparent;
+    border-bottom: 0;
+    border-radius: 0 var(--radius-card) 0 0;
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+    transition: border-color 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+.vehicle-stack-rolodex:hover .rolodex-card {
+    border-top-color: var(--color-border-strong);
+    border-right-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+}
+/* Selected: the card's accent border and tint (.vehicle-card.is-selected). */
+.rolodex-card.is-selected {
+    border-left-color: var(--color-accent-orange);
+    background-color: var(--color-cluster);
+}
+/* A filtered-out stretch, or the sources past the cap: there, but not shown. */
+.rolodex-card.is-gap { color: var(--color-text-meta); }
+
+.rolodex-card-swatch {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-mark);
+}
+.rolodex-card-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rolodex-card-figures {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* The fanned-out stack: every member a full card, the grid's own columns. */
+.vehicle-stack-fan {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3;
+    font-size: var(--fs-body);
+}
+
+/* Origin, has variants, or end of a lineage (LineageIcon), at the size of the
+   text it sits in. */
+.lineage-icon {
+    display: inline-block;
+    flex: none;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+}
+.vehicle-media-title h3 .lineage-icon { margin-left: 6px; }
+
 /* ── Chart layout: rail on the left, plot on the right ─────────────────────
  *
  * The controls used to sit in a card ABOVE the plot, which meant they scrolled
@@ -3443,7 +3546,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* ── Vehicles View ──────────────────────────────────────────────────────────── */
 
-/* Responsive card grid: 1 col mobile → 2 col tablet → 3 col desktop */
+/* Responsive card grid: 1 col mobile → 2 col tablet → 3 col desktop.
+   Each item spans two rows (see .vehicle-stack), so the row gap applies only
+   between the pairs; the gap inside a pair is the subgrid's own, zero. */
 .vehicle-grid {
     @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3;
 }
