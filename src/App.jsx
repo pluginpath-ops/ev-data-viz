@@ -48,6 +48,7 @@ const REFERENCE_STRIP_ITEMS = REFERENCE_SUBTABS.map(t => ({ key: t.id, label: t.
 const VEHICLES_STRIP_ITEMS = [
     { key: 'card', label: 'Cards', group: 'Summary' },
     { key: 'list', label: 'List',  group: 'Summary' },
+    { key: 'lineage', label: 'Lineage', group: 'Summary' },
 ];
 
 /**
