@@ -1368,11 +1368,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 onClick={() => onToggleVehicleVisibility(vehicle.id, isPublic ? 'private' : 'public')}
                                 className={`${base} ${isPublic ? 'is-public' : 'is-private'}`}
                             >
-                                {isPublic ? '🌐 Public' : '🔒 Private'}
+                                {isPublic ? 'Listed' : 'Unlisted'}
                             </button>
                         ) : (
                             <span className={`${base} ${isPublic ? 'is-public' : 'is-private'}`}>
-                                {isPublic ? '🌐 Public' : '🔒 Private'}
+                                {isPublic ? 'Listed' : 'Unlisted'}
                             </span>
                         );
                     })()}

@@ -2360,8 +2360,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    figure columns and the platform go — Cards are the view for those on a
    phone (#338, the owner's review). */
 @media (max-width: 999.98px) {
-    /* div. for specificity: the base .vehicle-list rule is later in the file. */
-    div.vehicle-list { --vehicle-list-cols: 20px minmax(0, 1fr) 112px; }
+    /* On the rows and the header, where the container tiers below set their
+       tracks too; `div.vehicle-list` makes this one outrank them. */
+    div.vehicle-list .vehicle-row,
+    div.vehicle-list .vehicle-list-head { --vehicle-list-cols: 20px minmax(0, 1fr) 112px; }
     .vehicle-list .vehicle-list-photo,
     .vehicle-list .vehicle-list-figure,
     .vehicle-list .vehicle-list-tests,
@@ -2393,6 +2395,291 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* The curator row: equal shares, so four short labels read as one set rather
    than as buttons sized by their words. The rows' flex layout is inline. */
 .vehicle-card-curator-actions > * { flex: 1 1 0; min-width: 0; }
+
+/* ── Stack ───────────────────────────────────────────────────────────────────
+ *
+ * A vehicle with its source chain above it as rolodex cards (VehicleStack).
+ * Every card on the grid is wrapped in one, stack or not, and each is a
+ * two-row subgrid of the grid: rolodex cards in the first track, the card in
+ * the second. So the cards in a row start level and share one height whether
+ * or not they carry a stack, and a plain card is never stretched to the
+ * height of its neighbour's stack. */
+.vehicle-stack {
+    display: grid;
+    grid-row: span 2;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+    min-width: 0;
+}
+.vehicle-stack > .vehicle-card { grid-row: 2; }
+.vehicle-stack-anchor.popover-anchor {
+    display: block;
+    grid-row: 1;
+    align-self: end;
+}
+
+/* The rolodex cards are ONE trigger: clicking anywhere on them fans the stack
+   out. */
+.vehicle-stack-rolodex {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+/* A source, saying only enough to recognise it. The card's own edge: the
+   3px left border reserved for the selection bar and the square corner on
+   that side, so a selected source and a selected card draw one continuous
+   bar. Open at the bottom, so it tucks behind the one below. */
+.rolodex-card {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin-bottom: -1px;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid transparent;
+    border-bottom: 0;
+    border-radius: 0 var(--radius-card) 0 0;
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+    transition: border-color 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+.vehicle-stack-rolodex:not(.is-static):hover .rolodex-card {
+    border-top-color: var(--color-border-strong);
+    border-right-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+}
+/* Selected: the card's accent border and tint (.vehicle-card.is-selected). */
+.rolodex-card.is-selected {
+    border-left-color: var(--color-accent-orange);
+    background-color: var(--color-cluster);
+}
+/* A filtered-out stretch, or the sources past the cap: there, but not shown. */
+.rolodex-card.is-gap { color: var(--color-text-meta); }
+
+.rolodex-card-swatch {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-mark);
+}
+.rolodex-card-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.rolodex-card-figures {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* A stack fans out as List rows (.vehicle-list) in a popover, which is
+   portaled to the body: at the page's own size, not the popover's note size.
+   The column header pins to the top of the popover's own scroll, not below
+   the site header (--app-header-h), which inside the panel left it floating
+   over the first row; and it takes the popover's surface, not the page's. */
+.popover .vehicle-list { font-size: var(--fs-body); }
+.popover .vehicle-list-head {
+    top: 0;
+    background-color: var(--color-popover);
+}
+
+/* ── Lineage tree ────────────────────────────────────────────────────────────
+ *
+ * Vehicles & Specs › Lineage (LineageTree): each lineage from its origin down,
+ * one vehicle per row, indented by depth. A row is a List row's shape — the
+ * card's accent border for selection, a checkbox — with the name cell indented
+ * by --lineage-depth, set per row. */
+/* --lineage-indent: how far each generation steps in. --lineage-stem: where a
+   row's lines run, the middle of its 16px lineage icon. */
+.lineage-tree {
+    --lineage-indent: 22px;
+    --lineage-stem: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+/* One lineage: a panel with the card's surface and a strong border, its rows
+   divided by hairlines inside it. */
+.lineage-tree-group {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 0 var(--radius-card) var(--radius-card) 0;
+}
+/* A row keeps the card's 3px left border for the selection bar, and gives up
+   the rest of its own frame to the panel. */
+.lineage-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px 88px auto;
+    align-items: center;
+    column-gap: 14px;
+    padding: 6px 14px 6px 11px;
+    /* The connector lines are laid against the row (.lineage-connectors). */
+    position: relative;
+    overflow: visible;
+    border-top: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0;
+    background-color: transparent;
+}
+.lineage-row:last-child { border-bottom: 0; }
+.lineage-row:hover {
+    border-bottom-color: var(--color-border);
+    background-color: var(--color-cluster);
+}
+.lineage-row:last-child:hover { border-bottom-color: transparent; }
+.lineage-row.is-selected::before { content: none; }
+
+/* ── Connector lines ─────────────────────────────────────────────────────────
+ *
+ * A layer behind the name cell, one --lineage-indent column per generation,
+ * running the row's full height (and over its hairline) so the lines join
+ * from row to row. Column k's line sits at the stem of the icon k generations
+ * in: a variant's elbow comes down from its source's icon and turns into its
+ * own. */
+.lineage-connectors {
+    position: absolute;
+    top: 0;
+    bottom: -1px;
+    left: 11px;
+    display: flex;
+    pointer-events: none;
+}
+.lineage-connector {
+    position: relative;
+    flex: none;
+    width: var(--lineage-indent);
+}
+.lineage-connector::before,
+.lineage-connector::after {
+    content: '';
+    position: absolute;
+    border-color: var(--color-border-strong);
+    border-style: solid;
+    border-width: 0;
+}
+/* │ an ancestor's line carried on past this row, and the down stroke of ├:
+   both run the row's full height. └ stops halfway, then turns across to
+   this row's icon. */
+.lineage-connector.is-through::before,
+.lineage-connector.is-branch::before {
+    top: 0;
+    bottom: 0;
+    left: var(--lineage-stem);
+    border-left-width: 1px;
+}
+.lineage-connector.is-last::before {
+    top: 0;
+    height: 50%;
+    left: var(--lineage-stem);
+    border-left-width: 1px;
+}
+.lineage-connector.is-branch::after,
+.lineage-connector.is-last::after {
+    top: 50%;
+    left: var(--lineage-stem);
+    right: 3px;
+    border-top-width: 1px;
+}
+/* The stub from this row's icon down to its first variant. */
+.lineage-connector.is-stub::before {
+    top: calc(50% + 0.6em);
+    bottom: 0;
+    left: var(--lineage-stem);
+    border-left-width: 1px;
+}
+/* A gap opens to name what the filters left out, as a line of its own: the
+   sources in it are one line of descent, so they read as a chain. */
+.lineage-gap-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.lineage-gap-toggle:hover { color: var(--color-text-secondary); }
+/* The gap's ⋯ in the icon's box, so lines meet it where they meet an icon. */
+.lineage-gap-mark {
+    display: inline-block;
+    flex: none;
+    width: calc(var(--lineage-stem) * 2);
+    text-align: center;
+}
+.lineage-row-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding-left: calc(var(--lineage-depth, 0) * var(--lineage-indent));
+    color: var(--color-text-secondary);
+}
+.lineage-row-title {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+}
+.lineage-row .rolodex-card-figures { text-align: right; }
+/* The sources the filters removed on the way to a variant that matched: a
+   row in the tree's flow, but not a vehicle, so no checkbox and no hover. */
+.lineage-row.is-gap {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 2px;
+    padding-bottom: 2px;
+    border-left: 3px solid transparent;
+}
+.lineage-row.is-gap:hover { background-color: transparent; }
+.lineage-row.is-gap > .lineage-row-name {
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-meta);
+}
+.lineage-tree-empty { color: var(--color-text-meta); }
+
+/* An unlisted vehicle, named where it appears in another vehicle's lineage
+   (UnlistedNote). Only a curator or its creator sees one by name, and it must
+   not be mistaken for a vehicle visitors are shown, so it is bold and in the
+   warning color. */
+.unlisted-note {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-warning);
+}
+/* A stack whose every source is unlisted for this reader has nothing to fan
+   out. */
+.vehicle-stack-rolodex.is-static { cursor: default; }
+
+/* Origin, has variants, or end of a lineage (LineageIcon), at the size of the
+   text it sits in. */
+.lineage-icon {
+    display: inline-block;
+    flex: none;
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.125em;
+}
+.vehicle-media-title h3 .lineage-icon { margin-left: 6px; }
 
 /* ── Chart layout: rail on the left, plot on the right ─────────────────────
  *
@@ -3454,7 +3741,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* ── Vehicles View ──────────────────────────────────────────────────────────── */
 
-/* Responsive card grid: 1 col mobile → 2 col tablet → 3 col desktop */
+/* Responsive card grid: 1 col mobile → 2 col tablet → 3 col desktop.
+   Each item spans two rows (see .vehicle-stack), so the row gap applies only
+   between the pairs; the gap inside a pair is the subgrid's own, zero. */
 .vehicle-grid {
     @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3;
 }
@@ -3466,6 +3755,37 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     /* Figure columns sized to their widest content on the live fleet
        (2026-09-28: battery 67px, EPA range 81, tested 109, a tests pair 138). */
     --vehicle-list-cols: 20px 96px minmax(220px, 1fr) 76px 88px 116px 144px 180px;
+    /* The columns answer to the LIST's width, not the window's: the same list
+       sits in the page and, narrower, in a stack's fanned-out popover. */
+    container: vehicle-list / inline-size;
+}
+
+/* Narrower than its columns, a list sheds them, least needed first, rather
+   than scrolling sideways. Widths are the columns plus their 14px gaps and
+   the row's padding and borders (32px): 1070 all, 960 without the photo,
+   800 without the photo and the tests counts. Below that the row is the
+   compact one, name and actions (the 1000px rule above, by the list's own
+   width). The figures go last: they are what a list is for.
+
+   The tracks are set on the rows and the header, not on .vehicle-list: a
+   container query styles the container's descendants, never the container. */
+@container vehicle-list (max-width: 1069.98px) {
+    .vehicle-row, .vehicle-list-head { --vehicle-list-cols: 20px minmax(220px, 1fr) 76px 88px 116px 144px 180px; }
+    .vehicle-list-photo,
+    .vehicle-list-head > :nth-child(2) { display: none; }
+}
+@container vehicle-list (max-width: 959.98px) {
+    .vehicle-row, .vehicle-list-head { --vehicle-list-cols: 20px minmax(220px, 1fr) 76px 88px 116px 180px; }
+    .vehicle-list-tests,
+    .vehicle-list-head > :nth-child(7) { display: none; }
+}
+@container vehicle-list (max-width: 799.98px) {
+    .vehicle-row, .vehicle-list-head { --vehicle-list-cols: 20px minmax(0, 1fr) 112px; }
+    .vehicle-list-figure,
+    .vehicle-list-extra .platform-line-value,
+    .vehicle-list-head > :nth-child(n+4):not(:last-child) { display: none; }
+    .vehicle-list-actions { flex-direction: column; align-items: flex-end; }
+    .vehicle-list-actions .vehicle-row-more { width: auto; }
 }
 
 

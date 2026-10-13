@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { withVehicleFigures } from '../utils/vehicleFigures';
 import { withInheritance, variantLinkPlan } from '../utils/vehicleInheritance';
+import { listedFor } from '../utils/vehicleListing';
 import { withPlatforms } from '../utils/platforms';
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
@@ -2023,7 +2024,13 @@ export function AppProvider({ children }) {
     // still count travel beside them as `pooledRuns`, so the statistics a
     // viewer sees (composites, spreads, best windows) are the ones a
     // contributor sees. utils/runListing.statisticalRuns is how they are read.
-    const visibleVehicles = useMemo(() => {
+    //
+    // Unlisted vehicles (vehicleListing.js) are resolved with the rest, so a
+    // listed variant inherits from an unlisted source as it would from any,
+    // and then left out of `vehicles` for everyone but curators and their
+    // creator. `fleet` keeps them, for what must see the whole lineage:
+    // stacks and the Lineage view, which name one only as "Unlisted record".
+    const fleet = useMemo(() => {
         const sessionOf = r => sessionFor(testSessions, r);
         const shown = vehicles.map(v => ({
             ...v,
@@ -2032,10 +2039,15 @@ export function AppProvider({ children }) {
         }));
         return withVehicleFigures(withPlatforms(withInheritance(shown), platformsById));
     }, [vehicles, isContributor, platformsById, testSessions]);
+    const visibleVehicles = useMemo(
+        () => fleet.filter(v => listedFor(v, { isContributor, userId: user?.id })),
+        [fleet, isContributor, user?.id],
+    );
     useEffect(() => { visibleVehiclesRef.current = visibleVehicles; }, [visibleVehicles]);
 
     const value = {
         vehicles: visibleVehicles,
+        fleet,
         selectedVehicles,
         user,
         userRole,

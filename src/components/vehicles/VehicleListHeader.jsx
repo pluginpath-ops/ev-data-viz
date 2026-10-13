@@ -15,20 +15,28 @@ const COLUMNS = [
     { key: 'actions' },
 ];
 
-export default function VehicleListHeader({ sortBy, onSort, allSelected, someSelected, onToggleAll }) {
+/**
+ * Without `onSort` the headings are plain labels: a stack's fanned-out
+ * lineage (VehicleStack) reads in lineage order, and a heading there that
+ * re-sorted the grid behind it would be a trap.
+ */
+export default function VehicleListHeader({
+    sortBy, onSort, allSelected, someSelected, onToggleAll,
+    selectAllLabel = 'Select every vehicle on this page',
+}) {
     return (
         <div className="vehicle-list-head" role="row">
             <span className="vehicle-list-select" role="columnheader">
                 <input
                     type="checkbox"
-                    aria-label="Select every vehicle on this page"
+                    aria-label={selectAllLabel}
                     checked={allSelected}
                     ref={el => { if (el) el.indeterminate = !allSelected && someSelected; }}
                     onChange={onToggleAll}
                 />
             </span>
             {COLUMNS.map(col => {
-                if (!col.sort) return <span key={col.key} role="columnheader" className="text-micro">{col.label ?? ''}</span>;
+                if (!col.sort || !onSort) return <span key={col.key} role="columnheader" className={`text-micro${col.numeric ? ' is-numeric' : ''}`}>{col.label ?? ''}</span>;
                 const at = col.sort.indexOf(sortBy);
                 const dir = at === -1 ? 'none' : (col.sort[0].endsWith('_az') || col.sort[0].endsWith('_asc')) === (at === 0) ? 'ascending' : 'descending';
                 return (
