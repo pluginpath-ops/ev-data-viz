@@ -135,7 +135,8 @@ const lineageKind = (v, isShown, isVisible) =>
  * Returns
  *   rolodex  entries to draw, furthest first (the order they sit above the
  *            card): { vehicle }, { gap: n } or { unlisted: n }, at most `cap`
- *   more     sources this reader can open that are past the cap
+ *   more     sources folded into "+N more" past the cap: every kind
+ *            counted, and never 1, since a single entry past the cap is shown
  *   members  every source shown, furthest first, then the vehicle: what the
  *            fanned-out stack shows, gaps and unlisted records left out
  *
@@ -152,12 +153,14 @@ export function vehicleStack(vehicle, index, isShown = () => true, isVisible = (
         else entries.push({ [kind]: 1 });
     }
 
-    let shown = entries.slice(0, cap);
-    const hidden = entries.slice(cap);
-    const more = hidden.filter(e => e.vehicle).length;
-    // Nothing past the cap but one stretch of filtered-out or unlisted
-    // sources: show it as what it is rather than as "+0 more".
-    if (more === 0 && hidden.length === 1) shown = [...shown, hidden[0]];
+    // One entry past the cap is shown, whatever it is: a "+1 more" card would
+    // take the same room as the card it hides. Two or more fold into "+N
+    // more", N counting every source folded, so it never reads "+1".
+    const fold = entries.length > cap + 1;
+    const shown = entries.slice(0, fold ? cap : entries.length);
+    const more = fold
+        ? entries.slice(cap).reduce((n, e) => n + (e.vehicle ? 1 : e.gap ?? e.unlisted), 0)
+        : 0;
 
     const members = chain.filter(v => lineageKind(v, isShown, isVisible) === 'vehicle').reverse();
     return {

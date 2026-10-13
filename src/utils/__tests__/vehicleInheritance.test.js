@@ -207,15 +207,26 @@ describe('vehicleStack', () => {
     it('folds a filtered-out stretch into one gap, and leaves it out of the members', () => {
         const shown = x => ![2, 3].includes(x.id);
         const s = vehicleStack(get(5), index, shown);
-        expect(ids(s.rolodex)).toEqual(['gap2', 4]);
-        expect(s.more).toBe(1);
+        expect(ids(s.rolodex)).toEqual([1, 'gap2', 4]);
+        expect(s.more).toBe(0);
         expect(s.members.map(m => m.id)).toEqual([1, 4, 5]);
     });
 
-    it('shows a lone gap past the cap as the gap, not as "+0 more"', () => {
-        const s = vehicleStack(get(5), index, x => x.id !== 1 && x.id !== 2);
-        expect(ids(s.rolodex)).toEqual(['gap2', 3, 4]);
-        expect(s.more).toBe(0);
+    it('shows a single entry past the cap rather than "+1 more", whatever it is', () => {
+        const gap = vehicleStack(get(5), index, x => x.id !== 1 && x.id !== 2);
+        expect(ids(gap.rolodex)).toEqual(['gap2', 3, 4]);
+        expect(gap.more).toBe(0);
+        // 1 ← 2 ← 3 ← 4: three sources, one past the cap
+        const one = vehicleStack(get(4), index);
+        expect(ids(one.rolodex)).toEqual([1, 2, 3]);
+        expect(one.more).toBe(0);
+    });
+
+    it('counts every source folded into "+N more", filtered ones included', () => {
+        // 5's sources, nearest first: 4, 3 (filtered), 2, 1; cap 1
+        const s = vehicleStack(get(5), index, x => x.id !== 3, () => true, 1);
+        expect(ids(s.rolodex)).toEqual([4]);
+        expect(s.more).toBe(3);
     });
 });
 
