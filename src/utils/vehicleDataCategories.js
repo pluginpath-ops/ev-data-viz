@@ -23,10 +23,13 @@ import { isListed } from './runListing';
  *
  * `count` reads a vehicle's total for that category. `colorClass` is the pill
  * styling; keeping it here means the filter chip and the card pill can share it.
+ * `subtab` is the Tests & Data sub-tab the tests live on (RunsView SUBTABS), so a
+ * count can link straight to them — charging and range share one.
  */
 export const DATA_CATEGORIES = [
     {
         key: 'charging',
+        subtab: 'tests',
         label: 'Charging',
         colorClass: 'text-green-600 dark:text-green-400',
         // Tests only: a stored composite curve (#313) is a charging run but
@@ -38,6 +41,7 @@ export const DATA_CATEGORIES = [
     },
     {
         key: 'range',
+        subtab: 'tests',
         label: 'Range',
         colorClass: 'text-amber-600 dark:text-amber-400',
         count: (v) => (v.runs || []).filter(r => isRangeRun(r) && isListed(r)).length,
@@ -45,12 +49,14 @@ export const DATA_CATEGORIES = [
     },
     {
         key: 'epa',
+        subtab: 'epa',
         label: 'EPA',
         colorClass: 'text-blue-600 dark:text-blue-400',
         count: (v) => v.epa_mappings?.length ?? 0,
     },
     {
         key: 'accel',
+        subtab: 'performance',
         label: 'Acceleration',
         // Where a line has no room for the word (the list's Tests column).
         short: 'Accel',
@@ -59,6 +65,7 @@ export const DATA_CATEGORIES = [
     },
     {
         key: 'braking',
+        subtab: 'performance',
         label: 'Braking',
         colorClass: 'text-rose-600 dark:text-rose-400',
         count: (v, perf) => perf?.[v.id]?.braking ?? 0,

@@ -1160,7 +1160,7 @@ export default function App() {
                             onAdd={addVehicle}
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
-                            onViewRuns={(v) => { setActiveVehicle(v); setRunsSubtab(DEFAULT_RUNS_SUBTAB); setFocusRunId(null); navigateTo('runs'); }}
+                            onViewRuns={(v, sub) => { setActiveVehicle(v); setRunsSubtab(RUNS_SUBTAB_IDS.includes(sub) ? sub : DEFAULT_RUNS_SUBTAB); setFocusRunId(null); navigateTo('runs'); }}
                             onOpenTest={openTest}
                             canCreate={canCreate}
                             canEdit={canEdit}
