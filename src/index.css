@@ -2349,8 +2349,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    figure columns and the platform go — Cards are the view for those on a
    phone (#338, the owner's review). */
 @media (max-width: 999.98px) {
-    /* div. for specificity: the base .vehicle-list rule is later in the file. */
-    div.vehicle-list { --vehicle-list-cols: 20px minmax(0, 1fr) 112px; }
+    /* On the rows and the header, where the container tiers below set their
+       tracks too; `div.vehicle-list` makes this one outrank them. */
+    div.vehicle-list .vehicle-row,
+    div.vehicle-list .vehicle-list-head { --vehicle-list-cols: 20px minmax(0, 1fr) 112px; }
     .vehicle-list .vehicle-list-photo,
     .vehicle-list .vehicle-list-figure,
     .vehicle-list .vehicle-list-tests,
@@ -2469,10 +2471,15 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     white-space: nowrap;
 }
 
-/* The fanned-out stack: every member a full card, the grid's own columns. */
-.vehicle-stack-fan {
-    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3;
-    font-size: var(--fs-body);
+/* A stack fans out as List rows (.vehicle-list) in a popover, which is
+   portaled to the body: at the page's own size, not the popover's note size.
+   The column header pins to the top of the popover's own scroll, not below
+   the site header (--app-header-h), which inside the panel left it floating
+   over the first row; and it takes the popover's surface, not the page's. */
+.popover .vehicle-list { font-size: var(--fs-body); }
+.popover .vehicle-list-head {
+    top: 0;
+    background-color: var(--color-popover);
 }
 
 /* ── Lineage tree ────────────────────────────────────────────────────────────
@@ -3737,6 +3744,37 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     /* Figure columns sized to their widest content on the live fleet
        (2026-09-28: battery 67px, EPA range 81, tested 109, a tests pair 138). */
     --vehicle-list-cols: 20px 96px minmax(220px, 1fr) 76px 88px 116px 144px 180px;
+    /* The columns answer to the LIST's width, not the window's: the same list
+       sits in the page and, narrower, in a stack's fanned-out popover. */
+    container: vehicle-list / inline-size;
+}
+
+/* Narrower than its columns, a list sheds them, least needed first, rather
+   than scrolling sideways. Widths are the columns plus their 14px gaps and
+   the row's padding and borders (32px): 1070 all, 960 without the photo,
+   800 without the photo and the tests counts. Below that the row is the
+   compact one, name and actions (the 1000px rule above, by the list's own
+   width). The figures go last: they are what a list is for.
+
+   The tracks are set on the rows and the header, not on .vehicle-list: a
+   container query styles the container's descendants, never the container. */
+@container vehicle-list (max-width: 1069.98px) {
+    .vehicle-row, .vehicle-list-head { --vehicle-list-cols: 20px minmax(220px, 1fr) 76px 88px 116px 144px 180px; }
+    .vehicle-list-photo,
+    .vehicle-list-head > :nth-child(2) { display: none; }
+}
+@container vehicle-list (max-width: 959.98px) {
+    .vehicle-row, .vehicle-list-head { --vehicle-list-cols: 20px minmax(220px, 1fr) 76px 88px 116px 180px; }
+    .vehicle-list-tests,
+    .vehicle-list-head > :nth-child(7) { display: none; }
+}
+@container vehicle-list (max-width: 799.98px) {
+    .vehicle-row, .vehicle-list-head { --vehicle-list-cols: 20px minmax(0, 1fr) 112px; }
+    .vehicle-list-figure,
+    .vehicle-list-extra .platform-line-value,
+    .vehicle-list-head > :nth-child(n+4):not(:last-child) { display: none; }
+    .vehicle-list-actions { flex-direction: column; align-items: flex-end; }
+    .vehicle-list-actions .vehicle-row-more { width: auto; }
 }
 
 

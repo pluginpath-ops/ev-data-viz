@@ -468,6 +468,129 @@ export default function VehiclesView({
     };
 
     /**
+     * One List row. A function, like renderCard, so the List view and a
+     * stack's fanned-out popover draw the same row.
+     */
+    const renderRow = (vehicle) => {
+        const isSelected = selectedVehicles.includes(vehicle.id);
+        const isPending  = pendingDeletes.has(vehicle.id);
+        const globalPos  = sortedFilteredVehicles.findIndex(v => v.id === vehicle.id);
+        const totalCount = sortedFilteredVehicles.length;
+        return (
+            <div
+                role="row"
+                onClick={() => handleCardClick(vehicle)}
+                className={`vehicle-card vehicle-row${isSelected ? ' is-selected' : ''}${isPending ? ' is-pending' : ''}`}
+            >
+                <span className="vehicle-list-select" role="cell" onClick={e => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleCardClick(vehicle)}
+                        aria-label={`Select ${vehicle.name}`}
+                    />
+                </span>
+                <span role="cell" className="vehicle-list-photo">
+                    {/* Reorder controls replace the photo while
+                        Edit Order is on: the same slot, so the
+                        columns do not move. */}
+                    {showReorderButtons ? (
+                        <span className="reorder-controls" onClick={e => e.stopPropagation()}>
+                            <button title="Up" onClick={() => handleMoveVehicle(vehicle.id, 'up')} disabled={globalPos === 0} className="reorder-btn">▲</button>
+                            <input
+                                type="number" min={1} max={totalCount}
+                                defaultValue={globalPos + 1}
+                                key={`pos-${vehicle.id}-${globalPos}`}
+                                onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); } }}
+                                onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
+                                className="form-input reorder-position-input"
+                                aria-label={`Position of ${vehicle.name}`}
+                            />
+                            <button title="Down" onClick={() => handleMoveVehicle(vehicle.id, 'down')} disabled={globalPos === totalCount - 1} className="reorder-btn">▼</button>
+                        </span>
+                    ) : (
+                        <VehicleMedia vehicle={vehicle} height={54} className="vehicle-media-thumb" />
+                    )}
+                </span>
+                <span role="cell" className="flex flex-col gap-0.5 min-w-0">
+                    <span className="flex items-center gap-2 min-w-0">
+                        {/* The curator's swatch, edited in place: setting
+                            a color per vehicle is a scroll-and-click pass. */}
+                        {canEdit(vehicle) && (
+                            <SeriesColorPicker
+                                value={vehicle.color || DEFAULT_RUN_COLOR}
+                                stored={ownValues(vehicle).color}
+                                label={vehicle.name}
+                                onChange={hex => onUpdate(vehicle.id, { color: hex })}
+                                onReset={() => onUpdate(vehicle.id, { color: null })}
+                            />
+                        )}
+                        <span className="vehicle-list-name-text">{vehicle.name}</span>
+                    <LineageIcon role={lineageRole(vehicle, lineage)} />
+                        <VisibilityPill vehicle={vehicle} />
+                    </span>
+                    {/* What it is: make · model · trim · year. */}
+                    <span className="vehicle-list-meta">
+                        {[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}
+                    </span>
+                    {/* What it is filed under, a step smaller: its
+                        tags, then its platform. Its own line, so a
+                        long trim no longer clips the tags away. */}
+                    <span className="vehicle-list-extra">
+                        <TagPills vehicle={vehicle} />
+                        <PlatformLine vehicle={vehicle} bare />
+                    </span>
+                </span>
+                <span role="cell" className="vehicle-list-figure" title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}>
+                    <ListFigure value={vehicle.socWindowKwh} unit="kWh" basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label} />
+                </span>
+                <span role="cell" className="vehicle-list-figure" title={epaRangeTitle(vehicle) ?? 'EPA range'}>
+                    <ListFigure value={epaRangeValue(vehicle, units)} unit={distanceUnit(units)} basis={epaRangeBasisMark(vehicle)} />
+                </span>
+                <span role="cell" className="vehicle-list-figure">
+                    {testedRangeSummary(vehicle)
+                        ? <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} bare />
+                        : <span className="stat-cell-empty" aria-label="not tested">—</span>}
+                </span>
+                <span role="cell" className="vehicle-list-tests">
+                    <TestCounts vehicle={vehicle} performanceCounts={performanceCounts} />
+                </span>
+                {/* The same two actions on every row: its tests,
+                    and a menu holding everything else, so no row's
+                    buttons push its figures sideways. */}
+                <span role="cell" className="vehicle-list-actions" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => onViewRuns(vehicle)} className="btn btn-primary">
+                        Tests &amp; Data →
+                    </button>
+                    <VehicleRowMenu label={vehicle.name} items={rowMenuItems(vehicle)} />
+                </span>
+            </div>
+        );
+    };
+
+    /**
+     * A stack fanned out (VehicleStack): its members as List rows, furthest
+     * source first, under the List's header. Rows, not cards, so a long
+     * lineage stays a short list. The header selects every member; it does
+     * not sort, since the order IS the lineage.
+     */
+    const renderLineageList = (members) => {
+        const ids = members.map(v => v.id);
+        const allSelected = ids.every(id => selectedVehicles.includes(id));
+        return (
+            <div className="vehicle-list" role="table" aria-label="Vehicles in this lineage">
+                <VehicleListHeader
+                    allSelected={allSelected}
+                    someSelected={ids.some(id => selectedVehicles.includes(id))}
+                    onToggleAll={() => (allSelected ? onClearAllVisible(ids) : onSelectAllVisible(ids))}
+                    selectAllLabel="Select every vehicle in this lineage"
+                />
+                {members.map(m => <div key={m.id} role="rowgroup">{renderRow(m)}</div>)}
+            </div>
+        );
+    };
+
+    /**
      * A List row's ⋯ menu (#338): the card's Specs and curator buttons, as
      * menu items, with the same handlers. Delete stays last.
      */
@@ -861,7 +984,7 @@ export default function VehiclesView({
                                     stack={vehicleStack(vehicle, lineage, isShownForStack, isListedForReader)}
                                     index={lineage}
                                     units={units}
-                                    renderCard={renderCard}
+                                    renderMembers={renderLineageList}
                                     isSelected={id => selectedVehicles.includes(id)}
                                 >
                                     {renderCard(vehicle)}
@@ -902,10 +1025,6 @@ export default function VehiclesView({
                         }}
                     />
                     {pagedVehicles.map((vehicle, pageIdx) => {
-                        const isSelected = selectedVehicles.includes(vehicle.id);
-                        const isPending  = pendingDeletes.has(vehicle.id);
-                        const globalPos  = sortedFilteredVehicles.findIndex(v => v.id === vehicle.id);
-                        const totalCount = sortedFilteredVehicles.length;
                         const mfgName = vehicle.manufacturer?.name || vehicle.make || 'Unknown';
                         const prevVehicle = pagedVehicles[pageIdx - 1];
                         const prevMfgName = prevVehicle ? (prevVehicle.manufacturer?.name || prevVehicle.make || 'Unknown') : null;
@@ -918,93 +1037,7 @@ export default function VehiclesView({
                                     row's figures sit anywhere but under their
                                     heading. The row still selects on click; the
                                     checkbox says so where the ✓ on the photo did. */}
-                                <div
-                                    role="row"
-                                    onClick={() => handleCardClick(vehicle)}
-                                    className={`vehicle-card vehicle-row${isSelected ? ' is-selected' : ''}${isPending ? ' is-pending' : ''}`}
-                                >
-                                    <span className="vehicle-list-select" role="cell" onClick={e => e.stopPropagation()}>
-                                        <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => handleCardClick(vehicle)}
-                                            aria-label={`Select ${vehicle.name}`}
-                                        />
-                                    </span>
-                                    <span role="cell" className="vehicle-list-photo">
-                                        {/* Reorder controls replace the photo while
-                                            Edit Order is on: the same slot, so the
-                                            columns do not move. */}
-                                        {showReorderButtons ? (
-                                            <span className="reorder-controls" onClick={e => e.stopPropagation()}>
-                                                <button title="Up" onClick={() => handleMoveVehicle(vehicle.id, 'up')} disabled={globalPos === 0} className="reorder-btn">▲</button>
-                                                <input
-                                                    type="number" min={1} max={totalCount}
-                                                    defaultValue={globalPos + 1}
-                                                    key={`pos-${vehicle.id}-${globalPos}`}
-                                                    onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value); if (!isNaN(v)) handleMoveVehicleToIndex(vehicle.id, v - 1); } }}
-                                                    onBlur={e => { const v = parseInt(e.target.value); if (!isNaN(v) && v !== globalPos + 1) handleMoveVehicleToIndex(vehicle.id, v - 1); }}
-                                                    className="form-input reorder-position-input"
-                                                    aria-label={`Position of ${vehicle.name}`}
-                                                />
-                                                <button title="Down" onClick={() => handleMoveVehicle(vehicle.id, 'down')} disabled={globalPos === totalCount - 1} className="reorder-btn">▼</button>
-                                            </span>
-                                        ) : (
-                                            <VehicleMedia vehicle={vehicle} height={54} className="vehicle-media-thumb" />
-                                        )}
-                                    </span>
-                                    <span role="cell" className="flex flex-col gap-0.5 min-w-0">
-                                        <span className="flex items-center gap-2 min-w-0">
-                                            {/* The curator's swatch, edited in place: setting
-                                                a color per vehicle is a scroll-and-click pass. */}
-                                            {canEdit(vehicle) && (
-                                                <SeriesColorPicker
-                                                    value={vehicle.color || DEFAULT_RUN_COLOR}
-                                                    stored={ownValues(vehicle).color}
-                                                    label={vehicle.name}
-                                                    onChange={hex => onUpdate(vehicle.id, { color: hex })}
-                                                    onReset={() => onUpdate(vehicle.id, { color: null })}
-                                                />
-                                            )}
-                                            <span className="vehicle-list-name-text">{vehicle.name}</span>
-                                            <VisibilityPill vehicle={vehicle} />
-                                        </span>
-                                        {/* What it is: make · model · trim · year. */}
-                                        <span className="vehicle-list-meta">
-                                            {[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}
-                                        </span>
-                                        {/* What it is filed under, a step smaller: its
-                                            tags, then its platform. Its own line, so a
-                                            long trim no longer clips the tags away. */}
-                                        <span className="vehicle-list-extra">
-                                            <TagPills vehicle={vehicle} />
-                                            <PlatformLine vehicle={vehicle} bare />
-                                        </span>
-                                    </span>
-                                    <span role="cell" className="vehicle-list-figure" title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}>
-                                        <ListFigure value={vehicle.socWindowKwh} unit="kWh" basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label} />
-                                    </span>
-                                    <span role="cell" className="vehicle-list-figure" title={epaRangeTitle(vehicle) ?? 'EPA range'}>
-                                        <ListFigure value={epaRangeValue(vehicle, units)} unit={distanceUnit(units)} basis={epaRangeBasisMark(vehicle)} />
-                                    </span>
-                                    <span role="cell" className="vehicle-list-figure">
-                                        {testedRangeSummary(vehicle)
-                                            ? <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} bare />
-                                            : <span className="stat-cell-empty" aria-label="not tested">—</span>}
-                                    </span>
-                                    <span role="cell" className="vehicle-list-tests">
-                                        <TestCounts vehicle={vehicle} performanceCounts={performanceCounts} />
-                                    </span>
-                                    {/* The same two actions on every row: its tests,
-                                        and a menu holding everything else, so no row's
-                                        buttons push its figures sideways. */}
-                                    <span role="cell" className="vehicle-list-actions" onClick={e => e.stopPropagation()}>
-                                        <button onClick={() => onViewRuns(vehicle)} className="btn btn-primary">
-                                            Tests &amp; Data →
-                                        </button>
-                                        <VehicleRowMenu label={vehicle.name} items={rowMenuItems(vehicle)} />
-                                    </span>
-                                </div>
+                                {renderRow(vehicle)}
                             </div>
                         );
                     })}

@@ -7,13 +7,13 @@
  * the stack says where it came from.
  *
  * The rolodex cards are one trigger. Clicking them fans the stack out in a
- * popover, every member a full card as it would be on top, each selectable
- * on its own. Sources the filters removed are a gap above the card, and
+ * popover, every member a List row, furthest source first, each selectable
+ * on its own: rows rather than cards, so a long lineage stays a short list. Sources the filters removed are a gap above the card, and
  * sources unlisted for this reader an "Unlisted record"; both are left out
  * of the fan.
  *
- * `stack` is `vehicleStack(...)` from vehicleInheritance.js; `renderCard`
- * draws one full card, the same function the grid uses; `isSelected(id)`
+ * `stack` is `vehicleStack(...)` from vehicleInheritance.js; `renderMembers`
+ * draws the members as the List view's rows; `isSelected(id)`
  * gives a selected source's rolodex card the card's accent border.
  *
  * Every card on the grid is wrapped, stack or not: the wrapper is a two-row
@@ -24,7 +24,7 @@ import Popover from '../Popover';
 import { RolodexCard, RolodexGap, RolodexMore, RolodexUnlisted } from './RolodexCard';
 import { lineageRole } from '../../utils/vehicleInheritance';
 
-export default function VehicleStack({ vehicle, stack, index, units, renderCard, isSelected, children }) {
+export default function VehicleStack({ vehicle, stack, index, units, renderMembers, isSelected, children }) {
     if (stack.members.length === 0) return <div className="vehicle-stack">{children}</div>;
     const rolodex = (
         <>
@@ -51,7 +51,7 @@ export default function VehicleStack({ vehicle, stack, index, units, renderCard,
             <Popover
                 className="vehicle-stack-anchor"
                 title={`${vehicle.name} and its sources`}
-                width="min(1040px, calc(100vw - 2rem))"
+                width="min(1180px, calc(100vw - 2rem))"
                 trigger={(props) => (
                     <button
                         type="button"
@@ -63,11 +63,7 @@ export default function VehicleStack({ vehicle, stack, index, units, renderCard,
                     </button>
                 )}
             >
-                <div className="vehicle-stack-fan">
-                    {stack.members.map(member => (
-                        <div key={member.id} className="contents">{renderCard(member)}</div>
-                    ))}
-                </div>
+                {renderMembers(stack.members)}
             </Popover>
             {children}
         </div>
