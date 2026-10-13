@@ -26,7 +26,7 @@ import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { EMPTY_VEHICLE_FILTERS, filtersActive } from '../utils/vehicleFilters';
 import VehicleListHeader from './vehicles/VehicleListHeader';
 import VehicleRowMenu from './vehicles/VehicleRowMenu';
-import TestCounts, { countTitle } from './vehicles/TestCounts';
+import TestCounts, { TestCountLink } from './vehicles/TestCounts';
 import LazyBoundary from './LazyBoundary';
 import { EditVehicleForm, ImportVehiclesModal } from './lazyComponents';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
@@ -96,7 +96,7 @@ function ListFigure({ value, unit, basis }) {
  * styling of Battery/Range rows. "Tests:" inherits the parent's text-sm color;
  * the type names are 1pt smaller and colored. Zero-count categories omitted.
  */
-function TestCountPills({ vehicle, performanceCounts = {} }) {
+function TestCountPills({ vehicle, performanceCounts = {}, onOpenSubtab }) {
     const counts = vehicleDataCategories(vehicle, performanceCounts);
     const pooled = vehiclePooledCounts(vehicle);
     const shown = DATA_CATEGORIES.filter(c => counts[c.key] > 0 || pooled[c.key] > 0);
@@ -108,9 +108,10 @@ function TestCountPills({ vehicle, performanceCounts = {} }) {
         <p className="flex flex-wrap items-baseline gap-x-1.5">
             <span>Tests:</span>
             {shown.map(c => (
-                <span key={c.key} className={`card-test-count ${c.colorClass}`} title={countTitle(c, counts[c.key], pooled[c.key])}>
+                <TestCountLink key={c.key} className={`card-test-count ${c.colorClass}`} category={c} vehicle={vehicle}
+                    count={counts[c.key]} pooled={pooled[c.key]} onOpenSubtab={onOpenSubtab}>
                     {c.label} ({counts[c.key]}{pooled[c.key] > 0 && <span className="test-count-pool">/{pooled[c.key]}</span>})
-                </span>
+                </TestCountLink>
             ))}
         </p>
     );
@@ -435,7 +436,7 @@ export default function VehiclesView({
 
                     <PlatformLine vehicle={vehicle} />
 
-                    <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} />
+                    <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} onOpenSubtab={onViewRuns} />
 
                     {vehicle.tags?.length > 0 && <TagPills vehicle={vehicle} />}
 
@@ -553,7 +554,7 @@ export default function VehiclesView({
                         : <span className="stat-cell-empty" aria-label="not tested">—</span>}
                 </span>
                 <span role="cell" className="vehicle-list-tests">
-                    <TestCounts vehicle={vehicle} performanceCounts={performanceCounts} />
+                    <TestCounts vehicle={vehicle} performanceCounts={performanceCounts} onOpenSubtab={onViewRuns} />
                 </span>
                 {/* The same two actions on every row: its tests,
                     and a menu holding everything else, so no row's

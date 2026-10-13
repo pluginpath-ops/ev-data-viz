@@ -966,6 +966,22 @@ describe('the seams that broke before', () => {
         expect(css, 'no auto track, or the empty header cell collapses it').not.toMatch(/--vehicle-list-cols:[^;]*\bauto;/);
     });
 
+    it('links every test count to its Tests & Data sub-tab, without selecting the vehicle', () => {
+        // The card and the row both select on click; a count that forgets to
+        // stop the click looks linked and quietly toggles the selection too.
+        const view = read('src/components/VehiclesView.jsx');
+        expect(view, 'the card\'s counts open their tests').toMatch(/<TestCountPills [^>]*onOpenSubtab=\{onViewRuns\}/);
+        expect(view, 'the list\'s counts open their tests').toMatch(/<TestCounts [^>]*onOpenSubtab=\{onViewRuns\}/);
+        expect(read('src/components/vehicles/TestCounts.jsx'), 'and the click stays off the row')
+            .toMatch(/e\.stopPropagation\(\); onOpenSubtab\(vehicle, category\.subtab\)/);
+        expect(read('src/App.jsx'), 'App takes the sub-tab, checked against the real ones')
+            .toMatch(/onViewRuns=\{\(v, sub\) => \{[^}]*RUNS_SUBTAB_IDS\.includes\(sub\)/);
+        const cats = read('src/utils/vehicleDataCategories.js');
+        for (const m of cats.matchAll(/subtab: '(\w+)'/g)) {
+            expect(read('src/components/RunsView.jsx'), `${m[1]} is a real sub-tab`).toMatch(new RegExp(`id: '${m[1]}'`));
+        }
+    });
+
     it('links a tested figure to its test, and lands on it', () => {
         // Built once and unconnected, a link that navigates nowhere looks
         // exactly like one that works until someone clicks it.

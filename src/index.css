@@ -2310,6 +2310,17 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     font-size: calc(var(--fs-body) * 0.9286);
     font-weight: 500;
 }
+/* A count that opens its tests (card and List): the text it replaces, as a
+   button. Preflight already strips a button's chrome and inherits its type;
+   this adds the pointer, and the underline on hover shows it is a link. */
+.test-count-link {
+    cursor: pointer;
+    text-align: inherit;
+}
+.test-count-link:hover,
+.test-count-link:focus-visible {
+    text-decoration: underline;
+}
 
 /* The slot after Tests & Data on a List row (#338): the ⋯ menu, a single
    action's button (a reader's Specs), or nothing — always this wide, so Tests
