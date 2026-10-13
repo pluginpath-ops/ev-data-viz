@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { withInheritance, ownValues, variantLinkPlan, lineageIndex, lineageRole, vehicleStack } from '../vehicleInheritance';
+import { withInheritance, ownValues, variantLinkPlan, lineageIndex, lineageRole, vehicleStack, lineageTrees } from '../vehicleInheritance';
 
 const tag = (id, name) => ({ id, name });
 const v = (id, over = {}) => ({
@@ -216,5 +216,95 @@ describe('vehicleStack', () => {
         const s = vehicleStack(get(5), index, x => x.id !== 1 && x.id !== 2);
         expect(ids(s.rolodex)).toEqual(['gap2', 3, 4]);
         expect(s.more).toBe(0);
+    });
+});
+
+describe('lineageTrees', () => {
+    // 1 ← 2 ← 3 ← 4, 3 ← 5; 6 alone; 7 ← 8
+    const fleet = [
+        v(1), v(2, { spec_source_vehicle_id: 1 }), v(3, { spec_source_vehicle_id: 2 }),
+        v(4, { spec_source_vehicle_id: 3 }), v(5, { spec_source_vehicle_id: 3 }),
+        v(6), v(7), v(8, { spec_source_vehicle_id: 7 }),
+    ];
+    const index = lineageIndex(fleet);
+    const flat = trees => trees.map(t => t.rows.map(r => r.vehicle ? `${r.depth}:${r.vehicle.id}` : `${r.depth}:gap${r.gap}`));
+
+    it('lists every lineage from its origin down, each vehicle once', () => {
+        expect(flat(lineageTrees(fleet, index))).toEqual([
+            ['0:1', '1:2', '2:3', '3:4', '3:5'], ['0:6'], ['0:7', '1:8'],
+        ]);
+    });
+
+    it('keeps a matching variant under a gap for the sources that failed', () => {
+        const shown = x => [4, 5, 8].includes(x.id);
+        expect(flat(lineageTrees(fleet, index, shown))).toEqual([
+            ['0:gap3', '1:4', '1:5'], ['0:gap1', '1:8'],
+        ]);
+    });
+
+    it('leaves out a branch with nothing that matches', () => {
+        const shown = x => [1, 4].includes(x.id);
+        expect(flat(lineageTrees(fleet, index, shown))).toEqual([['0:1', '1:gap2', '2:4']]);
+    });
+
+    it('orders trees and variants by the display order', () => {
+        const first = [8, 5, 4];
+        const order = [...first.map(id => fleet.find(x => x.id === id)), ...fleet.filter(x => !first.includes(x.id))];
+        expect(flat(lineageTrees(fleet, index, () => true, order))).toEqual([
+            ['0:7', '1:8'], ['0:1', '1:2', '2:3', '3:5', '3:4'], ['0:6'],
+        ]);
+    });
+});
+
+describe('lineageTrees with several branches', () => {
+    // 1 → 2 → {4, 5}, 1 → 3 → {6, 7 → 8}
+    const fleet = [
+        v(1), v(2, { spec_source_vehicle_id: 1 }), v(3, { spec_source_vehicle_id: 1 }),
+        v(4, { spec_source_vehicle_id: 2 }), v(5, { spec_source_vehicle_id: 2 }),
+        v(6, { spec_source_vehicle_id: 3 }), v(7, { spec_source_vehicle_id: 3 }),
+        v(8, { spec_source_vehicle_id: 7 }),
+    ];
+    const index = lineageIndex(fleet);
+    const flat = trees => trees.map(t => t.rows.map(r => r.vehicle ? `${r.depth}:${r.vehicle.id}` : `${r.depth}:gap${r.gap}`));
+
+    it('walks every branch to every end variant, each under its own source', () => {
+        expect(flat(lineageTrees(fleet, index))).toEqual([
+            ['0:1', '1:2', '2:4', '2:5', '1:3', '2:6', '2:7', '3:8'],
+        ]);
+    });
+
+    it('gives each branch its own gap when a fork is filtered out', () => {
+        const shown = x => [4, 5, 8].includes(x.id);
+        expect(flat(lineageTrees(fleet, index, shown))).toEqual([
+            ['0:gap1', '1:gap1', '2:4', '2:5', '1:gap2', '2:8'],
+        ]);
+    });
+
+    it('names the vehicles each gap stands for, furthest first', () => {
+        const shown = x => [4, 5, 8].includes(x.id);
+        const gaps = lineageTrees(fleet, index, shown)[0].rows.filter(r => r.gap);
+        expect(gaps.map(g => g.hidden.map(h => h.id))).toEqual([[1], [2], [3, 7]]);
+    });
+});
+
+describe('lineageTrees connector trails', () => {
+    // 1 → 2 → {4, 5}, 1 → 3
+    const fleet = [
+        v(1), v(2, { spec_source_vehicle_id: 1 }), v(3, { spec_source_vehicle_id: 1 }),
+        v(4, { spec_source_vehicle_id: 2 }), v(5, { spec_source_vehicle_id: 2 }),
+    ];
+    const rows = lineageTrees(fleet, lineageIndex(fleet))[0].rows;
+    const at = id => rows.find(r => r.vehicle.id === id);
+
+    it('says which lines carry on past each row', () => {
+        expect(at(1).trail).toEqual([]);
+        expect(at(2).trail).toEqual([true]);          // 3 follows it
+        expect(at(4).trail).toEqual([true, true]);    // 2's line, then 5 follows
+        expect(at(5).trail).toEqual([true, false]);   // last under 2
+        expect(at(3).trail).toEqual([false]);         // last under 1
+    });
+
+    it('marks the rows that have variants below them', () => {
+        expect([1, 2, 3, 4, 5].map(id => at(id).hasVariants)).toEqual([true, true, false, false, false]);
     });
 });

@@ -1,6 +1,7 @@
 import NewVariantButton from './NewVariantButton';
-import { ownValues, lineageIndex, lineageRole, vehicleStack } from '../utils/vehicleInheritance';
+import { ownValues, lineageIndex, lineageRole, vehicleStack, lineageTrees } from '../utils/vehicleInheritance';
 import VehicleStack from './vehicles/VehicleStack';
+import LineageTree from './vehicles/LineageTree';
 import LineageIcon from './vehicles/LineageIcon';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import SeriesColorPicker from './SeriesColorPicker';
@@ -867,6 +868,20 @@ export default function VehiclesView({
                 </div>
             )}
 
+            {/* ── LINEAGE VIEW ── every lineage with a match, each vehicle once,
+                in the view's sort order; not paged, since a page break would
+                cut a tree. */}
+            {viewMode === 'lineage' && (
+                <LineageTree
+                    trees={lineageTrees(vehicles, lineage, isShownForStack, sortedFilteredVehicles)}
+                    index={lineage}
+                    units={units}
+                    isSelected={id => selectedVehicles.includes(id)}
+                    onToggle={handleCardClick}
+                    onViewRuns={onViewRuns}
+                />
+            )}
+
             {/* ── LIST VIEW ── */}
             {viewMode === 'list' && (
                 <div className="vehicle-list" role="table" aria-label="Vehicles">
@@ -991,7 +1006,7 @@ export default function VehiclesView({
                 </div>
             )}
             {/* Pagination */}
-            {totalPages > 1 && (
+            {totalPages > 1 && viewMode !== 'lineage' && (
                 <div className="vehicle-pagination">
                     <button onClick={() => setVehiclePage(1)} disabled={vehiclePage === 1} className="pagination-btn">«</button>
                     <button onClick={() => setVehiclePage(p => p - 1)} disabled={vehiclePage === 1} className="pagination-btn">‹</button>

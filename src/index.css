@@ -2475,6 +2475,166 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     font-size: var(--fs-body);
 }
 
+/* ── Lineage tree ────────────────────────────────────────────────────────────
+ *
+ * Vehicles & Specs › Lineage (LineageTree): each lineage from its origin down,
+ * one vehicle per row, indented by depth. A row is a List row's shape — the
+ * card's accent border for selection, a checkbox — with the name cell indented
+ * by --lineage-depth, set per row. */
+/* --lineage-indent: how far each generation steps in. --lineage-stem: where a
+   row's lines run, the middle of its 16px lineage icon. */
+.lineage-tree {
+    --lineage-indent: 22px;
+    --lineage-stem: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+/* One lineage: a panel with the card's surface and a strong border, its rows
+   divided by hairlines inside it. */
+.lineage-tree-group {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 0 var(--radius-card) var(--radius-card) 0;
+}
+/* A row keeps the card's 3px left border for the selection bar, and gives up
+   the rest of its own frame to the panel. */
+.lineage-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px 88px auto;
+    align-items: center;
+    column-gap: 14px;
+    padding: 6px 14px 6px 11px;
+    /* The connector lines are laid against the row (.lineage-connectors). */
+    position: relative;
+    overflow: visible;
+    border-top: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0;
+    background-color: transparent;
+}
+.lineage-row:last-child { border-bottom: 0; }
+.lineage-row:hover {
+    border-bottom-color: var(--color-border);
+    background-color: var(--color-cluster);
+}
+.lineage-row:last-child:hover { border-bottom-color: transparent; }
+.lineage-row.is-selected::before { content: none; }
+
+/* ── Connector lines ─────────────────────────────────────────────────────────
+ *
+ * A layer behind the name cell, one --lineage-indent column per generation,
+ * running the row's full height (and over its hairline) so the lines join
+ * from row to row. Column k's line sits at the stem of the icon k generations
+ * in: a variant's elbow comes down from its source's icon and turns into its
+ * own. */
+.lineage-connectors {
+    position: absolute;
+    top: 0;
+    bottom: -1px;
+    left: 11px;
+    display: flex;
+    pointer-events: none;
+}
+.lineage-connector {
+    position: relative;
+    flex: none;
+    width: var(--lineage-indent);
+}
+.lineage-connector::before,
+.lineage-connector::after {
+    content: '';
+    position: absolute;
+    border-color: var(--color-border-strong);
+    border-style: solid;
+    border-width: 0;
+}
+/* │ an ancestor's line carried on past this row, and the down stroke of ├:
+   both run the row's full height. └ stops halfway, then turns across to
+   this row's icon. */
+.lineage-connector.is-through::before,
+.lineage-connector.is-branch::before {
+    top: 0;
+    bottom: 0;
+    left: var(--lineage-stem);
+    border-left-width: 1px;
+}
+.lineage-connector.is-last::before {
+    top: 0;
+    height: 50%;
+    left: var(--lineage-stem);
+    border-left-width: 1px;
+}
+.lineage-connector.is-branch::after,
+.lineage-connector.is-last::after {
+    top: 50%;
+    left: var(--lineage-stem);
+    right: 3px;
+    border-top-width: 1px;
+}
+/* The stub from this row's icon down to its first variant. */
+.lineage-connector.is-stub::before {
+    top: calc(50% + 0.6em);
+    bottom: 0;
+    left: var(--lineage-stem);
+    border-left-width: 1px;
+}
+/* A gap opens to name what the filters left out, as a line of its own: the
+   sources in it are one line of descent, so they read as a chain. */
+.lineage-gap-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.lineage-gap-toggle:hover { color: var(--color-text-secondary); }
+/* The gap's ⋯ in the icon's box, so lines meet it where they meet an icon. */
+.lineage-gap-mark {
+    display: inline-block;
+    flex: none;
+    width: calc(var(--lineage-stem) * 2);
+    text-align: center;
+}
+.lineage-row-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding-left: calc(var(--lineage-depth, 0) * var(--lineage-indent));
+    color: var(--color-text-secondary);
+}
+.lineage-row-title {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+}
+.lineage-row .rolodex-card-figures { text-align: right; }
+/* The sources the filters removed on the way to a variant that matched: a
+   row in the tree's flow, but not a vehicle, so no checkbox and no hover. */
+.lineage-row.is-gap {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 2px;
+    padding-bottom: 2px;
+    border-left: 3px solid transparent;
+}
+.lineage-row.is-gap:hover { background-color: transparent; }
+.lineage-row.is-gap > .lineage-row-name {
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-meta);
+}
+.lineage-tree-empty { color: var(--color-text-meta); }
+
 /* Origin, has variants, or end of a lineage (LineageIcon), at the size of the
    text it sits in. */
 .lineage-icon {

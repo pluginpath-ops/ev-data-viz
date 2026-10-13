@@ -260,3 +260,89 @@ export function variantLinkPlan(source) {
         }
         : { sourceRunId: run.id, efficiencyFactor: null, capacityFactor: null });
 }
+
+/**
+ * The lineage tree view: every lineage with something that passes the
+ * filters, from its origin down, each vehicle once.
+ *
+ * Unlike a stack, nothing repeats: a vehicle appears where it sits in its
+ * tree. A vehicle that fails the filters is kept only as a gap on the way to
+ * one that passes, so a matching variant is never hidden because its source
+ * did not match; a run of failing sources in a line is one gap. A branch with
+ * nothing that passes is left out entirely.
+ *
+ * `order` is the fleet in display order (the view's sort). Trees follow the
+ * position of their first passing member, and variants under a source follow
+ * the same order.
+ *
+ * Returns trees: [{ root, rows }], rows in reading order, each
+ * { vehicle, depth, trail, hasVariants } or { gap: n, hidden, depth, trail,
+ * hasVariants }, `hidden` being the vehicles the gap stands for, furthest
+ * first, so a reader can open it and see what the filters left out.
+ *
+ * `trail` and `hasVariants` are what the connector lines need: trail[k] is
+ * true when the row's ancestor at depth k + 1 (or, at the last place, the
+ * row itself) has a later sibling, so its line carries on down past this row;
+ * `hasVariants` is true when rows hang below this one.
+ */
+export function lineageTrees(vehicles, index, isShown = () => true, order = vehicles) {
+    const rank = new Map(order.map((v, i) => [v.id, i]));
+    const rankOf = v => rank.get(v.id) ?? Infinity;
+    const variants = new Map();
+    for (const v of vehicles) {
+        const src = v.spec_source_vehicle_id;
+        if (src == null || !index.byId.has(src) || src === v.id) continue;
+        if (!variants.has(src)) variants.set(src, []);
+        variants.get(src).push(v);
+    }
+    for (const list of variants.values()) list.sort((a, b) => rankOf(a) - rankOf(b));
+
+    // The earliest passing member of each subtree, or Infinity when none
+    // passes; guarded against cycles like the chain walk.
+    const first = new Map();
+    const firstShown = (v, seen = new Set()) => {
+        if (first.has(v.id)) return first.get(v.id);
+        if (seen.has(v.id)) return Infinity;
+        seen.add(v.id);
+        let best = isShown(v) ? rankOf(v) : Infinity;
+        for (const c of variants.get(v.id) ?? []) best = Math.min(best, firstShown(c, seen));
+        first.set(v.id, best);
+        return best;
+    };
+    const kept = v => (variants.get(v.id) ?? []).filter(c => firstShown(c) !== Infinity);
+
+    const walk = (v, depth, rows, seen, trail) => {
+        if (seen.has(v.id)) return;
+        seen.add(v.id);
+        let row, node = v;
+        if (isShown(v)) {
+            row = { vehicle: v, depth, trail };
+        } else {
+            // A gap: fold a single line of failing sources into one.
+            const hidden = [v];
+            for (;;) {
+                const next = kept(node);
+                if (next.length === 1 && !isShown(next[0]) && !seen.has(next[0].id)) {
+                    node = next[0];
+                    seen.add(node.id);
+                    hidden.push(node);
+                } else break;
+            }
+            row = { gap: hidden.length, hidden, depth, trail };
+        }
+        const below = kept(node).filter(c => !seen.has(c.id));
+        row.hasVariants = below.length > 0;
+        rows.push(row);
+        below.forEach((c, i) => walk(c, depth + 1, rows, seen, [...trail, i < below.length - 1]));
+    };
+
+    // An origin is a vehicle whose source is missing (or none): the chain walk
+    // stops there too.
+    const roots = vehicles.filter(v => inheritanceChain(v, index.byId).length === 0 && firstShown(v) !== Infinity);
+    roots.sort((a, b) => firstShown(a) - firstShown(b));
+    return roots.map(root => {
+        const rows = [];
+        walk(root, 0, rows, new Set(), []);
+        return { root, rows };
+    });
+}
