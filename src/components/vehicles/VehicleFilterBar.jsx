@@ -19,7 +19,7 @@ import {
  */
 export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, shownCount, children }) {
     const counts = useMemo(() => vehicleFacetCounts(vehicles, filters, ctx), [vehicles, filters, ctx]);
-    const chips = activeFilterChips(filters);
+    const chips = activeFilterChips(filters, { curator: ctx.curator });
     const active = filtersActive(filters);
 
     return (
@@ -33,7 +33,7 @@ export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, sho
                     aria-label="Search vehicles"
                     className="form-input guide-search-input"
                 />
-                {VEHICLE_FACETS.map(f => {
+                {VEHICLE_FACETS.filter(f => !f.curatorOnly || ctx.curator).map(f => {
                     const st = facetState(filters, f.key);
                     return (
                         <GuideFacetMenu

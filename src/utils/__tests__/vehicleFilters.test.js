@@ -114,3 +114,46 @@ describe('URL', () => {
         expect(decodeVehicleFilters('mk=,,,-&tg_all=yes&dt=-')).toEqual({ search: '', facets: {} });
     });
 });
+
+describe('the Curation facet', () => {
+    const cfleet = [
+        { id: 1, visibility: 'public',  color: '#f00', image_url: 'a.jpg', socWindowKwh: 80, epaRangeMi: 300 },
+        { id: 2, visibility: 'private', color: null,   image_url: null },
+        // A variant: shows its source's color, owns none.
+        { id: 3, visibility: 'public',  color: '#f00', own: { color: null, image_url: null }, spec_source_vehicle_id: 1 },
+    ];
+    const cctx = vehicleFilterContext(cfleet, {}, { curator: true });
+    const cids = (f, c = cctx) => filterVehicles(cfleet, f, c).map(v => v.id);
+    const inc = (...keys) => keys.reduce((f, k) => toggleInclude(f, 'curation', k), EMPTY_VEHICLE_FILTERS);
+
+    it('"is" includes and "is not" excludes the same check', () => {
+        expect(cids(inc('color'))).toEqual([1, 3]);
+        expect(cids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'curation', 'color'))).toEqual([2]);
+        expect(cids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'curation', 'public'))).toEqual([2]);
+    });
+
+    it('tells a shown color from an own one', () => {
+        expect(cids(inc('color', 'own-color'))).toEqual([1, 3]);   // any
+        expect(cids(setMatchAll(inc('color', 'own-color'), 'curation', true))).toEqual([1]);
+        expect(cids(inc('variant'))).toEqual([3]);
+        expect(cids(inc('has-variants'))).toEqual([1]);
+    });
+
+    it('offers every check, even one no vehicle passes', () => {
+        const counts = vehicleFacetCounts(cfleet, EMPTY_VEHICLE_FILTERS, cctx);
+        expect(counts.curation.values).toContain('own-photo');
+    });
+
+    it('does nothing for a reader who is not a curator', () => {
+        const reader = vehicleFilterContext(cfleet, {});
+        expect(cids(inc('variant'), reader)).toEqual([1, 2, 3]);
+        expect(activeFilterChips(inc('variant'))).toEqual([]);
+        expect(activeFilterChips(inc('variant'), { curator: true })).toHaveLength(1);
+    });
+
+    it('travels in the URL', () => {
+        const p = encodeVehicleFilters(toggleExclude(inc('color'), 'curation', 'photo'));
+        expect(p.get('cu')).toBe('color,-photo');
+        expect(facetState(decodeVehicleFilters(p.toString()), 'curation').out).toEqual(['photo']);
+    });
+});

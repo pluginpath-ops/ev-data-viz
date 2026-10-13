@@ -35,6 +35,36 @@
  */
 import { resolveEffectiveSpecs } from './specHelpers';
 import { DATA_CATEGORIES, hasDataCategory } from './vehicleDataCategories';
+import { ownValues } from './vehicleInheritance';
+
+/**
+ * What a curator audits a vehicle for: one yes/no question per entry, each
+ * true or false of a vehicle. They share ONE facet (Curation) because the
+ * facet's include / exclude already says "is" and "is not" — "Color set"
+ * included is vehicles with a color, excluded is vehicles without.
+ * `has(vehicle, ctx)` answers it. "Own" asks about the vehicle's stored value;
+ * "Color set" is what it shows, inherited or not.
+ */
+export const CURATION_CHECKS = [
+    { key: 'public',        label: 'Public',
+      has: (v) => v.visibility === 'public' },
+    { key: 'color',         label: 'Color set',
+      has: (v) => !!v.color },
+    { key: 'own-color',     label: 'Own color',
+      has: (v) => !!ownValues(v).color },
+    { key: 'photo',         label: 'Photo set',
+      has: (v) => !!v.image_url },
+    { key: 'own-photo',     label: 'Own photo',
+      has: (v) => !!ownValues(v).image_url },
+    { key: 'battery',       label: 'Battery size',
+      has: (v) => v.socWindowKwh != null },
+    { key: 'epa-range',     label: 'EPA range',
+      has: (v) => v.epaRangeMi != null && v.epaRangeMi !== '' },
+    { key: 'variant',       label: 'Variant',
+      has: (v) => v.spec_source_vehicle_id != null },
+    { key: 'has-variants',  label: 'Has variants',
+      has: (v, ctx) => ctx.sourceIds.has(v.id) },
+];
 
 /**
  * The facets, in the order the filter bar shows them.
@@ -61,6 +91,15 @@ export const VEHICLE_FACETS = [
       hint: 'which kinds of test a vehicle has',
       values: (v, ctx) => DATA_CATEGORIES.filter(c => hasDataCategory(v, c.key, ctx.performanceCounts)).map(c => c.key),
       format: (key) => DATA_CATEGORIES.find(c => c.key === key)?.label ?? key },
+    // Curators only: it asks what a viewer has no use for. Include is "is",
+    // exclude is "is not"; with `all`, a vehicle must pass every one chosen.
+    { key: 'curation', label: 'Curation', param: 'cu', anyAll: true, curatorOnly: true,
+      hint: 'what is and is not set on a vehicle',
+      values: (v, ctx) => CURATION_CHECKS.filter(c => c.has(v, ctx)).map(c => c.key),
+      format: (key) => CURATION_CHECKS.find(c => c.key === key)?.label ?? key,
+      // Every check is offered, even when no vehicle passes it: "not Public"
+      // needs "Public" in the menu while every vehicle is public.
+      options: () => CURATION_CHECKS.map(c => c.key) },
 ];
 const FACET_BY_KEY = new Map(VEHICLE_FACETS.map(f => [f.key, f]));
 export const vehicleFacetByKey = (key) => FACET_BY_KEY.get(key) ?? null;
@@ -134,10 +173,14 @@ export function setSearch(filters, search) {
  * comes through inheritance and the platform) and its performance counts.
  * Build once per render; `specsOf` caches per vehicle.
  */
-export function vehicleFilterContext(vehicles = [], performanceCounts = {}) {
+export function vehicleFilterContext(vehicles = [], performanceCounts = {}, { curator = false } = {}) {
     const cache = new Map();
     return {
         performanceCounts,
+        // Curators get the Curation facet; for anyone else a ?cu= in a shared
+        // link must not silently narrow a list they cannot see the filter for.
+        curator,
+        sourceIds: new Set(vehicles.map(v => v.spec_source_vehicle_id).filter(id => id != null)),
         specsOf: (v) => {
             if (!cache.has(v.id)) cache.set(v.id, resolveEffectiveSpecs(v, vehicles));
             return cache.get(v.id);
@@ -175,7 +218,7 @@ export function vehicleMatches(vehicle, filters, ctx, { skip = null } = {}) {
     const needle = filters?.search?.trim().toLowerCase();
     if (!searchMatches(vehicle, needle)) return false;
     for (const facet of VEHICLE_FACETS) {
-        if (facet.key === skip) continue;
+        if (facet.key === skip || (facet.curatorOnly && !ctx.curator)) continue;
         if (!facetMatches(facet, facetState(filters, facet.key), vehicle, ctx)) return false;
     }
     return true;
@@ -196,7 +239,7 @@ export function filterVehicles(vehicles = [], filters, ctx) {
 export function vehicleFacetCounts(vehicles = [], filters, ctx) {
     const out = {};
     for (const facet of VEHICLE_FACETS) {
-        const values = new Set();
+        const values = new Set(facet.options?.() ?? []);
         const counts = new Map();
         for (const v of vehicles) {
             const vals = facet.values(v, ctx);
@@ -216,9 +259,10 @@ export function vehicleFacetCounts(vehicles = [], filters, ctx) {
  * Every active filter as a chip: its text and how to remove it. The search is
  * not one — it shows in its own box.
  */
-export function activeFilterChips(filters) {
+export function activeFilterChips(filters, { curator = false } = {}) {
     const chips = [];
     for (const facet of VEHICLE_FACETS) {
+        if (facet.curatorOnly && !curator) continue;
         const st = facetState(filters, facet.key);
         const fmt = facet.format ?? String;
         const joiner = st.all && facet.anyAll && st.in.length > 1 ? 'all of' : null;
