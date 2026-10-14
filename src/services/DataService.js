@@ -898,7 +898,10 @@ class DataService {
       // and naming one there would refuse the whole insert.
       ...(this.platformsAvailable && vehicle.mechanical_platform_id ? { mechanical_platform_id: Number(vehicle.mechanical_platform_id) } : {}),
       ...(this.platformsAvailable && vehicle.electrical_platform_id ? { electrical_platform_id: Number(vehicle.electrical_platform_id) } : {}),
-      visibility: 'private'
+      // Unlisted unless the caller says otherwise. Only the bulk import does:
+      // its rows are curated records meant to be seen, and a hand-made vehicle
+      // stays unlisted until its creator lists it.
+      visibility: vehicle.visibility === 'public' ? 'public' : 'private'
     }).select().single();
     if (error) throw error;
     return { ...data, runs: [] };
