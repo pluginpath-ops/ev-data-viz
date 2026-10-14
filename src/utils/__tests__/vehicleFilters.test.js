@@ -129,7 +129,7 @@ describe('the Curation facet', () => {
     it('"is" includes and "is not" excludes the same check', () => {
         expect(cids(inc('color'))).toEqual([1, 3]);
         expect(cids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'curation', 'color'))).toEqual([2]);
-        expect(cids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'curation', 'public'))).toEqual([2]);
+        expect(cids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'curation', 'listed'))).toEqual([2]);
     });
 
     it('tells a shown color from an own one', () => {
@@ -137,6 +137,7 @@ describe('the Curation facet', () => {
         expect(cids(setMatchAll(inc('color', 'own-color'), 'curation', true))).toEqual([1]);
         expect(cids(inc('variant'))).toEqual([3]);
         expect(cids(inc('has-variants'))).toEqual([1]);
+        expect(cids(inc('origin'))).toEqual([1]);   // has variants and no source of its own
     });
 
     it('offers every check, even one no vehicle passes', () => {
