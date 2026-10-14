@@ -46,7 +46,7 @@ import { ownValues } from './vehicleInheritance';
  * "Color set" is what it shows, inherited or not.
  */
 export const CURATION_CHECKS = [
-    { key: 'public',        label: 'Public',
+    { key: 'listed',        label: 'Listed',
       has: (v) => v.visibility === 'public' },
     { key: 'color',         label: 'Color set',
       has: (v) => !!v.color },
@@ -64,6 +64,10 @@ export const CURATION_CHECKS = [
       has: (v) => v.spec_source_vehicle_id != null },
     { key: 'has-variants',  label: 'Has variants',
       has: (v, ctx) => ctx.sourceIds.has(v.id) },
+    // Where a lineage starts (docs/vocabulary.md: origin): the one place a
+    // curator sets specs, photo, range and charging for every variant below.
+    { key: 'origin',        label: 'Origin',
+      has: (v, ctx) => v.spec_source_vehicle_id == null && ctx.sourceIds.has(v.id) },
 ];
 
 /**
@@ -97,8 +101,8 @@ export const VEHICLE_FACETS = [
       hint: 'what is and is not set on a vehicle',
       values: (v, ctx) => CURATION_CHECKS.filter(c => c.has(v, ctx)).map(c => c.key),
       format: (key) => CURATION_CHECKS.find(c => c.key === key)?.label ?? key,
-      // Every check is offered, even when no vehicle passes it: "not Public"
-      // needs "Public" in the menu while every vehicle is public.
+      // Every check is offered, even when no vehicle passes it: "not Listed"
+      // needs "Listed" in the menu while every vehicle is listed.
       options: () => CURATION_CHECKS.map(c => c.key) },
 ];
 const FACET_BY_KEY = new Map(VEHICLE_FACETS.map(f => [f.key, f]));
