@@ -1925,3 +1925,22 @@ describe('the years and certifications reach both surfaces the owner named (#374
         expect(editor).toMatch(/label="Since"[^>]*canEdit=\{false\}/);
     });
 });
+
+describe('bulk import lists the vehicles it creates', () => {
+    const appContext = read('src/context/AppContext.jsx');
+    const dataService = read('src/services/DataService.js');
+
+    it('the import create path asks for a listed vehicle', () => {
+        const create = appContext.slice(appContext.indexOf("if (row.action === 'create') {"));
+        expect(create.slice(0, create.indexOf('rowVehicleIds.set'))).toMatch(/visibility:\s*'public'/);
+    });
+
+    it('addVehicle honors it, and a hand-made vehicle stays unlisted', () => {
+        expect(dataService).toMatch(/visibility:\s*vehicle\.visibility === 'public' \? 'public' : 'private'/);
+    });
+
+    it('the update branch never writes visibility', () => {
+        const update = appContext.slice(appContext.indexOf('const updates = { ...row.coreWrites'));
+        expect(update.slice(0, update.indexOf('rowVehicleIds.set'))).not.toMatch(/visibility/);
+    });
+});

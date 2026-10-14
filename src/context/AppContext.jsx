@@ -917,6 +917,10 @@ export function AppProvider({ children }) {
                         ...row.coreWrites,
                         ...(mfgId ? { manufacturer_id: mfgId } : {}),
                         ...platformColumns(row),
+                        // Imported vehicles arrive listed. Only a create: an
+                        // update never touches an existing vehicle's listing,
+                        // so a curator's Unlist survives a re-import.
+                        visibility: 'public',
                     });
                     rowVehicleIds.set(planIndex, newVehicle.id);
                     created++;
