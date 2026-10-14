@@ -8,10 +8,15 @@
  * come down the same chain:
  *
  *   color   the nearest vehicle in the chain with one set, else the palette
- *   photo   the nearest vehicle with a photo; image_url, image_thumb_url and
- *           image_focal_y travel together, so a thumbnail never pairs with
- *           another car's full image and a photo is never framed by a number
- *           that was set against a different picture (#340)
+ *   photo   the nearest vehicle IN THE SAME MODEL LINE with a photo (same
+ *           make and model, trim ignored: `sameModelLine`); image_url,
+ *           image_thumb_url and image_focal_y travel together, so a
+ *           thumbnail never pairs with another car's full image and a photo is
+ *           never framed by a number that was set against a different picture
+ *           (#340). A source of another model passes on its specs but not its
+ *           picture: a C-HR that inherits an Uncharted's figures must not wear
+ *           the Uncharted's photo, and an R1T is not an R1S. With no match the
+ *           vehicle shows the placeholder until it has a photo of its own
  *   platforms  each of the two platform links (#318) from the nearest vehicle
  *           with that link set, separately: a variant can keep its source's
  *           structure and change its electrics (the 2025 R1 did)
@@ -53,6 +58,38 @@ const PLATFORM_KEYS = ['mechanical_platform_id', 'electrical_platform_id'];
 
 const hasColor = (v) => v?.color != null && v.color !== '';
 const hasPhoto = (v) => Boolean(v?.image_url || v?.image_thumb_url);
+
+/* A name as a list of comparable tokens: case, punctuation and anything in
+   parentheses dropped, so "F-150 Lightning" and "F150 Lightning" agree, and
+   "Cybertruck (CyberBeast)" is "cybertruck". */
+const nameTokens = (s) => String(s ?? '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(Boolean);
+
+/* One name is the other with words added: "Model Y" / "Model Y L",
+   "Gravity" / "Gravity GT". Tokens, not characters, so "Model 3" is not
+   "Model 3Y" and "R1T" is not "R1S". A blank name matches anything: it
+   cannot be told apart, and a vehicle with no model on record has not said it
+   is a different car. */
+function sameNameLine(a, b) {
+    const x = nameTokens(a);
+    const y = nameTokens(b);
+    if (x.length === 0 || y.length === 0) return true;
+    const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+    return short.every((t, i) => t === long[i]);
+}
+
+/**
+ * Whether two vehicles are the same car for the purpose of lending a photo:
+ * the same make and the same model, spelled loosely. Trim and year are not
+ * asked, since a trim changes the car's specs and not its looks.
+ */
+function sameModelLine(a, b) {
+    return sameNameLine(a?.make, b?.make) && sameNameLine(a?.model, b?.model);
+}
 
 /** A vehicle as an inheritance source: enough to name it and link to it. */
 const sourceRef = (v) => ({ id: v.id, name: vehicleLabel(v) });
@@ -224,7 +261,7 @@ export function withInheritance(vehicles = []) {
         }
 
         if (!hasPhoto(vehicle)) {
-            const source = chain.find(hasPhoto);
+            const source = chain.find(v => hasPhoto(v) && sameModelLine(vehicle, v));
             if (source) {
                 for (const key of PHOTO_KEYS) resolved[key] = source[key] ?? null;
                 inheritedFrom.photo = sourceRef(source);
