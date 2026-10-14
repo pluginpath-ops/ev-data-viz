@@ -127,6 +127,62 @@ describe('withInheritance', () => {
     });
 });
 
+describe('a photo is lent only within a model line', () => {
+    const car = (id, make, model, over = {}) => v(id, { make, model, ...over });
+    // Does vehicle 2 (inheriting from 1, which has the photo) wear it?
+    const lends = (a, b) => {
+        const out = byId([car(1, ...a, { image_url: 'p.jpg', image_thumb_url: 't.jpg', image_focal_y: 40 }),
+                          car(2, ...b, { spec_source_vehicle_id: 1 })])[2];
+        return out.image_url === 'p.jpg';
+    };
+
+    it('does not lend it across models, though the specs still come down', () => {
+        expect(lends(['Subaru', 'Uncharted'], ['Toyota', 'C-HR'])).toBe(false);
+        expect(lends(['Rivian', 'R1S'], ['Rivian', 'R1T'])).toBe(false);
+        expect(lends(['Volvo', 'EX90'], ['Polestar', 'Polestar 3'])).toBe(false);
+        expect(lends(['Chevrolet', 'Silverado EV'], ['GMC', 'Sierra EV'])).toBe(false);
+        expect(lends(['Tesla', 'Model 3'], ['Tesla', 'Model Y'])).toBe(false);
+        expect(lends(['Cadillac', 'Lyriq'], ['Cadillac', 'Vistiq'])).toBe(false);
+        expect(lends(['Volkswagen', 'ID.4'], ['Volkswagen', 'ID.Buzz'])).toBe(false);
+    });
+
+    it('leaves the vehicle with no photo at all, focal point included', () => {
+        const out = byId([car(1, 'Subaru', 'Uncharted', { image_url: 'p.jpg', image_thumb_url: 't.jpg', image_focal_y: 40 }),
+                          car(2, 'Toyota', 'C-HR', { spec_source_vehicle_id: 1 })])[2];
+        expect([out.image_url, out.image_thumb_url, out.image_focal_y]).toEqual([null, null, null]);
+        expect(out.inheritedFrom.photo).toBeNull();
+    });
+
+    it('lends it across spellings and added words, and ignores trim and year', () => {
+        expect(lends(['Ford', 'F-150 Lightning'], ['ford', 'F150 Lightning'])).toBe(true);
+        expect(lends(['Tesla', 'Cybertruck (CyberBeast)'], ['Tesla', 'Cybertruck'])).toBe(true);
+        expect(lends(['Lucid', 'Gravity GT'], ['Lucid', 'Gravity'])).toBe(true);
+        expect(lends(['Tesla', 'Model Y'], ['Tesla', 'Model Y L'])).toBe(true);
+        expect(lends(['Tesla', 'Model Y'], ['Tesla', 'Model Y'])).toBe(true);
+    });
+
+    it('lends it when either side has no make or model on record', () => {
+        expect(lends(['Tesla', null], ['Tesla', 'Model Y'])).toBe(true);
+        expect(lends([null, null], ['Tesla', 'Model Y'])).toBe(true);
+    });
+
+    it('skips a source of another model and takes the nearest one in the same line', () => {
+        const out = byId([
+            car(1, 'Rivian', 'R1T', { image_url: 'truck.jpg' }),
+            car(2, 'Rivian', 'R1S', { image_url: 'suv.jpg', spec_source_vehicle_id: 1 }),
+            car(3, 'Rivian', 'R1T', { spec_source_vehicle_id: 2 }),
+        ]);
+        expect(out[3].image_url).toBe('truck.jpg');
+        expect(out[3].inheritedFrom.photo.id).toBe(1);
+    });
+
+    it('keeps its own photo regardless', () => {
+        const out = byId([car(1, 'Subaru', 'Uncharted', { image_url: 'a.jpg' }),
+                          car(2, 'Toyota', 'C-HR', { image_url: 'mine.jpg', spec_source_vehicle_id: 1 })])[2];
+        expect(out.image_url).toBe('mine.jpg');
+    });
+});
+
 describe('ownValues', () => {
     it('reads own values from a resolved vehicle, and the plain fields from a raw one', () => {
         const [, resolved] = withInheritance([v(1, { color: '#111111' }), v(2, { spec_source_vehicle_id: 1 })]);
