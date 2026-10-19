@@ -18,6 +18,7 @@
  */
 
 import { runKindFrom, isCompositeRun, compositesFirst } from './runUtils';
+import { findSource } from './sources';
 
 /** camelCase field → database column. One definition, so the writer and the
  *  optimistic update cannot drift — which is how the per-kind default bug
@@ -241,4 +242,29 @@ export function groupRunsBySession(runs) {
 export function sessionFor(sessions, run) {
     if (run?.session_id == null) return null;
     return (sessions || []).find(s => String(s.id) === String(run.session_id)) ?? null;
+}
+
+/**
+ * What a session starts with when it is created from a test (#426): the
+ * outing's date, who published it and where, and the conditions the test
+ * recorded. The test being assigned is nearly always one of the outing's
+ * first, so these save retyping them; the session's own form is where they are
+ * corrected, and every other test that joins is judged against them.
+ *
+ * Not the name (the curator's to give), the tester or the location (a test
+ * records neither), nor the notes. The source is the listed source the test's
+ * spelling names, else as the test has it.
+ *
+ * @param {Object} run
+ * @param {Array}  sources  rows of the sources table
+ */
+export function sessionSeedFromRun(run, sources = []) {
+    const stored = String(run?.source ?? '').trim();
+    return {
+        testedAt:     run?.date || null,
+        sourceName:   stored ? (findSource(sources, { name: stored })?.source.name ?? stored) : null,
+        url:          run?.source_url || run?.sourceUrl || null,
+        temperatureF: run?.temperature_f ?? null,
+        altitudeFt:   run?.altitude_ft ?? null,
+    };
 }

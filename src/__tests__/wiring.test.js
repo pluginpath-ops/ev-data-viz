@@ -708,13 +708,24 @@ describe('the seams that broke before', () => {
         const runs = read('src/components/RunsView.jsx');
         // Both forms — create and edit — mount the field; two inputs typed by hand
         // is how "Out of Spec" came to be spelled 35 ways.
-        expect((runs.match(/<RunSourceField/g) ?? []).length, 'create and edit must both mount RunSourceField').toBe(2);
-        expect(read('src/components/RunSourceField.jsx')).toMatch(/<SourcePicker/);
+        expect((runs.match(/<SourceField/g) ?? []).length, 'create and edit must both mount SourceField').toBe(2);
+        expect(read('src/components/SourceField.jsx')).toMatch(/<SourcePicker/);
         expect(runs, 'no hand-typed source input may come back').not.toMatch(/placeholder="Source \(e\.g\./);
         // What is written is the canonical name; a source typed as new joins the list.
         expect((runs.match(/await sourceToWrite\(/g) ?? []).length, 'create, CSV import and edit must resolve the source').toBe(3);
         expect(runs).toMatch(/ensureSourceId\(pickedSource\(/);
         expect(runs).toMatch(/startingName\(/);
+    });
+
+    it('chooses a session\'s source from the source list, and starts a session from its test (#426)', () => {
+        const edit = read('src/components/SessionEditModal.jsx');
+        expect(edit, 'the session form must mount the source field').toMatch(/<SourceField/);
+        expect(edit, 'no hand-typed source input may come back').not.toMatch(/key: 'sourceName'/);
+        // What is written is the canonical name; a source typed as new joins the list.
+        expect(edit).toMatch(/runSourceText\(sources, sourcePick/);
+        expect(edit).toMatch(/ensureSourceId\(pickedSource\(/);
+        // A session created from a test starts with that test's own fields.
+        expect(read('src/components/SessionControl.jsx')).toMatch(/\.\.\.sessionSeedFromRun\(run, sources\)/);
     });
 
     it('lets a variant inherit color, photo and tags by pointer, and keeps editors on own values', () => {

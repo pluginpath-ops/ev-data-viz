@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { vehiclesInSession, runsInSession } from '../utils/testSessions';
 import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
+import { useSources } from '../hooks/useSources';
+import { pickedSource, runSourceText } from '../utils/sources';
+import SourceField from './SourceField';
 
 /**
  * Edit a session's own fields.
@@ -23,7 +26,6 @@ const FIELDS = [
     { key: 'locationName', label: 'Location',    type: 'text',   placeholder: 'e.g. I-70 loop, Denver' },
     { key: 'temperatureF', label: 'Temp (°F)',   type: 'number', placeholder: 'Session-level reading' },
     { key: 'altitudeFt',   label: 'Altitude (ft)', type: 'number', placeholder: 'Session-level elevation' },
-    { key: 'sourceName',   label: 'Source',      type: 'text',   placeholder: 'Who published it' },
     { key: 'url',          label: 'URL',         type: 'url',    placeholder: 'https://…', wide: true },
 ];
 
@@ -36,14 +38,18 @@ function toDraft(session) {
         locationName: session?.location_name ?? '',
         temperatureF: session?.temperature_f ?? '',
         altitudeFt:   session?.altitude_ft ?? '',
-        sourceName:   session?.source_name ?? '',
+        // The source is chosen from the source list (#426): null until the
+        // picker is touched, when the stored text stands in.
+        sourcePick:   null,
+        storedSource: session?.source_name ?? '',
         url:          session?.url ?? '',
         notes:        session?.notes ?? '',
     };
 }
 
 export default function SessionEditModal({ session, vehicles, onSave, onDelete, onClose }) {
-    const { updateRun, isContributor } = useAppContext();
+    const { updateRun, isContributor, ensureSourceId } = useAppContext();
+    const { sources, available: sourcesAvailable } = useSources();
     const [draft, setDraft] = useState(() => toDraft(session));
     const [saving, setSaving] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -67,7 +73,13 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
 
     const handleSave = async () => {
         setSaving(true);
-        try { await onSave(session.id, draft); onClose(); }
+        try {
+            const { sourcePick, storedSource, ...rest } = draft;
+            // A source typed as new joins the list; what is written is the canonical name.
+            if (sourcesAvailable && sourcePick) await ensureSourceId(pickedSource(sources, sourcePick, draft.url));
+            await onSave(session.id, { ...rest, sourceName: runSourceText(sources, sourcePick, draft.url, storedSource) });
+            onClose();
+        }
         finally { setSaving(false); }
     };
 
@@ -132,6 +144,15 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                                 />
                             </label>
                         ))}
+                        <div className="session-edit-field">
+                            <SourceField
+                                sources={sources}
+                                pick={draft.sourcePick}
+                                onPick={pick => set('sourcePick', pick)}
+                                url={draft.url}
+                                stored={draft.storedSource}
+                            />
+                        </div>
                         {isContributor && members.length > 0 && (
                             <div className="session-edit-field is-wide">
                                 <span className="text-label">Copy source link</span>
