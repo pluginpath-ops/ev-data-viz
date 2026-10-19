@@ -959,7 +959,7 @@ describe('the seams that broke before', () => {
     it('lays out every List row on the header\'s grid, with one set of actions (#338)', () => {
         const view = read('src/components/VehiclesView.jsx');
         expect(view, 'the header row is drawn').toMatch(/<VehicleListHeader/);
-        expect(view, 'every row gets the same ⋯ menu').toMatch(/<VehicleRowMenu label=\{vehicle\.name\} items=\{rowMenuItems\(vehicle\)\} \/>/);
+        expect(view, 'every row gets the same ⋯ menu').toMatch(/<VehicleRowMenu label=\{vehicle\.name\} items=\{rowMenuItems\(vehicle, dismiss\)\} \/>/);
         expect(view, 'the Tests column').toMatch(/<TestCounts vehicle=\{vehicle\}/);
         const css = read('src/index.css');
         expect(css, 'rows and header share the tracks').toMatch(/\.vehicle-row,\s*\.vehicle-list-head \{\s*display: grid;\s*grid-template-columns: var\(--vehicle-list-cols\)/);

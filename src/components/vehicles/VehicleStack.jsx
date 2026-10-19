@@ -13,8 +13,9 @@
  * of the fan.
  *
  * `stack` is `vehicleStack(...)` from vehicleInheritance.js; `renderMembers`
- * draws the members as the List view's rows; `isSelected(id)`
- * gives a selected source's rolodex card the card's accent border.
+ * draws the members as the List view's rows, and is given the popover's
+ * `close` for the row actions that open a dialog; `isSelected(id)` gives a
+ * selected source's rolodex card the card's accent border.
  *
  * Every card on the grid is wrapped, stack or not: the wrapper is a two-row
  * subgrid (rolodex cards, then the card), so cards in a row start level
@@ -63,7 +64,7 @@ export default function VehicleStack({ vehicle, stack, index, units, renderMembe
                     </button>
                 )}
             >
-                {renderMembers(stack.members)}
+                {({ close }) => renderMembers(stack.members, close)}
             </Popover>
             {children}
         </div>

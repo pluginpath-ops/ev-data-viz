@@ -470,9 +470,10 @@ export default function VehiclesView({
 
     /**
      * One List row. A function, like renderCard, so the List view and a
-     * stack's fanned-out popover draw the same row.
+     * stack's fanned-out popover draw the same row. `dismiss` closes that
+     * popover, for the menu items that open a dialog.
      */
-    const renderRow = (vehicle) => {
+    const renderRow = (vehicle, dismiss) => {
         const isSelected = selectedVehicles.includes(vehicle.id);
         const isPending  = pendingDeletes.has(vehicle.id);
         const globalPos  = sortedFilteredVehicles.findIndex(v => v.id === vehicle.id);
@@ -563,7 +564,7 @@ export default function VehiclesView({
                     <button onClick={() => onViewRuns(vehicle)} className="btn btn-primary">
                         Tests &amp; Data →
                     </button>
-                    <VehicleRowMenu label={vehicle.name} items={rowMenuItems(vehicle)} />
+                    <VehicleRowMenu label={vehicle.name} items={rowMenuItems(vehicle, dismiss)} />
                 </span>
             </div>
         );
@@ -573,9 +574,9 @@ export default function VehiclesView({
      * A stack fanned out (VehicleStack): its members as List rows, furthest
      * source first, under the List's header. Rows, not cards, so a long
      * lineage stays a short list. The header selects every member; it does
-     * not sort, since the order IS the lineage.
+     * not sort, since the order IS the lineage. `dismiss` closes the popover.
      */
-    const renderLineageList = (members) => {
+    const renderLineageList = (members, dismiss) => {
         const ids = members.map(v => v.id);
         const allSelected = ids.every(id => selectedVehicles.includes(id));
         return (
@@ -586,7 +587,7 @@ export default function VehiclesView({
                     onToggleAll={() => (allSelected ? onClearAllVisible(ids) : onSelectAllVisible(ids))}
                     selectAllLabel="Select every vehicle in this lineage"
                 />
-                {members.map(m => <div key={m.id} role="rowgroup">{renderRow(m)}</div>)}
+                {members.map(m => <div key={m.id} role="rowgroup">{renderRow(m, dismiss)}</div>)}
             </div>
         );
     };
@@ -594,15 +595,21 @@ export default function VehiclesView({
     /**
      * A List row's ⋯ menu (#338): the card's Specs and curator buttons, as
      * menu items, with the same handlers. Delete stays last.
+     *
+     * `dismiss` is the popover the row sits in, if any. The items that open a
+     * dialog (Specs, Edit, Variant) close it first: the popover floats above
+     * modals so tooltips inside a dialog show, which would leave the lineage
+     * panel painted over the very form it just opened.
      */
-    const rowMenuItems = (vehicle) => {
+    const rowMenuItems = (vehicle, dismiss) => {
+        const opening = (fn) => (e) => { dismiss?.(); return fn(e); };
         const isPending = pendingDeletes.has(vehicle.id);
         const hasSpecs = vehicle.specs && Object.keys(vehicle.specs).length > 0;
         return [
             canEdit(vehicle)
-                ? { key: 'specs', label: 'Specs', onClick: () => setSpecsEditingVehicle(vehicle) }
-                : hasSpecs && { key: 'specs', label: 'Specs', onClick: () => setSpecsViewingVehicle(vehicle) },
-            canEdit(vehicle) && { key: 'edit', label: 'Edit', onClick: (e) => handleEdit(vehicle, e) },
+                ? { key: 'specs', label: 'Specs', onClick: opening(() => setSpecsEditingVehicle(vehicle)) }
+                : hasSpecs && { key: 'specs', label: 'Specs', onClick: opening(() => setSpecsViewingVehicle(vehicle)) },
+            canEdit(vehicle) && { key: 'edit', label: 'Edit', onClick: opening((e) => handleEdit(vehicle, e)) },
             canEdit(vehicle) && {
                 key: 'copy', label: '⧉ Copy', disabled: duplicatingId !== null,
                 title: 'Copy this vehicle, with its own copies of its specs and tests',
@@ -612,6 +619,7 @@ export default function VehiclesView({
                 key: 'variant', label: '＋ Variant', disabled: duplicatingId !== null,
                 title: 'A new vehicle that inherits this one\u2019s specs, tests, color, photo and tags. Set only what differs.',
                 onClick: async () => {
+                    dismiss?.();
                     const variant = await onCreateVariant(vehicle.id);
                     if (variant) handleEdit(variant, { stopPropagation: () => {} });
                 },
