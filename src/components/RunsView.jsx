@@ -421,7 +421,7 @@ const DeriveAxisPanel = ({
     );
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, onFocused, onBack, onClose }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, editOnFocus = false, onFocused, onBack, onClose }) {
     const { ensureSourceId, runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
@@ -1317,6 +1317,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         }, LINK_TARGET_MS);
         return () => clearTimeout(done);
     }, [linkTarget, linkGroupKey, onFocused]);
+
+    // …and, when the link asks (&edit=1, from Admin → Data Checks), opens that
+    // test's edit form once, so a finding is one click from the field that
+    // settles it.
+    useEffect(() => {
+        if (!editOnFocus || linkTarget == null) return;
+        const target = (vehicle.runs ?? []).find(r => String(r.id) === linkTarget);
+        if (target && canEdit(vehicle)) handleEditRun(target);
+        // Once per arrival: what the form holds afterwards is the reader's.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editOnFocus, linkTarget]);
 
     const inheritedRuns    = allDisplayRuns.filter(r => r._inherited);
     const barVisible       = pendingDeletes.size > 0 || !!undoState;

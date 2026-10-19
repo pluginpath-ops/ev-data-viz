@@ -168,3 +168,89 @@ export const ROLLOUT_BASES = [
     { key: 'rollout', label: '1-ft rollout omitted', note: 'Drag-strip convention: the printed 0–60 does not count the first foot. Saved to 0–60 (1ft).' },
     { key: 'none',    label: 'Standing start',       note: 'The clock ran from 0 mph. Saved to 0–60 mph.' },
 ];
+
+// ── What a source's links must look like (#426) ─────────────────────────────
+
+const YOUTUBE_HOSTS = ['youtube.com', 'youtu.be', 'youtube-nocookie.com'];
+const isYouTubeHost = (host) => !!host && YOUTUBE_HOSTS.some(d => onDomain(host, d));
+
+/** The one form a YouTube link is stored in: https://www.youtube.com/watch?v=<id>, nothing after it. */
+const PLAIN_YOUTUBE = /^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/;
+
+/** Whether a link is to YouTube at all, in any of its spellings. */
+export const isYouTubeLink = (url) => isYouTubeHost(domainOf(url));
+
+/**
+ * Whether a YouTube link is stored plainly. `youtu.be` short links, `si=`
+ * tracking, a `t=` offset or a trailing `&` all name the same video as one
+ * stored form does, so the same video can be written several ways.
+ */
+export const isPlainYouTubeLink = (url) => PLAIN_YOUTUBE.test(String(url ?? '').trim());
+
+const pageKey = (url) => {
+    const s = String(url ?? '').trim();
+    const host = domainOf(s);
+    if (!host) return null;
+    try {
+        const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`);
+        return `${host}${u.pathname.replace(/\/+$/, '')}`.toLowerCase();
+    } catch {
+        return null;
+    }
+};
+
+/** A YouTube address that is a video, not a channel or a search. */
+const isYouTubeVideo = (url) => {
+    const s = String(url ?? '').trim();
+    const host = domainOf(s);
+    if (!isYouTubeHost(host)) return false;
+    try {
+        const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`);
+        if (host === 'youtu.be') return u.pathname.length > 1;
+        return (u.pathname === '/watch' && u.searchParams.has('v')) || /^\/(shorts|live|embed)\/[\w-]+/.test(u.pathname);
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * Where a source's tests may link to, where it is stricter than "any link".
+ *
+ * The rule belongs to the SOURCE, not to the test: Out of Spec's tests are
+ * videos or its own testing page; State of Charge's are videos or pages on
+ * its site. It lives here, beside ROLLOUT_BASES, rather than as a `sources`
+ * column because it is a few lines of policy for two outlets, and a column
+ * would need a migration and an editor before it could be changed. When a
+ * third source needs one, or a curator should maintain them, it becomes a
+ * column.
+ *
+ *   video    a YouTube video is allowed
+ *   pages    exact pages allowed (host and path, trailing slash ignored)
+ *   hosts    whole websites allowed
+ *   label    what to say it should be
+ */
+const LINK_RULES = {
+    'out of spec':     { video: true, pages: ['outofspecstudios.com/testing'], hosts: [],
+                         label: 'a YouTube video, or https://outofspecstudios.com/testing' },
+    'state of charge': { video: true, pages: [], hosts: ['evchargingstations.com'],
+                         label: 'a YouTube video, or a page on evchargingstations.com' },
+};
+
+/**
+ * What is wrong with a test's link for its source, or null.
+ *
+ *   missing   there is no link (every source needs one)
+ *   rule      the source's rule is not met
+ *
+ * @returns {{ problem: 'missing'|'rule', expected: string|null } | null}
+ */
+export function linkProblem(sourceName, url) {
+    if (!String(url ?? '').trim()) return { problem: 'missing', expected: LINK_RULES[String(sourceName ?? '').trim().toLowerCase()]?.label ?? null };
+    const rule = LINK_RULES[String(sourceName ?? '').trim().toLowerCase()];
+    if (!rule) return null;
+    const host = domainOf(url);
+    const ok = (rule.video && isYouTubeVideo(url))
+        || rule.pages.includes(pageKey(url))
+        || rule.hosts.some(d => host && onDomain(host, d));
+    return ok ? null : { problem: 'rule', expected: rule.label };
+}

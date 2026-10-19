@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    runDataChecks, checkCounts, sourceNameVariants, groupPerformanceByVehicle, overlaySkips, skipKey, keepOrder,
+    runDataChecks, checkCounts, sourceNameVariants, testAttribution, ATTRIBUTION_FINDINGS, groupPerformanceByVehicle, overlaySkips, skipKey, keepOrder,
     DATA_CHECKS, LIMIT_KEYS, LOADED_LIMITS,
 } from '../dataChecks';
 
@@ -488,5 +488,154 @@ describe('400 V support against the voltage class (#352)', () => {
         const f = findingsFor(variant, { others: [source] }).find(x => x.check === 'native-on-800v');
         expect(f).toMatchObject({ kind: 'disagrees' });
         expect(f.text).toMatch(/800 V class \(from E-GMP 800 V\).*inherited from/);
+    });
+});
+
+describe('test attribution', () => {
+    const SOURCES = [
+        { id: 1, name: 'Out of Spec', aliases: ['OoS', 'Out of Spec Testing'], domains: ['outofspecstudios.com'] },
+        { id: 2, name: 'State of Charge', aliases: [], domains: ['evchargingstations.com'] },
+        { id: 3, name: 'Ever', aliases: [], domains: [] },
+    ];
+    const VIDEO = 'https://www.youtube.com/watch?v=KzzTAAfAN-Y';
+    let runId = 1;
+    const run = (over = {}) => ({
+        id: runId++, kind: 'range', name: 'Out of Spec 70mph', source: 'Out of Spec', source_url: VIDEO, ...over,
+    });
+    const vehicle = (runs, over = {}) => ({ id: 9, name: 'Model Y', year: 2024, runs, ...over });
+    const keys = (rows, i = 0) => rows[i].findings.map(f => f.key);
+
+    it('reports nothing for a test that is attributed correctly', () => {
+        const out = testAttribution([vehicle([run()])], { sources: SOURCES });
+        expect(out).toMatchObject({ rows: [], checked: 1 });
+        expect(Object.values(out.counts).every(n => n === 0)).toBe(true);
+    });
+
+    it('reports a blank source, an unlisted one, and another spelling of a listed one', () => {
+        const out = testAttribution([vehicle([
+            run({ source: '' }),
+            run({ source: 'Oos Reviews' }),
+            run({ source: 'OoS', name: 'Out of Spec 80mph' }),
+        ])], { sources: SOURCES });
+        expect(keys(out.rows, 0)).toContain('source-blank');
+        expect(keys(out.rows, 1)).toContain('source-unlisted');
+        expect(keys(out.rows, 2)).toEqual(['source-spelling']);
+        expect(out.rows[2].findings[0].text).toMatch(/Out of Spec/);
+    });
+
+    it('treats a trailing space or another case as another spelling, not a match', () => {
+        const out = testAttribution([vehicle([run({ source: 'out of spec ' })])], { sources: SOURCES });
+        expect(keys(out.rows)).toEqual(['source-spelling']);
+    });
+
+    it('wants the name to start with the source, ignoring case', () => {
+        const out = testAttribution([vehicle([run({ name: 'OoS 70mph' }), run({ name: 'out of spec 70mph' })])], { sources: SOURCES });
+        expect(out.rows).toHaveLength(1);
+        expect(keys(out.rows)).toEqual(['name-not-source']);
+    });
+
+    it('holds Out of Spec to a video or its testing page', () => {
+        const out = testAttribution([vehicle([
+            run({ source_url: 'https://outofspecstudios.com/testing' }),
+            run({ source_url: 'https://outofspecstudios.com/testing/' }),
+            run({ source_url: 'https://outofspecstudios.com/70-mph-range' }),
+            run({ source_url: 'https://x.com/someone/status/1' }),
+            run({ source_url: 'https://www.youtube.com/@outofspec' }),
+        ])], { sources: SOURCES });
+        expect(out.rows.map(r => r.url)).toEqual([
+            'https://outofspecstudios.com/70-mph-range', 'https://x.com/someone/status/1', 'https://www.youtube.com/@outofspec',
+        ]);
+        expect(out.rows.every(r => keys([r]).includes('link-rule'))).toBe(true);
+    });
+
+    it('lets State of Charge link to its own website, and any source link to anything', () => {
+        const out = testAttribution([vehicle([
+            run({ source: 'State of Charge', name: 'State of Charge 0-100%', kind: 'charging', source_url: 'https://evchargingstations.com/ford' }),
+            run({ source: 'State of Charge', name: 'State of Charge 70mph', source_url: 'https://example.com/post' }),
+            run({ source: 'Ever', name: 'Ever 70mph', source_url: 'https://caranddriver.com/x' }),
+        ])], { sources: SOURCES });
+        expect(out.rows).toHaveLength(1);
+        expect(out.rows[0].name).toBe('State of Charge 70mph');
+        expect(keys(out.rows)).toEqual(['link-rule']);
+    });
+
+    it('asks for a link whatever the source', () => {
+        const out = testAttribution([vehicle([run({ source_url: null }), run({ source: 'Ever', name: 'Ever 70mph', source_url: '' })])], { sources: SOURCES });
+        expect(out.rows.map(r => keys([r]))).toEqual([['link-missing'], ['link-missing']]);
+    });
+
+    it('wants a YouTube link stored plainly', () => {
+        const forms = ['https://youtu.be/KzzTAAfAN-Y', `${VIDEO}&si=abc`, `${VIDEO}&`, `${VIDEO}&t=60s`];
+        const out = testAttribution([vehicle(forms.map(source_url => run({ source_url })))], { sources: SOURCES });
+        expect(out.rows).toHaveLength(4);
+        expect(out.rows.every(r => keys([r]).includes('link-form'))).toBe(true);
+        expect(testAttribution([vehicle([run()])], { sources: SOURCES }).rows).toEqual([]);
+    });
+
+    it('reports a stated window the stored curve does not cover, by the curve and not the columns', () => {
+        const charging = (name, id) => run({ id, kind: 'charging', name, start_soc: 78, end_soc: 10 });
+        const out = testAttribution([vehicle([
+            charging('Out of Spec 0-100%', 101),
+            charging('Out of Spec 10-80%', 102),
+            charging('Out of Spec 0-100% again', 103),
+        ])], { sources: SOURCES, socRanges: { 101: { min: 10, max: 78 }, 102: { min: 9, max: 81 }, 103: { min: 1, max: 99 } } });
+        expect(out.rows.map(r => r.runId)).toEqual([101]);
+        expect(out.rows[0].findings[0].text).toBe('Name says 0–100%; the curve runs 10–78%.');
+    });
+
+    it('does not read a window from a range test, or a name with none, or a test with no curve', () => {
+        const out = testAttribution([vehicle([
+            run({ name: 'Out of Spec 80-10%', kind: 'range', id: 201 }),
+            run({ name: 'Out of Spec 70mph', kind: 'charging', id: 202 }),
+            run({ name: 'Out of Spec 0-100%', kind: 'charging', id: 203 }),
+        ])], { sources: SOURCES, socRanges: { 201: { min: 40, max: 50 }, 202: { min: 40, max: 50 } } });
+        expect(out.rows).toEqual([]);
+    });
+
+    it('reads a window written with an en dash or a space before the percent sign', () => {
+        const out = testAttribution([vehicle([run({ id: 501, kind: 'charging', name: 'State of Charge 10–80 %', source: 'State of Charge' })])],
+            { sources: SOURCES, socRanges: { 501: { min: 30, max: 60 } } });
+        expect(out.rows[0].findings.map(f => f.key)).toContain('window-mismatch');
+    });
+
+    it('reports the second of two charging tests holding one curve, for one vehicle only', () => {
+        const curve = { min: 10, max: 80 };
+        const twin = (id, name) => run({
+            id, kind: 'charging', name, dataPointCount: 159, charge_summary: { peakKw: 181, durationMin: 30 },
+        });
+        const out = testAttribution([
+            vehicle([twin(301, 'Out of Spec 10-80%'), twin(302, 'Out of Spec Lightning 10-80%')]),
+            vehicle([twin(303, 'Out of Spec 10-80%')], { id: 10 }),
+        ], { sources: SOURCES, socRanges: { 301: curve, 302: curve, 303: curve } });
+        expect(out.rows.map(r => r.runId)).toEqual([302]);
+        expect(keys(out.rows)).toEqual(['duplicate-curve']);
+        expect(out.rows[0].findings[0].text).toBe('Same curve as “Out of Spec 10-80%”.');
+    });
+
+    it('never calls a charging test without a summary a duplicate', () => {
+        const bare = (id) => run({ id, kind: 'charging', name: 'Out of Spec 10-80%', dataPointCount: 159 });
+        const out = testAttribution([vehicle([bare(401), bare(402)])], { sources: SOURCES, socRanges: { 401: { min: 10, max: 80 }, 402: { min: 10, max: 80 } } });
+        expect(out.rows).toEqual([]);
+    });
+
+    it('leaves composites out and counts what it checked', () => {
+        const out = testAttribution([vehicle([run({ source: '' }), run({ composite: true, source: '' }), run()])], { sources: SOURCES });
+        expect(out.checked).toBe(2);
+        expect(out.rows).toHaveLength(1);
+        expect(out.counts['source-blank']).toBe(1);
+        expect(Object.keys(out.counts)).toEqual(ATTRIBUTION_FINDINGS.map(f => f.key));
+    });
+
+    it('checks a test on the vehicle that owns it, not on every vehicle that inherits it', () => {
+        const own = run({ source: '' });
+        const inherited = { ...own, id: 'inherited_94_28', _inherited: true };
+        const out = testAttribution([vehicle([own, inherited]), vehicle([inherited], { id: 10 })], { sources: SOURCES });
+        expect(out.checked).toBe(1);
+        expect(out.rows.map(r => r.runId)).toEqual([own.id]);
+    });
+
+    it('judges the name and link against the stored text when the source is not listed', () => {
+        const out = testAttribution([vehicle([run({ source: 'Oos Reviews', name: 'Oos Reviews 70mph' })])], { sources: SOURCES });
+        expect(keys(out.rows)).toEqual(['source-unlisted']);
     });
 });
