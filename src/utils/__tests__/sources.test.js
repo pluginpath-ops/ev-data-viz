@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sameSource, domainOf, findSource, pickedSource, startingName, runSourceText } from '../sources';
+import { sameSource, domainOf, findSource, pickedSource, startingName, runSourceText, storedSourcePick } from '../sources';
 
 const SOURCES = [
     { id: 1, name: 'Car and Driver', aliases: ['C&D', 'CD'], domains: ['caranddriver.com'], default_rollout_basis: 'rollout' },
@@ -111,15 +111,33 @@ describe('runSourceText', () => {
         expect(runSourceText(SOURCES, { newName: ' Edmunds ' })).toBe('Edmunds');
     });
 
-    it('keeps a stored name that is not listed until something is chosen', () => {
-        expect(runSourceText(SOURCES, {}, '', 'Oos Reviews')).toBe('Oos Reviews');
-        expect(runSourceText(SOURCES, {}, 'https://www.motortrend.com/x', 'Oos Reviews')).toBe('Oos Reviews');
+    it('keeps what a test stored until the picker is touched, canonical when it is listed', () => {
+        expect(runSourceText(SOURCES, null, '', 'Oos Reviews')).toBe('Oos Reviews');
+        expect(runSourceText(SOURCES, null, 'https://www.motortrend.com/x', 'Oos Reviews')).toBe('Oos Reviews');
+        expect(runSourceText(SOURCES, null, '', 'oos')).toBe('Out of Spec');
         expect(runSourceText(SOURCES, { sourceId: 3 }, '', 'Oos Reviews')).toBe('MotorTrend');
+    });
+
+    it('lets a touched picker clear a stored source', () => {
+        expect(runSourceText(SOURCES, { sourceId: null, newName: null }, '', 'Out of Spec')).toBe('');
     });
 
     it('falls back to the link, then to nothing', () => {
         expect(runSourceText(SOURCES, {}, 'https://www.motortrend.com/x')).toBe('MotorTrend');
         expect(runSourceText(SOURCES, {}, 'https://www.youtube.com/watch?v=abc')).toBe('');
         expect(runSourceText(SOURCES, {})).toBe('');
+    });
+});
+
+describe('storedSourcePick', () => {
+    it('finds the listed source a stored spelling names', () => {
+        expect(storedSourcePick(SOURCES, 'oos')).toEqual({ sourceId: 2, newName: null });
+        expect(storedSourcePick(SOURCES, ' Out of Spec ')).toEqual({ sourceId: 2, newName: null });
+    });
+
+    it('is null for blank text, a source that is not listed, or a list not loaded yet', () => {
+        expect(storedSourcePick(SOURCES, '')).toBeNull();
+        expect(storedSourcePick(SOURCES, 'Oos Reviews')).toBeNull();
+        expect(storedSourcePick([], 'Out of Spec')).toBeNull();
     });
 });

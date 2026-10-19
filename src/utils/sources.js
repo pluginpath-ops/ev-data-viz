@@ -134,19 +134,32 @@ export function startingName(currentName, source) {
 }
 
 /**
+ * The picker value a test's stored source text comes to: the listed source it
+ * names under any spelling, or null when it is blank or not a listed source.
+ * Read when the form is drawn, so the edit form never depends on the list
+ * having loaded before it opened.
+ */
+export function storedSourcePick(sources = [], stored = '') {
+    const name = String(stored ?? '').trim();
+    const found = name ? findSource(sources, { name }) : null;
+    return found ? { sourceId: found.source.id, newName: null } : null;
+}
+
+/**
  * What to write to a test's `source` text for a picker's value. Always the
  * canonical name of a listed source, so one outlet keeps one spelling.
  *
- * Nothing chosen leaves a stored name that is not a listed source alone
- * (`legacy`) rather than blanking it behind the curator's back; failing that,
- * the link's domain suggests one.
+ * `pick` null means the curator has not touched the picker, so the test keeps
+ * what it stored — under its canonical spelling when it names a listed source,
+ * as written when it does not (never blanked behind the curator's back). A
+ * touched picker with nothing chosen falls back to the link's domain.
  *
  * @returns {string} '' when there is no source
  */
-export function runSourceText(sources = [], pick = {}, url = '', legacy = '') {
-    const nothingChosen = (pick.sourceId ?? null) == null && (pick.newName ?? null) == null;
-    if (nothingChosen && String(legacy ?? '').trim()) return String(legacy).trim();
-    const picked = pickedSource(sources, pick, url);
+export function runSourceText(sources = [], pick = null, url = '', stored = '') {
+    const kept = String(stored ?? '').trim();
+    if (pick == null && kept) return findSource(sources, { name: kept })?.source.name ?? kept;
+    const picked = pickedSource(sources, pick ?? {}, url);
     return picked.source?.name ?? picked.newName ?? '';
 }
 

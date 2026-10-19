@@ -2,20 +2,29 @@
  * A test's source on the test form: the one source list, so "OoS" and
  * "Out of Spec" cannot split into two outlets (#426).
  *
- * `legacy` is a name already stored on the test that is not a listed source.
- * It is shown rather than hidden, and `utils/sources.runSourceText` keeps it
- * until a source is chosen to replace it.
+ * `pick` is null until the curator touches the picker; the test's stored text
+ * (`stored`) then stands in, shown as the listed source it names. A stored name
+ * that is not a listed source is shown rather than hidden, and
+ * `utils/sources.runSourceText` keeps it until a source is chosen to replace it.
  */
 import SourcePicker from './SourcePicker';
+import { storedSourcePick } from '../utils/sources';
 
-export default function RunSourceField({ sources, pick, onPick, url, legacy = '' }) {
-    const nothingChosen = pick.sourceId == null && pick.newName == null;
-    const unlisted = nothingChosen ? legacy.trim() : '';
+const NOTHING = { sourceId: null, newName: null };
+
+export default function RunSourceField({ sources, pick, onPick, url, stored = '' }) {
+    const fromStored = pick == null ? storedSourcePick(sources, stored) : null;
+    const unlisted = pick == null && !fromStored ? stored.trim() : '';
     return (
         <div>
             <p className="text-xs text-secondary mb-1">Source</p>
             {/* A stored name outranks a guess from the link, so no suggestion while one stands. */}
-            <SourcePicker sources={sources} value={pick} onChange={onPick} url={unlisted ? '' : url} />
+            <SourcePicker
+                sources={sources}
+                value={pick ?? fromStored ?? NOTHING}
+                onChange={onPick}
+                url={unlisted ? '' : url}
+            />
             {unlisted && (
                 <p className="text-xs text-meta mt-1">
                     Stored as “{unlisted}”, which is not a listed source. Pick one to replace it.

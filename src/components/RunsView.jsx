@@ -579,19 +579,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         return { ...form, sourcePick: pick, ...(start ? { name: start } : {}) };
     };
 
-    /** The stored source as the picker shows it: a listed source chosen, else kept as stored text. */
-    const editSourceFields = (run) => {
-        const stored = (run.source || '').trim();
-        const listed = stored ? pickedSource(sources, { newName: stored }).source : null;
-        return listed
-            ? { sourcePick: { sourceId: listed.id, newName: null }, legacySource: '' }
-            : { sourcePick: NO_SOURCE_PICK, legacySource: stored };
-    };
-
     /** The text for `runs.source`; a source typed as new joins the list first. */
     const sourceToWrite = async (form) => {
-        if (sourcesAvailable) await ensureSourceId(pickedSource(sources, form.sourcePick, form.sourceUrl));
-        return runSourceText(sources, form.sourcePick, form.sourceUrl, form.legacySource);
+        if (sourcesAvailable && form.sourcePick) await ensureSourceId(pickedSource(sources, form.sourcePick, form.sourceUrl));
+        return runSourceText(sources, form.sourcePick, form.sourceUrl, form.storedSource);
     };
 
     const resetUploadState = () => {
@@ -866,7 +857,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             softwareVersion: run.softwareVersion || run.software_version || '',
             conditions: run.conditions || '',
             dataFlags: inferRunFlags(run),
-            ...editSourceFields(run),
+            // null until the picker is touched: the stored text stands in (RunSourceField).
+            sourcePick: null,
+            storedSource: run.source || '',
             startSoc: run.start_soc ?? '',
             endSoc: run.end_soc ?? '',
             speedMph: run.speed_mph ?? '',
@@ -890,7 +883,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setSavingData(true);
         try {
             // Convert dataFlags → boolean columns and drop the flags field
-            const { dataFlags, preconditioned, chargerVoltageClass, sourcePick, legacySource, ...formRest } = editFormData;
+            const { dataFlags, preconditioned, chargerVoltageClass, sourcePick, storedSource, ...formRest } = editFormData;
             // Sent only when it changed, so saving any other field never names
             // a column an unmigrated database lacks (migrations 073, 076).
             const storedRun = vehicle.runs?.find(r => r.id === runId);
@@ -2048,10 +2041,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     />
                                     <RunSourceField
                                         sources={sources}
-                                        pick={editFormData.sourcePick ?? NO_SOURCE_PICK}
+                                        pick={editFormData.sourcePick}
                                         onPick={pick => setEditFormData(withPickedSource(editFormData, pick))}
                                         url={editFormData.sourceUrl ?? ''}
-                                        legacy={editFormData.legacySource ?? ''}
+                                        stored={editFormData.storedSource ?? ''}
                                     />
                                     {/* Range test fields */}
                                     {(editFormData.dataFlags || ['charging']).includes('range') && (
