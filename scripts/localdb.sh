@@ -266,7 +266,7 @@ pid_alive() { [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 # start another copy: the copy fails to bind, exits, and its pid would replace
 # the live one in the .pid file — found 2026-10-10, when status said "not
 # serving" over a stand-in that had been answering for a day.
-listener_pid() { lsof -t -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | head -1; }
+listener_pid() { { lsof -t -iTCP:"$1" -sTCP:LISTEN 2>/dev/null || true; } | head -1; }
 
 mint_token() {   # mint_token <role> [sub] — a long-lived local test JWT
   LOCALDB_JWT_SECRET="$JWT_SECRET" node -e '
