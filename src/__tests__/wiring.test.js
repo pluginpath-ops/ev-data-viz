@@ -684,6 +684,19 @@ describe('the seams that broke before', () => {
         expect(read('supabase/migrations/068_sources.sql')).toMatch(/source_id bigint REFERENCES sources\(id\) ON DELETE SET NULL/);
     });
 
+    it('takes a test\'s source from the source list, never from free text (#426)', () => {
+        const runs = read('src/components/RunsView.jsx');
+        // Both forms — create and edit — mount the field; two inputs typed by hand
+        // is how "Out of Spec" came to be spelled 35 ways.
+        expect((runs.match(/<RunSourceField/g) ?? []).length, 'create and edit must both mount RunSourceField').toBe(2);
+        expect(read('src/components/RunSourceField.jsx')).toMatch(/<SourcePicker/);
+        expect(runs, 'no hand-typed source input may come back').not.toMatch(/placeholder="Source \(e\.g\./);
+        // What is written is the canonical name; a source typed as new joins the list.
+        expect((runs.match(/await sourceToWrite\(/g) ?? []).length, 'create, CSV import and edit must resolve the source').toBe(3);
+        expect(runs).toMatch(/ensureSourceId\(pickedSource\(/);
+        expect(runs).toMatch(/startingName\(/);
+    });
+
     it('lets a variant inherit color, photo and tags by pointer, and keeps editors on own values', () => {
         // Resolved where the figures are, so every reader of the fleet sees it.
         const ctx = read('src/context/AppContext.jsx');

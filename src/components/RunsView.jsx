@@ -32,6 +32,9 @@ import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
 import RunSourceLinks from './RunSourceLinks';
+import RunSourceField from './RunSourceField';
+import { useSources } from '../hooks/useSources';
+import { pickedSource, runSourceText, startingName } from '../utils/sources';
 import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
@@ -115,6 +118,9 @@ export const DEFAULT_RUNS_SUBTAB = 'tests';
 
 /** How long a test a link pointed at stays marked, in ms: long enough to find, short enough not to linger. */
 const LINK_TARGET_MS = 2500;
+
+// What the source picker holds before anything is chosen.
+const NO_SOURCE_PICK = { sourceId: null, newName: null };
 
 /**
  * One of the two scaling knobs on an inherited test, as an editable number.
@@ -416,7 +422,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, onFocused, onBack, onClose }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
+    const { ensureSourceId, runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -473,7 +479,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         softwareVersion: '',
         conditions: '',
         dataFlags: ['charging'],
-        source: '',
+        sourcePick: NO_SOURCE_PICK,
         startSoc: '',
         endSoc: '',
         speedMph: '',
@@ -563,12 +569,37 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    // A test's source comes from the one source list (#426); the form keeps the
+    // picker's value and only `runs.source` text is written, always canonical.
+    const { sources, available: sourcesAvailable } = useSources();
+
+    /** The form with this source picked — and its name offered if the test has none. */
+    const withPickedSource = (form, pick) => {
+        const start = startingName(form.name, pickedSource(sources, pick, form.sourceUrl).source);
+        return { ...form, sourcePick: pick, ...(start ? { name: start } : {}) };
+    };
+
+    /** The stored source as the picker shows it: a listed source chosen, else kept as stored text. */
+    const editSourceFields = (run) => {
+        const stored = (run.source || '').trim();
+        const listed = stored ? pickedSource(sources, { newName: stored }).source : null;
+        return listed
+            ? { sourcePick: { sourceId: listed.id, newName: null }, legacySource: '' }
+            : { sourcePick: NO_SOURCE_PICK, legacySource: stored };
+    };
+
+    /** The text for `runs.source`; a source typed as new joins the list first. */
+    const sourceToWrite = async (form) => {
+        if (sourcesAvailable) await ensureSourceId(pickedSource(sources, form.sourcePick, form.sourceUrl));
+        return runSourceText(sources, form.sourcePick, form.sourceUrl, form.legacySource);
+    };
+
     const resetUploadState = () => {
         setShowUpload(false);
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', chargerVoltageClass: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
+        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], sourcePick: NO_SOURCE_PICK, startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', chargerVoltageClass: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -671,10 +702,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     // ── Create-mode import ────────────────────────────────────────────────────
 
-    const handleSaveRecord = () => {
-        const { dataFlags, ...metaRest } = runMetadata;
+    const handleSaveRecord = async () => {
+        const { dataFlags, sourcePick, ...metaRest } = runMetadata;
         const run = {
             ...metaRest,
+            source: await sourceToWrite(runMetadata),
             kind: dataFlags.includes('range') ? 'range' : 'charging',
             data: [],
             uploadDate: new Date().toISOString()
@@ -709,7 +741,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             return (a.soc ?? Infinity) - (b.soc ?? Infinity);
         });
 
-    const handleImport = () => {
+    const handleImport = async () => {
         if (!csvData) return;
 
         let transformedData = csvData.data.map(row => {
@@ -742,9 +774,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             }
         }
 
-        const { dataFlags, ...metaRest } = runMetadata;
+        const { dataFlags, sourcePick, ...metaRest } = runMetadata;
         const run = {
             ...metaRest,
+            source: await sourceToWrite(runMetadata),
             kind: dataFlags.includes('range') ? 'range' : 'charging',
             data: transformedData,
             fieldMapping,
@@ -833,7 +866,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             softwareVersion: run.softwareVersion || run.software_version || '',
             conditions: run.conditions || '',
             dataFlags: inferRunFlags(run),
-            source: run.source || '',
+            ...editSourceFields(run),
             startSoc: run.start_soc ?? '',
             endSoc: run.end_soc ?? '',
             speedMph: run.speed_mph ?? '',
@@ -857,12 +890,13 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setSavingData(true);
         try {
             // Convert dataFlags → boolean columns and drop the flags field
-            const { dataFlags, preconditioned, chargerVoltageClass, ...formRest } = editFormData;
+            const { dataFlags, preconditioned, chargerVoltageClass, sourcePick, legacySource, ...formRest } = editFormData;
             // Sent only when it changed, so saving any other field never names
             // a column an unmigrated database lacks (migrations 073, 076).
             const storedRun = vehicle.runs?.find(r => r.id === runId);
             await onUpdateRun(runId, {
                 ...formRest,
+                source: await sourceToWrite(editFormData),
                 ...(toPreconditioned(preconditioned) !== (storedRun?.preconditioned ?? null) ? { preconditioned } : {}),
                 ...(toChargerClass(chargerVoltageClass) !== toChargerClass(storedRun?.charger_voltage_class)
                     ? { chargerVoltageClass } : {}),
@@ -1538,6 +1572,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             onChange={(e) => setRunMetadata({...runMetadata, sourceUrl: e.target.value})}
                                             className="form-input form-input w-full"
                                         />
+                                        <RunSourceField
+                                            sources={sources}
+                                            pick={runMetadata.sourcePick}
+                                            onPick={pick => setRunMetadata(withPickedSource(runMetadata, pick))}
+                                            url={runMetadata.sourceUrl}
+                                        />
 
                                         {/* Charging energy field (create mode) */}
                                         {runMetadata.dataFlags.includes('charging') && (
@@ -1570,12 +1610,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             <div className="data-subpanel p-4 space-y-3">
                                                 <p className="text-sm font-semibold text-secondary">Range Test Details</p>
                                                 <div className="form-grid gap-3">
-                                                    <input
-                                                        placeholder="Source (e.g., Out of Spec)"
-                                                        value={runMetadata.source}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, source: e.target.value})}
-                                                        className="form-input form-input col-span-2"
-                                                    />
                                                     <input
                                                         type="number"
                                                         placeholder="Start SoC (%)"
@@ -2012,17 +2046,18 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={(e) => setEditFormData({...editFormData, sourceUrl: e.target.value})}
                                         className="form-input form-input w-full"
                                     />
+                                    <RunSourceField
+                                        sources={sources}
+                                        pick={editFormData.sourcePick ?? NO_SOURCE_PICK}
+                                        onPick={pick => setEditFormData(withPickedSource(editFormData, pick))}
+                                        url={editFormData.sourceUrl ?? ''}
+                                        legacy={editFormData.legacySource ?? ''}
+                                    />
                                     {/* Range test fields */}
                                     {(editFormData.dataFlags || ['charging']).includes('range') && (
                                         <div className="data-subpanel p-4 space-y-3">
                                             <p className="text-sm font-semibold text-secondary">Range Test Details</p>
                                             <div className="form-grid gap-3">
-                                                <input
-                                                    placeholder="Source (e.g., Out of Spec)"
-                                                    value={editFormData.source}
-                                                    onChange={(e) => setEditFormData({...editFormData, source: e.target.value})}
-                                                    className="form-input form-input col-span-2"
-                                                />
                                                 <input
                                                     type="number"
                                                     placeholder="Start SoC (%)"

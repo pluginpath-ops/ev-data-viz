@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sameSource, domainOf, findSource, pickedSource } from '../sources';
+import { sameSource, domainOf, findSource, pickedSource, startingName, runSourceText } from '../sources';
 
 const SOURCES = [
     { id: 1, name: 'Car and Driver', aliases: ['C&D', 'CD'], domains: ['caranddriver.com'], default_rollout_basis: 'rollout' },
@@ -66,5 +66,60 @@ describe('pickedSource', () => {
     it('falls back to the link when nothing was chosen', () => {
         expect(pickedSource(SOURCES, {}, 'https://www.motortrend.com/x').source).toBe(SOURCES[2]);
         expect(pickedSource(SOURCES, {}, '')).toEqual({ source: null, newName: null });
+    });
+});
+
+describe('shared hosts', () => {
+    const LISTED_ON_YOUTUBE = [{ id: 9, name: 'Some Channel', aliases: [], domains: ['youtube.com'] }];
+
+    it('ignores a video or social site, subdomains and short links included', () => {
+        for (const url of ['https://www.youtube.com/watch?v=abc', 'https://m.youtube.com/watch?v=abc', 'https://youtu.be/abc']) {
+            expect(findSource(LISTED_ON_YOUTUBE, { url }), url).toBeNull();
+        }
+    });
+
+    it('never names a source from a shared host, even one that lists it', () => {
+        expect(findSource(LISTED_ON_YOUTUBE, { url: 'https://www.youtube.com/watch?v=abc' })).toBeNull();
+        expect(pickedSource(LISTED_ON_YOUTUBE, {}, 'https://youtu.be/abc').source).toBeNull();
+    });
+
+    it('still names a source from its own website', () => {
+        const oos = [{ id: 2, name: 'Out of Spec', aliases: [], domains: ['outofspecstudios.com'] }];
+        expect(findSource(oos, { url: 'https://outofspecstudios.com/testing' })).toMatchObject({ source: { id: 2 }, by: 'domain' });
+    });
+});
+
+describe('startingName', () => {
+    it('offers "<source> " for a test with no name yet', () => {
+        expect(startingName('', SOURCES[1])).toBe('Out of Spec ');
+        expect(startingName('   ', SOURCES[1])).toBe('Out of Spec ');
+    });
+
+    it('offers nothing once a name is started, or when there is no listed source', () => {
+        expect(startingName('70mph', SOURCES[1])).toBeNull();
+        expect(startingName('', null)).toBeNull();
+    });
+});
+
+describe('runSourceText', () => {
+    it('writes the canonical name of a chosen source', () => {
+        expect(runSourceText(SOURCES, { sourceId: 2 })).toBe('Out of Spec');
+    });
+
+    it('writes the canonical name for a new name that is a listed alias', () => {
+        expect(runSourceText(SOURCES, { newName: 'oos' })).toBe('Out of Spec');
+        expect(runSourceText(SOURCES, { newName: ' Edmunds ' })).toBe('Edmunds');
+    });
+
+    it('keeps a stored name that is not listed until something is chosen', () => {
+        expect(runSourceText(SOURCES, {}, '', 'Oos Reviews')).toBe('Oos Reviews');
+        expect(runSourceText(SOURCES, {}, 'https://www.motortrend.com/x', 'Oos Reviews')).toBe('Oos Reviews');
+        expect(runSourceText(SOURCES, { sourceId: 3 }, '', 'Oos Reviews')).toBe('MotorTrend');
+    });
+
+    it('falls back to the link, then to nothing', () => {
+        expect(runSourceText(SOURCES, {}, 'https://www.motortrend.com/x')).toBe('MotorTrend');
+        expect(runSourceText(SOURCES, {}, 'https://www.youtube.com/watch?v=abc')).toBe('');
+        expect(runSourceText(SOURCES, {})).toBe('');
     });
 });
