@@ -50,6 +50,22 @@ const onDomain = (host, domain) => {
 };
 
 /**
+ * Websites many sources publish on. A link to one says where a test was
+ * hosted, not who made it, so it never names a source — otherwise one listed
+ * `youtube.com` would credit every YouTube link to the same channel (#426).
+ */
+const SHARED_HOSTS = [
+    'youtube.com', 'youtu.be', 'youtube-nocookie.com', 'vimeo.com',
+    'x.com', 'twitter.com', 'facebook.com', 'instagram.com', 'tiktok.com', 'reddit.com',
+];
+
+/** Whether a link's website is one that says nothing about its source. */
+const isSharedHost = (url) => {
+    const host = domainOf(url);
+    return !!host && SHARED_HOSTS.some(d => onDomain(host, d));
+};
+
+/**
  * The listed source a name or link refers to, and how it was recognised.
  *
  *   name       the canonical name, ignoring case
@@ -77,7 +93,7 @@ export function findSource(sources = [], { name, url } = {}) {
         if (bySpelling) return { source: bySpelling, by: 'spelling' };
     }
     const host = domainOf(url);
-    if (host) {
+    if (host && !isSharedHost(host)) {
         const byDomain = sources.find(s => (s.domains ?? []).some(d => onDomain(host, d)));
         if (byDomain) return { source: byDomain, by: 'domain' };
     }
@@ -104,6 +120,47 @@ export function pickedSource(sources = [], { sourceId = null, newName = null } =
     }
     if (sourceId != null) return { source: sources.find(s => Number(s.id) === Number(sourceId)) ?? null, newName: null };
     return { source: findSource(sources, { url })?.source ?? null, newName: null };
+}
+
+/**
+ * The name to offer a test when its source is chosen and it has none yet:
+ * "<source> ", ready for what the test was ("Out of Spec 70mph"). Null when
+ * there is nothing to offer — the name is already started, or the source is
+ * not a listed one (a half-typed new name must not seed the field).
+ */
+export function startingName(currentName, source) {
+    if (String(currentName ?? '').trim() || !source?.name) return null;
+    return `${source.name} `;
+}
+
+/**
+ * The picker value a test's stored source text comes to: the listed source it
+ * names under any spelling, or null when it is blank or not a listed source.
+ * Read when the form is drawn, so the edit form never depends on the list
+ * having loaded before it opened.
+ */
+export function storedSourcePick(sources = [], stored = '') {
+    const name = String(stored ?? '').trim();
+    const found = name ? findSource(sources, { name }) : null;
+    return found ? { sourceId: found.source.id, newName: null } : null;
+}
+
+/**
+ * What to write to a test's `source` text for a picker's value. Always the
+ * canonical name of a listed source, so one outlet keeps one spelling.
+ *
+ * `pick` null means the curator has not touched the picker, so the test keeps
+ * what it stored — under its canonical spelling when it names a listed source,
+ * as written when it does not (never blanked behind the curator's back). A
+ * touched picker with nothing chosen falls back to the link's domain.
+ *
+ * @returns {string} '' when there is no source
+ */
+export function runSourceText(sources = [], pick = null, url = '', stored = '') {
+    const kept = String(stored ?? '').trim();
+    if (pick == null && kept) return findSource(sources, { name: kept })?.source.name ?? kept;
+    const picked = pickedSource(sources, pick ?? {}, url);
+    return picked.source?.name ?? picked.newName ?? '';
 }
 
 /** How each rollout basis is described wherever it is chosen. */
