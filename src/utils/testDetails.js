@@ -173,5 +173,7 @@ export function testHref(ref) {
     // sub-tab was last open, and a test link could land on EPA.
     const p = new URLSearchParams({ tab: 'runs', vid: String(ref.vehicleId), sub: ref.sub ?? 'tests' });
     if (ref.runId != null) p.set('run', String(ref.runId));
+    // Open the test's edit form on arrival (Data Checks → a test's attribution).
+    if (ref.runId != null && ref.edit) p.set('edit', '1');
     return `?${p.toString()}`;
 }

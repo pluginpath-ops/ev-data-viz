@@ -684,6 +684,26 @@ describe('the seams that broke before', () => {
         expect(read('supabase/migrations/068_sources.sql')).toMatch(/source_id bigint REFERENCES sources\(id\) ON DELETE SET NULL/);
     });
 
+    it('shows every test whose source, name or link disagrees, and opens its edit form (#426)', () => {
+        const panel = read('src/components/admin/DataChecksPanel.jsx');
+        expect(panel, 'the panel must mount the attribution check').toMatch(/<TestAttributionCheck\s*\/>/);
+
+        const check = read('src/components/admin/TestAttributionCheck.jsx');
+        // Reads the tests and the source list, and judges them by the pure check.
+        expect(check).toMatch(/testAttribution\(fleet, \{ sources, socRanges/);
+        expect(check).toMatch(/useSources\(\)/);
+        // The curve's span comes from its points, never from runs.start_soc/end_soc.
+        expect(check).toMatch(/dataService\.getSocRanges\(/);
+        // Every finding the check can raise has a filter option, and each row opens its edit.
+        expect(check).toMatch(/ATTRIBUTION_FINDINGS\.filter\(/);
+        expect(check).toMatch(/testHref\(\{[^}]*edit: true/);
+
+        // …and the edit link lands on the form: App carries the flag, RunsView acts on it.
+        expect(read('src/App.jsx')).toMatch(/editOnFocus=\{focusRunEdit\}/);
+        expect(read('src/App.jsx')).toMatch(/get\('edit'\) === '1'/);
+        expect(read('src/components/RunsView.jsx')).toMatch(/if \(target && canEdit\(vehicle\)\) handleEditRun\(target\)/);
+    });
+
     it('lets a variant inherit color, photo and tags by pointer, and keeps editors on own values', () => {
         // Resolved where the figures are, so every reader of the fleet sees it.
         const ctx = read('src/context/AppContext.jsx');

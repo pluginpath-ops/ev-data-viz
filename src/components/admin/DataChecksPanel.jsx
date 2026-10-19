@@ -1,5 +1,6 @@
 import ChargeSummaryMaintenance from './ChargeSummaryMaintenance';
 import CompositeMaintenance from './CompositeMaintenance';
+import TestAttributionCheck from './TestAttributionCheck';
 import { useState, useMemo, useCallback } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
@@ -747,6 +748,9 @@ export default function DataChecksPanel() {
             ) : (
                 <p className="text-note">Every published source is spelled one way.</p>
             )}
+
+            <h4 className="subsection-title mt-6">Test attribution</h4>
+            <TestAttributionCheck />
         </div>
     );
 }

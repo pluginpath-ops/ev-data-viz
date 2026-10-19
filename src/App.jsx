@@ -137,9 +137,12 @@ export default function App() {
     // The test a link pointed at (?tab=runs&run=…), which Tests & Data scrolls
     // to and marks once, then hands back. Only a link sets it.
     const [focusRunId, setFocusRunId] = useState(null);
+    // Whether that link also opens the test's edit form (&edit=1, from Admin →
+    // Data Checks), so a finding is one click from the field that settles it.
+    const [focusRunEdit, setFocusRunEdit] = useState(false);
     // Stable, because Tests & Data's landing effect depends on it: a new
     // function each render would re-scroll and restart its timer every time.
-    const clearFocusRun = useCallback(() => setFocusRunId(null), []);
+    const clearFocusRun = useCallback(() => { setFocusRunId(null); setFocusRunEdit(false); }, []);
     // Same lift for the Admin tab's sub-tabs (Roles / EPA Data / Fuel Economy
     // Guide / Model Constants / Interface Settings).
     const [adminSubtab, setAdminSubtab] = useState(DEFAULT_ADMIN_SUBTAB);
@@ -349,6 +352,7 @@ export default function App() {
         setActiveVehicle(v);
         setRunsSubtab(sub);
         setFocusRunId(ref.runId ?? null);
+        setFocusRunEdit(!!ref.edit);
         setView('runs');
         window.scrollTo(0, 0);
     }, [vehicles]);
@@ -436,6 +440,7 @@ export default function App() {
     const pendingRunsVehicleId = useRef(null);
     const pendingRunsSubtab = useRef(null);
     const pendingRunsRunId = useRef(null);
+    const pendingRunsEdit = useRef(false);
     // Whether to land on the Admin tab (?tab=admin&sub=…) once the user's role
     // has loaded, and which sub-tab to restore.
     const pendingAdminView = useRef(false);
@@ -471,6 +476,7 @@ export default function App() {
             const sub = p.get('sub');
             if (RUNS_SUBTAB_IDS.includes(sub)) pendingRunsSubtab.current = sub;
             if (p.get('run')) pendingRunsRunId.current = p.get('run');
+            pendingRunsEdit.current = p.get('edit') === '1';
             return;
         }
         // Unlinked, but a real route: nothing here needs a role or a selection
@@ -661,12 +667,14 @@ export default function App() {
         pendingRunsSubtab.current = null;
         const runId = pendingRunsRunId.current;
         pendingRunsRunId.current = null;
+        const editRun = pendingRunsEdit.current;
+        pendingRunsEdit.current = false;
         const v = vehicles.find(v => v.id === id);
         if (v) {
             setActiveVehicle(v);
             setView('runs');
             if (RUNS_SUBTAB_IDS.includes(sub)) setRunsSubtab(sub);
-            if (runId) setFocusRunId(runId);
+            if (runId) { setFocusRunId(runId); setFocusRunEdit(editRun); }
         }
     }, [loading, vehicles]);
 
@@ -1226,6 +1234,7 @@ export default function App() {
                             subtab={runsSubtab}
                             onSubtabChange={setRunsSubtab}
                             focusRunId={focusRunId}
+                            editOnFocus={focusRunEdit}
                             onFocused={clearFocusRun}
                         />
                     )}

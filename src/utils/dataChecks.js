@@ -55,7 +55,8 @@ import { formatYears } from './epaCertifications';
 // passes is one whose EPA tested the calculations actually use.
 import { testedAgreement } from './vehicleFigures';
 import { labelRangeCheck } from './labelRangeCheck';
-import { sameSource } from './sources';
+import { sameSource, findSource, isYouTubeLink, isPlainYouTubeLink, linkProblem } from './sources';
+import { isCompositeRun, isInheritedRunId } from './runUtils';
 import { deriveTested } from './performanceDerivations';
 import { resolveVoltageClass } from './platforms';
 import {
@@ -648,4 +649,139 @@ export function sourceNameVariants(summaries = []) {
     return groups
         .filter(g => g.length > 1)
         .map(g => g.map(name => ({ name, count: counts.get(name) })).sort((a, b) => b.count - a.count));
+}
+
+// ── Across the fleet: who a test says made it (#426) ────────────────────────
+
+/**
+ * The findings on a test's attribution, in the order they are listed. A test
+ * says who made it in three places — its source, the start of its name, its
+ * link — and they drifted apart because the source was free text.
+ */
+export const ATTRIBUTION_FINDINGS = [
+    { key: 'source-blank',    label: 'Source blank' },
+    { key: 'source-unlisted', label: 'Source not listed' },
+    { key: 'source-spelling', label: 'Source spelled another way' },
+    { key: 'name-not-source', label: 'Name does not start with its source' },
+    { key: 'link-missing',    label: 'No link' },
+    { key: 'link-rule',       label: 'Link breaks its source’s rule' },
+    { key: 'link-form',       label: 'YouTube link not plain' },
+    { key: 'window-mismatch', label: 'Name’s SoC window not on the curve' },
+    { key: 'duplicate-curve', label: 'Same curve stored twice' },
+];
+
+/** How far, in points of SoC, a curve may fall short of the window a name states. */
+const WINDOW_SLACK_SOC = 2;
+
+/** "0-100%", "10–80 %": the SoC window a charging test's name states, or null. */
+function statedWindow(name) {
+    const m = /(\d{1,3})\s*[-–—]\s*(\d{1,3})\s*%/.exec(String(name ?? ''));
+    if (!m) return null;
+    const [lo, hi] = [Number(m[1]), Number(m[2])];
+    return lo < hi && hi <= 100 ? { lo, hi } : null;
+}
+
+const norm = (s) => String(s ?? '').trim().toLowerCase();
+
+/**
+ * A charging session's curve, as far as stored figures can tell it from
+ * another's. Without the summary a point count and a span would match too
+ * easily, so a session without one is never called a duplicate.
+ */
+function curveFingerprint(run, socRange) {
+    const peakKw = run.charge_summary?.peakKw;
+    const durationMin = run.charge_summary?.durationMin;
+    if (peakKw == null || durationMin == null || !socRange || !run.dataPointCount) return null;
+    return [run.dataPointCount, socRange.min, socRange.max, peakKw, durationMin].join('|');
+}
+
+/**
+ * Check every test's attribution: source, name, link and the window the name
+ * states. One row per test that has a finding; composites are not tests and
+ * are left out, and so are tests a vehicle only inherits.
+ *
+ * The SoC span comes from the curve itself (`socRanges`, by run id), never
+ * from `runs.start_soc` / `end_soc`, which for a charging test are a leftover
+ * from the discharge it was split from (DataService.getSocRanges).
+ *
+ * @param {Array} vehicles
+ * @param {{ sources?: Array, socRanges?: Object }} context  rows of `sources`;
+ *        { [runId]: { min, max } } of the stored curves
+ * @returns {{ rows: Array, checked: number, counts: Object }}
+ *   rows    { runId, vehicleId, vehicle, kind, name, source, url, curve, findings: [{ key, text }] }
+ *   counts  tests per finding key, every key present
+ */
+export function testAttribution(vehicles = [], { sources = [], socRanges = {} } = {}) {
+    const rows = [];
+    let checked = 0;
+    const counts = Object.fromEntries(ATTRIBUTION_FINDINGS.map(f => [f.key, 0]));
+
+    for (const vehicle of vehicles) {
+        // A vehicle's runs include the ones it inherits through a spec link, which
+        // are the SOURCE vehicle's tests: they are checked there, once.
+        const tests = (vehicle.runs ?? []).filter(r => !isCompositeRun(r) && !r.synthetic && !r._inherited && !isInheritedRunId(r.id));
+        const seen = new Map();   // curve fingerprint → the first test holding it
+        for (const run of tests) {
+            checked += 1;
+            const findings = [];
+            const add = (key, text) => findings.push({ key, text });
+            const stored = String(run.source ?? '').trim();
+            const url = String(run.sourceUrl ?? run.source_url ?? '').trim();
+            const curve = socRanges[run.id] ?? null;
+
+            // Who it says made it.
+            const found = stored ? findSource(sources, { name: stored }) : null;
+            const canonical = found?.source.name ?? null;
+            if (!stored) add('source-blank', 'No source.');
+            else if (!found) add('source-unlisted', `“${run.source}” is not a listed source or alias.`);
+            else if (run.source !== canonical) {
+                add('source-spelling', `Stored as “${run.source}”; the source is “${canonical}”.`);
+            }
+
+            // Its name starts with it.
+            const owner = canonical ?? stored;
+            const name = String(run.name ?? '').trim();
+            if (owner && !norm(name).startsWith(norm(owner))) {
+                add('name-not-source', `“${name}” does not start with “${owner}”.`);
+            }
+
+            // Its link: there, right for the source, and stored one way.
+            const problem = linkProblem(owner, url);
+            if (problem?.problem === 'missing') {
+                add('link-missing', problem.expected ? `No link; ${owner} tests need ${problem.expected}.` : 'No link.');
+            } else if (problem) {
+                add('link-rule', `${owner} tests link to ${problem.expected}.`);
+            }
+            if (url && isYouTubeLink(url) && !isPlainYouTubeLink(url)) {
+                add('link-form', 'Store a YouTube link as https://www.youtube.com/watch?v=… and nothing after it.');
+            }
+
+            // The window its name states is on its curve.
+            const isCharging = run.kind === 'charging';
+            const window = isCharging ? statedWindow(name) : null;
+            if (window && curve
+                && (curve.min > window.lo + WINDOW_SLACK_SOC || curve.max < window.hi - WINDOW_SLACK_SOC)) {
+                add('window-mismatch',
+                    `Name says ${window.lo}–${window.hi}%; the curve runs ${Math.round(curve.min)}–${Math.round(curve.max)}%.`);
+            }
+
+            // Not stored twice under another name.
+            if (isCharging) {
+                const print = curveFingerprint(run, curve);
+                if (print && seen.has(print)) {
+                    add('duplicate-curve', `Same curve as “${seen.get(print).name}”.`);
+                } else if (print) {
+                    seen.set(print, run);
+                }
+            }
+
+            if (!findings.length) continue;
+            for (const key of new Set(findings.map(f => f.key))) counts[key] += 1;
+            rows.push({
+                runId: run.id, vehicleId: vehicle.id, vehicle: vehicleLabel(vehicle),
+                kind: run.kind, name: run.name ?? '', source: run.source ?? '', url, curve, findings,
+            });
+        }
+    }
+    return { rows, checked, counts };
 }
