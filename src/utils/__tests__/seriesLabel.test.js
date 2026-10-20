@@ -172,7 +172,7 @@ describe('the shelved free-text override', () => {
 
     it('wins over the composed label, in both tiers', () => {
         const m = buildSeriesLabels([oy('a', '2024', '70 mph')], { overrides: { a: 'winter' } });
-        expect(m.get('a')).toEqual({ short: 'winter', full: 'winter' });
+        expect(m.get('a')).toMatchObject({ short: 'winter', full: 'winter' });
     });
 
     it('does not lengthen its neighbours, being already distinct', () => {
@@ -224,5 +224,16 @@ describe('buildVehicleLabels — the curated name, widened only where needed', (
     it('gives the whole year name · trim as the full label', () => {
         const m = buildVehicleLabels([v(1, 'Model Y L', 2026, 'Premium')]);
         expect(m.get(1)).toEqual({ short: 'Model Y L', full: '2026 Model Y L · Premium' });
+    });
+});
+
+describe('fullBeside — verbose text next to a bar under a vehicle group', () => {
+    it('keeps every atom but the supplied vehicle ones; full still has them', () => {
+        const m = buildSeriesLabels(
+            [{ key: 'a', vehicle: { year: 2027, make: 'Rivian', model: 'R2', trim: 'Performance' }, rangeRun: { name: 'OoS 70 mph' } }],
+            { supplied: ['year', 'make', 'model', 'trim'] },
+        );
+        expect(m.get('a').full).toContain('Rivian');
+        expect(m.get('a').fullBeside).toBe('OoS 70 mph');
     });
 });

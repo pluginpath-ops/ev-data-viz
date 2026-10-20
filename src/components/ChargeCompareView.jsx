@@ -601,7 +601,7 @@ export default function ChargeCompareView({
                 ...p.rangeRun,
                 vehicleName: (verboseLabels ? vehicleNames.get(p.vehicle.id)?.full : vehicleNames.get(p.vehicle.id)?.short) ?? p.rangeRun.vehicleName,
             },
-            label: (verboseLabels ? labels.get(p.key)?.full : labels.get(p.key)?.short) ?? p.rangeRun.name,
+            label: (verboseLabels ? labels.get(p.key)?.fullBeside : labels.get(p.key)?.short) ?? p.rangeRun.name,
             fullLabel: labels.get(p.key)?.full ?? p.rangeRun.name,
             color: pairColors[p.key],
         }));

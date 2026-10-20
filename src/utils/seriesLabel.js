@@ -99,7 +99,9 @@ const clean = v => {
  * @param {boolean} [opts.useSessionName]  when both halves of a pair come from
  *        one session, prefer that session's name as the short label: "Ottawa
  *        loop" beats "10→80% DC fast × 70 mph highway" at a quarter the width.
- * @returns {Map<key, { short, full }>}
+ * @returns {Map<key, { short, full, fullBeside }>}  `fullBeside` is `full`
+ *          less the `supplied` atoms — what to print next to a bar that sits
+ *          under a group name already saying the vehicle.
  */
 export function buildSeriesLabels(
     series,
@@ -211,11 +213,14 @@ export function buildSeriesLabels(
         // reverted to the composed name would contradict the legend.
         const manual = overrideOf(s);
         if (manual) {
-            out.set(s.key, { short: manual, full: manual });
+            out.set(s.key, { short: manual, full: manual, fullBeside: manual });
             return;
         }
 
         const full = compose(ATOMS, row);
+        // Every atom except what the surface already says: the verbose form for
+        // text drawn BESIDE a bar whose group name carries the vehicle.
+        const fullBeside = compose(ATOMS.filter(a => !suppliedSet.has(a.key)), row);
 
         let short = compose(ATOMS.filter(a => chosen[i].has(a.key)), row);
 
@@ -231,7 +236,7 @@ export function buildSeriesLabels(
             short = chain.map(clean).find(Boolean) ?? full ?? '';
         }
 
-        out.set(s.key, { short, full: full || short });
+        out.set(s.key, { short, full: full || short, fullBeside: fullBeside || short });
     });
 
     return out;

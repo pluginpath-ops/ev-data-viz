@@ -199,7 +199,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             const nameFor = r => {
                 const l = barLabels.get(r.id);
                 if (!l) return r.name;
-                return verboseLabels ? l.full : l.short;
+                return verboseLabels ? l.fullBeside : l.short;
             };
             const labels = plottableRuns.map(nameFor);
 
