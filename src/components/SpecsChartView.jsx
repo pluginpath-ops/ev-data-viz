@@ -12,6 +12,7 @@ import { fieldFigureSource } from '../utils/vehicleFigures';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { buildVehicleLabels } from '../utils/seriesLabel';
 
 // ── Inside-bar label afterDraw plugin ─────────────────────────────────────────
 
@@ -93,7 +94,8 @@ export default function SpecsChartView({ vehicles: picked, selectedField: contro
         const fieldDef  = allFields.find(f => f.key === selectedField) || getFieldDef(selectedField, vehicleFields);
         const mode      = detectMode(vehicles, selectedField, fieldDef);
         const rawValues = vehicles.map(v => extractValue(v, selectedField));
-        const labels    = vehicles.map(v => v.name);
+        const vehicleNames = buildVehicleLabels(vehicles);
+        const labels    = vehicles.map(v => vehicleNames.get(v.id)?.short ?? v.name);
 
         let barData, bgColors, insideLabelFn, valueAxisOptions;
 

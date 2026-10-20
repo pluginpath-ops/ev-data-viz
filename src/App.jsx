@@ -36,6 +36,7 @@ import { isEpaPartnerId } from './utils/rangeSource';
 import { applyVehicleBases, withVehicleBase, NO_VEHICLE_BASES } from './utils/vehicleBase';
 import { VehicleBaseContext } from './context/VehicleBaseContext';
 import VehicleSwatch from './components/VehicleSwatch';
+import { buildVehicleLabels } from './utils/seriesLabel';
 
 /* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
    read by name in several places, so it is mapped here rather than renamed. */
@@ -253,6 +254,11 @@ export default function App() {
     // vehicle's color on the copy, so every chart, sidebar accent and swatch
     // that reads `vehicle.color` follows without knowing a second layer exists.
     const vehicleBases = chartConfig.vehicleBases ?? NO_VEHICLE_BASES;
+    // The selected chips' names: the curated name, widened only where two
+    // selected vehicles would otherwise read the same.
+    const chipNames = useMemo(
+        () => buildVehicleLabels(selectedVehicles.map(id => vehicles.find(v => v.id === id))),
+        [selectedVehicles, vehicles]);
     const chartVehicles = useMemo(
         () => applyVehicleBases(vehicles, vehicleBases), [vehicles, vehicleBases]);
     const vehicleBaseApi = useMemo(() => ({
@@ -1134,9 +1140,9 @@ export default function App() {
                                                         type="button"
                                                         onClick={() => viewVehicleRuns(vehicle)}
                                                         className="selected-vehicle-chip-name"
-                                                        title={`View ${vehicle.name} tests & data`}
+                                                        title={`View ${chipNames.get(vehicle.id)?.full ?? vehicle.name} tests & data`}
                                                     >
-                                                        {vehicle.name}
+                                                        {chipNames.get(vehicle.id)?.short ?? vehicle.name}
                                                     </button>
                                                     <button
                                                         onClick={() => removeVehicleSelection(vehicleId)}

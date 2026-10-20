@@ -704,8 +704,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             data: [],
             uploadDate: new Date().toISOString()
         };
-        onAddRun(run);
-        resetUploadState();
+        // Keep the form (and every typed value) until the save is accepted;
+        // addRun resolves undefined on failure after showing the error.
+        if (await onAddRun(run) !== undefined) resetUploadState();
     };
 
     // Sort data points by a field, toggling direction on repeated clicks.
@@ -778,8 +779,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             uploadDate: new Date().toISOString()
         };
 
-        onAddRun(run);
-        resetUploadState();
+        // Keep the form (and every typed value) until the save is accepted;
+        // addRun resolves undefined on failure after showing the error.
+        if (await onAddRun(run) !== undefined) resetUploadState();
     };
 
     // ── Merge-mode import ─────────────────────────────────────────────────────

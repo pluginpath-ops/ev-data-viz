@@ -12,6 +12,7 @@ import { fieldFigureSource } from '../utils/vehicleFigures';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { buildVehicleLabels } from '../utils/seriesLabel';
 
 // ── Linear regression ─────────────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
         };
 
         // Build per-vehicle datasets (one point each)
+        const vehicleNames = buildVehicleLabels(vehicles);
         const vehicleDatasets = vehicles.map((v, i) => {
             const rawX = extractValue(v, xField);
             const rawY = extractValue(v, yField);
@@ -146,7 +148,7 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
             const numY = toNum(rawY, yDef);
             const color = vehicleColor(v, i);
             return {
-                label:           v.name,
+                label:           vehicleNames.get(v.id)?.short ?? v.name,
                 data:            numX != null && numY != null ? [{ x: numX, y: numY }] : [],
                 backgroundColor: color,
                 borderColor:     color,

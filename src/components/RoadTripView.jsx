@@ -11,7 +11,7 @@ import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } fr
 import { resolveRangeSource, pricedAtSpeedMph, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { figureSources } from '../utils/vehicleFigures';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
-import { buildSeriesLabels } from '../utils/seriesLabel';
+import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { sessionFor } from '../utils/testSessions';
@@ -691,6 +691,9 @@ export default function RoadTripView({
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
         [vehicles, selectedVehicleIds]
     );
+    // Curated name, widened only where two selected vehicles read the same.
+    const vehicleNames = useMemo(() => buildVehicleLabels(selectedVehicles), [selectedVehicles]);
+    const nameOf = v => vehicleNames.get(v.id)?.short ?? vehicleLabel(v);
 
     // ── One entry per (range test × charging test) pair — structure only ──────
     // Range-primary, matching Charge Compare: a charging curve is a property of
@@ -2053,7 +2056,7 @@ export default function RoadTripView({
                                 if (!sim?.warnings?.length) return null;
                                 return sim.warnings.map((w, wi) => (
                                     <p key={`${entry.key}-${wi}`} className="roadtrip-warning">
-                                        ⚠ {vehicleLabel(entry.vehicle)} – {entry.label}: {w}
+                                        ⚠ {nameOf(entry.vehicle)} – {entry.label}: {w}
                                     </p>
                                 ));
                             })}
@@ -2146,11 +2149,11 @@ export default function RoadTripView({
                     {(vehiclesWithNoChargingRuns.length > 0 || skippedEntries.length > 0) && (
                         <div className="roadtrip-warning mt-3">
                             {vehiclesWithNoChargingRuns.map(v => (
-                                <p key={v.id}>⚠ {v.name}: No charging test data</p>
+                                <p key={v.id}>⚠ {nameOf(v)}: No charging test data</p>
                             ))}
                             {skippedEntries.map(e => (
                                 <p key={e.key}>
-                                    ⚠ {vehicleLabel(e.vehicle)} – {e.label}: {!e.miPerKwh ? 'No range data for efficiency' : 'No battery capacity'}
+                                    ⚠ {nameOf(e.vehicle)} – {e.label}: {!e.miPerKwh ? 'No range data for efficiency' : 'No battery capacity'}
                                 </p>
                             ))}
                         </div>
@@ -2233,7 +2236,7 @@ export default function RoadTripView({
                             {(() => {
                                 const spread = spreadSweep ?? spreadTimeline;
                                 const single = validEntries.filter((e, i) => spread[i] && !spread[i].steps);
-                                return single.length > 0 && ` No shading for ${single.map(e => vehicleLabel(e.vehicle)).join(', ')}: fewer than two range tests with an efficiency${spreadTimeline ? ' that finish the trip' : ''}.`;
+                                return single.length > 0 && ` No shading for ${single.map(e => nameOf(e.vehicle)).join(', ')}: fewer than two range tests with an efficiency${spreadTimeline ? ' that finish the trip' : ''}.`;
                             })()}
                         </p>
                     )}
@@ -2356,7 +2359,7 @@ export default function RoadTripView({
                                                     <span className="inline-block w-3 h-3 rounded-full mt-1 shrink-0"
                                                           style={{ backgroundColor: entry.color }} />
                                                     <div>
-                                                        <div className="font-medium">{vehicleLabel(entry.vehicle)}</div>
+                                                        <div className="font-medium">{nameOf(entry.vehicle)}</div>
                                                         <div className="text-xs text-meta">{entry.label}</div>
                                                         <div className="text-xs text-meta">
                                                             {figureSources(entry.vehicle, { capacity: true }, units)[0]?.line}
