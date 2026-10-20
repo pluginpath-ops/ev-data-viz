@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSeriesLabels } from '../seriesLabel';
+import { buildSeriesLabels, buildVehicleLabels } from '../seriesLabel';
 
 const V = (year, make, model, trim, name) => ({ year, make, model, trim, name });
 const shorts = (series, opts) => [...buildSeriesLabels(series, opts).values()].map(v => v.short);
@@ -197,5 +197,32 @@ describe('edges', () => {
             S('a', V('2026','Kia','EV6',''), '70'),
             S('b', V('2026','Kia','EV9',null), '80'),
         ])).toEqual(['EV6', 'EV9']);   // model alone separates them; the test adds nothing
+    });
+});
+
+describe('buildVehicleLabels — the curated name, widened only where needed', () => {
+    const v = (id, name, year, trim) => ({ id, name, year, trim });
+    const short = (list) => Object.fromEntries([...buildVehicleLabels(list)].map(([k, x]) => [k, x.short]));
+
+    it('uses the name alone when it already tells vehicles apart', () => {
+        expect(short([v(1, 'iX3 50 xDrive', 2027, 'Premium'), v(2, 'Model Y L', 2026, null)]))
+            .toEqual({ 1: 'iX3 50 xDrive', 2: 'Model Y L' });
+    });
+
+    it('adds the trim, then the year, only to vehicles whose names collide', () => {
+        expect(short([v(1, 'Model 3', 2024, 'LR'), v(2, 'Model 3', 2024, 'RWD'), v(3, 'Model Y', 2024, 'LR')]))
+            .toEqual({ 1: 'Model 3 · LR', 2: 'Model 3 · RWD', 3: 'Model Y' });
+        expect(short([v(1, 'Model 3 LR', 2024, null), v(2, 'Model 3 LR', 2025, null)]))
+            .toEqual({ 1: '2024 Model 3 LR', 2: '2025 Model 3 LR' });
+    });
+
+    it('never repeats a trim or year the name already carries', () => {
+        expect(short([v(1, 'Model 3 LR', 2024, 'LR'), v(2, 'Model 3 LR', 2025, 'LR')]))
+            .toEqual({ 1: '2024 Model 3 LR', 2: '2025 Model 3 LR' });
+    });
+
+    it('gives the whole year name · trim as the full label', () => {
+        const m = buildVehicleLabels([v(1, 'Model Y L', 2026, 'Premium')]);
+        expect(m.get(1)).toEqual({ short: 'Model Y L', full: '2026 Model Y L · Premium' });
     });
 });

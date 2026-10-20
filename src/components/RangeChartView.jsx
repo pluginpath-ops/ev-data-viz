@@ -5,7 +5,7 @@ import { useSyncedScale } from '../hooks/useSyncedScale';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
-import { buildSeriesLabels } from '../utils/seriesLabel';
+import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import { correctionFactor, correctionNote } from '../utils/conditionCorrection';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
@@ -29,6 +29,7 @@ import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
+import { wrapCanvasText } from '../utils/wrapCanvasText';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -113,6 +114,8 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // multiplication corrects range AND efficiency in every unit — including
     // Wh/mi, which inverts correctly because it is energy over distance.
     // Correcting the two outputs separately would let them drift apart.
+    const vehicleNames = buildVehicleLabels(selectedVehicles);
+    const vehicleNameOf = v => (verboseLabels ? vehicleNames.get(v.id)?.full : vehicleNames.get(v.id)?.short) ?? vehicleLabel(v);
     const corrected = (v, r) => {
         const session = sessionFor(testSessions, r);
         const result = correctionFactor({
@@ -121,7 +124,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             altitudeFt:   r.altitude_ft   ?? session?.altitude_ft,
             temperatureF: r.temperature_f ?? session?.temperature_f,
         }, { mode: correctionMode });
-        const base = { ...r, vehicle: v, vehicleName: vehicleLabel(v), vehicleId: v.id };
+        const base = { ...r, vehicle: v, vehicleName: vehicleNameOf(v), vehicleId: v.id };
         if (result.factor === 1) return base;
         return {
             ...base,
@@ -480,14 +483,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         ctx2.fillStyle    = legendColor;
                         ctx2.textAlign    = 'center';
                         ctx2.textBaseline = 'top';
-                        let label = group.vehicleName;
-                        if (ctx2.measureText(label).width > span) {
-                            while (label.length > 1 && ctx2.measureText(label + '…').width > span) {
-                                label = label.slice(0, -1);
-                            }
-                            label += '…';
-                        }
-                        ctx2.fillText(label, cx, groupLabelY + 4);
+                        const lead = fonts.label * 1.25;
+                        wrapCanvasText(ctx2, group.vehicleName, span, 3)
+                            .forEach((ln, li) => ctx2.fillText(ln, cx, groupLabelY + 4 + li * lead));
                         ctx2.restore();
                     }
 
@@ -521,7 +519,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 layout: {
                     padding: {
                         top:    0,
-                        bottom: built.kind === 'bar' ? 55 : 0,
+                        bottom: built.kind === 'bar' ? 75 : 0,
                     },
                 },
                 animation: false,

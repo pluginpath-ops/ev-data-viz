@@ -11,7 +11,7 @@ import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } fr
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { figureSources } from '../utils/vehicleFigures';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
-import { buildSeriesLabels } from '../utils/seriesLabel';
+import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
@@ -28,6 +28,7 @@ import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import NumberInput from './NumberInput';
+import { wrapCanvasText } from '../utils/wrapCanvasText';
 
 
 /**
@@ -279,15 +280,13 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     ctx2.fillStyle    = legendColor;
                     ctx2.textAlign    = 'right';
                     ctx2.textBaseline = 'middle';
-                    let vLabel = group.vehicleName;
-                    const vRoom = area.left - 16;
-                    if (ctx2.measureText(vLabel).width > vRoom) {
-                        while (vLabel.length > 1 && ctx2.measureText(vLabel + '…').width > vRoom) {
-                            vLabel = vLabel.slice(0, -1);
-                        }
-                        vLabel += '…';
-                    }
-                    ctx2.fillText(vLabel, area.left - 10, cy);
+                    // Wrapped to three lines before anything is cut, so the
+                    // trim that tells two variants apart survives.
+                    const vLines = wrapCanvasText(ctx2, group.vehicleName, area.left - 16, 3);
+                    const vLead  = fonts.label * 1.25;
+                    vLines.forEach((ln, li) => {
+                        ctx2.fillText(ln, area.left - 10, cy + (li - (vLines.length - 1) / 2) * vLead);
+                    });
                     ctx2.restore();
 
                     if (gi < groups.length - 1) {
@@ -332,7 +331,9 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     ctx2.fillStyle    = legendColor;
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'top';
-                    ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
+                    const gLead = fonts.axis * 1.25;
+                    wrapCanvasText(ctx2, group.vehicleName, x2 - x1 - 6, 3)
+                        .forEach((ln, li) => ctx2.fillText(ln, cx, groupLabelY + 4 + li * gLead));
                     ctx2.restore();
 
                     if (gi < groups.length - 1) {
@@ -593,8 +594,13 @@ export default function ChargeCompareView({
             baseColor:  colorMap[p.rangeRun.id] || DEFAULT_RUN_COLOR,
         })));
 
+        const vehicleNames = buildVehicleLabels(active.map(p => p.vehicle));
         return active.map(p => ({
             ...p,
+            rangeRun: {
+                ...p.rangeRun,
+                vehicleName: (verboseLabels ? vehicleNames.get(p.vehicle.id)?.full : vehicleNames.get(p.vehicle.id)?.short) ?? p.rangeRun.vehicleName,
+            },
             label: (verboseLabels ? labels.get(p.key)?.full : labels.get(p.key)?.short) ?? p.rangeRun.name,
             fullLabel: labels.get(p.key)?.full ?? p.rangeRun.name,
             color: pairColors[p.key],
@@ -858,7 +864,7 @@ export default function ChargeCompareView({
                 })],
                 options: {
                     indexAxis: isHorizontal ? 'y' : undefined,
-                    layout: { padding: isHorizontal ? { top: 0, left: 140, right: 10 } : { top: 0, bottom: 55 } },
+                    layout: { padding: isHorizontal ? { top: 0, left: 160, right: 10 } : { top: 0, bottom: 75 } },
                     animation: false,
                     responsive: true,
                     maintainAspectRatio: false,

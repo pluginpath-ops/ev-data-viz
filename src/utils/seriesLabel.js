@@ -20,10 +20,13 @@
  *
  *     year · make · model · trim · range test · charging test
  *
- * The vehicle's free-text `name` is deliberately NOT an atom. It is a selection
- * label, entered by hand and inconsistent — some carry the year, some the trim —
- * so eliding against it is unreliable. It survives only as a last-resort
- * fallback when the composed label would otherwise be empty.
+ * The vehicle's free-text `name` is deliberately NOT an atom of SERIES labels.
+ * It was entered by hand and was inconsistent — some carried the year, some the
+ * trim — so eliding against it was unreliable. It survives there only as a
+ * last-resort fallback. Where a chart names the VEHICLE alone (a group on the
+ * axis, a spec bar), `buildVehicleLabels` below starts from it instead: the
+ * curated name (model + trim) is by now the best short discriminator, and year
+ * and trim are added only where two selected vehicles still read the same.
  *
  * Elision at this granularity is what makes the year case work: treating the
  * vehicle as one blob would leave "2024 Model 3 LR" against "2025 Model 3 LR"
@@ -231,5 +234,81 @@ export function buildSeriesLabels(
         out.set(s.key, { short, full: full || short });
     });
 
+    return out;
+}
+
+// ── Vehicle names ────────────────────────────────────────────────────────────
+
+const has = (hay, needle) => hay.toLowerCase().includes(needle.toLowerCase());
+
+/**
+ * What to call each vehicle where the chart says only the vehicle — the
+ * group name under or beside a bar, a bar of a spec chart.
+ *
+ * The curated `name` (model + trim, by the friendly-name rule) is the base: it
+ * is the best short discriminator between vehicles. Trim, then year, are added
+ * only to the vehicles whose names still read the same, and only if they differ
+ * within that group — the same marginal rule `buildSeriesLabels` applies to
+ * series, with `name` as its first atom. A trim or year the name already
+ * contains is never added a second time.
+ *
+ * `full` is the whole `year name · trim`, for the Full Labels toggle.
+ *
+ * @param {Array} vehicles
+ * @returns {Map<id, { short, full }>}
+ */
+export function buildVehicleLabels(vehicles) {
+    const out = new Map();
+    const list = (vehicles ?? []).filter(Boolean);
+    const unique = [...new Map(list.map(v => [v.id, v])).values()];
+
+    const info = unique.map(v => {
+        const name = clean(v.name) ?? clean(v.model) ?? '';
+        const year = clean(v.year);
+        const trim = clean(v.trim);
+        return {
+            v, name,
+            year: year && !has(name, year) ? year : null,
+            trim: trim && !has(name, trim) ? trim : null,
+        };
+    });
+
+    const chosen = info.map(() => new Set());
+    const compose = i => {
+        const x = info[i];
+        const base = chosen[i].has('year') && x.year ? `${x.year} ${x.name}` : x.name;
+        return chosen[i].has('trim') && x.trim ? `${base}${SEPARATOR}${x.trim}` : base;
+    };
+
+    const refine = (indices, remaining) => {
+        if (indices.length <= 1) return;
+        for (let n = 0; n < remaining.length; n++) {
+            const key = remaining[n];
+            const groups = new Map();
+            for (const i of indices) {
+                const val = info[i][key] ?? '';
+                if (!groups.has(val)) groups.set(val, []);
+                groups.get(val).push(i);
+            }
+            if (groups.size <= 1) continue;
+            for (const i of indices) chosen[i].add(key);
+            for (const g of groups.values()) refine(g, remaining.slice(n + 1));
+            return;
+        }
+    };
+
+    const byName = new Map();
+    info.forEach((x, i) => {
+        const k = x.name.toLowerCase();
+        if (!byName.has(k)) byName.set(k, []);
+        byName.get(k).push(i);
+    });
+    for (const indices of byName.values()) refine(indices, ['trim', 'year']);
+
+    info.forEach((x, i) => {
+        const base = x.year || clean(x.v.year) ? `${clean(x.v.year) ?? ''} ${x.name}`.trim() : x.name;
+        const full = x.v.trim ? `${base}${SEPARATOR}${clean(x.v.trim)}` : base;
+        out.set(x.v.id, { short: compose(i), full });
+    });
     return out;
 }

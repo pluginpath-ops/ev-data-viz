@@ -4,6 +4,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useAppContext } from '../context/AppContext';
 import { convSpeed, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
+import { buildVehicleLabels } from '../utils/seriesLabel';
 import { PALETTE } from '../utils/specHelpers';
 import { resolveChartColors, seriesRowsOf, applyColorOverrides, VEHICLE_PALETTE } from '../utils/colorUtils';
 import {
@@ -274,6 +275,11 @@ export default function EpaCurvesView({
         selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
     [vehicles, selectedVehicleIds]);
 
+    // What each selected vehicle is called: its curated name, widened only where
+    // two selected vehicles would otherwise read the same.
+    const vehicleNames = useMemo(() => buildVehicleLabels(selectedVehicles), [selectedVehicles]);
+    const nameOf = useCallback(v => vehicleNames.get(v.id)?.short ?? vehicleLabel(v), [vehicleNames]);
+
     const vehiclesWithEpa    = selectedVehicles.filter(v => v.epa_mappings?.length > 0);
     const vehiclesWithoutEpa = selectedVehicles.filter(v => !v.epa_mappings?.length);
 
@@ -385,7 +391,7 @@ export default function EpaCurvesView({
         let shownIdx = 0;
         return {
             ...vehicle,
-            name: vehicleLabel(vehicle),
+            name: nameOf(vehicle),
             runs: (vehicle.epa_mappings ?? []).map((mapping) => {
                 const testVehicle = mapping.epaTestVehicle;
                 if (!testVehicle) return null;
@@ -404,7 +410,7 @@ export default function EpaCurvesView({
                 };
             }).filter(Boolean),
         };
-    }), [vehiclesWithEpa, vehicles, vehicleColorMap, shown]);
+    }), [vehiclesWithEpa, vehicles, vehicleColorMap, shown, nameOf]);
 
     /**
      * Everything the picker's wider scopes are allowed to touch.
@@ -459,7 +465,7 @@ export default function EpaCurvesView({
                 // no grade, drop the curve (and its overlay) entirely and flag it.
                 if (gradeAdjusted && !resolvePrimaryCoeffs(epaTestVehicle)?.equivTestWeightLbs) {
                     missingWeightWarnings.push({
-                        vehicleName: vehicleLabel(vehicle),
+                        vehicleName: nameOf(vehicle),
                         epaLabel: epaTestVehicle.display_name || epaTestVehicle.epa_carline_name,
                     });
                     return;
@@ -475,8 +481,8 @@ export default function EpaCurvesView({
                 const color = mappingColors[mapping.id] ?? mappingColor(baseColor, mi);
                 const epaLabel = epaTestVehicle.display_name || epaTestVehicle.epa_carline_name;
                 const baseLabel = vehiclesWithEpa.length > 1 || mi > 0
-                    ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
-                    : vehicleLabel(vehicle);
+                    ? `${nameOf(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
+                    : nameOf(vehicle);
                 // Subtle "adjusted" marker on each curve's legend entry (density or accessory load).
                 const label = (densityAdjusted || accessoryAdjusted || windAdjusted || gradeAdjusted) ? `${baseLabel} ▲` : baseLabel;
 
@@ -568,7 +574,7 @@ export default function EpaCurvesView({
             });
         });
         return { datasets: result, missingWeightWarnings };
-    }, [vehiclesWithEpa, vehicles, yAxis, units, shown, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, shown, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode, nameOf]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -763,7 +769,7 @@ export default function EpaCurvesView({
                 if (!epaTestVehicle) continue;
                 if (!shown.has(mapping.id)) continue;
 
-                const vehicleName = vehicleLabel(vehicle);
+                const vehicleName = nameOf(vehicle);
                 const epaLabel = epaTestVehicle.display_name || epaTestVehicle.epa_carline_name || null;
                 const { record, reason } =
                     epaRecordFromTestVehicle(epaTestVehicle, { vehicleName, configuration: epaLabel });
@@ -788,7 +794,7 @@ export default function EpaCurvesView({
             }
         }
         return out;
-    }, [vehiclesWithEpa, shown]);
+    }, [vehiclesWithEpa, shown, nameOf]);
 
     const methodologyModels = methodologyEntries.filter(e => e.model);
     const methodologyGaps   = methodologyEntries.filter(e => !e.model);
@@ -962,7 +968,7 @@ export default function EpaCurvesView({
                                 has not opened the list. */}
                             {vehiclesWithoutEpa.length > 0 && (
                                 <p className="text-note">
-                                    No EPA data: {vehiclesWithoutEpa.map(v => vehicleLabel(v)).join(', ')}
+                                    No EPA data: {vehiclesWithoutEpa.map(v => nameOf(v)).join(', ')}
                                     {' '}— link a test vehicle via Edit Vehicle.
                                 </p>
                             )}

@@ -15,7 +15,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { dataService } from '../services/DataService';
 import { vehicleLabel } from '../utils/specHelpers';
-import { buildSeriesLabels } from '../utils/seriesLabel';
+import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import { useTheme } from '../hooks/useTheme';
 import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
@@ -90,6 +90,9 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
         [selectedVehicleIds, vehicles],
     );
+    // Curated name, widened only where two selected vehicles read the same.
+    const vehicleNames = useMemo(() => buildVehicleLabels(selected), [selected]);
+    const nameOf = v => vehicleNames.get(v.id)?.short ?? vehicleLabel(v);
 
     useEffect(() => {
         let cancelled = false;
@@ -212,7 +215,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
 
             if (origin !== 'all') entries = entries.filter(e => e.origin === origin);
             entries.sort((a, b) => a.value - b.value);
-            return { id: v.id, vehicle: v, name: vehicleLabel(v), entries };
+            return { id: v.id, vehicle: v, name: nameOf(v), entries };
         });
     };
 
@@ -243,7 +246,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
             if (origin !== 'all') entries = entries.filter(e => e.origin === origin);
             // Higher g is better here, unlike every other metric on this page.
             entries.sort((a, b) => b.value - a.value);
-            return { id: v.id, vehicle: v, name: vehicleLabel(v), entries };
+            return { id: v.id, vehicle: v, name: nameOf(v), entries };
         });
     };
 
