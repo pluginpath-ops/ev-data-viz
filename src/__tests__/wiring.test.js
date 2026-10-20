@@ -721,7 +721,7 @@ describe('the seams that broke before', () => {
         // Resolved where the figures are, so every reader of the fleet sees it.
         const ctx = read('src/context/AppContext.jsx');
         expect(ctx).toMatch(/withVehicleFigures\(withPlatforms\(withInheritance\(shown\), platformsById\)\)/);
-        expect(ctx, 'createVariant must link every run the source shows').toMatch(/dataService\.createVariant\(source, variantLinkPlan\(source\)\)/);
+        expect(ctx, 'createVariant must link every run the source shows that the lineage does not bring').toMatch(/dataService\.createVariant\(source, variantLinkPlan\(source\)\)/);
 
         // Editors read own values. A form seeded from the resolved ones saves
         // the source's color or tags onto the variant and cuts the pointer.
@@ -885,8 +885,42 @@ describe('the seams that broke before', () => {
         expect(body('createVariant')).toMatch(/dataService\.rebuildComposites\(/);
         // The rebuild reads what it inherits, scaled as the chart scales it.
         const ds = read('src/services/DataService.js');
-        expect(ds).toMatch(/buildInheritedRuns\(\{ spec_links: links\.data \}/);
+        expect(ds).toMatch(/buildInheritedRuns\(\{ id: vehicleId, spec_links: links\.data \}, runById, runToVehicle, lineageTests\)/);
         expect(ds).toMatch(/shapePoint\(p, r\._efficiencyFactor \?\? 1, r\._capacityFactor \?\? 1\)/);
+    });
+
+    it('brings charging tests down the lineage, and stops them at a battery revision (086)', () => {
+        const ds = read('src/services/DataService.js');
+        const ctx = read('src/context/AppContext.jsx');
+        // Both doors a vehicle's runs come through build the lineage's tests.
+        expect(ds, 'getVehicles reads the lineage').toMatch(/buildInheritedRuns\(v, runById, runToVehicle, lineageChargingTests\(v, byId\)\)/);
+        expect(ds, 'the composite rebuild reads it too').toMatch(/rebuildComposites\(vehicle, lineage = \[\]\)[\s\S]*getVehicleRuns\(vehicle\.id, lineage\)/);
+        // Every rebuild is handed the lineage, or a variant's composite forgets
+        // the tests it inherits.
+        expect(ctx).toMatch(/const lineage = chargingLineage\(raw, /);
+        expect(ctx).toMatch(/rebuildComposites\(v, chargingLineage\(v, byId\)\)/);
+        // A test added above reaches the variants below, and their composites.
+        const body = (fn) => {
+            const start = ctx.indexOf(`    const ${fn} = async`);
+            return ctx.slice(start, ctx.indexOf('\n    const ', start + 1));
+        };
+        for (const fn of ['addRun', 'duplicateRun', 'copyRunToVehicle']) {
+            expect(body(fn), `${fn} must reach the variants below`).toMatch(/refreshLineageHeirs\(/);
+        }
+        // A write to a test rebuilds every variant reading it down the lineage.
+        expect(ctx).toMatch(/const inheritorsOf = \(runIds\) => \{[\s\S]*?lineageInheritors\(id, vehicles\)/);
+        // Changing the source, the revision or the factor re-resolves the lineage.
+        expect(body('updateVehicle')).toMatch(/if \(lineageChanged\) await reresolveLineage\(vehicleId\)/);
+        // The two fields are saved, only where the columns exist.
+        expect(ds).toMatch(/if \(this\.batteryRevisionAvailable\) \{\s*set\('battery_revision'/);
+        // The source vehicle is chosen on the vehicle form, and seeded from the record.
+        expect(read('src/components/EditVehicleForm.jsx')).toMatch(/<SourceVehiclePicker/);
+        expect(read('src/components/EditSpecsForm.jsx')).not.toMatch(/<VehicleCombobox/);
+        expect(read('src/utils/vehicleForm.js')).toMatch(/battery_revision: !!vehicle\.battery_revision/);
+        // A lineage test with no link gets one on its first change.
+        expect(read('src/components/RunsView.jsx')).toMatch(/overrideInheritedRun\(run, \{ \[f\.field\]: next \}, vehicle\.id\)/);
+        // The lineage tree marks where tests stop.
+        expect(read('src/components/vehicles/LineageTree.jsx')).toMatch(/<BatteryRevisionNote/);
     });
 
     it('measures a composite from the start SoC, built live from its tests (#408)', () => {

@@ -10,7 +10,8 @@ import { demotionUpdates, acceptGuideTags, guideOverlay, isCuratorOwned } from '
 import { selectTestForGuide } from '../utils/epaTestSelection';
 import { planTestVehicleImport, uniqueCoveredModels } from '../utils/epaImportMerge';
 import { planCertificationImport, guideLinkTarget, testGroupYear, isTestGroup, viewForVehicle, viewForTestVehicle, certifiedYears } from '../utils/epaCertifications';
-import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
+import { lineageChargingTests, testsFromLineage } from '../utils/lineageCharging';
+import { detectPopulatedFields, buildInheritedRunId, buildLineageRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
 import { planCompositeRebuild, compositeEligible, mayHaveComposite, storedComposites } from '../utils/compositeCurve';
 import { toPreconditioned } from '../utils/runPreconditioning';
@@ -189,19 +190,31 @@ function splitPerformance(performance = {}) {
 
 /**
  * Given a processed vehicle, a Map of runId→run, and a Map of runId→{vehicleId,vehicleName},
- * returns synthetic run objects for all runs inherited via spec_links.
+ * returns synthetic run objects for every run the vehicle inherits: through its
+ * spec_links, and down its lineage (`lineage`, from lineageChargingTests —
+ * migration 086).
+ *
+ * A link naming a test the lineage also provides is an OVERRIDE of that test,
+ * not a second copy: its factors win where set, and a null capacity factor
+ * defers to the lineage's. A lineage test with no link is read at the
+ * lineage's factor, with no color, DEF or notes of its own.
+ *
  * Each inherited run gets a synthetic string id to prevent runDataCache collisions.
  */
-function buildInheritedRuns(vehicle, runById, runToVehicle) {
+function buildInheritedRuns(vehicle, runById, runToVehicle, lineage = []) {
   const inherited = [];
+  const fromLineage = new Map(lineage.map(t => [Number(t.run.id), t]));
   for (const link of (vehicle.spec_links || [])) {
     const run = runById.get(Number(link.source_run_id));
     if (!run) continue;
     const vInfo = runToVehicle.get(Number(link.source_run_id));
+    const viaLineage = fromLineage.get(Number(run.id));
+    fromLineage.delete(Number(run.id));
     // Two independent knobs (migration 055). Null reads as 1 for both, so a
-    // link predating the split keeps exactly its old meaning.
+    // link predating the split keeps exactly its old meaning — or, for a test
+    // the lineage provides, as the lineage's capacity factor.
     const eff = link.efficiency_factor != null ? Number(link.efficiency_factor) : 1;
-    const cap = link.capacity_factor   != null ? Number(link.capacity_factor)   : 1;
+    const cap = link.capacity_factor   != null ? Number(link.capacity_factor)   : (viaLineage?.capacityFactor ?? 1);
     inherited.push({
       ...run,
       // Synthetic id prevents runDataCache collision when both source and
@@ -212,6 +225,7 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       _efficiencyFactor:  eff,
       _capacityFactor:    cap,
       _specLinkId:        link.id,
+      _viaLineage:        !!viaLineage,
       _sourceVehicleId:   vInfo?.vehicleId,
       _sourceVehicleName: vInfo?.vehicleName,
       // The link's own color still overrides, and is a separate stored value
@@ -224,6 +238,25 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       // Which factor reaches which field is the arithmetic that makes the two
       // knobs independent, so it lives in one tested place rather than here.
       ...scaleInheritedMagnitudes(run, cap, eff),
+    });
+  }
+  for (const { run, capacityFactor, source } of fromLineage.values()) {
+    inherited.push({
+      ...run,
+      id:                 buildLineageRunId(vehicle.id, run.id),
+      _inherited:         true,
+      _realRunId:         run.id,
+      _efficiencyFactor:  1,
+      _capacityFactor:    capacityFactor,
+      _specLinkId:        null,
+      _viaLineage:        true,
+      _sourceVehicleId:   source.id,
+      _sourceVehicleName: vehicleLabel(source),
+      color:              RETIRED_RUN_COLOR,
+      // The source's DEF is the source's: a variant's default is its own
+      // composite unless a curator marks one (which writes an override link).
+      isDefault:          false,
+      ...scaleInheritedMagnitudes(run, capacityFactor, 1),
     });
   }
   return inherited;
@@ -266,6 +299,8 @@ class DataService {
     this.useSupabase = false;
     // Whether migration 072's platform columns exist; set by getPlatforms().
     this.platformsAvailable = false;
+    // Whether migration 086's battery_revision / capacity_factor exist; set by getVehicles().
+    this.batteryRevisionAvailable = false;
   }
 
   get isAdmin()       { return this.role === 'admin'; }
@@ -362,6 +397,10 @@ class DataService {
       };
     });
 
+    // Migration 086 is applied when the rows carry its column: `*` brings it
+    // back once it exists, and updateVehicle writes it only then.
+    this.batteryRevisionAvailable = (data || []).some(v => 'battery_revision' in v);
+
     // Pass 2: build flat run lookup maps, then attach inherited runs.
     // buildInheritedRuns needs to locate source runs across all vehicles.
     const runById      = new Map(); // runId → run object
@@ -373,9 +412,13 @@ class DataService {
       }
     }
 
+    // Charging tests also come down the lineage (migration 086). Read from
+    // `processed`, whose runs are still each vehicle's OWN: a source's
+    // inherited tests are reached by walking further up, at the right factor.
+    const byId = new Map(processed.map(v => [v.id, v]));
     return processed.map(v => ({
       ...v,
-      runs: [...v.runs, ...buildInheritedRuns(v, runById, runToVehicle)],
+      runs: [...v.runs, ...buildInheritedRuns(v, runById, runToVehicle, lineageChargingTests(v, byId))],
     }));
   }
 
@@ -942,6 +985,20 @@ class DataService {
     // `|| null` is what lets the picker's Auto hand the vehicle back to the
     // palette rather than storing an empty string.
     set('color', updates.color !== undefined ? (updates.color || null) : undefined);
+    // The source pointer, here since "Inherit from" moved to the vehicle form.
+    // An id, or empty for none; the picker leaves out the vehicle's own
+    // variants, so it cannot make a cycle.
+    set('spec_source_vehicle_id', updates.spec_source_vehicle_id !== undefined
+        ? (updates.spec_source_vehicle_id ? Number(updates.spec_source_vehicle_id) : null)
+        : undefined);
+    // Battery revision and capacity factor (migration 086), only once the
+    // columns exist: naming one that does not would refuse the whole save.
+    if (this.batteryRevisionAvailable) {
+      set('battery_revision', updates.battery_revision !== undefined ? !!updates.battery_revision : undefined);
+      set('capacity_factor', updates.capacity_factor !== undefined
+        ? (Number(updates.capacity_factor) > 0 ? Number(updates.capacity_factor) : 1)
+        : undefined);
+    }
     // The two platform links (#318): an id, or empty for "none". Only where
     // migration 072 is applied: the form always sends them, and naming a
     // column that does not exist would refuse the whole save.
@@ -1026,8 +1083,11 @@ class DataService {
    * the name gets " (variant)" so the new card is findable. Everything a reader
    * sees beyond that comes from the source at read time — specs through
    * `spec_source_vehicle_id`, color, photo and tags through the same pointer
-   * (vehicleInheritance.js), and tests through one spec link per run in
-   * `links` (variantLinkPlan). Color stays null on purpose: null inherits.
+   * (vehicleInheritance.js), charging tests down the same pointer
+   * (lineageCharging.js, migration 086), and the rest — range tests, and any
+   * test the source reads through a link of its own — through one spec link
+   * per run in `links` (variantLinkPlan). Color stays null on purpose: null
+   * inherits.
    *
    * Not atomic: a failure part-way leaves the vehicle with fewer links, which
    * the Tests & Data link list shows and can finish. The vehicle row is written
@@ -1241,30 +1301,48 @@ class DataService {
 
   /**
    * A vehicle's runs straight from the database, shaped as getVehicles shapes
-   * them — its own, then those it inherits through spec links, built by the
-   * same buildInheritedRuns so their ids and factors match what is on screen.
+   * them — its own, then those it inherits through spec links and down its
+   * lineage, built by the same buildInheritedRuns so their ids and factors
+   * match what is on screen.
+   *
+   * `lineage` is chargingLineage(vehicle, fleet) — the sources and the factor
+   * each is read at — worked out by the caller, who holds the fleet. The
+   * sources' charging tests are re-read here, since this runs straight after
+   * a write to one of them.
    */
-  async getVehicleRuns(vehicleId) {
+  async getVehicleRuns(vehicleId, lineage = []) {
     const sb = getSupabase();
-    const [own, links] = await Promise.all([
+    const sourceVehicleIds = lineage.map(e => e.source.id);
+    const [own, links, fromSources] = await Promise.all([
       sb.from('runs').select('*, data_points(count)').eq('vehicle_id', vehicleId),
       sb.from('spec_links').select('*').eq('target_vehicle_id', vehicleId),
+      sourceVehicleIds.length
+        ? sb.from('runs').select('*, data_points(count)').in('vehicle_id', sourceVehicleIds).eq('kind', 'charging')
+        : Promise.resolve({ data: [] }),
     ]);
     if (own.error) throw own.error;
     if (links.error) throw links.error;
+    if (fromSources.error) throw fromSources.error;
     const runs = (own.data ?? []).map(shapeRun);
-    const sourceIds = (links.data ?? []).map(l => Number(l.source_run_id));
-    if (!sourceIds.length) return runs;
+    const sourceRuns = (fromSources.data ?? []).map(shapeRun);
+    const lineageTests = testsFromLineage(lineage, (source) => sourceRuns.filter(r => r.vehicle_id === source.id));
 
-    const { data: sources, error } = await sb.from('runs')
-      .select('*, data_points(count), vehicles(name, year, trim)').in('id', sourceIds);
-    if (error) throw error;
     const runById = new Map(), runToVehicle = new Map();
-    for (const { vehicles: sv, ...r } of sources ?? []) {
-      runById.set(Number(r.id), shapeRun(r));
-      runToVehicle.set(Number(r.id), { vehicleId: r.vehicle_id, vehicleName: vehicleLabel(sv) });
+    for (const { run, source } of lineageTests) {
+      runById.set(Number(run.id), run);
+      runToVehicle.set(Number(run.id), { vehicleId: source.id, vehicleName: vehicleLabel(source) });
     }
-    return [...runs, ...buildInheritedRuns({ spec_links: links.data }, runById, runToVehicle)];
+    const missing = (links.data ?? []).map(l => Number(l.source_run_id)).filter(id => !runById.has(id));
+    if (missing.length) {
+      const { data: sources, error } = await sb.from('runs')
+        .select('*, data_points(count), vehicles(name, year, trim)').in('id', missing);
+      if (error) throw error;
+      for (const { vehicles: sv, ...r } of sources ?? []) {
+        runById.set(Number(r.id), shapeRun(r));
+        runToVehicle.set(Number(r.id), { vehicleId: r.vehicle_id, vehicleName: vehicleLabel(sv) });
+      }
+    }
+    return [...runs, ...buildInheritedRuns({ id: vehicleId, spec_links: links.data }, runById, runToVehicle, lineageTests)];
   }
 
   /**
@@ -1278,10 +1356,13 @@ class DataService {
    *
    * Each composite is rebuilt IN PLACE where one of its class exists
    * (planCompositeRebuild), so its id, DEF tag and pairings survive.
+   *
+   * `lineage` is chargingLineage(vehicle, fleet): where its inherited charging
+   * tests come from (see getVehicleRuns).
    */
-  async rebuildComposites(vehicle) {
+  async rebuildComposites(vehicle, lineage = []) {
     if (!this.useSupabase || !this.isContributor || !vehicle) return null;
-    const runs = await this.getVehicleRuns(vehicle.id);
+    const runs = await this.getVehicleRuns(vehicle.id, lineage);
     const withRuns = { ...vehicle, runs };
     if (!mayHaveComposite(withRuns) && !storedComposites(withRuns).length) return runs;
 
@@ -1323,7 +1404,7 @@ class DataService {
         throw new Error(`${deletes.length - (gone?.length ?? 0)} obsolete composite curve(s) could not be deleted — is migration 077 applied?`);
       }
     }
-    return this.getVehicleRuns(vehicle.id);
+    return this.getVehicleRuns(vehicle.id, lineage);
   }
 
   /**

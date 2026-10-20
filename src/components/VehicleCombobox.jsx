@@ -14,11 +14,15 @@ import { useState } from 'react';
  *   value       — the selected id as a string, '' for none
  *   onChange    — (id: string) => void; '' when "— None —" is chosen
  *   noneLabel   — text for the empty choice, closed and in the list
+ *   suggestedSearch — what the list opens already filtered by (say, the
+ *                 vehicle's own model, when picking its source), selected so
+ *                 the first key typed replaces it with a search of your own
  */
 export default function VehicleCombobox({
     options, value, onChange,
     placeholder = 'Type to filter vehicles…',
     noneLabel = '— None —',
+    suggestedSearch = '',
 }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -48,6 +52,7 @@ export default function VehicleCombobox({
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
+                    onFocus={e => e.target.select()}
                     onBlur={() => setTimeout(() => setOpen(false), 150)}
                     placeholder={placeholder}
                     className="form-input w-full"
@@ -55,7 +60,7 @@ export default function VehicleCombobox({
             ) : (
                 <button
                     type="button"
-                    onClick={() => { setSearch(''); setOpen(true); }}
+                    onClick={() => { setSearch(suggestedSearch ?? ''); setOpen(true); }}
                     className="form-input w-full text-left truncate"
                 >
                     {selectedLabel || <span className="text-meta">{noneLabel}</span>}

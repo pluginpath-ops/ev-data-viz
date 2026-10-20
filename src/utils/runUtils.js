@@ -58,10 +58,12 @@ export function compositesFirst(runs) {
 /**
  * A vehicle's own composite: the one for the car's own charger class, ahead
  * of a lower class's (an 800 V car's 800 V composite before its 400 V one).
- * Hidden composites are passed over.
+ * Hidden composites are passed over, and so is one that reaches the vehicle
+ * through a spec link made before composites stopped being linkable: that one
+ * is its source's, not its own.
  */
 export function nativeComposite(runs) {
-    const composites = (runs || []).filter(r => isCompositeRun(r) && !(r.isHidden || r.is_hidden));
+    const composites = (runs || []).filter(r => isCompositeRun(r) && !r._inherited && !(r.isHidden || r.is_hidden));
     return composites.sort((a, b) =>
         (b.composite.chargerClassV ?? Infinity) - (a.composite.chargerClassV ?? Infinity))[0] ?? null;
 }
@@ -129,16 +131,29 @@ export function detectPopulatedFields(points) {
 }
 
 // ── Inherited run ID helpers ──────────────────────────────────────────────────
-// Inherited run IDs follow the pattern: inherited_<linkId>_<realRunId>
+// Two forms, one prefix, so everything that asks "is this inherited?" or "which
+// real run?" never has to know which:
+//
+//   inherited_<linkId>_<realRunId>      read through a spec link
+//   inherited_v<vehicleId>_<realRunId>  down the lineage with no link (086)
+//
+// A linked test keeps its link's id even when the lineage also provides it:
+// chart URLs carry run ids, and those links predate the lineage.
 // Centralising the format here means a single change propagates everywhere.
 
 const INHERITED_PREFIX = 'inherited_';
 
 export const isInheritedRunId    = (id) => typeof id === 'string' && id.startsWith(INHERITED_PREFIX);
 export const buildInheritedRunId = (linkId, realRunId) => `${INHERITED_PREFIX}${linkId}_${realRunId}`;
+export const buildLineageRunId   = (vehicleId, realRunId) => `${INHERITED_PREFIX}v${vehicleId}_${realRunId}`;
 export const parseInheritedRunId = (id) => {
-    const [, linkId, realRunId] = id.split('_');
-    return { linkId: parseInt(linkId, 10), realRunId: parseInt(realRunId, 10) };
+    const [, owner, realRunId] = id.split('_');
+    const viaLineage = owner.startsWith('v');
+    return {
+        linkId:    viaLineage ? null : parseInt(owner, 10),
+        vehicleId: viaLineage ? parseInt(owner.slice(1), 10) : null,
+        realRunId: parseInt(realRunId, 10),
+    };
 };
 
 // ── Default runs ─────────────────────────────────────────────────────────────

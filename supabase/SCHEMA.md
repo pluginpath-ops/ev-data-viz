@@ -56,7 +56,9 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 | `flagged_specs` | `text[]` | `'{}'` | Field keys flagged as potentially inaccurate by public users (e.g. `['powertrain.horsepower_hp']`). Append-only via `flag_spec_field` RPC; cleared by `unflag_spec_field` (admin only). |
 | `mechanical_platform_id` | `bigint` | `NULL` | FK → `platforms.id` ON DELETE SET NULL; must be a `mechanical` platform (trigger `vehicles_platform_kinds`). Inherited down `spec_source_vehicle_id` when unset (`vehicleInheritance.js`). Migration 072, #318 |
 | `electrical_platform_id` | `bigint` | `NULL` | FK → `platforms.id` ON DELETE SET NULL; must be an `electrical` platform. Inherited the same way, separately. Migration 072, #318 |
-| `spec_source_vehicle_id` | `bigint` | `NULL` | FK → `vehicles.id`, no `ON DELETE` action (migration 075; it was `SET NULL`). The vehicle this one inherits specs, tests, color, photo and tags from. Delete through `delete_vehicle_passing_down()`, which copies the deleted vehicle's own values onto its variants and re-points them first; a plain `DELETE` of a source is refused. |
+| `spec_source_vehicle_id` | `bigint` | `NULL` | FK → `vehicles.id`, no `ON DELETE` action (migration 075; it was `SET NULL`). The vehicle this one inherits specs, color, photo, tags, platforms and charging tests from — all at read time, up the whole chain. Charging tests come down unless `battery_revision` stops them (migration 086, `src/utils/lineageCharging.js`); range tests still come only through `spec_links`. Set on the vehicle form (`SourceVehiclePicker`). Delete through `delete_vehicle_passing_down()`, which copies the deleted vehicle's own values onto its variants and re-points them first; a plain `DELETE` of a source is refused. |
+| `battery_revision` | `boolean` | `false` | The pack differs from the source's in chemistry or construction: the vehicle takes no charging tests from its source or above, and its own variants inherit from it. Passed down by `delete_vehicle_passing_down()`. Migration 086 |
+| `capacity_factor` | `numeric` | `1` | `> 0`. This pack against the source's, for one effectively the same but a different size: scales the charging tests that come down to it, and multiplies down the chain. 1 unless a curator sets it. A spec link's own `capacity_factor` on one test overrides it. Migration 086 |
 | `created_at` | `timestamptz` | `now()` | |
 
 > **`specs` JSONB structure:** Each category key maps to an object of predefined field keys plus `_custom` (user-defined key-value pairs). Categories: `pricing`, `powertrain`, `performance`, `compute`, `infotainment`, `dimensions`, `wheels`, `suspension`, `lighting`, `charging`, `towing`, `warranty`, `range`, `interior`. Where a field is blank on the vehicle and its source chain, what its platform provides is shown in its place, marked as the platform's (`PLATFORM_PROVIDES` in `src/utils/platforms.js`, #352); nothing is written to `specs`. See `src/utils/vehicleSpecSchema.js` for the full field list. `specs = NULL` means no specs entered yet — handled gracefully by all UI components.
@@ -69,6 +71,25 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 > ```sql
 > UPDATE public.vehicles SET user_id = '<admin-uuid>' WHERE user_id IS NULL;
 > ```
+
+---
+
+### `spec_links`
+
+One test of another vehicle that a vehicle shows as its own, scaled (migrations 011, 016, 055). A charging test the vehicle's lineage already brings down (migration 086) is not linked for that; a link naming one is an **override** of that test on that vehicle — its factors, color, default and notes — and removing it puts the test back to the lineage's reading. Everything else (range tests, and any test from outside the lineage) is shown only through a link.
+
+| Column | Type | Default | Notes |
+|--------|------|---------|-------|
+| `id` | `bigint` | auto | PK. Part of the inherited run's id, `inherited_<id>_<run>`; a lineage test with no link is `inherited_v<vehicle>_<run>` (`runUtils.js`) |
+| `target_vehicle_id` | `bigint` | — | FK → `vehicles.id` ON DELETE CASCADE. The vehicle showing the test |
+| `source_run_id` | `bigint` | — | FK → `runs.id` ON DELETE CASCADE. `UNIQUE (target_vehicle_id, source_run_id)` |
+| `capacity_factor` | `numeric` | `NULL` | Scales kW, kWh and (with efficiency) distance. NULL reads as 1 — or, on a test the lineage brings, as the lineage's factor |
+| `efficiency_factor` | `numeric` | `NULL` | Scales distance only. NULL reads as 1 |
+| `color` | `text` | `NULL` | |
+| `is_default` | `boolean` | `false` | The vehicle's DEF charging curve; competes with its own runs' `is_default` of kind charging |
+| `notes` | `text` | `NULL` | |
+| `created_by` | `uuid` | — | FK → `auth.users.id` ON DELETE SET NULL |
+| `created_at` | `timestamptz` | `now()` | |
 
 ---
 

@@ -10,12 +10,18 @@ import { mayHaveComposite, staleComposites, storedComposites } from '../utils/co
 /** Vehicles rebuilt at once by Admin → Rebuild composites. Enough to overlap
  *  the round trips; few enough not to flood the database with writes. */
 const REBUILD_CONCURRENCY = 4;
+
+// The vehicle fields that decide which charging tests come down a lineage to
+// it and at what scale (migration 086, utils/lineageCharging.js).
+const LINEAGE_FIELDS = ['spec_source_vehicle_id', 'battery_revision', 'capacity_factor'];
+const defaultOf = (key) => ({ battery_revision: false, capacity_factor: 1 })[key] ?? null;
 import { dataService } from '../services/DataService';
 import { applyDefaultRun, clearDefaultRuns, isCompositeRun } from '../utils/runUtils';
 import { toSessionRow, sessionFor } from '../utils/testSessions';
 import { isListed, poolOf } from '../utils/runListing';
 import { createWriteGuard } from '../utils/writeGuard';
 import { passDown } from '../utils/vehicleDeletion';
+import { chargingLineage, lineageInheritors } from '../utils/lineageCharging';
 
 const AppContext = createContext(null);
 
@@ -84,6 +90,7 @@ export function AppProvider({ children }) {
     async function softRefreshVehicles() {
         const vehiclesData = await dataService.getVehicles();
         setVehicles(vehiclesData);
+        return vehiclesData;
     }
 
     async function initializeApp() {
@@ -198,6 +205,11 @@ export function AppProvider({ children }) {
     };
 
     const updateVehicle = async (vehicleId, updates) => {
+        // The edit form always sends the lineage fields; only a change to one
+        // re-resolves what this vehicle and its variants inherit.
+        const before = vehicles.find(v => v.id === vehicleId);
+        const lineageChanged = LINEAGE_FIELDS.some(k => k in updates
+            && String(updates[k] ?? defaultOf(k)) !== String(before?.[k] ?? defaultOf(k)));
         try {
             await dataService.updateVehicle(vehicleId, updates);
             setVehicles(prev => prev.map(v => {
@@ -210,6 +222,7 @@ export function AppProvider({ children }) {
                 }
                 return updated;
             }));
+            if (lineageChanged) await reresolveLineage(vehicleId);
             return true;
         } catch (error) {
             logIfUnauthorized('update_vehicle', 'vehicle', vehicleId, error);
@@ -295,7 +308,9 @@ export function AppProvider({ children }) {
             // specs, so the source's visible copy stands in for the voltage class.
             const resolved = visibleVehiclesRef.current.find(v => v.id === sourceId);
             if (resolved && isContributor) {
-                await dataService.rebuildComposites({ ...resolved, id: newVehicle.id })
+                const lineage = chargingLineage(
+                    { id: newVehicle.id, spec_source_vehicle_id: sourceId }, new Map(vehicles.map(v => [v.id, v])));
+                await dataService.rebuildComposites({ ...resolved, id: newVehicle.id }, lineage)
                     .catch(error => showError('Composite curves not built for the variant: ' + error.message));
             }
             // Same refresh as Copy, for the same reason: no setLoading, or the
@@ -318,9 +333,10 @@ export function AppProvider({ children }) {
             await dataService.deleteVehicle(vehicleId);
             // The same pass-down the database just did, so the variants show what
             // the deleted source said without a refetch.
+            const fleet = passDown(vehicles, vehicleId);
             setVehicles(prev => passDown(prev, vehicleId));
             setSelectedVehicles(prev => prev.filter(id => id !== vehicleId));
-            if (inheritors.length) await Promise.all(inheritors.map(refreshComposites));
+            if (inheritors.length) await Promise.all(inheritors.map(id => refreshComposites(id, { fleet })));
         } catch (error) {
             logIfUnauthorized('delete_vehicle', 'vehicle', vehicleId, error);
             showError('Error deleting vehicle: ' + error.message);
@@ -346,12 +362,42 @@ export function AppProvider({ children }) {
     // vehicle on the other end.
     const visibleVehiclesRef = useRef([]);
 
-    /** Vehicles that read `runId` through a spec link. */
+    /**
+     * Vehicles that read `runIds` through a spec link, or down their lineage
+     * (migration 086) — every variant below a charging test's owner that no
+     * battery revision cuts off.
+     */
     const inheritorsOf = (runIds) => {
         const ids = new Set([].concat(runIds).map(String));
-        return vehicles
+        const viaLinks = vehicles
             .filter(v => (v.spec_links || []).some(l => ids.has(String(l.source_run_id))))
             .map(v => v.id);
+        const owners = vehicles
+            .filter(v => (v.runs || []).some(r => !r._inherited && r.kind === 'charging' && ids.has(String(r.id))))
+            .map(v => v.id);
+        return [...new Set([...viaLinks, ...owners.flatMap(id => lineageInheritors(id, vehicles))])];
+    };
+
+    /**
+     * After a charging test of `vehicleId` is added: the variants below it show
+     * it on a re-read, and their composites take it in. Inherited runs are
+     * built in DataService, so a re-read rather than an optimistic copy.
+     */
+    const refreshLineageHeirs = async (vehicleId, heirs = lineageInheritors(vehicleId, vehicles)) => {
+        if (!heirs.length) return;
+        await Promise.all(heirs.map(id => refreshComposites(id)));
+        await softRefreshVehicles();
+    };
+
+    /**
+     * A vehicle's source, battery revision or capacity factor changed: what it
+     * and every variant below it inherit is different now. Re-read, then
+     * rebuild their composites against the fleet as it now stands.
+     */
+    const reresolveLineage = async (vehicleId) => {
+        const fleet = await softRefreshVehicles();
+        const affected = [vehicleId, ...lineageInheritors(vehicleId, fleet)];
+        await Promise.all(affected.map(id => refreshComposites(id, { fleet })));
     };
 
     /** Whether a write to this run can change its vehicle's composites. */
@@ -361,12 +407,17 @@ export function AppProvider({ children }) {
         return !!run && run.kind === 'charging' && !isCompositeRun(run);
     };
 
-    const refreshComposites = async (vehicleId) => {
+    // `fleet` is the vehicles to walk the lineage through, when state has not
+    // caught up with a write that changed it (reresolveLineage). The second
+    // argument is an object so `ids.map(refreshComposites)` (index) is harmless.
+    const refreshComposites = async (vehicleId, { fleet = vehicles } = {}) => {
         if (!isContributor) return;
         const vehicle = visibleVehiclesRef.current.find(v => v.id === vehicleId);
         if (!vehicle) return;
         try {
-            const runs = await dataService.rebuildComposites(vehicle);
+            const raw = fleet.find(v => v.id === vehicleId) ?? vehicle;
+            const lineage = chargingLineage(raw, new Map(fleet.map(v => [v.id, v])));
+            const runs = await dataService.rebuildComposites(vehicle, lineage);
             if (!runs) return;
             const composites = storedComposites({ runs });
             setVehicles(prev => prev.map(v => v.id !== vehicleId ? v : {
@@ -411,10 +462,11 @@ export function AppProvider({ children }) {
             return all || !stored.length || staleComposites(v).length > 0;
         });
         let rebuilt = 0, failed = 0, done = 0, next = 0;
+        const byId = new Map(vehicles.map(v => [v.id, v]));
         const worker = async () => {
             while (next < todo.length) {
                 const v = todo[next++];
-                try { await dataService.rebuildComposites(v); rebuilt++; }
+                try { await dataService.rebuildComposites(v, chargingLineage(v, byId)); rebuilt++; }
                 catch (error) { failed++; console.warn('[composites] not rebuilt for vehicle', v.id, error?.message ?? error); }
                 onProgress?.({ done: ++done, total: todo.length });
             }
@@ -435,7 +487,10 @@ export function AppProvider({ children }) {
                     : v
             ));
             showSuccess(`Test copied to ${vehicles.find(v => v.id === targetVehicleId)?.name || 'vehicle'}`);
-            if (run.kind === 'charging') await refreshComposites(targetVehicleId);
+            if (run.kind === 'charging') {
+                await refreshComposites(targetVehicleId);
+                await refreshLineageHeirs(targetVehicleId);
+            }
         } catch (error) {
             logIfUnauthorized('copy_run', 'run', null, error);
             showError('Error copying test: ' + error.message);
@@ -453,7 +508,10 @@ export function AppProvider({ children }) {
                     ? { ...v, runs: [...(v.runs || []), newRun] }
                     : v
             ));
-            if (feedsComposites(vehicleId, runId)) await refreshComposites(vehicleId);
+            if (feedsComposites(vehicleId, runId)) {
+                await refreshComposites(vehicleId);
+                await refreshLineageHeirs(vehicleId);
+            }
         } catch (error) {
             logIfUnauthorized('duplicate_run', 'run', runId, error);
             showError('Error duplicating run: ' + error.message);
@@ -468,7 +526,10 @@ export function AppProvider({ children }) {
                     ? { ...v, runs: [...(v.runs || []), newRun] }
                     : v
             ));
-            if (newRun?.kind === 'charging') await refreshComposites(vehicleId);
+            if (newRun?.kind === 'charging') {
+                await refreshComposites(vehicleId);
+                await refreshLineageHeirs(vehicleId);
+            }
             return vehicleId;
         } catch (error) {
             logIfUnauthorized('add_run', 'run', null, error);
@@ -481,6 +542,7 @@ export function AppProvider({ children }) {
         // longer feeds a composite afterwards, but its leaving changes them.
         const feeds = feedsComposites(vehicleId, runId, updates.kind);
         const inheritors = feeds ? inheritorsOf(runId) : [];
+        const heirs = feeds ? lineageInheritors(vehicleId, vehicles) : [];
         try {
             await dataService.updateRun(vehicleId, runId, updates);
             // Convert the camelCase editFormData keys back to the snake_case keys that
@@ -513,6 +575,8 @@ export function AppProvider({ children }) {
                     : v
             ));
             if (feeds) await refreshCompositesAround(vehicleId, runId, inheritors);
+            // Its lineage copies carry its name, date and kind.
+            if (heirs.length) await softRefreshVehicles();
         } catch (error) {
             logIfUnauthorized('update_run', 'run', runId, error);
             showError('Error updating run: ' + error.message);
@@ -638,6 +702,7 @@ export function AppProvider({ children }) {
         const feeds = feedsComposites(vehicleId, runId);
         // Before the delete: its spec links cascade away with it.
         const inheritors = feeds ? inheritorsOf(runId) : [];
+        const heirs = feeds ? lineageInheritors(vehicleId, vehicles) : [];
         try {
             await dataService.deleteRun(vehicleId, runId);
             setVehicles(prev => prev.map(v =>
@@ -646,6 +711,7 @@ export function AppProvider({ children }) {
                     : v
             ));
             if (feeds) await refreshCompositesAround(vehicleId, runId, inheritors);
+            if (heirs.length) await softRefreshVehicles();
         } catch (error) {
             logIfUnauthorized('delete_run', 'run', runId, error);
             showError('Error deleting run: ' + error.message);
@@ -824,6 +890,10 @@ export function AppProvider({ children }) {
                 }
                 return update;
             }));
+            const before = vehicles.find(v => v.id === vehicleId)?.spec_source_vehicle_id ?? null;
+            if (specSourceVehicleId !== undefined && (specSourceVehicleId ? Number(specSourceVehicleId) : null) !== before) {
+                await reresolveLineage(vehicleId);
+            }
             // Update custom field suggestions with any new keys from the saved specs
             setSpecCustomFieldSuggestions(prev => {
                 const next = { ...prev };
@@ -1245,6 +1315,26 @@ export function AppProvider({ children }) {
         } catch (error) {
             logIfUnauthorized('update_spec_link', 'spec_link', linkId, error);
             showError('Error updating spec link: ' + error.message);
+            throw error;
+        }
+    };
+
+    /**
+     * Change one inherited test on one vehicle: its factors, or whether it is
+     * the vehicle's DEF. A test that came down the lineage has no link of its
+     * own until now, so the first change writes one — an override of that test
+     * here, which removing puts back to the lineage's reading.
+     */
+    const overrideInheritedRun = async (run, changes, targetVehicleId) => {
+        if (run._specLinkId != null) return updateSpecLink(run._specLinkId, changes, targetVehicleId);
+        try {
+            const link = await dataService.addSpecLink({ targetVehicleId, sourceRunId: run._realRunId });
+            await dataService.updateSpecLink(link.id, changes, targetVehicleId);
+            await softRefreshVehicles();
+            if ('capacityFactor' in changes) await refreshComposites(targetVehicleId);
+        } catch (error) {
+            logIfUnauthorized('override_inherited_run', 'spec_link', null, error);
+            showError('Error saving the inherited test: ' + error.message);
             throw error;
         }
     };
@@ -2101,6 +2191,7 @@ export function AppProvider({ children }) {
         importData,
         importTableauSessions,
         updateVehicleSpecs,
+        overrideInheritedRun,
         specCustomFieldSuggestions,
         specVouches,
         runVotes,
@@ -2119,6 +2210,9 @@ export function AppProvider({ children }) {
         manufacturers,
         platforms,
         platformsAvailable,
+        // Migration 086 applied: the battery revision and capacity factor can
+        // be written. Read from the service, which learns it from getVehicles.
+        batteryRevisionAvailable: dataService.batteryRevisionAvailable,
         platformsById,
         savePlatform,
         deletePlatform,

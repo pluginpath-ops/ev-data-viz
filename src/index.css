@@ -2657,15 +2657,22 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    (UnlistedNote). Only a curator or its creator sees one by name, and it must
    not be mistaken for a vehicle visitors are shown, so it is bold and in the
    warning color. */
-.unlisted-note {
+/* The type is shared with .battery-revision-note: two marks of the same kind
+   beside a lineage row's name. */
+.unlisted-note,
+.battery-revision-note {
     flex: none;
     font-family: var(--font-mono);
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--color-warning);
 }
+.unlisted-note { color: var(--color-warning); }
+/* Where charging tests stop coming down a lineage (BatteryRevisionNote,
+   migration 086). The unlisted note's type, in the secondary text color: a
+   fact about the car, not a warning. */
+.battery-revision-note { color: var(--color-text-secondary); }
 /* A stack whose every source is unlisted for this reader has nothing to fan
    out. */
 .vehicle-stack-rolodex.is-static { cursor: default; }
@@ -5156,6 +5163,31 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply mt-1.5;
     font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: var(--color-text-secondary);
+}
+
+/* What a vehicle inherits from (SourceVehiclePicker): the pointer, then — with
+   one chosen — its battery revision and capacity factor (migration 086). */
+.source-vehicle-picker {
+    @apply flex flex-col gap-1;
+}
+.source-vehicle-picker-label {
+    @apply font-medium whitespace-nowrap;
+}
+.source-vehicle-picker-battery {
+    @apply flex flex-col gap-1 mt-1 pl-3;
+    border-left: 2px solid var(--color-border);
+}
+/* The factor sits on the revision's row, set apart from the checkbox. */
+.source-vehicle-picker-factor-label {
+    @apply ml-4;
+}
+.source-vehicle-picker-factor {
+    @apply w-24;
+}
+/* The packs differ and neither the revision nor the factor says how. */
+.pack-mismatch {
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-warning-text);
 }
 
 /* Custom field rows in the edit form */
