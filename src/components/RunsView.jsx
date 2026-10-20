@@ -477,7 +477,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [fieldMapping, setFieldMapping] = useState({});
     const [runMetadata, setRunMetadata] = useState({
         name: '',
-        date: new Date().toISOString().split('T')[0],
+        date: '',
         softwareVersion: '',
         conditions: '',
         dataFlags: ['charging'],
@@ -592,7 +592,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], sourcePick: NO_SOURCE_PICK, startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', chargerVoltageClass: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
+        setRunMetadata({ name: '', date: '', softwareVersion: '', conditions: '', dataFlags: ['charging'], sourcePick: NO_SOURCE_PICK, startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', chargerVoltageClass: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });

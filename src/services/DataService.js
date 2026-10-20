@@ -1198,7 +1198,7 @@ class DataService {
       return v != null && v !== '' ? Number(v) : null;
     };
     const { data: newRun, error } = await getSupabase().from('runs').insert({
-      vehicle_id: vehicleId, name: run.name, date: run.date,
+      vehicle_id: vehicleId, name: run.name, date: run.date || null,
       software_version: coalesce(run.softwareVersion,   run.software_version)  || null,
       conditions: run.conditions || null,
       is_default: coalesce(run.isDefault,  run.is_default)  || false,
@@ -1449,7 +1449,7 @@ class DataService {
       return;
     }
     const { error } = await getSupabase().from('runs').update({
-      name: updates.name, date: updates.date,
+      name: updates.name, date: updates.date || null,
       software_version: updates.softwareVersion, conditions: updates.conditions,
       ...(updates.calculated_fields !== undefined ? { calculated_fields: updates.calculated_fields } : {}),
       ...(updates.kind !== undefined ? { kind: updates.kind } : {}),

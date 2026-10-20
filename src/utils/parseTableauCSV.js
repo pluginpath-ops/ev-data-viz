@@ -1,6 +1,5 @@
 import Papa from 'papaparse';
 
-const TODAY = new Date().toISOString().slice(0, 10);
 
 /**
  * Read a file as text with the given encoding.
@@ -78,7 +77,7 @@ export async function parseTableauCSV(file) {
         const optimizedText = optimizedIdx >= 0 ? ((row[optimizedIdx] || '')).trim() : '';
         const synthetic     = optimizedText.length > 0;
 
-        const date    = rawDate || TODAY;
+        const date    = rawDate || null;
         // Date is stored as a separate field — don't include it in the run name
         const runName = synthetic ? `${vehicleName} (Synthetic)` : vehicleName;
 
