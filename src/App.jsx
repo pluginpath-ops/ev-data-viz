@@ -287,7 +287,12 @@ export default function App() {
         if (view === 'runs') lastModeUnderTab.current.vehicles = 'runs';
     }, [view]);
     // Cards or List (#338): a sub-nav item now, so App owns it.
-    const [vehiclesMode, setVehiclesMode] = useState('card');
+    // ?tab=vehicles&sub=list|lineage; Cards is the default and writes no `sub`.
+    const [vehiclesMode, setVehiclesMode] = useState(() => {
+        const p = new URLSearchParams(window.location.search);
+        const sub = p.get('tab') === 'vehicles' ? p.get('sub') : null;
+        return VEHICLES_STRIP_ITEMS.find((i) => i.key === sub)?.key ?? 'card';
+    });
     // Vehicles & Specs' filters (#338): one set for Cards, List and Table, so
     // switching views never changes which vehicles show. Read from the link
     // the page opened on (vehicleFilters.js reads the table's old vt_ ones too).
@@ -850,11 +855,12 @@ export default function App() {
         if (loading) return;
         const p = new URLSearchParams();
         p.set('tab', 'vehicles');
+        if (vehiclesMode !== 'card') p.set('sub', vehiclesMode);
         for (const [k, v] of encodeVehicleFilters(vehicleFilters)) p.set(k, v);
         history.replaceState({ view: 'vehicles', chartMode }, '', '?' + p.toString());
     // chartMode rides in the history state only; it does not decide the URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isPopout, view, vehicleFilters]);
+    }, [isPopout, view, vehicleFilters, vehiclesMode]);
 
     // ── Keep URL in sync while on the Reference tab (#338) ──────────────────
     useEffect(() => {
