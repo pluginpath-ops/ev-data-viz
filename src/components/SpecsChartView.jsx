@@ -5,7 +5,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convValue, formatSpecValue } from '../utils/unitConversions';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import {
-    makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
+    makeVehicleFields, buildFieldGroups, getFieldDef, extractValue, withEffectiveSpecs,
     detectMode, formatNumericLabel, vehicleColor,
 } from '../utils/specHelpers';
 import { fieldFigureSource } from '../utils/vehicleFigures';
@@ -49,8 +49,9 @@ function makeInsideLabelPlugin(getLabelFn) {
 
 // ── SpecsChartView ────────────────────────────────────────────────────────────
 
-export default function SpecsChartView({ vehicles, selectedField: controlledField = null, onFieldChange, presentationMode = false }) {
-    const { units } = useAppContext();
+export default function SpecsChartView({ vehicles: picked, selectedField: controlledField = null, onFieldChange, presentationMode = false }) {
+    const { units, vehicles: allVehicles } = useAppContext();
+    const vehicles = useMemo(() => withEffectiveSpecs(picked, allVehicles), [picked, allVehicles]);
     const { isDark } = useTheme();
 
     const vehicleFields = useMemo(() => makeVehicleFields(units), [units]);

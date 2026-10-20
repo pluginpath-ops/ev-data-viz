@@ -5,7 +5,7 @@ import { useTheme } from '../hooks/useTheme';
 import { convValue, formatSpecValue } from '../utils/unitConversions';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import {
-    makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
+    makeVehicleFields, buildFieldGroups, getFieldDef, extractValue, withEffectiveSpecs,
     vehicleColor, formatNumericLabel,
 } from '../utils/specHelpers';
 import { fieldFigureSource } from '../utils/vehicleFigures';
@@ -64,8 +64,9 @@ const pointLabelPlugin = {
 
 // ── SpecsScatterView ──────────────────────────────────────────────────────────
 
-export default function SpecsScatterView({ vehicles, xField: xProp, yField: yProp, onFieldChange, presentationMode = false }) {
-    const { units } = useAppContext();
+export default function SpecsScatterView({ vehicles: picked, xField: xProp, yField: yProp, onFieldChange, presentationMode = false }) {
+    const { units, vehicles: allVehicles } = useAppContext();
+    const vehicles = useMemo(() => withEffectiveSpecs(picked, allVehicles), [picked, allVehicles]);
     const { isDark } = useTheme();
 
     const vehicleFields = useMemo(() => makeVehicleFields(units), [units]);
