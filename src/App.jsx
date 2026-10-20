@@ -421,6 +421,17 @@ export default function App() {
     const openVehiclePage = () => navigateTo('runs');
 
     /**
+     * A vehicle's Tests & Data (its page), optionally at a sub-tab — from a
+     * card's button, a test-count pill, or a selected-vehicle chip.
+     */
+    const viewVehicleRuns = (v, sub) => {
+        setActiveVehicle(v);
+        setRunsSubtab(RUNS_SUBTAB_IDS.includes(sub) ? sub : DEFAULT_RUNS_SUBTAB);
+        setFocusRunId(null);
+        navigateTo('runs');
+    };
+
+    /**
      * Close the opened vehicle (#338): it leaves the header, Vehicles & Specs
      * stops returning to it, and if its page is showing, the reader goes back
      * to Vehicles & Specs.
@@ -1117,7 +1128,16 @@ export default function App() {
                                                     title="Drag to reorder"
                                                 >
                                                     <VehicleSwatch vehicle={vehicle} />
-                                                    <span>{vehicle.name}</span>
+                                                    {/* The name goes to the vehicle's Tests & Data. A
+                                                        button inside a draggable chip still lets the chip drag. */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => viewVehicleRuns(vehicle)}
+                                                        className="selected-vehicle-chip-name"
+                                                        title={`View ${vehicle.name} tests & data`}
+                                                    >
+                                                        {vehicle.name}
+                                                    </button>
                                                     <button
                                                         onClick={() => removeVehicleSelection(vehicleId)}
                                                         className="ml-1 hover:opacity-70 rounded-full w-4 h-4 flex items-center justify-center"
@@ -1169,7 +1189,7 @@ export default function App() {
                             onAdd={addVehicle}
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
-                            onViewRuns={(v, sub) => { setActiveVehicle(v); setRunsSubtab(RUNS_SUBTAB_IDS.includes(sub) ? sub : DEFAULT_RUNS_SUBTAB); setFocusRunId(null); navigateTo('runs'); }}
+                            onViewRuns={viewVehicleRuns}
                             onOpenTest={openTest}
                             canCreate={canCreate}
                             canEdit={canEdit}
@@ -1334,7 +1354,7 @@ export default function App() {
                     {/* No selection gate: the vehicle table is where a selection is
                         made, over the whole fleet (#315). */}
                     {activeChartCategory && chartMode === 'specstable' && (
-                        <VehicleTable onOpenTest={openTest} filters={vehicleFilters} onFiltersChange={setVehicleFilters} />
+                        <VehicleTable onOpenTest={openTest} onViewRuns={viewVehicleRuns} filters={vehicleFilters} onFiltersChange={setVehicleFilters} />
                     )}
                     {view === 'epa' && <EpaSection subtab={epaSubtab} onExplorerState={setEpaExplorer} />}
                     {view === 'reference' && (

@@ -21,7 +21,7 @@
  * Flagging and clearing stay in View Specs; the table only shows the state.
  *
  * `onClick` is for a cell that does something other than its row: both tables
- * make the name cell pick the row, and every other cell opens the details.
+ * give the name cell its own action, and every other cell opens the details.
  *
  * A cell whose figure stands on a TEST (`test`, a { href, onOpen } pair) makes
  * its note a link to that test, and always peeks, because what the reader

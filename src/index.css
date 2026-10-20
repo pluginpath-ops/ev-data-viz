@@ -1903,6 +1903,14 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: var(--color-primary-text);
 }
 
+/* The chip's name, a button that opens the vehicle's Tests & Data. Looks like
+   the text it replaced; dotted underline on hover says it goes somewhere. */
+.selected-vehicle-chip-name {
+    @apply underline-offset-2;
+    color: inherit;
+}
+.selected-vehicle-chip-name:hover { @apply underline decoration-dotted; }
+
 /* OWNER role badge next to user email */
 .owner-badge {
     @apply ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-bold;
@@ -7745,6 +7753,21 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .vehicle-table-name {
     @apply flex items-center gap-2 min-w-0;
 }
+/* A vehicle's name that opens its card (VehicleCardPopover). Reads as text
+   and says "this opens" only on hover, like .vehicle-link, since every row
+   carries one. */
+.vehicle-name-button {
+    @apply text-left min-w-0 underline-offset-2 transition-colors;
+    color: inherit;
+}
+.vehicle-name-button:hover {
+    @apply underline decoration-dotted;
+    color: var(--color-primary);
+}
+.vehicle-card-popover-anchor { @apply min-w-0; }
+/* The card in a popover is read, not picked: the grid's pointer cursor says
+   "click to select", which this card does not do. */
+.vehicle-card-popover .vehicle-card { cursor: default; }
 /* Where a resolved or tested figure came from, under it — "EPA tested",
    "Car and Driver". In the unit's voice: it qualifies the figure. */
 .vehicle-table-note {
