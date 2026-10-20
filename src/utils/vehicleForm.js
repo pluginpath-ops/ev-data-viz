@@ -17,6 +17,7 @@ export const EMPTY_VEHICLE_FORM = {
     name: '', make: '', model: '', trim: '', year: '',
     battery: '', range: '', manufacturer_id: null, color: null,
     image_focal_y: null, mechanical_platform_id: null, electrical_platform_id: null,
+    spec_source_vehicle_id: null, battery_revision: false, capacity_factor: 1,
 };
 
 /**
@@ -51,5 +52,10 @@ export function vehicleFormFrom(vehicle) {
         // resolved platform is its source's, and saving it would cut the pointer.
         mechanical_platform_id: vehicle.own ? vehicle.own.mechanical_platform_id : (vehicle.mechanical_platform_id ?? null),
         electrical_platform_id: vehicle.own ? vehicle.own.electrical_platform_id : (vehicle.electrical_platform_id ?? null),
+        // What it inherits from, and how its charging tests come down (086).
+        // Stored on the vehicle itself, never resolved, so read as they are.
+        spec_source_vehicle_id: vehicle.spec_source_vehicle_id ?? null,
+        battery_revision: !!vehicle.battery_revision,
+        capacity_factor: vehicle.capacity_factor != null ? Number(vehicle.capacity_factor) : 1,
     };
 }

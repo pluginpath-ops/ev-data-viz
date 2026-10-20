@@ -124,6 +124,34 @@ describe('tests cannot be passed down', () => {
     });
 });
 
+describe('the battery revision and capacity factor are passed down (086)', () => {
+    it('makes a variant of a deleted revision a revision itself', () => {
+        const f = chain();
+        f[1].battery_revision = true;
+        const c = passDown(f, 2).find(v => v.id === 3);
+        expect(c.spec_source_vehicle_id).toBe(1);
+        expect(c.battery_revision).toBe(true);
+    });
+
+    it('multiplies the two factors otherwise, so the tests above read at the same scale', () => {
+        const f = chain();
+        f[1].capacity_factor = 1.1;
+        f[2].capacity_factor = 1.2;
+        const c = passDown(f, 2).find(v => v.id === 3);
+        expect(c.battery_revision ?? false).toBe(false);
+        expect(c.capacity_factor).toBeCloseTo(1.32);
+    });
+
+    it('counts a lineage test that stops showing once, link or not', () => {
+        const f = chain();
+        f[1].runs = [{ id: 500 }, { id: 501 }];
+        f[2].runs = [{ id: 'inherited_v3_500', _inherited: true, _realRunId: 500 }, { id: 'inherited_v3_501', _inherited: true, _realRunId: 501 }];
+        f[2].spec_links = [{ source_run_id: 500 }];
+        const [entry] = deletionImpact(f, [2]);
+        expect(entry.shownOn.map(s => [s.vehicle.id, s.count])).toEqual([[3, 2]]);
+    });
+});
+
 describe('deletionImpact', () => {
     it('names the variants that stay and what they will inherit from', () => {
         const [entry] = deletionImpact(chain(), [2]);

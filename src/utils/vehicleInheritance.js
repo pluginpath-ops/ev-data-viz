@@ -1,8 +1,8 @@
 /**
  * What a vehicle inherits beyond its specs: series color, photo and tags.
  *
- * A vehicle that inherits from another (`spec_source_vehicle_id`, "Inherit
- * from:" on the specs form) already falls back to that vehicle's specs field by
+ * A vehicle that inherits from another (`spec_source_vehicle_id`, "Inherits
+ * from" on the vehicle form) already falls back to that vehicle's specs field by
  * field, through the whole chain (`resolveEffectiveSpecs`). A variant is the
  * same car with a stated difference, so the things a reader RECOGNISES it by
  * come down the same chain:
@@ -44,7 +44,7 @@
  * read `own`, and `inheritedFrom` says where each resolved value came from.
  */
 import { vehicleLabel } from './specHelpers';
-import { isCompositeRun } from './runUtils';
+import { isCompositeRun, runKindFrom } from './runUtils';
 
 /* One unit. The focal point is a property OF the photo -- it says which slice
    of that particular image the card's band shows -- so it can only ever be
@@ -207,6 +207,29 @@ export function vehicleStack(vehicle, index, isShown = () => true, isVisible = (
     };
 }
 
+/**
+ * Every vehicle below `vehicleId` in its lineage: its variants, theirs, and so
+ * on. What a source picker leaves out, since choosing one as the source would
+ * make a cycle. Guarded against a cycle already in the data.
+ */
+export function descendantIds(vehicleId, vehicles = []) {
+    const below = new Map();
+    for (const v of vehicles) {
+        if (v.spec_source_vehicle_id == null) continue;
+        if (!below.has(v.spec_source_vehicle_id)) below.set(v.spec_source_vehicle_id, []);
+        below.get(v.spec_source_vehicle_id).push(v.id);
+    }
+    const found = new Set();
+    const stack = [...(below.get(vehicleId) ?? [])];
+    while (stack.length) {
+        const id = stack.pop();
+        if (found.has(id) || id === vehicleId) continue;
+        found.add(id);
+        stack.push(...(below.get(id) ?? []));
+    }
+    return found;
+}
+
 /** A vehicle's own, un-inherited values: what an editor must read. */
 export function ownValues(vehicle) {
     return vehicle?.own ?? {
@@ -293,12 +316,19 @@ export function withInheritance(vehicles = []) {
  * What a new variant of `source` links to, so it shows every test the source
  * shows.
  *
- * Tests are inherited per run (`spec_links`, migrations 016 and 055), with a
- * capacity and an efficiency factor on each link. So a variant gets one link
- * per run the source shows: its own runs at factor 1 (the variant has not been
- * measured as different yet), and the runs the source itself inherits with the
- * source's factors, so the variant starts out reading exactly as its source
- * does. Hidden runs are included: hiding is a judgement about the run, and it
+ * Charging tests mostly need no link: they come down the lineage (migration
+ * 086, lineageCharging.js), the source's own and everything it inherits that
+ * way, and keep coming as tests are added above. What still needs one:
+ *
+ *   range tests      range keeps the link model — its own at factor 1 (the
+ *                    variant has not been measured as different yet), and the
+ *                    ones the source inherits with the source's factors
+ *   linked charging  a charging test the source reads through a link of its
+ *                    own: one from outside the lineage, or a lineage test it
+ *                    rescales — copied with its factors, so the variant starts
+ *                    out reading exactly as its source does
+ *
+ * Unlisted runs are included: unlisting is a judgement about the run, and it
  * travels with the run.
  *
  * Stored composites are not: the variant builds its own from the tests it
@@ -306,13 +336,19 @@ export function withInheritance(vehicles = []) {
  * would be the same curve twice.
  */
 export function variantLinkPlan(source) {
-    return (source?.runs ?? []).filter(run => !isCompositeRun(run)).map(run => run._inherited
-        ? {
-            sourceRunId: run._realRunId,
-            efficiencyFactor: run._efficiencyFactor !== 1 ? run._efficiencyFactor : null,
-            capacityFactor: run._capacityFactor !== 1 ? run._capacityFactor : null,
+    const factor = (f) => (f != null && f !== 1 ? f : null);
+    return (source?.runs ?? []).filter(run => !isCompositeRun(run)).flatMap(run => {
+        const charging = runKindFrom(run) === 'charging';
+        if (!run._inherited) {
+            return charging ? [] : [{ sourceRunId: run.id, efficiencyFactor: null, capacityFactor: null }];
         }
-        : { sourceRunId: run.id, efficiencyFactor: null, capacityFactor: null });
+        const efficiencyFactor = factor(run._efficiencyFactor);
+        const capacityFactor = factor(run._capacityFactor);
+        // Down the lineage already, at a factor the variant's own walk repeats.
+        if (charging && run._viaLineage && run._specLinkId == null) return [];
+        if (charging && run._viaLineage && efficiencyFactor == null && capacityFactor == null) return [];
+        return [{ sourceRunId: run._realRunId, efficiencyFactor, capacityFactor }];
+    });
 }
 
 /**

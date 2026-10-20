@@ -7,6 +7,7 @@ import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { FULL_MAX, buildRenditions, displayImageUrl } from '../utils/imageRenditions';
 import SeriesColorPicker from './SeriesColorPicker';
+import SourceVehiclePicker from './SourceVehiclePicker';
 import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import CardBandPreview from './vehicles/CardBandPreview';
 import { CARD_BAND_MAX_WIDTH, PHOTO_ASPECT, focalY } from '../utils/cardBand';
@@ -90,7 +91,11 @@ export default function EditVehicleForm({
     // What the vehicle being edited inherits (vehicleInheritance.js). The form
     // edits own values only; these are shown beside them, never saved.
     const inheritedColor = editingVehicle?.inheritedFrom?.color ?? null;
-    const { platforms, platformsAvailable, platformsById } = useAppContext();
+    const { platforms, platformsAvailable, platformsById, fleet, batteryRevisionAvailable } = useAppContext();
+    // A source chosen here and not yet saved: what this form shows as
+    // inherited still comes from the saved one until it is.
+    const sourceChanged = editingId != null
+        && (formData.spec_source_vehicle_id ?? null) !== (editingVehicle?.spec_source_vehicle_id ?? null);
     // Inherited tags show only while the vehicle has none of its own: tags are
     // one set, overridden whole. The first change a curator makes here adopts
     // the inherited set as the vehicle's own and applies the change to that,
@@ -275,6 +280,29 @@ export default function EditVehicleForm({
                     <input placeholder="Battery (kWh)"  value={formData.battery} onChange={(e) => onFormChange({ ...formData, battery: e.target.value })} className="form-input form-input" />
                     <input placeholder="EPA Range (mi)" value={formData.range}   onChange={(e) => onFormChange({ ...formData, range: e.target.value })}   className="form-input form-input" />
                 </div>
+
+                {/* ── Source ───────────────────────────────────────────────
+                  * What this vehicle inherits from. Here rather than on the
+                  * specs form since it carries far more than specs: everything
+                  * below that says "Inherited from" reads through it, and so do
+                  * its charging tests (migration 086). Edit mode only — a new
+                  * variant comes from ＋ Variant, which sets it. */}
+                {editingId && (
+                    <div className="form-section mt-5">
+                        <SourceVehiclePicker
+                            vehicle={editingVehicle}
+                            vehicles={fleet}
+                            value={formData}
+                            canRevise={batteryRevisionAvailable}
+                            onChange={patch => onFormChange({ ...formData, ...patch })}
+                        />
+                        {sourceChanged && (
+                            <p className="text-note mt-1">
+                                What this form shows as inherited follows the new source once it is saved.
+                            </p>
+                        )}
+                    </div>
+                )}
 
                 {/* ── Platforms (#318) ─────────────────────────────────────
                   * What the car is built on: structure and electrics, one each.

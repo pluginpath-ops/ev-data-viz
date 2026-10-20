@@ -43,6 +43,7 @@ import { isRangeRun, runKindFrom, linkableRuns, linkableCounts, isCompositeRun }
 import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
 import RunCard from './runs/RunCard';
 import CompositeRunCard from './runs/CompositeRunCard';
+import LineageChargingNote from './runs/LineageChargingNote';
 import VehicleCombobox from './VehicleCombobox';
 import { DATA_FLAGS, RunKindPill, FIELD_META, inferRunFlags } from './runs/runDisplay';
 
@@ -50,10 +51,11 @@ import { DATA_FLAGS, RunKindPill, FIELD_META, inferRunFlags } from './runs/runDi
 
 
 const INHERITED_SECTION_HELP =
-    'Tests borrowed from another vehicle that shares this one\'s hardware — a ' +
-    'trim with the same battery can inherit its charging curves, a battery ' +
-    'variant of the same body can inherit its range tests. Linked per test, ' +
-    'with a scaling factor where the two differ.';
+    'Tests borrowed from another vehicle that shares this one\'s hardware. A ' +
+    'variant\'s charging tests come down its lineage by themselves, unless it ' +
+    'is a battery revision (set with Edit). Anything else — range tests, ' +
+    'or a test from outside the lineage — is linked per test, with a scaling ' +
+    'factor where the two differ.';
 
 // The two knobs on an inherited test (migration 055). What a field IS decides
 // which factors reach it, so neither needs to know the run's kind:
@@ -422,7 +424,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, editOnFocus = false, onFocused, onBack, onClose }) {
-    const { ensureSourceId, runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
+    const { ensureSourceId, runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, overrideInheritedRun, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -2538,6 +2540,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             </SectionAction>
                         )}
                     />
+                    <LineageChargingNote vehicle={vehicle} canEdit={isContributor && canEdit(vehicle)} />
                 </div>
             )}
             {subtab === 'inherited' && inheritedRuns.length === 0 && !(isContributor && canEdit(vehicle)) && (
@@ -2561,7 +2564,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 // list, and VehicleLink falls back to text.
                                 const srcVehicle = (vehicles || [])
                                     .find(v => String(v.id) === String(run._sourceVehicleId));
+                                // Null for a test that came down the lineage with no
+                                // link of its own (086): the first change writes one.
                                 const linkId = run._specLinkId;
+                                // In-progress edits keyed by the run, which has an id
+                                // whether or not it has a link yet.
+                                const editKey = run.id;
                                 const isChargingLink = runKindFrom(run) === 'charging';
 
                                 // Both knobs, saved the same way. `edits` holds the in-progress
@@ -2590,8 +2598,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     const next = raw === '' ? null : parseFloat(raw);
                                     if (next === (f.stored ?? null)) return;
                                     try {
-                                        await updateSpecLink(linkId, { [f.field]: next });
-                                        f.setEdits(prev => { const n = { ...prev }; delete n[linkId]; return n; });
+                                        await overrideInheritedRun(run, { [f.field]: next }, vehicle.id);
+                                        f.setEdits(prev => { const n = { ...prev }; delete n[editKey]; return n; });
                                     } catch (_) { /* error shown by context */ }
                                 };
                                 return (
@@ -2640,8 +2648,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     {isContributor && canEdit(vehicle) ? (
                                                         <button
                                                             onClick={() => run.isDefault
-                                                                ? updateSpecLink(linkId, { useAsDefault: false })
-                                                                : updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)
+                                                                ? overrideInheritedRun(run, { useAsDefault: false }, vehicle.id)
+                                                                : overrideInheritedRun(run, { useAsDefault: true }, vehicle.id)
                                                             }
                                                             title={run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
                                                             className={`btn btn-toggle${run.isDefault ? ' active' : ''}`}
@@ -2651,12 +2659,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     ) : run.isDefault ? (
                                                         <span className="btn btn-toggle active">Default</span>
                                                     ) : null}
-                                                    {isContributor && canEdit(vehicle) && (
+                                                    {/* A linked test is removed. One the lineage
+                                                        brings has nothing to remove — a battery
+                                                        revision is what stops it — but its override
+                                                        can be dropped, back to the lineage's reading. */}
+                                                    {isContributor && canEdit(vehicle) && linkId != null && (
                                                         <button
                                                             onClick={() => deleteSpecLink(linkId)}
-                                                            className="btn btn-danger text-sm"
+                                                            className={run._viaLineage ? 'btn btn-secondary text-sm' : 'btn btn-danger text-sm'}
+                                                            title={run._viaLineage ? 'Drop this test\'s own factors and default, back to what the lineage gives it' : undefined}
                                                         >
-                                                            Remove
+                                                            {run._viaLineage ? 'Reset' : 'Remove'}
                                                         </button>
                                                     )}
                                                 </div>
@@ -2672,9 +2685,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             key={f.key}
                                                             label={f.label}
                                                             title={f.title}
-                                                            value={f.edits[linkId] ?? (f.stored != null ? String(f.stored) : '')}
-                                                            onChange={v => f.setEdits(prev => ({ ...prev, [linkId]: v }))}
-                                                            onCommit={() => saveFactor(f, f.edits[linkId] ?? (f.stored != null ? String(f.stored) : ''))}
+                                                            value={f.edits[editKey] ?? (f.stored != null ? String(f.stored) : '')}
+                                                            onChange={v => f.setEdits(prev => ({ ...prev, [editKey]: v }))}
+                                                            onCommit={() => saveFactor(f, f.edits[editKey] ?? (f.stored != null ? String(f.stored) : ''))}
                                                         />
                                                     ) : (
                                                         f.stored !== 1 && f.stored != null && (
@@ -2694,10 +2707,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                     {/* Add link form */}
                     {showAddLink && (() => {
-                        // Run IDs already linked to this vehicle
-                        const alreadyLinkedRunIds = new Set(
-                            (vehicle.spec_links || []).map(l => Number(l.source_run_id))
-                        );
+                        // Run IDs this vehicle already shows: linked, or down its
+                        // lineage (086), which a link would only duplicate.
+                        const alreadyLinkedRunIds = new Set([
+                            ...(vehicle.spec_links || []).map(l => Number(l.source_run_id)),
+                            ...inheritedRuns.map(r => Number(r._realRunId)),
+                        ]);
                         // Source vehicles: any vehicle with at least one run it could still lend
                         const sourceVehicles = (vehicles || [])
                             .filter(v =>

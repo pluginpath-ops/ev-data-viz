@@ -192,11 +192,11 @@ describe('ownValues', () => {
 });
 
 describe('variantLinkPlan', () => {
-    it('links the source’s own runs at factor 1 and its inherited runs with the source’s factors', () => {
+    it('links range tests: the source’s own at factor 1, its inherited ones with the source’s factors', () => {
         const source = {
             runs: [
-                { id: 101 },
-                { id: 'inh-7-202', _inherited: true, _realRunId: 202, _efficiencyFactor: 0.95, _capacityFactor: 1 },
+                { id: 101, kind: 'range' },
+                { id: 'inherited_7_202', kind: 'range', _inherited: true, _realRunId: 202, _efficiencyFactor: 0.95, _capacityFactor: 1, _specLinkId: 7 },
             ],
         };
         expect(variantLinkPlan(source)).toEqual([
@@ -205,8 +205,32 @@ describe('variantLinkPlan', () => {
         ]);
     });
 
+    it('links no charging test the lineage brings down (086)', () => {
+        const source = {
+            runs: [
+                { id: 101, kind: 'charging' },
+                { id: 'inherited_v5_202', kind: 'charging', _inherited: true, _viaLineage: true, _realRunId: 202, _efficiencyFactor: 1, _capacityFactor: 1.1, _specLinkId: null },
+                { id: 'inherited_8_203', kind: 'charging', _inherited: true, _viaLineage: true, _realRunId: 203, _efficiencyFactor: 1, _capacityFactor: 1, _specLinkId: 8 },
+            ],
+        };
+        expect(variantLinkPlan(source)).toEqual([]);
+    });
+
+    it('copies the source’s rescaled lineage tests and its links from outside the lineage', () => {
+        const source = {
+            runs: [
+                { id: 'inherited_8_203', kind: 'charging', _inherited: true, _viaLineage: true, _realRunId: 203, _efficiencyFactor: 1, _capacityFactor: 1.2, _specLinkId: 8 },
+                { id: 'inherited_9_404', kind: 'charging', _inherited: true, _viaLineage: false, _realRunId: 404, _efficiencyFactor: 1, _capacityFactor: 1, _specLinkId: 9 },
+            ],
+        };
+        expect(variantLinkPlan(source)).toEqual([
+            { sourceRunId: 203, efficiencyFactor: null, capacityFactor: 1.2 },
+            { sourceRunId: 404, efficiencyFactor: null, capacityFactor: null },
+        ]);
+    });
+
     it('does not link the source’s composites — the variant builds its own', () => {
-        const source = { runs: [{ id: 101 }, { id: 300, synthetic: true, composite: { chargerClassV: null } }] };
+        const source = { runs: [{ id: 101, kind: 'range' }, { id: 300, synthetic: true, composite: { chargerClassV: null } }] };
         expect(variantLinkPlan(source).map(l => l.sourceRunId)).toEqual([101]);
     });
 });

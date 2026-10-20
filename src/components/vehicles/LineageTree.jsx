@@ -14,6 +14,7 @@
 import { useState } from 'react';
 import LineageIcon from './LineageIcon';
 import UnlistedNote from './UnlistedNote';
+import BatteryRevisionNote from './BatteryRevisionNote';
 import { lineageRole } from '../../utils/vehicleInheritance';
 import { distanceValue, distanceUnit } from '../../utils/unitConversions';
 
@@ -61,6 +62,7 @@ function LineageRow({ vehicle, depth, trail, hasVariants, role, units, selected,
                 <span className="rolodex-card-swatch" style={{ backgroundColor: vehicle.color }} aria-hidden="true" />
                 <span className="lineage-row-title">{vehicle.name}</span>
                 <UnlistedNote vehicle={vehicle} />
+                <BatteryRevisionNote vehicle={vehicle} />
                 <span className="vehicle-list-meta">
                     {[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' · ')}
                 </span>
