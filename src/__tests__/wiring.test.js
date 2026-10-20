@@ -1977,3 +1977,28 @@ describe('bulk import lists the vehicles it creates', () => {
         expect(update.slice(0, update.indexOf('rowVehicleIds.set'))).not.toMatch(/visibility/);
     });
 });
+
+describe('a vehicle save that RLS refuses is an error, not a silent success', () => {
+    // RLS filters a disallowed UPDATE to 0 rows and PostgREST answers 204, so a
+    // write that does not read its row back cannot tell "saved" from "refused".
+    // Every contributor's Edit vehicle save did nothing that way until 087.
+    const dataService = read('src/services/DataService.js');
+    const vehiclesView = read('src/components/VehiclesView.jsx');
+
+    it('the one direct vehicles UPDATE outside the guard writes a row just created', () => {
+        const direct = [...dataService.matchAll(/\.from\('vehicles'\)\s*\.update\(([^)]*)\)/g)].map(m => m[1]);
+        // The guard's own call, and addVehicle's spec_source link on the new row.
+        expect(direct).toEqual(['patch', '{ spec_source_vehicle_id: source.id }']);
+    });
+
+    it('the guard reads the row back and raises on 0 rows', () => {
+        const guard = dataService.slice(dataService.indexOf('async #updateVehicleRow('));
+        const body = guard.slice(0, guard.indexOf('\n  }\n'));
+        expect(body).toMatch(/\.select\('id'\)/);
+        expect(body).toMatch(/if \(!data\?\.length\)[\s\S]*throw/);
+    });
+
+    it('the Edit vehicle form stays open when the save is refused', () => {
+        expect(vehiclesView).toMatch(/if \(await onUpdate\(editingId, formData\) === false\) return;/);
+    });
+});

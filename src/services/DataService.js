@@ -796,9 +796,7 @@ class DataService {
     ]);
 
     const patch = { image_url: fullResult, image_thumb_url: thumbResult, image_focal_y: null };
-    const { error: updateError } = await getSupabase()
-      .from('vehicles').update(patch).eq('id', vehicleId);
-    if (updateError) throw updateError;
+    await this.#updateVehicleRow(vehicleId, patch);
     return patch;
   }
 
@@ -822,6 +820,28 @@ class DataService {
     if (error) throw error;
     const { data } = getSupabase().storage.from('vehicle-images').getPublicUrl(path);
     return `${data.publicUrl}?v=${Date.now()}`;
+  }
+
+  /**
+   * Write a patch to one vehicle row, and fail loudly if no row took it.
+   *
+   * Row-level security does not refuse an UPDATE it disallows. It filters the
+   * row out, and PostgREST answers 204 as if the write landed. For years the
+   * vehicles policies admitted only the `is_owner` account (made in the
+   * dashboard, never the role check 001_rbac meant), so every contributor's
+   * Edit vehicle save "succeeded" and changed nothing. Reading the row back is
+   * how a refusal becomes an error. The 42501 code routes it through the
+   * app's access-attempt log the same way a real RLS violation would be.
+   */
+  async #updateVehicleRow(vehicleId, patch) {
+    const { data, error } = await getSupabase()
+      .from('vehicles').update(patch).eq('id', vehicleId).select('id');
+    if (error) throw error;
+    if (!data?.length) {
+      const refused = new Error('the change was not saved: this account may not edit this vehicle, or it no longer exists.');
+      refused.code = '42501';
+      throw refused;
+    }
   }
 
   /**
@@ -861,9 +881,7 @@ class DataService {
         const thumbUrl = await this.#putVehicleImageObject(
           thumbPathFor(`${vehicle.id}.jpg`), thumb,
         );
-        const { error: updateError } = await getSupabase()
-          .from('vehicles').update({ image_thumb_url: thumbUrl }).eq('id', vehicle.id);
-        if (updateError) throw updateError;
+        await this.#updateVehicleRow(vehicle.id, { image_thumb_url: thumbUrl });
         updated++;
       } catch (err) {
         failures.push({ id: vehicle.id, name: vehicle.name, error: err.message });
@@ -959,8 +977,7 @@ class DataService {
             ? null : Math.round(Number(updates.image_focal_y)))
         : undefined);
 
-    const { error } = await getSupabase().from('vehicles').update(patch).eq('id', vehicleId);
-    if (error) throw error;
+    await this.#updateVehicleRow(vehicleId, patch);
   }
 
   async updateVehicleSpecs(vehicleId, specs, specSourceVehicleId = undefined) {
@@ -983,22 +1000,14 @@ class DataService {
     if (specSourceVehicleId !== undefined) {
       update.spec_source_vehicle_id = specSourceVehicleId ? Number(specSourceVehicleId) : null;
     }
-    const { error } = await getSupabase()
-      .from('vehicles')
-      .update(update)
-      .eq('id', vehicleId);
-    if (error) throw error;
+    await this.#updateVehicleRow(vehicleId, update);
   }
 
   async updateVehicleSortOrders(sortUpdates) {
     // sortUpdates: [{ id, sort_order }, ...]
     if (!this.useSupabase || !this.user) return; // no-op in localStorage mode
     for (const { id, sort_order } of sortUpdates) {
-      const { error } = await getSupabase()
-        .from('vehicles')
-        .update({ sort_order })
-        .eq('id', id);
-      if (error) throw error;
+      await this.#updateVehicleRow(id, { sort_order });
     }
   }
 
@@ -1642,15 +1651,7 @@ class DataService {
   }
 
   async toggleVehicleVisibility(vehicleId, newVisibility) {
-    const { data, error } = await getSupabase()
-      .from('vehicles')
-      .update({ visibility: newVisibility })
-      .eq('id', vehicleId)
-      .select('id');
-    if (error) throw error;
-    if (!data || data.length === 0) {
-      throw new Error('Update blocked — vehicle may have no owner assigned. Run the SQL fix in Supabase.');
-    }
+    await this.#updateVehicleRow(vehicleId, { visibility: newVisibility });
   }
 
   // ── Site settings ────────────────────────────────────────────────────────
