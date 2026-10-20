@@ -189,7 +189,10 @@ export default function VehiclesView({
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (editingId) {
-            await onUpdate(editingId, formData);
+            // A refused save has already shown its error. Keep the form open
+            // with what was typed, and leave the tags alone, rather than close
+            // it as though the save had landed.
+            if (await onUpdate(editingId, formData) === false) return;
             await onSyncVehicleTags(editingId, formTags.map(t => t.id));
             setEditingId(null);
         } else {
