@@ -32,7 +32,7 @@ import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
 import RunSourceLinks from './RunSourceLinks';
-import RunSourceField from './RunSourceField';
+import SourceField from './SourceField';
 import { useSources } from '../hooks/useSources';
 import { pickedSource, runSourceText, startingName } from '../utils/sources';
 import EpaVehicleSection from './EpaVehicleSection';
@@ -859,7 +859,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             softwareVersion: run.softwareVersion || run.software_version || '',
             conditions: run.conditions || '',
             dataFlags: inferRunFlags(run),
-            // null until the picker is touched: the stored text stands in (RunSourceField).
+            // null until the picker is touched: the stored text stands in (SourceField).
             sourcePick: null,
             storedSource: run.source || '',
             startSoc: run.start_soc ?? '',
@@ -1578,7 +1578,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             onChange={(e) => setRunMetadata({...runMetadata, sourceUrl: e.target.value})}
                                             className="form-input form-input w-full"
                                         />
-                                        <RunSourceField
+                                        <SourceField
                                             sources={sources}
                                             pick={runMetadata.sourcePick}
                                             onPick={pick => setRunMetadata(withPickedSource(runMetadata, pick))}
@@ -2052,7 +2052,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={(e) => setEditFormData({...editFormData, sourceUrl: e.target.value})}
                                         className="form-input form-input w-full"
                                     />
-                                    <RunSourceField
+                                    <SourceField
                                         sources={sources}
                                         pick={editFormData.sourcePick}
                                         onPick={pick => setEditFormData(withPickedSource(editFormData, pick))}

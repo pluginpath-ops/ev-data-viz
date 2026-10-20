@@ -1,8 +1,8 @@
 /**
- * A test's source on the test form: the one source list, so "OoS" and
+ * A source on a record's form — a test's, a session's: the one source list, so "OoS" and
  * "Out of Spec" cannot split into two outlets (#426).
  *
- * `pick` is null until the curator touches the picker; the test's stored text
+ * `pick` is null until the curator touches the picker; the record's stored text
  * (`stored`) then stands in, shown as the listed source it names. A stored name
  * that is not a listed source is shown rather than hidden, and
  * `utils/sources.runSourceText` keeps it until a source is chosen to replace it.
@@ -12,7 +12,7 @@ import { storedSourcePick } from '../utils/sources';
 
 const NOTHING = { sourceId: null, newName: null };
 
-export default function RunSourceField({ sources, pick, onPick, url, stored = '' }) {
+export default function SourceField({ sources, pick, onPick, url, stored = '' }) {
     const fromStored = pick == null ? storedSourcePick(sources, stored) : null;
     const unlisted = pick == null && !fromStored ? stored.trim() : '';
     return (

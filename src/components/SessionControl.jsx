@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
     sessionLabel, sessionsForPicker, vehiclesInSession,
-    sessionDateMismatch, runsInSession,
+    sessionDateMismatch, runsInSession, sessionSeedFromRun,
 } from '../utils/testSessions';
+import { useSources } from '../hooks/useSources';
 import { vehicleLabel } from '../utils/specHelpers';
 import SessionBrowserModal from './SessionBrowserModal';
 import SessionEditModal from './SessionEditModal';
@@ -24,7 +25,7 @@ import SessionEditModal from './SessionEditModal';
 export default function SessionControl({
     run, vehicle, vehicles, sessions,
     onAssign,          // (sessionId | null) => void
-    onCreate,          // ({ name, testedAt }) => Promise<session | null>
+    onCreate,          // ({ name, ...sessionSeedFromRun }) => Promise<session | null>
     onUpdate,          // (id, changes) => void
     onDelete,          // (id) => void
 }) {
@@ -35,6 +36,7 @@ export default function SessionControl({
     const [browseEditId, setBrowseEditId] = useState(null);
     const [draftName, setDraftName] = useState('');
     const [saving, setSaving] = useState(false);
+    const { sources } = useSources();
 
     const { used } = sessionsForPicker(sessions, vehicles, vehicle.id);
     const current  = (sessions || []).find(s => String(s.id) === String(run.session_id)) ?? null;
@@ -62,9 +64,10 @@ export default function SessionControl({
     const handleCreate = async () => {
         setSaving(true);
         try {
-            // Seed the session's date from the run's own, since the run being
-            // assigned is nearly always one of the outing's first.
-            const created = await onCreate({ name: draftName.trim() || null, testedAt: run.date || null });
+            // Start the session from the run being assigned — its date, source,
+            // link and conditions — since it is nearly always one of the
+            // outing's first (#426).
+            const created = await onCreate({ name: draftName.trim() || null, ...sessionSeedFromRun(run, sources) });
             if (created) onAssign(created.id);
             setCreating(false);
         } finally {
