@@ -158,3 +158,17 @@ describe('the Curation facet', () => {
         expect(facetState(decodeVehicleFilters(p.toString()), 'curation').out).toEqual(['photo']);
     });
 });
+
+describe('year facet and model-year spans', () => {
+    it('lists plain years only, a span counting under each year it covers', () => {
+        const ctx = vehicleFilterContext(fleet);
+        const { values, counts } = vehicleFacetCounts(fleet, EMPTY_VEHICLE_FILTERS, ctx).year;
+        expect(values.some(v => v.includes('-'))).toBe(false);
+        expect(counts.get('2025')).toBe(2); // R1S + the 2024-2026 Lyriq
+    });
+    it('picking a year finds spans that contain it', () => {
+        const ctx = vehicleFilterContext(fleet);
+        const f = toggleInclude(EMPTY_VEHICLE_FILTERS, 'year', '2025');
+        expect(filterVehicles(fleet, f, ctx).map(v => v.id).sort()).toEqual([1, 3]);
+    });
+});

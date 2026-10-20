@@ -70,6 +70,16 @@ export const CURATION_CHECKS = [
       has: (v, ctx) => v.spec_source_vehicle_id == null && ctx.sourceIds.has(v.id) },
 ];
 
+/** The years a vehicle's `year` covers: one for "2024", each for "2023-2025". */
+export function yearsOf(year) {
+    if (year == null || year === '') return [];
+    const span = /^(\d{4})\s*[-–]\s*(\d{4})$/.exec(String(year).trim());
+    if (!span) return [String(year)];
+    const [from, to] = [Number(span[1]), Number(span[2])];
+    if (to < from || to - from > 30) return [String(year)];
+    return Array.from({ length: to - from + 1 }, (_, i) => String(from + i));
+}
+
 /**
  * The facets, in the order the filter bar shows them.
  *
@@ -83,7 +93,9 @@ export const VEHICLE_FACETS = [
     { key: 'model', label: 'Model', param: 'md',
       values: (v) => [v.model].filter(Boolean) },
     { key: 'year',  label: 'Year',  param: 'yr', legacy: 'vt_y',
-      values: (v) => (v.year != null && v.year !== '' ? [String(v.year)] : []) },
+      // A model-year span ("2023-2025") counts under every year it covers, so
+      // the menu lists plain years and picking 2024 finds the span too.
+      values: (v) => yearsOf(v.year) },
     { key: 'drive', label: 'Drive', param: 'dr', legacy: 'vt_dr',
       // Through inheritance and the platform, as the table shows it.
       values: (v, ctx) => [ctx.specsOf(v)?.powertrain?.drive_type].filter(Boolean) },

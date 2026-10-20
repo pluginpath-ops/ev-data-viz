@@ -17,10 +17,14 @@ import {
  * `children` sits in the row after the facets: what else changes what the
  * reader is looking at in that view (the Table's columns, the Cards' sort).
  */
+const TAGS = 'tags';
+
 export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, shownCount, children }) {
     const counts = useMemo(() => vehicleFacetCounts(vehicles, filters, ctx), [vehicles, filters, ctx]);
     const chips = activeFilterChips(filters, { curator: ctx.curator });
     const active = filtersActive(filters);
+    const tagState = facetState(filters, TAGS);
+    const tagValues = [...counts[TAGS].values].sort((a, b) => a.localeCompare(b));
 
     return (
         <div className="guide-filter-strip">
@@ -33,7 +37,7 @@ export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, sho
                     aria-label="Search vehicles"
                     className="form-input guide-search-input"
                 />
-                {VEHICLE_FACETS.filter(f => !f.curatorOnly || ctx.curator).map(f => {
+                {VEHICLE_FACETS.filter(f => f.key !== TAGS && (!f.curatorOnly || ctx.curator)).map(f => {
                     const st = facetState(filters, f.key);
                     return (
                         <GuideFacetMenu
@@ -65,6 +69,33 @@ export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, sho
                     )}
                 </div>
             </div>
+            {tagValues.length > 0 && (
+                <div className="guide-narrowed-row">
+                    <span className="text-nano">Tags</span>
+                    {tagValues.map(t => {
+                        const on = tagState.in.includes(t);
+                        const out = tagState.out.includes(t);
+                        return (
+                            <button
+                                key={t}
+                                type="button"
+                                className={`guide-chip${on ? ' active' : ''}${out ? ' is-excluded' : ''}`}
+                                aria-pressed={on}
+                                onClick={() => onChange(toggleInclude(filters, TAGS, t))}
+                            >
+                                {t}
+                                <span className="guide-chip-count">{counts[TAGS].counts.get(t) ?? 0}</span>
+                            </button>
+                        );
+                    })}
+                    {tagState.in.length > 1 && (
+                        <button type="button" className="guide-filter-reset"
+                            onClick={() => onChange(setMatchAll(filters, TAGS, !tagState.all))}>
+                            {tagState.all ? 'Match all' : 'Match any'}
+                        </button>
+                    )}
+                </div>
+            )}
             {chips.length > 0 && (
                 <div className="guide-narrowed-row">
                     <span className="text-nano">Narrowed by</span>

@@ -7235,6 +7235,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     align-items: center;
     gap: 6px;
 }
+.guide-chip.is-excluded { color: var(--color-danger); }
 .guide-narrowed-chip {
     display: inline-flex;
     align-items: center;
