@@ -52,6 +52,16 @@ export function makeModelLine(v) {
     return [v?.make, v?.model, v?.trim, v?.year].filter(Boolean).join(' · ');
 }
 
+/**
+ * The vehicles a spec chart plots, each carrying `effectiveSpecs` — its own
+ * values, else its source chain's, else its platform's. `extractValue` reads
+ * that in preference to `specs`, so an inherited value plots instead of
+ * showing a blank bar while the table beside it shows the figure.
+ */
+export function withEffectiveSpecs(picked, allVehicles) {
+    return picked.map(v => ({ ...v, effectiveSpecs: resolveEffectiveSpecs(v, allVehicles) }));
+}
+
 // ── Spec inheritance merge ────────────────────────────────────────────────────
 
 /**
@@ -234,9 +244,10 @@ export function vehicleColor(vehicle, idx) {
 export function buildFieldGroups(vehicles, vehicleFields) {
     const catCustomKeys = {};
     for (const v of vehicles) {
-        if (!v.specs) continue;
+        const specs = v.effectiveSpecs ?? v.specs;
+        if (!specs) continue;
         for (const cat of SPEC_CATEGORIES) {
-            const custom = v.specs[cat.key]?._custom || {};
+            const custom = specs[cat.key]?._custom || {};
             if (!catCustomKeys[cat.key]) catCustomKeys[cat.key] = new Set();
             for (const ck of Object.keys(custom)) catCustomKeys[cat.key].add(ck);
         }
@@ -271,7 +282,7 @@ export function getFieldDef(fieldKey, vehicleFields) {
 export function extractValue(vehicle, fieldKey) {
     if (fieldKey.startsWith('vehicle.')) return vehicle[fieldKey.split('.')[1]] ?? null;
     const [catKey, sub, customKey] = fieldKey.split('.');
-    const catData = vehicle.specs?.[catKey];
+    const catData = (vehicle.effectiveSpecs ?? vehicle.specs)?.[catKey];
     if (!catData) return null;
     if (sub === '_custom') return catData._custom?.[customKey] ?? null;
     return catData[sub] ?? null;
