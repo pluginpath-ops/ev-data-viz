@@ -9,9 +9,8 @@ import { DEFAULT_RUN_COLOR } from '../utils/colorUtils';
 import { filterTests } from '../utils/runUtils';
 import { EMPTY_VEHICLE_FORM, vehicleFormFrom } from '../utils/vehicleForm';
 import { useAppContext } from '../context/AppContext';
-import { DATA_CATEGORIES, vehicleDataCategories, vehiclePooledCounts } from '../utils/vehicleDataCategories';
-import { distanceValue, distanceUnit } from '../utils/unitConversions';
-import StatCell from './StatCell';
+import { distanceUnit } from '../utils/unitConversions';
+import VehicleCardFigures, { TagPills, epaRangeValue, epaRangeBasisMark, epaRangeTitle } from './vehicles/VehicleCardFigures';
 import VehicleMedia from './vehicles/VehicleMedia';
 import { CARD_BAND_HEIGHT } from '../utils/cardBand';
 import TestedFigure from './vehicles/TestedFigure';
@@ -26,39 +25,11 @@ import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { EMPTY_VEHICLE_FILTERS, filtersActive } from '../utils/vehicleFilters';
 import VehicleListHeader from './vehicles/VehicleListHeader';
 import VehicleRowMenu from './vehicles/VehicleRowMenu';
-import TestCounts, { TestCountLink } from './vehicles/TestCounts';
+import TestCounts from './vehicles/TestCounts';
 import LazyBoundary from './LazyBoundary';
 import { EditVehicleForm, ImportVehiclesModal } from './lazyComponents';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
-import { fromYearNote } from '../utils/epaCertifications';
 import { deletionImpact, impactLines } from '../utils/vehicleDeletion';
-
-/**
- * The card's EPA range figure: the resolved range, or — with several EPA
- * configurations and no primary — the span of their labels, rather than one
- * picked silently.
- */
-function epaRangeValue(vehicle, units) {
-    if (vehicle.epaRangeMi) return distanceValue(vehicle.epaRangeMi, units);
-    const span = vehicle.epaRange?.spanMi;
-    return span ? span.map(mi => distanceValue(mi, units)).join('–') : null;
-}
-
-/**
- * A word beside the range only when it is not this vehicle's own EPA label:
- * an expected or unsorted figure, or a label from another model year's
- * certification — "From MY2024" (#374).
- */
-function epaRangeBasisMark(vehicle) {
-    if (['expected', 'unsorted'].includes(vehicle.epaRangeBasis)) return vehicle.epaRangeBasis;
-    return fromYearNote(vehicle.epaRange?.certification)?.short ?? null;
-}
-
-/** Why the range reads as it does, for a title. */
-function epaRangeTitle(vehicle) {
-    return fromYearNote(vehicle.epaRange?.certification)?.long
-        ?? EPA_RANGE_BASIS[vehicle.epaRangeBasis]?.note;
-}
 
 /** Compare two figures in a direction, blanks last whichever way the column sorts. */
 function byNumber(a, b, dir = 'asc') {
@@ -86,34 +57,6 @@ function ListFigure({ value, unit, basis }) {
             <span className="stat-cell-value">{value}{unit && <span className="stat-cell-unit">{unit}</span>}</span>
             {basis && <span className="stat-cell-basis">{basis}</span>}
         </>
-    );
-}
-
-// ── Test-count row ────────────────────────────────────────────────────────────
-
-/**
- * Renders a "Tests: Charging (n) Range (n) EPA (n)" line that matches the
- * styling of Battery/Range rows. "Tests:" inherits the parent's text-sm color;
- * the type names are 1pt smaller and colored. Zero-count categories omitted.
- */
-function TestCountPills({ vehicle, performanceCounts = {}, onOpenSubtab }) {
-    const counts = vehicleDataCategories(vehicle, performanceCounts);
-    const pooled = vehiclePooledCounts(vehicle);
-    const shown = DATA_CATEGORIES.filter(c => counts[c.key] > 0 || pooled[c.key] > 0);
-    if (shown.length === 0) return null;
-
-    // "Charging (4/2)": listed tests, then in grey the unlisted ones that still
-    // count in the statistics (#394, the pool).
-    return (
-        <p className="flex flex-wrap items-baseline gap-x-1.5">
-            <span>Tests:</span>
-            {shown.map(c => (
-                <TestCountLink key={c.key} className={`card-test-count ${c.colorClass}`} category={c} vehicle={vehicle}
-                    count={counts[c.key]} pooled={pooled[c.key]} onOpenSubtab={onOpenSubtab}>
-                    {c.label} ({counts[c.key]}{pooled[c.key] > 0 && <span className="test-count-pool">/{pooled[c.key]}</span>})
-                </TestCountLink>
-            ))}
-        </p>
     );
 }
 
@@ -408,40 +351,13 @@ export default function VehiclesView({
                         </div>
                     )}
 
-                    {/* The figures, set as figures. They were prose —
-                        "Battery: 82 kWh" in the same face and weight
-                        as the sentence beside it — which made the
-                        LABELS the loudest thing on a card whose whole
-                        job is to compare numbers. */}
-                    <div className="stat-grid">
-                        <StatCell
-                            label="Battery"
-                            value={vehicle.socWindowKwh}
-                            unit="kWh"
-                            basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label}
-                            title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}
-                        />
-                        <StatCell
-                            label="EPA range"
-                            value={epaRangeValue(vehicle, units)}
-                            unit={distanceUnit(units)}
-                            basis={epaRangeBasisMark(vehicle)}
-                            title={epaRangeTitle(vehicle)}
-                        />
-                        {vehicle.power != null && (
-                            <StatCell label="Power" value={vehicle.power} unit="kW" />
-                        )}
-                    </div>
-
-                    {/* The measurement, with the conditions that
-                        produced it and no verdict attached. */}
-                    <TestedFigure vehicle={vehicle} tested={testedRangeSummary(vehicle)} units={units} onOpenTest={onOpenTest} />
-
-                    <PlatformLine vehicle={vehicle} />
-
-                    <TestCountPills vehicle={vehicle} performanceCounts={performanceCounts} onOpenSubtab={onViewRuns} />
-
-                    {vehicle.tags?.length > 0 && <TagPills vehicle={vehicle} />}
+                    <VehicleCardFigures
+                        vehicle={vehicle}
+                        units={units}
+                        performanceCounts={performanceCounts}
+                        onOpenTest={onOpenTest}
+                        onOpenSubtab={onViewRuns}
+                    />
 
                     {/* Actions at the foot of the card, in two rows.
                         The first is what anyone can do with the
@@ -733,28 +649,6 @@ export default function VehiclesView({
                     </button>
                 )}
             </>
-        );
-    };
-
-    const TagPills = ({ vehicle }) => {
-        if (!vehicle.tags?.length) return null;
-        return (
-            <div className="vehicle-tags">
-                {vehicle.tags.map(tag => {
-                    // A tag that came down the inheritance chain is drawn as
-                    // one, so a curator can tell it from a tag set here.
-                    const from = vehicle.inheritedFrom?.tags?.[tag.id];
-                    return (
-                        <span
-                            key={tag.id}
-                            className={`vehicle-tag${from ? ' is-inherited' : ''}`}
-                            title={from ? `Inherited from ${from.name}` : undefined}
-                        >
-                            {tag.name}
-                        </span>
-                    );
-                })}
-            </div>
         );
     };
 

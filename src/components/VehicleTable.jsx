@@ -36,6 +36,7 @@ import VehicleFilterBar from './vehicles/VehicleFilterBar';
 import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { decodeVehicleFilters } from '../utils/vehicleFilters';
 import ViewSpecsModal from './ViewSpecsModal';
+import VehicleCardPopover from './vehicles/VehicleCardPopover';
 import { vehicleColor } from '../utils/specHelpers';
 import { groupPerformanceByVehicle } from '../utils/dataChecks';
 import {
@@ -65,7 +66,7 @@ function writeMemory({ view }) {
 }
 
 /** One vehicle. Rendered by the selected band and the body from the same component. */
-function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen, onOpenTest }) {
+function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen, onOpenTest, onViewRuns, performanceCounts }) {
     const { openPlatform } = useNavigation();
     return (
         <tr className={`guide-row${selected ? ' selected' : ''}`} data-row-id={row.id} onClick={() => onOpen(row.vehicle)}>
@@ -81,9 +82,11 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen,
                 const text = formatVehicleCell(row, col, units);
                 if (col.key === 'name') {
                     return (
-                        // The name selects, like the checkbox beside it: it is the
-                        // biggest target in the row and the one the eye lands on.
-                        // Every other cell still opens View Specs.
+                        // The name TEXT opens the vehicle's card in a popover; the
+                        // rest of the cell — the margin around it and the swatch —
+                        // selects, like the checkbox beside it, so the row's
+                        // biggest target still does what it always did. Every other
+                        // cell opens View Specs.
                         <TableCell
                             key={col.key}
                             className="sticky-name"
@@ -94,7 +97,17 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen,
                                 {/* The vehicle's series color, so a row ties to the
                                     same vehicle on every chart. */}
                                 <span className="series-swatch" style={{ backgroundColor: vehicleColor(row.vehicle, row.index) }} aria-hidden="true" />
-                                <span className="guide-cell-name">{text}</span>
+                                <VehicleCardPopover
+                                    vehicle={row.vehicle}
+                                    units={units}
+                                    performanceCounts={performanceCounts}
+                                    selected={selected}
+                                    onViewRuns={onViewRuns}
+                                    onViewSpecs={onOpen}
+                                    onOpenTest={onOpenTest}
+                                >
+                                    <span className="guide-cell-name">{text}</span>
+                                </VehicleCardPopover>
                             </span>
                         </TableCell>
                     );
@@ -137,8 +150,10 @@ function testLink(ref, onOpenTest) {
  * Props:
  *   onOpenTest  {(TestReference) => void}  open a test in Tests & Data
  *               without a reload; absent in the pop-out window
+ *   onViewRuns  {(vehicle, subtab?) => void}  open a vehicle's Tests & Data,
+ *               from its card; absent in the pop-out window
  */
-export default function VehicleTable({ onOpenTest = null, filters: sharedFilters = null, onFiltersChange = null }) {
+export default function VehicleTable({ onOpenTest = null, onViewRuns = null, filters: sharedFilters = null, onFiltersChange = null }) {
     const {
         vehicles, selectedVehicles, toggleVehicleSelection, units, platformsById,
         getPerformanceSummaries, getPerformanceSessions, performanceCounts,
@@ -250,7 +265,7 @@ export default function VehicleTable({ onOpenTest = null, filters: sharedFilters
             setSortDir(firstSortDir(vehicleColumnByKey(key)));
         }
     };
-    const rowProps = { cols, units, maxima, onToggle: toggleVehicleSelection, onOpen: setViewing, onOpenTest };
+    const rowProps = { cols, units, maxima, onToggle: toggleVehicleSelection, onOpen: setViewing, onOpenTest, onViewRuns, performanceCounts };
 
     return (
         <div className="vehicle-table">

@@ -52,6 +52,7 @@ export const OWNED_FAMILIES = [
  * teaches nothing — or variants whose parent is already shown.
  */
 export const NOT_CATALOGUED = {
+    'selected-vehicle-chip-name': 'The name inside .selected-vehicle-chip, drawn as a button: inherits the chip\'s color and only underlines on hover. The chip is catalogued.',
     'info-icon':        'Layout wrapper — an inline-flex span holding the glyph. The glyph is catalogued.',
     'popover-foot-gap': 'A flex spacer inside the action row — it has no appearance at '
         + 'all, it is the gap that keeps Auto away from Apply. The row is catalogued.',

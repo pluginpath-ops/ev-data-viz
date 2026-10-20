@@ -779,7 +779,7 @@ describe('the seams that broke before', () => {
         expect(read('src/components/ImportVehiclesModal.jsx')).toMatch(/buildImportPlan\([^)]*platforms/);
         expect(read('src/utils/parseVehicleImport.js')).toMatch(/mechanical_platform: \[/);
 
-        expect(read('src/components/VehiclesView.jsx')).toMatch(/<PlatformLine vehicle=\{vehicle\} \/>/);
+        expect(read('src/components/vehicles/VehicleCardFigures.jsx')).toMatch(/<PlatformLine vehicle=\{vehicle\} \/>/);
         expect(read('src/components/ViewSpecsModal.jsx')).toMatch(/<PlatformFacts vehicle=\{liveVehicle\} \/>/);
         expect(read('src/components/VehicleTable.jsx')).toMatch(/buildVehicleRows\(vehicles, \{[^}]*platformsById/);
     });
@@ -1037,12 +1037,13 @@ describe('the seams that broke before', () => {
         // The card and the row both select on click; a count that forgets to
         // stop the click looks linked and quietly toggles the selection too.
         const view = read('src/components/VehiclesView.jsx');
-        expect(view, 'the card\'s counts open their tests').toMatch(/<TestCountPills [^>]*onOpenSubtab=\{onViewRuns\}/);
+        expect(view, 'the card\'s figures open their tests').toMatch(/<VehicleCardFigures[^>]*onOpenSubtab=\{onViewRuns\}/);
+        expect(read('src/components/vehicles/VehicleCardFigures.jsx'), 'the card\'s counts open their tests').toMatch(/<TestCountPills [^>]*onOpenSubtab=\{onOpenSubtab\}/);
         expect(view, 'the list\'s counts open their tests').toMatch(/<TestCounts [^>]*onOpenSubtab=\{onViewRuns\}/);
         expect(read('src/components/vehicles/TestCounts.jsx'), 'and the click stays off the row')
             .toMatch(/e\.stopPropagation\(\); onOpenSubtab\(vehicle, category\.subtab\)/);
         expect(read('src/App.jsx'), 'App takes the sub-tab, checked against the real ones')
-            .toMatch(/onViewRuns=\{\(v, sub\) => \{[^}]*RUNS_SUBTAB_IDS\.includes\(sub\)/);
+            .toMatch(/const viewVehicleRuns = \(v, sub\) => \{[^}]*RUNS_SUBTAB_IDS\.includes\(sub\)[\s\S]*onViewRuns=\{viewVehicleRuns\}/);
         const cats = read('src/utils/vehicleDataCategories.js');
         for (const m of cats.matchAll(/subtab: '(\w+)'/g)) {
             expect(read('src/components/RunsView.jsx'), `${m[1]} is a real sub-tab`).toMatch(new RegExp(`id: '${m[1]}'`));
@@ -1099,7 +1100,10 @@ describe('the seams that broke before', () => {
             // ...and the restatement is the shared peek, not a browser title.
             expect(read(f), `${f} must restate clipped cells with useCellPeek`).toMatch(/useCellPeek\([^)]*\)[\s\S]*\{\.\.\.peekProps\}[\s\S]*\{cellPeek\}/);
         }
-        // Clicking the name picks the row in both tables; other cells open details.
+        // The vehicle table's name TEXT opens the vehicle's card in a popover;
+        // the rest of the name cell picks the row, as in the guide table. Other
+        // cells open details.
+        expect(table).toMatch(/<VehicleCardPopover/);
         expect(table).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggle\(row\.id\); \}\}/);
         expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggleSelect\(row\.id\); \}\}/);
         // Community flags reach the table's cells (flagging itself stays in View Specs).
