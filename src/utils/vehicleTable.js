@@ -245,6 +245,8 @@ const WINDOW_TIME_COLUMN = {
  *   windowFrom/windowTo  the charge window, 10→80% by default (`vt_win`)
  *   homePrice/fastPrice  electricity, $/kWh, at home and at a DC fast charger
  *                        (`vt_home`, `vt_fast`)
+ *   rangeBasis           what a percent of charge is priced at in "Time to add":
+ *                        'tested' (composite range) or 'epa' (`vt_basis`)
  *
  * The conditions the composite range is corrected to are NOT the table's: they
  * are the site-wide correction target (correctionSettings.js), shared with
@@ -255,7 +257,15 @@ const WINDOW_TIME_COLUMN = {
  * menu only offers the ones a shown column reads — a table without a cost
  * column has no price to set.
  */
-export const DEFAULT_ASSUMPTIONS = { addDistance: 150, windowFrom: 10, windowTo: 80, homePrice: 0.17, fastPrice: 0.48 };
+export const DEFAULT_ASSUMPTIONS = { addDistance: 150, windowFrom: 10, windowTo: 80, homePrice: 0.17, fastPrice: 0.48, rangeBasis: 'tested' };
+
+/**
+ * What "Time to add" prices a percent of charge at (`vt_basis`): what the
+ * vehicle has been MEASURED to go (the composite range, else its reported
+ * range test), or the EPA label. Either falls back to the other when its own
+ * figure is absent, and the note beneath says which it used.
+ */
+const RANGE_BASES = ['tested', 'epa'];
 
 /**
  * Each assumption's slider. The window's two ends cannot cross: From stops at
@@ -285,8 +295,12 @@ function clampAssumption(key, n) {
 
 /** Every assumption held to its slider, missing ones defaulted. */
 function normalizeAssumptions(assumptions = DEFAULT_ASSUMPTIONS) {
-    return Object.fromEntries(Object.keys(DEFAULT_ASSUMPTIONS)
-        .map(k => [k, clampAssumption(k, assumptions?.[k] ?? DEFAULT_ASSUMPTIONS[k])]));
+    const { rangeBasis, ...numbers } = DEFAULT_ASSUMPTIONS;
+    return {
+        ...Object.fromEntries(Object.keys(numbers)
+            .map(k => [k, clampAssumption(k, assumptions?.[k] ?? DEFAULT_ASSUMPTIONS[k])])),
+        rangeBasis: RANGE_BASES.includes(assumptions?.rangeBasis) ? assumptions.rangeBasis : rangeBasis,
+    };
 }
 
 /**
@@ -345,7 +359,9 @@ const ratio = (a, b) => (a != null && b != null && b > 0 ? a / b : null);
  * holds the rate is unknown (it falls off past 80%), so the cell is blank and
  * says why rather than extrapolating.
  */
-function timeToAdd([range, windowMin], { addMi, windowFrom, windowShare }, { chargeSummary }) {
+function timeToAdd([epaRange, windowMin, compositeRange, testedRange], { addMi, windowFrom, windowShare, rangeBasis }, { chargeSummary }) {
+    const { range, basis } = pricedRange(rangeBasis, { epaRange, compositeRange, testedRange });
+    const said = (r) => ({ ...r, note: r.note ?? `${basis} range` });
     if (range == null || !(range > 0)) return { value: null };
     const miPerPct = range / 100;
     if (chargeSummary) {
@@ -354,12 +370,20 @@ function timeToAdd([range, windowMin], { addMi, windowFrom, windowShare }, { cha
         const a = minutesBetween(chargeSummary, windowFrom, lo) ?? (lo === windowFrom ? 0 : null);
         const b = hi === lo ? a : minutesBetween(chargeSummary, windowFrom, hi);
         if (hi > 100 || a == null || b == null) return { value: null, note: 'more than the test charged' };
-        return { value: a + (b - a) * (target - lo) };
+        return said({ value: a + (b - a) * (target - lo) });
     }
     if (!(windowMin > 0)) return { value: null };
     const windowMi = range * windowShare;
     if (addMi > windowMi) return { value: null, note: `more than a ${SPEC_WINDOW.from}→${SPEC_WINDOW.to}% stop adds` };
-    return { value: addMi / (windowMi / windowMin) };
+    return said({ value: addMi / (windowMi / windowMin) });
+}
+
+/** The range a percent is priced at, and what to call it: the reader's basis, else the other. */
+function pricedRange(rangeBasis, { epaRange, compositeRange, testedRange }) {
+    const measured = compositeRange > 0 ? { range: compositeRange, basis: 'composite' }
+        : testedRange > 0 ? { range: testedRange, basis: 'tested' } : null;
+    const epa = epaRange > 0 ? { range: epaRange, basis: 'EPA' } : null;
+    return (rangeBasis === 'epa' ? epa ?? measured : measured ?? epa) ?? { range: null, basis: null };
 }
 
 /** Wall-side miles per kWh: EPA's where the label gives it, else the battery-side estimate less charging losses. */
@@ -382,12 +406,12 @@ const CALCULATED_COLUMNS = [
       calc: ([range, min], { windowShare }) => ratio(range == null ? null : range * windowShare, min),
       hint: 'EPA range × the charge window ÷ the time to charge across it: the miles a stop adds per minute plugged in. Peak kW is the number quoted; this is the one a road trip feels. From a test where one covers the window, else the spec’s 10→80% time.' },
     { key: 'calc.timeToAdd', label: 'Time to add distance', unit: 'min',
-      better: 'lower', digits: 0, assumption: ['addDistance', 'window'], charging: true,
+      better: 'lower', digits: 0, assumption: ['addDistance', 'window', 'rangeBasis', 'conditions'], charging: true,
       labelFor: ({ addDistance, units }) => `Time to add ${addDistance} ${units === 'metric' ? 'km' : 'mi'}`,
-      inputs: ['figures.epaRangeMi', 'tested.charge_window_min'],
+      inputs: ['figures.epaRangeMi', 'tested.charge_window_min', 'tested.composite_range_mi', 'tested.range_mi'],
       calc: (inputs, ctx, extra) => timeToAdd(inputs, ctx, extra).value,
       note: (inputs, ctx, extra) => timeToAdd(inputs, ctx, extra).note ?? null,
-      hint: 'Minutes from the start of the charge window to add the distance set under Assumptions, pricing each percent at the EPA range. Read off the vehicle’s own charging curve where it has one; else at the average rate of the spec’s 10→80% time, and blank where that stop adds less.' },
+      hint: 'Minutes from the start of the charge window to add the distance set under Assumptions, pricing each percent at the composite range (else the reported range test, else EPA), or at the EPA range, as set under Assumptions. Read off the vehicle’s own charging curve where it has one; else at the average rate of the spec’s 10→80% time, and blank where that stop adds less.' },
     { key: 'calc.avgChargeKw', label: 'Avg charge', unit: 'kW',
       better: 'higher', digits: 0, assumption: ['window'], charging: true,
       labelFor: ({ windowFrom, windowTo }) => `Avg charge ${windowFrom}→${windowTo}%`,
@@ -893,6 +917,7 @@ export function encodeVehicleTableParams({ columns, sortKey, sortDir, modifiedFr
     }
     if (a.homePrice !== DEFAULT_ASSUMPTIONS.homePrice) p.set('vt_home', String(a.homePrice));
     if (a.fastPrice !== DEFAULT_ASSUMPTIONS.fastPrice) p.set('vt_fast', String(a.fastPrice));
+    if (a.rangeBasis !== DEFAULT_ASSUMPTIONS.rangeBasis) p.set('vt_basis', a.rangeBasis);
     return p;
 }
 
@@ -933,6 +958,7 @@ function decodeAssumptions(p) {
         windowTo: to,
         homePrice: p.get('vt_home'),
         fastPrice: p.get('vt_fast'),
+        rangeBasis: p.get('vt_basis'),
     });
 }
 

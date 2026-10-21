@@ -574,7 +574,7 @@ describe('the charge window (#335)', () => {
         const w = { ...DEFAULT_ASSUMPTIONS, windowFrom: 20, windowTo: 90 };
         expect(labelledColumn(vehicleColumnByKey(W), w).label).toBe('Charge 20→90%');
         expect(labelledColumn(vehicleColumnByKey('calc.avgChargeKw'), w).label).toBe('Avg charge 20→90%');
-        expect([...assumptionsFor(['name', 'calc.timeToAdd'])].sort()).toEqual(['addDistance', 'window']);
+        expect([...assumptionsFor(['name', 'calc.timeToAdd'])].sort()).toEqual(['addDistance', 'conditions', 'rangeBasis', 'window']);
         expect([...assumptionsFor(['name', 'calc.costPer100Fast'])]).toEqual(['fastPrice']);
         expect(assumptionsFor(['name', 'calc.efficiency']).size).toBe(0);
     });
@@ -589,5 +589,30 @@ describe('the charge window (#335)', () => {
         expect(decodeVehicleTableParams('vt_win=70-30').assumptions).toMatchObject({ windowFrom: 40, windowTo: 50 });
         expect(decodeVehicleTableParams('vt_win=junk&vt_home=-3').assumptions)
             .toMatchObject({ windowFrom: 10, windowTo: 80, homePrice: 0.05 });
+    });
+});
+
+describe('Time to add prices a percent at the reader\'s range basis', () => {
+    const car = () => vehicle({ epaRangeMi: 300, specs: { charging: { charge_time_10_to_80_pct_min: 21 } } });
+
+    it('round-trips the basis through the URL, the default omitted', () => {
+        expect(encodeVehicleTableParams({ columns: ['name'], sortKey: 'name', sortDir: 'asc' }).has('vt_basis')).toBe(false);
+        const epa = encodeVehicleTableParams({ columns: ['name'], sortKey: 'name', sortDir: 'asc', assumptions: { ...DEFAULT_ASSUMPTIONS, rangeBasis: 'epa' } });
+        expect(epa.get('vt_basis')).toBe('epa');
+        expect(decodeVehicleTableParams(epa.toString()).assumptions.rangeBasis).toBe('epa');
+        expect(decodeVehicleTableParams('vt_basis=nonsense').assumptions.rangeBasis).toBe('tested');
+    });
+
+    it('defaults to tested, falls back to EPA when a car has no tested range, and says which it used', () => {
+        expect(DEFAULT_ASSUMPTIONS.rangeBasis).toBe('tested');
+        const [row] = buildVehicleRows([car()]);
+        expect(row.values['calc.timeToAdd']).toBeCloseTo(15);
+        expect(row.notes['calc.timeToAdd']).toBe('EPA range');
+        const [epa] = buildVehicleRows([car()], { assumptions: { rangeBasis: 'epa' } });
+        expect(epa.notes['calc.timeToAdd']).toBe('EPA range');
+    });
+
+    it('offers the basis in the Assumptions menu with Time to add', () => {
+        expect(assumptionsFor(['name', 'calc.timeToAdd']).has('rangeBasis')).toBe(true);
     });
 });

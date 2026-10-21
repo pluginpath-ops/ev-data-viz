@@ -51,6 +51,7 @@ export default function VehicleTableAssumptions({ assumptions, needed, units, on
     const summary = [
         shows('window') && differs('windowFrom', 'windowTo') && `${a.windowFrom}→${a.windowTo}%`,
         shows('addDistance') && differs('addDistance') && `add ${a.addDistance} ${unit}`,
+        shows('rangeBasis') && differs('rangeBasis') && 'EPA range',
         shows('homePrice') && differs('homePrice') && `${money(a.homePrice)} home`,
         shows('fastPrice') && differs('fastPrice') && `${money(a.fastPrice)} fast`,
         shows('conditions') && targetDiffers(correctionTarget) && correctionTargetText(correctionTarget, units),
@@ -96,10 +97,31 @@ export default function VehicleTableAssumptions({ assumptions, needed, units, on
                     </span>
                     <Slider name="addDistance" value={a.addDistance} onChange={set('addDistance')} />
                     <span className="text-note">
-                        Used by “Time to add”, starting from the bottom of the charge window, with each
-                        percent priced at the EPA range.
+                        Used by “Time to add”, starting from the bottom of the charge window.
                     </span>
                 </label>
+            )}
+            {shows('rangeBasis') && (
+                <div className="assumption-field">
+                    <span className="assumption-field-name">Price each percent at</span>
+                    <div className="stats-segmented" role="group" aria-label="Range basis">
+                        {[['tested', 'Tested range'], ['epa', 'EPA range']].map(([value, label]) => (
+                            <button
+                                key={value}
+                                type="button"
+                                className={a.rangeBasis === value ? 'active' : ''}
+                                aria-pressed={a.rangeBasis === value}
+                                onClick={() => set('rangeBasis')(value)}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                    <span className="text-note">
+                        Tested is the composite range, else the reported range test; EPA is the label.
+                        Either falls back to the other when a car has no figure of its own.
+                    </span>
+                </div>
             )}
             {shows('homePrice') && (
                 <label className="assumption-field">
