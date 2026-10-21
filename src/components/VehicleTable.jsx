@@ -79,7 +79,9 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen,
                 />
             </td>
             {cols.map(col => {
-                const text = formatVehicleCell(row, col, units);
+                // An asterisk on the tested range where its peek has a when-new
+                // range to justify it (whenNewRange: only a pack well down).
+                const text = formatVehicleCell(row, col, units) + (col.key === 'tested.range_mi' && row.whenNew ? '*' : '');
                 if (col.key === 'name') {
                     return (
                         // The name TEXT opens the vehicle's card in a popover; the
