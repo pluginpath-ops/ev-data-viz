@@ -121,7 +121,8 @@ describe('peakOnCharger', () => {
 describe('topics', () => {
     it('reads every content file, and each has a title', () => {
         expect(TOPICS.map(t => t.slug).sort()).toEqual(['400v-charger-compatibility', '400v-vs-800v',
-            'epa-battery-figures', 'epa-drive-cycles', 'epa-test-procedures', 'epa-vs-real-world', 'reading-modeled-efficiency']);
+            'epa-battery-figures', 'epa-drive-cycles', 'epa-test-procedures', 'epa-vs-real-world', 'reading-modeled-efficiency',
+            'wind-and-range-tests']);
         for (const t of TOPICS) expect(t.title).not.toBe(t.slug);
     });
 

@@ -1728,6 +1728,164 @@
       ],
       "status": "verified",
       "note": "What the records show, not what the lab did. Readings consistent with it: the pair comes from one run reported under two codes (the 4 / 2 bag counts match a Multi-Cycle Test's 4 city and 2 highway laps), or the recharge is shared between two runs. Settling it needs a CSI PDF's test notes or the lab. The owner questioned the 21-hour city run this replaced (2026-09-29)."
+    },
+    {
+      "id": "physics-aero-drag-airspeed",
+      "claim": "Aerodynamic drag depends on the car's speed through the air, not over the ground, so a headwind raises it and a tailwind lowers it. The air speed is the vector difference of the car's velocity and the wind's.",
+      "value": null,
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Drag equation F = ½ρC_dAv², with v the air-relative speed (physics)",
+          "url": null,
+          "accessed": "2026-10-21"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "physics-wind-roundtrip-no-cancel",
+      "claim": "Because drag goes as the square of air speed, equal head and tail legs do not cancel: at 70 mph in a 10 mph wind the legs see 80 and 60 mph, and (80² + 60²)/2 = 5000 = 70² + 10², against 4900 in calm air.",
+      "value": {
+        "v": 70,
+        "w": 10,
+        "legs": [
+          80,
+          60
+        ],
+        "mean_square": 5000,
+        "calm": 4900,
+        "excess": 0.0204
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Arithmetic: ((v+w)² + (v−w)²)/2 = v² + w²",
+          "url": null,
+          "accessed": "2026-10-21"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "evbench-aero-fraction",
+      "claim": "EVBench takes 70% of a car's energy at its reference speed to be aerodynamic (AERO_FRACTION 0.70, unladen), so a 2.04% rise in mean squared air speed is about +1.4% in energy.",
+      "value": {
+        "aero_fraction": 0.7,
+        "energy_rise": 0.0143
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench constant AERO_FRACTION in src/constants/epa.js (owner has not ratified the figure); 0.70 × 2.04% by arithmetic",
+          "url": null,
+          "accessed": "2026-10-21"
+        }
+      ],
+      "status": "verified",
+      "note": "An EVBench modelling assumption, not a measured value for any car."
+    },
+    {
+      "id": "evbench-wind-simplified-law",
+      "claim": "EVBench charges the aerodynamic share of a test in proportion to |V_rel|², the square of the air speed, where |V_rel|² = v² + w² − 2vw·cos θ. Averaged over an out-and-back (the angle θ and θ + 180°), the cos term cancels and the cost is v² + w² at any angle: 5000 against 4900 calm, at 0°, 45° and 90° alike (70 mph, 10 mph wind).",
+      "value": {
+        "v": 70,
+        "w": 10,
+        "at_0": 5000,
+        "at_45": 5000,
+        "at_90": 5000,
+        "calm": 4900
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "apparentAirspeed() in src/utils/epaDerivations.js; arithmetic",
+          "url": null,
+          "accessed": "2026-10-21"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "physics-wind-strict-along-road",
+      "claim": "With a constant drag coefficient, only the component of the aerodynamic force along the road costs energy: |V_rel|·(v − w·cos θ). An out-and-back then costs 5000, 4975 and 4950 at 0°, 45° and 90° (70 mph, 10 mph wind), so a crosswind costs about half what a head/tail wind does. At 15 mph of wind it is 5125, 5068 and 5011 against 4900 calm.",
+      "value": {
+        "v": 70,
+        "w": 10,
+        "at_0": 5000,
+        "at_45": 4974.9,
+        "at_90": 4949.7,
+        "calm": 4900,
+        "w15": {
+          "at_0": 5125,
+          "at_45": 5068.4,
+          "at_90": 5011.2
+        }
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Arithmetic: mean of |V_rel|(v ∓ w cos θ) over the two legs",
+          "url": null,
+          "accessed": "2026-10-21"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "physics-drag-yaw",
+      "claim": "A car meeting the air at an angle (yaw) usually has a higher drag coefficient than when it meets it head on, because the flow separates earlier along the body. So the strict constant-Cd figure is a floor: real crosswind costs more.",
+      "value": null,
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Standard vehicle-aerodynamics knowledge: the yaw sensitivity of Cd is a textbook effect, general to road vehicles and not a figure for any one car. No source cited, by the owner's 2026-09-28 rule for accepted facts."
+    },
+    {
+      "id": "evbench-no-yaw-data",
+      "claim": "EVBench holds no per-vehicle yaw-sensitivity curve, so the extra cost of crosswind cannot be calculated for a given car.",
+      "value": null,
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Comment on apparentAirspeed() in src/utils/epaDerivations.js",
+          "url": null,
+          "accessed": "2026-10-21"
+        }
+      ],
+      "status": "verified",
+      "note": "Covers what EVBench holds. The owner understands makers publish no such curve per vehicle; no search is recorded, so the page claims only that EVBench has none."
+    },
+    {
+      "id": "evbench-wind-entry-rules",
+      "claim": "On a test, a blank wind angle means an out-and-back or loop, and the correction charges v² + w². An angle is given only for a test that held one heading (0° tailwind, 180° headwind, 90° or 270° crosswind) and is charged by the same |V_rel|² law. A blank wind speed means calm.",
+      "value": null,
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Owner decision 2026-10-21 (the simplified |V_rel|² law, and a blank angle as a round trip); wind-direction tooltip in RunsView.jsx",
+          "url": null,
+          "accessed": "2026-10-21"
+        }
+      ],
+      "status": "verified",
+      "note": "Until the unified condition-correction change merges, the code still reads a blank angle as 0° (a tailwind). Keep the page DRAFT until it does."
+    },
+    {
+      "id": "evbench-wind-angle-size",
+      "claim": "Under the strict law, an out-and-back at 0° and one at 90° differ by about 0.7% of total energy at 10 mph of wind, and about 1.6% at 15 mph (70 mph, 70% of energy aerodynamic). That gap is what the simplified law folds into one figure.",
+      "value": {
+        "w10": 0.0071,
+        "w15": 0.0163
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Arithmetic: 0.70 × (5000−4950)/4900 and 0.70 × (5125−5011)/4900",
+          "url": null,
+          "accessed": "2026-10-21"
+        }
+      ],
+      "status": "verified"
     }
   ]
 }

@@ -62,6 +62,8 @@ export const OUTLINE = [
               children: [
                   { slug: 'epa-label-basics', title: 'Reading the window sticker',
                     blurb: 'MPGe, kWh/100 mi, city and highway, and the 55/45 blend.' },
+                  { slug: 'wind-and-range-tests', title: 'How wind changes a range test',
+                    blurb: 'Why a wind never cancels on a round trip, and how to record its speed and angle.' },
                   { slug: 'epa-drive-cycles', title: 'The five test cycles',
                     blurb: 'What each cycle drives, how fast, and what it stands in for.' },
                   { slug: 'epa-test-procedures', title: 'How an EV is actually tested',
