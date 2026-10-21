@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { correctionSummary } from '../utils/correctionSettings';
+import SectionBand from './SectionBand';
+import SidebarDisplaySection from './SidebarDisplaySection';
 import { useSyncedScale } from '../hooks/useSyncedScale';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
@@ -251,7 +254,6 @@ const PALETTE = [
 // mode-dependent charge amount (leg distance / charge time). Blank shows the
 // global value greyed as a placeholder; typing overrides just that run.
 function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, dl, onChange, onReset }) {
-    const headerRef = useRef(null);
     const [open, setOpen] = useState(false);
     if (!entries.length) return null;
 
@@ -260,26 +262,12 @@ function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, d
 
     return (
         <div className="routing-panel">
-            <button
-                ref={headerRef}
-                onClick={() => {
-                    const next = !open;
-                    setOpen(next);
-                    // Same nudge as the run selector: a disclosure whose content
-                    // opens below the fold reads as a control that did nothing.
-                    if (next) {
-                        requestAnimationFrame(() =>
-                            headerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
-                    }
-                }}
-                className="run-selector-header"
-            >
-                <span style={{ display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                <span className="text-control">Customize routing</span>
-                <span className="run-selector-count">
-                    {customized ? `${customized} / ${entries.length}` : `0 / ${entries.length}`}
-                </span>
-            </button>
+            <SectionBand
+                open={open}
+                onToggle={setOpen}
+                label="Customize routing"
+                count={`${customized} / ${entries.length}`}
+            />
 
             {/* A table needed four columns and horizontal scroll in a 320px
                 rail. Two rows per entry costs no width: the name, then the two
@@ -658,6 +646,7 @@ export default function RoadTripView({
     handSet = false,
     verboseLabels = false,
     correctionMode = 'none',
+    correctionTarget = undefined,
     setChartConfig = null,
 }) {
     const { units, testSessions } = useAppContext();
@@ -734,7 +723,7 @@ export default function RoadTripView({
                         vehicle,
                         batteryKwh: vehicle.socWindowKwh,
                         explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
-                        correction: { mode: correctionMode },
+                        correction: { mode: correctionMode, target: correctionTarget },
                         session: sessionFor(testSessions, rangeRun),
                     });
 
@@ -766,7 +755,7 @@ export default function RoadTripView({
             }
         }
         return map;
-    }, [selectedVehicles, pairings, correctionMode, testSessions]);
+    }, [selectedVehicles, pairings, correctionMode, correctionTarget, testSessions]);
 
     // Selection lives in the shared hook (hooks/useRunSelection.js), the same one
     // Charge Compare uses. Previously this view had its own copy, whose bootstrap
@@ -1080,9 +1069,10 @@ export default function RoadTripView({
         if (!showTestSpread || roadTripConfig.towingMode) return null;
         return validEntries.map(entry => spreadTestsFor(entry.vehicle, {
             correctionMode,
+            correctionTarget,
             sessionOf: r => sessionFor(testSessions, r),
         }));
-    }, [showTestSpread, roadTripConfig.towingMode, validEntries, correctionMode, testSessions]);
+    }, [showTestSpread, roadTripConfig.towingMode, validEntries, correctionMode, correctionTarget, testSessions]);
 
     const spreadSweep = useMemo(() => {
         const {
@@ -2024,8 +2014,7 @@ export default function RoadTripView({
                       * accent-filled button in a "Mode" group of one: it is a
                       * thing that is either on or off, which is what every
                       * other control in this region already is. */}
-                    <div className="chart-rail-group">
-                        <span className="text-micro">Display</span>
+                    <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={correctionSummary(correctionMode, correctionTarget, units)}>
                         <div className="display-grid">
                             {setChartConfig && (
                                 <>
@@ -2040,13 +2029,9 @@ export default function RoadTripView({
                             </label>
                         </div>
                         {setChartConfig && (
-                            <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
+                            <CorrectionControl mode={correctionMode} target={correctionTarget} setChartConfig={setChartConfig} />
                         )}
-                        {setChartConfig && (
-                            <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
-                        )}
-
-                    </div>
+                    </SidebarDisplaySection>
 
                     {/* Simulation result warnings — shown here so they're near the controls that triggered them */}
                     {simResults.some(s => s?.warnings?.length > 0) && (
@@ -2065,6 +2050,7 @@ export default function RoadTripView({
 
                     {/* Run selector */}
                     <RunSelector
+                        colorControl={setChartConfig ? <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} /> : null}
                             handSetColorOf={handSetColorOf}
                             chartPalette={palette}
                             onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}

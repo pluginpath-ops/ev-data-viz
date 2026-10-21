@@ -302,9 +302,9 @@ export function testedEfficiency(vehicle) {
  *     Usable. Gross and unsorted read high, which would charge a healthy car
  *     with a fade it does not have.
  *
- * Raw, not condition-corrected, like the card and the table beside it: a
- * corrected efficiency would put the when-new range on different conditions
- * from the tested range it sits under.
+ * Raw here and on the card. The vehicle table corrects it (and the tested
+ * range and efficiency beside it) to the reader's conditions, one factor for
+ * all three, so the when-new range stays on the same footing as the tested range.
  *
  * @returns {{ run: object, whenNewMi: number, testedMi: number, retention: number,
  *             impliedKwh: number, capacityKwh: number, capacityBasis: string }|null}

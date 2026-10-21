@@ -24,6 +24,8 @@ import { useAsyncResource } from '../hooks/useAsyncResource';
 import SortHeader from './tables/SortHeader';
 import ColumnPicker from './tables/ColumnPicker';
 import PresetPicker from './tables/PresetPicker';
+import { sessionFor } from '../utils/testSessions';
+import { DEFAULT_CORRECTION_TARGET } from '../utils/correctionSettings';
 import VehicleTableAssumptions from './VehicleTableAssumptions';
 import useColumnDrag from '../hooks/useColumnDrag';
 import TableCell from './tables/TableCell';
@@ -155,10 +157,13 @@ function testLink(ref, onOpenTest) {
  *   onViewRuns  {(vehicle, subtab?) => void}  open a vehicle's Tests & Data,
  *               from its card; absent in the pop-out window
  */
-export default function VehicleTable({ onOpenTest = null, onViewRuns = null, filters: sharedFilters = null, onFiltersChange = null }) {
+export default function VehicleTable({
+    onOpenTest = null, onViewRuns = null, filters: sharedFilters = null, onFiltersChange = null,
+    correctionTarget: sharedTarget = null, onCorrectionTargetChange = null,
+}) {
     const {
         vehicles, selectedVehicles, toggleVehicleSelection, units, platformsById,
-        getPerformanceSummaries, getPerformanceSessions, performanceCounts,
+        getPerformanceSummaries, getPerformanceSessions, performanceCounts, testSessions,
     } = useAppContext();
 
     const [initial] = useState(() => decodeVehicleTableParams(
@@ -173,6 +178,11 @@ export default function VehicleTable({ onOpenTest = null, onViewRuns = null, fil
     const filters = sharedFilters ?? localFilters;
     const setFilters = onFiltersChange ?? setLocalFilters;
     const [assumptions, setAssumptions] = useState(initial.assumptions);
+    // The site-wide correction target (correctionSettings.js), App's. The
+    // pop-out window shows the one it was handed and keeps any change local.
+    const [localTarget, setLocalTarget] = useState(sharedTarget ?? DEFAULT_CORRECTION_TARGET);
+    const correctionTarget = onCorrectionTargetChange ? (sharedTarget ?? DEFAULT_CORRECTION_TARGET) : localTarget;
+    const setCorrectionTarget = onCorrectionTargetChange ?? setLocalTarget;
     // The preset the columns last WERE, kept so a changed set can say what it
     // was changed from. Which preset is showing is never stored: it is read
     // off the columns (presetMatching).
@@ -210,9 +220,14 @@ export default function VehicleTable({ onOpenTest = null, onViewRuns = null, fil
     }, [wantsPerformance, idsKey]);
     const { data: performance, loading: performanceLoading } = useAsyncResource(loadPerformance, [loadPerformance]);
 
+    // A range test's session supplies the conditions it omits, which the
+    // composite range corrects for.
     const rows     = useMemo(
-        () => buildVehicleRows(vehicles, { performance, assumptions, units, platformsById }),
-        [vehicles, performance, assumptions, units, platformsById],
+        () => buildVehicleRows(vehicles, {
+            performance, assumptions, units, platformsById, correctionTarget,
+            sessionOf: r => sessionFor(testSessions, r),
+        }),
+        [vehicles, performance, assumptions, units, platformsById, testSessions, correctionTarget],
     );
     // A tested cell peeks with its test — which one, why, and its conditions —
     // rather than restating its own text. One peek for every clipped cell in
@@ -225,9 +240,9 @@ export default function VehicleTable({ onOpenTest = null, onViewRuns = null, fil
         const col = vehicleColumnByKey(key);
         if (!test || !col) return null;
         const unit = unitFor(col, units);
-        const figure = `${labelledColumn(col, assumptions, units).label}: ${formatVehicleCell(row, col, units)}${unit && row.values[key] != null ? ` ${unit}` : ''}`;
+        const figure = `${labelledColumn(col, assumptions, units, correctionTarget).label}: ${formatVehicleCell(row, col, units)}${unit && row.values[key] != null ? ` ${unit}` : ''}`;
         return <TestPeek test={test} figure={figure} />;
-    }, [rowsById, assumptions, units]);
+    }, [rowsById, assumptions, units, correctionTarget]);
     const { tableProps: peekProps, panel: cellPeek } = useCellPeek({ renderPeek });
     const { ctx: filterCtx, filtered: filteredVehicles } = useFilteredVehicles(vehicles, filters, performanceCounts);
     const shownIds = useMemo(() => new Set(filteredVehicles.map(v => v.id)), [filteredVehicles]);
@@ -250,7 +265,7 @@ export default function VehicleTable({ onOpenTest = null, onViewRuns = null, fil
     // Headers drag the same list the column picker does.
     const { dragProps, dragClass } = useColumnDrag({ visible: columns, fixedKey: 'name', onChange: changeColumns });
     // Named from the assumptions where a name carries one ("Time to add 150 mi").
-    const label    = useCallback((col) => labelledColumn(col, assumptions, units), [assumptions, units]);
+    const label    = useCallback((col) => labelledColumn(col, assumptions, units, correctionTarget), [assumptions, units, correctionTarget]);
     const cols     = useMemo(() => columns.map(vehicleColumnByKey).filter(Boolean).map(label), [columns, label]);
     const pickable = useMemo(() => VEHICLE_COLUMNS.map(label), [label]);
     const maxima   = useMemo(() => vehicleBarMaxima(filtered, cols), [filtered, cols]);
@@ -289,7 +304,10 @@ export default function VehicleTable({ onOpenTest = null, onViewRuns = null, fil
                 shownCount={sorted.length}
             >
                 {needsAssumptions(columns) && (
-                    <VehicleTableAssumptions assumptions={assumptions} needed={assumptionsFor(columns)} units={units} onChange={setAssumptions} />
+                    <VehicleTableAssumptions
+                        assumptions={assumptions} needed={assumptionsFor(columns)} units={units} onChange={setAssumptions}
+                        correctionTarget={correctionTarget} onCorrectionTargetChange={setCorrectionTarget}
+                    />
                 )}
                 <ColumnPicker
                     columns={pickable}

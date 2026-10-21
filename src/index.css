@@ -2845,7 +2845,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     min-width: 0;
     width: 100%;
 }
-.chart-rail .run-selector-header { flex-wrap: wrap; }
+.chart-rail .section-band { flex-wrap: wrap; }
 
 /* The correction picker stacks its label above its <select>; the checkbox
    toggles beside it must NOT, because a checkbox above its own words is not a
@@ -3236,8 +3236,8 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     gap: 6px 10px;
 }
 
-/* A labelled <select> in the Display group — the color source and the
-   correction basis, and any that follow.
+/* A labelled <select> in the sidebar — the correction basis in Display, the
+   color source atop the run selector, and any that follow.
  *
  * They are written as separate components with unrelated data, and they were
  * laid out separately too: one inherited `.display-grid`'s checkbox cell and
@@ -4051,10 +4051,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-warning-text);
 }
 
-/* Collapsible "Select Runs" section header button */
-/* The expand/collapse row reads as a control now, not as a line of text that
-   happens to be clickable. */
-.run-selector-header {
+/* The section band (SectionBand.jsx): the labelled divider that opens a
+   section of the sidebar — the run selector, routing overrides, the
+   performance run picker, every Display section. One class for all of them;
+   the label inside is .text-micro, the band's micro all-caps voice. */
+.section-band {
     @apply flex items-center gap-2 w-full text-left font-medium transition-colors;
     padding: 6px 9px;
     margin-bottom: 6px;
@@ -4062,9 +4063,26 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-surface-sunken);
     color: var(--color-text-primary);
 }
-.run-selector-header:hover {
+.section-band:hover {
     background-color: var(--color-hover-lift);
     color: var(--color-text-primary);
+}
+/* The applied dot: something inside the band is in force — a correction
+   moving the figures. Accent orange because that is the "active / now"
+   signal (docs/design-tokens.md), and the only thing it may mean. */
+.section-band-dot {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--color-accent-orange);
+}
+/* A summary while closed, a hint while open. Truncates rather than wrapping
+   onto a further line. */
+.section-band-note {
+    @apply text-xs truncate;
+    min-width: 0;
+    color: var(--color-text-meta);
 }
 
 /* In the rail it is a SECTION BAND, not a card: full width, square, ruled top
@@ -4079,7 +4097,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    block parent, `width: auto` on a `display: flex` element fills the parent and
    the margins then extend past it, which is the behaviour wanted. */
 .chart-rail .run-selector-bar { display: block; }
-.chart-rail .run-selector-header {
+.chart-rail .section-band {
     /* Explicit width, not `auto`: a <button> sizes to its CONTENT even at
        display:flex, so collapsed — where the "drag the pills" hint disappears —
        the band came up 65px short of the rail. The width is the parent's plus
@@ -8186,6 +8204,33 @@ a.is-test-link:focus-visible {
 .assumption-slider {
     width: 100%;
     accent-color: var(--color-primary);
+}
+
+/* ── Correction target ───────────────────────────────────────────────────────
+   What corrected figures are corrected to (CorrectionTargetFields): a heading
+   with its ⓘ, then one row per condition — name, slider, value — in a grid so
+   the three sliders start and end on the same edges. Shared by the charts'
+   sidebar and the vehicle table's Assumptions menu. */
+.correction-target {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+}
+/* The heading row is a .rail-select-row, the sidebar's own labelled row; only
+   "reset" needs placing, at the far end. */
+.correction-target .section-action { margin-left: auto; }
+.correction-target-row {
+    display: grid;
+    grid-template-columns: 4.25em minmax(0, 1fr) 4.5em;
+    align-items: center;
+    gap: 8px;
+}
+.correction-target-value {
+    @apply font-mono tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+    color: var(--color-text-primary);
 }
 
 /* ── The headline ────────────────────────────────────────────────────────────

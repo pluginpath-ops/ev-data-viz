@@ -16,6 +16,7 @@ import PopoutView from './components/PopoutView';
 import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
 import { VEHICLE_TABLE_PARAM_PREFIX } from './utils/vehicleTable';
+import { decodeCorrection, encodeCorrection, DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from './utils/correctionSettings';
 import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -249,6 +250,11 @@ export default function App() {
         specsField:     null,   // selected field key for Spec Chart mode
         scatterXField:  null,   // selected X field key for Spec Scatter mode
         scatterYField:  null,   // selected Y field key for Spec Scatter mode
+        // The reader's correction (utils/correctionSettings.js): what every
+        // chart corrects range for, and the conditions every corrected figure
+        // — the vehicle table's composite range included — is corrected to.
+        correctionMode:   DEFAULT_READER_MODE,
+        correctionTarget: DEFAULT_CORRECTION_TARGET,
     });
     // The vehicles as the charts should draw them: a session base replaces the
     // vehicle's color on the copy, so every chart, sidebar accent and swatch
@@ -547,6 +553,7 @@ export default function App() {
             chartMode:     ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE,
             scatterXField: p.get('scx') || null,
             scatterYField: p.get('scy') || null,
+            correction:    decodeCorrection(window.location.search),
         };
 
         // Charge Compare config
@@ -670,6 +677,8 @@ export default function App() {
             addedSpread:     s.addedSpread ?? false,
             ...(s.scatterXField && { scatterXField: s.scatterXField }),
             ...(s.scatterYField && { scatterYField: s.scatterYField }),
+            correctionMode:   s.correction.mode,
+            correctionTarget: s.correction.target,
         }));
         // Land on the category that owns the restored mode.
         setView(categoryForMode(s.chartMode).key);
@@ -746,6 +755,8 @@ export default function App() {
         if (chartConfig.compositeSpread === false) p.set('cspread', '0');
         if (chartConfig.addedSpread)              p.set('aspread', '1');
         if (chartMode !== 'charging')             p.set('m', chartMode);
+        // One correction for every chart and the table, so written for every mode.
+        for (const [key, value] of encodeCorrection({ mode: chartConfig.correctionMode, target: chartConfig.correctionTarget })) p.set(key, value);
 
         // Charge Compare options
         if (chartMode === 'compare') {
@@ -1296,7 +1307,8 @@ export default function App() {
                             palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
-                            correctionMode={chartConfig.correctionMode ?? 'none'}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                            correctionTarget={chartConfig.correctionTarget}
                             setChartConfig={setChartConfig}
                         />
                     )}
@@ -1313,7 +1325,8 @@ export default function App() {
                             pairings={pairings}
                             setPairings={setPairings}
                             verboseLabels={chartConfig.verboseLabels ?? false}
-                            correctionMode={chartConfig.correctionMode ?? 'none'}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                            correctionTarget={chartConfig.correctionTarget}
                             palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             testSpread={chartConfig.testSpread ?? true}
@@ -1347,7 +1360,8 @@ export default function App() {
                             palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
-                            correctionMode={chartConfig.correctionMode ?? 'none'}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                            correctionTarget={chartConfig.correctionTarget}
                             setChartConfig={setChartConfig}
                         />
                     )}
@@ -1366,7 +1380,10 @@ export default function App() {
                     {/* No selection gate: the vehicle table is where a selection is
                         made, over the whole fleet (#315). */}
                     {activeChartCategory && chartMode === 'specstable' && (
-                        <VehicleTable onOpenTest={openTest} onViewRuns={viewVehicleRuns} filters={vehicleFilters} onFiltersChange={setVehicleFilters} />
+                        <VehicleTable onOpenTest={openTest} onViewRuns={viewVehicleRuns} filters={vehicleFilters} onFiltersChange={setVehicleFilters}
+                            correctionTarget={chartConfig.correctionTarget}
+                            onCorrectionTargetChange={t => setChartConfig(prev => ({ ...prev, correctionTarget: t }))}
+                        />
                     )}
                     {view === 'epa' && <EpaSection subtab={epaSubtab} onExplorerState={setEpaExplorer} />}
                     {view === 'reference' && (

@@ -71,7 +71,7 @@ export const VEHICLE_TABLE_PRESETS = [
         label: 'Road trips',
         description: 'Range, and how much of it a charging stop puts back per minute.',
         columns: [
-            'name', 'figures.epaRangeMi', 'figures.epaHwyMi', 'tested.range_mi', 'charging.max_dc_kw',
+            'name', 'figures.epaRangeMi', 'figures.epaHwyMi', 'tested.range_mi', 'tested.composite_range_mi', 'calc.pctOfEpaHwy', 'charging.max_dc_kw',
             'tested.charge_window_min', 'tested.charge_best_15min_kw',
             'calc.rangePerChargeMin', 'calc.timeToAdd', 'calc.costPer100Fast', 'charging.charge_port',
             'charging.native_supercharger_access', 'charging.plug_and_charge', 'charging.preconditioning',
@@ -97,7 +97,7 @@ export const VEHICLE_TABLE_PRESETS = [
         label: 'Efficiency',
         description: 'Miles per kWh, and the visible reasons two versions of a car differ.',
         columns: [
-            'name', 'calc.efficiency', 'figures.epaEfficiency', 'tested.efficiency_mi_kwh', 'calc.costPer100Home',
+            'name', 'calc.efficiency', 'figures.epaEfficiency', 'tested.efficiency_mi_kwh', 'tested.composite_efficiency_mi_kwh', 'calc.costPer100Home',
             'figures.epaCityMi', 'figures.epaHwyMi', 'figures.socWindowKwh',
             'performance.weight_lbs', 'powertrain.drive_type', 'wheels.wheel_size_in', 'wheels.tire_size',
             'dimensions.height_in', 'charging.heat_pump', 'charging.max_ac_kw', 'charging.v2l',

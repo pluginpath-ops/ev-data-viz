@@ -4,6 +4,7 @@ import ChargeCompareView from './ChargeCompareView';
 import RoadTripView from './RoadTripView';
 import SpecsChartView from './SpecsChartView';
 import SpecsScatterView from './SpecsScatterView';
+import { DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import VehicleTable from './VehicleTable';
 import EpaCurvesView from './EpaCurvesView';
 import PerformanceCompareView from './PerformanceCompareView';
@@ -66,7 +67,7 @@ export default function PopoutView({
 
             {/* The vehicle table pops out like every other view under the Charts
                 nav, and needs no selection — it is where one is made (#315). */}
-            {chartMode === 'specstable' && <VehicleTable />}
+            {chartMode === 'specstable' && <VehicleTable correctionTarget={chartConfig?.correctionTarget} />}
 
             {selectedVehicles.length > 0 && chartMode === 'specscatter' && (
                 <SpecsScatterView
@@ -84,7 +85,8 @@ export default function PopoutView({
                     roadTripConfig={roadTripConfig}
                     pairings={pairings}
                     setRoadTripConfig={() => {}}
-                    correctionMode={chartConfig?.correctionMode ?? 'none'}
+                    correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
+                    correctionTarget={chartConfig?.correctionTarget}
                     handSet={chartConfig?.handSet ?? false}
                     verboseLabels={chartConfig?.verboseLabels ?? false}
                     palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
@@ -118,7 +120,8 @@ export default function PopoutView({
                     verboseLabels={chartConfig?.verboseLabels ?? false}
                     palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
                     testSpread={chartConfig?.testSpread ?? true}
-                    correctionMode={chartConfig?.correctionMode ?? 'none'}
+                    correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
+                    correctionTarget={chartConfig?.correctionTarget}
                     handSet={chartConfig?.handSet ?? false}
                     presentationMode
                 />

@@ -1704,8 +1704,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     />
                                                     <input
                                                         type="number"
-                                                        placeholder="Wind dir. vs travel (0-360°)"
-                                                        title="Direction relative to travel: 0° = tailwind, 180° = headwind, 90/270° = crosswind"
+                                                        placeholder="Wind dir., one heading only"
+                                                        title="Only for a test that held one heading: 0° = tailwind, 180° = headwind, 90/270° = crosswind. Leave blank for an out-and-back or a loop, whatever the wind did — the legs cancel except for a cost the wind speed alone records."
                                                         value={runMetadata.windDirectionDeg}
                                                         onChange={(e) => setRunMetadata({...runMetadata, windDirectionDeg: e.target.value})}
                                                         className="form-input form-input"
@@ -2152,8 +2152,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 />
                                                 <input
                                                     type="number"
-                                                    placeholder="Wind dir. vs travel (0-360°)"
-                                                    title="Direction relative to travel: 0° = tailwind, 180° = headwind, 90/270° = crosswind"
+                                                    placeholder="Wind dir., one heading only"
+                                                    title="Only for a test that held one heading: 0° = tailwind, 180° = headwind, 90/270° = crosswind. Leave blank for an out-and-back or a loop, whatever the wind did — the legs cancel except for a cost the wind speed alone records."
                                                     value={editFormData.windDirectionDeg}
                                                     onChange={(e) => setEditFormData({...editFormData, windDirectionDeg: e.target.value})}
                                                     className="form-input form-input"

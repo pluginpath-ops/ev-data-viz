@@ -284,10 +284,10 @@ const CHARGER_LIMITED_SHARE = 0.7;
  * charging curve (runUtils.defaultChargingRun), among the sessions that cover
  * the window: the curator's DEF, else the vehicle's own composite curve (#313)
  * — the mean of its tests, which stands for the car better than any one day —
- * else the newest test. Sessions that could not stand for the car are left
- * out: unlisted or excluded, synthetic or inherited ones (as for the best windows; a stored
- * composite is synthetic but IS the car's, so it stays), and charger-limited
- * ones.
+ * else a single test — the fastest that reaches the window when a composite
+ * exists but starts too high, otherwise the newest. Inherited tests count.
+ * Left out: unlisted or excluded sessions, synthetic ones (a stored composite is
+ * synthetic but IS the car's, so it stays), and charger-limited ones.
  *
  * @param {Array} runs
  * @param {{ from: number, to: number, maxDcKw?: number|null }} window
@@ -300,7 +300,8 @@ export function chargeTimeSession(runs = [], { from, to, maxDcKw = null }) {
     for (const run of runs) {
         if (!run || run.kind !== 'charging') continue;
         // Quotes one session, so a listed one a reader can find (runListing).
-        if (isUnlisted(run) || isExcluded(run) || isInheritedRunId(run.id)) continue;
+        // An inherited one counts: it is the lineage's, and the note says so.
+        if (isUnlisted(run) || isExcluded(run)) continue;
         if (run.synthetic && !isCompositeRun(run)) continue;
         const minutes = minutesBetween(run.charge_summary, from, to);
         if (!(minutes > 0)) continue;
@@ -309,10 +310,18 @@ export function chargeTimeSession(runs = [], { from, to, maxDcKw = null }) {
         covering.push({ run, minutes });
     }
     const own = nativeComposite(covering.map(c => c.run));
+    const singles = covering.filter(c => !isCompositeRun(c.run));
+    // A composite that starts above the window (the opening ramp is trimmed,
+    // so it often starts a couple of percent in) leaves the window to the
+    // fastest single session that does reach it, inherited or not. With no
+    // composite at all it is the newest, as the charts' default curve is.
+    const hasComposite = runs.some(r => r?.kind === 'charging' && isCompositeRun(r) && !r._inherited);
+    const single = hasComposite
+        ? [...singles].sort((a, b) => a.minutes - b.minutes)[0]
+        : [...singles].sort((a, b) => new Date(b.run.date) - new Date(a.run.date))[0];
     const pick = covering.find(c => c.run.isDefault || c.run.is_default)
         ?? covering.find(c => c.run === own)
-        ?? covering.filter(c => !isCompositeRun(c.run))
-            .sort((a, b) => new Date(b.run.date) - new Date(a.run.date))[0];
+        ?? single;
     if (!pick) return { run: null, limitedOut };
     return {
         run: pick.run,

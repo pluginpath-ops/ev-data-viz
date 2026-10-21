@@ -356,38 +356,95 @@ describe('tested charging columns (#346)', () => {
 describe('tested range columns (#335)', () => {
     const test = (over = {}) => ({
         id: 7, kind: 'range', distance_miles: 280, energy_kwh: 90, start_soc: 100, end_soc: 5,
-        speed_mph: 70, temperature_f: 72, date: '2025-05-01', ...over,
+        speed_mph: 70, temperature_f: 70, altitude_ft: 0, date: '2025-05-01', ...over,
     });
-    const row = (runs, opts) => buildVehicleRows([vehicle({ socWindowKwh: 95, runs })], opts)[0];
+    // The target is the test's own conditions unless a test says otherwise, so
+    // a figure reads as measured; the correction has its own test below.
+    const AT_TEST = { speedMph: 70, temperatureF: 70, altitudeFt: 0 };
+    const row = (runs, opts) => buildVehicleRows([vehicle({ socWindowKwh: 95, runs })], { correctionTarget: AT_TEST, ...opts })[0];
 
     it('shows the range scaled to a full pack, with its conditions and window beneath', () => {
         const r = row([test()]);
         expect(r.values['tested.range_mi']).toBeCloseTo(294.7, 1);   // 280 over 95 points
-        expect(r.notes['tested.range_mi']).toBe('70 mph · 72°F · scaled from 100→5%');
+        expect(r.notes['tested.range_mi']).toBe('70 mph · 70°F · scaled from 100→5%');
         const metric = row([test()], { units: 'metric' });
-        expect(metric.notes['tested.range_mi']).toBe('112.7 kph · 22°C · scaled from 100→5%');
+        expect(metric.notes['tested.range_mi']).toBe('112.7 kph · 21°C · scaled from 100→5%');
+    });
+
+    it('works out % of EPA hwy over the composite range, saying what it rests on', () => {
+        // 70 mph at 70°F, sea level: already at standard conditions, so no correction.
+        const r = buildVehicleRows([vehicle({ socWindowKwh: 95, runs: [test({ temperature_f: 70 })], epaRange: { hwyMi: 280 } })])[0];
+        expect(r.values['tested.composite_range_mi']).toBeCloseTo(294.7, 1);
+        expect(r.notes['tested.composite_range_mi']).toBe('composite of 1 test');
+        expect(r.values['calc.pctOfEpaHwy']).toBeCloseTo(105.3, 1);   // 294.7 ÷ 280
+        expect(r.notes['calc.pctOfEpaHwy']).toBe('composite of 1 test');
+        // No highway figure: blank, with no note.
+        const noHwy = row([test()]);
+        expect(noHwy.values['calc.pctOfEpaHwy']).toBeNull();
+        expect(noHwy.notes['calc.pctOfEpaHwy']).toBeNull();
+    });
+
+    it('corrects the composite to the site-wide correction target', () => {
+        // Altitude moves only a test that recorded one; an unrecorded one is not invented.
+        const v = vehicle({ socWindowKwh: 95, runs: [test({ temperature_f: 70, altitude_ft: 0 })] });
+        const at = (target) => buildVehicleRows([v], { correctionTarget: { speedMph: 70, temperatureF: 70, altitudeFt: 0, ...target } })[0]
+            .values['tested.composite_range_mi'];
+        expect(at({ speedMph: 60 })).toBeGreaterThan(at({}));
+        expect(at({ altitudeFt: 5000 })).toBeGreaterThan(at({}));   // thinner air
+        expect(labelledColumn(vehicleColumnByKey('tested.composite_range_mi'), DEFAULT_ASSUMPTIONS, 'imperial', { speedMph: 65 }).label)
+            .toBe('Composite range, 65 mph');
+        expect(assumptionsFor(['calc.pctOfEpaHwy']).has('conditions')).toBe(true);
+        // The target is not the table's to write: no vt_ parameter carries it.
+        expect(encodeVehicleTableParams({ columns: DEFAULT_VEHICLE_COLUMNS, sortKey: 'name', sortDir: 'asc' }).toString()).toBe('');
+    });
+
+    it('says why a composite is blank', () => {
+        const cold = row([test({ temperature_f: 30 })]);
+        expect(cold.values['tested.composite_range_mi']).toBeNull();
+        expect(cold.notes['tested.composite_range_mi']).toBe('1 test: outside the temperature band');
+        const narrow = row([test({ temperature_f: 70, start_soc: 56, end_soc: 10 })]);
+        expect(narrow.values['tested.composite_range_mi']).toBeNull();
+        expect(narrow.notes['tested.composite_range_mi']).toBe('no test wide enough to scale');
+        expect(narrow.values['tested.composite_efficiency_mi_kwh']).not.toBeNull();
+    });
+
+    it('corrects the tested range, efficiency and when-new range to the target, saying so', () => {
+        const slow = test({ speed_mph: 80, start_soc: 100, end_soc: 0, distance_miles: 280, energy_kwh: 90 });
+        const v = vehicle({ socWindowKwh: 100, socWindowBasis: 'epa-tested', runs: [slow] });
+        const at = (speedMph) => buildVehicleRows([v], { correctionTarget: { ...AT_TEST, speedMph } })[0];
+        // A harder test (80 mph) re-priced to 70 reads better than it measured.
+        expect(at(70).values['tested.range_mi']).toBeGreaterThan(280);
+        expect(at(70).values['tested.efficiency_mi_kwh']).toBeGreaterThan(280 / 90);
+        expect(at(70).values['tested.when_new_range_mi']).toBeGreaterThan(311);
+        expect(at(70).notes['tested.range_mi']).toMatch(/% corrected$/);
+        // At its own speed it is as measured, and says nothing about a correction.
+        expect(at(80).values['tested.range_mi']).toBeCloseTo(280, 5);
+        expect(at(80).notes['tested.range_mi']).not.toMatch(/corrected/);
+        // The reader's conditions are offered with them, and name the header.
+        expect(assumptionsFor(['tested.range_mi', 'tested.efficiency_mi_kwh', 'tested.when_new_range_mi']).has('conditions')).toBe(true);
+        expect(labelledColumn(vehicleColumnByKey('tested.range_mi'), DEFAULT_ASSUMPTIONS, 'imperial', { speedMph: 65 }).label).toBe('Tested range, 65 mph');
     });
 
     it('leaves the range blank, and says why, when the window was too narrow to scale', () => {
         const r = row([test({ start_soc: 56, end_soc: 10, distance_miles: 120, energy_kwh: 40 })]);
         expect(r.values['tested.range_mi']).toBeNull();
-        expect(r.notes['tested.range_mi']).toBe('70 mph · 72°F · 56→10% only');
+        expect(r.notes['tested.range_mi']).toBe('70 mph · 70°F · 56→10% only');
         // Efficiency needs no full pack.
         expect(r.values['tested.efficiency_mi_kwh']).toBe(3);
-        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · 72°F · over 56→10%');
+        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · 70°F · over 56→10%');
     });
 
     it('marks a mixed cycle, and an efficiency estimated from the window', () => {
         const r = row([test({ speed_basis: 'mixed', energy_kwh: null, start_soc: 100, end_soc: 0, distance_miles: 285 })]);
         expect(r.values['tested.efficiency_mi_kwh']).toBeCloseTo(3);
-        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · mixed cycle · 72°F · est. from SoC');
+        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · mixed cycle · 70°F · est. from SoC');
     });
 
     it('prices the test at the new-car capacity, and says nothing without measured energy', () => {
         const aged = (over = {}, vOver = {}) => buildVehicleRows([vehicle({
             socWindowKwh: 100, socWindowBasis: 'epa-tested', ...vOver,
             runs: [test({ distance_miles: 280, energy_kwh: 90, start_soc: 100, end_soc: 0, ...over })],
-        })])[0];
+        })], { correctionTarget: AT_TEST })[0];
         const r = aged();
         expect(r.values['tested.when_new_range_mi']).toBeCloseTo(311.1, 1);   // 3.11 mi/kWh × 100 kWh
         expect(r.values['tested.capacity_retention']).toBeCloseTo(90, 5);
@@ -476,7 +533,7 @@ describe('the charge window (#335)', () => {
         expect(r.values[W]).toBeCloseTo(21);
         expect(r.notes[W]).toBe('Out of Spec · 50°F');
         expect(r.values['calc.rangePerChargeMin']).toBeCloseTo(10);    // 210 mi in 21 min
-        expect(r.notes['calc.rangePerChargeMin']).toBe('tested');
+        expect(r.notes['calc.rangePerChargeMin']).toBe('EPA range');   // names the range it was priced at
         expect(r.values['calc.avgChargeKw']).toBeCloseTo(200);         // 70 kWh in 21 min
     });
 
@@ -484,7 +541,7 @@ describe('the charge window (#335)', () => {
         const r = row(car([session(21)]));
         expect(r.tests[W]).toMatchObject({ runId: 11, reason: 'The newest charging test that covers 10→80%' });
         expect(r.tests['calc.rangePerChargeMin']).toBe(r.tests[W]);
-        expect(r.tests['calc.timeToAdd']).toBe(r.tests[W]);
+        expect(r.tests['calc.timeToAdd']).toMatchObject({ runId: 11 });
         // From the spec there is no test to open.
         const spec = row(car([]));
         expect(spec.tests[W]).toBeNull();
@@ -503,7 +560,7 @@ describe('the charge window (#335)', () => {
         const r = row(car([]));
         expect(r.values[W]).toBe(30);
         expect(r.notes[W]).toBe('spec');
-        expect(r.notes['calc.rangePerChargeMin']).toBeNull();
+        expect(r.notes['calc.rangePerChargeMin']).toBe('EPA range');
     });
 
     it('answers any window from a test, and none from a spec', () => {
@@ -537,7 +594,7 @@ describe('the charge window (#335)', () => {
         const w = { ...DEFAULT_ASSUMPTIONS, windowFrom: 20, windowTo: 90 };
         expect(labelledColumn(vehicleColumnByKey(W), w).label).toBe('Charge 20→90%');
         expect(labelledColumn(vehicleColumnByKey('calc.avgChargeKw'), w).label).toBe('Avg charge 20→90%');
-        expect([...assumptionsFor(['name', 'calc.timeToAdd'])].sort()).toEqual(['addDistance', 'window']);
+        expect([...assumptionsFor(['name', 'calc.timeToAdd'])].sort()).toEqual(['addDistance', 'conditions', 'rangeBasis', 'window']);
         expect([...assumptionsFor(['name', 'calc.costPer100Fast'])]).toEqual(['fastPrice']);
         expect(assumptionsFor(['name', 'calc.efficiency']).size).toBe(0);
     });
@@ -552,5 +609,42 @@ describe('the charge window (#335)', () => {
         expect(decodeVehicleTableParams('vt_win=70-30').assumptions).toMatchObject({ windowFrom: 40, windowTo: 50 });
         expect(decodeVehicleTableParams('vt_win=junk&vt_home=-3').assumptions)
             .toMatchObject({ windowFrom: 10, windowTo: 80, homePrice: 0.05 });
+    });
+});
+
+describe('Time to add prices a percent at the reader\'s range basis', () => {
+    const car = () => vehicle({ epaRangeMi: 300, specs: { charging: { charge_time_10_to_80_pct_min: 21 } } });
+
+    it('round-trips the basis through the URL, the default omitted', () => {
+        expect(encodeVehicleTableParams({ columns: ['name'], sortKey: 'name', sortDir: 'asc' }).has('vt_basis')).toBe(false);
+        const epa = encodeVehicleTableParams({ columns: ['name'], sortKey: 'name', sortDir: 'asc', assumptions: { ...DEFAULT_ASSUMPTIONS, rangeBasis: 'epa' } });
+        expect(epa.get('vt_basis')).toBe('epa');
+        expect(decodeVehicleTableParams(epa.toString()).assumptions.rangeBasis).toBe('epa');
+        expect(decodeVehicleTableParams('vt_basis=nonsense').assumptions.rangeBasis).toBe('tested');
+    });
+
+    it('defaults to tested, falls back to EPA when a car has no tested range, and says which it used', () => {
+        expect(DEFAULT_ASSUMPTIONS.rangeBasis).toBe('tested');
+        const [row] = buildVehicleRows([car()]);
+        expect(row.values['calc.timeToAdd']).toBeCloseTo(15);
+        expect(row.notes['calc.timeToAdd']).toBe('EPA range');
+        const [epa] = buildVehicleRows([car()], { assumptions: { rangeBasis: 'epa' } });
+        expect(epa.notes['calc.timeToAdd']).toBe('EPA range');
+    });
+
+    it('offers the basis in the Assumptions menu with Time to add and Range per minute', () => {
+        expect(assumptionsFor(['name', 'calc.timeToAdd']).has('rangeBasis')).toBe(true);
+        expect(assumptionsFor(['name', 'calc.rangePerChargeMin']).has('rangeBasis')).toBe(true);
+    });
+
+    it('does not blank a stop because the window\'s end is past the test', () => {
+        const socMin = new Array(101).fill(null);
+        for (let p = 5; p <= 85; p++) socMin[p] = (p - 10) * 0.4 + 5;
+        const run = { id: 11, kind: 'charging', date: '2025-01-01', source: 'x', temperature_f: 50,
+            charge_summary: { version: CHARGE_SUMMARY_VERSION, peakKw: 240, windows: {}, socMin } };
+        const v = vehicle({ epaRangeMi: 300, runs: [run], specs: { charging: { max_dc_kw: 250 } } });
+        const [r] = buildVehicleRows([v], { assumptions: { windowFrom: 10, windowTo: 90, addDistance: 150 } });
+        expect(r.values['calc.timeToAdd']).toBeGreaterThan(0);
+        expect(r.notes['calc.timeToAdd']).toBe('EPA range');
     });
 });

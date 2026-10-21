@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import SidebarDisplaySection from './SidebarDisplaySection';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
 Chart.register(ZoomPlugin);
@@ -26,7 +27,8 @@ import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries, overExtrapolated } from '../utils/socAlignment';
 import { sessionFor } from '../utils/testSessions';
-import { correctionFactor } from '../utils/conditionCorrection';
+import { correctionFactor, runConditions } from '../utils/conditionCorrection';
+import { correctionCaption, correctionSummary, DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
@@ -364,7 +366,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // own measured curve and never passes through miPerSoc, so a correction
     // applied there would have been silently skipped.
     const rangeFactorFor = (runId) => {
-        const mode = chartConfig.correctionMode ?? 'none';
+        const mode = chartConfig.correctionMode ?? DEFAULT_READER_MODE;
         if (mode === 'none') return 1;
         const parentVehicle = parentOf(runId);
         if (!parentVehicle) return 1;
@@ -379,13 +381,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         });
         const sourceRun = src.sourceRun;
         if (!sourceRun) return 1;
-        const session = sessionFor(testSessions, sourceRun);
-        return correctionFactor({
-            speedMph:     sourceRun.speed_mph,
-            speedBasis:   sourceRun.speed_basis,
-            altitudeFt:   sourceRun.altitude_ft   ?? session?.altitude_ft,
-            temperatureF: sourceRun.temperature_f ?? session?.temperature_f,
-        }, { mode }).factor;
+        return correctionFactor(runConditions(sourceRun, sessionFor(testSessions, sourceRun)),
+            { mode, target: chartConfig.correctionTarget }).factor;
     };
 
     // Range-derived axes only. EPA axes are a published spec, not a measurement,
@@ -981,11 +978,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         if (raceActive) parts.push(`race mode from ${raceThreshold}% SoC`);
         const curves = selectedComposites.length;
         if (curves) parts.push(`${curves} composite curve${curves === 1 ? '' : 's'}`);
-        const mode = chartConfig.correctionMode ?? 'none';
-        parts.push(mode === 'none' ? 'no correction' : `corrected: ${mode}`);
+        parts.push(correctionCaption(chartConfig.correctionMode, chartConfig.correctionTarget, units));
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [colorableRuns, selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.correctionMode, units, selectedComposites]);
+    }, [colorableRuns, selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.correctionMode, chartConfig.correctionTarget, units, selectedComposites]);
 
     // ── PNG export ───────────────────────────────────────────────────────────
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
@@ -1014,7 +1010,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 // palette. RangeChartView is rendered from HERE rather than from
                 // App, so it misses anything App hands the other charts.
                 verboseLabels={chartConfig.verboseLabels ?? false}
-                correctionMode={chartConfig.correctionMode ?? 'none'}
+                correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                correctionTarget={chartConfig.correctionTarget}
                 testSpread={chartConfig.testSpread ?? true}
             />
         );
@@ -1122,9 +1119,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                   * selector's header and Correct sat beside them — three
                   * controls of the same kind in two different places, split by
                   * where they happened to be built rather than by what they
-                  * do. */}
-                <div className="chart-rail-group">
-                    <span className="text-micro">Display</span>
+                  * do. Colors has since moved INTO the run selector, beside
+                  * the swatches it governs (its colorControl). */}
+                <SidebarDisplaySection title="Display and corrections" active={(chartConfig.correctionMode ?? DEFAULT_READER_MODE) !== 'none'} summary={correctionSummary(chartConfig.correctionMode ?? DEFAULT_READER_MODE, chartConfig.correctionTarget, units)}>
                     <div className="display-grid">
                         <label className="toggle-label">
                             <input
@@ -1171,16 +1168,12 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             </label>
                         )}
                     </div>
-                    {/* A select, so it takes a row of its own beside the correction
-                        picker rather than a cell of the checkbox grid above — that
-                        grid is two columns of a 320px rail, which truncated this
-                        control's own default to "Vehicle colou…". */}
-                    <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
-                    <CorrectionControl mode={chartConfig.correctionMode ?? 'none'} setChartConfig={setChartConfig} />
-                </div>
+                    <CorrectionControl mode={chartConfig.correctionMode ?? DEFAULT_READER_MODE} target={chartConfig.correctionTarget} setChartConfig={setChartConfig} />
+                </SidebarDisplaySection>
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
+                    colorControl={<SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
                     handSetColorOf={handSetColorOf}
                     chartPalette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                     onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
