@@ -356,16 +356,19 @@ describe('tested charging columns (#346)', () => {
 describe('tested range columns (#335)', () => {
     const test = (over = {}) => ({
         id: 7, kind: 'range', distance_miles: 280, energy_kwh: 90, start_soc: 100, end_soc: 5,
-        speed_mph: 70, temperature_f: 72, date: '2025-05-01', ...over,
+        speed_mph: 70, temperature_f: 70, altitude_ft: 0, date: '2025-05-01', ...over,
     });
-    const row = (runs, opts) => buildVehicleRows([vehicle({ socWindowKwh: 95, runs })], opts)[0];
+    // The target is the test's own conditions unless a test says otherwise, so
+    // a figure reads as measured; the correction has its own test below.
+    const AT_TEST = { speedMph: 70, temperatureF: 70, altitudeFt: 0 };
+    const row = (runs, opts) => buildVehicleRows([vehicle({ socWindowKwh: 95, runs })], { correctionTarget: AT_TEST, ...opts })[0];
 
     it('shows the range scaled to a full pack, with its conditions and window beneath', () => {
         const r = row([test()]);
         expect(r.values['tested.range_mi']).toBeCloseTo(294.7, 1);   // 280 over 95 points
-        expect(r.notes['tested.range_mi']).toBe('70 mph · 72°F · scaled from 100→5%');
+        expect(r.notes['tested.range_mi']).toBe('70 mph · 70°F · scaled from 100→5%');
         const metric = row([test()], { units: 'metric' });
-        expect(metric.notes['tested.range_mi']).toBe('112.7 kph · 22°C · scaled from 100→5%');
+        expect(metric.notes['tested.range_mi']).toBe('112.7 kph · 21°C · scaled from 100→5%');
     });
 
     it('works out % of EPA hwy over the composite range, saying what it rests on', () => {
@@ -405,26 +408,43 @@ describe('tested range columns (#335)', () => {
         expect(narrow.values['tested.composite_efficiency_mi_kwh']).not.toBeNull();
     });
 
+    it('corrects the tested range, efficiency and when-new range to the target, saying so', () => {
+        const slow = test({ speed_mph: 80, start_soc: 100, end_soc: 0, distance_miles: 280, energy_kwh: 90 });
+        const v = vehicle({ socWindowKwh: 100, socWindowBasis: 'epa-tested', runs: [slow] });
+        const at = (speedMph) => buildVehicleRows([v], { correctionTarget: { ...AT_TEST, speedMph } })[0];
+        // A harder test (80 mph) re-priced to 70 reads better than it measured.
+        expect(at(70).values['tested.range_mi']).toBeGreaterThan(280);
+        expect(at(70).values['tested.efficiency_mi_kwh']).toBeGreaterThan(280 / 90);
+        expect(at(70).values['tested.when_new_range_mi']).toBeGreaterThan(311);
+        expect(at(70).notes['tested.range_mi']).toMatch(/% corrected$/);
+        // At its own speed it is as measured, and says nothing about a correction.
+        expect(at(80).values['tested.range_mi']).toBeCloseTo(280, 5);
+        expect(at(80).notes['tested.range_mi']).not.toMatch(/corrected/);
+        // The reader's conditions are offered with them, and name the header.
+        expect(assumptionsFor(['tested.range_mi', 'tested.efficiency_mi_kwh', 'tested.when_new_range_mi']).has('conditions')).toBe(true);
+        expect(labelledColumn(vehicleColumnByKey('tested.range_mi'), DEFAULT_ASSUMPTIONS, 'imperial', { speedMph: 65 }).label).toBe('Tested range, 65 mph');
+    });
+
     it('leaves the range blank, and says why, when the window was too narrow to scale', () => {
         const r = row([test({ start_soc: 56, end_soc: 10, distance_miles: 120, energy_kwh: 40 })]);
         expect(r.values['tested.range_mi']).toBeNull();
-        expect(r.notes['tested.range_mi']).toBe('70 mph · 72°F · 56→10% only');
+        expect(r.notes['tested.range_mi']).toBe('70 mph · 70°F · 56→10% only');
         // Efficiency needs no full pack.
         expect(r.values['tested.efficiency_mi_kwh']).toBe(3);
-        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · 72°F · over 56→10%');
+        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · 70°F · over 56→10%');
     });
 
     it('marks a mixed cycle, and an efficiency estimated from the window', () => {
         const r = row([test({ speed_basis: 'mixed', energy_kwh: null, start_soc: 100, end_soc: 0, distance_miles: 285 })]);
         expect(r.values['tested.efficiency_mi_kwh']).toBeCloseTo(3);
-        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · mixed cycle · 72°F · est. from SoC');
+        expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · mixed cycle · 70°F · est. from SoC');
     });
 
     it('prices the test at the new-car capacity, and says nothing without measured energy', () => {
         const aged = (over = {}, vOver = {}) => buildVehicleRows([vehicle({
             socWindowKwh: 100, socWindowBasis: 'epa-tested', ...vOver,
             runs: [test({ distance_miles: 280, energy_kwh: 90, start_soc: 100, end_soc: 0, ...over })],
-        })])[0];
+        })], { correctionTarget: AT_TEST })[0];
         const r = aged();
         expect(r.values['tested.when_new_range_mi']).toBeCloseTo(311.1, 1);   // 3.11 mi/kWh × 100 kWh
         expect(r.values['tested.capacity_retention']).toBeCloseTo(90, 5);

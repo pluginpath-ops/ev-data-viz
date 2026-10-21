@@ -58,6 +58,7 @@ import {
 import { ASSUMED_CHARGER_EFF, MPG_E_CONVERSION } from '../constants/epa';
 import { normalizeCorrectionTarget, DEFAULT_CORRECTION_TARGET } from './correctionSettings';
 import { compositeRange, compositeLeftOutNote } from './compositeRange';
+import { correctionFactor, runConditions } from './conditionCorrection';
 import { vehiclePlatforms, resolveVoltageClass } from './platforms';
 import { preconditionedNote } from './runPreconditioning';
 import { isCompositeRun } from './runUtils';
@@ -165,9 +166,11 @@ const TESTED_COLUMNS = [
  */
 const RANGE_TESTED_COLUMNS = [
     { key: 'tested.range_mi', label: 'Tested range', unitGroup: 'distance', better: 'higher', digits: 0, scale: 'range',
+      assumption: ['conditions'], labelFor: ({ conditions, units }) => `Tested range, ${speedText(conditions.speedMph, units)}`,
       hint: 'The vehicle’s reported range test — the curator’s default, else the newest full-pack test — scaled to a full pack when it saw enough of one. Beneath it, its speed, temperature and window. Blank where the window was too narrow to scale from.' },
     { key: 'tested.efficiency_mi_kwh', label: 'Tested efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
       better: 'higher', digits: 2, scale: 'efficiency',
+      assumption: ['conditions'], labelFor: ({ conditions, units }) => `Tested efficiency, ${speedText(conditions.speedMph, units)}`,
       hint: 'Distance ÷ energy used on the same test as Tested range: battery-side, so comparable to Efficiency, not to EPA efficiency. Estimated from the SoC window and battery where the test logged no energy, and marked so.' },
     // The composite (compositeRange.js): every steady-state range test,
     // corrected to the conditions under Assumptions and averaged. The speed is
@@ -182,6 +185,7 @@ const RANGE_TESTED_COLUMNS = [
       labelFor: ({ conditions, units }) => `Composite efficiency, ${speedText(conditions.speedMph, units)}`,
       hint: 'The same tests’ efficiency, corrected the same way. Battery-side, so comparable to Tested efficiency, not to EPA efficiency. Any window counts here, so it can rest on more tests than Composite range; estimated from the SoC window and battery where a test logged no energy, and marked so.' },
     { key: 'tested.when_new_range_mi', label: 'When-new range', unitGroup: 'distance', better: 'higher', digits: 0, scale: 'range',
+      assumption: ['conditions'], labelFor: ({ conditions, units }) => `When-new range, ${speedText(conditions.speedMph, units)}`,
       hint: 'What the reported range test would reach with a new pack: its measured efficiency × the car’s new-car capacity (EPA tested, else Usable). Blank unless the test measured its energy, saw most of the pack, a new-car capacity is known, and the pack is more than 5% down — closer than that is test scatter.' },
     { key: 'tested.capacity_retention', label: 'Capacity retention', unit: '%', better: 'higher', digits: 0,
       hint: 'The share of its new-car capacity the pack delivered on the reported range test: the energy that test implies for a full pack ÷ EPA tested (else Usable) capacity. Shown only below 95%.' },
@@ -679,16 +683,25 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
 
         const whenNew = whenNewRange(vehicle);
         const range = testedRangeSummary(vehicle);
-        values['tested.range_mi'] = range?.fullPackMi ?? (range?.isFullPack ? range.distanceMi : null);
-        notes['tested.range_mi'] = range ? rangeTestNote(range, units, {
+        // Corrected to the site-wide target, as the composite is: a figure that
+        // leans on one test's speed, altitude and weather is not comparable
+        // until it is re-priced. The conditions it was TESTED at stay beneath it.
+        const correct = (run) => run
+            ? correctionFactor(runConditions(run, sessionOf(run)), { mode: 'aero_wind', target: calcContext.conditions }).factor
+            : 1;
+        const rangeFactor = correct(range?.run);
+        const rangeRaw = range?.fullPackMi ?? (range?.isFullPack ? range.distanceMi : null);
+        values['tested.range_mi'] = rangeRaw != null ? rangeRaw * rangeFactor : null;
+        notes['tested.range_mi'] = range ? [rangeTestNote(range, units, {
             window: range.isScaled ? 'scaled from' : range.fullPackMi == null && !range.isFullPack ? 'only' : null,
-        }) : null;
+        }), rangeRaw != null ? correctedNote(rangeFactor) : null].filter(Boolean).join(' · ') : null;
         tests['tested.range_mi'] = rangeTestReference(vehicle, range, units, 'range', whenNew);
         const efficiency = testedEfficiency(vehicle);
-        values['tested.efficiency_mi_kwh'] = efficiency?.miPerKwh ?? null;
+        const efficiencyFactor = correct(efficiency?.run);
+        values['tested.efficiency_mi_kwh'] = efficiency ? efficiency.miPerKwh * efficiencyFactor : null;
         notes['tested.efficiency_mi_kwh'] = efficiency
             ? [rangeTestNote(efficiency, units, { window: efficiency.isRepresentative ? null : 'over' }),
-                efficiency.estimated ? 'est. from SoC' : null].filter(Boolean).join(' · ')
+                efficiency.estimated ? 'est. from SoC' : null, correctedNote(efficiencyFactor)].filter(Boolean).join(' · ')
             : null;
         tests['tested.efficiency_mi_kwh'] = rangeTestReference(vehicle, efficiency, units, 'efficiency');
 
@@ -700,8 +713,10 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         const capacityNote = whenNew
             ? `${whenNew.impliedKwh.toFixed(1)} of ${whenNew.capacityKwh} kWh (${SOC_WINDOW_BASIS[whenNew.capacityBasis]?.label})`
             : null;
-        values['tested.when_new_range_mi'] = whenNew?.whenNewMi ?? null;
-        notes['tested.when_new_range_mi'] = whenNew ? `at ${whenNew.capacityKwh} kWh (${SOC_WINDOW_BASIS[whenNew.capacityBasis]?.label})` : null;
+        values['tested.when_new_range_mi'] = whenNew ? whenNew.whenNewMi * correct(whenNew.run) : null;
+        notes['tested.when_new_range_mi'] = whenNew
+            ? [`at ${whenNew.capacityKwh} kWh (${SOC_WINDOW_BASIS[whenNew.capacityBasis]?.label})`, correctedNote(correct(whenNew.run))].filter(Boolean).join(' · ')
+            : null;
         tests['tested.when_new_range_mi'] = whenNew ? rangeTestReference(vehicle, efficiency, units, 'when-new') : null;
         values['tested.capacity_retention'] = whenNew ? whenNew.retention * 100 : null;
         notes['tested.capacity_retention'] = capacityNote;
@@ -817,6 +832,10 @@ function chargeWindowTime(vehicle, specs, { windowFrom, windowTo, isSpecWindow }
 }
 
 const temperatureText = (f, units) => (units === 'metric' ? `${Math.round((f - 32) * 5 / 9)}°C` : `${Math.round(f)}°F`);
+/** What a correction did to a figure, beneath it; nothing when it moved by under half a percent. */
+const correctedNote = (factor) => (Math.abs(factor - 1) < 0.005 ? null
+    : `${factor > 1 ? '+' : '−'}${Math.abs((factor - 1) * 100).toFixed(1)}% corrected`);
+
 const speedText = (mph, units) => (units === 'metric' ? `${Math.round(mph * MI_TO_KM)} km/h` : `${Math.round(mph)} mph`);
 
 /**
