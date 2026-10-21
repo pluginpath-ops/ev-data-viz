@@ -233,6 +233,27 @@ describe('chargeTimeSession — which session a charge time comes from (#335)', 
             { from: 10, to: 80 }).run.id).toBe(1);
     });
 
+    it("falls back to the lineage's session when none of its own covers the window", () => {
+        const own = run(1, { ...curve(30), socMin: new Array(101).fill(null) });
+        const inherited = run('inherited_12_115', curve(28));
+        expect(chargeTimeSession([own, inherited], { from: 10, to: 80 }).run.id).toBe('inherited_12_115');
+        // …but its own wins whenever it covers.
+        expect(chargeTimeSession([run(1, curve(30)), inherited], { from: 10, to: 80 }).run.id).toBe(1);
+    });
+
+    it('uses the fastest single session, inherited or not, when the composite starts above the window', () => {
+        const high = (min) => { const c = curve(min); c.socMin[10] = c.socMin[11] = null; return c; };
+        const composite = { synthetic: true, composite: { chargerClassV: null, tests: [{}, {}] } };
+        const got = chargeTimeSession([
+            run(9, high(25), composite),
+            run(1, curve(30), { date: '2025-06-01' }),
+            run('inherited_12_115', curve(27), { date: '2024-01-01' }),
+        ], { from: 10, to: 80 });
+        expect(got.run.id).toBe('inherited_12_115');
+        // A composite that reaches the window still wins.
+        expect(chargeTimeSession([run(9, curve(25), composite), run(1, curve(20))], { from: 10, to: 80 }).run.id).toBe(9);
+    });
+
     it('falls back to the newest session that covers the window', () => {
         const got = chargeTimeSession([
             run(1, curve(30), { date: '2024-01-01' }),
@@ -251,11 +272,10 @@ describe('chargeTimeSession — which session a charge time comes from (#335)', 
         expect(chargeTimeSession([run(1, limited)], { from: 10, to: 80 }).run.id).toBe(1);
     });
 
-    it('leaves out hidden, synthetic, inherited and range sessions', () => {
+    it('leaves out hidden, synthetic and range sessions', () => {
         expect(chargeTimeSession([
             run(1, curve(20), { isHidden: true }),
             run(2, curve(20), { synthetic: true }),
-            run('inherited_4_9', curve(20)),
             run(3, curve(20), { kind: 'range' }),
         ], { from: 10, to: 80 }).run).toBeNull();
     });
