@@ -26,8 +26,10 @@
  *     for air density only; a cold test's heating and battery losses are
  *     not modelled, so a cold test is left out, not "corrected".
  *
- * Altitude and wind are corrected where the test records them and taken as
- * the target's where it does not, which is correctionFactor's rule. It always
+ * A blank altitude is corrected from the assumed test conditions
+ * (ASSUMED_TEST_CONDITIONS), which is correctionFactor's rule; a blank wind is
+ * calm air. A blank speed or temperature leaves the test out instead, above:
+ * an assumed value cannot be checked against the gap or the band. It always
  * corrects for everything the model can (mode 'aero_wind'), whatever the
  * charts' mode: an uncorrected mean of tests at different conditions is the
  * comparison this exists to replace. Its TARGET is the reader's, shared with

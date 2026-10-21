@@ -420,6 +420,31 @@ describe('tested range columns (#335)', () => {
         expect(r.notes['tested.efficiency_mi_kwh']).toBe('70 mph · mixed cycle · 72°F · est. from SoC');
     });
 
+    it('prices the test at the new-car capacity, and says nothing without measured energy', () => {
+        const aged = (over = {}, vOver = {}) => buildVehicleRows([vehicle({
+            socWindowKwh: 100, socWindowBasis: 'epa-tested', ...vOver,
+            runs: [test({ distance_miles: 280, energy_kwh: 90, start_soc: 100, end_soc: 0, ...over })],
+        })])[0];
+        const r = aged();
+        expect(r.values['tested.when_new_range_mi']).toBeCloseTo(311.1, 1);   // 3.11 mi/kWh × 100 kWh
+        expect(r.values['tested.capacity_retention']).toBeCloseTo(90, 5);
+        expect(r.notes['tested.capacity_retention']).toBe('90.0 of 100 kWh (EPA tested)');
+        expect(r.tests['tested.capacity_retention']).toMatchObject({ runId: 7 });
+        const estimated = aged({ energy_kwh: null });
+        expect(estimated.values['tested.when_new_range_mi']).toBeNull();
+        expect(estimated.values['tested.capacity_retention']).toBeNull();
+        expect(aged({}, { socWindowBasis: 'gross' }).values['tested.capacity_retention']).toBeNull();
+        // The tested range's peek carries the when-new range, and the row says so
+        // (the table draws an asterisk from `whenNew`); a near-new pack has neither.
+        expect(r.whenNew).not.toBeNull();
+        expect(r.tests['tested.range_mi'].facts).toContainEqual({ label: 'Capacity retention', value: '90%' });
+        expect(r.tests['tested.range_mi'].facts.map(f => f.label)).toContain('When new');
+        expect(aged({ energy_kwh: 98, distance_miles: 304 }).whenNew).toBeNull();
+        expect(aged({ energy_kwh: 98, distance_miles: 304 }).tests['tested.range_mi'].facts.map(f => f.label)).not.toContain('When new');
+        // Within five points of the rating there is nothing to report.
+        expect(aged({ energy_kwh: 98, distance_miles: 304 }).values['tested.capacity_retention']).toBeNull();
+    });
+
     it('names the test behind each figure, so its note can link to it', () => {
         const r = row([test()]);
         expect(r.tests['tested.range_mi']).toMatchObject({ runId: 7, sub: 'tests' });

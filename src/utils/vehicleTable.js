@@ -51,7 +51,7 @@ import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from './vehicleFigures';
 import { sortByColumn, barMaximaOf, barPercentOf } from './tableColumns';
 import { VEHICLE_TABLE_PRESETS } from './vehicleTablePresets';
 import { CHARGE_WINDOWS, chargeTimeSession, minutesBetween } from './chargeWindows';
-import { testedRangeSummary, testedEfficiency } from './testedRange';
+import { testedRangeSummary, testedEfficiency, whenNewRange } from './testedRange';
 import {
     rangeTestReference, chargeTimeTestReference, chargeBestTestReference, performanceTestReference,
 } from './testDetails';
@@ -176,11 +176,15 @@ const RANGE_TESTED_COLUMNS = [
     { key: 'tested.composite_range_mi', label: 'Composite range', unitGroup: 'distance', better: 'higher', digits: 0, scale: 'range',
       assumption: ['conditions'],
       labelFor: ({ conditions, units }) => `Composite range, ${speedText(conditions.speedMph, units)}`,
-      hint: 'The mean of the vehicle’s steady-state range tests, each scaled to a full pack and corrected to the speed, temperature and altitude under Assumptions, in calm air. Tests on a mixed cycle, far from the target speed, or outside a mild temperature band are left out: temperature is corrected for air density only, so a cold test’s heating losses would survive any correction. Altitude and wind are corrected only where a test recorded them. How many tests made it is beneath.' },
+      hint: 'The mean of the vehicle’s steady-state range tests, each scaled to a full pack and corrected to the speed, temperature and altitude under Assumptions, in calm air. Tests on a mixed cycle, far from the target speed, or outside a mild temperature band are left out: temperature is corrected for air density only, so a cold test’s heating losses would survive any correction. A blank altitude is corrected from the assumed test altitude, and the note says so; a blank wind is calm air. How many tests made it is beneath.' },
     { key: 'tested.composite_efficiency_mi_kwh', label: 'Composite efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
       better: 'higher', digits: 2, scale: 'efficiency', assumption: ['conditions'],
       labelFor: ({ conditions, units }) => `Composite efficiency, ${speedText(conditions.speedMph, units)}`,
       hint: 'The same tests’ efficiency, corrected the same way. Battery-side, so comparable to Tested efficiency, not to EPA efficiency. Any window counts here, so it can rest on more tests than Composite range; estimated from the SoC window and battery where a test logged no energy, and marked so.' },
+    { key: 'tested.when_new_range_mi', label: 'When-new range', unitGroup: 'distance', better: 'higher', digits: 0, scale: 'range',
+      hint: 'What the reported range test would reach with a new pack: its measured efficiency × the car’s new-car capacity (EPA tested, else Usable). Blank unless the test measured its energy, saw most of the pack, a new-car capacity is known, and the pack is more than 5% down — closer than that is test scatter.' },
+    { key: 'tested.capacity_retention', label: 'Capacity retention', unit: '%', better: 'higher', digits: 0,
+      hint: 'The share of its new-car capacity the pack delivered on the reported range test: the energy that test implies for a full pack ÷ EPA tested (else Usable) capacity. Shown only below 95%.' },
 ].map(c => ({ ...c, group: 'Tested range', numeric: true, bar: true }));
 
 /**
@@ -627,12 +631,13 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         values['figures.epaEfficiency'] = mpge ? mpge / MPG_E_CONVERSION : null;
         notes['figures.epaEfficiency'] = mpge ? `${Math.round(mpge)} MPGe` : null;
 
+        const whenNew = whenNewRange(vehicle);
         const range = testedRangeSummary(vehicle);
         values['tested.range_mi'] = range?.fullPackMi ?? (range?.isFullPack ? range.distanceMi : null);
         notes['tested.range_mi'] = range ? rangeTestNote(range, units, {
             window: range.isScaled ? 'scaled from' : range.fullPackMi == null && !range.isFullPack ? 'only' : null,
         }) : null;
-        tests['tested.range_mi'] = rangeTestReference(vehicle, range, units);
+        tests['tested.range_mi'] = rangeTestReference(vehicle, range, units, 'range', whenNew);
         const efficiency = testedEfficiency(vehicle);
         values['tested.efficiency_mi_kwh'] = efficiency?.miPerKwh ?? null;
         notes['tested.efficiency_mi_kwh'] = efficiency
@@ -646,6 +651,15 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         notes['tested.composite_range_mi'] = compositeNote(composite, 'range');
         values['tested.composite_efficiency_mi_kwh'] = composite?.miPerKwh ?? null;
         notes['tested.composite_efficiency_mi_kwh'] = compositeNote(composite, 'efficiency');
+        const capacityNote = whenNew
+            ? `${whenNew.impliedKwh.toFixed(1)} of ${whenNew.capacityKwh} kWh (${SOC_WINDOW_BASIS[whenNew.capacityBasis]?.label})`
+            : null;
+        values['tested.when_new_range_mi'] = whenNew?.whenNewMi ?? null;
+        notes['tested.when_new_range_mi'] = whenNew ? `at ${whenNew.capacityKwh} kWh (${SOC_WINDOW_BASIS[whenNew.capacityBasis]?.label})` : null;
+        tests['tested.when_new_range_mi'] = whenNew ? rangeTestReference(vehicle, efficiency, units, 'when-new') : null;
+        values['tested.capacity_retention'] = whenNew ? whenNew.retention * 100 : null;
+        notes['tested.capacity_retention'] = capacityNote;
+        tests['tested.capacity_retention'] = whenNew ? rangeTestReference(vehicle, efficiency, units, 'when-new') : null;
 
         const charge = chargeWindowTime(vehicle, specs, calcContext, units);
         values[WINDOW_TIME_COLUMN.key] = charge.minutes;
@@ -703,7 +717,7 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         // results are worked out, not entered, and nobody flags them.
         const flagged = new Set((vehicle.flagged_specs ?? []).filter(k => BY_KEY.get(k)?.spec));
 
-        return { id: vehicle.id, index, vehicle, values, notes, links, tests, flagged };
+        return { id: vehicle.id, index, vehicle, values, notes, links, tests, flagged, whenNew };
     });
 }
 

@@ -2028,7 +2028,8 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     color: var(--color-text-meta);
 }
-/* A derived figure has to say it is derived. Quiet, because it qualifies the
+/* A derived figure has to say it is derived (the scaled note, and the
+   when-new range beside it). Quiet, because it qualifies the
    number rather than warning about it — the reader is looking at something no
    odometer showed, but the test behind it was a good one. */
 .tested-figure-scaled {

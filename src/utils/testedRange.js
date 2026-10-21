@@ -276,3 +276,76 @@ export function testedEfficiency(vehicle) {
         speedNote: speedBasisNote(run),
     };
 }
+
+/**
+ * What the reported range test says about the pack against a new one (#431
+ * follow-up): the range the car would reach with its new-car capacity, and the
+ * share of that capacity it still delivers. Worked out when drawn, never stored.
+ *
+ *     when-new range     = tested mi/kWh × the car's own 0–100% energy
+ *     capacity retention = the energy this test implies for a full pack
+ *                          (energy used ÷ the window it covered) ÷ that same energy
+ *
+ * Efficiency does not depend on how big or how worn the pack is, so two cars
+ * with the same efficiency and a 7% gap in range differ by 7% in what the pack
+ * holds. That is the whole idea.
+ *
+ * Four guards, each there to stop a figure that only restates the test or
+ * reads as more than it is (the fourth is CAPACITY_RETENTION_SHOWN_BELOW):
+ *
+ *   · MEASURED energy only. Without `energy_kwh`, miPerKwhFrom prices the SoC
+ *     window at the very capacity this compares against, so retention would be
+ *     100% by construction.
+ *   · A window that covers the practical pack (coversPracticalPack). Efficiency
+ *     over 56→10% is real, but the energy of a full pack inferred from it is not.
+ *   · A capacity that is a new pack's own: EPA tested, or the manufacturer's
+ *     Usable. Gross and unsorted read high, which would charge a healthy car
+ *     with a fade it does not have.
+ *
+ * Raw, not condition-corrected, like the card and the table beside it: a
+ * corrected efficiency would put the when-new range on different conditions
+ * from the tested range it sits under.
+ *
+ * @returns {{ run: object, whenNewMi: number, testedMi: number, retention: number,
+ *             impliedKwh: number, capacityKwh: number, capacityBasis: string }|null}
+ *   `retention` is a ratio — 0.93, and above 1 when the pack beats the figure.
+ */
+export const WHEN_NEW_CAPACITY_BASES = ['epa-tested', 'usable'];
+
+/**
+ * Said only when the pack is this far down. Within it, a test's own scatter —
+ * temperature, a headwind, a few percent of SoC reading — is as large as any
+ * real fade, and a "97% capacity retention" on every card would be noise
+ * presented as a measurement. Five points is where a difference starts to be
+ * something a reader could act on, and what the Model Y comparison (about 7%)
+ * that prompted this cleared.
+ */
+export const CAPACITY_RETENTION_SHOWN_BELOW = 0.95;
+
+export function whenNewRange(vehicle) {
+    return whenNewRangeOfRun(reportedRangeChoice(vehicle).run, vehicle);
+}
+
+/** whenNewRange for one named test — a chart bar is any test, not the reported one. */
+export function whenNewRangeOfRun(run, vehicle) {
+    if (!run ||!(run.energy_kwh > 0) || !(run.distance_miles > 0)) return null;
+    if (!coversPracticalPack(run)) return null;
+
+    const capacityKwh = Number(vehicle?.socWindowKwh);
+    if (!(capacityKwh > 0) || !WHEN_NEW_CAPACITY_BASES.includes(vehicle?.socWindowBasis)) return null;
+
+    const windowPct = socWindow(run);
+    if (!windowPct) return null;
+
+    const impliedKwh = run.energy_kwh * 100 / windowPct;
+    if (!(impliedKwh / capacityKwh < CAPACITY_RETENTION_SHOWN_BELOW)) return null;
+    return {
+        run,
+        whenNewMi: (run.distance_miles / run.energy_kwh) * capacityKwh,
+        testedMi: run.distance_miles * 100 / windowPct,
+        retention: impliedKwh / capacityKwh,
+        impliedKwh,
+        capacityKwh,
+        capacityBasis: vehicle.socWindowBasis,
+    };
+}

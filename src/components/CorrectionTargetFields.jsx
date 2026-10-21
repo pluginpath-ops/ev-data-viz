@@ -25,7 +25,7 @@ const ROWS = [
 
 const ABOUT = 'The conditions every corrected range and efficiency figure is moved to, in calm air — the same setting on every chart and the vehicle table. '
     + 'Temperature corrects only for air density, so it stays mild: a cold test’s heating losses are not modelled, and those tests are left out of composites rather than corrected. '
-    + 'Altitude and wind move only the tests that recorded them.';
+    + 'A test that leaves its speed, temperature or altitude blank is corrected from assumed test conditions (an Admin setting), and its note says so; a blank wind is calm air.';
 
 export default function CorrectionTargetFields({ target, onChange }) {
     const { units } = useAppContext();
