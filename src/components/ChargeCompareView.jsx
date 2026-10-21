@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import SidebarDisplaySection from './SidebarDisplaySection';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
@@ -17,6 +18,7 @@ import CorrectionControl from './CorrectionControl';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import TestSpreadToggle from './TestSpreadToggle';
+import { correctionCaption, correctionSummary } from '../utils/correctionSettings';
 import { spreadOf, rangeBasesFor, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip, spreadSummary } from '../utils/rangeTestSpread';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
@@ -372,6 +374,7 @@ export default function ChargeCompareView({
     presentationMode = false,
     verboseLabels = false,
     correctionMode = 'none',
+    correctionTarget = undefined,
     palette = VEHICLE_PALETTE,
     handSet = false,
     testSpread = true,
@@ -442,7 +445,7 @@ export default function ChargeCompareView({
                     const rangeSrc = resolveRangeSource(chargingRun, {
                         vehicle,
                         explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
-                        correction: { mode: correctionMode },
+                        correction: { mode: correctionMode, target: correctionTarget },
                         session: sessionFor(testSessions, rangeRun),
                     });
 
@@ -459,7 +462,7 @@ export default function ChargeCompareView({
         }
 
         return result;
-    }, [selectedVehicles, pairings, testSessions, correctionMode]);
+    }, [selectedVehicles, pairings, testSessions, correctionMode, correctionTarget]);
 
     const neededRunIds = useMemo(
         () => [...new Set(resolvedPairs.map(p => p.chargingRun?.id).filter(Boolean))],
@@ -617,11 +620,12 @@ export default function ChargeCompareView({
         for (const p of activePairs) {
             out.set(p.key, rangeBasesFor(p.chargingRun, p.vehicle, {
                 correctionMode,
+                correctionTarget,
                 sessionOf: r => sessionFor(testSessions, r),
             }).filter(b => b.miPerSoc > 0));
         }
         return out;
-    }, [testSpread, activePairs, correctionMode, testSessions]);
+    }, [testSpread, activePairs, correctionMode, correctionTarget, testSessions]);
 
     // ── The frames' caption, and their exports ───────────────────────────────
     // This view had no PNG export at all — only a Copy URL — so the one chart
@@ -636,10 +640,10 @@ export default function ChargeCompareView({
             `${pairs} pair${pairs === 1 ? '' : 's'}`,
             `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
             `from ~${startSoc}% SoC`,
-            correctionMode === 'none' ? 'no correction' : `corrected: ${correctionMode}`,
+            correctionCaption(correctionMode, correctionTarget, units),
             units === 'metric' ? 'metric' : 'imperial',
         ].join(' · ');
-    }, [activePairs, startSoc, correctionMode, units]);
+    }, [activePairs, startSoc, correctionMode, correctionTarget, units]);
 
     // Two frames, two exports, so two independent previews.
     const title1 = `Range added in ${xMinutes} minutes`;
@@ -990,8 +994,7 @@ export default function ChargeCompareView({
                 </div>
 
                 {/* ── DISPLAY ── as in the other two charts. */}
-                <div className="chart-rail-group">
-                    <span className="text-micro">Display</span>
+                <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={correctionSummary(correctionMode, correctionTarget, units)}>
                     <div className="efficiency-unit-toggle">
                         {['vertical', 'horizontal'].map(o => (
                             <button
@@ -1009,13 +1012,13 @@ export default function ChargeCompareView({
                                 <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                                 <TestSpreadToggle on={testSpread} setChartConfig={setChartConfig} />
                             </div>
-                            <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
-                            <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
+                            <CorrectionControl mode={correctionMode} target={correctionTarget} setChartConfig={setChartConfig} />
                         </>
                     )}
-                </div>
+                </SidebarDisplaySection>
 
                 <RunSelector
+                    colorControl={setChartConfig ? <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} /> : null}
                         handSetColorOf={handSetColorOf}
                         chartPalette={palette}
                         onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}

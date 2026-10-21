@@ -1457,6 +1457,43 @@ describe('the seams that broke before', () => {
     });
 });
 
+describe('one correction, everywhere it is applied', () => {
+    // Four charts and the table each built their own conditions object, and a
+    // field added to one (wind, for the composite range) reached none of the
+    // others; each also corrected to the Admin standard while the table let a
+    // reader choose. Every correction now reads the run through runConditions
+    // and corrects to the reader's target (utils/correctionSettings.js).
+    const sources = () => [
+        'src/utils/rangeSource.js', 'src/utils/roadTripSpread.js', 'src/utils/compositeRange.js',
+        'src/components/RangeChartView.jsx', 'src/components/ChargingView.jsx',
+    ];
+
+    it('builds every correction\'s conditions in one place', () => {
+        for (const file of sources()) {
+            const src = read(file);
+            expect(src, `${file} corrects`).toMatch(/correctionFactor\(/);
+            expect(src, `${file} must read the run through runConditions`).toMatch(/correctionFactor\(runConditions\(/);
+        }
+    });
+
+    it('hands every chart\'s correction control the reader\'s target', () => {
+        for (const file of ['src/components/RangeChartView.jsx', 'src/components/ChargingView.jsx',
+                            'src/components/RoadTripView.jsx', 'src/components/ChargeCompareView.jsx']) {
+            const src = read(file);
+            for (const use of src.match(/<CorrectionControl[^>]*\/>/g) ?? []) {
+                expect(use, `${file}: a CorrectionControl without the target edits nothing the charts read`).toMatch(/target=\{/);
+            }
+        }
+    });
+
+    it('shares the target between the charts and the table, and writes it to the URL once', () => {
+        const app = read('src/App.jsx');
+        expect(app).toMatch(/encodeCorrection\(/);
+        expect(app).toMatch(/decodeCorrection\(window\.location\.search\)/);
+        expect(app, 'the table must get App\'s target, not its own').toMatch(/correctionTarget=\{chartConfig\.correctionTarget\}\s*onCorrectionTargetChange=/);
+    });
+});
+
 describe('constants exposed for tuning are reachable in the Admin panel', () => {
     it('offers every correction constant as a knob', () => {
         // AERO_FRACTION drives every correction magnitude. It was made

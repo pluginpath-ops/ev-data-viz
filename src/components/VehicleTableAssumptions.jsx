@@ -1,10 +1,14 @@
 import MenuButton from './shell/MenuButton';
 import { DEFAULT_ASSUMPTIONS, ASSUMPTION_RANGES } from '../utils/vehicleTable';
+import CorrectionTargetFields from './CorrectionTargetFields';
+import { targetDiffers, correctionTargetText, DEFAULT_CORRECTION_TARGET } from '../utils/correctionSettings';
 
 /**
  * The vehicle table's assumptions (#335): inputs the reader sets for the
  * calculated columns that need one — the charge window, how far a stop should
- * take them, and what electricity costs at home and at a fast charger.
+ * take them, what electricity costs at home and at a fast charger, and the
+ * conditions the composite range is corrected to — the last is the site-wide
+ * correction target, the same setting the charts' Correct control edits.
  *
  * One menu for every assumption rather than a control inside each header: a
  * header already sorts on click and moves on drag, and a third gesture on the
@@ -16,6 +20,7 @@ import { DEFAULT_ASSUMPTIONS, ASSUMPTION_RANGES } from '../utils/vehicleTable';
  * sliders are there for the reader who goes looking.
  */
 const money = (n) => `$${n.toFixed(2)}`;
+
 
 function Slider({ name, value, onChange, label }) {
     const { min, max, step } = ASSUMPTION_RANGES[name];
@@ -33,7 +38,7 @@ function Slider({ name, value, onChange, label }) {
     );
 }
 
-export default function VehicleTableAssumptions({ assumptions, needed, units, onChange }) {
+export default function VehicleTableAssumptions({ assumptions, needed, units, onChange, correctionTarget, onCorrectionTargetChange }) {
     const unit = units === 'metric' ? 'km' : 'mi';
     const a = { ...DEFAULT_ASSUMPTIONS, ...assumptions };
     const set = (key) => (value) => onChange({ ...a, [key]: value });
@@ -48,6 +53,7 @@ export default function VehicleTableAssumptions({ assumptions, needed, units, on
         shows('addDistance') && differs('addDistance') && `add ${a.addDistance} ${unit}`,
         shows('homePrice') && differs('homePrice') && `${money(a.homePrice)} home`,
         shows('fastPrice') && differs('fastPrice') && `${money(a.fastPrice)} fast`,
+        shows('conditions') && targetDiffers(correctionTarget) && correctionTargetText(correctionTarget, units),
     ].filter(Boolean);
     const changed = summary.length > 0;
 
@@ -56,13 +62,16 @@ export default function VehicleTableAssumptions({ assumptions, needed, units, on
             label="Assumptions"
             value={summary.join(' · ') || null}
             active={changed}
-            title="Inputs to the calculated columns: the charge window, how far a stop should take you, electricity prices"
+            title="Inputs to the calculated columns: the charge window, how far a stop should take you, electricity prices, the conditions a composite range is corrected to"
             panelClass="vehicle-table-assumptions"
         >
             <div className="guide-facet-panel-head">
                 <span className="text-nano">Assumptions</span>
                 {changed && (
-                    <button type="button" className="section-action" onClick={() => onChange(DEFAULT_ASSUMPTIONS)}>
+                    <button type="button" className="section-action" onClick={() => {
+                        onChange(DEFAULT_ASSUMPTIONS);
+                        if (shows('conditions')) onCorrectionTargetChange(DEFAULT_CORRECTION_TARGET);
+                    }}>
                         reset
                     </button>
                 )}
@@ -107,6 +116,9 @@ export default function VehicleTableAssumptions({ assumptions, needed, units, on
                     </span>
                     <Slider name="fastPrice" value={a.fastPrice} onChange={set('fastPrice')} />
                 </label>
+            )}
+            {shows('conditions') && (
+                <CorrectionTargetFields target={correctionTarget} onChange={onCorrectionTargetChange} />
             )}
             {(shows('homePrice') || shows('fastPrice')) && (
                 <span className="text-note">

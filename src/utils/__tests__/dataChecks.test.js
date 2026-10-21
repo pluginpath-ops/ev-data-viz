@@ -639,3 +639,26 @@ describe('test attribution', () => {
         expect(keys(out.rows)).toEqual(['source-unlisted']);
     });
 });
+
+describe('range tests missing conditions', () => {
+    const range = (over = {}) => ({ id: 1, kind: 'range', distance_miles: 300, speed_mph: 70, temperature_f: 70, altitude_ft: 0, ...over });
+    const findingOf = (runs, opts = {}) => runDataChecks([vehicle({ runs })], { limits: LIMITS, ...opts })[0]
+        .findings.find(f => f.check === 'range-test-conditions');
+
+    it('names each counted test and what it lacks, as one gap per vehicle', () => {
+        const f = findingOf([range({ id: 1, name: 'Highway loop', altitude_ft: null }), range({ id: 2, speed_mph: null, temperature_f: null })]);
+        expect(f.kind).toBe('gap');
+        expect(f.text).toContain('Highway loop (altitude)');
+        expect(f.text).toContain('(speed, temperature)');
+        expect(f.evidence.tests).toEqual(['1:altitude', '2:speed+temperature']);
+    });
+
+    it('takes a reading from the session, and passes a complete test', () => {
+        expect(findingOf([range()])).toBeUndefined();
+        expect(findingOf([range({ altitude_ft: null, session_id: 9 })], { sessionOf: () => ({ altitude_ft: 600 }) })).toBeUndefined();
+    });
+
+    it('ignores excluded tests', () => {
+        expect(findingOf([range({ altitude_ft: null, is_excluded: true })])).toBeUndefined();
+    });
+});

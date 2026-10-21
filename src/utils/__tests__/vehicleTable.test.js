@@ -368,6 +368,43 @@ describe('tested range columns (#335)', () => {
         expect(metric.notes['tested.range_mi']).toBe('112.7 kph · 22°C · scaled from 100→5%');
     });
 
+    it('works out % of EPA hwy over the composite range, saying what it rests on', () => {
+        // 70 mph at 70°F, sea level: already at standard conditions, so no correction.
+        const r = buildVehicleRows([vehicle({ socWindowKwh: 95, runs: [test({ temperature_f: 70 })], epaRange: { hwyMi: 280 } })])[0];
+        expect(r.values['tested.composite_range_mi']).toBeCloseTo(294.7, 1);
+        expect(r.notes['tested.composite_range_mi']).toBe('composite of 1 test');
+        expect(r.values['calc.pctOfEpaHwy']).toBeCloseTo(105.3, 1);   // 294.7 ÷ 280
+        expect(r.notes['calc.pctOfEpaHwy']).toBe('composite of 1 test');
+        // No highway figure: blank, with no note.
+        const noHwy = row([test()]);
+        expect(noHwy.values['calc.pctOfEpaHwy']).toBeNull();
+        expect(noHwy.notes['calc.pctOfEpaHwy']).toBeNull();
+    });
+
+    it('corrects the composite to the site-wide correction target', () => {
+        // Altitude moves only a test that recorded one; an unrecorded one is not invented.
+        const v = vehicle({ socWindowKwh: 95, runs: [test({ temperature_f: 70, altitude_ft: 0 })] });
+        const at = (target) => buildVehicleRows([v], { correctionTarget: { speedMph: 70, temperatureF: 70, altitudeFt: 0, ...target } })[0]
+            .values['tested.composite_range_mi'];
+        expect(at({ speedMph: 60 })).toBeGreaterThan(at({}));
+        expect(at({ altitudeFt: 5000 })).toBeGreaterThan(at({}));   // thinner air
+        expect(labelledColumn(vehicleColumnByKey('tested.composite_range_mi'), DEFAULT_ASSUMPTIONS, 'imperial', { speedMph: 65 }).label)
+            .toBe('Composite range, 65 mph');
+        expect(assumptionsFor(['calc.pctOfEpaHwy']).has('conditions')).toBe(true);
+        // The target is not the table's to write: no vt_ parameter carries it.
+        expect(encodeVehicleTableParams({ columns: DEFAULT_VEHICLE_COLUMNS, sortKey: 'name', sortDir: 'asc' }).toString()).toBe('');
+    });
+
+    it('says why a composite is blank', () => {
+        const cold = row([test({ temperature_f: 30 })]);
+        expect(cold.values['tested.composite_range_mi']).toBeNull();
+        expect(cold.notes['tested.composite_range_mi']).toBe('1 test: outside the temperature band');
+        const narrow = row([test({ temperature_f: 70, start_soc: 56, end_soc: 10 })]);
+        expect(narrow.values['tested.composite_range_mi']).toBeNull();
+        expect(narrow.notes['tested.composite_range_mi']).toBe('no test wide enough to scale');
+        expect(narrow.values['tested.composite_efficiency_mi_kwh']).not.toBeNull();
+    });
+
     it('leaves the range blank, and says why, when the window was too narrow to scale', () => {
         const r = row([test({ start_soc: 56, end_soc: 10, distance_miles: 120, energy_kwh: 40 })]);
         expect(r.values['tested.range_mi']).toBeNull();

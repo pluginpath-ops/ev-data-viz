@@ -56,11 +56,13 @@ export default function SeriesPaletteSelect({
     ));
 
     return (
-        // Labelled, and in the same row shape as the correction picker beneath
-        // it. The options name themselves well enough to stand alone, but the
-        // two selects sit together in the Display group and a labelled control
-        // above an unlabelled one reads as two unrelated things rather than a
-        // block of settings — so context, not the field, is what earns the word.
+        // Labelled, in the sidebar's labelled-row shape. It sits first inside
+        // the run selector (its `colorControl`), directly above the swatches it
+        // colors: the color source and the per-series colors are one setting
+        // at two grains, and in Display they were a section apart. It is not
+        // back in the run selector's HEADER, where it once was beside Full
+        // labels — that split checkboxes of one kind across two places; this
+        // groups a color control with the colors.
         <label className="rail-select-row" title="Where each series takes its color from">
             <span className="text-label">Colors:</span>
             <select
