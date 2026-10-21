@@ -45,7 +45,7 @@ export default function SectionBand({ open, onToggle, label, count = null, activ
                 <span className="flex items-center gap-2">
                     <span className="text-micro">{label}</span>
                     {active && <span className="section-band-dot" role="img" aria-label={activeLabel ?? 'Applied'} title={activeLabel ?? undefined} />}
-                    {count != null && <span className="run-selector-count">{count}</span>}
+                    {count != null && <span className="section-band-count">{count}</span>}
                 </span>
                 {note && <span className="section-band-note">{note}</span>}
             </span>

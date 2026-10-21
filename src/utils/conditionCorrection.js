@@ -285,7 +285,8 @@ export function correctionNote({ factor, applied, missing, skipped, assumed = []
     // An assumed value is said every time it is used: it is a stand-in, and the
     // figure leans on it.
     for (const a of assumed) parts.push(`${a.axis} not recorded, taken as ${ASSUMED_TEXT[a.axis](a.value)}`);
-    const unassumed = (missing ?? []).filter(m => !assumed.some(a => a.axis === m));
+    // A blank wind is calm air by decision, not a gap, so it goes unsaid.
+    const unassumed = (missing ?? []).filter(m => m !== 'wind' && !assumed.some(a => a.axis === m));
     if (unassumed.length) parts.push(`no ${unassumed.join('/')} recorded`);
     return parts.join(' · ');
 }
