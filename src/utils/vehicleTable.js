@@ -56,7 +56,7 @@ import {
     rangeTestReference, chargeTimeTestReference, chargeBestTestReference, performanceTestReference,
 } from './testDetails';
 import { ASSUMED_CHARGER_EFF, MPG_E_CONVERSION } from '../constants/epa';
-import { normalizeCorrectionTarget, DEFAULT_CORRECTION_TARGET } from './correctionSettings';
+import { normalizeCorrectionTarget, DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from './correctionSettings';
 import { compositeRange, compositeLeftOutNote } from './compositeRange';
 import { correctionFactor, runConditions } from './conditionCorrection';
 import { vehiclePlatforms, resolveVoltageClass } from './platforms';
@@ -166,12 +166,12 @@ const TESTED_COLUMNS = [
  */
 const RANGE_TESTED_COLUMNS = [
     { key: 'tested.range_mi', label: 'Tested range', unitGroup: 'distance', better: 'higher', digits: 0, scale: 'range',
-      assumption: ['conditions'], labelFor: ({ conditions, units }) => `Tested range, ${speedText(conditions.speedMph, units)}`,
-      hint: 'The vehicle’s reported range test — the curator’s default, else the newest full-pack test — scaled to a full pack when it saw enough of one. Beneath it, its speed, temperature and window. Blank where the window was too narrow to scale from.' },
+      assumption: ['conditions'], labelFor: ({ conditions, units, correctionMode }) => (correctionMode === 'none' ? 'Tested range' : `Tested range, ${speedText(conditions.speedMph, units)}`),
+      hint: 'The vehicle’s reported range test — the curator’s default, else the newest full-pack test — scaled to a full pack when it saw enough of one. Beneath it, its speed, temperature and window. Blank where the window was too narrow to scale from. Corrected to the conditions under Assumptions, by the margin beneath, unless correction is off on the charts, where it is the test as measured.' },
     { key: 'tested.efficiency_mi_kwh', label: 'Tested efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
       better: 'higher', digits: 2, scale: 'efficiency',
-      assumption: ['conditions'], labelFor: ({ conditions, units }) => `Tested efficiency, ${speedText(conditions.speedMph, units)}`,
-      hint: 'Distance ÷ energy used on the same test as Tested range: battery-side, so comparable to Efficiency, not to EPA efficiency. Estimated from the SoC window and battery where the test logged no energy, and marked so.' },
+      assumption: ['conditions'], labelFor: ({ conditions, units, correctionMode }) => (correctionMode === 'none' ? 'Tested efficiency' : `Tested efficiency, ${speedText(conditions.speedMph, units)}`),
+      hint: 'Distance ÷ energy used on the same test as Tested range: battery-side, so comparable to Efficiency, not to EPA efficiency. Estimated from the SoC window and battery where the test logged no energy, and marked so. Corrected to the conditions under Assumptions, by the margin beneath, unless correction is off on the charts, where it is the test as measured.' },
     // The composite (compositeRange.js): every steady-state range test,
     // corrected to the conditions under Assumptions and averaged. The speed is
     // in the header, as the charge window is in "Charge 10→80%"; how many tests
@@ -185,8 +185,8 @@ const RANGE_TESTED_COLUMNS = [
       labelFor: ({ conditions, units }) => `Composite efficiency, ${speedText(conditions.speedMph, units)}`,
       hint: 'The same tests’ efficiency, corrected the same way. Battery-side, so comparable to Tested efficiency, not to EPA efficiency. Any window counts here, so it can rest on more tests than Composite range; estimated from the SoC window and battery where a test logged no energy, and marked so.' },
     { key: 'tested.when_new_range_mi', label: 'When-new range', unitGroup: 'distance', better: 'higher', digits: 0, scale: 'range',
-      assumption: ['conditions'], labelFor: ({ conditions, units }) => `When-new range, ${speedText(conditions.speedMph, units)}`,
-      hint: 'What the reported range test would reach with a new pack: its measured efficiency × the car’s new-car capacity (EPA tested, else Usable). Blank unless the test measured its energy, saw most of the pack, a new-car capacity is known, and the pack is more than 5% down — closer than that is test scatter.' },
+      assumption: ['conditions'], labelFor: ({ conditions, units, correctionMode }) => (correctionMode === 'none' ? 'When-new range' : `When-new range, ${speedText(conditions.speedMph, units)}`),
+      hint: 'What the reported range test would reach with a new pack: its measured efficiency × the car’s new-car capacity (EPA tested, else Usable). Blank unless the test measured its energy, saw most of the pack, a new-car capacity is known, and the pack is more than 5% down — closer than that is test scatter. Corrected to the conditions under Assumptions, by the margin beneath, unless correction is off on the charts, where it is the test as measured.' },
     { key: 'tested.capacity_retention', label: 'Capacity retention', unit: '%', better: 'higher', digits: 0,
       hint: 'The share of its new-car capacity the pack delivered on the reported range test: the energy that test implies for a full pack ÷ EPA tested (else Usable) capacity. Shown only below 95%.' },
 ].map(c => ({ ...c, group: 'Tested range', numeric: true, bar: true }));
@@ -309,9 +309,10 @@ function normalizeAssumptions(assumptions = DEFAULT_ASSUMPTIONS) {
 
 /**
  * What a calculation sees: the assumptions, plus the distance in miles, the
- * window as a share of the pack, and the correction target (`conditions`).
+ * window as a share of the pack, the correction target (`conditions`) and the
+ * reader's correction mode (`correctionMode`, 'none' when they turned it off).
  */
-function assumptionContext(assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET) {
+function assumptionContext(assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE) {
     const conditions = normalizeCorrectionTarget(correctionTarget);
     const a = normalizeAssumptions(assumptions);
     return {
@@ -321,6 +322,7 @@ function assumptionContext(assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial'
         windowShare: (a.windowTo - a.windowFrom) / 100,
         isSpecWindow: a.windowFrom === SPEC_WINDOW.from && a.windowTo === SPEC_WINDOW.to,
         conditions,
+        correctionMode,
     };
 }
 
@@ -328,9 +330,9 @@ function assumptionContext(assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial'
  * A column as a header shows it: a column whose name carries an assumption
  * ("Time to add 150 mi", "Charge 10→80%") is named from it.
  */
-export function labelledColumn(col, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET) {
+export function labelledColumn(col, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE) {
     if (!col?.labelFor) return col;
-    return { ...col, label: col.labelFor(assumptionContext(assumptions, units, correctionTarget)) };
+    return { ...col, label: col.labelFor(assumptionContext(assumptions, units, correctionTarget, correctionMode)) };
 }
 
 /**
@@ -616,12 +618,14 @@ const present = (v) => (v === '' || v === undefined ? null : v);
  * @param {Map}    [opts.platformsById]  the platform list by id (#318); platform columns are blank without it
  * @param {Function} [opts.sessionOf]  run → its test session, which supplies conditions a range test omits
  * @param {Object}   [opts.correctionTarget]  the site-wide correction target (correctionSettings.js)
+ * @param {string}   [opts.correctionMode]  the reader's correction mode; 'none' shows the
+ *        reported test's figures as measured. The composite corrects regardless.
  * @returns {Array<{ id, index, vehicle, values: Object, notes: Object, links: Object, tests: Object, flagged: Set }>}
  *          `notes` holds the basis or source shown beneath a figure; `tests`
  *          the test behind it, where one is (testDetails.js TestReference)
  */
-export function buildVehicleRows(vehicles = [], { performance = null, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', platformsById = null, sessionOf = () => null, correctionTarget = DEFAULT_CORRECTION_TARGET } = {}) {
-    const calcContext = assumptionContext(assumptions, units, correctionTarget);
+export function buildVehicleRows(vehicles = [], { performance = null, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', platformsById = null, sessionOf = () => null, correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE } = {}) {
+    const calcContext = assumptionContext(assumptions, units, correctionTarget, correctionMode);
     return vehicles.map((vehicle, index) => {
         // AppContext attaches the platform rows (withPlatforms); a caller that
         // passes only the list gets the same resolution.
@@ -686,8 +690,12 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         // Corrected to the site-wide target, as the composite is: a figure that
         // leans on one test's speed, altitude and weather is not comparable
         // until it is re-priced. The conditions it was TESTED at stay beneath it.
-        const correct = (run) => run
-            ? correctionFactor(runConditions(run, sessionOf(run)), { mode: 'aero_wind', target: calcContext.conditions }).factor
+        // It follows the reader's mode, as every chart does: with correction
+        // off these are the test's own figures. The composite does NOT follow
+        // it — an uncorrected mean of tests at different conditions is the
+        // comparison it exists to replace (compositeRange.js).
+        const correct = (run) => run && calcContext.correctionMode !== 'none'
+            ? correctionFactor(runConditions(run, sessionOf(run)), { mode: calcContext.correctionMode, target: calcContext.conditions }).factor
             : 1;
         const rangeFactor = correct(range?.run);
         const rangeRaw = range?.fullPackMi ?? (range?.isFullPack ? range.distanceMi : null);
