@@ -716,12 +716,18 @@ export default function App() {
         const p = new URLSearchParams();
         p.set('tab', view);
         if (chartMode === 'charging' && chartConfig.selectedRuns.length > 0)  p.set('r', chartConfig.selectedRuns.join(','));
-        // Include v= only for selected vehicles that have no runs in r (run-less selections)
-        const runVehicleIds = new Set(
-            vehicles
-                .filter(v => (v.runs || []).some(r => chartConfig.selectedRuns.includes(r.id)))
-                .map(v => String(v.id))
-        );
+        // Include v= only for selected vehicles that have no runs in r (run-less selections).
+        // r= is written for the charging chart alone, so in every other mode
+        // (Range & Efficiency included) no vehicle is covered by it and v= must
+        // carry the whole selection — the charging run selection lingers in
+        // chartConfig and would otherwise drop those vehicles from the link.
+        const runVehicleIds = chartMode === 'charging'
+            ? new Set(
+                vehicles
+                    .filter(v => (v.runs || []).some(r => chartConfig.selectedRuns.includes(r.id)))
+                    .map(v => String(v.id))
+            )
+            : new Set();
         const runlessVehicles = selectedVehicles.filter(id => !runVehicleIds.has(String(id)));
         if (runlessVehicles.length > 0)           p.set('v', runlessVehicles.join(','));
         p.set('x', chartConfig.xAxis);
