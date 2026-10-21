@@ -92,12 +92,12 @@ export function spreadEfficiency(run, socWindowKwh) {
  *
  * @returns {Array<{ run: object, miPerSoc: number|null, miPerKwh: number|null }>}
  */
-export function rangeBasesFor(chargingRun, vehicle, { correctionMode = 'none', sessionOf = () => null } = {}) {
+export function rangeBasesFor(chargingRun, vehicle, { correctionMode = 'none', correctionTarget, sessionOf = () => null } = {}) {
     return countedRangeTests(vehicle).flatMap(run => {
         const src = resolveRangeSource(chargingRun, {
             vehicle,
             explicitPairing: run,
-            correction: { mode: correctionMode },
+            correction: { mode: correctionMode, target: correctionTarget },
             session: sessionOf(run),
         });
         if (src.source !== 'paired' || src.sourceRun?.id !== run.id) return [];

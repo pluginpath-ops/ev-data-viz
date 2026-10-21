@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
+import SectionBand from './SectionBand';
 import { pairKey, partnersFor } from '../utils/pairings';
 import RunSourceLinks from './RunSourceLinks';
 import SeriesColorPicker from './SeriesColorPicker';
@@ -87,6 +88,9 @@ function plottedColorOf(run, colorMap, vehicle) {
  *   onSetPartner    — (primaryRunId, oldPartnerId, newPartnerId) => void
  *   onAddPartner    — (primaryRunId, partnerId) => void
  *   onRemovePartner — (primaryRunId, partnerId) => void
+ *   colorControl    — optional node: the chart's color source (SeriesPaletteSelect),
+ *                     shown first when open, directly above the swatches it
+ *                     colors. It used to sit in Display, a section away from them.
  */
 export default function RunSelector({
     vehicles,
@@ -99,6 +103,7 @@ export default function RunSelector({
     emptyMessage = 'No runs',
     chartPalette = null,
     onChartPaletteChange = null,
+    colorControl = null,
     // (runId) => the color it holds by hand, in force or parked, or null.
     handSetColorOf = null,
     renderRunBadges = null,
@@ -129,7 +134,6 @@ export default function RunSelector({
     onAddPartner = null,
     onRemovePartner = null,
 }) {
-    const headerRef = useRef(null);
     const [expanded, setExpanded] = useState(false);
     // Default all vehicles to expanded; track explicit collapses
     const [collapsedVehicles, setCollapsedVehicles] = useState({});
@@ -252,35 +256,19 @@ export default function RunSelector({
                 controls card: they act on what this selector chooses, and every
                 chart had drifted into putting them somewhere different. */}
             <div className="run-selector-bar">
-            <button
-                ref={headerRef}
-                onClick={() => {
-                    const next = !expanded;
-                    setExpanded(next);
-                    // Nudge the header into view on OPEN. A disclosure whose
-                    // content appears below the fold looks like a control that
-                    // did nothing — you click, the page does not move, and the
-                    // thing you asked for is off-screen. `nearest` so an already
-                    // visible header does not jump.
-                    if (next) {
-                        requestAnimationFrame(() =>
-                            headerRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
-                    }
-                }}
-                className="run-selector-header"
-            >
-                <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>
-                <span className="text-control">Select vehicles &amp; tests</span>
-                <span className="run-selector-count">{selectedCount} / {availableCount}</span>
-                {expanded && (
-                    <span className="text-xs font-normal text-meta ml-2">· Drag the pills above to reorder</span>
-                )}
-            </button>
+            <SectionBand
+                open={expanded}
+                onToggle={setExpanded}
+                label="Select vehicles & tests"
+                count={`${selectedCount} / ${availableCount}`}
+                note={expanded ? 'Drag the pills above to reorder' : null}
+            />
                 {headerActions && <div className="run-selector-actions">{headerActions}</div>}
             </div>
 
             {expanded && (
                 <div className="mt-3">
+                    {colorControl}
                     <div className="runs-list">
                         {vehicles.map(vehicle => {
                             const filteredRuns = primaryRunsFor(vehicle);

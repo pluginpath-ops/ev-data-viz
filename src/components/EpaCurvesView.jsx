@@ -914,17 +914,6 @@ export default function EpaCurvesView({
                         </div>
                     )}
 
-                    {/* ── DISPLAY ── where every other chart in this section
-                      * keeps Auto Color, rather than tucked into the subject
-                      * selector's header. */}
-                    {setChartConfig && (
-                        <div className="chart-rail-group">
-                            <span className="text-micro">Display</span>
-                            {/* No .display-grid: that is a two-column grid for
-                                checkboxes, and this group holds one select. */}
-                            <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
-                        </div>
-                    )}
 
                     {/* ── SELECT ── the certification records this chart draws.
                       *
@@ -947,6 +936,7 @@ export default function EpaCurvesView({
                                 <InfoIcon text={EPA_EXPLAINERS.curveEta} />
                             </span>
                             <RunSelector
+                                colorControl={setChartConfig ? <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} /> : null}
                                 vehicles={selectorVehicles}
                                 selectedRunIds={selectedMappings}
                                 onToggleRun={toggleMapping}

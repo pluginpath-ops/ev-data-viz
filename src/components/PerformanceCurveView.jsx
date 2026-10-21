@@ -9,6 +9,7 @@
  * launches, and plotting all of them at once buries the comparison that
  * actually matters — what each drive mode costs you.
  */
+import SidebarDisplaySection from './SidebarDisplaySection';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
@@ -477,8 +478,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     </div>
                 </div>
 
-                <div className="chart-rail-group">
-                    <span className="text-micro">Display</span>
+                <SidebarDisplaySection title="Display">
                     <div className="chart-toggles">
                         <label className="toggle-label">
                             <input
@@ -505,7 +505,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         it is the same 60&nbsp;mph point on a different clock.
                         {showG && ' Dotted lines are estimated acceleration between splits.'}
                     </p>
-                </div>
+                </SidebarDisplaySection>
 
                 {/* Curation sits with the control that enables it, and only under
                     "Every run" — the other groupings already pick for you, so a

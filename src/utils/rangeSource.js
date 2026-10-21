@@ -51,7 +51,7 @@
  */
 
 import { isListed, isExcluded } from './runListing';
-import { correctionFactor, applyCorrection, correctionNote } from './conditionCorrection';
+import { correctionFactor, applyCorrection, correctionNote, runConditions } from './conditionCorrection';
 import { isRangeRun } from './runUtils';
 import { STANDARD_CONDITIONS } from '../constants/epa';
 
@@ -226,24 +226,19 @@ function buildNote(source, sourceRun, energyMethod) {
 /**
  * Re-price a resolved basis for the conditions its range test was run under.
  *
- * A run's own value wins over its session's: the session reading is the shared
- * context of the outing, and a run that states its own knows better. Same rule
- * migration 044 already documents for temperature.
+ * The conditions come from conditionCorrection.runConditions, which says whose
+ * reading wins when the run and its session both have one.
  */
 function correctBasis(basis, run, correction, session) {
     if (!correction || correction.mode === 'none' || !correction.mode) {
         return { ...basis, correction: null };
     }
-    const conditions = {
-        speedMph:     run?.speed_mph,
-        speedBasis:   run?.speed_basis,
-        altitudeFt:   run?.altitude_ft    ?? session?.altitude_ft,
-        temperatureF: run?.temperature_f  ?? session?.temperature_f,
-    };
-    const result = correctionFactor(conditions, correction);
+    const result = correctionFactor(runConditions(run, session), correction);
     return {
         ...applyCorrection(basis, result.factor),
-        correction: { ...result, note: correctionNote(result) },
+        // The target travels with the result, so pricedAtSpeedMph knows what
+        // speed a corrected figure now stands at.
+        correction: { ...result, note: correctionNote(result), target: correction.target ?? STANDARD_CONDITIONS },
     };
 }
 
@@ -252,7 +247,7 @@ function correctBasis(basis, run, correction, session) {
  * re-prices for speed (simulateRoadTrip's testSpeedMph) must start from.
  *
  * When correction applied the speed axis, the figure has already been moved to
- * STANDARD_CONDITIONS.speedMph; handing the simulation the test's own speed on
+ * the target speed (the reader's, else STANDARD_CONDITIONS'); handing the simulation the test's own speed on
  * top re-prices from 80 mph a figure that is already at 70, and counts speed
  * twice (an 80 mph test read 21% better corrected than uncorrected). Otherwise
  * — correction off, the run states no speed, or a mixed cycle skipped the axis
@@ -263,7 +258,7 @@ function correctBasis(basis, run, correction, session) {
  */
 export function pricedAtSpeedMph(src, ownSpeedMph) {
     return src?.correction?.applied?.includes('speed')
-        ? STANDARD_CONDITIONS.speedMph
+        ? (src.correction.target ?? STANDARD_CONDITIONS).speedMph
         : ownSpeedMph;
 }
 

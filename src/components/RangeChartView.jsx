@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import SidebarDisplaySection from './SidebarDisplaySection';
 import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
 import { useSyncedScale } from '../hooks/useSyncedScale';
@@ -6,7 +7,8 @@ import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
-import { correctionFactor, correctionNote } from '../utils/conditionCorrection';
+import { correctionFactor, correctionNote, runConditions } from '../utils/conditionCorrection';
+import { correctionCaption, correctionSummary } from '../utils/correctionSettings';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import VerboseLabelToggle from './VerboseLabelToggle';
@@ -72,7 +74,7 @@ const hasDataForType = (run, type) => {
 // used to roll its own toggle against chartConfig — one more copy of the
 // behaviour, and the reason a run could be switched off here and come back.
 export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = VEHICLE_PALETTE,
-    handSet = false, verboseLabels = false, correctionMode = 'none', testSpread = true }) {
+    handSet = false, verboseLabels = false, correctionMode = 'none', correctionTarget = undefined, testSpread = true }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -118,12 +120,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const vehicleNameOf = v => (verboseLabels ? vehicleNames.get(v.id)?.full : vehicleNames.get(v.id)?.short) ?? vehicleLabel(v);
     const corrected = (v, r) => {
         const session = sessionFor(testSessions, r);
-        const result = correctionFactor({
-            speedMph:     r.speed_mph,
-            speedBasis:   r.speed_basis,
-            altitudeFt:   r.altitude_ft   ?? session?.altitude_ft,
-            temperatureF: r.temperature_f ?? session?.temperature_f,
-        }, { mode: correctionMode });
+        const result = correctionFactor(runConditions(r, session), { mode: correctionMode, target: correctionTarget });
         const base = { ...r, vehicle: v, vehicleName: vehicleNameOf(v), vehicleId: v.id };
         if (result.factor === 1) return base;
         return {
@@ -618,7 +615,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // rebuilt every render, so the map is a new object each time while holding
     // the same values — depending on its identity would redraw the chart on
     // every render. Comparing the colors by value redraws only when one moves.
-    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, palette, correctionMode, testSpread]);
+    }, [chartType, effUnit, selectedRuns, selectedVehicles, xMin, xMax, yMin, yMax, showPoints, units, isDark, colorSignature, verboseLabels, palette, correctionMode, correctionTarget, testSpread]);
 
     // ── The frame's caption ──────────────────────────────────────────────────
     // In the frame, so it is in the export: a bar chart pasted into a thread has
@@ -640,10 +637,10 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
         ];
         if (isEff) parts.push(effOptions(units).find(o => o.value === effUnit)?.label ?? effUnit);
-        parts.push(correctionMode === 'none' ? 'no correction' : `corrected: ${correctionMode}`);
+        parts.push(correctionCaption(correctionMode, correctionTarget, units));
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [plottableRuns, chartType, effUnit, correctionMode, units]);
+    }, [plottableRuns, chartType, effUnit, correctionMode, correctionTarget, units]);
 
     const { copyPng, copied, preview, dismissPreview } =
         useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle });
@@ -691,8 +688,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 </div>
 
                 {/* ── DISPLAY ── every toggle in one region, as in Charging. */}
-                <div className="chart-rail-group">
-                    <span className="text-micro">Display</span>
+                <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={correctionSummary(correctionMode, correctionTarget, units)}>
                     <div className="display-grid">
                         {CHART_TYPES.find(t => t.key === chartType)?.kind === 'line' && (
                             <label className="toggle-label">
@@ -710,16 +706,12 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                             <TestSpreadToggle on={testSpread} setChartConfig={setChartConfig} />
                         )}
                     </div>
-                    {/* A select, so it takes a row of its own beside the correction
-                        picker rather than a cell of the checkbox grid above — that
-                        grid is two columns of a 320px rail, which truncated this
-                        control's own default to "Vehicle colou…". */}
-                    <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
-                    <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
-                </div>
+                    <CorrectionControl mode={correctionMode} target={correctionTarget} setChartConfig={setChartConfig} />
+                </SidebarDisplaySection>
 
                 {/* ── Run selector ── */}
                 <RunSelector
+                    colorControl={<SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
                     handSetColorOf={handSetColorOf}
                     chartPalette={palette}
                     onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}

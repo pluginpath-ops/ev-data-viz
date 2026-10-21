@@ -165,6 +165,16 @@ export const EPA_DEFAULTS = {
     STD_ALTITUDE_FT: 0,
     STD_TEMP_F:      70,
 
+    // Which range tests the composite range (utils/compositeRange.js) takes.
+    // Temperature is corrected for air density only, so a test outside a mild
+    // band carries cabin-heat, AC and battery-conditioning losses no
+    // correction removes — it is left out rather than "corrected". Speed is
+    // corrected fully, but the further a test is from the target the more the
+    // single fleet-wide AERO_FRACTION is doing the work, so a test more than
+    // this far from it is left out too.
+    COMPOSITE_RANGE_TEMP_BAND:     [50, 95],  // °F, as tested
+    COMPOSITE_RANGE_SPEED_GAP_MPH: 15,        // mph from the target speed
+
     // How far the EPA label range may sit from the vehicle's spec range before
     // the curator form flags it. NOT a tie between the fields: one vehicle trim
     // legitimately maps to several EPA configurations — different wheels, tyres
@@ -315,6 +325,11 @@ export const STANDARD_CONDITIONS = {
     altitudeFt:   resolve('STD_ALTITUDE_FT', EPA_DEFAULTS.STD_ALTITUDE_FT),
     temperatureF: resolve('STD_TEMP_F',      EPA_DEFAULTS.STD_TEMP_F),
 };
+
+export const COMPOSITE_RANGE_TEMP_BAND =
+    resolve('COMPOSITE_RANGE_TEMP_BAND', EPA_DEFAULTS.COMPOSITE_RANGE_TEMP_BAND);
+export const COMPOSITE_RANGE_SPEED_GAP_MPH =
+    resolve('COMPOSITE_RANGE_SPEED_GAP_MPH', EPA_DEFAULTS.COMPOSITE_RANGE_SPEED_GAP_MPH);
 
 export const LABEL_RANGE_TOLERANCE_PCT = resolve('LABEL_RANGE_TOLERANCE_PCT', EPA_DEFAULTS.LABEL_RANGE_TOLERANCE_PCT);
 export const ETA_BAND          = resolve('ETA_BAND',          EPA_DEFAULTS.ETA_BAND);

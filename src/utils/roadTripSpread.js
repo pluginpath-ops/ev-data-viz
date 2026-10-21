@@ -15,7 +15,7 @@
  * left out. Road Trip's own line has always taken the same estimate.
  */
 import { countedRangeTests, spreadEfficiency } from './rangeTestSpread';
-import { correctionFactor } from './conditionCorrection';
+import { correctionFactor, runConditions } from './conditionCorrection';
 import { STANDARD_CONDITIONS } from '../constants/epa';
 
 /** The simulation never prices a test without a speed; neither does this. */
@@ -26,12 +26,12 @@ const ASSUMED_TEST_SPEED_MPH = 70;
  * testSpeedMph }.
  *
  * With correction on, a test corrected for speed is already priced at the
- * standard speed, so that is the speed handed to the simulation — which then
+ * target speed, so that is the speed handed to the simulation — which then
  * re-prices it to the travel speed exactly once. A test whose speed was not
  * corrected (a mixed cycle, or none recorded) keeps its own speed, as the
  * uncorrected path does.
  */
-export function spreadTestsFor(vehicle, { correctionMode = 'none', sessionOf = () => null } = {}) {
+export function spreadTestsFor(vehicle, { correctionMode = 'none', correctionTarget = STANDARD_CONDITIONS, sessionOf = () => null } = {}) {
     const out = [];
     // The tests that count, as on the bar charts: listed and pooled, less the
     // excluded (#394). A viewer and a contributor see the same spread.
@@ -44,18 +44,12 @@ export function spreadTestsFor(vehicle, { correctionMode = 'none', sessionOf = (
             out.push({ run, miPerKwh, estimated, testSpeedMph: ownSpeed });
             continue;
         }
-        const session = sessionOf(run);
-        const c = correctionFactor({
-            speedMph:     run.speed_mph,
-            speedBasis:   run.speed_basis,
-            altitudeFt:   run.altitude_ft   ?? session?.altitude_ft,
-            temperatureF: run.temperature_f ?? session?.temperature_f,
-        }, { mode: correctionMode });
+        const c = correctionFactor(runConditions(run, sessionOf(run)), { mode: correctionMode, target: correctionTarget });
         out.push({
             run,
             miPerKwh: miPerKwh * c.factor,
             estimated,
-            testSpeedMph: c.applied.includes('speed') ? STANDARD_CONDITIONS.speedMph : ownSpeed,
+            testSpeedMph: c.applied.includes('speed') ? correctionTarget.speedMph : ownSpeed,
         });
     }
     return out;

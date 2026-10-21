@@ -46,6 +46,12 @@ export const KNOB_GROUPS = [
             { key: 'REFERENCE_SPEED_MPH', label: 'Reference speed', kind: 'number',
               min: 30, max: 100, step: 1, unit: 'mph',
               help: 'The speed the aero fraction is quoted at. Changing it rescales what that fraction means.' },
+            { key: 'COMPOSITE_RANGE_TEMP_BAND', label: 'Composite range: test temperature band', kind: 'range',
+              min: -20, max: 120, step: 1, unit: '°F',
+              help: 'A range test outside this band is left out of the composite range and efficiency. Temperature is corrected for air density only, so a cold or hot test carries heating, AC and battery losses no correction removes.' },
+            { key: 'COMPOSITE_RANGE_SPEED_GAP_MPH', label: 'Composite range: speed gap', kind: 'number',
+              min: 0, max: 40, step: 1, unit: 'mph',
+              help: 'How far a test’s held speed may sit from the target speed and still be corrected into the composite. Further out, the one fleet-wide aero fraction is doing most of the work.' },
         ],
     },
     {
