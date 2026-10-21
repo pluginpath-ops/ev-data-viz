@@ -4,6 +4,7 @@ import AxisScaleControls from './AxisScaleControls';
 import { useSyncedScale } from '../hooks/useSyncedScale';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
+import { whenNewRangeOfRun } from '../utils/testedRange';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { correctionFactor, correctionNote } from '../utils/conditionCorrection';
@@ -247,6 +248,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     name:     nameFor(r),
                     fullName: barLabels.get(r.id)?.full ?? r.name,
                     _yValue: getY(r), _yUnit: yUnit,
+                    // What this test reaches on a new pack — a range bar only, and
+                    // only where the pack is well down (whenNewRangeOfRun).
+                    _whenNew: isRange ? whenNewRangeOfRun(r, r.vehicle) : null,
                     _spread: spreadByVehicle.get(r.vehicleId) ?? null,
                     _spreadBasis: 'range tests',
                 })),
@@ -568,6 +572,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                                         // which axes moved it leaves the reader to
                                         // infer it from the size of the change.
                                         run._correction?.note ?? null,
+                                        run._whenNew
+                                            ? `When new: ${convDistance(run._whenNew.whenNewMi, units).toFixed(0)} ${run._yUnit} · ${Math.round(run._whenNew.retention * 100)}% capacity retention`
+                                            : null,
                                         run._spread
                                             ? spreadSummary(run._spread, run._yUnit, run._spreadBasis)
                                             : null,

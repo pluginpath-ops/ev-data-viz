@@ -50,7 +50,7 @@ const commonFacts = (run, units) => [
  *        behind, which decides the caveat: a narrow window costs a range its
  *        claim and costs an efficiency nothing
  */
-export function rangeTestReference(vehicle, t, units = 'imperial', figure = 'range') {
+export function rangeTestReference(vehicle, t, units = 'imperial', figure = 'range', whenNew = null) {
     if (!t?.run) return null;
     const run = t.run;
     const speed = t.speedMph != null ? `${fmtSpeed(t.speedMph, units)}${t.speedNote ? ` (${t.speedNote})` : ''}` : null;
@@ -68,8 +68,14 @@ export function rangeTestReference(vehicle, t, units = 'imperial', figure = 'ran
             fact('Distance', run.distance_miles > 0 ? fmtDistance(run.distance_miles, units) : null),
             fact('Energy used', run.energy_kwh > 0 ? `${round1(Number(run.energy_kwh))} kWh` : null),
             fact('Full pack', t.isScaled && t.fullPackMi != null ? `${fmtDistance(t.fullPackMi, units)}, scaled from the window` : null),
+            // What the same test reaches on a new pack, said only where the pack
+            // is far enough down for it to matter (whenNewRange).
+            fact('When new', whenNew ? `${fmtDistance(whenNew.whenNewMi, units)} at ${round1(whenNew.capacityKwh)} kWh` : null),
+            fact('Capacity retention', whenNew ? `${Math.round(whenNew.retention * 100)}%` : null),
         ].filter(Boolean),
-        caveat: figure === 'efficiency'
+        caveat: figure === 'when-new'
+            ? 'Measured efficiency at the new-car capacity. A pack that has aged shows as capacity retention under 100%; a test run in unusual conditions can read the same way.'
+            : figure === 'efficiency'
             ? (t.estimated ? 'The test logged no energy, so it is estimated from the window and the battery.' : null)
             : t.startSoc == null ? 'The test does not record its state-of-charge window.'
             : t.isScaled ? 'Scaled to a full pack assuming consumption is flat across it.'
