@@ -64,7 +64,7 @@ describe('the case that motivated it', () => {
     });
 });
 
-describe('missing data is reported, never invented', () => {
+describe('a blank axis is reported, and corrected from the assumed test conditions', () => {
     it('lists an unrecorded axis as missing while correcting what was recorded', () => {
         const r = correctionFactor({ speedMph: 80 }, { mode: 'aero' });
         expect(r.missing).toContain('altitude');
@@ -81,6 +81,25 @@ describe('missing data is reported, never invented', () => {
 
     it('tolerates null conditions', () => {
         expect(correctionFactor(null, { mode: 'aero' }).factor).toBe(1);
+    });
+
+    it('corrects a blank from the assumption, not the target, so a moving target moves every blank test one way', () => {
+        // Assumed 0 ft. Correcting to 6,000 ft must lift a blank-altitude test
+        // exactly as it lifts one that recorded 0 ft — taking the blank as the
+        // target used to shrink a fast test and grow a slow one instead.
+        const target = { speedMph: 55, temperatureF: 70, altitudeFt: 6000 };
+        const assumed = { speedMph: 70, temperatureF: 70, altitudeFt: 0 };
+        const blank = correctionFactor({ speedMph: 74.5, temperatureF: 65 }, { mode: 'aero', target, assumed });
+        const recorded = correctionFactor({ speedMph: 74.5, temperatureF: 65, altitudeFt: 0 }, { mode: 'aero', target, assumed });
+        expect(blank.factor).toBeCloseTo(recorded.factor, 9);
+        expect(blank.assumed).toEqual([{ axis: 'altitude', value: 0 }]);
+        const atSea = correctionFactor({ speedMph: 74.5, temperatureF: 65 }, { mode: 'aero', target: { ...target, altitudeFt: 0 }, assumed });
+        expect(blank.factor).toBeGreaterThan(atSea.factor);
+    });
+
+    it('does not assume a mixed cycle\'s speed: it is skipped, not blank', () => {
+        const r = correctionFactor({ speedMph: 52.7, speedBasis: 'mixed', altitudeFt: 0, temperatureF: 70 }, { mode: 'aero' });
+        expect(r.assumed).toEqual([]);
     });
 });
 
@@ -140,7 +159,7 @@ describe('the note never lets a corrected number pass for measured', () => {
         const note = correctionNote(correctionFactor({ speedMph: 80, altitudeFt: 5280 }, { mode: 'aero' }));
         expect(note).toMatch(/corrected [+-]/);
         expect(note).toContain('speed');
-        expect(note).toContain('no temperature recorded');
+        expect(note).toContain('temperature not recorded, taken as 70°F');
     });
 
     it('says why an axis was skipped, even when nothing else was corrected', () => {

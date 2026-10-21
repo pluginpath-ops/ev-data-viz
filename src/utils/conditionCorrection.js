@@ -52,7 +52,7 @@
  */
 
 import {
-    AERO_FRACTION, REFERENCE_SPEED_MPH, STANDARD_CONDITIONS,
+    AERO_FRACTION, REFERENCE_SPEED_MPH, STANDARD_CONDITIONS, ASSUMED_TEST_CONDITIONS,
 } from '../constants/epa';
 import { airDensityRatio, temperatureDensityRatio, apparentAirspeed } from './epaDerivations';
 
@@ -153,19 +153,25 @@ function airSpeedSquared(speedMph, windMph, windDirDeg = null) {
  * @param {string} [opts.mode]         a CORRECTION_MODES key
  * @param {Object} [opts.target]       standard conditions to correct TO
  * @param {number} [opts.aeroFraction] override, e.g. towing
- * @returns {{ factor: number, applied: string[], missing: string[], skipped: Array }}
+ * @param {Object} [opts.assumed]      what a blank axis is taken as (ASSUMED_TEST_CONDITIONS)
+ * @returns {{ factor: number, applied: string[], missing: string[], skipped: Array,
+ *             assumed: Array<{ axis: string, value: number }> }}
+ *   `missing` lists every blank axis; `assumed` the ones corrected from an
+ *   assumed value (wind is never assumed: a blank wind is calm air)
  */
 export function correctionFactor(conditions, {
     mode = DEFAULT_CORRECTION_MODE,
     target = STANDARD_CONDITIONS,
     aeroFraction = AERO_FRACTION,
+    assumed: assumedConditions = ASSUMED_TEST_CONDITIONS,
 } = {}) {
     const axes = modeAxes(mode);
-    if (!axes.length) return { factor: 1, applied: [], missing: [], skipped: [] };
+    if (!axes.length) return { factor: 1, applied: [], missing: [], skipped: [], assumed: [] };
 
     const applied = [];
     const missing = [];
     const skipped = [];
+    const assumed = [];
 
     // Correcting for speed assumes the test held one. Aero energy goes as the
     // MEAN OF v², while an average speed supplies the SQUARE OF THE MEAN, and
@@ -175,13 +181,23 @@ export function correctionFactor(conditions, {
     // and temperature still apply.
     const mixedCycle = conditions?.speedBasis === 'mixed';
 
-    // An axis is only corrected when the test SAYS what it was. Assuming a
-    // default would silently invent a correction — the opposite of the point.
+    // An axis the test records is corrected from what it recorded. A blank one
+    // is corrected from the ASSUMED test conditions, never from the target:
+    // taken as the target, a blank altitude looked like "no correction" but
+    // re-priced the speed correction in the target's air, so moving the target
+    // altitude shrank some tests and grew others (the owner caught it on the
+    // range bars). An assumption is the same for every blank test and is named
+    // in the note, and Data Checks lists the blanks so they get filled.
     const has = (axis, value) => {
         if (!axes.includes(axis)) return false;
         if (value == null || value === '') { missing.push(axis); return false; }
         applied.push(axis);
         return true;
+    };
+    const assume = (axis, key) => {
+        if (!axes.includes(axis)) return target[key];
+        assumed.push({ axis, value: assumedConditions[key] });
+        return assumedConditions[key];
     };
 
     let useSpeed = false;
@@ -201,21 +217,40 @@ export function correctionFactor(conditions, {
         useWind = has('wind', conditions?.windMph);
     }
 
-    const runSpeed   = useSpeed ? conditions.speedMph : target.speedMph;
-    const runDensity = (useAlt  ? airDensityRatio(conditions.altitudeFt) : airDensityRatio(target.altitudeFt))
-                     * (useTemp ? temperatureDensityRatio(conditions.temperatureF) : temperatureDensityRatio(target.temperatureF));
+    // A mixed cycle's speed is SKIPPED, not blank: it has a speed, just not one
+    // a correction can use, so it stands at the target and moves nothing.
+    const runSpeed   = useSpeed ? Number(conditions.speedMph)
+        : mixedCycle ? target.speedMph : assume('speed', 'speedMph');
+    const runAlt     = useAlt  ? Number(conditions.altitudeFt)   : assume('altitude', 'altitudeFt');
+    const runTemp    = useTemp ? Number(conditions.temperatureF) : assume('temperature', 'temperatureF');
+    const runDensity = airDensityRatio(runAlt) * temperatureDensityRatio(runTemp);
 
     const targetDensity = airDensityRatio(target.altitudeFt) * temperatureDensityRatio(target.temperatureF);
 
     const airSq    = useWind ? airSpeedSquared(runSpeed, Number(conditions.windMph), conditions.windDirDeg) : null;
     const atRun    = loadTerm(runSpeed,        runDensity,    aeroFraction, airSq);
     const atTarget = loadTerm(target.speedMph, targetDensity, aeroFraction);
-    if (!atRun || atRun <= 0) return { factor: 1, applied: [], missing, skipped };
+    if (!atRun || atRun <= 0) return { factor: 1, applied: [], missing, skipped, assumed: [] };
 
     // Consumption ratio inverted: a harder test (higher load) means the car
     // deserves a BETTER corrected efficiency than it measured.
-    return { factor: atRun / atTarget, applied, missing, skipped };
+    return { factor: atRun / atTarget, applied, missing, skipped, assumed };
 }
+
+/**
+ * Whether a correction moved a figure to the target SPEED — from the test's own
+ * speed or from an assumed one — so a caller that re-prices for speed starts
+ * from the target, not from the test (rangeSource.pricedAtSpeedMph,
+ * roadTripSpread).
+ */
+export const speedCorrected = (result) =>
+    !!(result?.applied?.includes('speed') || result?.assumed?.some(a => a.axis === 'speed'));
+
+const ASSUMED_TEXT = {
+    speed:       v => `${v} mph`,
+    temperature: v => `${v}°F`,
+    altitude:    v => `${v.toLocaleString('en-US')} ft`,
+};
 
 /**
  * Apply a correction factor to a resolved range basis.
@@ -235,17 +270,22 @@ export function applyCorrection({ miPerKwh, miPerSoc }, factor) {
  * A short human note for a corrected series — what moved it, and by how much.
  * Charts show this so a corrected number never passes for a measured one.
  */
-export function correctionNote({ factor, applied, missing, skipped }) {
+export function correctionNote({ factor, applied, missing, skipped, assumed = [] }) {
     // A skipped axis is worth saying even when nothing was corrected: "not
     // corrected because we cannot" is a different claim from "not corrected".
-    if (!applied?.length && !skipped?.length) return null;
+    if (!applied?.length && !skipped?.length && !assumed?.length) return null;
 
     const parts = [];
-    if (applied?.length) {
+    const moved = [...(applied ?? []), ...assumed.map(a => a.axis)];
+    if (moved.length) {
         const pct = (factor - 1) * 100;
-        parts.push(`corrected ${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% for ${applied.join(', ')}`);
+        parts.push(`corrected ${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% for ${moved.join(', ')}`);
     }
     for (const s of skipped ?? []) parts.push(`${s.axis} not corrected (${s.reason})`);
-    if (missing?.length) parts.push(`no ${missing.join('/')} recorded`);
+    // An assumed value is said every time it is used: it is a stand-in, and the
+    // figure leans on it.
+    for (const a of assumed) parts.push(`${a.axis} not recorded, taken as ${ASSUMED_TEXT[a.axis](a.value)}`);
+    const unassumed = (missing ?? []).filter(m => !assumed.some(a => a.axis === m));
+    if (unassumed.length) parts.push(`no ${unassumed.join('/')} recorded`);
     return parts.join(' · ');
 }

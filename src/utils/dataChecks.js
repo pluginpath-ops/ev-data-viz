@@ -56,7 +56,8 @@ import { formatYears } from './epaCertifications';
 import { testedAgreement } from './vehicleFigures';
 import { labelRangeCheck } from './labelRangeCheck';
 import { sameSource, findSource, isYouTubeLink, isPlainYouTubeLink, linkProblem } from './sources';
-import { isCompositeRun, isInheritedRunId } from './runUtils';
+import { isCompositeRun, isInheritedRunId, filterRangeRuns } from './runUtils';
+import { statisticalRuns } from './runListing';
 import { deriveTested } from './performanceDerivations';
 import { resolveVoltageClass } from './platforms';
 import {
@@ -85,6 +86,7 @@ export const DATA_CHECKS = [
     { key: 'label-spread',       figure: 'range',       kind: 'disagrees', label: 'EPA configurations disagree on range' },
     { key: 'range-no-label',     figure: 'range',       kind: 'gap',       label: 'Range with no EPA label' },
     { key: 'expected-vs-label',  figure: 'range',       kind: 'disagrees', label: 'Expected EPA range disagrees with the EPA label' },
+    { key: 'range-test-conditions', figure: 'range',    kind: 'gap',       label: 'Range test missing speed, temperature or altitude' },
     { key: 'tested-vs-label',    figure: 'capacity',    kind: 'disagrees', label: 'EPA tested disagrees with Usable/Gross' },
     { key: 'tested-spread',      figure: 'capacity',    kind: 'disagrees', label: 'EPA tested differs across configurations' },
     { key: 'usable-over-gross',  figure: 'capacity',    kind: 'disagrees', label: 'Usable larger than Gross' },
@@ -493,6 +495,48 @@ function performanceFindings(ctx, perf, limits) {
         { claimed, quickestTested: best.value })];
 }
 
+/**
+ * Range tests that leave a condition blank (owner's call, 2026-10-21).
+ *
+ * Every correction — every chart and the composite range — needs a test's
+ * speed, temperature and altitude. A blank one is corrected from the assumed
+ * test conditions (constants/epa.js ASSUMED_TEST_CONDITIONS), which is a
+ * stand-in the figure then leans on, and the composite leaves a test with no
+ * speed or temperature out altogether. So a blank is a gap to fill, one finding
+ * per vehicle naming each test and what it lacks. A session's reading counts,
+ * as it does for the correction (conditionCorrection.runConditions). Wind is
+ * not asked for: a blank wind is calm air, a fair default.
+ *
+ * Counted tests only (runListing.statisticalRuns): an excluded test feeds no
+ * figure, and composites and inherited copies are not entered here.
+ */
+const CONDITION_FIELDS = [
+    ['speed',       r => r.speed_mph],
+    ['temperature', (r, s) => r.temperature_f ?? s?.temperature_f],
+    ['altitude',    (r, s) => r.altitude_ft ?? s?.altitude_ft],
+];
+const LISTED_TESTS = 3;
+
+function rangeConditionFindings(vehicle, sessionOf) {
+    const lacking = filterRangeRuns(statisticalRuns(vehicle))
+        .filter(r => !isCompositeRun(r) && !isInheritedRunId(r.id))
+        .map(run => {
+            const session = sessionOf(run);
+            const blank = CONDITION_FIELDS.filter(([, read]) => num(read(run, session)) == null).map(([axis]) => axis);
+            return { run, blank };
+        })
+        .filter(t => t.blank.length);
+    if (!lacking.length) return [];
+    const name = (r) => r.name || r.source || `test ${r.id}`;
+    const listed = lacking.slice(0, LISTED_TESTS).map(t => `${name(t.run)} (${t.blank.join(', ')})`);
+    const more = lacking.length - listed.length;
+    const n = lacking.length;
+    return [finding('range-test-conditions',
+        `${n} range test${n === 1 ? ' lacks' : 's lack'} conditions a correction needs: ${listed.join('; ')}`
+        + `${more ? `; and ${more} more` : ''}. Corrected from assumed values until filled.`,
+        { tests: lacking.map(t => `${t.run.id}:${t.blank.join('+')}`).sort() })];
+}
+
 // ── The fleet ───────────────────────────────────────────────────────────────
 
 /**
@@ -560,7 +604,7 @@ function applySkips(vehicle, findings, skipsByKey) {
  *          the two counts are of findings NOT skipped
  */
 export function runDataChecks(vehicles = [], {
-    limits = LOADED_LIMITS, testedRule = 'nearer', performance = null, skips = [],
+    limits = LOADED_LIMITS, testedRule = 'nearer', performance = null, skips = [], sessionOf = () => null,
 } = {}) {
     const skipsByKey = new Map(skips.map(s => [`${s.vehicle_id}:${s.check_key}`, s]));
     return vehicles
@@ -572,6 +616,7 @@ export function runDataChecks(vehicles = [], {
                 ...primaryFindings(links),
                 ...certificationYearFindings(vehicle, links),
                 ...rangeFindings(vehicle, links, ctx, limits),
+                ...rangeConditionFindings(vehicle, sessionOf),
                 ...capacityFindings(vehicle, links, ctx, limits, testedRule),
                 ...weightFindings(links, ctx, limits),
                 ...driveFindings(links, ctx),

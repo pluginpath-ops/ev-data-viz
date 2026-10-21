@@ -51,7 +51,7 @@
  */
 
 import { isListed, isExcluded } from './runListing';
-import { correctionFactor, applyCorrection, correctionNote, runConditions } from './conditionCorrection';
+import { correctionFactor, applyCorrection, correctionNote, runConditions, speedCorrected } from './conditionCorrection';
 import { isRangeRun } from './runUtils';
 import { STANDARD_CONDITIONS } from '../constants/epa';
 
@@ -257,7 +257,7 @@ function correctBasis(basis, run, correction, session) {
  * @param {number|null} ownSpeedMph  the test's own speed, as the caller reads it
  */
 export function pricedAtSpeedMph(src, ownSpeedMph) {
-    return src?.correction?.applied?.includes('speed')
+    return speedCorrected(src?.correction)
         ? (src.correction.target ?? STANDARD_CONDITIONS).speedMph
         : ownSpeedMph;
 }

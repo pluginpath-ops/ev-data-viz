@@ -15,11 +15,8 @@
  * left out. Road Trip's own line has always taken the same estimate.
  */
 import { countedRangeTests, spreadEfficiency } from './rangeTestSpread';
-import { correctionFactor, runConditions } from './conditionCorrection';
-import { STANDARD_CONDITIONS } from '../constants/epa';
-
-/** The simulation never prices a test without a speed; neither does this. */
-const ASSUMED_TEST_SPEED_MPH = 70;
+import { correctionFactor, runConditions, speedCorrected } from './conditionCorrection';
+import { STANDARD_CONDITIONS, ASSUMED_TEST_CONDITIONS } from '../constants/epa';
 
 /**
  * Every range test of a vehicle as a simulation input: { run, miPerKwh,
@@ -39,7 +36,8 @@ export function spreadTestsFor(vehicle, { correctionMode = 'none', correctionTar
         const e = spreadEfficiency(run, vehicle?.socWindowKwh);
         if (!e) continue;
         const { miPerKwh, estimated } = e;
-        const ownSpeed = run.speed_mph || ASSUMED_TEST_SPEED_MPH;
+        // The simulation never prices a test without a speed; neither does this.
+        const ownSpeed = run.speed_mph || ASSUMED_TEST_CONDITIONS.speedMph;
         if (correctionMode === 'none') {
             out.push({ run, miPerKwh, estimated, testSpeedMph: ownSpeed });
             continue;
@@ -49,7 +47,7 @@ export function spreadTestsFor(vehicle, { correctionMode = 'none', correctionTar
             run,
             miPerKwh: miPerKwh * c.factor,
             estimated,
-            testSpeedMph: c.applied.includes('speed') ? correctionTarget.speedMph : ownSpeed,
+            testSpeedMph: speedCorrected(c) ? correctionTarget.speedMph : ownSpeed,
         });
     }
     return out;

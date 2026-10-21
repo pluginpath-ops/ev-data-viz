@@ -165,6 +165,19 @@ export const EPA_DEFAULTS = {
     STD_ALTITUDE_FT: 0,
     STD_TEMP_F:      70,
 
+    // What a range test that leaves a condition blank is taken to have been
+    // driven in, when it is corrected (owner's call, 2026-10-21). Before the
+    // reader could move the target, a blank axis was "taken as the target",
+    // which looked like no correction; with a movable target that made a blank
+    // altitude shrink a speed correction as the target altitude rose, and grow
+    // it on another test. A fixed assumption moves every blank-altitude test
+    // the same way. Blanks are a Data Checks gap ('range-test-conditions'), so
+    // the assumption is named in every correction note and shrinks as they are
+    // filled.
+    ASSUMED_TEST_SPEED_MPH:   70,
+    ASSUMED_TEST_TEMP_F:      70,
+    ASSUMED_TEST_ALTITUDE_FT: 0,
+
     // Which range tests the composite range (utils/compositeRange.js) takes.
     // Temperature is corrected for air density only, so a test outside a mild
     // band carries cabin-heat, AC and battery-conditioning losses no
@@ -324,6 +337,13 @@ export const STANDARD_CONDITIONS = {
     speedMph:     resolve('STD_SPEED_MPH',   EPA_DEFAULTS.STD_SPEED_MPH),
     altitudeFt:   resolve('STD_ALTITUDE_FT', EPA_DEFAULTS.STD_ALTITUDE_FT),
     temperatureF: resolve('STD_TEMP_F',      EPA_DEFAULTS.STD_TEMP_F),
+};
+
+/** What a range test that leaves a condition blank is taken to have been driven in. */
+export const ASSUMED_TEST_CONDITIONS = {
+    speedMph:     resolve('ASSUMED_TEST_SPEED_MPH',   EPA_DEFAULTS.ASSUMED_TEST_SPEED_MPH),
+    temperatureF: resolve('ASSUMED_TEST_TEMP_F',      EPA_DEFAULTS.ASSUMED_TEST_TEMP_F),
+    altitudeFt:   resolve('ASSUMED_TEST_ALTITUDE_FT', EPA_DEFAULTS.ASSUMED_TEST_ALTITUDE_FT),
 };
 
 export const COMPOSITE_RANGE_TEMP_BAND =
