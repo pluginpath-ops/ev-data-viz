@@ -359,23 +359,40 @@ const ratio = (a, b) => (a != null && b != null && b > 0 ? a / b : null);
  * holds the rate is unknown (it falls off past 80%), so the cell is blank and
  * says why rather than extrapolating.
  */
-function timeToAdd([epaRange, windowMin, compositeRange, testedRange], { addMi, windowFrom, windowShare, rangeBasis }, { chargeSummary }) {
+function timeToAdd([epaRange, , compositeRange, testedRange], { addMi, windowFrom, rangeBasis }, { addSummary, specMin }) {
     const { range, basis } = pricedRange(rangeBasis, { epaRange, compositeRange, testedRange });
     const said = (r) => ({ ...r, note: r.note ?? `${basis} range` });
     if (range == null || !(range > 0)) return { value: null };
     const miPerPct = range / 100;
-    if (chargeSummary) {
+    // Only the START of the charge window matters here: a stop ends when the
+    // distance is added, wherever the reader's "to" sits. What the session
+    // must cover is the start up to that point (see addTimeSession).
+    if (addSummary) {
         const target = windowFrom + addMi / miPerPct;
         const lo = Math.floor(target), hi = Math.ceil(target);
-        const a = minutesBetween(chargeSummary, windowFrom, lo) ?? (lo === windowFrom ? 0 : null);
-        const b = hi === lo ? a : minutesBetween(chargeSummary, windowFrom, hi);
+        const a = minutesBetween(addSummary, windowFrom, lo) ?? (lo === windowFrom ? 0 : null);
+        const b = hi === lo ? a : minutesBetween(addSummary, windowFrom, hi);
         if (hi > 100 || a == null || b == null) return { value: null, note: 'more than the test charged' };
         return said({ value: a + (b - a) * (target - lo) });
     }
-    if (!(windowMin > 0)) return { value: null };
-    const windowMi = range * windowShare;
+    // The spec answers one window, 10→80%: its average rate, up to what that holds.
+    if (!(specMin > 0) || windowFrom !== SPEC_WINDOW.from) return { value: null };
+    const windowMi = range * (SPEC_WINDOW.to - SPEC_WINDOW.from) / 100;
     if (addMi > windowMi) return { value: null, note: `more than a ${SPEC_WINDOW.from}→${SPEC_WINDOW.to}% stop adds` };
-    return said({ value: addMi / (windowMi / windowMin) });
+    return said({ value: addMi / (windowMi / specMin) });
+}
+
+/**
+ * The charging session a "Time to add" reads: one that covers the stop from the
+ * window's start to where the added distance ends, not to the reader's window
+ * end — a 10→90% window must not blank a stop that ends at 63% because the
+ * tests stop at 85%. Same pick as the window's (chargeTimeSession).
+ */
+function addTimeSession(vehicle, maxDcKw, { windowFrom, addMi, rangeBasis }, ranges) {
+    const { range } = pricedRange(rangeBasis, ranges);
+    if (!(range > 0)) return { tested: { run: null }, to: null };
+    const to = Math.min(100, Math.ceil(windowFrom + addMi / (range / 100)));
+    return { tested: chargeTimeSession(vehicle.runs ?? [], { from: windowFrom, to, maxDcKw }), to };
 }
 
 /** The range a percent is priced at, and what to call it: the reader's basis, else the other. */
@@ -401,10 +418,15 @@ const CALCULATED_COLUMNS = [
       calc: ([range, kwh]) => ratio(range, kwh),
       hint: 'EPA range ÷ battery. An estimate from the label range and the resolved battery capacity, not a measured figure. Battery-side: EPA efficiency, from the wall, reads lower.' },
     { key: 'calc.rangePerChargeMin', label: 'Range per minute', unit: 'mi/min', metric: ['km/min', MI_TO_KM],
-      better: 'higher', digits: 1, assumption: ['window'], charging: true,
-      inputs: ['figures.epaRangeMi', 'tested.charge_window_min'],
-      calc: ([range, min], { windowShare }) => ratio(range == null ? null : range * windowShare, min),
-      hint: 'EPA range × the charge window ÷ the time to charge across it: the miles a stop adds per minute plugged in. Peak kW is the number quoted; this is the one a road trip feels. From a test where one covers the window, else the spec’s 10→80% time.' },
+      better: 'higher', digits: 1, assumption: ['window', 'rangeBasis', 'conditions'], charging: true,
+      inputs: ['figures.epaRangeMi', 'tested.charge_window_min', 'tested.composite_range_mi', 'tested.range_mi'],
+      calc: ([epaRange, min, compositeRange, testedRange], { windowShare, rangeBasis }) => {
+          const { range } = pricedRange(rangeBasis, { epaRange, compositeRange, testedRange });
+          return ratio(range == null ? null : range * windowShare, min);
+      },
+      note: ([epaRange, , compositeRange, testedRange], { rangeBasis }) =>
+          pricedRange(rangeBasis, { epaRange, compositeRange, testedRange }).basis && `${pricedRange(rangeBasis, { epaRange, compositeRange, testedRange }).basis} range`,
+      hint: 'The composite range (else the reported range test, else EPA; or EPA, as set under Assumptions) × the charge window ÷ the time to charge across it: the miles a stop adds per minute plugged in. Peak kW is the number quoted; this is the one a road trip feels. From a test where one covers the window, else the spec’s 10→80% time.' },
     { key: 'calc.timeToAdd', label: 'Time to add distance', unit: 'min',
       better: 'lower', digits: 0, assumption: ['addDistance', 'window', 'rangeBasis', 'conditions'], charging: true,
       labelFor: ({ addDistance, units }) => `Time to add ${addDistance} ${units === 'metric' ? 'km' : 'mi'}`,
@@ -714,7 +736,22 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
 
         // Last, so every input — spec, figure or tested — is already in place.
         // In order, too: a calculation may read one listed before it.
-        const extra = { chargeSummary: charge.summary };
+        const add = addTimeSession(vehicle, num(specs?.charging?.max_dc_kw), calcContext, {
+            epaRange: num(values['figures.epaRangeMi']),
+            compositeRange: num(values['tested.composite_range_mi']),
+            testedRange: num(values['tested.range_mi']),
+        });
+        // No session reaches that far: the window's own, so the cell can say
+        // "more than the test charged" rather than fall through to the spec.
+        const addTested = add.tested.run ? add.tested : (charge.tested ?? { run: null });
+        const addTest = addTested.run
+            ? chargeTimeTestReference(vehicle, addTested, { from: calcContext.windowFrom, to: add.tested.run ? add.to : calcContext.windowTo }, units)
+            : null;
+        const extra = {
+            chargeSummary: charge.summary,
+            addSummary: addTested.run?.charge_summary ?? null,
+            specMin: num(specs?.charging?.charge_time_10_to_80_pct_min),
+        };
         for (const col of CALCULATED_COLUMNS) {
             const inputs = col.inputs.map(k => num(values[k]));
             const value = col.calc(inputs, calcContext, extra);
@@ -722,7 +759,9 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             // A note can explain a blank, too ("more than a 10→80% stop adds").
             // A charging figure worked from a test says "tested"; from the spec it
             // is like every other calculation and says nothing.
-            const fromTest = col.charging && charge.summary && values[col.key] != null;
+            const isAdd = col.key === 'calc.timeToAdd';
+            const usedSummary = isAdd ? extra.addSummary : charge.summary;
+            const fromTest = col.charging && usedSummary && values[col.key] != null;
             // A ratio over one tested figure says what that figure says beneath it.
             if (col.notesFrom) {
                 notes[col.key] = values[col.key] != null ? notes[col.notesFrom] ?? null : null;
@@ -732,7 +771,7 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             notes[col.key] = col.note?.(inputs, calcContext, extra) ?? (fromTest ? 'tested' : null);
             // "Tested" links to the charging test the time came from — as does
             // a blank explained by that test's reach.
-            tests[col.key] = col.charging && charge.summary && (fromTest || notes[col.key]) ? chargeTest : null;
+            tests[col.key] = col.charging && usedSummary && (fromTest || notes[col.key]) ? (isAdd ? addTest : chargeTest) : null;
         }
 
         // Community flags are stored as the spec's own `category.field` key,

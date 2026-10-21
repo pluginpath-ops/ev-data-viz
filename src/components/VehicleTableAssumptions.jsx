@@ -97,7 +97,7 @@ export default function VehicleTableAssumptions({ assumptions, needed, units, on
                     </span>
                     <Slider name="addDistance" value={a.addDistance} onChange={set('addDistance')} />
                     <span className="text-note">
-                        Used by “Time to add”, starting from the bottom of the charge window.
+                        Used by “Time to add”, starting from the bottom of the charge window; the top of the window does not limit it.
                     </span>
                 </label>
             )}
@@ -118,7 +118,7 @@ export default function VehicleTableAssumptions({ assumptions, needed, units, on
                         ))}
                     </div>
                     <span className="text-note">
-                        Tested is the composite range, else the reported range test; EPA is the label.
+                        For “Time to add” and “Range per minute”. Tested is the composite range, else the reported range test; EPA is the label.
                         Either falls back to the other when a car has no figure of its own.
                     </span>
                 </div>

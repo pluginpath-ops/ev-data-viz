@@ -513,7 +513,7 @@ describe('the charge window (#335)', () => {
         expect(r.values[W]).toBeCloseTo(21);
         expect(r.notes[W]).toBe('Out of Spec · 50°F');
         expect(r.values['calc.rangePerChargeMin']).toBeCloseTo(10);    // 210 mi in 21 min
-        expect(r.notes['calc.rangePerChargeMin']).toBe('tested');
+        expect(r.notes['calc.rangePerChargeMin']).toBe('EPA range');   // names the range it was priced at
         expect(r.values['calc.avgChargeKw']).toBeCloseTo(200);         // 70 kWh in 21 min
     });
 
@@ -521,7 +521,7 @@ describe('the charge window (#335)', () => {
         const r = row(car([session(21)]));
         expect(r.tests[W]).toMatchObject({ runId: 11, reason: 'The newest charging test that covers 10→80%' });
         expect(r.tests['calc.rangePerChargeMin']).toBe(r.tests[W]);
-        expect(r.tests['calc.timeToAdd']).toBe(r.tests[W]);
+        expect(r.tests['calc.timeToAdd']).toMatchObject({ runId: 11 });
         // From the spec there is no test to open.
         const spec = row(car([]));
         expect(spec.tests[W]).toBeNull();
@@ -540,7 +540,7 @@ describe('the charge window (#335)', () => {
         const r = row(car([]));
         expect(r.values[W]).toBe(30);
         expect(r.notes[W]).toBe('spec');
-        expect(r.notes['calc.rangePerChargeMin']).toBeNull();
+        expect(r.notes['calc.rangePerChargeMin']).toBe('EPA range');
     });
 
     it('answers any window from a test, and none from a spec', () => {
@@ -612,7 +612,19 @@ describe('Time to add prices a percent at the reader\'s range basis', () => {
         expect(epa.notes['calc.timeToAdd']).toBe('EPA range');
     });
 
-    it('offers the basis in the Assumptions menu with Time to add', () => {
+    it('offers the basis in the Assumptions menu with Time to add and Range per minute', () => {
         expect(assumptionsFor(['name', 'calc.timeToAdd']).has('rangeBasis')).toBe(true);
+        expect(assumptionsFor(['name', 'calc.rangePerChargeMin']).has('rangeBasis')).toBe(true);
+    });
+
+    it('does not blank a stop because the window\'s end is past the test', () => {
+        const socMin = new Array(101).fill(null);
+        for (let p = 5; p <= 85; p++) socMin[p] = (p - 10) * 0.4 + 5;
+        const run = { id: 11, kind: 'charging', date: '2025-01-01', source: 'x', temperature_f: 50,
+            charge_summary: { version: CHARGE_SUMMARY_VERSION, peakKw: 240, windows: {}, socMin } };
+        const v = vehicle({ epaRangeMi: 300, runs: [run], specs: { charging: { max_dc_kw: 250 } } });
+        const [r] = buildVehicleRows([v], { assumptions: { windowFrom: 10, windowTo: 90, addDistance: 150 } });
+        expect(r.values['calc.timeToAdd']).toBeGreaterThan(0);
+        expect(r.notes['calc.timeToAdd']).toBe('EPA range');
     });
 });
