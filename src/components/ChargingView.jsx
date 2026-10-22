@@ -997,6 +997,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 toggleRun={toggleRun}
                 setChartConfig={setChartConfig}
                 presentationMode={presentationMode}
+                chartType={chartConfig.rangeChartType}
+                effUnit={chartConfig.effUnit}
                 palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                 // Without this the Range sub-tab could never return to Hand-set:
                 // selecting it wrote chartConfig.handSet, the prop defaulted to

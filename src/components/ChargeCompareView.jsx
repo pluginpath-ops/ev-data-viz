@@ -21,6 +21,7 @@ import TestSpreadToggle from './TestSpreadToggle';
 import { correctionCaption, correctionSummary } from '../utils/correctionSettings';
 import { spreadOf, rangeBasesFor, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip, spreadSummary } from '../utils/rangeTestSpread';
 import { useRunSelection } from '../hooks/useRunSelection';
+import { DEFAULT_COMPARE_ORIENTATION } from '../utils/chartUrlState';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
 import LoadingSpinner from './LoadingSpinner';
@@ -380,13 +381,17 @@ export default function ChargeCompareView({
     handSet = false,
     testSpread = true,
     setChartConfig = null,
+    // Lifted to App with the rest of the controls (compareConfig), so a link and
+    // the pop-out reopen the chart as it was left. `selectedKeys` null keeps the
+    // selection local, which is what a caller with no App above it gets.
+    orientation = DEFAULT_COMPARE_ORIENTATION, setOrientation = () => {},
+    selectedKeys = null, onSelectedChange = null,
 }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const [runDataCache,    setRunDataCache]    = useState({});
     const [loading,         setLoading]         = useState(false);
     const [copied,          setCopied]          = useState(false);
-    const [orientation,     setOrientation]     = useState('horizontal');
     const isHorizontal = orientation === 'horizontal';
 
     const chart1Ref      = useRef(null);
@@ -547,7 +552,7 @@ export default function ChargeCompareView({
     }, [selectedVehicles]);
 
     const { selected: selectedRuns, toggle: toggleRun } = useRunSelection(
-        selectionRows, { shouldBootstrap: bootstrapOneRow }
+        selectionRows, { shouldBootstrap: bootstrapOneRow, value: selectedKeys, onChange: onSelectedChange ?? (() => {}) }
     );
 
     // Bars are colored by the range test (the row's subject). The hook gives the

@@ -116,6 +116,8 @@ export default function PopoutView({
                     xMinutes={compareConfig.xMinutes}
                     mMiles={compareConfig.mMiles}
                     startSoc={compareConfig.startSoc}
+                    orientation={compareConfig.orientation}
+                    selectedKeys={compareConfig.selected}
                     pairings={pairings}
                     verboseLabels={chartConfig?.verboseLabels ?? false}
                     palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}

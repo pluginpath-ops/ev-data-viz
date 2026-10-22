@@ -946,7 +946,7 @@ describe('the seams that broke before', () => {
         expect(view, 'a thin start estimates the spread from all its tests').toMatch(/spreadAlong\(seriesFrom\(members, live\.fullStart\), xs\)/);
         expect(view, 'and the legend says how many it rests on').toMatch(/\$\{live\.tests\.length\} of \$\{live\.of\} tests/);
         expect(view, 'that spread is its own setting, off by default').toMatch(/chartConfig\.addedSpread \?\? false/);
-        expect(read('src/App.jsx'), 'and rides the URL').toMatch(/p\.set\('aspread', '1'\)/);
+        expect(read('src/utils/chartUrlState.js'), 'and rides the URL').toMatch(/p\.set\('aspread', '1'\)/);
     });
 
     it('takes a composite as the default charging curve everywhere: DEF → composite → newest (#313)', () => {
@@ -963,7 +963,7 @@ describe('the seams that broke before', () => {
         expect(view, 'its ⓘ sits where a source link would').toMatch(/renderRunSource=\{run => isCompositeRun\(run\)/);
         expect(read('src/components/RunSelector.jsx'), 'a derived row is told apart by its name').toMatch(/run-name-derived/);
         expect(read('src/utils/colorUtils.js'), 'a composite wears the vehicle color').toMatch(/r\.composite \? -\(r\.composite\.chargerClassV/);
-        expect(read('src/App.jsx'), 'the spread toggle rides the URL').toMatch(/p\.set\('cspread'/);
+        expect(read('src/utils/chartUrlState.js'), 'the spread toggle rides the URL').toMatch(/p\.set\('cspread'/);
     });
 
     it('draws Modeled vs Tested under the EPA tab, keeping it a chart mode (#338)', () => {
@@ -1120,7 +1120,7 @@ describe('the seams that broke before', () => {
         expect(app).not.toMatch(/selectedVehicles\.length > 0 && chartMode === 'specstable'/);
         // The chart URL writer must carry the table's own parameters, or every
         // selection change wipes the reader's columns, sort and filters.
-        expect(app).toMatch(/startsWith\(VEHICLE_TABLE_PARAM_PREFIX\)/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/startsWith\(VEHICLE_TABLE_PARAM_PREFIX\)/);
 
         // Its tab is a way to pick vehicles, so it must never wait for a pick:
         // the top nav gates on the modes, and entering lands on one that works.
@@ -1533,8 +1533,9 @@ describe('one correction, everywhere it is applied', () => {
 
     it('shares the target between the charts and the table, and writes it to the URL once', () => {
         const app = read('src/App.jsx');
-        expect(app).toMatch(/encodeCorrection\(/);
-        expect(app).toMatch(/decodeCorrection\(window\.location\.search\)/);
+        const codec = read('src/utils/chartUrlState.js');
+        expect(codec).toMatch(/encodeCorrection\(/);
+        expect(codec).toMatch(/decodeCorrection\(/);
         expect(app, 'the table must get App\'s target, not its own').toMatch(/correctionTarget=\{chartConfig\.correctionTarget\}[\s\S]{0,200}onCorrectionTargetChange=/);
         // And the mode: a reader who turns correction off on a chart must see
         // the table's reported-test figures as measured too.
@@ -1935,8 +1936,8 @@ describe('a pop-out receives every setting the chart it was opened from does (#3
         const end = src.indexOf('/>', at);
         return [...src.slice(at, end).matchAll(/^\s+([A-Za-z]+)(?==|\s*$)/gm)].map(m => m[1]);
     };
-    // The pop-out is read-only, so setters are left out on purpose.
-    const READ_ONLY = (p) => /^set[A-Z]/.test(p);
+    // The pop-out is read-only, so setters and change handlers are left out on purpose.
+    const READ_ONLY = (p) => /^(set|on)[A-Z]/.test(p);
 
     for (const tag of ['ChargeCompareView', 'RoadTripView']) {
         it(`${tag}: the pop-out passes every non-setter prop the main tab does`, () => {
@@ -2249,5 +2250,58 @@ describe('the chart subtitle leads with conditions; counts follow Full Labels (#
     it('Range & Efficiency hides a legend that has nothing to tell apart', () => {
         expect(read('src/components/RangeChartView.jsx'))
             .toMatch(/legend: \{ display: legendWorthShowing\(built\.data\.datasets\) \}/);
+    });
+});
+
+describe('a chart link is read and written in one module (#448 layer 1)', () => {
+    const codec = read('src/utils/chartUrlState.js');
+    const [parseSrc, buildSrc] = codec.split('export function buildChartParams');
+    const app = read('src/App.jsx');
+
+    it('App parses and builds the query through chartUrlState, not inline', () => {
+        expect(app).toMatch(/parseChartUrl\(window\.location\.search\)/);
+        expect(app).toMatch(/buildChartParams\(\{/);
+        expect(app).not.toMatch(/p\.get\('cmp_soc'\)/);
+        expect(app).not.toMatch(/p\.set\('cmp_soc'/);
+    });
+
+    it('every key the builder writes, the parser reads', () => {
+        const written = [...buildSrc.matchAll(/p\.set\('([a-z0-9_]+)'/g)].map(m => m[1]);
+        expect(written.length).toBeGreaterThan(40);
+        // `tab` is read by App itself before the parse, `m` and `v` through
+        // their own names — the check is on the quoted key appearing at all.
+        const unread = written.filter(k => k !== 'tab' && !parseSrc.includes(`'${k}'`));
+        expect(unread).toEqual([]);
+    });
+
+    it('the settings a link now carries have a home in the state App holds', () => {
+        for (const field of ['rangeChartType', 'effUnit', 'specsField']) {
+            expect(app).toMatch(new RegExp(`${field}:`));
+        }
+        expect(app).toMatch(/orientation: DEFAULT_COMPARE_ORIENTATION/);
+        expect(app).toMatch(/selected: \[\]/);
+    });
+
+    it('Range & Efficiency draws the chart type and unit it is given, and asks App to change them', () => {
+        const view = read('src/components/RangeChartView.jsx');
+        expect(view).not.toMatch(/useState\('range-vehicle-bar'\)/);
+        expect(view).not.toMatch(/useState\('mi_kwh'\)/);
+        expect(view).toMatch(/rangeChartType/);
+        const charging = read('src/components/ChargingView.jsx');
+        expect(charging).toMatch(/chartType=\{chartConfig\.rangeChartType\}/);
+        expect(charging).toMatch(/effUnit=\{chartConfig\.effUnit\}/);
+    });
+
+    it('Charge Stop takes its orientation and plotted pairs from App, in the tab and the pop-out', () => {
+        const view = read('src/components/ChargeCompareView.jsx');
+        expect(view).not.toMatch(/useState\('horizontal'\)/);
+        expect(view).toMatch(/value: selectedKeys/);
+        expect(app).toMatch(/selectedKeys=\{compareConfig\.selected\}/);
+        expect(read('src/components/PopoutView.jsx')).toMatch(/selectedKeys=\{compareConfig\.selected\}/);
+        expect(read('src/components/PopoutView.jsx')).toMatch(/orientation=\{compareConfig\.orientation\}/);
+    });
+
+    it('the plotted tests are applied from the link for range as well as charging', () => {
+        expect(app).toMatch(/s\.chartMode === 'charging' \|\| s\.chartMode === 'range'/);
     });
 });

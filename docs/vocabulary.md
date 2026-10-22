@@ -79,6 +79,7 @@ Renaming it is [tracked separately](#deferred-renames).
 | Re-ordering a palette to lead with the base | **rotation** | — | `rotatePaletteFrom()` — different hues, for unrelated tests |
 | One hue in lightness steps from the base | **the ramp**, or light→dark | — | `rampFrom()` — one vehicle's runs, handoff 3c |
 | How much of the plot a pick recolors | **scope** | — | this test · this vehicle · all tests |
+| The address that reopens a chart as it was left — tab, vehicles, plotted tests, settings and correction | **a chart link**; its parts are **parameters** (`r`, `rc`, `eff`, `cmp_sel` …). Read and written together in one module, so a parameter cannot be written and never read. A featured comparison (#448) stores one | — | [chartUrlState.js](../src/utils/chartUrlState.js) `parseChartUrl`, `buildChartParams` |
 
 A series color has two values that routinely differ and must not be called the
 same thing: the **stored** color is the durable preference — `vehicles.color`
