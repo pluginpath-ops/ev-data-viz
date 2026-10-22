@@ -165,6 +165,62 @@ export function parseChartUrl(search) {
 }
 
 /**
+ * A chart's settings with a link's laid over them: the one place that knows
+ * which parsed fields win. App applies a link's state through it once the data
+ * has loaded, and a featured comparison applies a chart's through it onto the
+ * defaults (#448).
+ *
+ * Fields the link does not name keep what `base` has, except the ones that are
+ * written as "absent means the default" (the limits, the display toggles, the
+ * correction), which a link always sets: a missing yn is a zero axis, not
+ * "whatever the page had".
+ *
+ * @param {object} chart  `parseChartUrl(...).chart`
+ * @param {object} base   the chartConfig to lay it over
+ */
+export function chartConfigFromParsed(chart, base) {
+    const s = chart;
+    return {
+        ...base,
+        ...(s.xAxis         && { xAxis: s.xAxis }),
+        ...(s.yAxis         && { yAxis: s.yAxis }),
+        ...(s.y2Axis        && { y2Axis: s.y2Axis }),
+        ...(s.runIds.length > 0 && (s.chartMode === 'charging' || s.chartMode === 'range') && { selectedRuns: s.runIds }),
+        alignRaw:      s.alignRaw,
+        raceThreshold: s.raceThreshold,
+        xMin:          s.xMin,
+        xMax:          s.xMax,
+        yMin:          s.yMin,
+        yMax:          s.yMax,
+        y2Min:         s.y2Min ?? null,
+        y2Max:         s.y2Max ?? null,
+        showLine:      s.showLine ?? true,
+        showPoints:    s.showPoints ?? false,
+        compositeSpread: s.compositeSpread ?? true,
+        addedSpread:     s.addedSpread ?? false,
+        ...(s.scatterXField && { scatterXField: s.scatterXField }),
+        ...(s.scatterYField && { scatterYField: s.scatterYField }),
+        ...(s.specsField    && { specsField: s.specsField }),
+        ...(s.rangeChartType && { rangeChartType: s.rangeChartType }),
+        ...(s.effUnit       && { effUnit: s.effUnit }),
+        correctionMode:   s.correction.mode,
+        correctionTarget: s.correction.target,
+    };
+}
+
+/**
+ * The vehicles a link names: its v=, and the owners of the tests in its r=
+ * (v= carries only the vehicles that have no plotted test).
+ */
+export function vehicleIdsOfLink(chart, vehicles) {
+    const runIdSet = new Set(chart.runIds.map(String));
+    const fromRuns = vehicles
+        .filter(v => (v.runs || []).some(r => runIdSet.has(String(r.id))))
+        .map(v => v.id);
+    return [...new Set([...chart.vehicleIds, ...fromRuns])];
+}
+
+/**
  * The query a chart category's page writes, from the state that drew it.
  *
  * Each key is written only when it differs from what an untouched page would

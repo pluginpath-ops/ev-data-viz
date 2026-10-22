@@ -15,8 +15,10 @@ import RoadTripView from './components/RoadTripView';
 import PopoutView from './components/PopoutView';
 import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
-import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from './utils/correctionSettings';
-import { parseChartUrl, buildChartParams, DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION } from './utils/chartUrlState';
+import { DEFAULT_READER_MODE } from './utils/correctionSettings';
+import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './utils/chartDefaults';
+import { chartStateOf, resetStateOf } from './utils/featuredComparisons';
+import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink } from './utils/chartUrlState';
 import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -172,13 +174,7 @@ export default function App() {
     }));
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare' | 'epacurves' | …
-    const [compareConfig, setCompareConfig] = useState({
-        xMinutes: 15, mMiles: 150, startSoc: 10,
-        // Held here, not in the view, so a link can reopen Charge Stop as it
-        // was left: bars lying down or standing, and which pairs are plotted.
-        orientation: DEFAULT_COMPARE_ORIENTATION,
-        selected: [],   // pair keys; the view fills it on first sight of a vehicle
-    });
+    const [compareConfig, setCompareConfig] = useState(defaultCompareConfig);
     // Which range test supplies the miles for which charging test. Global to the
     // chart session rather than per-view, so two charts on one screen can never
     // disagree about what "range" means. See utils/pairings.js.
@@ -197,75 +193,9 @@ export default function App() {
     // (see useSyncedScale). Reported by that chart in the main tab; received by a
     // pop-out.
     const [viewScale, setViewScale] = useState(null);
-    const [epaConfig, setEpaConfig] = useState({
-        yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null,
-        // Which curves are drawn, and any colors overridden for them (#221).
-        // Held here rather than inside EpaCurvesView so they reach the URL and
-        // the pop-out, exactly as every other chart's selection does.
-        selectedMappings: [], mappingColors: {},
-        // The real-world overlay (null | 'corrected' | 'uncorrected'). Here, not
-        // in the view, so a link can open the chart with its tests showing: an
-        // explainer's modeled-efficiency card links in with epa_ov=corrected.
-        overlay: null,
-    });
-    const [roadTripConfig, setRoadTripConfig] = useState({
-        mode: 'distance', startSoc: 90, minSoc: 10, destinationMinSoc: 10,
-        legDistance: 150, chargeTime: 30,
-        totalDistance: 500, speed: 70,
-        overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
-        yAxis: 'chargeTime',      // 'distance' | 'chargeTime' | 'byTest'
-        xAxis: 'totalTime',       // 'totalTime' | 'driveTime' | 'speed' | 'tripDist'
-        sweepYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' (sweep modes only)
-        towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
-        towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
-        towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured
-        perRun: {},               // { [runId]: { minSoc?, legDistance?, chargeTime? } } — per-run overrides
-    });
-    const [chartConfig, setChartConfig] = useState({
-        xAxis: 'soc',
-        yAxis: 'chargeRate',
-        y2Axis: null,
-        selectedRuns: [],
-        // Time-axis alignment is on by default (#195): unaligned, every run
-        // starts at zero whatever SoC it began at, which compares nothing.
-        // alignRaw is the opt-out.
-        alignRaw: false,
-        // null means "follow the data" — the lowest SoC every selected run
-        // actually reaches. A fixed 10 looked like a default and behaved like a
-        // decision, drawing a run that began at 25% from t=0 alongside runs that
-        // began at 10%.
-        raceThreshold: null,
-        xMin: null,
-        xMax: null,
-        yMin: 0,
-        yMax: null,
-        y2Min: null,
-        y2Max: null,
-        showLine:   true,
-        showPoints: false,
-        // Where series colors come from: each vehicle's curated color by
-        // default, or a SERIES_PALETTES id to assign from that set instead.
-        seriesPalette: VEHICLE_PALETTE,
-        // Whether hand-set colors are in force over that base. Choosing a
-        // palette parks them; selecting Hand-set brings them back.
-        handSet: false,
-        // { [vehicleId]: hex } — a color asked of one car for this session
-        // (utils/vehicleBase.js). Lives here so the pop-out window gets it with
-        // the rest of the chart's state.
-        vehicleBases: NO_VEHICLE_BASES,
-        specsField:     null,   // selected field key for Spec Chart mode
-        // Range & Efficiency's chart type and efficiency unit. Held here, not in
-        // the view, so a link — and the pop-out — draw the chart the sender saw.
-        rangeChartType: DEFAULT_RANGE_CHART_TYPE,
-        effUnit:        DEFAULT_EFFICIENCY_UNIT,
-        scatterXField:  null,   // selected X field key for Spec Scatter mode
-        scatterYField:  null,   // selected Y field key for Spec Scatter mode
-        // The reader's correction (utils/correctionSettings.js): what every
-        // chart corrects range for, and the conditions every corrected figure
-        // — the vehicle table's composite range included — is corrected to.
-        correctionMode:   DEFAULT_READER_MODE,
-        correctionTarget: DEFAULT_CORRECTION_TARGET,
-    });
+    const [epaConfig, setEpaConfig] = useState(defaultEpaConfig);
+    const [roadTripConfig, setRoadTripConfig] = useState(defaultRoadTripConfig);
+    const [chartConfig, setChartConfig] = useState(defaultChartConfig);
     // The vehicles as the charts should draw them: a session base replaces the
     // vehicle's color on the copy, so every chart, sidebar accent and swatch
     // that reads `vehicle.color` follows without knowing a second layer exists.
@@ -414,6 +344,51 @@ export default function App() {
         }
         navigateTo(tab);
     };
+
+    /**
+     * Put one chart of a featured comparison on screen (#448): its vehicles, and
+     * its saved settings laid over a clean slate, so the previous chart's tweaks
+     * do not leak in. A history entry, so Back returns to Home. From here the
+     * reader's changes are theirs; Home's reset puts the comparison back.
+     *
+     * Replacing a selection of two or more is the caller's to warn about
+     * (featuredComparisons.replacesSelection) — this does what it is told.
+     */
+    const openFeaturedChart = useCallback((comparison, index) => {
+        const state = chartStateOf(comparison, index, vehicles);
+        if (!state) return;
+        history.pushState(
+            { view: state.view, chartMode: state.chartMode },
+            '',
+            `?tab=${state.view}&m=${state.chartMode}`, // URL sync effect replaces with full params
+        );
+        lastModeByCategory.current[state.view] = state.chartMode;
+        const parentTab = categoryForMode(state.chartMode).navParent;
+        if (parentTab) lastModeUnderTab.current[parentTab] = state.chartMode;
+        setVehicleSelection(state.vehicleIds);
+        setChartMode(state.chartMode);
+        setChartConfig(state.chartConfig);
+        setCompareConfig(state.compareConfig);
+        setRoadTripConfig(state.roadTripConfig);
+        setEpaConfig(state.epaConfig);
+        setPairings(state.pairings);
+        setView(state.view);
+        window.scrollTo(0, 0);
+    }, [vehicles, setVehicleSelection]);
+
+    /**
+     * Put the site back to a featured comparison: its vehicles and its
+     * correction, every other setting at a fresh visitor's. Stays where it is.
+     */
+    const resetToComparison = useCallback((comparison) => {
+        const state = resetStateOf(comparison, vehicles);
+        setVehicleSelection(state.vehicleIds);
+        setChartConfig(state.chartConfig);
+        setCompareConfig(state.compareConfig);
+        setRoadTripConfig(state.roadTripConfig);
+        setEpaConfig(state.epaConfig);
+        setPairings(state.pairings);
+    }, [vehicles, setVehicleSelection]);
 
     /**
      * A platform's page, from anywhere a platform is named (#354). A history
@@ -596,42 +571,13 @@ export default function App() {
         urlApplied.current = true;
         const s = pendingUrlState.current;
 
-        // Derive vehicle IDs from run IDs, then merge with any explicit v= IDs
-        // (v= carries vehicles that have no runs selected)
-        const runIdSet = new Set(s.runIds.map(String));
-        const fromRuns = vehicles
-            .filter(v => (v.runs || []).some(r => runIdSet.has(String(r.id))))
-            .map(v => v.id);
-        const vehicleIds = [...new Set([...s.vehicleIds, ...fromRuns])];
+        // Vehicles from the plotted tests as well as v= (v= carries only those
+        // with no plotted test).
+        const vehicleIds = vehicleIdsOfLink(s, vehicles);
         if (vehicleIds.length > 0) setVehicleSelection(vehicleIds);
         if (s.chartMode) setChartMode(s.chartMode);
 
-        setChartConfig(prev => ({
-            ...prev,
-            ...(s.xAxis         && { xAxis: s.xAxis }),
-            ...(s.yAxis         && { yAxis: s.yAxis }),
-            ...(s.y2Axis        && { y2Axis: s.y2Axis }),
-            ...(s.runIds.length  > 0 && (s.chartMode === 'charging' || s.chartMode === 'range') && { selectedRuns: s.runIds }),
-            alignRaw:      s.alignRaw,
-            raceThreshold: s.raceThreshold,
-            xMin:          s.xMin,
-            xMax:          s.xMax,
-            yMin:          s.yMin,
-            yMax:          s.yMax,
-            y2Min:         s.y2Min ?? null,
-            y2Max:         s.y2Max ?? null,
-            showLine:      s.showLine ?? true, // default to true if not present, false if explicitly set to 0
-            showPoints:    s.showPoints ?? false, // default to false if not present, true if explicitly set to 1
-            compositeSpread: s.compositeSpread ?? true,
-            addedSpread:     s.addedSpread ?? false,
-            ...(s.scatterXField && { scatterXField: s.scatterXField }),
-            ...(s.scatterYField && { scatterYField: s.scatterYField }),
-            ...(s.specsField    && { specsField: s.specsField }),
-            ...(s.rangeChartType && { rangeChartType: s.rangeChartType }),
-            ...(s.effUnit       && { effUnit: s.effUnit }),
-            correctionMode:   s.correction.mode,
-            correctionTarget: s.correction.target,
-        }));
+        setChartConfig(prev => chartConfigFromParsed(s, prev));
         // Land on the category that owns the restored mode.
         setView(categoryForMode(s.chartMode).key);
     }, [loading]);
@@ -870,7 +816,7 @@ export default function App() {
 
     return (
         <ScaleSyncContext.Provider value={scaleSync}>
-        <NavigationContext.Provider value={{ openPlatform, openExplainer }}>
+        <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison }}>
         <VehicleBaseContext.Provider value={vehicleBaseApi}>
             {showAuthModal && (
                 <AuthModal

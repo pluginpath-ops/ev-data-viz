@@ -1060,7 +1060,7 @@ describe('the seams that broke before', () => {
 
     it('opens an explainer from a link, and restores it from the URL (#355)', () => {
         const app = read('src/App.jsx');
-        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform, openExplainer \}\}>/);
+        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform, openExplainer[ ,]/);
         expect(app, 'and restores ?topic=').toMatch(/setReferenceTopic\(p\.get\('topic'\) \|\| null\)/);
         expect(app, 'and writes it back').toMatch(/p\.set\('topic', referenceTopic\)/);
         expect(read('src/components/reference/ReferenceSection.jsx'), 'Reference mounts the section')
@@ -1961,7 +1961,8 @@ describe('the vehicle swatch is connected (#308, #317)', () => {
     });
 
     it('session bases live in chartConfig, so the pop-out window receives them', () => {
-        expect(app).toMatch(/vehicleBases: NO_VEHICLE_BASES/);
+        expect(read('src/utils/chartDefaults.js')).toMatch(/vehicleBases: NO_VEHICLE_BASES/);
+        expect(app).toMatch(/useState\(defaultChartConfig\)/);
         // useChartSync ships the whole chartConfig; if that ever narrows to named
         // fields, this is where it is noticed.
         expect(read('src/hooks/useChartSync.js')).toMatch(/chartConfig,/);
@@ -2275,11 +2276,14 @@ describe('a chart link is read and written in one module (#448 layer 1)', () => 
     });
 
     it('the settings a link now carries have a home in the state App holds', () => {
+        // The starting state is in chartDefaults.js; App starts from it.
+        const defaults = read('src/utils/chartDefaults.js');
         for (const field of ['rangeChartType', 'effUnit', 'specsField']) {
-            expect(app).toMatch(new RegExp(`${field}:`));
+            expect(defaults).toMatch(new RegExp(`${field}:`));
         }
-        expect(app).toMatch(/orientation: DEFAULT_COMPARE_ORIENTATION/);
-        expect(app).toMatch(/selected: \[\]/);
+        expect(defaults).toMatch(/orientation: DEFAULT_COMPARE_ORIENTATION/);
+        expect(defaults).toMatch(/selected: \[\]/);
+        expect(app).toMatch(/useState\(defaultCompareConfig\)/);
     });
 
     it('Range & Efficiency draws the chart type and unit it is given, and asks App to change them', () => {
@@ -2302,6 +2306,63 @@ describe('a chart link is read and written in one module (#448 layer 1)', () => 
     });
 
     it('the plotted tests are applied from the link for range as well as charging', () => {
-        expect(app).toMatch(/s\.chartMode === 'charging' \|\| s\.chartMode === 'range'/);
+        expect(codec).toMatch(/s\.chartMode === 'charging' \|\| s\.chartMode === 'range'/);
+        expect(app).toMatch(/chartConfigFromParsed\(s, prev\)/);
+    });
+});
+
+describe('featured comparisons are stored, saved safely and openable (#448 layer 2)', () => {
+    const migration = read('supabase/migrations/089_featured_comparisons.sql');
+    const service = read('src/services/DataService.js');
+    const app = read('src/App.jsx');
+
+    it('the migration is safe to run twice and mirrors the curators\' policies', () => {
+        expect(migration).toMatch(/CREATE TABLE IF NOT EXISTS public\.featured_comparisons/);
+        const created = migration.match(/CREATE POLICY/g) ?? [];
+        const dropped = migration.match(/DROP POLICY IF EXISTS/g) ?? [];
+        expect(created.length).toBe(4);
+        expect(dropped.length, 'every policy is dropped IF EXISTS first').toBe(created.length);
+        expect(migration).toMatch(/DROP TRIGGER IF EXISTS featured_comparisons_stamp_listed/);
+        expect(migration).toMatch(/FOR DELETE\s+USING \(public\.current_user_role\(\) = 'admin'\)/);
+        expect(migration).toMatch(/is_listed OR public\.current_user_role\(\) IN \('admin', 'contributor'\)/);
+    });
+
+    it('an update or delete that RLS filtered raises, instead of looking saved', () => {
+        const update = service.slice(service.indexOf('async updateFeaturedComparison'), service.indexOf('async deleteFeaturedComparison'));
+        expect(update).toMatch(/\.select\(\)/);
+        expect(update).toMatch(/!data\?\.length/);
+        const del = service.slice(service.indexOf('async deleteFeaturedComparison'));
+        expect(del.slice(0, 700)).toMatch(/\.select\('id'\)/);
+        expect(del.slice(0, 700)).toMatch(/!data\?\.length/);
+    });
+
+    it('the list degrades to empty before 089 is applied, since Home is the landing page', () => {
+        const read_ = service.slice(service.indexOf('async getFeaturedComparisons'), service.indexOf('async addFeaturedComparison'));
+        expect(read_).toMatch(/42P01/);
+        expect(read_).toMatch(/return \[\];/);
+    });
+
+    it('App can open a comparison\'s chart and reset to it, and shares both through the navigation context', () => {
+        expect(app).toMatch(/const openFeaturedChart = useCallback/);
+        expect(app).toMatch(/const resetToComparison = useCallback/);
+        expect(app).toMatch(/<NavigationContext\.Provider value=\{\{[^}]*openFeaturedChart, resetToComparison/);
+        // Both write the selection through the guarded writer, not the setter.
+        const open = app.slice(app.indexOf('const openFeaturedChart'), app.indexOf('const resetToComparison'));
+        expect(open).toMatch(/setVehicleSelection\(state\.vehicleIds\)/);
+    });
+
+    it('opening a chart applies a clean slate: every config comes from the saved state, none from the live one', () => {
+        const open = app.slice(app.indexOf('const openFeaturedChart'), app.indexOf('const resetToComparison'));
+        for (const setter of ['setChartConfig', 'setCompareConfig', 'setRoadTripConfig', 'setEpaConfig', 'setPairings']) {
+            expect(open, setter).toMatch(new RegExp(`${setter}\\(state\\.`));
+        }
+    });
+
+    it('the hook writes through the service and reloads', () => {
+        const hook = read('src/hooks/useFeaturedComparisons.js');
+        for (const call of ['addFeaturedComparison', 'updateFeaturedComparison', 'deleteFeaturedComparison']) {
+            expect(hook).toMatch(new RegExp(call));
+        }
+        expect(hook).toMatch(/reload\(\)/);
     });
 });
