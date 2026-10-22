@@ -221,11 +221,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
     );
 
     const plotSubtitle = useMemo(() => {
-        const n = plotted.length;
-        const parts = [
-            `${n} record${n === 1 ? '' : 's'}`,
-            'from EPA road-load coefficients A, B, C',
-        ];
+        const parts = ['from EPA road-load coefficients A, B, C'];
         // Condition values are TEXT INPUT state, so an unset field is '' — and
         // `'' != null` is true, so a `!= null` guard lets the empty string
         // through and fmtTemp renders it as 0 °F. Absent has to read as absent
@@ -241,10 +237,11 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
         parts.push(gradeGainFtNum ? 'graded' : 'level');
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [plotted, conditions, units, gradeGainFtNum]);
+    }, [conditions, units, gradeGainFtNum]);
 
     const { copyPng, copied: pngCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+            signature: String(plotted.length) });
     const [urlCopied, setUrlCopied] = useState(false);
 
     // Tell App what is on screen so it can broadcast it to a pop-out. Keyed on the

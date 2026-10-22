@@ -31,6 +31,7 @@ import SpeedBadge from './charts/SpeedBadge';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import NumberInput from './NumberInput';
 import { wrapCanvasText } from '../utils/wrapCanvasText';
+import { countParts } from '../utils/plotCaption';
 
 
 /**
@@ -637,19 +638,19 @@ export default function ChargeCompareView({
         const pairs = activePairs.length;
         const vehicles = new Set(activePairs.map(p2 => p2.vehicleName ?? p2.vehicle?.id)).size;
         return [
-            `${pairs} pair${pairs === 1 ? '' : 's'}`,
-            `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
+            ...countParts(verboseLabels, [[pairs, 'pair'], [vehicles, 'vehicle']]),
             `from ~${startSoc}% SoC`,
             correctionCaption(correctionMode, correctionTarget, units),
             units === 'metric' ? 'metric' : 'imperial',
         ].join(' · ');
-    }, [activePairs, startSoc, correctionMode, correctionTarget, units]);
+    }, [activePairs, startSoc, verboseLabels, correctionMode, correctionTarget, units]);
 
     // Two frames, two exports, so two independent previews.
     const title1 = `Range added in ${xMinutes} minutes`;
     const title2 = `Time to add ${units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} ${distanceLabel(units)}`;
-    const png1 = useChartPng(chart1Instance, { title: title1, subtitle: plotSubtitle });
-    const png2 = useChartPng(chart2Instance, { title: title2, subtitle: plotSubtitle });
+    const plotSignature = activePairs.map(p2 => p2.key).join(',');
+    const png1 = useChartPng(chart1Instance, { title: title1, subtitle: plotSubtitle, signature: plotSignature });
+    const png2 = useChartPng(chart2Instance, { title: title2, subtitle: plotSubtitle, signature: plotSignature });
 
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
