@@ -1,0 +1,18 @@
+[
+  {
+    "name": "iX5 60 xDrive 2027",
+    "manufacturer": "BMW",
+    "make": "BMW",
+    "model": "iX5",
+    "trim": "60 xDrive",
+    "year": "2027",
+    "battery": 144,
+    "specs": {
+      "pricing": { "base_price_usd": 79800 },
+      "powertrain": { "drive_type": "AWD", "motors": 2, "horsepower_hp": 570, "torque_lbft": 593 },
+      "performance": { "zero_to_60_mph_sec": 4.4, "top_speed_mph": 130 },
+      "charging": { "battery_usable_kwh": 144, "max_dc_kw": 460, "charge_time_10_to_80_pct_min": 22 },
+      "range": { "expected_epa_mi": 435, "expected_epa_basis": "Manufacturer" }
+    }
+  }
+]
