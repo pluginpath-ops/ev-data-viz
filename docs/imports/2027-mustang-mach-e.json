@@ -1,0 +1,165 @@
+[
+  {
+    "name": "Mustang Mach-E Select RWD 2027",
+    "manufacturer": "Ford",
+    "make": "Ford",
+    "model": "Mustang Mach-E",
+    "trim": "Select RWD",
+    "year": "2027",
+    "battery": 88,
+    "specs": {
+      "pricing": {
+        "base_price_usd": 39995
+      },
+      "powertrain": {
+        "drive_type": "RWD",
+        "motors": 1
+      },
+      "charging": {
+        "battery_usable_kwh": 88
+      }
+    }
+  },
+  {
+    "name": "Mustang Mach-E Select eAWD 2027",
+    "manufacturer": "Ford",
+    "make": "Ford",
+    "model": "Mustang Mach-E",
+    "trim": "Select eAWD",
+    "year": "2027",
+    "battery": 88,
+    "specs": {
+      "pricing": {
+        "base_price_usd": 42995
+      },
+      "powertrain": {
+        "drive_type": "AWD",
+        "motors": 2
+      },
+      "charging": {
+        "battery_usable_kwh": 88
+      }
+    }
+  },
+  {
+    "name": "Mustang Mach-E Trail eAWD 2027",
+    "manufacturer": "Ford",
+    "make": "Ford",
+    "model": "Mustang Mach-E",
+    "trim": "Trail eAWD",
+    "year": "2027",
+    "battery": 88,
+    "specs": {
+      "pricing": {
+        "base_price_usd": 45290
+      },
+      "powertrain": {
+        "drive_type": "AWD",
+        "motors": 2,
+        "horsepower_hp": 370,
+        "torque_lbft": 500
+      },
+      "charging": {
+        "battery_usable_kwh": 88,
+        "v2l": true
+      },
+      "wheels": {
+        "wheel_size_in": 19,
+        "tire_size": "235/55R19 Michelin CrossClimate 2"
+      },
+      "dimensions": {
+        "_custom": {
+          "ride_height_vs_select_premium": "+0.4 in front / +0.6 in rear"
+        }
+      }
+    }
+  },
+  {
+    "name": "Mustang Mach-E Premium RWD 2027",
+    "manufacturer": "Ford",
+    "make": "Ford",
+    "model": "Mustang Mach-E",
+    "trim": "Premium RWD",
+    "year": "2027",
+    "battery": 88,
+    "specs": {
+      "pricing": {
+        "base_price_usd": 42995
+      },
+      "powertrain": {
+        "drive_type": "RWD",
+        "motors": 1
+      },
+      "charging": {
+        "battery_usable_kwh": 88
+      }
+    }
+  },
+  {
+    "name": "Mustang Mach-E Premium eAWD 2027",
+    "manufacturer": "Ford",
+    "make": "Ford",
+    "model": "Mustang Mach-E",
+    "trim": "Premium eAWD",
+    "year": "2027",
+    "battery": 88,
+    "specs": {
+      "pricing": {
+        "base_price_usd": 45995
+      },
+      "powertrain": {
+        "drive_type": "AWD",
+        "motors": 2
+      },
+      "charging": {
+        "battery_usable_kwh": 88
+      }
+    }
+  },
+  {
+    "name": "Mustang Mach-E GT eAWD 2027",
+    "manufacturer": "Ford",
+    "make": "Ford",
+    "model": "Mustang Mach-E",
+    "trim": "GT eAWD",
+    "year": "2027",
+    "battery": 91,
+    "specs": {
+      "pricing": {
+        "base_price_usd": 50995
+      },
+      "powertrain": {
+        "drive_type": "AWD",
+        "motors": 2,
+        "horsepower_hp": 480,
+        "torque_lbft": 700
+      },
+      "charging": {
+        "battery_usable_kwh": 91
+      }
+    }
+  },
+  {
+    "name": "Mustang Mach-E Rally eAWD 2027",
+    "manufacturer": "Ford",
+    "make": "Ford",
+    "model": "Mustang Mach-E",
+    "trim": "Rally eAWD",
+    "year": "2027",
+    "battery": 91,
+    "specs": {
+      "pricing": {
+        "base_price_usd": 55290
+      },
+      "powertrain": {
+        "drive_type": "AWD",
+        "motors": 2,
+        "horsepower_hp": 480,
+        "torque_lbft": 700
+      },
+      "charging": {
+        "battery_usable_kwh": 91
+      }
+    }
+  }
+]
