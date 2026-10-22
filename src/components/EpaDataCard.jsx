@@ -221,7 +221,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
                                             <div>{g.drive || '—'}</div>
                                             <div className="text-meta mt-0.5">
                                                 {coeff.equiv_test_weight_lbs != null
-                                                    ? `${Number(coeff.equiv_test_weight_lbs).toLocaleString()} lbs`
+                                                    ? `${Number(coeff.equiv_test_weight_lbs).toLocaleString()} lb`
                                                     : '—'}
                                             </div>
                                         </td>

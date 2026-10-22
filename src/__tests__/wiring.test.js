@@ -1012,10 +1012,45 @@ describe('the seams that broke before', () => {
         expect(app).toMatch(/<ReferenceSection\s+subtab=\{referenceSubtab\}\s+platformId=\{referencePlatformId\}/);
     });
 
+    it('opens Reference on Explainers, and reaches Platforms only by name (#444)', () => {
+        const app = read('src/App.jsx');
+        const section = read('src/components/reference/ReferenceSection.jsx');
+        expect(section, 'a bare ?tab=reference is Explainers').toMatch(/DEFAULT_REFERENCE_SUBTAB = 'explainers'/);
+        // The constant means "what a bare URL opens" and nothing else: the
+        // platform paths must not borrow it to mean Platforms.
+        expect(app, 'a platform link names Platforms').toMatch(/subtab: 'platforms', platformId: String\(id\)/);
+        expect(app).toMatch(/setReferenceSubtab\('platforms'\)/);
+        expect(app, 'openPlatform does not use the default').not.toMatch(/subtab: DEFAULT_REFERENCE_SUBTAB, platformId/);
+        expect(app, 'a pid with no sub is read as Platforms, from the URL and from history')
+            .toMatch(/referenceSubtabFromParam\(p\.get\('sub'\), pid\)/);
+        expect(app).toMatch(/referenceSubtabFromParam\(e\.state\.subtab, e\.state\.platformId\)/);
+        expect(app, 'a platform page is written as ?pid= alone')
+            .toMatch(/referenceSubtab === 'platforms' && referencePlatformId != null\) p\.set\('pid'/);
+        expect(read('src/components/reference/PlatformPage.jsx'), 'the crumb back to the list names it')
+            .toMatch(/href="\?tab=reference&sub=platforms"/);
+    });
+
+    it('lists Explainers before Platforms in the Reference sub-nav (#444)', async () => {
+        const { REFERENCE_SUBTAB_IDS } = await import('../components/reference/ReferenceSection');
+        expect(REFERENCE_SUBTAB_IDS).toEqual(['explainers', 'platforms']);
+    });
+
+    it('reads the Reference sub-tab out of a URL or history state (#444)', async () => {
+        const { referenceSubtabFromParam, DEFAULT_REFERENCE_SUBTAB } = await import('../components/reference/ReferenceSection');
+        expect(DEFAULT_REFERENCE_SUBTAB).toBe('explainers');
+        expect(referenceSubtabFromParam(null), '?tab=reference').toBe('explainers');
+        expect(referenceSubtabFromParam('bogus')).toBe('explainers');
+        expect(referenceSubtabFromParam('platforms'), '?tab=reference&sub=platforms').toBe('platforms');
+        expect(referenceSubtabFromParam('explainers')).toBe('explainers');
+        expect(referenceSubtabFromParam(null, '12'), '?tab=reference&pid=12, which predates the flip').toBe('platforms');
+        expect(referenceSubtabFromParam(undefined, 12), 'a history state with only a platform').toBe('platforms');
+        expect(referenceSubtabFromParam('explainers', '12'), 'a named sub-tab wins').toBe('explainers');
+    });
+
     it('opens a platform\'s page from every place a platform is named (#354)', () => {
         const app = read('src/App.jsx');
         expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform[ ,]/);
-        expect(app, 'and restores ?pid=').toMatch(/setReferencePlatformId\(p\.get\('pid'\) \|\| null\)/);
+        expect(app, 'and restores ?pid=').toMatch(/const pid = p\.get\('pid'\) \|\| null;[\s\S]*?setReferencePlatformId\(pid\)/);
         expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
         expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
         expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
@@ -1108,6 +1143,8 @@ describe('the seams that broke before', () => {
         expect(read('src/utils/sortSelection.js').replace(/\/\*[\s\S]*?\*\//g, ''), 'the reorder is pure: it writes nothing').not.toMatch(/setVehicleSelection|setSelectedVehicles|localStorage/);
         // "Pin is local, select is global": the word stays out of this table.
         expect(table.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')).not.toMatch(/pin/i);
+        // The selected band says it is kept across the site, at the top.
+        expect(table).toMatch(/Selected · \{selectedRows\.length\}[\s\S]*maintained site-wide, at the top/);
 
         // The mechanisms are shared, not copied.
         for (const f of ['src/components/VehicleTable.jsx', 'src/components/epa/guide/GuideTable.jsx']) {
@@ -2094,5 +2131,120 @@ describe('a vehicle save that RLS refuses is an error, not a silent success', ()
 
     it('the Edit vehicle form stays open when the save is refused', () => {
         expect(vehiclesView).toMatch(/if \(await onUpdate\(editingId, formData\) === false\) return;/);
+    });
+});
+
+describe('a unit is stated in the cell, not the header (#446)', () => {
+    const cell = read('src/components/tables/TableCell.jsx');
+    const header = read('src/components/tables/SortHeader.jsx');
+    const code = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+    it('the cell draws its unit in the card\'s unit style', () => {
+        expect(cell).toMatch(/className="stat-cell-unit"/);
+        expect(cell).toMatch(/from '\.\.\/\.\.\/utils\/tableColumns'/);
+    });
+
+    it('the header draws no unit line, and the stylesheet no longer styles one', () => {
+        expect(code(header), 'no unit prop').not.toMatch(/function SortHeader\(\{[^)]*\bunit\b/);
+        expect(code(header), 'no unit drawn').not.toMatch(/\{unit\b|stat-cell-unit/);
+        expect(read('src/index.css')).not.toMatch(/guide-th-unit/);
+    });
+
+    it('both tables hand each cell its column\'s unit, and only where the cell has a value', () => {
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/unit=\{col\.numeric \? cellUnit\(unitFor\(col, units\), row\.values\[col\.key\]\)/);
+        expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/unit=\{cellUnit\(col\.unit, row\[col\.key\]\)\}/);
+    });
+
+    it('no screen prints weight as "lbs" or metric speed as "kph" (one spelling: lb, km/h)', () => {
+        // A figure's unit as the reader sees it: after `} `, a quote or `>`. The EPA sheet's own
+        // column header ("Equivalent Test Weight (lbs.)") and the stored enum 'kph' are not display.
+        const shown = ALL
+            .filter(x => !x.file.endsWith('parseEpaTestCarSheet.js'))
+            .filter(x => /(\} |['"`>])lbs\b/.test(code(x.text)) || /\$\{[^}]*\}\s*kph\b/.test(code(x.text)))
+            .map(x => x.file);
+        expect(shown).toEqual([]);
+    });
+
+    it('the pinned name header says "drag to reorder columns", in both tables, and not on a phone', () => {
+        expect(header).toMatch(/text-nano guide-th-reorder">drag to reorder columns</);
+        expect(read('src/components/tables/ColumnPicker.jsx'), 'the picker\'s own role').toMatch(/className="text-nano">Shown · drag to reorder</);
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/reorderHint=\{col\.sticky\}/);
+        expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/reorderHint=\{col\.sticky\}/);
+        const css = read('src/index.css');
+        expect(css).toMatch(/\.guide-th-reorder \{\s*position: absolute;/);
+        expect(css, 'hidden at phone width').toMatch(/@media \(max-width: 48rem\) \{[\s\S]*\.guide-th-reorder \{ display: none; \}/);
+    });
+
+    it('a spec column\'s unit is declared by the schema, never read out of its label', () => {
+        const table = code(read('src/utils/vehicleTable.js'));
+        expect(table).not.toMatch(/UNIT_WORD|splitUnit/);
+        expect(table).toMatch(/f\.unit \?\? null/);
+    });
+});
+
+describe('the chart subtitle leads with conditions; counts follow Full Labels (#443)', () => {
+    // The counts cost a phone's width and a reader can see them, so they come
+    // back only under Full Labels - on screen and in the PNG export, which
+    // captions itself from the same plotSubtitle.
+    const SUBTITLE_WITH_COUNTS = {
+        'ChargingView.jsx': 'chartConfig.verboseLabels',
+        'RangeChartView.jsx': 'verboseLabels',
+        'ChargeCompareView.jsx': 'verboseLabels',
+        'RoadTripView.jsx': 'verboseLabels',
+    };
+
+    for (const [file, flag] of Object.entries(SUBTITLE_WITH_COUNTS)) {
+        it(`${file} builds its counts through countParts(${flag})`, () => {
+            const text = read(`src/components/${file}`);
+            const body = text.slice(text.indexOf('const plotSubtitle = useMemo('));
+            const subtitle = body.slice(0, body.indexOf('\n    }, ['));
+            expect(subtitle).toContain(`countParts(${flag}`);
+            // No hand-rolled "N runs" phrase left in the subtitle.
+            expect(subtitle).not.toMatch(/\$\{(runs|vehicles|pairs)\} (run|vehicle|pair)/);
+        });
+
+        it(`${file} re-memoizes the subtitle when Full Labels flips`, () => {
+            const text = read(`src/components/${file}`);
+            const from = text.indexOf('const plotSubtitle = useMemo(');
+            const deps = text.slice(from, text.indexOf('useChartPng', from));
+            expect(deps).toMatch(new RegExp(`\\}, \\[[^\\]]*${flag.replace('.', '\\.')}`));
+        });
+    }
+
+    it('the pop-out hands Full Labels to every view that shows counts', () => {
+        const popout = read('src/components/PopoutView.jsx');
+        // Charging + Range ride chartConfig whole; the others take the flag.
+        expect(popout).toMatch(/<ChargingView[\s\S]*?chartConfig=\{chartConfig\}/);
+        for (const view of ['ChargeCompareView', 'RoadTripView']) {
+            const tag = popout.slice(popout.indexOf(`<${view}`));
+            expect(tag.slice(0, tag.indexOf('/>'))).toMatch(/verboseLabels=\{chartConfig\?\.verboseLabels \?\? false\}/);
+        }
+    });
+
+    // The other six chart views have no Full Labels control to restore counts
+    // with, so they never show them (owner decision on #443).
+    const NEVER_COUNTS = ['SpecsChartView.jsx', 'SpecsScatterView.jsx', 'PerformanceCurveView.jsx',
+        'performance/PerformanceCompareChart.jsx', 'EpaCurvesView.jsx', 'epa/curves/EpaCurveExplorer.jsx'];
+
+    for (const file of NEVER_COUNTS) {
+        it(`${file} puts no run, vehicle, curve or record count in its subtitle`, () => {
+            const text = read(`src/components/${file}`);
+            const from = text.indexOf('const plotSubtitle');
+            const subtitle = text.slice(from, text.indexOf('useChartPng', from));
+            expect(subtitle).not.toMatch(/\$\{n\}|countParts|\.length\}/);
+            expect(subtitle).not.toMatch(/\b(runs?|vehicles?|curves?|records?)\b['`]/);
+        });
+    }
+
+    it('every view that dropped its counts still clears a stale PNG preview when the selection changes', () => {
+        for (const file of [...Object.keys(SUBTITLE_WITH_COUNTS), ...NEVER_COUNTS]) {
+            expect(read(`src/components/${file}`), file).toMatch(/signature:/);
+        }
+        expect(read('src/hooks/useChartPng.js')).toMatch(/frame\?\.signature/);
+    });
+
+    it('Range & Efficiency hides a legend that has nothing to tell apart', () => {
+        expect(read('src/components/RangeChartView.jsx'))
+            .toMatch(/legend: \{ display: legendWorthShowing\(built\.data\.datasets\) \}/);
     });
 });

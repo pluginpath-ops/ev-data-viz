@@ -720,8 +720,7 @@ export default function EpaCurvesView({
     );
 
     const plotSubtitle = useMemo(() => {
-        const n = datasets.filter(d => !d._isOverlay).length;
-        const parts = [`${n} curve${n === 1 ? '' : 's'}`, 'from EPA road-load coefficients'];
+        const parts = ['from EPA road-load coefficients'];
         const c = conditions?.values ?? {};
         // These are TEXT INPUT values, so an empty field is '' rather than null
         // — and `'' != null` is true, so a `!= null` guard let the empty string
@@ -738,10 +737,11 @@ export default function EpaCurvesView({
         if (overlayMode) parts.push(`${overlayMode === 'corrected' ? 'corrected' : 'raw'} tests overlaid`);
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [datasets, conditions, overlayMode, units]);
+    }, [conditions, overlayMode, units]);
 
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+            signature: String(datasets.length) });
 
     const handleCopyUrl = () => {
         navigator.clipboard.writeText(window.location.href).then(() => {

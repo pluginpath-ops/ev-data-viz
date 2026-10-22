@@ -423,14 +423,14 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     const plotTitle = 'Speed vs time';
 
     const plotSubtitle = useMemo(() => {
-        const n = series.length;
-        const parts = [`${n} run${n === 1 ? '' : 's'}`, 'from imported split data'];
+        const parts = ['from imported split data'];
         if (showG) parts.push('acceleration overlay');
         return parts.join(' · ');
-    }, [series, showG]);
+    }, [showG]);
 
     const { copyPng, copied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+            signature: String(series.length) });
 
     const [urlCopied, setUrlCopied] = useState(false);
 

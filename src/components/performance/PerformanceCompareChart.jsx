@@ -37,10 +37,9 @@ export default function PerformanceCompareChart({
     // The caption the export carries. `title` was an <h3> above the card and the
     // measure lived in a <select> beside it, so a pasted PNG was a row of bars
     // labelled with vehicle names and a bare axis — no statement of which
-    // metric, in which mode, over how many vehicles.
+    // metric, in which mode. No vehicle count: the bars show it (#443).
     const plotSubtitle = useMemo(() => {
-        const n = withData.length;
-        const parts = [`${n} vehicle${n === 1 ? '' : 's'}`];
+        const parts = [];
         // The mode is frequently the first word of the axis label ("Distance" /
         // "Distance (ft)"), and "distance · Distance (ft)" reads as a stutter
         // rather than as two facts.
@@ -51,11 +50,12 @@ export default function PerformanceCompareChart({
         }
         if (axis) parts.push(axis);
         return parts.join(' · ');
-    }, [withData, valueModes, valueMode, axisLabel]);
+    }, [valueModes, valueMode, axisLabel]);
 
     const [urlCopied, setUrlCopied] = useState(false);
     const { copyPng, copied, preview, dismissPreview } =
-        useChartPng(chartRef, { title, subtitle: plotSubtitle });
+        useChartPng(chartRef, { title, subtitle: plotSubtitle,
+            signature: String(withData.length) });
 
     useEffect(() => {
         if (!canvasRef.current || withData.length === 0) {
