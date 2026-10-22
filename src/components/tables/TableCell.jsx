@@ -1,3 +1,5 @@
+import { figureWithUnit, unitAround } from '../../utils/tableColumns';
+
 /**
  * One data cell of a sortable table, shared by the FE Guide table and the
  * vehicle table (#235, #315).
@@ -31,6 +33,14 @@
  * different with nothing to show it would be a trap. The link stops the row's
  * click, and is a real href, so a new tab works.
  *
+ * A figure states its UNIT beside it, in the card's unit style
+ * (`.stat-cell-unit`: nano, quiet, on the value's baseline, case kept — it
+ * carries meaning, kWh against KWH), so a screenshot of a row with no header
+ * still reads. The column header therefore does not repeat it. `unit` is the
+ * column's, already set to the reader's unit system, and absent for a cell
+ * with no value: a dash has no unit. `mark` (an asterisk) closes the figure
+ * after its unit.
+ *
  * Children, when given, replace the default content (the name cells carry a
  * swatch or badges, and wrap their name with `.guide-cell-name`). Otherwise the
  * cell draws its text, and beneath it the bar and the note when there are any.
@@ -49,15 +59,30 @@ export function isClipped(el) {
 
 export const FLAGGED_NOTE = 'Flagged as possibly inaccurate';
 
+/** A figure with its unit beside it (see above). */
+function Figure({ text, unit, mark }) {
+    // The same before/after as the text figureWithUnit makes (tableColumns.js).
+    const { before, after } = unitAround(unit);
+    return (
+        <>
+            {before && <span className="stat-cell-unit">{before}</span>}
+            {text}
+            {after && <span className="stat-cell-unit">{after}</span>}
+            {mark}
+        </>
+    );
+}
+
 export default function TableCell({
-    text, note = null, pct = null, numeric = false, flagged = false, restate, className = '', onClick, children,
+    text, unit = null, mark = '', note = null, pct = null, numeric = false, flagged = false, restate, className = '', onClick, children,
     test = null, testKey,
     // A note that names a page but is not a test (a platform, #354): linked
     // the same way, without the test's peek.
     link = null,
 }) {
     const noteLink = test ?? link;
-    const said = restate ?? (note ? `${text} · ${note}` : text);
+    const figure = `${figureWithUnit(text, unit)}${mark}`;
+    const said = restate ?? (note ? `${figure} · ${note}` : figure);
     // A flag can sit on a blank (someone thinks a value is missing), and
     // "— · Flagged" reads as a typo rather than as that.
     const full = flagged ? `${text === '\u2014' && !restate ? 'No value' : said} · ${FLAGGED_NOTE}` : said;
@@ -74,7 +99,7 @@ export default function TableCell({
             {flagged && <span className="guide-td-flag" aria-label={FLAGGED_NOTE}>{'\u2691'}</span>}
             {children ?? (hasStack ? (
                 <span className="guide-cell-stack">
-                    <span>{text}</span>
+                    <span><Figure text={text} unit={unit} mark={mark} /></span>
                     {/* The value, then its bar beneath it. */}
                     {pct != null && <span className="guide-spark" style={{ '--bar-fill': `${pct}%` }} aria-hidden="true" />}
                     {/* Where a resolved or tested figure came from. */}
@@ -95,7 +120,7 @@ export default function TableCell({
                         </a>
                     ) : <span className="vehicle-table-note">{note}</span>)}
                 </span>
-            ) : words ? <span className="guide-cell-text">{text}</span> : text)}
+            ) : words ? <span className="guide-cell-text">{text}</span> : <Figure text={text} unit={unit} mark={mark} />)}
         </td>
     );
 }

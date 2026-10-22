@@ -212,7 +212,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                     </td>
                                                     <td className="py-2 pr-3 whitespace-nowrap">
                                                         <div>{g.drive ?? '—'}</div>
-                                                        <div className="text-meta">{cs.equiv_test_weight_lbs != null ? `${cs.equiv_test_weight_lbs.toLocaleString()} lbs` : '—'}</div>
+                                                        <div className="text-meta">{cs.equiv_test_weight_lbs != null ? `${cs.equiv_test_weight_lbs.toLocaleString()} lb` : '—'}</div>
                                                     </td>
                                                     <td className="py-2 pr-3 font-mono whitespace-nowrap">
                                                         {a != null ? (

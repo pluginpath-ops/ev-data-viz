@@ -64,8 +64,19 @@ import { preconditionedNote } from './runPreconditioning';
 import { isCompositeRun } from './runUtils';
 
 // ── Units ───────────────────────────────────────────────────────────────────
+//
+// A column's unit is STATED: `unit` (a string), `unitGroup` (converted between
+// systems, below), or `unitless: true` for a count, a year or a ratio. Every
+// numeric column does one of the three — utils/__tests__/tableUnits.test.js
+// fails the one that does not — and every cell draws the unit beside its
+// figure (TableCell), so the header carries only the name. A unit is never read
+// out of a column's name: "¼ mile" is seconds and mph, "0–100 mph" is seconds.
 
-/** How each unit group reads, imperial then metric — the units convValue converts to. */
+/**
+ * How each unit group reads, imperial then metric — the units convValue
+ * converts to. Each string is in CANONICAL_UNITS (tableColumns.js), cased as
+ * written: `lb` not `lbs`, `km/h` not `kph`, `cu ft`, `Nm`.
+ */
 const UNIT_LABELS = {
     distance:  ['mi', 'km'],
     speed:     ['mph', 'km/h'],
@@ -77,22 +88,31 @@ const UNIT_LABELS = {
     feet:      ['ft', 'm'],
 };
 
-/** The unit a column's figures are shown in, for the header's unit line. */
+/** The unit a column's figures are shown in, set beside each figure in its cell. */
 export function unitFor(col, units = 'imperial') {
     if (col?.metric && units === 'metric') return col.metric[0];
     if (col?.unitGroup) return UNIT_LABELS[col.unitGroup]?.[units === 'metric' ? 1 : 0] ?? null;
     return col?.unit ?? null;
 }
 
-// A parenthetical is taken as a unit only when it is one — "Elk Test Speed
-// (Moose Test)" keeps its parenthesis.
-const UNIT_WORD = /^(kWh|kW|V|in|sec|s|min|lb-ft|lbs?|hp|cu ft|g|USD|ft|mph|years)$/i;
+// How a schema label may spell its own unit where that is not the unit's
+// canonical form: "(sec)" for s, "(years)" for yr, "(USD)" for $.
+const LABEL_SPELLINGS = { sec: 's', years: 'yr', usd: '$' };
 
-/** "Battery Usable (kWh)" → label "Battery Usable", unit "kWh". */
-function splitUnit(label) {
+/**
+ * A spec label as the table names its column: a parenthetical that only
+ * spells out the field's DECLARED unit is dropped ("Battery Usable (kWh)" →
+ * "Battery Usable"), because the cells state the unit. The label never decides
+ * the unit — that is `unit`/`unitGroup`/`unitless` on the schema field — and a
+ * parenthetical that is not that unit stays: "Elk Test Speed (Moose Test)",
+ * "Heads-Up Display (HUD)". A name like "0–100 mph" has no parenthesis to read.
+ */
+function withoutDeclaredUnit(label, declared) {
     const m = /^(.*?)\s*\(([^)]*)\)(.*)$/.exec(label);
-    if (!m || !UNIT_WORD.test(m[2].trim())) return { label, unit: null };
-    return { label: `${m[1]}${m[3]}`.trim(), unit: m[2].trim() };
+    if (!m || !declared) return label;
+    const said = m[2].trim();
+    const spelled = LABEL_SPELLINGS[said.toLowerCase()] ?? said;
+    return spelled.toLowerCase() === declared.toLowerCase() ? `${m[1]}${m[3]}`.trim() : label;
 }
 
 // ── Columns ─────────────────────────────────────────────────────────────────
@@ -170,7 +190,8 @@ const RANGE_TESTED_COLUMNS = [
       hint: 'The vehicle’s reported range test — the curator’s default, else the newest full-pack test — scaled to a full pack when it saw enough of one. Beneath it, its speed, temperature and window. Blank where the window was too narrow to scale from. Corrected to the conditions under Assumptions, by the margin beneath, unless correction is off on the charts, where it is the test as measured.' },
     { key: 'tested.efficiency_mi_kwh', label: 'Tested efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
       better: 'higher', digits: 2, scale: 'efficiency',
-      assumption: ['conditions'], labelFor: ({ conditions, units, correctionMode }) => (correctionMode === 'none' ? 'Tested efficiency' : `Tested efficiency, ${speedText(conditions.speedMph, units)}`),
+      assumption: ['conditions'], labelFor: ({ conditions, units, correctionMode }) => (correctionMode === 'none' ? 'Tested eff.' : `Tested eff., ${speedText(conditions.speedMph, units)}`),
+      fullLabelFor: ({ conditions, units, correctionMode }) => (correctionMode === 'none' ? 'Tested efficiency' : `Tested efficiency, ${speedText(conditions.speedMph, units)}`),
       hint: 'Distance ÷ energy used on the same test as Tested range: battery-side, so comparable to Efficiency, not to EPA efficiency. Estimated from the SoC window and battery where the test logged no energy, and marked so. Corrected to the conditions under Assumptions, by the margin beneath, unless correction is off on the charts, where it is the test as measured.' },
     // The composite (compositeRange.js): every steady-state range test,
     // corrected to the conditions under Assumptions and averaged. The speed is
@@ -182,14 +203,19 @@ const RANGE_TESTED_COLUMNS = [
       hint: 'The mean of the vehicle’s steady-state range tests, each scaled to a full pack and corrected to the speed, temperature and altitude under Assumptions, in calm air. Tests on a mixed cycle, far from the target speed, or outside a mild temperature band are left out: temperature is corrected for air density only, so a cold test’s heating losses would survive any correction. A blank altitude is corrected from the assumed test altitude, and the note says so; a blank wind is calm air. How many tests made it is beneath.' },
     { key: 'tested.composite_efficiency_mi_kwh', label: 'Composite efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
       better: 'higher', digits: 2, scale: 'efficiency', assumption: ['conditions'],
-      labelFor: ({ conditions, units }) => `Composite efficiency, ${speedText(conditions.speedMph, units)}`,
+      labelFor: ({ conditions, units }) => `Composite eff., ${speedText(conditions.speedMph, units)}`,
+      fullLabelFor: ({ conditions, units }) => `Composite efficiency, ${speedText(conditions.speedMph, units)}`,
       hint: 'The same tests’ efficiency, corrected the same way. Battery-side, so comparable to Tested efficiency, not to EPA efficiency. Any window counts here, so it can rest on more tests than Composite range; estimated from the SoC window and battery where a test logged no energy, and marked so.' },
     { key: 'tested.when_new_range_mi', label: 'When-new range', unitGroup: 'distance', better: 'higher', digits: 0, scale: 'range',
       assumption: ['conditions'], labelFor: ({ conditions, units, correctionMode }) => (correctionMode === 'none' ? 'When-new range' : `When-new range, ${speedText(conditions.speedMph, units)}`),
       hint: 'What the reported range test would reach with a new pack: its measured efficiency × the car’s new-car capacity (EPA tested, else Usable). Blank unless the test measured its energy, saw most of the pack, a new-car capacity is known, and the pack is more than 5% down — closer than that is test scatter. Corrected to the conditions under Assumptions, by the margin beneath, unless correction is off on the charts, where it is the test as measured.' },
     { key: 'tested.capacity_retention', label: 'Capacity retention', unit: '%', better: 'higher', digits: 0,
       hint: 'The share of its new-car capacity the pack delivered on the reported range test: the energy that test implies for a full pack ÷ EPA tested (else Usable) capacity. Shown only below 95%.' },
-].map(c => ({ ...c, group: 'Tested range', numeric: true, bar: true }));
+// A name that states its speed ("Composite range, 70 mph") is the longest
+// header in the table and cannot be shortened without dropping it, so those
+// columns take the room (`noted-figures`, index.css).
+].map(c => ({ ...c, group: 'Tested range', numeric: true, bar: true,
+    holds: c.labelFor ? 'noted-figures' : null, qualified: !!c.labelFor }));
 
 /**
  * EVBench's own charge rate (#346): the best 5, 10 and 15-minute average
@@ -332,7 +358,10 @@ function assumptionContext(assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial'
  */
 export function labelledColumn(col, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE) {
     if (!col?.labelFor) return col;
-    return { ...col, label: col.labelFor(assumptionContext(assumptions, units, correctionTarget, correctionMode)) };
+    const ctx = assumptionContext(assumptions, units, correctionTarget, correctionMode);
+    // `fullLabelFor` names the column in full where the header's name is cut
+    // short: the header tooltip's fallback and the column picker's search.
+    return { ...col, label: col.labelFor(ctx), ...(col.fullLabelFor && { fullLabel: col.fullLabelFor(ctx) }) };
 }
 
 /**
@@ -469,22 +498,27 @@ const CALCULATED_COLUMNS = [
       inputs: ['pricing.base_price_usd', 'figures.socWindowKwh'],
       calc: ([price, kwh]) => ratio(price, kwh),
       hint: 'Advertised base price ÷ battery.' },
-    { key: 'calc.costPer100Home', label: 'Cost per 100 mi, home', unit: '$', metric: ['$', 1 / MI_TO_KM],
+    { key: 'calc.costPer100Home', label: 'Cost/100 mi, home', unit: '$', metric: ['$', 1 / MI_TO_KM],
       better: 'lower', digits: 2, assumption: ['homePrice'],
-      labelFor: ({ units }) => `Cost per 100 ${units === 'metric' ? 'km' : 'mi'}, home`,
+      labelFor: ({ units }) => `Cost/100 ${units === 'metric' ? 'km' : 'mi'}, home`,
+      fullLabelFor: ({ units }) => `Cost per 100 ${units === 'metric' ? 'km' : 'mi'}, home`,
       inputs: ['figures.epaEfficiency', 'calc.efficiency'],
       calc: (inputs, { homePrice }) => costPer100(homePrice)(inputs),
       note: costNote,
       hint: 'The home electricity price set under Assumptions × 100 ÷ EPA efficiency, which counts charging losses. Where the vehicle has no EPA label, Efficiency less the assumed charging loss, marked as an estimate.' },
-    { key: 'calc.costPer100Fast', label: 'Cost per 100 mi, DC fast', unit: '$', metric: ['$', 1 / MI_TO_KM],
+    { key: 'calc.costPer100Fast', label: 'Cost/100 mi, fast', unit: '$', metric: ['$', 1 / MI_TO_KM],
       better: 'lower', digits: 2, assumption: ['fastPrice'],
-      labelFor: ({ units }) => `Cost per 100 ${units === 'metric' ? 'km' : 'mi'}, DC fast`,
+      labelFor: ({ units }) => `Cost/100 ${units === 'metric' ? 'km' : 'mi'}, fast`,
+      fullLabelFor: ({ units }) => `Cost per 100 ${units === 'metric' ? 'km' : 'mi'}, DC fast`,
       inputs: ['figures.epaEfficiency', 'calc.efficiency'],
       calc: (inputs, { fastPrice }) => costPer100(fastPrice)(inputs),
       note: costNote,
       hint: 'The same at the DC fast-charging price set under Assumptions: what a road trip’s miles cost. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
-    { key: 'calc.weightPerHp', label: 'Weight per horsepower', unit: 'lb/hp', metric: ['kg/kW', LBS_TO_KG / HP_TO_KW],
+    { key: 'calc.weightPerHp', label: 'Weight per hp', unit: 'lb/hp', metric: ['kg/kW', LBS_TO_KG / HP_TO_KW],
       better: 'lower', digits: 1,
+      // The cells are kg/kW in metric, so the name follows the unit.
+      labelFor: ({ units }) => `Weight per ${units === 'metric' ? 'kW' : 'hp'}`,
+      fullLabelFor: ({ units }) => `Weight per ${units === 'metric' ? 'kilowatt' : 'horsepower'}`,
       inputs: ['performance.weight_lbs', 'powertrain.horsepower_hp'],
       calc: ([lb, hp]) => ratio(lb, hp),
       hint: 'Curb weight ÷ horsepower. Lower is quicker, all else equal.' },
@@ -509,11 +543,19 @@ const CALCULATED_COLUMNS = [
  * the schema type:
  *   short-values  yes/no, and counts with no bar (cameras, seats)
  *   long-text     free text, which also wraps to two lines
+ *   long-figures  figures of six digits, or printed to three decimals, that
+ *                 do not fit a figure column beside their unit
  * An enum is sized by its longest option, since the schema lists every value
  * it can hold: Drive Type (FWD, RWD, AWD) is short, Motor Type ("Switched
  * Reluctance") is not. Everything else keeps the default: figures their figure
  * width, identity text the text width. A bar needs the figure width to be
  * readable, so a count that has one is not narrowed.
+ *
+ * Width is about the VALUES, not the name: a name too long for its column
+ * carries a shorter `tableLabel` (the schema's) rather than a wider column.
+ * The one exception is `noted-figures` on the tested range columns,
+ * whose names state their speed. utils/__tests__/headerFit.test.js holds
+ * every name to two lines at its column's width.
  */
 const SHORT_OPTION_CHARS = 7;
 
@@ -523,11 +565,16 @@ function holdsFor(field) {
     if (field.type === 'enum' && field.options?.length
         && Math.max(...field.options.map(o => String(o).length)) <= SHORT_OPTION_CHARS) return 'short-values';
     if (field.type === 'text') return 'long-text';
+    // A warranty's distance is 100,000 mi, and 160,934 km: six digits and a unit.
+    if (field.type === 'integer' && field.unitGroup === 'distance') return 'long-figures';
     return null;
 }
 
 const SPEC_COLUMNS = SPEC_CATEGORIES.flatMap(cat => cat.fields.map(f => {
-    const { label, unit } = splitUnit(f.label);
+    // The field's unit in the imperial spelling the label would use, for
+    // matching a parenthetical against it.
+    const declared = f.unit ?? (f.unitGroup ? UNIT_LABELS[f.unitGroup]?.[0] : null);
+    const label = withoutDeclaredUnit(f.label, declared);
     return {
         key: `${cat.key}.${f.key}`,
         // A header gets ~72px a line, two lines. A field whose name cannot fit
@@ -535,8 +582,11 @@ const SPEC_COLUMNS = SPEC_CATEGORIES.flatMap(cat => cat.fields.map(f => {
         // the header's tooltip and everywhere else specs are shown.
         label: f.tableLabel ?? label,
         fullLabel: f.tableLabel ? label : null,
-        unit: f.unitGroup ? null : unit,
+        // The unit is the schema's, stated there: `unit`, `unitGroup`, or
+        // `unitless` for a count. Never read out of the label.
+        unit: f.unitGroup ? null : f.unit ?? null,
         unitGroup: f.unitGroup ?? null,
+        unitless: !!f.unitless,
         group: cat.label,
         type: f.type,
         numeric: f.type === 'number' || f.type === 'integer',

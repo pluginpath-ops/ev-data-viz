@@ -30,9 +30,9 @@ describe('columns', () => {
         expect(vehicleColumnByKey('tested.zero_to_60_rollout_sec')).toMatchObject({ bar: true, better: 'lower' });
     });
 
-    it('moves a unit from the label to the header, converted by system', () => {
-        expect(vehicleColumnByKey('charging.max_ac_kw')).toMatchObject({ label: 'Max AC Charge Rate', unit: 'kW' });
-        expect(vehicleColumnByKey('performance.elk_test_mph').label).toMatch(/Moose Test/);
+    it('states a column\'s unit on the column, shortens its name, and converts the unit by system', () => {
+        expect(vehicleColumnByKey('charging.max_ac_kw')).toMatchObject({ label: 'Max AC charge', fullLabel: 'Max AC Charge Rate', unit: 'kW' });
+        expect(vehicleColumnByKey('performance.elk_test_mph').fullLabel).toMatch(/Moose Test/);
         expect(unitFor(vehicleColumnByKey('dimensions.length_in'), 'imperial')).toBe('in');
         expect(unitFor(vehicleColumnByKey('dimensions.length_in'), 'metric')).toBe('mm');
     });
@@ -368,7 +368,7 @@ describe('tested range columns (#335)', () => {
         expect(r.values['tested.range_mi']).toBeCloseTo(294.7, 1);   // 280 over 95 points
         expect(r.notes['tested.range_mi']).toBe('70 mph · 70°F · scaled from 100→5%');
         const metric = row([test()], { units: 'metric' });
-        expect(metric.notes['tested.range_mi']).toBe('112.7 kph · 21°C · scaled from 100→5%');
+        expect(metric.notes['tested.range_mi']).toBe('112.7 km/h · 21°C · scaled from 100→5%');
     });
 
     it('works out % of EPA hwy over the composite range, saying what it rests on', () => {
@@ -507,9 +507,19 @@ describe('EPA efficiency and electricity cost (#335)', () => {
 
     it('names the cost per 100 km for a metric reader, and converts it', () => {
         const col = vehicleColumnByKey('calc.costPer100Home');
-        expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'metric').label).toBe('Cost per 100 km, home');
+        expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'metric').label).toBe('Cost/100 km, home');
         const [r] = buildVehicleRows([labelled]);
         expect(Number(formatVehicleCell(r, col, 'metric'))).toBeCloseTo(0.17 * 100 / 3 / 1.60934, 2);
+    });
+
+    it('keeps "DC fast" in the fast column\'s full name, and follows the unit system', () => {
+        const fast = labelledColumn(vehicleColumnByKey('calc.costPer100Fast'), DEFAULT_ASSUMPTIONS, 'metric');
+        expect(fast.label).toBe('Cost/100 km, fast');
+        expect(fast.fullLabel).toBe('Cost per 100 km, DC fast');
+        const weight = vehicleColumnByKey('calc.weightPerHp');
+        expect(labelledColumn(weight, DEFAULT_ASSUMPTIONS, 'imperial')).toMatchObject({ label: 'Weight per hp', fullLabel: 'Weight per horsepower' });
+        // Its cells are kg/kW in metric, so the name says kW.
+        expect(labelledColumn(weight, DEFAULT_ASSUMPTIONS, 'metric')).toMatchObject({ label: 'Weight per kW', fullLabel: 'Weight per kilowatt' });
     });
 });
 
@@ -669,5 +679,8 @@ describe('the reported test follows the reader\'s correction mode', () => {
         const col = vehicleColumnByKey('tested.range_mi');
         expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'imperial', undefined, 'none').label).toBe('Tested range');
         expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'imperial').label).toBe('Tested range, 70 mph');
+        // The full name, for the tooltip and the column picker, drops it too.
+        const eff = labelledColumn(vehicleColumnByKey('tested.efficiency_mi_kwh'), DEFAULT_ASSUMPTIONS, 'imperial', undefined, 'none');
+        expect([eff.label, eff.fullLabel]).toEqual(['Tested eff.', 'Tested efficiency']);
     });
 });

@@ -39,6 +39,7 @@ import SpeedBadge from './charts/SpeedBadge';
 import { spreadTestsFor, sweepSpread, timelineSpread } from '../utils/roadTripSpread';
 import { unlistedCount } from '../utils/runListing';
 import { countsAside } from '../utils/rangeTestSpread';
+import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
 
 Chart.register(ZoomPlugin);
@@ -1811,7 +1812,7 @@ export default function RoadTripView({
 
     const plotSubtitle = useMemo(() => {
         const runs = validEntries.length;
-        const parts = [`${runs} run${runs === 1 ? '' : 's'}`];
+        const parts = countParts(verboseLabels, [[runs, 'run']]);
         if (!isSpeedMode) parts.push(`${Math.round(convDistance(totalDistance, units))} ${dl}`);
         if (!isSpeedMode) parts.push(`${Math.round(convDistance(speed, units))} ${sl}`);
         parts.push(mode === 'distance'
@@ -1822,10 +1823,11 @@ export default function RoadTripView({
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
     }, [validEntries, isSpeedMode, totalDistance, speed, mode, legDistance, chargeTime,
-        startSoc, minSoc, towingMode, units, dl, sl]);
+        startSoc, minSoc, towingMode, units, dl, sl, verboseLabels]);
 
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+            signature: String(validEntries.length) });
 
     const dispLeg          = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
     const dispTotal        = units === 'metric' ? Math.round(totalDistance * MI_TO_KM) : totalDistance;

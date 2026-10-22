@@ -13,6 +13,21 @@
  *   'enum'    — select from a fixed list of options
  *   'text'    — free-text input
  *
+ * Units — a 'number' or 'integer' field says what it is measured in, one way:
+ *   `unit: 'kWh'`      a fixed unit (cased as written; see CANONICAL_UNITS in
+ *                      tableColumns.js)
+ *   `unitGroup: '…'`   a unit that converts between imperial and metric
+ *   `unitless: true`   a count — "no unit" is the field's decision on record
+ * Wheel size and screen size are `unit: 'in'`, not the dimension group: both are
+ * inches everywhere, metric readers included (a "508 mm" wheel is nobody's size).
+ * The label's parenthetical ("Battery Usable (kWh)") is for the editor and
+ * View Specs; the vehicle table drops it when it only restates the declared
+ * unit, and never reads a unit out of it (tableUnits.test.js).
+ *
+ * `tableLabel` — optional. A shorter name for the vehicle table's column
+ * header, which gets two lines of about 72px (headerFit.test.js checks it).
+ * The full name stays in the header's tooltip.
+ *
  * `hint` — optional. What the field means where the label cannot say it: the
  * vehicle table's column tooltip, and the label's tooltip in View Specs and
  * the spec editor.
@@ -40,7 +55,7 @@ export const SPEC_CATEGORIES = [
         key: 'pricing',
         label: 'Pricing',
         fields: [
-            { key: 'base_price_usd', label: 'Advertised Base Price (USD)', type: 'number' },
+            { key: 'base_price_usd', label: 'Advertised Base Price (USD)', type: 'number', unit: '$', tableLabel: 'Base price' },
         ],
     },
     {
@@ -49,13 +64,13 @@ export const SPEC_CATEGORIES = [
         fields: [
             { key: 'drive_type',          label: 'Drive Type',              type: 'enum',
               options: ['FWD', 'RWD', 'AWD'] },
-            { key: 'motors',              label: 'Number of Motors',        type: 'integer' },
+            { key: 'motors',              label: 'Number of Motors',        type: 'integer', unitless: true, tableLabel: 'Motors' },
             { key: 'motor_type',          label: 'Motor Type',              type: 'enum',
               options: ['Permanent Magnet', 'Induction', 'Wound Rotor', 'Switched Reluctance'] },
-            { key: 'transmission_speeds', label: 'Transmission Speeds',     type: 'integer' },
+            { key: 'transmission_speeds', label: 'Transmission Speeds',     type: 'integer', unitless: true, tableLabel: 'Gears' },
             { key: 'horsepower_hp',       label: 'Horsepower (hp)',         type: 'number', better: 'higher', unitGroup: 'power' },
             { key: 'torque_lbft',         label: 'Torque (lb-ft)',          type: 'number', better: 'higher', unitGroup: 'torque' },
-            { key: 'battery_gross_kwh',   label: 'Battery Gross (kWh)',     type: 'number' },
+            { key: 'battery_gross_kwh',   label: 'Battery Gross (kWh)',     type: 'number', unit: 'kWh' },
         ],
     },
     {
@@ -69,17 +84,17 @@ export const SPEC_CATEGORIES = [
         key: 'performance',
         label: 'Performance (Published)',
         fields: [
-            { key: 'zero_to_60_mph_sec', label: '0–60 mph (sec) — claimed',     type: 'number', better: 'lower', tableLabel: '0–60 claimed' },
-            { key: 'quarter_mile_sec',   label: '¼ Mile (sec) — claimed',       type: 'number', better: 'lower' },
-            { key: 'quarter_mile_mph',   label: '¼ Mile Trap Speed — claimed',  type: 'number', better: 'higher', unitGroup: 'speed' },
-            { key: 'top_speed_mph',      label: 'Top Speed — claimed',          type: 'number', better: 'higher', unitGroup: 'speed' },
+            { key: 'zero_to_60_mph_sec', label: '0–60 mph (sec) — claimed',     type: 'number', unit: 's', better: 'lower', tableLabel: '0–60 claimed' },
+            { key: 'quarter_mile_sec',   label: '¼ Mile (sec) — claimed',       type: 'number', unit: 's', better: 'lower' },
+            { key: 'quarter_mile_mph',   label: '¼ Mile Trap Speed — claimed',  type: 'number', better: 'higher', unitGroup: 'speed', tableLabel: '¼ mile trap claimed' },
+            { key: 'top_speed_mph',      label: 'Top Speed — claimed',          type: 'number', better: 'higher', unitGroup: 'speed', tableLabel: 'Top speed claimed' },
             { key: 'weight_lbs',         label: 'Curb Weight',                  type: 'number', unitGroup: 'weight' },
-            { key: 'braking_60_0_ft',    label: 'Braking 60–0 — published',     type: 'number', better: 'lower', unitGroup: 'feet' },
-            { key: 'braking_70_0_ft',    label: 'Braking 70–0 — published',     type: 'number', better: 'lower', unitGroup: 'feet' },
-            { key: 'lateral_g',          label: 'Lateral Grip (g) — published', type: 'number', better: 'higher' },
-            { key: 'figure_8_sec',       label: 'Figure 8 (sec) — published',   type: 'number', better: 'lower' },
-            { key: 'slalom_mph',         label: 'Slalom Speed — published',     type: 'number', better: 'higher', unitGroup: 'speed' },
-            { key: 'elk_test_mph',       label: 'Elk Test Speed (Moose Test) — published', type: 'number', better: 'higher', unitGroup: 'speed' },
+            { key: 'braking_60_0_ft',    label: 'Braking 60–0 — published',     type: 'number', better: 'lower', unitGroup: 'feet', tableLabel: 'Braking 60–0' },
+            { key: 'braking_70_0_ft',    label: 'Braking 70–0 — published',     type: 'number', better: 'lower', unitGroup: 'feet', tableLabel: 'Braking 70–0' },
+            { key: 'lateral_g',          label: 'Lateral Grip (g) — published', type: 'number', unit: 'g', better: 'higher', tableLabel: 'Lateral grip' },
+            { key: 'figure_8_sec',       label: 'Figure 8 (sec) — published',   type: 'number', unit: 's', better: 'lower' },
+            { key: 'slalom_mph',         label: 'Slalom Speed — published',     type: 'number', better: 'higher', unitGroup: 'speed', tableLabel: 'Slalom speed' },
+            { key: 'elk_test_mph',       label: 'Elk Test Speed (Moose Test) — published', type: 'number', better: 'higher', unitGroup: 'speed', tableLabel: 'Elk test speed' },
         ],
     },
     {
@@ -87,9 +102,9 @@ export const SPEC_CATEGORIES = [
         label: 'Compute / ADAS',
         fields: [
             { key: 'lidar',           label: 'LIDAR',               type: 'boolean' },
-            { key: 'radars',          label: 'Radar Units',         type: 'integer' },
-            { key: 'ultrasonics',     label: 'Ultrasonic Sensors',  type: 'integer' },
-            { key: 'cameras',         label: 'Cameras',             type: 'integer' },
+            { key: 'radars',          label: 'Radar Units',         type: 'integer', unitless: true },
+            { key: 'ultrasonics',     label: 'Ultrasonic Sensors',  type: 'integer', unitless: true },
+            { key: 'cameras',         label: 'Cameras',             type: 'integer', unitless: true },
             { key: 'processing_chip', label: 'Processing Chip',     type: 'text' },
         ],
     },
@@ -119,7 +134,7 @@ export const SPEC_CATEGORIES = [
         key: 'wheels',
         label: 'Wheels & Tires',
         fields: [
-            { key: 'wheel_size_in', label: 'Wheel Size (in)', type: 'integer', unitGroup: 'dimension' },
+            { key: 'wheel_size_in', label: 'Wheel Size (in)', type: 'integer', unit: 'in' },
             { key: 'tire_size',     label: 'Tire Size',       type: 'text' },
         ],
     },
@@ -130,18 +145,18 @@ export const SPEC_CATEGORIES = [
             { key: 'front_type',        label: 'Front Suspension Type',  type: 'text' },
             { key: 'rear_type',         label: 'Rear Suspension Type',   type: 'text' },
             { key: 'adaptive_damping',  label: 'Adaptive Damping',       type: 'boolean' },
-            { key: 'adjustable_height', label: 'Adjustable Ride Height', type: 'boolean' },
+            { key: 'adjustable_height', label: 'Adjustable Ride Height', type: 'boolean', tableLabel: 'Adj. ride height' },
         ],
     },
     {
         key: 'lighting',
         label: 'Lighting',
         fields: [
-            { key: 'adaptive_headlights', label: 'Adaptive Headlights',       type: 'boolean' },
+            { key: 'adaptive_headlights', label: 'Adaptive Headlights',       type: 'boolean', tableLabel: 'Adaptive lights' },
             { key: 'headlight_type',      label: 'Headlight Type',            type: 'enum',
               options: ['LED', 'Laser', 'Matrix LED', 'Pixel LED'] },
             { key: 'auto_high_beam',      label: 'Auto High Beam',            type: 'boolean' },
-            { key: 'ambient_lighting',    label: 'Ambient Interior Lighting', type: 'boolean' },
+            { key: 'ambient_lighting',    label: 'Ambient Interior Lighting', type: 'boolean', tableLabel: 'Ambient lighting' },
         ],
     },
     {
@@ -149,18 +164,18 @@ export const SPEC_CATEGORIES = [
         key: 'charging',
         label: 'Battery & Charging',
         fields: [
-            { key: 'battery_usable_kwh',          label: 'Battery Usable (kWh)',          type: 'number' },
-            { key: 'battery_nominal_voltage_v',   label: 'Battery Nominal Voltage (V)',   type: 'number', tableLabel: 'Nominal voltage' },
-            { key: 'max_dc_kw',                   label: 'Max DC Charge Rate (kW)',        type: 'number', better: 'higher' },
-            { key: 'max_ac_kw',                   label: 'Max AC Charge Rate (kW)',        type: 'number', better: 'higher' },
-            { key: 'charge_time_10_to_80_pct_min',label: 'Charge Time 10→80% (min)',       type: 'number', better: 'lower', tableLabel: 'Charge 10→80%' },
+            { key: 'battery_usable_kwh',          label: 'Battery Usable (kWh)',          type: 'number', unit: 'kWh' },
+            { key: 'battery_nominal_voltage_v',   label: 'Battery Nominal Voltage (V)',   type: 'number', unit: 'V', tableLabel: 'Nominal voltage' },
+            { key: 'max_dc_kw',                   label: 'Max DC Charge Rate (kW)',        type: 'number', unit: 'kW', better: 'higher', tableLabel: 'Max DC charge' },
+            { key: 'max_ac_kw',                   label: 'Max AC Charge Rate (kW)',        type: 'number', unit: 'kW', better: 'higher', tableLabel: 'Max AC charge' },
+            { key: 'charge_time_10_to_80_pct_min',label: 'Charge Time 10→80% (min)',       type: 'number', unit: 'min', better: 'lower', tableLabel: 'Charge 10→80%' },
             { key: 'charge_port',                 label: 'Charge Port',                   type: 'enum',
               options: ['NACS', 'CCS1', 'CHAdeMO', 'Type 2'] },
-            { key: 'v2l',                         label: 'Vehicle-to-Load (V2L)',          type: 'boolean' },
+            { key: 'v2l',                         label: 'Vehicle-to-Load (V2L)',          type: 'boolean', tableLabel: 'V2L' },
             // V2H and V2G are separate answers: a car can power a house through
             // a bidirectional wallbox without being allowed to export to the grid.
-            { key: 'v2h',                         label: 'Vehicle-to-Home (V2H)',          type: 'boolean' },
-            { key: 'v2g',                         label: 'Vehicle-to-Grid (V2G)',          type: 'boolean' },
+            { key: 'v2h',                         label: 'Vehicle-to-Home (V2H)',          type: 'boolean', tableLabel: 'V2H' },
+            { key: 'v2g',                         label: 'Vehicle-to-Grid (V2G)',          type: 'boolean', tableLabel: 'V2G' },
             { key: 'plug_and_charge',             label: 'Plug & Charge',                  type: 'boolean' },
             // Whether the car can use Superchargers without an adapter or an
             // account workaround. The charge port alone does not say: a NACS
@@ -176,7 +191,7 @@ export const SPEC_CATEGORIES = [
               hint: 'How the car charges from a 400 V DC fast charger, if it can: native (a 400 V pack), a DC booster, motor boost, a split pack, or not at all. It decides whether an 800 V car can use older DC fast chargers, and Tesla Superchargers installed before V4 (mid-2026). Its electrical platform provides it unless the vehicle sets its own.' },
             // Per vehicle, not provided by the platform: it changed by model
             // year within one platform (early and later E-GMP).
-            { key: 'max_dc_400v_kw',              label: 'Max DC on 400 V (kW)',           type: 'number', better: 'higher',
+            { key: 'max_dc_400v_kw',              label: 'Max DC on 400 V (kW)',           type: 'number', unit: 'kW', better: 'higher',
               tableLabel: 'Max DC on 400 V',
               hint: 'The fastest DC charge rate the car reaches on a 400 V charger, which on an 800 V car is usually well below its peak. It varies by model year on one platform: early E-GMP cars reach about 80 kW and later ones about 150 kW; an early Taycan about 50 kW. Few boosters pass 200 kW; the Lucid Gravity, which boosts through its rear motor, is rated up to 225 kW. A split pack is usually limited by current, to 400–500 A.' },
             // Per vehicle, never the platform's list: a Mach-E is NMC or LFP, not
@@ -206,10 +221,10 @@ export const SPEC_CATEGORIES = [
         key: 'warranty',
         label: 'Warranty',
         fields: [
-            { key: 'battery_years', label: 'Battery Warranty (years)', type: 'integer', better: 'higher', tableLabel: 'Battery warranty' },
-            { key: 'battery_miles', label: 'Battery Warranty Distance', type: 'integer', better: 'higher', unitGroup: 'distance', tableLabel: 'Battery warranty distance' },
-            { key: 'basic_years',   label: 'Basic Warranty (years)',   type: 'integer', better: 'higher', tableLabel: 'Basic warranty' },
-            { key: 'basic_miles',   label: 'Basic Warranty Distance',  type: 'integer', better: 'higher', unitGroup: 'distance', tableLabel: 'Basic warranty distance' },
+            { key: 'battery_years', label: 'Battery Warranty (years)', type: 'integer', unit: 'yr', better: 'higher', tableLabel: 'Battery warranty' },
+            { key: 'battery_miles', label: 'Battery Warranty Distance', type: 'integer', better: 'higher', unitGroup: 'distance', tableLabel: 'Battery mileage' },
+            { key: 'basic_years',   label: 'Basic Warranty (years)',   type: 'integer', unit: 'yr', better: 'higher', tableLabel: 'Basic warranty' },
+            { key: 'basic_miles',   label: 'Basic Warranty Distance',  type: 'integer', better: 'higher', unitGroup: 'distance', tableLabel: 'Basic mileage' },
         ],
     },
     {
@@ -219,7 +234,7 @@ export const SPEC_CATEGORIES = [
         key: 'range',
         label: 'Range',
         fields: [
-            { key: 'expected_epa_mi',    label: 'Expected EPA Range',          type: 'number', unitGroup: 'distance' },
+            { key: 'expected_epa_mi',    label: 'Expected EPA Range',          type: 'number', unitGroup: 'distance', tableLabel: 'Expected range' },
             { key: 'expected_epa_basis', label: 'Expected EPA Range — Basis', type: 'enum',
               options: ['Manufacturer', 'Independent test'] },
         ],
@@ -228,18 +243,18 @@ export const SPEC_CATEGORIES = [
         key: 'interior',
         label: 'Interior & Comfort',
         fields: [
-            { key: 'seating',                  label: 'Seating Capacity',            type: 'integer' },
+            { key: 'seating',                  label: 'Seating Capacity',            type: 'integer', unitless: true },
             { key: 'cargo_cuft',               label: 'Cargo Volume (cu ft)',          type: 'number', unitGroup: 'volume' },
             { key: 'frunk_cuft',               label: 'Frunk Capacity (cu ft)',        type: 'number', unitGroup: 'volume' },
-            { key: 'max_cargo_cuft',           label: 'Max Cargo, Seats Flat (cu ft)', type: 'number', unitGroup: 'volume' },
-            { key: 'screen_size_in',           label: 'Head Unit Screen Size (in)',    type: 'number', unitGroup: 'dimension' },
+            { key: 'max_cargo_cuft',           label: 'Max Cargo, Seats Flat (cu ft)', type: 'number', unitGroup: 'volume', tableLabel: 'Max cargo' },
+            { key: 'screen_size_in',           label: 'Head Unit Screen Size (in)',    type: 'number', unit: 'in', tableLabel: 'Screen size' },
             { key: 'hud',                      label: 'Heads-Up Display (HUD)',       type: 'boolean', tableLabel: 'HUD' },
-            { key: 'front_heated_seats',       label: 'Front Heated Seats',           type: 'boolean' },
-            { key: 'front_ventilated_seats',   label: 'Front Ventilated Seats',       type: 'boolean' },
-            { key: 'rear_heated_seats',        label: 'Rear Heated Seats',            type: 'boolean' },
-            { key: 'heated_steering_wheel',    label: 'Heated Steering Wheel',        type: 'boolean' },
-            { key: 'sound_system_speakers',    label: 'Sound System Speakers',        type: 'integer' },
-            { key: 'sound_system_watts',       label: 'Sound System Watts',           type: 'integer' },
+            { key: 'front_heated_seats',       label: 'Front Heated Seats',           type: 'boolean', tableLabel: 'Front seat heating' },
+            { key: 'front_ventilated_seats',   label: 'Front Ventilated Seats',       type: 'boolean', tableLabel: 'Front seat cooling' },
+            { key: 'rear_heated_seats',        label: 'Rear Heated Seats',            type: 'boolean', tableLabel: 'Rear seat heating' },
+            { key: 'heated_steering_wheel',    label: 'Heated Steering Wheel',        type: 'boolean', tableLabel: 'Heated wheel' },
+            { key: 'sound_system_speakers',    label: 'Sound System Speakers',        type: 'integer', unitless: true, tableLabel: 'Speakers' },
+            { key: 'sound_system_watts',       label: 'Sound System Watts',           type: 'integer', unit: 'W', tableLabel: 'Audio power' },
         ],
     },
 ];

@@ -7375,10 +7375,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     table-layout: fixed;
 }
 
-/* Header: the name, then its unit beneath, or the name's own second line when
-   there is no unit. Top-aligned, so every name starts on the same line and the
-   eye reads across the header row. Bottom alignment dropped a unitless name a
-   line below its neighbours, so a row of labels looked like two rows. */
+/* Header: the name, and nothing else — each cell states its own unit beside
+   its figure (TableCell, `.stat-cell-unit`), so the header no longer carries a
+   second line for one. The row is as tall as its longest name (two lines at
+   most). */
 .guide-th {
     @apply px-3 py-2 text-left align-top whitespace-nowrap cursor-pointer select-none;
     background-color: var(--color-surface-muted);
@@ -7387,25 +7387,24 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     top: 0;
     z-index: 2;
 }
+/* A column header (SortHeader) is bottom-aligned, so a one-line name sits
+   against the data it heads rather than floating above it. Top alignment earned
+   its keep when a unit line hung beneath every name; with none, a short name
+   top-aligned in a two-line row left a gap between it and its column. Only the
+   sortable tables' headers: the compare panel's "Field" head and the platform
+   list's headers share `.guide-th` and keep it top-aligned. */
+.guide-th.column-header { @apply align-bottom; }
 .guide-th-name {
     @apply block;
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--color-text-primary);
 }
-.guide-th-unit {
-    @apply block;
-    font-size: 0.6875rem;
-    font-weight: 400;
-    color: var(--color-text-faint);
-    min-height: 0.9rem;
-}
 /* Numeric columns are centred, text stays left. Centring trades away decimal
    alignment, which is the usual reason to right-align a number column — but
    these are whole-number figures at a fixed precision per column, and the bar
    fill behind them already gives the eye a left-anchored edge to scan. */
-.guide-th.numeric .guide-th-name,
-.guide-th.numeric .guide-th-unit { @apply text-center; }
+.guide-th.numeric .guide-th-name { @apply text-center; }
 .guide-th.active .guide-th-name  { color: var(--color-primary); }
 .guide-th.dragging    { opacity: 0.5; }
 .guide-th.drop-before { box-shadow: inset 2px 0 0 var(--color-primary); }
@@ -7421,24 +7420,46 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Two widths, taken from what a column HOLDS rather than written per column:
    figures are short and of a known precision, text is neither. The pinned
    columns declare their own further down and win on source order. A header
-   longer than its column ellipses — the full label is in the tooltip, and the
-   unit line beneath carries the rest of the meaning. */
+   longer than its column ellipses — the full label is in the tooltip. */
 .guide-th          { width: 9rem; }
-.guide-th.numeric  { width: 6rem; }
+.guide-th.numeric  { width: 6.25rem; }
 /* Two more, where a table knows its columns better than "text or figure"
    (the vehicle table reads them off the spec schema). Yes/no and small counts
    need half a figure's room; free text is a sentence and needs more than a
-   name's. Later than the two above, so they win at equal specificity. */
-.guide-th.short-values { width: 4.75rem; }
-.guide-th.long-text    { width: 13rem; }
+   name's. Later than the two above, so they win at equal specificity.
+ *
+ * `short-values` was 4.75rem, which left 52px a line: wide enough for "Yes"
+ * and too narrow for the NAME above it — "Ultrasonic" alone is 58px — so the
+ * header broke mid-word or ran to three lines (#446). 6.25rem is what a figure
+ * column gets, and the narrowest that holds "Supercharger access" in two
+ * lines with a margin; the columns whose names are longer carry a shorter
+ * `tableLabel` (headerFit.test.js holds every name to it).
+ *
+ * `noted-figures` (8.5rem, 136px) are figures whose name states the speed they
+ * are stated at ("Composite range, 129 km/h") and whose note beneath is as long.
+ * The header breaks after the comma and sets the speed whole on its own line
+ * (SortHeader, `qualified`), so "Composite range," is the widest line it must
+ * hold: 8.5rem, with the efficiency names abbreviated ("Composite eff.") — the
+ * full word needs 9.8rem. The note wraps to two lines (below) in the 108px the
+ * column leaves it.
+ *
+ * `long-figures` are figures that do not fit a figure column BESIDE THEIR UNIT:
+ * the EPA guide's MPGe to three decimals ("154.214 MPGe" is about 88px of a
+ * 76px content box), and a warranty's distance ("160,934 km"). cellFit.test.js
+ * holds the largest figure of every column to its room. */
+.guide-th.short-values        { width: 6.25rem; }
+.guide-th.long-text           { width: 13rem; }
+.guide-th.noted-figures { width: 8.5rem; }
+.guide-th.long-figures        { width: 7.25rem; }
 .guide-th-name     { @apply truncate; }
-/* A name wraps to two lines before it ellipses; a header with no unit line
-   spends that line on its name too, and gets three. Every header is three
-   lines tall either way — a ragged header row is harder to scan than a
-   slightly taller one. One line truncated half the headers in a 6rem figure
-   column ("Max DC Charge Rate", "Charge Time 10→80%"), which is most of what
-   a preset shows (#335). `overflow-wrap` lets a single long word
-   ("Vehicle-to-Load") break rather than spill into the next column. */
+/* A name wraps to two lines before it ellipses, and that is the tallest a
+   header gets. One line truncated half the headers in a 6rem figure column
+   ("Max DC Charge Rate", "Charge Time 10→80%"), which is most of what a preset
+   shows (#335). A name that needs a third line carries a shorter `tableLabel`
+   (vehicleSpecSchema.js) rather than a taller header row: utils/__tests__/
+   headerFit.test.js holds every name to two lines at its column's width.
+   `overflow-wrap` lets a single long word ("Vehicle-to-Load") break rather
+   than spill into the next column. */
 .guide-th-name {
     white-space: normal;
     overflow-wrap: anywhere;
@@ -7446,10 +7467,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-}
-.guide-th-name.wraps {
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
 }
 .guide-sort-caret {
     @apply ml-1 inline-block;
@@ -7502,6 +7519,28 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* A hairline marking where the pinned block ends, so the seam is legible when
    content scrolls under it. */
 .sticky-name { box-shadow: 1px 0 0 var(--color-border); }
+/* The pinned name's header (Vehicle, Configuration) is the table's title for its
+   rows, so it is set apart from the column names: one step larger (the
+   subsection-title role's size, docs/typography.md) and flush with the LEFT edge
+   of the table, over the select column, rather than indented past it. The
+   select column's header is empty, so the word runs back over it: the name
+   header paints after it, and both are pinned, so they move together. The
+   margin is that column's width. */
+.guide-th.sticky-name .guide-th-name {
+    font-size: var(--fs-subsection-title, var(--fs-body));
+    margin-left: -2.25rem;
+}
+/* "drag to reorder columns", at the right of the pinned name header (SortHeader
+   `reorderHint`). Out of flow: the header gets no taller, and the name cannot
+   wrap or move for it. Right: the cell's own padding (px-3); bottom: py-2 plus a
+   little, to sit on the name's baseline. */
+.guide-th-reorder {
+    position: absolute;
+    right: 0.75rem;
+    bottom: 0.625rem;
+    white-space: nowrap;
+    pointer-events: none;
+}
 
 /* On a phone the pinned block WAS the table. 36px + 288px is 324 of a 349px
    scroller — 93%, leaving 25px for the other nine columns, so the sideways
@@ -7517,6 +7556,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * earlier: equal specificity, so the later rule wins. */
 @media (max-width: 48rem) {
     .sticky-select { width: 2rem; min-width: 2rem; }
+    .guide-th.sticky-name .guide-th-name { margin-left: -2rem; }
+    /* No drag on a phone, and the pinned column is 10rem: the hint goes. */
+    .guide-th-reorder { display: none; }
     .sticky-name {
         left: 2rem;
         width: 10rem;
@@ -7795,6 +7837,19 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     text-overflow: ellipsis;
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     color: var(--color-text-meta);
+}
+/* Under a figure, a note wraps to two small lines before it ellipses — "70 mph ·
+   98°F · −3.5% corrected" is the note a tested figure usually carries, and one
+   line of it was cut to "…corre…". Past two lines the cell's peek restates the
+   rest. Beats the stack's one-line truncation (equal specificity, later). */
+.guide-cell-stack > .vehicle-table-note {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.25;
 }
 /* Text that names a test links to it — a tested cell's note in the vehicle
    table, the conditions on a card's tested line. Link-coloured and underlined

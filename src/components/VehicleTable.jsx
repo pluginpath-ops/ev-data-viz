@@ -8,7 +8,8 @@
  * `selectedVehicles` the chips render and every chart reads. There is no second,
  * local notion of chosen. The band at the top holds the selected vehicles, in
  * chip order, kept through filters and sorting; deselecting one drops it from
- * every chart, which is intended. (The band borrows the FE Guide's pinned band,
+ * every chart, which is intended. Sorting by a header reorders the selection to
+ * match (#457), so the chips and the charts follow the table. (The band borrows the FE Guide's pinned band,
  * but it is a selection, not a pin — see docs/vocabulary.md, Tables.)
  *
  * ── State ───────────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ import useColumnDrag from '../hooks/useColumnDrag';
 import TableCell from './tables/TableCell';
 import { useCellPeek } from '../hooks/useCellPeek';
 import TestPeek from './TestPeek';
+import { cellUnit, figureWithUnit } from '../utils/tableColumns';
 import { testHref } from '../utils/testDetails';
 import { platformHref } from '../utils/platforms';
 import { useNavigation } from '../context/NavigationContext';
@@ -41,6 +43,7 @@ import ViewSpecsModal from './ViewSpecsModal';
 import VehicleCardPopover from './vehicles/VehicleCardPopover';
 import { vehicleColor } from '../utils/specHelpers';
 import { groupPerformanceByVehicle } from '../utils/dataChecks';
+import { reorderSelectionBySort } from '../utils/sortSelection';
 import {
     VEHICLE_COLUMNS, DEFAULT_VEHICLE_COLUMNS, VEHICLE_TABLE_PARAM_PREFIX,
     vehicleColumnByKey, unitFor, needsPerformance, buildVehicleRows, formatVehicleCell,
@@ -83,7 +86,9 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen,
             {cols.map(col => {
                 // An asterisk on the tested range where its peek has a when-new
                 // range to justify it (whenNewRange: only a pack well down).
-                const text = formatVehicleCell(row, col, units) + (col.key === 'tested.range_mi' && row.whenNew ? '*' : '');
+                const text = formatVehicleCell(row, col, units);
+                // The asterisk closes the figure, unit included: "512 mi*".
+                const mark = col.key === 'tested.range_mi' && row.whenNew ? '*' : '';
                 if (col.key === 'name') {
                     return (
                         // The name TEXT opens the vehicle's card in a popover; the
@@ -94,7 +99,7 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen,
                         <TableCell
                             key={col.key}
                             className="sticky-name"
-                            restate={text}
+                            restate={text + mark}
                             onClick={(e) => { e.stopPropagation(); onToggle(row.id); }}
                         >
                             <span className="vehicle-table-name">
@@ -121,6 +126,8 @@ function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen,
                         key={col.key}
                         numeric={col.numeric}
                         text={text}
+                        unit={col.numeric ? cellUnit(unitFor(col, units), row.values[col.key]) : null}
+                        mark={mark}
                         pct={vehicleBarPercent(row, col, maxima)}
                         note={row.notes[col.key]}
                         flagged={row.flagged.has(col.key)}
@@ -165,7 +172,7 @@ export default function VehicleTable({
     correctionMode = DEFAULT_READER_MODE,
 }) {
     const {
-        vehicles, selectedVehicles, toggleVehicleSelection, units, platformsById,
+        vehicles, selectedVehicles, toggleVehicleSelection, setVehicleSelection, units, platformsById,
         getPerformanceSummaries, getPerformanceSessions, performanceCounts, testSessions,
     } = useAppContext();
 
@@ -242,8 +249,8 @@ export default function VehicleTable({
         const test = row?.tests?.[key];
         const col = vehicleColumnByKey(key);
         if (!test || !col) return null;
-        const unit = unitFor(col, units);
-        const figure = `${labelledColumn(col, assumptions, units, correctionTarget, correctionMode).label}: ${formatVehicleCell(row, col, units)}${unit && row.values[key] != null ? ` ${unit}` : ''}`;
+        const unit = cellUnit(unitFor(col, units), row.values[key]);
+        const figure = `${labelledColumn(col, assumptions, units, correctionTarget, correctionMode).label}: ${figureWithUnit(formatVehicleCell(row, col, units), unit)}`;
         return <TestPeek test={test} figure={figure} />;
     }, [rowsById, assumptions, units, correctionTarget, correctionMode]);
     const { tableProps: peekProps, panel: cellPeek } = useCellPeek({ renderPeek });
@@ -279,11 +286,16 @@ export default function VehicleTable({
     const span = cols.length + 1;
 
     const sortBy = (key) => {
-        if (key === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
-        else {
-            setSortKey(key);
-            setSortDir(firstSortDir(vehicleColumnByKey(key)));
-        }
+        const dir = key === sortKey ? (sortDir === 'asc' ? 'desc' : 'asc') : firstSortDir(vehicleColumnByKey(key));
+        if (key !== sortKey) setSortKey(key);
+        setSortDir(dir);
+        // The selection follows the sort (#457): chips and charts take the
+        // table's order. Over every row, not the filtered ones — the band keeps
+        // a selected vehicle through filters. Held back while a tested column's
+        // results are still loading, when every cell would read blank.
+        if (needsPerformance([key]) && !performance) return;
+        const next = reorderSelectionBySort(selectedVehicles, rows, key, dir);
+        if (next !== selectedVehicles) setVehicleSelection(next);
     };
     const rowProps = { cols, units, maxima, onToggle: toggleVehicleSelection, onOpen: setViewing, onOpenTest, onViewRuns, performanceCounts };
 
@@ -329,8 +341,8 @@ export default function VehicleTable({
                         <tr>
                             <th className="guide-th guide-th-select sticky-select" />
                             {cols.map(col => (
-                                <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={sortBy} unit={unitFor(col, units)}
-                                    dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} />
+                                <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={sortBy}
+                                    dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} reorderHint={col.sticky} />
                             ))}
                         </tr>
                     </thead>
@@ -341,7 +353,7 @@ export default function VehicleTable({
                                     <td colSpan={span}>
                                         <div className="guide-band-content">
                                             <span className="text-nano">Selected · {selectedRows.length}</span>
-                                            <span className="text-note">on every chart, and kept here through filters and sorting</span>
+                                            <span className="text-note">maintained site-wide, at the top</span>
                                         </div>
                                     </td>
                                 </tr>
