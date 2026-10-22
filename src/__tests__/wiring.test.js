@@ -2171,6 +2171,9 @@ describe('a unit is stated in the cell, not the header (#446)', () => {
         const table = code(read('src/utils/vehicleTable.js'));
         expect(table).not.toMatch(/UNIT_WORD|splitUnit/);
         expect(table).toMatch(/f\.unit \?\? null/);
+    });
+});
+
 describe('the chart subtitle leads with conditions; counts follow Full Labels (#443)', () => {
     // The counts cost a phone's width and a reader can see them, so they come
     // back only under Full Labels - on screen and in the PNG export, which
