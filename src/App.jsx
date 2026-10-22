@@ -1394,6 +1394,7 @@ export default function App() {
                     {activeChartCategory && chartMode === 'specstable' && (
                         <VehicleTable onOpenTest={openTest} onViewRuns={viewVehicleRuns} filters={vehicleFilters} onFiltersChange={setVehicleFilters}
                             correctionTarget={chartConfig.correctionTarget}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
                             onCorrectionTargetChange={t => setChartConfig(prev => ({ ...prev, correctionTarget: t }))}
                         />
                     )}

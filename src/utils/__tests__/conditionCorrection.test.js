@@ -162,6 +162,11 @@ describe('the note never lets a corrected number pass for measured', () => {
         expect(note).toContain('temperature not recorded, taken as 70°F');
     });
 
+    it('does not call a blank wind missing: it is calm air', () => {
+        const note = correctionNote(correctionFactor({ speedMph: 80, altitudeFt: 0, temperatureF: 70 }, { mode: 'aero_wind' }));
+        expect(note).not.toContain('wind');
+    });
+
     it('says why an axis was skipped, even when nothing else was corrected', () => {
         const note = correctionNote(correctionFactor({ speedMph: 52.7, speedBasis: 'mixed' }, { mode: 'aero' }));
         expect(note).toContain('speed not corrected (mixed cycle)');

@@ -18,8 +18,8 @@ import { DEFAULT_READER_MODE } from '../utils/correctionSettings';
  * there is nothing for it to do. It is the same setting the vehicle table's
  * composite range reads.
  *
- * Lives in chartConfig beside Auto Color and Full Labels, so it rides the
- * pop-out sync and is set once for every chart.
+ * Lives in chartConfig, so it rides the pop-out sync and is set once for
+ * every chart and the vehicle table.
  */
 export default function CorrectionControl({ mode = DEFAULT_READER_MODE, target, setChartConfig }) {
     return (

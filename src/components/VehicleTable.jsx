@@ -26,7 +26,7 @@ import SortHeader from './tables/SortHeader';
 import ColumnPicker from './tables/ColumnPicker';
 import PresetPicker from './tables/PresetPicker';
 import { sessionFor } from '../utils/testSessions';
-import { DEFAULT_CORRECTION_TARGET } from '../utils/correctionSettings';
+import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import VehicleTableAssumptions from './VehicleTableAssumptions';
 import useColumnDrag from '../hooks/useColumnDrag';
 import TableCell from './tables/TableCell';
@@ -167,6 +167,9 @@ function testLink(ref, onOpenTest) {
 export default function VehicleTable({
     onOpenTest = null, onViewRuns = null, filters: sharedFilters = null, onFiltersChange = null,
     correctionTarget: sharedTarget = null, onCorrectionTargetChange = null,
+    // The reader's correction mode, set on the charts' Correct control. Read
+    // only here: 'none' shows the reported test's figures as measured.
+    correctionMode = DEFAULT_READER_MODE,
 }) {
     const {
         vehicles, selectedVehicles, toggleVehicleSelection, setVehicleSelection, units, platformsById,
@@ -231,10 +234,10 @@ export default function VehicleTable({
     // composite range corrects for.
     const rows     = useMemo(
         () => buildVehicleRows(vehicles, {
-            performance, assumptions, units, platformsById, correctionTarget,
+            performance, assumptions, units, platformsById, correctionTarget, correctionMode,
             sessionOf: r => sessionFor(testSessions, r),
         }),
-        [vehicles, performance, assumptions, units, platformsById, testSessions, correctionTarget],
+        [vehicles, performance, assumptions, units, platformsById, testSessions, correctionTarget, correctionMode],
     );
     // A tested cell peeks with its test — which one, why, and its conditions —
     // rather than restating its own text. One peek for every clipped cell in
@@ -247,9 +250,9 @@ export default function VehicleTable({
         const col = vehicleColumnByKey(key);
         if (!test || !col) return null;
         const unit = cellUnit(unitFor(col, units), row.values[key]);
-        const figure = `${labelledColumn(col, assumptions, units, correctionTarget).label}: ${figureWithUnit(formatVehicleCell(row, col, units), unit)}`;
+        const figure = `${labelledColumn(col, assumptions, units, correctionTarget, correctionMode).label}: ${figureWithUnit(formatVehicleCell(row, col, units), unit)}`;
         return <TestPeek test={test} figure={figure} />;
-    }, [rowsById, assumptions, units, correctionTarget]);
+    }, [rowsById, assumptions, units, correctionTarget, correctionMode]);
     const { tableProps: peekProps, panel: cellPeek } = useCellPeek({ renderPeek });
     const { ctx: filterCtx, filtered: filteredVehicles } = useFilteredVehicles(vehicles, filters, performanceCounts);
     const shownIds = useMemo(() => new Set(filteredVehicles.map(v => v.id)), [filteredVehicles]);
@@ -272,7 +275,7 @@ export default function VehicleTable({
     // Headers drag the same list the column picker does.
     const { dragProps, dragClass } = useColumnDrag({ visible: columns, fixedKey: 'name', onChange: changeColumns });
     // Named from the assumptions where a name carries one ("Time to add 150 mi").
-    const label    = useCallback((col) => labelledColumn(col, assumptions, units, correctionTarget), [assumptions, units, correctionTarget]);
+    const label    = useCallback((col) => labelledColumn(col, assumptions, units, correctionTarget, correctionMode), [assumptions, units, correctionTarget, correctionMode]);
     const cols     = useMemo(() => columns.map(vehicleColumnByKey).filter(Boolean).map(label), [columns, label]);
     const pickable = useMemo(() => VEHICLE_COLUMNS.map(label), [label]);
     const maxima   = useMemo(() => vehicleBarMaxima(filtered, cols), [filtered, cols]);

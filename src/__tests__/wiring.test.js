@@ -1535,7 +1535,10 @@ describe('one correction, everywhere it is applied', () => {
         const app = read('src/App.jsx');
         expect(app).toMatch(/encodeCorrection\(/);
         expect(app).toMatch(/decodeCorrection\(window\.location\.search\)/);
-        expect(app, 'the table must get App\'s target, not its own').toMatch(/correctionTarget=\{chartConfig\.correctionTarget\}\s*onCorrectionTargetChange=/);
+        expect(app, 'the table must get App\'s target, not its own').toMatch(/correctionTarget=\{chartConfig\.correctionTarget\}[\s\S]{0,200}onCorrectionTargetChange=/);
+        // And the mode: a reader who turns correction off on a chart must see
+        // the table's reported-test figures as measured too.
+        expect(app, 'the table must get the reader\'s correction mode').toMatch(/<VehicleTable[^>]*correctionMode=\{chartConfig\.correctionMode/);
     });
 });
 

@@ -4067,6 +4067,15 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-hover-lift);
     color: var(--color-text-primary);
 }
+/* The selected/available count on a section band. Mono, because it is two
+   numbers: "5 / 12" says both how many and how many there are, where
+   "5 selected" said only the first. */
+.section-band-count {
+    font-family: var(--font-mono);
+    font-size: calc(var(--fs-body) * 0.7857);
+    font-weight: 500;
+    color: var(--color-text-meta);
+}
 /* The applied dot: something inside the band is in force — a correction
    moving the figures. Accent orange because that is the "active / now"
    signal (docs/design-tokens.md), and the only thing it may mean. */
@@ -4424,16 +4433,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    list only has to space them. */
 .run-items {
     @apply flex flex-col gap-0;
-}
-
-/* The selected/available count in the disclosure. Mono, because it is two
-   numbers: "5 / 12" says both how many and how many there are, where
-   "5 selected" said only the first. */
-.run-selector-count {
-    font-family: var(--font-mono);
-    font-size: calc(var(--fs-body) * 0.7857);
-    font-weight: 500;
-    color: var(--color-text-meta);
 }
 
 /* ↗ to the video/article a test came from. Attribution, so it is deliberately

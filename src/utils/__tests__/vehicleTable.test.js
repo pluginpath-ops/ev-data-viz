@@ -658,3 +658,29 @@ describe('Time to add prices a percent at the reader\'s range basis', () => {
         expect(r.notes['calc.timeToAdd']).toBe('EPA range');
     });
 });
+
+describe('the reported test follows the reader\'s correction mode', () => {
+    const run = { id: 7, kind: 'range', distance_miles: 280, energy_kwh: 90, start_soc: 100, end_soc: 5,
+        speed_mph: 80, temperature_f: 70, altitude_ft: 0, date: '2025-05-01' };
+    const rowAt = (correctionMode) => buildVehicleRows([vehicle({ socWindowKwh: 95, runs: [run] })], { correctionMode })[0];
+
+    it('shows the test as measured when correction is off, and corrected otherwise', () => {
+        const off = rowAt('none'), on = rowAt('aero_wind');
+        expect(off.values['tested.range_mi']).toBeCloseTo(294.7, 1);            // 280 over 95 points, untouched
+        expect(on.values['tested.range_mi']).toBeGreaterThan(off.values['tested.range_mi']);   // an 80 mph test, lifted to 70
+        expect(off.notes['tested.range_mi']).not.toMatch(/corrected/);
+    });
+
+    it('keeps the composite corrected either way', () => {
+        expect(rowAt('none').values['tested.composite_range_mi']).toBeCloseTo(rowAt('aero_wind').values['tested.composite_range_mi'], 6);
+    });
+
+    it('drops the target speed from the header when nothing is corrected to it', () => {
+        const col = vehicleColumnByKey('tested.range_mi');
+        expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'imperial', undefined, 'none').label).toBe('Tested range');
+        expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'imperial').label).toBe('Tested range, 70 mph');
+        // The full name, for the tooltip and the column picker, drops it too.
+        const eff = labelledColumn(vehicleColumnByKey('tested.efficiency_mi_kwh'), DEFAULT_ASSUMPTIONS, 'imperial', undefined, 'none');
+        expect([eff.label, eff.fullLabel]).toEqual(['Tested eff.', 'Tested efficiency']);
+    });
+});

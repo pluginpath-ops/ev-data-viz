@@ -67,7 +67,7 @@ export default function PopoutView({
 
             {/* The vehicle table pops out like every other view under the Charts
                 nav, and needs no selection — it is where one is made (#315). */}
-            {chartMode === 'specstable' && <VehicleTable correctionTarget={chartConfig?.correctionTarget} />}
+            {chartMode === 'specstable' && <VehicleTable correctionTarget={chartConfig?.correctionTarget} correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE} />}
 
             {selectedVehicles.length > 0 && chartMode === 'specscatter' && (
                 <SpecsScatterView
