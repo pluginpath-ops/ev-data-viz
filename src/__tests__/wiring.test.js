@@ -1012,10 +1012,45 @@ describe('the seams that broke before', () => {
         expect(app).toMatch(/<ReferenceSection\s+subtab=\{referenceSubtab\}\s+platformId=\{referencePlatformId\}/);
     });
 
+    it('opens Reference on Explainers, and reaches Platforms only by name (#444)', () => {
+        const app = read('src/App.jsx');
+        const section = read('src/components/reference/ReferenceSection.jsx');
+        expect(section, 'a bare ?tab=reference is Explainers').toMatch(/DEFAULT_REFERENCE_SUBTAB = 'explainers'/);
+        // The constant means "what a bare URL opens" and nothing else: the
+        // platform paths must not borrow it to mean Platforms.
+        expect(app, 'a platform link names Platforms').toMatch(/subtab: 'platforms', platformId: String\(id\)/);
+        expect(app).toMatch(/setReferenceSubtab\('platforms'\)/);
+        expect(app, 'openPlatform does not use the default').not.toMatch(/subtab: DEFAULT_REFERENCE_SUBTAB, platformId/);
+        expect(app, 'a pid with no sub is read as Platforms, from the URL and from history')
+            .toMatch(/referenceSubtabFromParam\(p\.get\('sub'\), pid\)/);
+        expect(app).toMatch(/referenceSubtabFromParam\(e\.state\.subtab, e\.state\.platformId\)/);
+        expect(app, 'a platform page is written as ?pid= alone')
+            .toMatch(/referenceSubtab === 'platforms' && referencePlatformId != null\) p\.set\('pid'/);
+        expect(read('src/components/reference/PlatformPage.jsx'), 'the crumb back to the list names it')
+            .toMatch(/href="\?tab=reference&sub=platforms"/);
+    });
+
+    it('lists Explainers before Platforms in the Reference sub-nav (#444)', async () => {
+        const { REFERENCE_SUBTAB_IDS } = await import('../components/reference/ReferenceSection');
+        expect(REFERENCE_SUBTAB_IDS).toEqual(['explainers', 'platforms']);
+    });
+
+    it('reads the Reference sub-tab out of a URL or history state (#444)', async () => {
+        const { referenceSubtabFromParam, DEFAULT_REFERENCE_SUBTAB } = await import('../components/reference/ReferenceSection');
+        expect(DEFAULT_REFERENCE_SUBTAB).toBe('explainers');
+        expect(referenceSubtabFromParam(null), '?tab=reference').toBe('explainers');
+        expect(referenceSubtabFromParam('bogus')).toBe('explainers');
+        expect(referenceSubtabFromParam('platforms'), '?tab=reference&sub=platforms').toBe('platforms');
+        expect(referenceSubtabFromParam('explainers')).toBe('explainers');
+        expect(referenceSubtabFromParam(null, '12'), '?tab=reference&pid=12, which predates the flip').toBe('platforms');
+        expect(referenceSubtabFromParam(undefined, 12), 'a history state with only a platform').toBe('platforms');
+        expect(referenceSubtabFromParam('explainers', '12'), 'a named sub-tab wins').toBe('explainers');
+    });
+
     it('opens a platform\'s page from every place a platform is named (#354)', () => {
         const app = read('src/App.jsx');
         expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform[ ,]/);
-        expect(app, 'and restores ?pid=').toMatch(/setReferencePlatformId\(p\.get\('pid'\) \|\| null\)/);
+        expect(app, 'and restores ?pid=').toMatch(/const pid = p\.get\('pid'\) \|\| null;[\s\S]*?setReferencePlatformId\(pid\)/);
         expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
         expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
         expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
