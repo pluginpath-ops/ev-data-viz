@@ -3,6 +3,7 @@ import { columnByKey, formatCell, barPercent, clusterByTestGroup } from '../../.
 import SortHeader from '../../tables/SortHeader';
 import useColumnDrag from '../../../hooks/useColumnDrag';
 import TableCell from '../../tables/TableCell';
+import { cellUnit } from '../../../utils/tableColumns';
 import { useCellPeek } from '../../../hooks/useCellPeek';
 
 /**
@@ -50,7 +51,7 @@ function GuideRow({ row, cols, selectedIds, onToggleSelect, onOpenRow, vehicleLi
                 const text = formatCell(row, col);
                 const className = col.sticky ? 'sticky-name' : '';
                 if (col.key !== 'carline') {
-                    return <TableCell key={col.key} className={className} numeric={col.numeric} text={text} pct={barPercent(row, col, barMaxima)} />;
+                    return <TableCell key={col.key} className={className} numeric={col.numeric} text={text} unit={cellUnit(col.unit, row[col.key])} pct={barPercent(row, col, barMaxima)} />;
                 }
                 return (
                     // The name picks the row for comparison, like the checkbox
@@ -213,7 +214,7 @@ export default function GuideTable({
                         <th className="guide-th guide-th-select sticky-select" />
                         {cols.map(col => (
                             <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={onSort}
-                                dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} />
+                                dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} reorderHint={col.sticky} />
                         ))}
                     </tr>
                 </thead>
