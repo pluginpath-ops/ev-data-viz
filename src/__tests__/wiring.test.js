@@ -2088,3 +2088,70 @@ describe('a vehicle save that RLS refuses is an error, not a silent success', ()
         expect(vehiclesView).toMatch(/if \(await onUpdate\(editingId, formData\) === false\) return;/);
     });
 });
+
+describe('the chart subtitle leads with conditions; counts follow Full Labels (#443)', () => {
+    // The counts cost a phone's width and a reader can see them, so they come
+    // back only under Full Labels - on screen and in the PNG export, which
+    // captions itself from the same plotSubtitle.
+    const SUBTITLE_WITH_COUNTS = {
+        'ChargingView.jsx': 'chartConfig.verboseLabels',
+        'RangeChartView.jsx': 'verboseLabels',
+        'ChargeCompareView.jsx': 'verboseLabels',
+        'RoadTripView.jsx': 'verboseLabels',
+    };
+
+    for (const [file, flag] of Object.entries(SUBTITLE_WITH_COUNTS)) {
+        it(`${file} builds its counts through countParts(${flag})`, () => {
+            const text = read(`src/components/${file}`);
+            const body = text.slice(text.indexOf('const plotSubtitle = useMemo('));
+            const subtitle = body.slice(0, body.indexOf('\n    }, ['));
+            expect(subtitle).toContain(`countParts(${flag}`);
+            // No hand-rolled "N runs" phrase left in the subtitle.
+            expect(subtitle).not.toMatch(/\$\{(runs|vehicles|pairs)\} (run|vehicle|pair)/);
+        });
+
+        it(`${file} re-memoizes the subtitle when Full Labels flips`, () => {
+            const text = read(`src/components/${file}`);
+            const from = text.indexOf('const plotSubtitle = useMemo(');
+            const deps = text.slice(from, text.indexOf('useChartPng', from));
+            expect(deps).toMatch(new RegExp(`\\}, \\[[^\\]]*${flag.replace('.', '\\.')}`));
+        });
+    }
+
+    it('the pop-out hands Full Labels to every view that shows counts', () => {
+        const popout = read('src/components/PopoutView.jsx');
+        // Charging + Range ride chartConfig whole; the others take the flag.
+        expect(popout).toMatch(/<ChargingView[\s\S]*?chartConfig=\{chartConfig\}/);
+        for (const view of ['ChargeCompareView', 'RoadTripView']) {
+            const tag = popout.slice(popout.indexOf(`<${view}`));
+            expect(tag.slice(0, tag.indexOf('/>'))).toMatch(/verboseLabels=\{chartConfig\?\.verboseLabels \?\? false\}/);
+        }
+    });
+
+    // The other six chart views have no Full Labels control to restore counts
+    // with, so they never show them (owner decision on #443).
+    const NEVER_COUNTS = ['SpecsChartView.jsx', 'SpecsScatterView.jsx', 'PerformanceCurveView.jsx',
+        'performance/PerformanceCompareChart.jsx', 'EpaCurvesView.jsx', 'epa/curves/EpaCurveExplorer.jsx'];
+
+    for (const file of NEVER_COUNTS) {
+        it(`${file} puts no run, vehicle, curve or record count in its subtitle`, () => {
+            const text = read(`src/components/${file}`);
+            const from = text.indexOf('const plotSubtitle');
+            const subtitle = text.slice(from, text.indexOf('useChartPng', from));
+            expect(subtitle).not.toMatch(/\$\{n\}|countParts|\.length\}/);
+            expect(subtitle).not.toMatch(/\b(runs?|vehicles?|curves?|records?)\b['`]/);
+        });
+    }
+
+    it('every view that dropped its counts still clears a stale PNG preview when the selection changes', () => {
+        for (const file of [...Object.keys(SUBTITLE_WITH_COUNTS), ...NEVER_COUNTS]) {
+            expect(read(`src/components/${file}`), file).toMatch(/signature:/);
+        }
+        expect(read('src/hooks/useChartPng.js')).toMatch(/frame\?\.signature/);
+    });
+
+    it('Range & Efficiency hides a legend that has nothing to tell apart', () => {
+        expect(read('src/components/RangeChartView.jsx'))
+            .toMatch(/legend: \{ display: legendWorthShowing\(built\.data\.datasets\) \}/);
+    });
+});

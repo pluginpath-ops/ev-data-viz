@@ -48,6 +48,7 @@ import InfoIcon from './InfoIcon';
 import { compositeConditions, compositeExplainer, compositeFrom, earliestStart, spreadAlong, THIN_SUPPORT, COMPOSITE_MIN_TESTS } from '../utils/compositeCurve';
 import { statisticalRuns } from '../utils/runListing';
 import { reportedRangeRun } from '../utils/testedRange';
+import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
@@ -965,27 +966,26 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
     // Everything a reader needs to know what the plot was drawn under. It lives
     // in the frame, so it lives in the export — which is the whole argument for
-    // the frame. A chart pasted into a thread has to answer "how many runs, on
-    // what, corrected how, in which units" without anyone typing a caption.
+    // the frame. A chart pasted into a thread has to answer "on what, corrected
+    // how, in which units" without anyone typing a caption. The run and vehicle
+    // counts lead only under Full Labels (see utils/plotCaption.js).
     const plotSubtitle = useMemo(() => {
         const runs = colorableRuns.filter(r => !isCompositeRun(r)).length;
         const vehicles = selectedVehicles.filter(
             v => (v.runs || []).some(r => selectedRuns.includes(r.id))).length;
-        const parts = [
-            `${runs} run${runs === 1 ? '' : 's'}`,
-            `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
-        ];
+        const parts = countParts(chartConfig.verboseLabels, [[runs, 'run'], [vehicles, 'vehicle']]);
         if (raceActive) parts.push(`race mode from ${raceThreshold}% SoC`);
         const curves = selectedComposites.length;
-        if (curves) parts.push(`${curves} composite curve${curves === 1 ? '' : 's'}`);
+        if (curves) parts.push(...countParts(chartConfig.verboseLabels, [[curves, 'composite curve']]));
         parts.push(correctionCaption(chartConfig.correctionMode, chartConfig.correctionTarget, units));
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [colorableRuns, selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.correctionMode, chartConfig.correctionTarget, units, selectedComposites]);
+    }, [colorableRuns, selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.verboseLabels, chartConfig.correctionMode, chartConfig.correctionTarget, units, selectedComposites]);
 
     // ── PNG export ───────────────────────────────────────────────────────────
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle });
+        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle,
+            signature: `${selectedRuns.join(',')}|${selectedComposites.length}` });
 
     // ── Render ────────────────────────────────────────────────────────────────
 
