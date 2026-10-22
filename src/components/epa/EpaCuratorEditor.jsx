@@ -348,7 +348,7 @@ export default function EpaCuratorEditor({ testVehicleId, canEdit, onDirtyChange
 
             {/* Section 2: Road load (Target A/B/C drive the curve & η) */}
             <Section title={`Road Load & Weight — ${primary?.category || 'City/Highway'} (primary, drives the curve)`}>
-                <CuratorField label="Test weight" type="number" unit="lbs" tooltip={TIP.weight} value={primary?.equiv_test_weight_lbs} canEdit={canEdit} overrideSource={cOv('equiv_test_weight_lbs')} onSave={v => saveCoeff('equiv_test_weight_lbs', v)} />
+                <CuratorField label="Test weight" type="number" unit="lb" tooltip={TIP.weight} value={primary?.equiv_test_weight_lbs} canEdit={canEdit} overrideSource={cOv('equiv_test_weight_lbs')} onSave={v => saveCoeff('equiv_test_weight_lbs', v)} />
                 <span />
                 <CuratorField label="Target A" used type="number" step="0.0001" unit="lbf" tooltip={TIP.target_a} value={primary?.target_a} canEdit={canEdit} overrideSource={cOv('target_a')} onSave={v => saveCoeff('target_a', v)} />
                 <CuratorField label="Set A" type="number" step="0.0001" unit="lbf" tooltip={TIP.set_abc} value={primary?.set_a} canEdit={canEdit} overrideSource={cOv('set_a')} onSave={v => saveCoeff('set_a', v)} />

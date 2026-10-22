@@ -1135,6 +1135,8 @@ describe('the seams that broke before', () => {
         expect(table, 'the table must not keep its own selected ids').not.toMatch(/useState\([^)]*[Ss]elected/);
         // "Pin is local, select is global": the word stays out of this table.
         expect(table.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')).not.toMatch(/pin/i);
+        // The selected band says it is kept across the site, at the top.
+        expect(table).toMatch(/Selected · \{selectedRows\.length\}[\s\S]*maintained site-wide, at the top/);
 
         // The mechanisms are shared, not copied.
         for (const f of ['src/components/VehicleTable.jsx', 'src/components/epa/guide/GuideTable.jsx']) {
@@ -2121,6 +2123,54 @@ describe('a vehicle save that RLS refuses is an error, not a silent success', ()
 
     it('the Edit vehicle form stays open when the save is refused', () => {
         expect(vehiclesView).toMatch(/if \(await onUpdate\(editingId, formData\) === false\) return;/);
+    });
+});
+
+describe('a unit is stated in the cell, not the header (#446)', () => {
+    const cell = read('src/components/tables/TableCell.jsx');
+    const header = read('src/components/tables/SortHeader.jsx');
+    const code = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+    it('the cell draws its unit in the card\'s unit style', () => {
+        expect(cell).toMatch(/className="stat-cell-unit"/);
+        expect(cell).toMatch(/from '\.\.\/\.\.\/utils\/tableColumns'/);
+    });
+
+    it('the header draws no unit line, and the stylesheet no longer styles one', () => {
+        expect(code(header), 'no unit prop').not.toMatch(/function SortHeader\(\{[^)]*\bunit\b/);
+        expect(code(header), 'no unit drawn').not.toMatch(/\{unit\b|stat-cell-unit/);
+        expect(read('src/index.css')).not.toMatch(/guide-th-unit/);
+    });
+
+    it('both tables hand each cell its column\'s unit, and only where the cell has a value', () => {
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/unit=\{col\.numeric \? cellUnit\(unitFor\(col, units\), row\.values\[col\.key\]\)/);
+        expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/unit=\{cellUnit\(col\.unit, row\[col\.key\]\)\}/);
+    });
+
+    it('no screen prints weight as "lbs" or metric speed as "kph" (one spelling: lb, km/h)', () => {
+        // A figure's unit as the reader sees it: after `} `, a quote or `>`. The EPA sheet's own
+        // column header ("Equivalent Test Weight (lbs.)") and the stored enum 'kph' are not display.
+        const shown = ALL
+            .filter(x => !x.file.endsWith('parseEpaTestCarSheet.js'))
+            .filter(x => /(\} |['"`>])lbs\b/.test(code(x.text)) || /\$\{[^}]*\}\s*kph\b/.test(code(x.text)))
+            .map(x => x.file);
+        expect(shown).toEqual([]);
+    });
+
+    it('the pinned name header says "drag to reorder columns", in both tables, and not on a phone', () => {
+        expect(header).toMatch(/text-nano guide-th-reorder">drag to reorder columns</);
+        expect(read('src/components/tables/ColumnPicker.jsx'), 'the picker\'s own role').toMatch(/className="text-nano">Shown · drag to reorder</);
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/reorderHint=\{col\.sticky\}/);
+        expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/reorderHint=\{col\.sticky\}/);
+        const css = read('src/index.css');
+        expect(css).toMatch(/\.guide-th-reorder \{\s*position: absolute;/);
+        expect(css, 'hidden at phone width').toMatch(/@media \(max-width: 48rem\) \{[\s\S]*\.guide-th-reorder \{ display: none; \}/);
+    });
+
+    it('a spec column\'s unit is declared by the schema, never read out of its label', () => {
+        const table = code(read('src/utils/vehicleTable.js'));
+        expect(table).not.toMatch(/UNIT_WORD|splitUnit/);
+        expect(table).toMatch(/f\.unit \?\? null/);
     });
 });
 

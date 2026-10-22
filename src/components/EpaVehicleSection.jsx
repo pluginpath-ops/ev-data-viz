@@ -299,7 +299,7 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                     <div className="text-meta text-[10px] uppercase tracking-wide mb-1 font-semibold">
                         Test Setup
                     </div>
-                    <DataRow always label="Test weight" value={coeff.equiv_test_weight_lbs != null ? coeff.equiv_test_weight_lbs.toLocaleString() + ' lbs' : null} />
+                    <DataRow always label="Test weight" value={coeff.equiv_test_weight_lbs != null ? coeff.equiv_test_weight_lbs.toLocaleString() + ' lb' : null} />
                     <DataRow always label="Config" value={g.vehicle_config_number} />
                     {/* What was actually driven. Read from the stored phases
                         rather than from the label's declared method, which says

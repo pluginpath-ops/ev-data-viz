@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtDistance, fmtSpeed, fmtTemp, fmtPower } from '../unitConversions';
+import { fmtDistance, fmtSpeed, fmtTemp, fmtPower, fmtWeight, speedLabel } from '../unitConversions';
 
 /**
  * The imperial branches used to interpolate the stored number raw, which was
@@ -32,5 +32,15 @@ describe('imperial formatting clamps computed values', () => {
     it('still rounds the metric conversions it always did', () => {
         expect(fmtDistance(100, 'metric')).toBe('160.9 km');
         expect(fmtTemp(32,      'metric')).toBe('0°C');
+    });
+});
+
+describe('units are spelled one way across the site (#446)', () => {
+    it('weight is lb, not lbs, and speed is km/h, not kph', () => {
+        expect(fmtWeight(4500, 'imperial')).toBe('4500 lb');
+        expect(fmtWeight(4500, 'metric')).toBe('2041.2 kg');
+        expect(fmtSpeed(70, 'metric')).toBe('112.7 km/h');
+        expect(speedLabel('metric')).toBe('km/h');
+        expect(speedLabel('imperial')).toBe('mph');
     });
 });

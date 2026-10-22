@@ -10,6 +10,74 @@
 /** Absent is null, undefined or an empty string. Zero is a value. */
 export const isBlank = (v) => v == null || v === '';
 
+// ── Units ───────────────────────────────────────────────────────────────────
+
+/**
+ * Every unit a column may state, spelled and cased as it is written.
+ *
+ * Case carries meaning in a unit (`kWh` is energy and `KWH` is a typo; `mW` is
+ * a thousandth of a watt and `MW` is a million), so a unit is never upper- or
+ * lower-cased to match its neighbours. A column states its unit by one of
+ * these strings, or says it has none (`unitless: true`); the test in
+ * tableColumns.test.js fails a column that does neither, and a unit that is
+ * not in this list.
+ *
+ * `lb`, not `lbs`: an abbreviation has no plural. `km/h`, not `kph`.
+ * `s`, not `sec`.
+ */
+export const CANONICAL_UNITS = new Set([
+    // distance, speed, length, volume, weight
+    'mi', 'km', 'mph', 'km/h', 'ft', 'm', 'in', 'mm', 'cu ft', 'L', 'lb', 'kg',
+    // energy, power, torque, charge
+    'kWh', 'kW', 'W', 'hp', 'lb-ft', 'Nm', 'V', 'Ah', 'Wh/kg', 'C',
+    // time, force
+    's', 'min', 'h', 'yr', 'g',
+    // economy and money
+    'mi/kWh', 'km/kWh', 'mi/min', 'km/min', 'MPGe', '$', '$/mi', '$/km', '$/kWh', 'lb/hp', 'kg/kW',
+    // share
+    '%',
+]);
+
+/**
+ * Where a unit sits against its figure, in ONE place: what the cell draws and
+ * what its peek and a copied cell say are both made from this, so they cannot
+ * drift.
+ *
+ *   $…  money: the `$` leads and any per-unit part follows, closed up
+ *       ($52,000; $173/mi; $650/kWh)
+ *   %   follows, closed up (93%)
+ *   any other follows with a space (82 kWh, 2.5 mi/kWh)
+ *
+ * `before` and `after` are the text each side of the figure, space included.
+ */
+export function unitAround(unit) {
+    if (!unit) return { before: '', after: '' };
+    if (unit.startsWith('$')) return { before: '$', after: unit.slice(1) };
+    return { before: '', after: `${unit === '%' ? '' : ' '}${unit}` };
+}
+
+/** A figure with its unit, as plain text — what a cell's peek and a copied cell say. */
+export function figureWithUnit(text, unit) {
+    const { before, after } = unitAround(unit);
+    return `${before}${text}${after}`;
+}
+
+/**
+ * A column name split where it states a qualifier: "Composite range, 70 mph" →
+ * ["Composite range", "70 mph"]. The header breaks there and sets the qualifier
+ * on its own line, whole (its spaces are no-break spaces), so a short tail
+ * never orphans on a line of its own — "Composite range, 70 / mph". A name with
+ * no comma is one line of words that wrap as they like.
+ */
+export function nameLines(label) {
+    const at = String(label ?? '').indexOf(', ');
+    if (at < 0) return [label, null];
+    return [`${label.slice(0, at)},`, label.slice(at + 2).replace(/ /g, '\u00a0')];
+}
+
+/** The unit a cell states: its column's, and only where the cell holds a value. */
+export const cellUnit = (unit, value) => (isBlank(value) ? null : unit ?? null);
+
 /**
  * Sort rows by one column. Nulls last in both directions: they are absences,
  * not low values, and floating them to the top of an ascending sort would bury

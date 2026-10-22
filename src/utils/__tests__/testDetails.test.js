@@ -42,7 +42,7 @@ describe('rangeTestReference', () => {
     it('marks the speed of a mixed cycle, and converts for a metric reader', () => {
         const v = vehicle([rangeRun({ speed_basis: 'mixed' })]);
         const facts = rangeTestReference(v, testedRangeSummary(v), 'metric').facts;
-        expect(facts.find(f => f.label === 'Speed').value).toBe('112.7 kph (mixed cycle)');
+        expect(facts.find(f => f.label === 'Speed').value).toBe('112.7 km/h (mixed cycle)');
         expect(facts.find(f => f.label === 'Temperature').value).toBe('22°C');
     });
 

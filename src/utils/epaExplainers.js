@@ -18,7 +18,7 @@ export const EPA_EXPLAINERS = {
         'Target coefficients are the EPA-certified road load, from the vehicle\'s coast-down test, and the ones used to compute label MPGe. Set coefficients are what was programmed into the dynamometer, adjusted downward (A is often negative) because the drums add their own friction. The curves and derived values use the target coefficients, and fall back to the set only when a target is missing.',
 
     equivTestWeight:
-        'Equivalent Test Weight (ETW) is the vehicle\'s curb weight plus 300 lbs (representing passengers and cargo), rounded to the nearest 125-lb increment. It determines how much inertia the dynamometer simulates during acceleration phases. May differ from the spec sheet curb weight by up to ~60 lbs.',
+        'Equivalent Test Weight (ETW) is the vehicle\'s curb weight plus 300 lb (representing passengers and cargo), rounded to the nearest 125-lb increment. It determines how much inertia the dynamometer simulates during acceleration phases. May differ from the spec sheet curb weight by up to ~60 lb.',
 
     steadyStateCurve:
         'This curve is theoretical, not measured. It assumes constant speed on flat ground with no wind, a fixed 0.3 kW accessory load, and a single composite drivetrain efficiency back-solved from the constant-speed phases of the vehicle\'s own test — or scaled to that basis from its highway phase where it has none. It does not capture grade, wind, HVAC transients, or stop-and-go losses.',
