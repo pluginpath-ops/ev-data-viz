@@ -25,9 +25,12 @@ export function useChartPng(chartRef, frame) {
     // up after the chart changes and it quietly becomes a picture of something
     // else — two different answers on screen at once, the stale one looking
     // just as authoritative. Keyed on the caption because that is what encodes
-    // the run count, the mode, the corrections and the units; a plain object
-    // dependency would be a new identity every render and clear it instantly.
-    const caption = `${frame?.title ?? ''}|${frame?.subtitle ?? ''}`;
+    // the mode, the corrections and the units. The subtitle no longer carries
+    // the run/vehicle counts (#443), so a view passes `frame.signature` (a
+    // string of what is plotted) to keep a change of selection clearing the
+    // preview. A plain object dependency would be a new identity every render
+    // and clear it instantly.
+    const caption = `${frame?.title ?? ''}|${frame?.subtitle ?? ''}|${frame?.signature ?? ''}`;
     const firstRun = useRef(true);
     useEffect(() => {
         if (firstRun.current) { firstRun.current = false; return; }

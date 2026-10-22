@@ -309,7 +309,7 @@ export default function App() {
     // switching views never changes which vehicles show. Read from the link
     // the page opened on (vehicleFilters.js reads the table's old vt_ ones too).
     const [vehicleFilters, setVehicleFilters] = useState(() => decodeVehicleFilters(window.location.search));
-    // Reference's sub-tab (#338): Platforms or Explainers.
+    // Reference's sub-tab (#338): Explainers or Platforms.
     const [referenceSubtab, setReferenceSubtab] = useState(DEFAULT_REFERENCE_SUBTAB);
     // The platform whose page is showing under Reference › Platforms (#354), or null for the list.
     const [referencePlatformId, setReferencePlatformId] = useState(null);
@@ -410,8 +410,9 @@ export default function App() {
      * entry, so Back returns to the card, table or View Specs it came from.
      */
     const openPlatform = (id) => {
-        history.pushState({ view: 'reference', subtab: DEFAULT_REFERENCE_SUBTAB, platformId: String(id) }, '', platformHref(id));
-        setReferenceSubtab(DEFAULT_REFERENCE_SUBTAB);
+        // Named, not the default: a bare ?tab=reference is Explainers (#444).
+        history.pushState({ view: 'reference', subtab: 'platforms', platformId: String(id) }, '', platformHref(id));
+        setReferenceSubtab('platforms');
         setReferencePlatformId(String(id));
         setView('reference');
         window.scrollTo(0, 0);
@@ -419,8 +420,10 @@ export default function App() {
 
     /** A Reference sub-tab's top level (the platform list, or Explainers), or one explainer. */
     const openReference = (subtab, topic = null) => {
-        const url = subtab === DEFAULT_REFERENCE_SUBTAB ? '?tab=reference'
-            : `?tab=reference&sub=${subtab}${topic ? `&topic=${encodeURIComponent(topic)}` : ''}`;
+        // Only the default is left out of the URL (Platforms is written as
+        // sub=platforms), and the topic rides on whichever sub-tab holds it.
+        const topicPart = subtab === 'explainers' && topic ? `&topic=${encodeURIComponent(topic)}` : '';
+        const url = `?tab=reference${subtab === DEFAULT_REFERENCE_SUBTAB ? '' : `&sub=${subtab}`}${topicPart}`;
         history.pushState({ view: 'reference', subtab, platformId: null, topic }, '', url);
         setReferenceSubtab(subtab);
         setReferencePlatformId(null);
@@ -514,8 +517,9 @@ export default function App() {
             return;
         }
         if (tab === 'reference') {
-            setReferenceSubtab(referenceSubtabFromParam(p.get('sub')));
-            setReferencePlatformId(p.get('pid') || null);
+            const pid = p.get('pid') || null;
+            setReferenceSubtab(referenceSubtabFromParam(p.get('sub'), pid));
+            setReferencePlatformId(pid);
             setReferenceTopic(p.get('topic') || null);
             setView('reference');
             return;
@@ -634,7 +638,7 @@ export default function App() {
                 if (RUNS_SUBTAB_IDS.includes(e.state.subtab)) setRunsSubtab(e.state.subtab);
             }
             if (e.state.view === 'reference') {
-                setReferenceSubtab(referenceSubtabFromParam(e.state.subtab));
+                setReferenceSubtab(referenceSubtabFromParam(e.state.subtab, e.state.platformId));
                 setReferencePlatformId(e.state.platformId ?? null);
                 setReferenceTopic(e.state.topic ?? null);
             }
@@ -891,8 +895,10 @@ export default function App() {
         if (view !== 'reference') return;
         const p = new URLSearchParams();
         p.set('tab', 'reference');
-        if (referenceSubtab !== DEFAULT_REFERENCE_SUBTAB) p.set('sub', referenceSubtab);
-        else if (referencePlatformId != null) p.set('pid', referencePlatformId);
+        // A platform's page is ?pid= alone (the parser reads it as Platforms);
+        // the list is sub=platforms, since a bare ?tab=reference is Explainers (#444).
+        if (referenceSubtab === 'platforms' && referencePlatformId != null) p.set('pid', referencePlatformId);
+        else if (referenceSubtab !== DEFAULT_REFERENCE_SUBTAB) p.set('sub', referenceSubtab);
         if (referenceSubtab === 'explainers' && referenceTopic) p.set('topic', referenceTopic);
         history.replaceState({ view: 'reference', subtab: referenceSubtab, platformId: referencePlatformId, topic: referenceTopic }, '', '?' + p.toString());
     }, [isPopout, view, referenceSubtab, referencePlatformId, referenceTopic]);
@@ -949,7 +955,7 @@ export default function App() {
         epa:      { tab: 'epa',      items: EPA_STRIP_ITEMS,      active: epaSubtab,    select: setEpaSubtab },
         vehicles: { tab: 'vehicles', items: VEHICLES_STRIP_ITEMS, active: vehiclesMode, select: setVehiclesMode },
         reference: { tab: 'reference', items: REFERENCE_STRIP_ITEMS, active: referenceSubtab,
-            // A sub-tab opens its own top level: Platforms is the list.
+            // A sub-tab opens its own top level: Platforms is the list, Explainers the index.
             select: (key) => { setReferenceSubtab(key); setReferencePlatformId(null); setReferenceTopic(null); } },
     }[headerTab] ?? null;
 

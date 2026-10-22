@@ -115,7 +115,7 @@ export default function PlatformPage({ platformId, onBack }) {
 function PlatformCrumb({ onBack, current }) {
     return (
         <nav aria-label="Breadcrumb" className="page-crumb mb-1">
-            <a href="?tab=reference" onClick={e => { e.preventDefault(); onBack?.(); }}>Platforms</a>
+            <a href="?tab=reference&sub=platforms" onClick={e => { e.preventDefault(); onBack?.(); }}>Platforms</a>
             {current && <><span aria-hidden="true"> / </span><span aria-current="page">{current}</span></>}
         </nav>
     );

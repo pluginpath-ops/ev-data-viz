@@ -259,16 +259,12 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
         return x && y ? `${y} vs ${x}` : 'Compare specs';
     }, [allNumericFields, xField, yField]);
 
-    const plotSubtitle = useMemo(() => {
-        const n = vehicles.length;
-        return [
-            `${n} vehicle${n === 1 ? '' : 's'}`,
-            units === 'metric' ? 'metric' : 'imperial',
-        ].join(' · ');
-    }, [vehicles, units]);
+    // Units only: the vehicle count is visible on the chart (#443).
+    const plotSubtitle = units === 'metric' ? 'metric' : 'imperial';
 
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+            signature: vehicles.map(v => v.id).join(',') });
 
     return (
         <>

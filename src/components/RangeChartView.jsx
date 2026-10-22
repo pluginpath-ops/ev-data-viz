@@ -33,6 +33,7 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
 import { wrapCanvasText } from '../utils/wrapCanvasText';
+import { countParts, legendWorthShowing } from '../utils/plotCaption';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -530,6 +531,10 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     // The frame draws the title now, in the DOM, and the export
                     // draws it onto the PNG. Leaving it on here printed it twice.
                     title: { display: false },
+                    // A lone dataset's swatch only repeats the y-axis title
+                    // ("Range (mi)" twice), so the legend appears for two or
+                    // more distinct series — the line charts' vehicles.
+                    legend: { display: legendWorthShowing(built.data.datasets) },
                     tooltip: {
                         displayColors: false,
                         filter: suppressBarTooltip,
@@ -639,18 +644,16 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
         const runs = plottableRuns.length;
         const vehicles = new Set(plottableRuns.map(r => r.vehicleName ?? r.vehicle?.id)).size;
         const isEff = chartType.startsWith('eff-');
-        const parts = [
-            `${runs} run${runs === 1 ? '' : 's'}`,
-            `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
-        ];
+        const parts = countParts(verboseLabels, [[runs, 'run'], [vehicles, 'vehicle']]);
         if (isEff) parts.push(effOptions(units).find(o => o.value === effUnit)?.label ?? effUnit);
         parts.push(correctionCaption(correctionMode, correctionTarget, units));
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [plottableRuns, chartType, effUnit, correctionMode, correctionTarget, units]);
+    }, [plottableRuns, chartType, effUnit, verboseLabels, correctionMode, correctionTarget, units]);
 
     const { copyPng, copied, preview, dismissPreview } =
-        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle });
+        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle,
+            signature: plottableRuns.map(r => r.id).join(',') });
 
     return (
         <div className="chart-layout">

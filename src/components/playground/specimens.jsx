@@ -270,7 +270,7 @@ export const COMPOSITES = {
             <div className="plot-frame-head">
                 <span className="plot-frame-mark" aria-hidden="true" />
                 <span className="plot-frame-title">Charge rate</span>
-                <span className="plot-frame-subtitle">4 runs · 70 mph · 98°F</span>
+                <span className="plot-frame-subtitle">corrected for wind · 70°F · 0 ft · imperial</span>
             </div>
         </div>
     ),
