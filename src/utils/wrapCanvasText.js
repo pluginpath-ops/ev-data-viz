@@ -33,3 +33,43 @@ export function wrapCanvasText(ctx, text, maxWidth, maxLines = 3) {
     while (last.length > 1 && !fits(last + '…')) last = last.slice(0, -1);
     return [...lines.slice(0, maxLines - 1), last + '…'];
 }
+
+/**
+ * `wrapCanvasText` for a Chart.js tick label. A tick callback has no font set on
+ * the context it can reach, so this sets `font` (a CSS font shorthand — the one
+ * the axis draws in) for the measuring and puts the context back. Returns the
+ * lines as an array, which Chart.js draws as a multi-line label and sizes the
+ * axis to, so the axis grows to the widest wrapped line and no further.
+ */
+export function wrapAxisLabel(ctx, font, text, maxWidth, maxLines = 3) {
+    ctx.save();
+    try {
+        ctx.font = font;
+        const lines = wrapCanvasText(ctx, text, maxWidth, maxLines);
+        return lines.length ? lines : '';
+    } finally {
+        ctx.restore();
+    }
+}
+
+/** Room a lane-labelled Y axis leaves for the legend, the X axis and its title. */
+const LANE_AXIS_CHROME_PX = 90;
+
+/**
+ * How wide and how many lines a label on a lane-labelled Y axis may take, from
+ * the size of the chart rather than a fixed character count — so the same chart
+ * wraps tighter at phone width and gives a crowded one fewer lines.
+ *
+ *   maxWidth — 30% of the chart, between 72 and 220px. The axis is as wide as
+ *              its widest line, so this is also the most it can take of the plot.
+ *   maxLines — as many lines as fit inside one lane (up to 3, the limit the
+ *              other charts wrap to), never fewer than 1.
+ */
+export function laneLabelBudget({ chartWidth, chartHeight, lanes, lineHeight }) {
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const laneHeight = Math.max(0, chartHeight - LANE_AXIS_CHROME_PX) / Math.max(1, lanes);
+    return {
+        maxWidth: clamp(Math.round(chartWidth * 0.3), 72, 220),
+        maxLines: clamp(Math.floor(laneHeight / lineHeight), 1, 3),
+    };
+}
