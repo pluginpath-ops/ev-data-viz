@@ -4,9 +4,41 @@ import { platformProvides } from './platforms';
 
 // ── Vehicle display label ─────────────────────────────────────────────────────
 
+/** Lowercased alphanumeric words of a string: "Premium AWD" -> ["premium", "awd"]. */
+const words = (s) => String(s).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/**
+ * True when `part` already appears inside `earlier`, as a whole run of words.
+ * Case-insensitive and ignores punctuation, but never matches inside a word:
+ * "L" is not contained in "Long Range", nor "3" in "Model 30", so a trim that
+ * merely shares letters with the name is kept. (`vehicleDetailLabel` uses a
+ * plain substring test, which would drop that "L".) A part with no words at
+ * all is never "contained" — it is kept as written.
+ */
+function containedIn(earlier, part) {
+    const need = words(part);
+    if (!need.length) return false;
+    const have = words(earlier);
+    for (let i = 0; i + need.length <= have.length; i++) {
+        if (need.every((w, k) => have[i + k] === w)) return true;
+    }
+    return false;
+}
+
+/**
+ * What we CALL a vehicle: `year name · trim`. The year and the trim are each
+ * dropped when the name already carries them as whole words, so a vehicle named
+ * "Model Y Premium AWD" with trim "Premium AWD" reads "2026 Model Y Premium AWD"
+ * rather than "... · Premium AWD". A missing name, year or trim is simply left
+ * out. Display only: it does not edit the stored name.
+ */
 export function vehicleLabel(v) {
-    const base = v?.year ? `${v.year} ${v.name}` : (v?.name ?? '');
-    return v?.trim ? `${base} · ${v.trim}` : base;
+    const clean = (x) => (x == null ? '' : String(x).trim());
+    const name = clean(v?.name);
+    const year = clean(v?.year);
+    const trim = clean(v?.trim);
+    const base = [year && !containedIn(name, year) ? year : '', name].filter(Boolean).join(' ');
+    return trim && !containedIn(base, trim) ? (base ? `${base} · ${trim}` : trim) : base;
 }
 
 /**
