@@ -1098,6 +1098,14 @@ describe('the seams that broke before', () => {
         expect(table).toMatch(/toggleVehicleSelection/);
         expect(table).toMatch(/selectedVehicles\.map/);
         expect(table, 'the table must not keep its own selected ids').not.toMatch(/useState\([^)]*[Ss]elected/);
+
+        // Sorting reorders the selection (#457) — through the one guarded writer,
+        // from the pure reorder, never by writing the selection state directly.
+        const sortHandler = table.slice(table.indexOf('const sortBy = '), table.indexOf('const rowProps'));
+        expect(sortHandler, 'the sort handler must reorder the selection').toMatch(/reorderSelectionBySort\(/);
+        expect(sortHandler, 'the reorder must go through setVehicleSelection').toMatch(/setVehicleSelection\(next\)/);
+        expect(table, 'the table must not call the raw selection setter').not.toMatch(/setSelectedVehicles/);
+        expect(read('src/utils/sortSelection.js').replace(/\/\*[\s\S]*?\*\//g, ''), 'the reorder is pure: it writes nothing').not.toMatch(/setVehicleSelection|setSelectedVehicles|localStorage/);
         // "Pin is local, select is global": the word stays out of this table.
         expect(table.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')).not.toMatch(/pin/i);
 

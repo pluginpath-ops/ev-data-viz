@@ -8,7 +8,8 @@
  * `selectedVehicles` the chips render and every chart reads. There is no second,
  * local notion of chosen. The band at the top holds the selected vehicles, in
  * chip order, kept through filters and sorting; deselecting one drops it from
- * every chart, which is intended. (The band borrows the FE Guide's pinned band,
+ * every chart, which is intended. Sorting by a header reorders the selection to
+ * match (#457), so the chips and the charts follow the table. (The band borrows the FE Guide's pinned band,
  * but it is a selection, not a pin — see docs/vocabulary.md, Tables.)
  *
  * ── State ───────────────────────────────────────────────────────────────────
@@ -41,6 +42,7 @@ import ViewSpecsModal from './ViewSpecsModal';
 import VehicleCardPopover from './vehicles/VehicleCardPopover';
 import { vehicleColor } from '../utils/specHelpers';
 import { groupPerformanceByVehicle } from '../utils/dataChecks';
+import { reorderSelectionBySort } from '../utils/sortSelection';
 import {
     VEHICLE_COLUMNS, DEFAULT_VEHICLE_COLUMNS, VEHICLE_TABLE_PARAM_PREFIX,
     vehicleColumnByKey, unitFor, needsPerformance, buildVehicleRows, formatVehicleCell,
@@ -162,7 +164,7 @@ export default function VehicleTable({
     correctionTarget: sharedTarget = null, onCorrectionTargetChange = null,
 }) {
     const {
-        vehicles, selectedVehicles, toggleVehicleSelection, units, platformsById,
+        vehicles, selectedVehicles, toggleVehicleSelection, setVehicleSelection, units, platformsById,
         getPerformanceSummaries, getPerformanceSessions, performanceCounts, testSessions,
     } = useAppContext();
 
@@ -276,11 +278,16 @@ export default function VehicleTable({
     const span = cols.length + 1;
 
     const sortBy = (key) => {
-        if (key === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
-        else {
-            setSortKey(key);
-            setSortDir(firstSortDir(vehicleColumnByKey(key)));
-        }
+        const dir = key === sortKey ? (sortDir === 'asc' ? 'desc' : 'asc') : firstSortDir(vehicleColumnByKey(key));
+        if (key !== sortKey) setSortKey(key);
+        setSortDir(dir);
+        // The selection follows the sort (#457): chips and charts take the
+        // table's order. Over every row, not the filtered ones — the band keeps
+        // a selected vehicle through filters. Held back while a tested column's
+        // results are still loading, when every cell would read blank.
+        if (needsPerformance([key]) && !performance) return;
+        const next = reorderSelectionBySort(selectedVehicles, rows, key, dir);
+        if (next !== selectedVehicles) setVehicleSelection(next);
     };
     const rowProps = { cols, units, maxima, onToggle: toggleVehicleSelection, onOpen: setViewing, onOpenTest, onViewRuns, performanceCounts };
 
