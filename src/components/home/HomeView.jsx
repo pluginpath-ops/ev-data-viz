@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useNavigation } from '../../context/NavigationContext';
 import { useFeaturedComparisonsContext } from '../../context/FeaturedComparisonsContext';
-import { comparisonToShow, liveVehicleIds, replacesSelection } from '../../utils/featuredComparisons';
+import { comparisonToShow, liveVehicleIds, replacesSelection, vehiclesInOrder } from '../../utils/featuredComparisons';
 import { buildVehicleLabels } from '../../utils/seriesLabel';
 import HomeIntro from './HomeIntro';
+import ScrollMoreHint from './ScrollMoreHint';
+import MarkdownText from '../MarkdownText';
 import FeaturedChartPanel from './FeaturedChartPanel';
 import ReplaceSelectionDialog from './ReplaceSelectionDialog';
 import LoadingSpinner from '../LoadingSpinner';
@@ -33,11 +35,10 @@ export default function HomeView({ slug, onSlugChange }) {
     const record = useSiteEvents();
 
     const shown = useMemo(() => comparisonToShow(comparisons, slug), [comparisons, slug]);
-    const shownVehicles = useMemo(() => {
-        if (!shown) return [];
-        const ids = new Set(liveVehicleIds(shown, vehicles).map(String));
-        return vehicles.filter(v => ids.has(String(v.id)));
-    }, [shown, vehicles]);
+    const shownVehicles = useMemo(
+        () => (shown ? vehiclesInOrder(liveVehicleIds(shown, vehicles), vehicles) : []),
+        [shown, vehicles],
+    );
     const names = useMemo(() => buildVehicleLabels(shownVehicles), [shownVehicles]);
 
     // Home was opened, once per tab per comparison, once there is something to say it showed.
@@ -128,7 +129,7 @@ export default function HomeView({ slug, onSlugChange }) {
                         </button>
                     </div>
                 </div>
-                {shown.blurb && <p className="text-secondary">{shown.blurb}</p>}
+                <MarkdownText text={shown.blurb} />
                 <ul className="home-vehicles" aria-label="Vehicles in this comparison">
                     {shownVehicles.map(v => (
                         <li key={v.id} className="featured-vehicle-chip" style={{ '--chip-accent': v.color || undefined }}>
@@ -148,6 +149,8 @@ export default function HomeView({ slug, onSlugChange }) {
                     />
                 ))}
             </div>
+
+            <ScrollMoreHint />
 
             {pending && (
                 <ReplaceSelectionDialog

@@ -53,7 +53,7 @@ export const OWNED_FAMILIES = [
  */
 export const NOT_CATALOGUED = {
     'featured-vehicle-chip': 'The same pill as .selected-vehicle-chip (one rule, two names) where Home and the featured comparison editor name a comparison\'s vehicles. It reports a set, so it is not the selection. The selection chip is catalogued.',
-    'featured-chip-remove': 'The × inside a .featured-vehicle-chip in the editor: inherits the chip\'s color, dims on hover.',
+    'featured-chip-button': 'The ‹ › × buttons inside a .featured-vehicle-chip in the editor (move earlier, move later, remove): inherit the chip\'s color, dim on hover and when unavailable.',
     'selected-vehicle-chip-name': 'The name inside .selected-vehicle-chip, drawn as a button: inherits the chip\'s color and only underlines on hover. The chip is catalogued.',
     'info-icon':        'Layout wrapper — an inline-flex span holding the glyph. The glyph is catalogued.',
     'popover-foot-gap': 'A flex spacer inside the action row — it has no appearance at '

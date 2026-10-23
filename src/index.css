@@ -9013,6 +9013,8 @@ a.is-test-link:focus-visible {
     min-width: 0;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
+    /* Where the "More" pill leaves a panel when it scrolls to it: below the header. */
+    scroll-margin-top: calc(var(--app-header-h, 0px) + 12px);
 }
 .home-panel-head {
     @apply flex items-start justify-between gap-3;
@@ -9038,8 +9040,8 @@ a.is-test-link:focus-visible {
     opacity: 0.12;
 }
 
-/* A chip's remove button, in the editor. */
-.featured-chip-remove {
+/* A chip's move and remove buttons, in the editor. */
+.featured-chip-button {
     color: inherit;
     cursor: pointer;
     background: none;
@@ -9047,7 +9049,8 @@ a.is-test-link:focus-visible {
     padding: 0 2px;
     line-height: 1;
 }
-.featured-chip-remove:hover { opacity: 0.7; }
+.featured-chip-button:hover:not(:disabled) { opacity: 0.7; }
+.featured-chip-button:disabled { opacity: 0.3; cursor: default; }
 
 .featured-editor-grid {
     @apply grid gap-3;
@@ -9067,9 +9070,78 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-2;
 }
 .featured-editor-chart {
+    @apply flex flex-col gap-1;
+}
+.featured-editor-chart-row {
     @apply flex items-center gap-2;
 }
-.featured-editor-chart .form-input {
+.featured-editor-chart-row .form-input {
     flex: 1 1 auto;
     min-width: 0;
+}
+
+
+/* ── A curator's text: basic Markdown on Home (#448) ────────────────────────── */
+
+.markdown {
+    @apply flex flex-col gap-2;
+    min-width: 0;
+    font-size: var(--fs-body);
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+}
+.markdown p,
+.markdown ul {
+    margin: 0;
+}
+.markdown-list {
+    @apply flex flex-col gap-1;
+    padding-left: 1.25rem;
+    list-style: disc;
+}
+/* Every level is one modest size, so text in a field can never outshout the
+   page's own headings. */
+.markdown-heading {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--fs-body);
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+.markdown strong {
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+.markdown a {
+    color: var(--color-text-link);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* The "More" pill: another chart waits below the edge of the window (#448). */
+.scroll-more {
+    @apply fixed inline-flex items-center gap-2 font-mono uppercase;
+    left: 50%;
+    bottom: 1.25rem;
+    transform: translateX(-50%);
+    z-index: var(--z-header);
+    padding: 0.45rem 1rem;
+    border: 0;
+    border-radius: 9999px;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    background-color: var(--color-primary);
+    color: white;
+    box-shadow: var(--shadow-popover);
+    cursor: pointer;
+    animation: scroll-more-bob 2.2s ease-in-out infinite;
+}
+.scroll-more:hover { filter: brightness(1.1); }
+@keyframes scroll-more-bob {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50%      { transform: translateX(-50%) translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .scroll-more { animation: none; }
 }

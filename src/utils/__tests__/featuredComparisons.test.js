@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
     slugify, uniqueSlug, chartParamsFromSearch, chartModeOf, defaultChartTitle,
     normalizeComparison, comparisonToRow, comparisonProblems, comparisonToShow,
-    addChart, removeChart, moveChart, renameChart,
-    liveVehicleIds, chartStateOf, resetStateOf, replacesSelection,
+    addChart, removeChart, moveChart, renameChart, captionChart,
+    liveVehicleIds, chartStateOf, resetStateOf, replacesSelection, vehiclesInOrder, moveVehicle,
 } from '../featuredComparisons';
 import { buildChartParams } from '../chartUrlState';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from '../chartDefaults';
@@ -81,7 +81,7 @@ describe('a stored row', () => {
 
     it('drops a chart that is not one rather than breaking Home', () => {
         const c = normalizeComparison(row({ charts: [null, { title: 'x' }, { title: 'y', params: 'tab=reference' }, { title: 'ok', params: 'tab=efficiency&m=range' }] }));
-        expect(c.charts).toEqual([{ title: 'ok', params: 'tab=efficiency&m=range' }]);
+        expect(c.charts).toEqual([{ title: 'ok', caption: '', params: 'tab=efficiency&m=range' }]);
         expect(normalizeComparison(row({ charts: 'oops', vehicle_ids: null })).charts).toEqual([]);
     });
 
@@ -205,5 +205,59 @@ describe('when opening would replace a selection worth keeping', () => {
     it('does not warn when the comparison would select the same vehicles', () => {
         expect(replacesSelection([2, 1], c, vehicles)).toBe(false);
         expect(replacesSelection(['1', '2'], c, vehicles)).toBe(false);
+    });
+});
+
+describe('a chart\'s caption', () => {
+    it('is kept as written, line breaks included, and is empty when there is none', () => {
+        const c = normalizeComparison(row({ charts: [
+            { title: 'A', caption: 'line one\nline two', params: 'tab=efficiency&m=range' },
+            { title: 'B', params: 'tab=efficiency&m=compare' },
+            { title: 'C', caption: 7, params: 'tab=efficiency&m=compare' },
+        ] }));
+        expect(c.charts.map(x => x.caption)).toEqual(['line one\nline two', '', '']);
+    });
+
+    it('is saved only when there is one, trimmed at the ends but not inside', () => {
+        const c = normalizeComparison(row({ charts: [
+            { title: 'A', caption: '  one\n\ntwo  ', params: 'tab=efficiency&m=range' },
+            { title: 'B', caption: '   ', params: 'tab=efficiency&m=compare' },
+        ] }));
+        const out = comparisonToRow(c).charts;
+        expect(out[0]).toEqual({ title: 'A', caption: 'one\n\ntwo', params: 'tab=efficiency&m=range' });
+        expect(out[1]).toEqual({ title: 'B', params: 'tab=efficiency&m=compare' });
+    });
+
+    it('is edited on one chart without touching the others', () => {
+        const c = normalizeComparison(row());
+        const next = captionChart(c, 1, 'Cold and high');
+        expect(next.charts[1].caption).toBe('Cold and high');
+        expect(next.charts[0].caption).toBe('');
+        expect(c.charts[1].caption).toBe('');   // not mutated
+    });
+});
+
+describe('the order of a comparison\'s vehicles is the curator\'s', () => {
+    const c = normalizeComparison(row({ vehicle_ids: [3, 1, 2] }));
+
+    it('is kept when the records are listed, whatever order the site lists them in', () => {
+        expect(vehiclesInOrder(c.vehicleIds, vehicles).map(v => v.id)).toEqual([3, 1, 2]);
+        expect(vehiclesInOrder(c.vehicleIds, [...vehicles].reverse()).map(v => v.id)).toEqual([3, 1, 2]);
+    });
+
+    it('skips a vehicle that has since been deleted, and matches ids across string and number', () => {
+        expect(vehiclesInOrder([2, 99, '1'], vehicles).map(v => v.id)).toEqual([2, 1]);
+    });
+
+    it('comes through to the chart state, so the series are drawn in it', () => {
+        expect(chartStateOf(c, 0, vehicles).vehicleIds).toEqual([3, 1, 2]);
+        expect(resetStateOf(c, vehicles).vehicleIds).toEqual([3, 1, 2]);
+    });
+
+    it('can be changed one vehicle at a time', () => {
+        expect(moveVehicle(c, 0, 2).vehicleIds).toEqual([1, 2, 3]);
+        expect(moveVehicle(c, 2, 0).vehicleIds).toEqual([2, 3, 1]);
+        expect(moveVehicle(c, 0, 5)).toBe(c);
+        expect(c.vehicleIds).toEqual([3, 1, 2]);   // not mutated
     });
 });

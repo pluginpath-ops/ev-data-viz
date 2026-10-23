@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-    addChart, removeChart, moveChart, renameChart, uniqueSlug,
+    addChart, removeChart, moveChart, moveVehicle, renameChart, captionChart, uniqueSlug,
     comparisonProblems, chartModeOf, defaultChartTitle,
 } from '../../utils/featuredComparisons';
 import { buildVehicleLabels } from '../../utils/seriesLabel';
 
 const NEW = 'new';
+
+// What the blurb and a chart's caption understand (utils/miniMarkdown.js).
+const MARKDOWN_HINT = '**bold**, *italic*, # heading, - bullet, [text](address); Enter starts a new line.';
 
 /**
  * Make or change a featured comparison (#448).
@@ -118,9 +121,10 @@ export default function FeaturedComparisonEditor({ request, comparisons, vehicle
                         </label>
                         <label className="featured-editor-field is-wide">
                             <span className="text-label">What it shows</span>
-                            <textarea className="form-input" rows={3} value={draft.blurb}
+                            <textarea className="form-input" rows={4} value={draft.blurb}
                                 onChange={e => set({ blurb: e.target.value })}
                                 placeholder="A sentence or two for the top of Home" />
+                            <span className="text-meta">{MARKDOWN_HINT}</span>
                         </label>
                         <label className="featured-editor-field">
                             <span className="text-label">Link name</span>
@@ -135,14 +139,18 @@ export default function FeaturedComparisonEditor({ request, comparisons, vehicle
                         </label>
                     </div>
 
-                    <p className="text-label mt-4 mb-1">Vehicles (shared by every chart)</p>
+                    <p className="text-label mt-4 mb-1">Vehicles (shared by every chart; the order is the order they are drawn and listed in)</p>
                     <ul className="home-vehicles">
-                        {draft.vehicleIds.map(id => {
+                        {draft.vehicleIds.map((id, i) => {
                             const v = vehicles.find(x => String(x.id) === String(id));
                             return (
                                 <li key={id} className="featured-vehicle-chip" style={{ '--chip-accent': v?.color || undefined }}>
+                                    <button type="button" className="featured-chip-button" aria-label="Move earlier" disabled={i === 0}
+                                        onClick={() => set(moveVehicle(draft, i, i - 1))}>‹</button>
                                     {v ? (names.get(v.id)?.short ?? v.name) : `Unavailable (#${id})`}
-                                    <button type="button" className="featured-chip-remove" aria-label="Remove vehicle"
+                                    <button type="button" className="featured-chip-button" aria-label="Move later" disabled={i === draft.vehicleIds.length - 1}
+                                        onClick={() => set(moveVehicle(draft, i, i + 1))}>›</button>
+                                    <button type="button" className="featured-chip-button" aria-label="Remove vehicle"
                                         onClick={() => set({ vehicleIds: draft.vehicleIds.filter(x => x !== id) })}>×</button>
                                 </li>
                             );
@@ -153,15 +161,21 @@ export default function FeaturedComparisonEditor({ request, comparisons, vehicle
                     <div className="featured-editor-charts">
                         {draft.charts.map((chart, i) => (
                             <div key={i} className="featured-editor-chart">
-                                <input className="form-input" value={chart.title} aria-label={`Chart ${i + 1} title`}
-                                    onChange={e => set(renameChart(draft, i, e.target.value))} />
-                                <span className="text-meta">{defaultChartTitle(chartModeOf(chart.params))}</span>
-                                <button type="button" className="btn btn-secondary" disabled={i === 0} aria-label="Move up"
-                                    onClick={() => set(moveChart(draft, i, i - 1))}>↑</button>
-                                <button type="button" className="btn btn-secondary" disabled={i === draft.charts.length - 1} aria-label="Move down"
-                                    onClick={() => set(moveChart(draft, i, i + 1))}>↓</button>
-                                <button type="button" className="btn btn-secondary" aria-label="Remove chart"
-                                    onClick={() => set(removeChart(draft, i))}>×</button>
+                                <div className="featured-editor-chart-row">
+                                    <input className="form-input" value={chart.title} aria-label={`Chart ${i + 1} title`}
+                                        onChange={e => set(renameChart(draft, i, e.target.value))} />
+                                    <span className="text-meta">{defaultChartTitle(chartModeOf(chart.params))}</span>
+                                    <button type="button" className="btn btn-secondary" disabled={i === 0} aria-label="Move up"
+                                        onClick={() => set(moveChart(draft, i, i - 1))}>↑</button>
+                                    <button type="button" className="btn btn-secondary" disabled={i === draft.charts.length - 1} aria-label="Move down"
+                                        onClick={() => set(moveChart(draft, i, i + 1))}>↓</button>
+                                    <button type="button" className="btn btn-secondary" aria-label="Remove chart"
+                                        onClick={() => set(removeChart(draft, i))}>×</button>
+                                </div>
+                                <textarea className="form-input" rows={2} value={chart.caption ?? ''}
+                                    aria-label={`Chart ${i + 1} caption`}
+                                    onChange={e => set(captionChart(draft, i, e.target.value))}
+                                    placeholder="Caption under the title (optional)" />
                             </div>
                         ))}
                     </div>
