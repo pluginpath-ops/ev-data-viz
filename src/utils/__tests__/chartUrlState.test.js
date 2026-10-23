@@ -36,6 +36,17 @@ describe('an untouched chart keeps a short link', () => {
     });
 });
 
+describe('the axes belong to Charging Curves', () => {
+    it('are written for charging only, since no other chart reads them', () => {
+        const keys = mode => [...new URLSearchParams(build({ chartMode: mode, selectedVehicles: [3] })).keys()];
+        expect(keys('charging')).toEqual(expect.arrayContaining(['x', 'y']));
+        for (const mode of ['range', 'compare', 'roadtrip', 'epacurves']) {
+            expect(keys(mode)).not.toContain('x');
+            expect(keys(mode)).not.toContain('y');
+        }
+    });
+});
+
 describe('the plotted tests are pinned for charging and for range', () => {
     const vehicles = [{ id: 3, runs: [{ id: 11 }, { id: 12 }] }, { id: 4, runs: [{ id: 21 }] }];
     const config = { ...baseConfig(), selectedRuns: [11, 21] };
