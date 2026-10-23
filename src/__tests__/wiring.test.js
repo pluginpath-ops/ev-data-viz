@@ -2646,3 +2646,28 @@ describe('Home says when there is more below the window (#448)', () => {
         expect(read('src/index.css')).toMatch(/\.scroll-more \{ animation: none; \}/);
     });
 });
+
+describe('Home offers the other featured comparisons and a link to this one (#448)', () => {
+    const home = read('src/components/home/HomeView.jsx');
+
+    it('everyone, not only curators, can pick another listed comparison, at the bottom of Home', () => {
+        expect(home).toMatch(/comparisons\.filter\(c => c\.isListed && c\.slug !== shown\?\.slug\)/);
+        expect(home).toMatch(/Other comparisons/);
+        // After the panels, and outside the curators' bar.
+        expect(home.indexOf('Other comparisons')).toBeGreaterThan(home.indexOf('className="home-panels"'));
+        expect(home.indexOf('Other comparisons')).toBeGreaterThan(home.indexOf('const curatorBar'));
+        expect(home).toMatch(/onSlugChange\(slug\)/);
+    });
+
+    it('a section header, with its rule, separates the other comparisons from the charts above', () => {
+        expect(home).toMatch(/<h2 className="home-section-head text-micro">Other comparisons<\/h2>/);
+        // The header is not part of the dropdown's own block.
+        expect(home).not.toMatch(/<label className="home-others">\s*<h2/);
+        expect(home).toMatch(/Past comparisons/);
+    });
+
+    it('the copied link names this comparison, so a shared link stays on the one shared', () => {
+        expect(home).toMatch(/\?tab=home&fc=\$\{encodeURIComponent\(shown\.slug\)\}/);
+        expect(home).toMatch(/navigator\.clipboard\?\.writeText\(url\)/);
+    });
+});
