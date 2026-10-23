@@ -349,6 +349,22 @@ describe('the seams that broke before', () => {
         }
     });
 
+    it("wraps Road Trip's By-test lane labels with the shared wrap helper (#454)", () => {
+        const view = read('src/components/RoadTripView.jsx');
+        // The tick callback must hand the lane labels to wrapAxisLabel (which is
+        // wrapCanvasText underneath, the helper the other charts wrap with) — not
+        // return the label as one long string.
+        const callback = view.slice(view.indexOf('stepSize: 0.5,'),
+                                    view.indexOf('suppress integer tick labels'));
+        expect(callback.length).toBeGreaterThan(0);
+        expect(callback).toMatch(/entryLabel\(validEntries\[idx\]\)/);
+        expect(callback).toMatch(/'ICE Reference'/);
+        expect(callback).toMatch(/wrapAxisLabel\(/);
+        expect(callback).toMatch(/laneLabelBudget\(/);
+        expect(callback).toMatch(/autoSkip:\s*false/);
+        expect(read('src/utils/wrapCanvasText.js')).toMatch(/wrapCanvasText\(ctx, text, maxWidth, maxLines\)/);
+    });
+
     it('renders vehicle images through the thumbnail resolver', () => {
         // image_url is the FULL-resolution original — 1600x900, ~210KB each, and
         // 91% of a cold first load when 23 of them render at once. Displaying it
@@ -2444,6 +2460,47 @@ describe('Home draws a featured comparison and curators can make one (#448 layer
     it('the address carries the comparison Home shows (fc), written beside the tab', () => {
         expect(app).toMatch(/p\.set\('fc', homeSlug\)/);
         expect(app).toMatch(/setHomeSlug\(p\.get\('fc'\) \|\| null\)/);
+    });
+});
+
+describe('chart views show a loading indicator from their real loading state (#453)', () => {
+    const plotFrame = read('src/components/charts/PlotFrame.jsx');
+    const chartLoading = read('src/components/charts/ChartLoading.jsx');
+
+    it('PlotFrame renders the indicator and marks itself busy', () => {
+        expect(plotFrame).toMatch(/<ChartLoading\b[^>]*loading=\{loading\}/);
+        expect(plotFrame).toMatch(/aria-busy=\{loading/);
+    });
+
+    it('the indicator is announced, delayed, and drawn out of flow', () => {
+        expect(chartLoading).toMatch(/role="status"/);
+        expect(chartLoading).toMatch(/useDelayedLoading\(loading\)/);
+        expect(chartLoading).toMatch(/className="chart-loading"/);
+        const css = read('src/index.css');
+        expect(css).toMatch(/\.chart-loading \{[^}]*position: absolute/);
+        expect(css).toMatch(/prefers-reduced-motion[^{]*\{\s*\.chart-loading/);
+    });
+
+    it('the hook is driven by the helper, so the delay lives in one place', () => {
+        expect(read('src/hooks/useDelayedLoading.js')).toMatch(/isLoadingIndicatorVisible\(/);
+    });
+
+    it.each([
+        ['ChargingView', 'loadingData'],
+        ['ChargeCompareView', 'loading'],
+    ])('%s passes its loading state to PlotFrame', (file, flag) => {
+        expect(read(`src/components/${file}.jsx`)).toMatch(new RegExp(`loading=\\{${flag}\\}`));
+    });
+
+    it('RoadTripView, which builds no frame while loading, mounts the indicator directly', () => {
+        expect(read('src/components/RoadTripView.jsx')).toMatch(/<ChartLoading loading=\{loading\}/);
+    });
+
+    it('no view keeps its own copy of the floating badge', () => {
+        const copies = ALL
+            .filter(x => /className="chart-loading"/.test(x.text))
+            .map(x => x.file);
+        expect(copies).toEqual([expect.stringMatching(/ChartLoading\.jsx$/)]);
     });
 });
 
