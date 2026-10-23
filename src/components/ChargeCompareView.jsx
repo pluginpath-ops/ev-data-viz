@@ -24,7 +24,6 @@ import { useRunSelection } from '../hooks/useRunSelection';
 import { DEFAULT_COMPARE_ORIENTATION } from '../utils/chartUrlState';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
-import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -1080,12 +1079,6 @@ export default function ChargeCompareView({
             </aside>}
 
             <div className="chart-main">
-                {loading && (
-                    <span className="chart-loading">
-                        <LoadingSpinner message="Loading charging data…" />
-                    </span>
-                )}
-
             {!hasRangeRuns ? (
                 <div className="card text-center py-12 text-meta">
                     <p className="text-lg font-medium">No range test runs found for selected vehicles</p>
@@ -1101,6 +1094,8 @@ export default function ChargeCompareView({
                         subtitle={plotSubtitle}
                         preview={png1.preview}
                         onDismissPreview={png1.dismissPreview}
+                        loading={loading}
+                        loadingMessage="Loading charging data…"
                         exportControls={!presentationMode && (
                             <>
                                 <button
@@ -1131,6 +1126,8 @@ export default function ChargeCompareView({
                             subtitle={plotSubtitle}
                             preview={png2.preview}
                             onDismissPreview={png2.dismissPreview}
+                            loading={loading}
+                            loadingMessage="Loading charging data…"
                             exportControls={!presentationMode && (
                                 <button
                                     onClick={png2.copyPng}

@@ -16,9 +16,9 @@
  * and gets URLSearchParams back.
  *
  * ── What the query holds, by mode ────────────────────────────────────────────
- *   every chart   tab m v  x y y2 raw rt xn xx yn yx y2n y2x  line pts cspread
+ *   every chart   tab m v  raw rt xn xx yn yx y2n y2x  line pts cspread
  *                 aspread  corr c_spd c_tmp c_alt  pairs
- *   charging      r (the plotted tests)
+ *   charging      x y y2 (the axes), r (the plotted tests)
  *   range         r (the plotted tests), rc (chart type), eff (efficiency unit)
  *   compare       cmp_soc cmp_mins cmp_mi  cmp_o (orientation)  cmp_sel (the
  *                 plotted pairs)
@@ -211,9 +211,12 @@ export function buildChartParams({
         : new Set();
     const runlessVehicles = selectedVehicles.filter(id => !runVehicleIds.has(String(id)));
     if (runlessVehicles.length > 0)           p.set('v', runlessVehicles.join(','));
-    p.set('x', chartConfig.xAxis);
-    p.set('y', chartConfig.yAxis);
-    if (chartConfig.y2Axis)                   p.set('y2',   chartConfig.y2Axis);
+    // x / y / y2 are the Charging Curves axes; no other chart reads them.
+    if (chartMode === 'charging') {
+        p.set('x', chartConfig.xAxis);
+        p.set('y', chartConfig.yAxis);
+        if (chartConfig.y2Axis)               p.set('y2',   chartConfig.y2Axis);
+    }
     if (chartConfig.alignRaw)                 p.set('raw', '1');
     if (chartConfig.raceThreshold != null)    p.set('rt',   String(chartConfig.raceThreshold));
     if (chartConfig.xMin != null)             p.set('xn',   String(chartConfig.xMin));

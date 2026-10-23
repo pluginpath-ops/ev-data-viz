@@ -206,15 +206,9 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            boxWidth: 10,
-                            padding: 10,
-                            color: legendColor,
-                            filter: item => item.text !== 'Trend',
-                        },
-                    },
+                    // Off: every point is already labeled and a whole-database
+                    // selection makes the legend dozens of rows tall.
+                    legend: { display: false },
                     tooltip: {
                         filter: item => item.dataset.label !== 'Trend',
                         callbacks: {
@@ -332,7 +326,7 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
                 </>
             )}
         >
-            <div style={{ height: `${Math.max(400, vehicles.length * 40)}px`, position: 'relative' }}>
+            <div style={{ height: '640px', position: 'relative' }}>
                 <canvas ref={canvasRef} />
             </div>
         </PlotFrame>
