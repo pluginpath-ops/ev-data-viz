@@ -139,7 +139,11 @@ export default function App() {
 
 
     const [activeVehicle, setActiveVehicle] = useState(null);
-    const [view, setView] = useState('vehicles');
+    // Home is where a bare address lands (#448): a first-time visitor meets the
+    // featured comparison, not the full vehicle grid. Every other tab is reached
+    // by its own ?tab=, which the mount parse below turns into a view; a tab name
+    // it does not know stays here.
+    const [view, setView] = useState('home');
     // Which Runs-tab sub-tab is showing (Charging & Range / Inherited /
     // Performance / EPA). Lifted out of RunsView so it can be persisted in the
     // URL the same way activeVehicle is.
@@ -541,6 +545,12 @@ export default function App() {
         if (tab === 'home') {
             setHomeSlug(p.get('fc') || null);
             setView('home');
+            return;
+        }
+        // Vehicles & Specs is no longer the default, so a link to it must say so.
+        // Its sub-nav and filters read their own state from the address.
+        if (tab === 'vehicles') {
+            setView('vehicles');
             return;
         }
         if (tab === 'reference') {

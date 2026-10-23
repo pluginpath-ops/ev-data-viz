@@ -2497,3 +2497,23 @@ describe('site events are counted without knowing who (#448 layer 4)', () => {
         expect(callers).toEqual([expect.stringMatching(/hooks[\\/]useSiteEvents\.js$/)]);
     });
 });
+
+describe('Home is where a bare address lands (#448 layer 5)', () => {
+    const app = read('src/App.jsx');
+
+    it('the first view is Home, and Vehicles & Specs is reached by saying so', () => {
+        expect(app).toMatch(/useState\('home'\)/);
+        expect(app).not.toMatch(/const \[view, setView\] = useState\('vehicles'\)/);
+        // The mount parse names it, or a link to ?tab=vehicles would land on Home.
+        expect(app).toMatch(/if \(tab === 'vehicles'\) \{\s+setView\('vehicles'\);/);
+    });
+
+    it('the wordmark goes Home', () => {
+        expect(read('src/components/shell/AppNav.jsx')).toMatch(/\(onHome \?\? onNavigate\)\('home'\)/);
+    });
+
+    it('nothing writes the address while the app loads, so a link to another tab survives the first render', () => {
+        const home = app.slice(app.indexOf('Keep URL in sync while on Home'));
+        expect(home.slice(0, 500)).toMatch(/view !== 'home' \|\| loading/);
+    });
+});

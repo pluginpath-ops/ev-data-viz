@@ -110,7 +110,7 @@ export default function AppNav({
         <div className="app-nav-bar">
             <button
                 type="button"
-                onClick={() => (onHome ?? onNavigate)('vehicles')}
+                onClick={() => (onHome ?? onNavigate)('home')}
                 className="app-wordmark"
                 title="EVBench — home"
             >
