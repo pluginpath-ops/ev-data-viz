@@ -11,11 +11,15 @@ import { normalizeComparison, comparisonToRow } from '../utils/featuredCompariso
  * `listed_at` and decides the slug is free, and the list Home shows is ordered
  * by what it stamped.
  *
+ * @param {{ enabled?: boolean }} [options]  false loads nothing (the pop-out has no Home)
  * @returns {{ comparisons: Array, loading: boolean, error: *, reload: Function,
  *             create: Function, save: Function, remove: Function }}
  */
-export function useFeaturedComparisons() {
-    const load = useCallback(async () => (await dataService.getFeaturedComparisons()).map(normalizeComparison), []);
+export function useFeaturedComparisons({ enabled = true } = {}) {
+    const load = useCallback(
+        async () => (enabled ? (await dataService.getFeaturedComparisons()).map(normalizeComparison) : []),
+        [enabled],
+    );
     const { data, loading, error, reload } = useAsyncResource(load, [load]);
 
     const create = useCallback(async (comparison) => {

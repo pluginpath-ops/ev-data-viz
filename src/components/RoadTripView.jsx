@@ -41,6 +41,7 @@ import { unlistedCount } from '../utils/runListing';
 import { countsAside } from '../utils/rangeTestSpread';
 import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
+import FeatureChartButton from './home/FeatureChartButton';
 
 Chart.register(ZoomPlugin);
 
@@ -2179,6 +2180,7 @@ export default function RoadTripView({
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
                         <>
+                            <FeatureChartButton />
                             <button
                                 onClick={() => chartRef.current?.resetZoom()}
                                 className="chart-copy-btn"

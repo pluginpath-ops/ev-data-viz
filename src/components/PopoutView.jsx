@@ -1,14 +1,6 @@
-import ChargingView from './ChargingView';
-import { VEHICLE_PALETTE } from '../utils/colorUtils';
-import ChargeCompareView from './ChargeCompareView';
-import RoadTripView from './RoadTripView';
-import SpecsChartView from './SpecsChartView';
-import SpecsScatterView from './SpecsScatterView';
+import PresentedChart from './PresentedChart';
 import { DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import VehicleTable from './VehicleTable';
-import EpaCurvesView from './EpaCurvesView';
-import PerformanceCompareView from './PerformanceCompareView';
-import PerformanceCurveView from './PerformanceCurveView';
 import EpaCurveExplorer from './epa/curves/EpaCurveExplorer';
 
 /**
@@ -41,104 +33,21 @@ export default function PopoutView({
                 </div>
             )}
 
-            {selectedVehicles.length > 0 && chartMode === 'specs' && (
-                <SpecsChartView
-                    vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
-                    selectedField={chartConfig.specsField}
-                    presentationMode
-                />
-            )}
-
-            {selectedVehicles.length > 0 && chartMode === 'perfcompare' && (
-                <PerformanceCompareView
-                    vehicles={vehicles}
-                    selectedVehicleIds={selectedVehicles}
-                    presentationMode
-                />
-            )}
-
-            {selectedVehicles.length > 0 && chartMode === 'perfcurve' && (
-                <PerformanceCurveView
-                    vehicles={vehicles}
-                    selectedVehicleIds={selectedVehicles}
-                    presentationMode
-                />
-            )}
-
             {/* The vehicle table pops out like every other view under the Charts
                 nav, and needs no selection — it is where one is made (#315). */}
             {chartMode === 'specstable' && <VehicleTable correctionTarget={chartConfig?.correctionTarget} correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE} />}
 
-            {selectedVehicles.length > 0 && chartMode === 'specscatter' && (
-                <SpecsScatterView
-                    vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
-                    xField={chartConfig.scatterXField}
-                    yField={chartConfig.scatterYField}
-                    presentationMode
-                />
-            )}
-
-            {selectedVehicles.length > 0 && chartMode === 'roadtrip' && roadTripConfig && (
-                <RoadTripView
-                    vehicles={vehicles}
-                    selectedVehicleIds={selectedVehicles}
-                    roadTripConfig={roadTripConfig}
-                    pairings={pairings}
-                    setRoadTripConfig={() => {}}
-                    correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
-                    correctionTarget={chartConfig?.correctionTarget}
-                    handSet={chartConfig?.handSet ?? false}
-                    verboseLabels={chartConfig?.verboseLabels ?? false}
-                    palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
-                    presentationMode
-                />
-            )}
-
-            {/* Charging + Range only — ChargingView delegates to RangeChartView when
-                chartMode === 'range'. Other modes have their own explicit branches so
-                they no longer fall through to the charging chart. */}
-            {selectedVehicles.length > 0 && (chartMode === 'charging' || chartMode === 'range') && (
-                <ChargingView
-                    vehicles={vehicles}
-                    selectedVehicleIds={selectedVehicles}
-                    chartConfig={chartConfig}
-                    setChartConfig={setChartConfig}
-                    chartMode={chartMode}
-                    pairings={pairings}
-                    presentationMode
-                />
-            )}
-
-            {selectedVehicles.length > 0 && chartMode === 'compare' && (
-                <ChargeCompareView
-                    vehicles={vehicles}
-                    selectedVehicleIds={selectedVehicles}
-                    xMinutes={compareConfig.xMinutes}
-                    mMiles={compareConfig.mMiles}
-                    startSoc={compareConfig.startSoc}
-                    orientation={compareConfig.orientation}
-                    selectedKeys={compareConfig.selected}
-                    pairings={pairings}
-                    verboseLabels={chartConfig?.verboseLabels ?? false}
-                    palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
-                    testSpread={chartConfig?.testSpread ?? true}
-                    correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
-                    correctionTarget={chartConfig?.correctionTarget}
-                    handSet={chartConfig?.handSet ?? false}
-                    presentationMode
-                />
-            )}
-
-            {selectedVehicles.length > 0 && chartMode === 'epacurves' && (
-                <EpaCurvesView
-                    vehicles={vehicles}
-                    selectedVehicleIds={selectedVehicles}
-                    epaConfig={epaConfig || { yAxis: 'kwh100mi' }}
-                    setEpaConfig={() => {}}
-                    palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
-                    presentationMode
-                />
-            )}
+            <PresentedChart
+                vehicles={vehicles}
+                selectedVehicles={selectedVehicles}
+                chartMode={chartMode}
+                chartConfig={chartConfig}
+                setChartConfig={setChartConfig}
+                compareConfig={compareConfig}
+                roadTripConfig={roadTripConfig}
+                epaConfig={epaConfig}
+                pairings={pairings}
+            />
         </div>
     );
 }

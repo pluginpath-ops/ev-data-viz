@@ -33,6 +33,8 @@ import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme'
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useRunSelection } from '../hooks/useRunSelection';
 import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
+import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
+import FeatureChartButton from './home/FeatureChartButton';
 
 
 // ── Highway band plugin ───────────────────────────────────────────────────────
@@ -984,6 +986,7 @@ export default function EpaCurvesView({
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
                         <>
+                            <FeatureChartButton />
                             <button
                                 onClick={handleCopyUrl}
                                 className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
@@ -1002,7 +1005,7 @@ export default function EpaCurvesView({
                         </>
                     )}
                 >
-                    <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 500 }}>
+                    <div style={{ height: presentationMode ? PRESENTED_HEIGHT : 500 }}>
                         <canvas ref={canvasRef} />
                     </div>
                     <p className="text-note mt-2">Shaded band — 65–75 mph typical highway</p>

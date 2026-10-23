@@ -17,7 +17,11 @@ import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
 import { DEFAULT_READER_MODE } from './utils/correctionSettings';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './utils/chartDefaults';
-import { chartStateOf, resetStateOf } from './utils/featuredComparisons';
+import { chartStateOf, resetStateOf, chartParamsFromSearch, defaultChartTitle } from './utils/featuredComparisons';
+import { useFeaturedComparisons } from './hooks/useFeaturedComparisons';
+import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext';
+import HomeView from './components/home/HomeView';
+import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
 import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink } from './utils/chartUrlState';
 import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
@@ -72,7 +76,7 @@ const VEHICLES_STRIP_ITEMS = [
  * Hiding is not clearing. The selection survives the trip and the chips are
  * back the moment a view uses them again.
  */
-const SELECTION_INERT_VIEWS = new Set(['runs', 'epa', 'reference', 'admin', 'playground']);
+const SELECTION_INERT_VIEWS = new Set(['home', 'runs', 'epa', 'reference', 'admin', 'playground']);
 
 export default function App() {
     const {
@@ -255,6 +259,10 @@ export default function App() {
     const [referencePlatformId, setReferencePlatformId] = useState(null);
     // The explainer showing under Reference › Explainers (#355), by slug, or null for the list.
     const [referenceTopic, setReferenceTopic] = useState(null);
+    // Home (#448): the featured comparison named by ?fc=, or null for the newest
+    // listed; and the editor request (a chart to save, or a comparison to edit).
+    const [homeSlug, setHomeSlug] = useState(null);
+    const [featuredEditor, setFeaturedEditor] = useState(null);
 
     const handleChartModeChange = (newMode) => {
         const categoryKey = categoryForMode(newMode).key;
@@ -295,6 +303,25 @@ export default function App() {
         chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, viewScale,
         setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer, setViewScale,
     });
+
+    // The featured comparisons (#448), loaded once here so Home and the editor
+    // share one list. The pop-out has no Home and loads nothing.
+    const featured = useFeaturedComparisons({ enabled: !isPopout });
+    const canCurate = isContributor;
+
+    /** The chart on screen, as the address now states it, into the editor. */
+    const featureThisChart = () => {
+        const params = chartParamsFromSearch(window.location.search);
+        if (!params) return;
+        setFeaturedEditor({ add: { title: defaultChartTitle(chartMode), params }, vehicleIds: selectedVehicles });
+    };
+
+    const featuredContext = {
+        comparisons: featured.comparisons, loading: featured.loading, error: featured.error,
+        canCurate, canDelete: isAdmin,
+        openEditor: setFeaturedEditor,
+        featureThisChart: isPopout || !canCurate ? null : featureThisChart,
+    };
 
     /**
      * Open a test in Tests & Data from a figure that rests on it — the vehicle
@@ -501,6 +528,11 @@ export default function App() {
             setView('playground');
             return;
         }
+        if (tab === 'home') {
+            setHomeSlug(p.get('fc') || null);
+            setView('home');
+            return;
+        }
         if (tab === 'reference') {
             const pid = p.get('pid') || null;
             setReferenceSubtab(referenceSubtabFromParam(p.get('sub'), pid));
@@ -664,6 +696,15 @@ export default function App() {
         history.replaceState({ view: 'epa', subtab: epaSubtab }, '', '?' + p.toString());
     }, [isPopout, view, epaSubtab]);
 
+    // ── Keep URL in sync while on Home (#448) ───────────────────────────────
+    // The tab, and fc= when a particular comparison was asked for.
+    useEffect(() => {
+        if (isPopout || view !== 'home' || loading) return;
+        const p = new URLSearchParams({ tab: 'home' });
+        if (homeSlug) p.set('fc', homeSlug);
+        history.replaceState({ view: 'home' }, '', '?' + p.toString());
+    }, [isPopout, view, loading, homeSlug]);
+
     // ── Keep URL in sync while on Vehicles & Specs' Cards or List (#338) ────
     // Only the filters: the tab alone otherwise. The table writes its own
     // parameters, and the chart-tab effect carries the filters for it.
@@ -817,6 +858,7 @@ export default function App() {
     return (
         <ScaleSyncContext.Provider value={scaleSync}>
         <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison }}>
+        <FeaturedComparisonsContext.Provider value={featuredContext}>
         <VehicleBaseContext.Provider value={vehicleBaseApi}>
             {showAuthModal && (
                 <AuthModal
@@ -1008,6 +1050,7 @@ export default function App() {
                 </nav>
 
                 <main className="page-container py-6 flex-1 flex flex-col">
+                    {view === 'home' && <HomeView slug={homeSlug} onSlugChange={setHomeSlug} />}
                     {view === 'vehicles' && (
                         <VehiclesView
                             vehicles={vehicles}
@@ -1250,6 +1293,18 @@ export default function App() {
                     )}
                 </main>
 
+                {featuredEditor && (
+                    <FeaturedComparisonEditor
+                        request={featuredEditor}
+                        comparisons={featured.comparisons}
+                        vehicles={vehicles}
+                        canDelete={isAdmin}
+                        onSave={(c) => (c.id == null ? featured.create(c) : featured.save(c))}
+                        onDelete={featured.remove}
+                        onClose={() => setFeaturedEditor(null)}
+                    />
+                )}
+
                 {/* Footer, and the ~100px of clear space below it.
                     Every bottom-anchored panel here — the delete/undo bar, the
                     reorder bar, the notification banner — is fixed to the
@@ -1288,6 +1343,7 @@ export default function App() {
                 </div>
             )}
         </VehicleBaseContext.Provider>
+        </FeaturedComparisonsContext.Provider>
         </NavigationContext.Provider>
         </ScaleSyncContext.Provider>
     );

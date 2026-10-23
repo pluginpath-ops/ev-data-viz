@@ -33,6 +33,8 @@ import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme'
 import NumberInput from './NumberInput';
 import { wrapCanvasText } from '../utils/wrapCanvasText';
 import { countParts } from '../utils/plotCaption';
+import { PRESENTED_HALF_HEIGHT } from '../utils/presentedHeight';
+import FeatureChartButton from './home/FeatureChartButton';
 
 
 /**
@@ -1103,6 +1105,7 @@ export default function ChargeCompareView({
                         onDismissPreview={png1.dismissPreview}
                         exportControls={!presentationMode && (
                             <>
+                                <FeatureChartButton />
                                 <button
                                     onClick={handleCopyUrl}
                                     className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
@@ -1120,7 +1123,7 @@ export default function ChargeCompareView({
                             </>
                         )}
                     >
-                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? PRESENTED_HALF_HEIGHT : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
                         </div>
                     </PlotFrame>
@@ -1141,7 +1144,7 @@ export default function ChargeCompareView({
                                 </button>
                             )}
                         >
-                            <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
+                            <div style={{ height: presentationMode ? PRESENTED_HALF_HEIGHT : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                                 <canvas ref={chart2Ref} />
                             </div>
                         </PlotFrame>

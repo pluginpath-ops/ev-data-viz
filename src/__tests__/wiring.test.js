@@ -53,10 +53,12 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
                      'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js',
-                     'epaCertifications.js'];
+                     'epaCertifications.js', 'featuredComparisons.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
+        'featuredComparisons.slugify':
+            'Reached through uniqueSlug; exported so the slug rule is tested on its own.',
         'sources.domainOf':
             'Reached through findSource and pickedSource; exported so link reading is tested on its own.',
         'chargeWindows.countsTowardBest':
@@ -1942,9 +1944,9 @@ describe('a pop-out receives every setting the chart it was opened from does (#3
     for (const tag of ['ChargeCompareView', 'RoadTripView']) {
         it(`${tag}: the pop-out passes every non-setter prop the main tab does`, () => {
             const main = propsOf(read('src/App.jsx'), tag);
-            const popout = propsOf(read('src/components/PopoutView.jsx'), tag);
+            const popout = propsOf(read('src/components/PresentedChart.jsx'), tag);
             expect(main, `${tag} in App.jsx`).toBeTruthy();
-            expect(popout, `${tag} in PopoutView.jsx`).toBeTruthy();
+            expect(popout, `${tag} in PresentedChart.jsx`).toBeTruthy();
             const missing = main.filter(p => !READ_ONLY(p) && !popout.includes(p));
             expect(missing, `props App passes to ${tag} that PopoutView does not`).toEqual([]);
         });
@@ -2217,7 +2219,7 @@ describe('the chart subtitle leads with conditions; counts follow Full Labels (#
     }
 
     it('the pop-out hands Full Labels to every view that shows counts', () => {
-        const popout = read('src/components/PopoutView.jsx');
+        const popout = read('src/components/PresentedChart.jsx');
         // Charging + Range ride chartConfig whole; the others take the flag.
         expect(popout).toMatch(/<ChargingView[\s\S]*?chartConfig=\{chartConfig\}/);
         for (const view of ['ChargeCompareView', 'RoadTripView']) {
@@ -2301,8 +2303,8 @@ describe('a chart link is read and written in one module (#448 layer 1)', () => 
         expect(view).not.toMatch(/useState\('horizontal'\)/);
         expect(view).toMatch(/value: selectedKeys/);
         expect(app).toMatch(/selectedKeys=\{compareConfig\.selected\}/);
-        expect(read('src/components/PopoutView.jsx')).toMatch(/selectedKeys=\{compareConfig\.selected\}/);
-        expect(read('src/components/PopoutView.jsx')).toMatch(/orientation=\{compareConfig\.orientation\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/selectedKeys=\{compareConfig\.selected\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/orientation=\{compareConfig\.orientation\}/);
     });
 
     it('the plotted tests are applied from the link for range as well as charging', () => {
@@ -2364,5 +2366,83 @@ describe('featured comparisons are stored, saved safely and openable (#448 layer
             expect(hook).toMatch(new RegExp(call));
         }
         expect(hook).toMatch(/reload\(\)/);
+    });
+});
+
+describe('Home draws a featured comparison and curators can make one (#448 layer 3)', () => {
+    const app = read('src/App.jsx');
+    const home = read('src/components/home/HomeView.jsx');
+    const panel = read('src/components/home/FeaturedChartPanel.jsx');
+
+    it('Home is the first tab, a view of its own, and reads no selection', () => {
+        const nav = read('src/components/shell/AppNav.jsx');
+        expect(nav.indexOf("key: 'home'")).toBeGreaterThan(-1);
+        expect(nav.indexOf("key: 'home'")).toBeLessThan(nav.indexOf("key: 'vehicles'"));
+        expect(app).toMatch(/SELECTION_INERT_VIEWS = new Set\(\['home',/);
+        expect(app).toMatch(/\{view === 'home' && <HomeView/);
+        expect(app).toMatch(/if \(tab === 'home'\)/);
+    });
+
+    it('Home opens with the intro, whether or not anything is featured', () => {
+        expect(home.match(/<HomeIntro \/>/g)?.length).toBe(3);
+    });
+
+    it('the featured comparison sits under its own section header', () => {
+        expect(home).toMatch(/<h2 className="home-section-head text-micro">Featured comparison<\/h2>/);
+    });
+
+    it('a panel draws through PresentedChart, the view the pop-out uses, from its own state', () => {
+        expect(panel).toMatch(/<PresentedChart/);
+        expect(read('src/components/PopoutView.jsx')).toMatch(/<PresentedChart/);
+        // Its own copy: the live site's chart state must not reach a panel.
+        expect(panel).not.toMatch(/useChartSync|chartConfig=\{chartConfig\}.*live/);
+        expect(panel).toMatch(/chartStateOf\(/);
+        // A chart that fills its own selection on first sight needs somewhere to
+        // write it, or it stays blank (Charge Stop did, on Home).
+        for (const setter of ['setChartConfig', 'setCompareConfig', 'setRoadTripConfig', 'setEpaConfig']) {
+            expect(panel, setter).toMatch(new RegExp(`${setter}=\\{${setter}\\}`));
+        }
+        expect(panel).toMatch(/useInView\(/);
+    });
+
+    it('opening a chart and resetting both warn before replacing a selection', () => {
+        expect(home).toMatch(/replacesSelection\(selectedVehicles, shown, vehicles\)/);
+        expect(home).toMatch(/openFeaturedChart\(shown, index\)/);
+        expect(home).toMatch(/resetToComparison\(shown\)/);
+        expect(home).toMatch(/<ReplaceSelectionDialog/);
+    });
+
+    it('every chart view offers Save as featured comparison, to curators only', () => {
+        for (const f of ['ChargingView', 'RangeChartView', 'ChargeCompareView', 'RoadTripView', 'EpaCurvesView', 'SpecsChartView', 'SpecsScatterView']) {
+            expect(read(`src/components/${f}.jsx`), f).toMatch(/<FeatureChartButton \/>/);
+        }
+        const button = read('src/components/home/FeatureChartButton.jsx');
+        expect(button).toMatch(/if \(!canCurate \|\| !featureThisChart\) return null/);
+        // No button in the pop-out, and none for anyone who cannot curate.
+        expect(app).toMatch(/featureThisChart: isPopout \|\| !canCurate \? null : featureThisChart/);
+        expect(app).toMatch(/const canCurate = isContributor/);
+    });
+
+    it('the editor saves through the hook, and only an admin sees Delete', () => {
+        expect(app).toMatch(/featured\.create\(c\) : featured\.save\(c\)/);
+        expect(app).toMatch(/canDelete=\{isAdmin\}/);
+        expect(read('src/components/home/FeaturedComparisonEditor.jsx')).toMatch(/!isNew && canDelete/);
+    });
+
+    it('a presented chart is as tall as its frame says, not as tall as the window', () => {
+        for (const f of ['ChargingView', 'RangeChartView', 'EpaCurvesView']) {
+            const src = read(`src/components/${f}.jsx`);
+            expect(src, f).toMatch(/presentationMode \? PRESENTED_HEIGHT/);
+            expect(src, f).not.toMatch(/calc\(100vh - 2rem\)/);
+        }
+        expect(read('src/components/ChargeCompareView.jsx')).not.toMatch(/'45vh'/);
+        expect(read('src/index.css')).toMatch(/--presented-h: /);
+        // One height for every panel: a taller one leaves a gap under its neighbor.
+        expect(read('src/index.css')).not.toMatch(/\.home-panel\.is-tall/);
+    });
+
+    it('the address carries the comparison Home shows (fc), written beside the tab', () => {
+        expect(app).toMatch(/p\.set\('fc', homeSlug\)/);
+        expect(app).toMatch(/setHomeSlug\(p\.get\('fc'\) \|\| null\)/);
     });
 });

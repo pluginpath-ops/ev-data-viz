@@ -35,6 +35,8 @@ import SpeedBadge from './charts/SpeedBadge';
 import { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT } from '../utils/chartUrlState';
 import { wrapCanvasText } from '../utils/wrapCanvasText';
 import { countParts, legendWorthShowing } from '../utils/plotCaption';
+import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
+import FeatureChartButton from './home/FeatureChartButton';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -800,6 +802,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (
                     <>
+                        <FeatureChartButton />
                         <button
                             onClick={() => {
                                 navigator.clipboard.writeText(window.location.href).then(() => {
@@ -823,7 +826,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     </>
                 )}
             >
-                <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px', position: 'relative' }}>
+                <div style={{ height: presentationMode ? PRESENTED_HEIGHT : '500px', position: 'relative' }}>
                     {/* Canvas always mounted so ref stays valid */}
                     <canvas
                         ref={chartRef}

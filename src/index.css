@@ -1889,7 +1889,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 
    This is the one place a vehicle's color appears on EVERY tab, including the
    four with no plot: Vehicles, Tests & Data, Specifications and EPA. */
-.selected-vehicle-chip {
+.selected-vehicle-chip,
+/* The same pill where it names a featured comparison's vehicles (#448): it
+   reports a set rather than being the selection, so it is its own name. */
+.featured-vehicle-chip {
     @apply flex items-center gap-2;
     padding: 3px 8px 3px 9px;
     /* Square on the color side — see .vehicle-run-group. */
@@ -8928,4 +8931,134 @@ a.is-test-link:focus-visible {
     @apply text-[10px] font-mono rounded px-1 py-0.5;
     background-color: var(--color-warning-surface);
     color: var(--color-warning-text);
+}
+
+
+/* ── Home: the featured comparison (#448) ───────────────────────────────────── */
+
+.home-view {
+    @apply flex flex-col gap-5;
+}
+
+/* The curators' row above the comparison: which one is shown, and Edit. */
+.home-curator {
+    @apply flex flex-wrap items-center gap-3 rounded-lg px-3 py-2;
+    background-color: var(--color-surface-muted);
+    border: 1px dashed var(--color-border-strong);
+}
+.home-curator-select {
+    width: auto;
+    max-width: 22rem;
+}
+
+.home-intro {
+    @apply flex flex-col gap-2;
+}
+
+.home-section-head {
+    @apply flex items-center gap-3;
+}
+/* The rule that carries the label across the page. */
+.home-section-head::after {
+    content: "";
+    flex: 1 1 auto;
+    border-top: 1px solid var(--color-border);
+}
+
+.home-header {
+    @apply flex flex-col gap-2;
+}
+.home-heading {
+    @apply flex flex-wrap items-center justify-between gap-3;
+}
+.home-title {
+    @apply flex items-center gap-3;
+    min-width: 0;
+}
+.home-vehicles {
+    @apply flex flex-wrap gap-2;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.home-actions {
+    @apply flex items-center gap-2;
+}
+.home-empty {
+    @apply flex flex-col gap-2 py-6;
+}
+
+/* One panel per chart, side by side where there is room. */
+.home-panels {
+    @apply grid gap-4;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
+}
+.home-panel {
+    @apply flex flex-col gap-3 rounded-lg p-3;
+    /* The frame height every presented chart draws to (utils/presentedHeight.js).
+       One height for every panel, Charge Stop's two stacked charts included, so a
+       row of panels is one height and nothing is left with a gap under it. */
+    --presented-h: 32rem;
+    min-width: 0;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+}
+.home-panel-head {
+    @apply flex items-start justify-between gap-3;
+}
+.home-panel-heading {
+    @apply flex flex-col gap-1;
+    min-width: 0;
+}
+.home-panel-body {
+    @apply relative;
+    min-height: 8rem;
+}
+/* A shop window: a click anywhere on the chart opens it on its own tab. */
+.home-panel-cover {
+    @apply absolute inset-0 w-full h-full;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+.home-panel-cover:hover {
+    background-color: var(--color-primary-surface);
+    opacity: 0.12;
+}
+
+/* A chip's remove button, in the editor. */
+.featured-chip-remove {
+    color: inherit;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 0 2px;
+    line-height: 1;
+}
+.featured-chip-remove:hover { opacity: 0.7; }
+
+.featured-editor-grid {
+    @apply grid gap-3;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.featured-editor-field {
+    @apply flex flex-col gap-1;
+}
+.featured-editor-field.is-wide {
+    grid-column: 1 / -1;
+}
+.featured-editor-listed {
+    @apply flex-row items-center justify-start gap-2;
+    align-self: center;
+}
+.featured-editor-charts {
+    @apply flex flex-col gap-2;
+}
+.featured-editor-chart {
+    @apply flex items-center gap-2;
+}
+.featured-editor-chart .form-input {
+    flex: 1 1 auto;
+    min-width: 0;
 }
