@@ -4148,6 +4148,32 @@ class DataService {
     if (error) throw error;
   }
 
+  // ── Site events (#448) ──────────────────────────────────────────────────────
+
+  /**
+   * Record that a reader did something worth counting (utils/siteEvents.js lists
+   * the events). Writes through the SECURITY DEFINER log_site_event (migration
+   * 090), which an anonymous visitor may call and which refuses anything not on
+   * its list or past its rate limit. Identity is the anonymous browser token:
+   * no user id, no IP. Never throws and never reaches the reader: counting must
+   * not get in the way of the thing being counted.
+   *
+   * @param {{ event: string, slug?: string|null, detail?: object }} opts
+   */
+  async logSiteEvent({ event, slug = null, detail = {} }) {
+    if (!this.useSupabase) return;
+    try {
+      await getSupabase().rpc('log_site_event', {
+        p_event:         event,
+        p_browser_token: this.getBrowserToken(),
+        p_slug:          slug,
+        p_detail:        detail,
+      });
+    } catch {
+      // Intentionally swallowed, as for access logging.
+    }
+  }
+
   // ── Access logging ──────────────────────────────────────────────────────────
 
   /**

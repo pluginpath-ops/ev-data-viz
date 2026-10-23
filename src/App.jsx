@@ -19,6 +19,8 @@ import { DEFAULT_READER_MODE } from './utils/correctionSettings';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './utils/chartDefaults';
 import { chartStateOf, resetStateOf, chartParamsFromSearch, defaultChartTitle } from './utils/featuredComparisons';
 import { useFeaturedComparisons } from './hooks/useFeaturedComparisons';
+import { useSiteEvents } from './hooks/useSiteEvents';
+import { SITE_EVENTS } from './utils/siteEvents';
 import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext';
 import HomeView from './components/home/HomeView';
 import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
@@ -306,6 +308,14 @@ export default function App() {
 
     // The featured comparisons (#448), loaded once here so Home and the editor
     // share one list. The pop-out has no Home and loads nothing.
+    // A chart tab or mode opened, however the reader got there (#448). One event
+    // per change of tab or mode; a curator's own and the pop-out's are skipped.
+    const recordEvent = useSiteEvents();
+    useEffect(() => {
+        if (loading || !isChartCategory(view)) return;
+        recordEvent(SITE_EVENTS.CHART_VIEW, { detail: { mode: chartMode } });
+    }, [loading, view, chartMode, recordEvent]);
+
     const featured = useFeaturedComparisons({ enabled: !isPopout });
     const canCurate = isContributor;
 

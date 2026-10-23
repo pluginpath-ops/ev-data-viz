@@ -8,6 +8,9 @@ import HomeIntro from './HomeIntro';
 import FeaturedChartPanel from './FeaturedChartPanel';
 import ReplaceSelectionDialog from './ReplaceSelectionDialog';
 import LoadingSpinner from '../LoadingSpinner';
+import { useSiteEvents } from '../../hooks/useSiteEvents';
+import { SITE_EVENTS } from '../../utils/siteEvents';
+import { chartModeOf } from '../../utils/featuredComparisons';
 
 /**
  * Home (#448): the featured comparison a curator chose, every chart of it drawn
@@ -27,6 +30,7 @@ export default function HomeView({ slug, onSlugChange }) {
     const { comparisons, loading, error, canCurate, openEditor } = useFeaturedComparisonsContext();
     const [pending, setPending] = useState(null);      // { action: 'open' | 'reset', index }
     const [justReset, setJustReset] = useState(false);
+    const record = useSiteEvents();
 
     const shown = useMemo(() => comparisonToShow(comparisons, slug), [comparisons, slug]);
     const shownVehicles = useMemo(() => {
@@ -35,6 +39,13 @@ export default function HomeView({ slug, onSlugChange }) {
         return vehicles.filter(v => ids.has(String(v.id)));
     }, [shown, vehicles]);
     const names = useMemo(() => buildVehicleLabels(shownVehicles), [shownVehicles]);
+
+    // Home was opened, once per tab per comparison, once there is something to say it showed.
+    const shownSlug = shown?.slug ?? null;
+    useEffect(() => {
+        if (loading) return;
+        record(SITE_EVENTS.HOME_VIEW, { slug: shownSlug, once: true });
+    }, [loading, shownSlug, record]);
 
     useEffect(() => {
         if (!justReset) return undefined;
@@ -45,8 +56,14 @@ export default function HomeView({ slug, onSlugChange }) {
     if (loading && comparisons.length === 0) return <div className="home-view"><HomeIntro /><LoadingSpinner /></div>;
 
     const run = (action, index) => {
-        if (action === 'open') openFeaturedChart(shown, index);
-        else { resetToComparison(shown); setJustReset(true); }
+        if (action === 'open') {
+            record(SITE_EVENTS.FEATURED_OPEN, { slug: shown.slug, detail: { chart: index + 1, mode: chartModeOf(shown.charts[index].params) } });
+            openFeaturedChart(shown, index);
+        } else {
+            record(SITE_EVENTS.FEATURED_RESET, { slug: shown.slug });
+            resetToComparison(shown);
+            setJustReset(true);
+        }
     };
     // Ask first only when it would replace a selection the reader built.
     const attempt = (action, index = 0) => {

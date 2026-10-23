@@ -2446,3 +2446,54 @@ describe('Home draws a featured comparison and curators can make one (#448 layer
         expect(app).toMatch(/setHomeSlug\(p\.get\('fc'\) \|\| null\)/);
     });
 });
+
+describe('site events are counted without knowing who (#448 layer 4)', () => {
+    const migration = read('supabase/migrations/090_site_events.sql');
+    const events = read('src/utils/siteEvents.js');
+    const service = read('src/services/DataService.js');
+
+    it('the client, the table and the function agree on the events', () => {
+        const client = [...events.matchAll(/:\s+'([a-z_]+)',/g)].map(m => m[1]).sort();
+        expect(client).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view']);
+        const quoted = (src) => [...src.matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
+        const check = migration.match(/CHECK \(event IN \(([^)]*)\)/)[1];
+        const fn = migration.match(/p_event NOT IN \(([^)]*)\)/)[1];
+        expect(quoted(check).sort()).toEqual(client);
+        expect(quoted(fn).sort()).toEqual(client);
+    });
+
+    it('only the function writes, and only an admin reads', () => {
+        expect(migration).toMatch(/SECURITY DEFINER/);
+        expect(migration).toMatch(/REVOKE ALL ON public\.site_events FROM anon, authenticated/);
+        expect(migration).not.toMatch(/FOR INSERT/);
+        expect(migration).toMatch(/FOR SELECT\s+USING \(public\.current_user_role\(\) = 'admin'\)/);
+        expect(migration).toMatch(/DROP POLICY IF EXISTS "site_events: admin read"/);
+    });
+
+    it('the function refuses a flood and never raises', () => {
+        expect(migration).toMatch(/>= 60 THEN/);
+        expect(migration).toMatch(/EXCEPTION WHEN OTHERS THEN\s+RETURN false/);
+    });
+
+    it('nothing identifying is stored or sent: no user id, email, IP or user agent', () => {
+        const table = migration.slice(migration.indexOf('CREATE TABLE'), migration.indexOf(');', migration.indexOf('CREATE TABLE')));
+        expect(table).not.toMatch(/user_id|email|ip_|user_agent/);
+        const send = service.slice(service.indexOf('async logSiteEvent'), service.indexOf('// ── Access logging'));
+        expect(send).toMatch(/p_browser_token: this\.getBrowserToken\(\)/);
+        expect(send).not.toMatch(/this\.user|navigator/);
+        expect(send).toMatch(/catch \{/);
+    });
+
+    it('the events are recorded where they happen, through the one hook', () => {
+        const home = read('src/components/home/HomeView.jsx');
+        expect(home).toMatch(/record\(SITE_EVENTS\.HOME_VIEW, \{ slug: shownSlug, once: true \}\)/);
+        expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_OPEN/);
+        expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_RESET/);
+        expect(read('src/App.jsx')).toMatch(/recordEvent\(SITE_EVENTS\.CHART_VIEW/);
+        const hook = read('src/hooks/useSiteEvents.js');
+        expect(hook).toMatch(/shouldRecord\(\{ role: userRole, popout \}\)/);
+        // Nobody else calls the service directly, or the curator skip is bypassable.
+        const callers = consumersOf('logSiteEvent', ['src/services/DataService.js']);
+        expect(callers).toEqual([expect.stringMatching(/hooks[\\/]useSiteEvents\.js$/)]);
+    });
+});
