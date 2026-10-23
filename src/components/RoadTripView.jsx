@@ -27,7 +27,7 @@ import {
     formatTime, speedCorrectionFactor,
 } from '../utils/roadTripSimulation';
 import { useRunSelection } from '../hooks/useRunSelection';
-import LoadingSpinner from './LoadingSpinner';
+import ChartLoading from './charts/ChartLoading';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, resolvePairColors, VEHICLE_PALETTE } from '../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
@@ -35,6 +35,7 @@ import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { wrapAxisLabel, laneLabelBudget } from '../utils/wrapCanvasText';
 import SpeedBadge from './charts/SpeedBadge';
 import { spreadTestsFor, sweepSpread, timelineSpread } from '../utils/roadTripSpread';
 import { unlistedCount } from '../utils/runListing';
@@ -1609,15 +1610,30 @@ export default function RoadTripView({
                         ticks: {
                             stepSize: 0.5,
                             color: tickColor,
-                            callback: (val) => {
+                            // Off: the callback already decides which ticks carry
+                            // a label, and Chart.js sizes its skip spacing from the
+                            // TALLEST label — a wrapped one would drop lane labels.
+                            autoSkip: false,
+                            // A function, not an arrow: `this` is the scale, which
+                            // knows the canvas it is drawn on.
+                            callback: function (val) {
                                 // Half-integer positions = lane centers → show label
                                 const frac = val - Math.floor(val);
                                 if (Math.abs(frac - 0.5) < 0.01) {
                                     const idx = Math.floor(val); // lane index
-                                    if (idx >= 0 && idx < validEntries.length) {
-                                        return entryLabel(validEntries[idx]);
+                                    const text = idx >= 0 && idx < validEntries.length
+                                        ? entryLabel(validEntries[idx])
+                                        : idx === validEntries.length ? 'ICE Reference' : null;
+                                    if (text != null) {
+                                        // Wrapped to the width and lane height the chart has,
+                                        // so the axis fits the wrapped label instead of one
+                                        // long line being clipped or crowding the plot.
+                                        const { maxWidth, maxLines } = laneLabelBudget({
+                                            chartWidth: this.chart.width, chartHeight: this.chart.height,
+                                            lanes: validEntries.length + 1, lineHeight: fonts.axis * 1.2,
+                                        });
+                                        return wrapAxisLabel(this.ctx, `${fonts.axis}px ${fonts.sans}`, text, maxWidth, maxLines);
                                     }
-                                    if (idx === validEntries.length) return 'ICE Reference';
                                 }
                                 return ''; // suppress integer tick labels (lane boundaries shown as gridlines)
                             },
@@ -2151,11 +2167,9 @@ export default function RoadTripView({
             )}
 
             <div className="chart-main">
-                {loading && (
-                    <span className="chart-loading">
-                        <LoadingSpinner message="Loading charging data…" />
-                    </span>
-                )}
+                {/* No PlotFrame while loading here (the chart is not built until
+                    the data is), so the indicator sits on .chart-main itself. */}
+                <ChartLoading loading={loading} message="Loading charging data…" />
 
             {/* ── Chart ────────────────────────────────────────────────── */}
             {loading && (

@@ -40,7 +40,6 @@ import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } fr
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
-import LoadingSpinner from './LoadingSpinner';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE, withAlpha } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
@@ -1249,12 +1248,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             </aside>}
 
             <div className="chart-main">
-                {loadingData && (
-                    <span className="chart-loading">
-                        <LoadingSpinner message="Loading run data…" />
-                    </span>
-                )}
-
             {/* Runs the alignment could not include, named on the chart itself.
                 The selector carries a badge, but that only helps someone who
                 opens the selector — and a screenshot shows neither. A chart
@@ -1346,6 +1339,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 subtitle={plotSubtitle}
                 preview={preview}
                 onDismissPreview={dismissPreview}
+                loading={loadingData}
+                loadingMessage="Loading run data…"
                 exportControls={!presentationMode && (
                     <>
                         <FeatureChartButton />
