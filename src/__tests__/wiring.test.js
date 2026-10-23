@@ -2574,3 +2574,100 @@ describe('Home is where a bare address lands (#448 layer 5)', () => {
         expect(home.slice(0, 500)).toMatch(/view !== 'home' \|\| loading/);
     });
 });
+
+describe('a curator\'s text on Home is drawn as basic Markdown, never as HTML (#448)', () => {
+    const component = read('src/components/MarkdownText.jsx');
+
+    it('the blurb and a chart\'s caption go through MarkdownText', () => {
+        expect(read('src/components/home/HomeView.jsx')).toMatch(/<MarkdownText text=\{shown\.blurb\} \/>/);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/<MarkdownText text=\{chart\.caption\} \/>/);
+    });
+
+    it('it builds React elements and never sets HTML', () => {
+        expect(component).not.toMatch(/dangerouslySetInnerHTML|innerHTML/);
+        expect(read('src/utils/miniMarkdown.js')).not.toMatch(/innerHTML|document\./);
+    });
+
+    it('external links open in a new tab without handing over the opener', () => {
+        expect(component).toMatch(/target: '_blank', rel: 'noopener noreferrer'/);
+    });
+
+    it('a link is only ever made from an address safeHref allowed', () => {
+        const src = read('src/utils/miniMarkdown.js');
+        expect(src).toMatch(/const safe = safeHref\(href\)/);
+        // The bare address is the other way a link appears: it can only match http(s).
+        expect(src).toMatch(/\(https\?:\\\/\\\/\[\^\\s<\]\+\)/);
+    });
+
+    it('the editor offers a multi-line box for each, and says what it understands', () => {
+        const editor = read('src/components/home/FeaturedComparisonEditor.jsx');
+        expect(editor).toMatch(/<textarea className="form-input" rows=\{4\} value=\{draft\.blurb\}/);
+        expect(editor).toMatch(/aria-label=\{`Chart \$\{i \+ 1\} caption`\}/);
+        expect(editor).toMatch(/MARKDOWN_HINT/);
+        // A title is one line of plain text.
+        expect(editor).toMatch(/<input className="form-input" value=\{chart\.title\}/);
+    });
+});
+
+describe('a featured comparison keeps its vehicles in the order the curator set (#448)', () => {
+    it('Home and its panels take the order from the comparison, not from the vehicle list', () => {
+        expect(read('src/components/home/HomeView.jsx')).toMatch(/vehiclesInOrder\(liveVehicleIds\(shown, vehicles\), vehicles\)/);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/vehiclesInOrder\(seed\.vehicleIds, vehicles\)/);
+        // The failure was `vehicles.filter(v => ids.has(v.id))`, which is list order.
+        for (const f of ['HomeView', 'FeaturedChartPanel']) {
+            expect(read(`src/components/home/${f}.jsx`), f).not.toMatch(/vehicles\.filter\(v => (ids|seed)/);
+        }
+    });
+
+    it('the editor can move a vehicle earlier or later', () => {
+        const editor = read('src/components/home/FeaturedComparisonEditor.jsx');
+        expect(editor).toMatch(/moveVehicle\(draft, i, i - 1\)/);
+        expect(editor).toMatch(/moveVehicle\(draft, i, i \+ 1\)/);
+    });
+});
+
+describe('Home says when there is more below the window (#448)', () => {
+    const hint = read('src/components/home/ScrollMoreHint.jsx');
+
+    it('Home shows the "More" pill', () => {
+        expect(read('src/components/home/HomeView.jsx')).toMatch(/<ScrollMoreHint \/>/);
+    });
+
+    it('it watches the panels as they scroll, resize and grow, and is gone when none is below', () => {
+        expect(hint).toMatch(/addEventListener\('scroll'/);
+        expect(hint).toMatch(/addEventListener\('resize'/);
+        expect(hint).toMatch(/new ResizeObserver/);
+        expect(hint).toMatch(/if \(!more\) return null/);
+    });
+
+    it('pressing it goes to the next panel, without animation for a reader who asked for less', () => {
+        expect(hint).toMatch(/prefers-reduced-motion: reduce/);
+        expect(hint).toMatch(/scrollIntoView\(\{ behavior: reduced \? 'auto' : 'smooth'/);
+        expect(read('src/index.css')).toMatch(/\.scroll-more \{ animation: none; \}/);
+    });
+});
+
+describe('Home offers the other featured comparisons and a link to this one (#448)', () => {
+    const home = read('src/components/home/HomeView.jsx');
+
+    it('everyone, not only curators, can pick another listed comparison, at the bottom of Home', () => {
+        expect(home).toMatch(/comparisons\.filter\(c => c\.isListed && c\.slug !== shown\?\.slug\)/);
+        expect(home).toMatch(/Other comparisons/);
+        // After the panels, and outside the curators' bar.
+        expect(home.indexOf('Other comparisons')).toBeGreaterThan(home.indexOf('className="home-panels"'));
+        expect(home.indexOf('Other comparisons')).toBeGreaterThan(home.indexOf('const curatorBar'));
+        expect(home).toMatch(/onSlugChange\(slug\)/);
+    });
+
+    it('a section header, with its rule, separates the other comparisons from the charts above', () => {
+        expect(home).toMatch(/<h2 className="home-section-head text-micro">Other comparisons<\/h2>/);
+        // The header is not part of the dropdown's own block.
+        expect(home).not.toMatch(/<label className="home-others">\s*<h2/);
+        expect(home).toMatch(/Past comparisons/);
+    });
+
+    it('the copied link names this comparison, so a shared link stays on the one shared', () => {
+        expect(home).toMatch(/\?tab=home&fc=\$\{encodeURIComponent\(shown\.slug\)\}/);
+        expect(home).toMatch(/navigator\.clipboard\?\.writeText\(url\)/);
+    });
+});

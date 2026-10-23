@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import PresentedChart from '../PresentedChart';
+import MarkdownText from '../MarkdownText';
 import { useAppContext } from '../../context/AppContext';
 import { useInView } from '../../hooks/useInView';
-import { chartStateOf, defaultChartTitle } from '../../utils/featuredComparisons';
+import { chartStateOf, defaultChartTitle, vehiclesInOrder } from '../../utils/featuredComparisons';
 
 /**
  * One chart of a featured comparison, drawn on Home from its saved settings.
@@ -31,7 +32,8 @@ export default function FeaturedChartPanel({ comparison, index, onOpen }) {
     const [epaConfig, setEpaConfig] = useState(() => seed?.epaConfig);
 
     if (!seed || !chart) return null;
-    const shown = vehicles.filter(v => seed.vehicleIds.some(id => String(id) === String(v.id)));
+    // In the comparison's order: it is the order the series are drawn and listed in.
+    const shown = vehiclesInOrder(seed.vehicleIds, vehicles);
 
     return (
         <section ref={ref} className="home-panel" aria-label={chart.title}>
@@ -44,6 +46,7 @@ export default function FeaturedChartPanel({ comparison, index, onOpen }) {
                     Open chart →
                 </button>
             </header>
+            <MarkdownText text={chart.caption} />
             <div className="home-panel-body">
                 {near && shown.length > 0 && (
                     <PresentedChart

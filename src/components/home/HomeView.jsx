@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useNavigation } from '../../context/NavigationContext';
 import { useFeaturedComparisonsContext } from '../../context/FeaturedComparisonsContext';
-import { comparisonToShow, liveVehicleIds, replacesSelection } from '../../utils/featuredComparisons';
+import { comparisonToShow, liveVehicleIds, replacesSelection, vehiclesInOrder } from '../../utils/featuredComparisons';
 import { buildVehicleLabels } from '../../utils/seriesLabel';
 import HomeIntro from './HomeIntro';
+import ScrollMoreHint from './ScrollMoreHint';
+import MarkdownText from '../MarkdownText';
 import FeaturedChartPanel from './FeaturedChartPanel';
 import ReplaceSelectionDialog from './ReplaceSelectionDialog';
 import LoadingSpinner from '../LoadingSpinner';
@@ -30,14 +32,14 @@ export default function HomeView({ slug, onSlugChange }) {
     const { comparisons, loading, error, canCurate, openEditor } = useFeaturedComparisonsContext();
     const [pending, setPending] = useState(null);      // { action: 'open' | 'reset', index }
     const [justReset, setJustReset] = useState(false);
+    const [urlCopied, setUrlCopied] = useState(false);
     const record = useSiteEvents();
 
     const shown = useMemo(() => comparisonToShow(comparisons, slug), [comparisons, slug]);
-    const shownVehicles = useMemo(() => {
-        if (!shown) return [];
-        const ids = new Set(liveVehicleIds(shown, vehicles).map(String));
-        return vehicles.filter(v => ids.has(String(v.id)));
-    }, [shown, vehicles]);
+    const shownVehicles = useMemo(
+        () => (shown ? vehiclesInOrder(liveVehicleIds(shown, vehicles), vehicles) : []),
+        [shown, vehicles],
+    );
     const names = useMemo(() => buildVehicleLabels(shownVehicles), [shownVehicles]);
 
     // Home was opened, once per tab per comparison, once there is something to say it showed.
@@ -46,6 +48,12 @@ export default function HomeView({ slug, onSlugChange }) {
         if (loading) return;
         record(SITE_EVENTS.HOME_VIEW, { slug: shownSlug, once: true });
     }, [loading, shownSlug, record]);
+
+    useEffect(() => {
+        if (!urlCopied) return undefined;
+        const t = setTimeout(() => setUrlCopied(false), 2000);
+        return () => clearTimeout(t);
+    }, [urlCopied]);
 
     useEffect(() => {
         if (!justReset) return undefined;
@@ -65,6 +73,21 @@ export default function HomeView({ slug, onSlugChange }) {
             setJustReset(true);
         }
     };
+    // The link to THIS comparison, by name: a bare Home would follow whichever is
+    // newest, so a shared link names the one that was shared.
+    const copyUrl = () => {
+        const url = `${window.location.origin}${window.location.pathname}?tab=home&fc=${encodeURIComponent(shown.slug)}`;
+        navigator.clipboard?.writeText(url).then(() => setUrlCopied(true)).catch(() => {});
+    };
+
+    // The listed comparisons other than this one, for the dropdown at the bottom.
+    const others = comparisons.filter(c => c.isListed && c.slug !== shown?.slug);
+    const showOther = (slug) => {
+        if (!slug) return;
+        onSlugChange(slug);
+        window.scrollTo({ top: 0 });
+    };
+
     // Ask first only when it would replace a selection the reader built.
     const attempt = (action, index = 0) => {
         if (replacesSelection(selectedVehicles, shown, vehicles)) setPending({ action, index });
@@ -76,7 +99,7 @@ export default function HomeView({ slug, onSlugChange }) {
             <span className="text-micro">Featured comparisons</span>
             {comparisons.length > 0 && (
                 <select
-                    className="form-input home-curator-select"
+                    className="form-input home-select"
                     value={shown?.slug ?? ''}
                     onChange={e => onSlugChange(e.target.value || null)}
                     aria-label="Featured comparison shown"
@@ -126,9 +149,13 @@ export default function HomeView({ slug, onSlugChange }) {
                             title="Select this comparison's vehicles and use its correction. Your other settings go back to the defaults.">
                             {justReset ? '✓ Reset' : 'Reset to this comparison'}
                         </button>
+                        <button type="button" className="btn btn-secondary" onClick={copyUrl}
+                            title="Copy a link to this featured comparison">
+                            {urlCopied ? '✓ Copied' : '🔗 URL'}
+                        </button>
                     </div>
                 </div>
-                {shown.blurb && <p className="text-secondary">{shown.blurb}</p>}
+                <MarkdownText text={shown.blurb} />
                 <ul className="home-vehicles" aria-label="Vehicles in this comparison">
                     {shownVehicles.map(v => (
                         <li key={v.id} className="featured-vehicle-chip" style={{ '--chip-accent': v.color || undefined }}>
@@ -148,6 +175,21 @@ export default function HomeView({ slug, onSlugChange }) {
                     />
                 ))}
             </div>
+
+            {others.length > 0 && (
+                <>
+                    <h2 className="home-section-head text-micro">Other comparisons</h2>
+                    <label className="home-others">
+                        <span className="text-label">Past comparisons</span>
+                        <select className="form-input home-select" value="" onChange={e => showOther(e.target.value)}>
+                            <option value="">Choose one…</option>
+                            {others.map(c => <option key={c.slug} value={c.slug}>{c.title}</option>)}
+                        </select>
+                    </label>
+                </>
+            )}
+
+            <ScrollMoreHint />
 
             {pending && (
                 <ReplaceSelectionDialog

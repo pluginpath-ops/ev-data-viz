@@ -86,6 +86,8 @@ export function normalizeComparison(row) {
         .filter(c => c && typeof c.params === 'string' && isChartCategory(new URLSearchParams(c.params).get('tab')))
         .map(c => ({
             title: typeof c.title === 'string' && c.title.trim() ? c.title.trim() : defaultChartTitle(chartModeOf(c.params)),
+            // The curator's text under the title; basic Markdown (miniMarkdown.js).
+            caption: typeof c.caption === 'string' ? c.caption : '',
             params: c.params,
         }));
     return {
@@ -109,7 +111,8 @@ export function comparisonToRow(c) {
         title:       c.title.trim(),
         blurb:       c.blurb?.trim() ? c.blurb.trim() : null,
         vehicle_ids: c.vehicleIds,
-        charts:      c.charts.map(({ title, params }) => ({ title: title.trim(), params })),
+        // A caption is stored only when there is one, so a chart without keeps its old shape.
+        charts:      c.charts.map(({ title, caption, params }) => ({ title: title.trim(), ...(caption?.trim() && { caption: caption.trim() }), params })),
         is_listed:   !!c.isListed,
     };
 }
@@ -152,6 +155,16 @@ export function addChart(comparison, chart, vehicleIds = []) {
     };
 }
 
+/** Move one of the comparison's vehicles to another place in its order. */
+export function moveVehicle(comparison, from, to) {
+    const ids = comparison.vehicleIds;
+    if (from === to || from < 0 || to < 0 || from >= ids.length || to >= ids.length) return comparison;
+    const next = [...ids];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return { ...comparison, vehicleIds: next };
+}
+
 export function removeChart(comparison, index) {
     return { ...comparison, charts: comparison.charts.filter((_, i) => i !== index) };
 }
@@ -168,6 +181,10 @@ export function renameChart(comparison, index, title) {
     return { ...comparison, charts: comparison.charts.map((c, i) => (i === index ? { ...c, title } : c)) };
 }
 
+export function captionChart(comparison, index, caption) {
+    return { ...comparison, charts: comparison.charts.map((c, i) => (i === index ? { ...c, caption } : c)) };
+}
+
 // ── Putting a saved chart on screen ──────────────────────────────────────────
 
 /**
@@ -178,6 +195,17 @@ export function renameChart(comparison, index, title) {
 export function liveVehicleIds(comparison, vehicles) {
     const have = new Set(vehicles.map(v => String(v.id)));
     return comparison.vehicleIds.filter(id => have.has(String(id)));
+}
+
+/**
+ * The vehicles of a comparison, as records, in the comparison's own order and
+ * skipping any that no longer exist. The order is the curator's — siblings
+ * beside siblings, a cousin next to its cousin — so every place that draws or
+ * lists them takes it from here, never from the order of the site's vehicle list.
+ */
+export function vehiclesInOrder(ids, vehicles) {
+    const byId = new Map(vehicles.map(v => [String(v.id), v]));
+    return ids.map(id => byId.get(String(id))).filter(Boolean);
 }
 
 /**
