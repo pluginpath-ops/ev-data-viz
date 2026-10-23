@@ -2769,7 +2769,11 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * measurement rather than a judgement: the first control's top must not move
  * between idle and loading. Pointer-transparent, because the stale chart
  * underneath stays readable and worth interacting with while the new data
- * arrives. */
+ * arrives.
+ *
+ * Mounted by ChartLoading (#453), which PlotFrame renders: it centers on the
+ * plot frame (`.plot-frame` is `relative`), or on `.chart-main` where a view
+ * builds no frame while loading. */
 .chart-loading {
     @apply flex items-center;
     position: absolute;
@@ -2785,6 +2789,11 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     background-color: var(--color-card);
     box-shadow: var(--shadow-popover, 0 4px 12px rgba(0, 0, 0, 0.3));
     pointer-events: none;
+}
+/* Still ring, same words: the message carries the meaning, the spin only
+   decorates it. */
+@media (prefers-reduced-motion: reduce) {
+    .chart-loading .animate-spin { animation: none; }
 }
 
 /* ── Controls, re-laid for a 300px column ──────────────────────────────────
@@ -3309,6 +3318,8 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 }
 
 .plot-frame {
+    /* The ground the loading badge floats over (.chart-loading, #453). */
+    position: relative;
     padding: 14px 16px 16px;
     background-color: var(--color-card);
     border: 1px solid var(--color-border-strong);
