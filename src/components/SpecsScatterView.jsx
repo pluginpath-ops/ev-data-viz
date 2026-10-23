@@ -13,6 +13,7 @@ import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import { buildVehicleLabels } from '../utils/seriesLabel';
+import FeatureChartButton from './home/FeatureChartButton';
 
 // ── Linear regression ─────────────────────────────────────────────────────────
 
@@ -304,6 +305,7 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
             onDismissPreview={dismissPreview}
             exportControls={!presentationMode && (
                 <>
+                    <FeatureChartButton />
                     <button
                         onClick={() => {
                             navigator.clipboard.writeText(window.location.href).then(() => {

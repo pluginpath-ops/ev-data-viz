@@ -58,6 +58,9 @@ export default function AppNav({
      * between the buttons this replaced.
      */
     const items = [
+        // Home (#448): the featured comparison a curator chose. Not gated on a
+        // selection, and not a chart category: it draws its own charts.
+        { key: 'home', label: 'Home' },
         // Vehicles & Specs (#338): the cards and list, and — drawn under it —
         // the vehicle table and the spec chart. Specs are front and center by
         // being in the first tab's name, not by a tab of their own.
@@ -107,7 +110,7 @@ export default function AppNav({
         <div className="app-nav-bar">
             <button
                 type="button"
-                onClick={() => (onHome ?? onNavigate)('vehicles')}
+                onClick={() => (onHome ?? onNavigate)('home')}
                 className="app-wordmark"
                 title="EVBench — home"
             >

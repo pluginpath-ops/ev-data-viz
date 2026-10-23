@@ -13,6 +13,7 @@ import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import { buildVehicleLabels } from '../utils/seriesLabel';
+import FeatureChartButton from './home/FeatureChartButton';
 
 // ── Inside-bar label afterDraw plugin ─────────────────────────────────────────
 
@@ -251,6 +252,7 @@ export default function SpecsChartView({ vehicles: picked, selectedField: contro
             onDismissPreview={dismissPreview}
             exportControls={!presentationMode && (
                 <>
+                    <FeatureChartButton />
                     <button
                         onClick={() => {
                             navigator.clipboard.writeText(window.location.href).then(() => {

@@ -53,10 +53,12 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
                      'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js',
-                     'epaCertifications.js'];
+                     'epaCertifications.js', 'featuredComparisons.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
+        'featuredComparisons.slugify':
+            'Reached through uniqueSlug; exported so the slug rule is tested on its own.',
         'sources.domainOf':
             'Reached through findSource and pickedSource; exported so link reading is tested on its own.',
         'chargeWindows.countsTowardBest':
@@ -962,7 +964,7 @@ describe('the seams that broke before', () => {
         expect(view, 'a thin start estimates the spread from all its tests').toMatch(/spreadAlong\(seriesFrom\(members, live\.fullStart\), xs\)/);
         expect(view, 'and the legend says how many it rests on').toMatch(/\$\{live\.tests\.length\} of \$\{live\.of\} tests/);
         expect(view, 'that spread is its own setting, off by default').toMatch(/chartConfig\.addedSpread \?\? false/);
-        expect(read('src/App.jsx'), 'and rides the URL').toMatch(/p\.set\('aspread', '1'\)/);
+        expect(read('src/utils/chartUrlState.js'), 'and rides the URL').toMatch(/p\.set\('aspread', '1'\)/);
     });
 
     it('takes a composite as the default charging curve everywhere: DEF → composite → newest (#313)', () => {
@@ -979,7 +981,7 @@ describe('the seams that broke before', () => {
         expect(view, 'its ⓘ sits where a source link would').toMatch(/renderRunSource=\{run => isCompositeRun\(run\)/);
         expect(read('src/components/RunSelector.jsx'), 'a derived row is told apart by its name').toMatch(/run-name-derived/);
         expect(read('src/utils/colorUtils.js'), 'a composite wears the vehicle color').toMatch(/r\.composite \? -\(r\.composite\.chargerClassV/);
-        expect(read('src/App.jsx'), 'the spread toggle rides the URL').toMatch(/p\.set\('cspread'/);
+        expect(read('src/utils/chartUrlState.js'), 'the spread toggle rides the URL').toMatch(/p\.set\('cspread'/);
     });
 
     it('draws Modeled vs Tested under the EPA tab, keeping it a chart mode (#338)', () => {
@@ -1076,7 +1078,7 @@ describe('the seams that broke before', () => {
 
     it('opens an explainer from a link, and restores it from the URL (#355)', () => {
         const app = read('src/App.jsx');
-        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform, openExplainer \}\}>/);
+        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform, openExplainer[ ,]/);
         expect(app, 'and restores ?topic=').toMatch(/setReferenceTopic\(p\.get\('topic'\) \|\| null\)/);
         expect(app, 'and writes it back').toMatch(/p\.set\('topic', referenceTopic\)/);
         expect(read('src/components/reference/ReferenceSection.jsx'), 'Reference mounts the section')
@@ -1136,7 +1138,7 @@ describe('the seams that broke before', () => {
         expect(app).not.toMatch(/selectedVehicles\.length > 0 && chartMode === 'specstable'/);
         // The chart URL writer must carry the table's own parameters, or every
         // selection change wipes the reader's columns, sort and filters.
-        expect(app).toMatch(/startsWith\(VEHICLE_TABLE_PARAM_PREFIX\)/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/startsWith\(VEHICLE_TABLE_PARAM_PREFIX\)/);
 
         // Its tab is a way to pick vehicles, so it must never wait for a pick:
         // the top nav gates on the modes, and entering lands on one that works.
@@ -1549,8 +1551,9 @@ describe('one correction, everywhere it is applied', () => {
 
     it('shares the target between the charts and the table, and writes it to the URL once', () => {
         const app = read('src/App.jsx');
-        expect(app).toMatch(/encodeCorrection\(/);
-        expect(app).toMatch(/decodeCorrection\(window\.location\.search\)/);
+        const codec = read('src/utils/chartUrlState.js');
+        expect(codec).toMatch(/encodeCorrection\(/);
+        expect(codec).toMatch(/decodeCorrection\(/);
         expect(app, 'the table must get App\'s target, not its own').toMatch(/correctionTarget=\{chartConfig\.correctionTarget\}[\s\S]{0,200}onCorrectionTargetChange=/);
         // And the mode: a reader who turns correction off on a chart must see
         // the table's reported-test figures as measured too.
@@ -1951,15 +1954,15 @@ describe('a pop-out receives every setting the chart it was opened from does (#3
         const end = src.indexOf('/>', at);
         return [...src.slice(at, end).matchAll(/^\s+([A-Za-z]+)(?==|\s*$)/gm)].map(m => m[1]);
     };
-    // The pop-out is read-only, so setters are left out on purpose.
-    const READ_ONLY = (p) => /^set[A-Z]/.test(p);
+    // The pop-out is read-only, so setters and change handlers are left out on purpose.
+    const READ_ONLY = (p) => /^(set|on)[A-Z]/.test(p);
 
     for (const tag of ['ChargeCompareView', 'RoadTripView']) {
         it(`${tag}: the pop-out passes every non-setter prop the main tab does`, () => {
             const main = propsOf(read('src/App.jsx'), tag);
-            const popout = propsOf(read('src/components/PopoutView.jsx'), tag);
+            const popout = propsOf(read('src/components/PresentedChart.jsx'), tag);
             expect(main, `${tag} in App.jsx`).toBeTruthy();
-            expect(popout, `${tag} in PopoutView.jsx`).toBeTruthy();
+            expect(popout, `${tag} in PresentedChart.jsx`).toBeTruthy();
             const missing = main.filter(p => !READ_ONLY(p) && !popout.includes(p));
             expect(missing, `props App passes to ${tag} that PopoutView does not`).toEqual([]);
         });
@@ -1976,7 +1979,8 @@ describe('the vehicle swatch is connected (#308, #317)', () => {
     });
 
     it('session bases live in chartConfig, so the pop-out window receives them', () => {
-        expect(app).toMatch(/vehicleBases: NO_VEHICLE_BASES/);
+        expect(read('src/utils/chartDefaults.js')).toMatch(/vehicleBases: NO_VEHICLE_BASES/);
+        expect(app).toMatch(/useState\(defaultChartConfig\)/);
         // useChartSync ships the whole chartConfig; if that ever narrows to named
         // fields, this is where it is noticed.
         expect(read('src/hooks/useChartSync.js')).toMatch(/chartConfig,/);
@@ -2231,7 +2235,7 @@ describe('the chart subtitle leads with conditions; counts follow Full Labels (#
     }
 
     it('the pop-out hands Full Labels to every view that shows counts', () => {
-        const popout = read('src/components/PopoutView.jsx');
+        const popout = read('src/components/PresentedChart.jsx');
         // Charging + Range ride chartConfig whole; the others take the flag.
         expect(popout).toMatch(/<ChargingView[\s\S]*?chartConfig=\{chartConfig\}/);
         for (const view of ['ChargeCompareView', 'RoadTripView']) {
@@ -2265,6 +2269,197 @@ describe('the chart subtitle leads with conditions; counts follow Full Labels (#
     it('Range & Efficiency hides a legend that has nothing to tell apart', () => {
         expect(read('src/components/RangeChartView.jsx'))
             .toMatch(/legend: \{ display: legendWorthShowing\(built\.data\.datasets\) \}/);
+    });
+});
+
+describe('a chart link is read and written in one module (#448 layer 1)', () => {
+    const codec = read('src/utils/chartUrlState.js');
+    const [parseSrc, buildSrc] = codec.split('export function buildChartParams');
+    const app = read('src/App.jsx');
+
+    it('App parses and builds the query through chartUrlState, not inline', () => {
+        expect(app).toMatch(/parseChartUrl\(window\.location\.search\)/);
+        expect(app).toMatch(/buildChartParams\(\{/);
+        expect(app).not.toMatch(/p\.get\('cmp_soc'\)/);
+        expect(app).not.toMatch(/p\.set\('cmp_soc'/);
+    });
+
+    it('every key the builder writes, the parser reads', () => {
+        const written = [...buildSrc.matchAll(/p\.set\('([a-z0-9_]+)'/g)].map(m => m[1]);
+        expect(written.length).toBeGreaterThan(40);
+        // `tab` is read by App itself before the parse, `m` and `v` through
+        // their own names — the check is on the quoted key appearing at all.
+        const unread = written.filter(k => k !== 'tab' && !parseSrc.includes(`'${k}'`));
+        expect(unread).toEqual([]);
+    });
+
+    it('the settings a link now carries have a home in the state App holds', () => {
+        // The starting state is in chartDefaults.js; App starts from it.
+        const defaults = read('src/utils/chartDefaults.js');
+        for (const field of ['rangeChartType', 'effUnit', 'specsField']) {
+            expect(defaults).toMatch(new RegExp(`${field}:`));
+        }
+        expect(defaults).toMatch(/orientation: DEFAULT_COMPARE_ORIENTATION/);
+        expect(defaults).toMatch(/selected: \[\]/);
+        expect(app).toMatch(/useState\(defaultCompareConfig\)/);
+    });
+
+    it('Range & Efficiency draws the chart type and unit it is given, and asks App to change them', () => {
+        const view = read('src/components/RangeChartView.jsx');
+        expect(view).not.toMatch(/useState\('range-vehicle-bar'\)/);
+        expect(view).not.toMatch(/useState\('mi_kwh'\)/);
+        expect(view).toMatch(/rangeChartType/);
+        const charging = read('src/components/ChargingView.jsx');
+        expect(charging).toMatch(/chartType=\{chartConfig\.rangeChartType\}/);
+        expect(charging).toMatch(/effUnit=\{chartConfig\.effUnit\}/);
+    });
+
+    it('Charge Stop takes its orientation and plotted pairs from App, in the tab and the pop-out', () => {
+        const view = read('src/components/ChargeCompareView.jsx');
+        expect(view).not.toMatch(/useState\('horizontal'\)/);
+        expect(view).toMatch(/value: selectedKeys/);
+        expect(app).toMatch(/selectedKeys=\{compareConfig\.selected\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/selectedKeys=\{compareConfig\.selected\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/orientation=\{compareConfig\.orientation\}/);
+    });
+
+    it('the plotted tests are applied from the link for range as well as charging', () => {
+        expect(codec).toMatch(/s\.chartMode === 'charging' \|\| s\.chartMode === 'range'/);
+        expect(app).toMatch(/chartConfigFromParsed\(s, prev\)/);
+    });
+});
+
+describe('featured comparisons are stored, saved safely and openable (#448 layer 2)', () => {
+    const migration = read('supabase/migrations/089_featured_comparisons.sql');
+    const service = read('src/services/DataService.js');
+    const app = read('src/App.jsx');
+
+    it('the migration is safe to run twice and mirrors the curators\' policies', () => {
+        expect(migration).toMatch(/CREATE TABLE IF NOT EXISTS public\.featured_comparisons/);
+        const created = migration.match(/CREATE POLICY/g) ?? [];
+        const dropped = migration.match(/DROP POLICY IF EXISTS/g) ?? [];
+        expect(created.length).toBe(4);
+        expect(dropped.length, 'every policy is dropped IF EXISTS first').toBe(created.length);
+        expect(migration).toMatch(/DROP TRIGGER IF EXISTS featured_comparisons_stamp_listed/);
+        expect(migration).toMatch(/FOR DELETE\s+USING \(public\.current_user_role\(\) = 'admin'\)/);
+        expect(migration).toMatch(/is_listed OR public\.current_user_role\(\) IN \('admin', 'contributor'\)/);
+    });
+
+    it('an update or delete that RLS filtered raises, instead of looking saved', () => {
+        const update = service.slice(service.indexOf('async updateFeaturedComparison'), service.indexOf('async deleteFeaturedComparison'));
+        expect(update).toMatch(/\.select\(\)/);
+        expect(update).toMatch(/!data\?\.length/);
+        const del = service.slice(service.indexOf('async deleteFeaturedComparison'));
+        expect(del.slice(0, 700)).toMatch(/\.select\('id'\)/);
+        expect(del.slice(0, 700)).toMatch(/!data\?\.length/);
+    });
+
+    it('the list degrades to empty before 089 is applied, since Home is the landing page', () => {
+        const read_ = service.slice(service.indexOf('async getFeaturedComparisons'), service.indexOf('async addFeaturedComparison'));
+        expect(read_).toMatch(/42P01/);
+        expect(read_).toMatch(/return \[\];/);
+    });
+
+    it('App can open a comparison\'s chart and reset to it, and shares both through the navigation context', () => {
+        expect(app).toMatch(/const openFeaturedChart = useCallback/);
+        expect(app).toMatch(/const resetToComparison = useCallback/);
+        expect(app).toMatch(/<NavigationContext\.Provider value=\{\{[^}]*openFeaturedChart, resetToComparison/);
+        // Both write the selection through the guarded writer, not the setter.
+        const open = app.slice(app.indexOf('const openFeaturedChart'), app.indexOf('const resetToComparison'));
+        expect(open).toMatch(/setVehicleSelection\(state\.vehicleIds\)/);
+    });
+
+    it('opening a chart applies a clean slate: every config comes from the saved state, none from the live one', () => {
+        const open = app.slice(app.indexOf('const openFeaturedChart'), app.indexOf('const resetToComparison'));
+        for (const setter of ['setChartConfig', 'setCompareConfig', 'setRoadTripConfig', 'setEpaConfig', 'setPairings']) {
+            expect(open, setter).toMatch(new RegExp(`${setter}\\(state\\.`));
+        }
+    });
+
+    it('the hook writes through the service and reloads', () => {
+        const hook = read('src/hooks/useFeaturedComparisons.js');
+        for (const call of ['addFeaturedComparison', 'updateFeaturedComparison', 'deleteFeaturedComparison']) {
+            expect(hook).toMatch(new RegExp(call));
+        }
+        expect(hook).toMatch(/reload\(\)/);
+    });
+});
+
+describe('Home draws a featured comparison and curators can make one (#448 layer 3)', () => {
+    const app = read('src/App.jsx');
+    const home = read('src/components/home/HomeView.jsx');
+    const panel = read('src/components/home/FeaturedChartPanel.jsx');
+
+    it('Home is the first tab, a view of its own, and reads no selection', () => {
+        const nav = read('src/components/shell/AppNav.jsx');
+        expect(nav.indexOf("key: 'home'")).toBeGreaterThan(-1);
+        expect(nav.indexOf("key: 'home'")).toBeLessThan(nav.indexOf("key: 'vehicles'"));
+        expect(app).toMatch(/SELECTION_INERT_VIEWS = new Set\(\['home',/);
+        expect(app).toMatch(/\{view === 'home' && <HomeView/);
+        expect(app).toMatch(/if \(tab === 'home'\)/);
+    });
+
+    it('Home opens with the intro, whether or not anything is featured', () => {
+        expect(home.match(/<HomeIntro \/>/g)?.length).toBe(3);
+    });
+
+    it('the featured comparison sits under its own section header', () => {
+        expect(home).toMatch(/<h2 className="home-section-head text-micro">Featured comparison<\/h2>/);
+    });
+
+    it('a panel draws through PresentedChart, the view the pop-out uses, from its own state', () => {
+        expect(panel).toMatch(/<PresentedChart/);
+        expect(read('src/components/PopoutView.jsx')).toMatch(/<PresentedChart/);
+        // Its own copy: the live site's chart state must not reach a panel.
+        expect(panel).not.toMatch(/useChartSync|chartConfig=\{chartConfig\}.*live/);
+        expect(panel).toMatch(/chartStateOf\(/);
+        // A chart that fills its own selection on first sight needs somewhere to
+        // write it, or it stays blank (Charge Stop did, on Home).
+        for (const setter of ['setChartConfig', 'setCompareConfig', 'setRoadTripConfig', 'setEpaConfig']) {
+            expect(panel, setter).toMatch(new RegExp(`${setter}=\\{${setter}\\}`));
+        }
+        expect(panel).toMatch(/useInView\(/);
+    });
+
+    it('opening a chart and resetting both warn before replacing a selection', () => {
+        expect(home).toMatch(/replacesSelection\(selectedVehicles, shown, vehicles\)/);
+        expect(home).toMatch(/openFeaturedChart\(shown, index\)/);
+        expect(home).toMatch(/resetToComparison\(shown\)/);
+        expect(home).toMatch(/<ReplaceSelectionDialog/);
+    });
+
+    it('every chart view offers Save as featured comparison, to curators only', () => {
+        for (const f of ['ChargingView', 'RangeChartView', 'ChargeCompareView', 'RoadTripView', 'EpaCurvesView', 'SpecsChartView', 'SpecsScatterView']) {
+            expect(read(`src/components/${f}.jsx`), f).toMatch(/<FeatureChartButton \/>/);
+        }
+        const button = read('src/components/home/FeatureChartButton.jsx');
+        expect(button).toMatch(/if \(!canCurate \|\| !featureThisChart\) return null/);
+        // No button in the pop-out, and none for anyone who cannot curate.
+        expect(app).toMatch(/featureThisChart: isPopout \|\| !canCurate \? null : featureThisChart/);
+        expect(app).toMatch(/const canCurate = isContributor/);
+    });
+
+    it('the editor saves through the hook, and only an admin sees Delete', () => {
+        expect(app).toMatch(/featured\.create\(c\) : featured\.save\(c\)/);
+        expect(app).toMatch(/canDelete=\{isAdmin\}/);
+        expect(read('src/components/home/FeaturedComparisonEditor.jsx')).toMatch(/!isNew && canDelete/);
+    });
+
+    it('a presented chart is as tall as its frame says, not as tall as the window', () => {
+        for (const f of ['ChargingView', 'RangeChartView', 'EpaCurvesView']) {
+            const src = read(`src/components/${f}.jsx`);
+            expect(src, f).toMatch(/presentationMode \? PRESENTED_HEIGHT/);
+            expect(src, f).not.toMatch(/calc\(100vh - 2rem\)/);
+        }
+        expect(read('src/components/ChargeCompareView.jsx')).not.toMatch(/'45vh'/);
+        expect(read('src/index.css')).toMatch(/--presented-h: /);
+        // One height for every panel: a taller one leaves a gap under its neighbor.
+        expect(read('src/index.css')).not.toMatch(/\.home-panel\.is-tall/);
+    });
+
+    it('the address carries the comparison Home shows (fc), written beside the tab', () => {
+        expect(app).toMatch(/p\.set\('fc', homeSlug\)/);
+        expect(app).toMatch(/setHomeSlug\(p\.get\('fc'\) \|\| null\)/);
     });
 });
 
@@ -2306,5 +2501,76 @@ describe('chart views show a loading indicator from their real loading state (#4
             .filter(x => /className="chart-loading"/.test(x.text))
             .map(x => x.file);
         expect(copies).toEqual([expect.stringMatching(/ChartLoading\.jsx$/)]);
+    });
+});
+
+describe('site events are counted without knowing who (#448 layer 4)', () => {
+    const migration = read('supabase/migrations/090_site_events.sql');
+    const events = read('src/utils/siteEvents.js');
+    const service = read('src/services/DataService.js');
+
+    it('the client, the table and the function agree on the events', () => {
+        const client = [...events.matchAll(/:\s+'([a-z_]+)',/g)].map(m => m[1]).sort();
+        expect(client).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view']);
+        const quoted = (src) => [...src.matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
+        const check = migration.match(/CHECK \(event IN \(([^)]*)\)/)[1];
+        const fn = migration.match(/p_event NOT IN \(([^)]*)\)/)[1];
+        expect(quoted(check).sort()).toEqual(client);
+        expect(quoted(fn).sort()).toEqual(client);
+    });
+
+    it('only the function writes, and only an admin reads', () => {
+        expect(migration).toMatch(/SECURITY DEFINER/);
+        expect(migration).toMatch(/REVOKE ALL ON public\.site_events FROM anon, authenticated/);
+        expect(migration).not.toMatch(/FOR INSERT/);
+        expect(migration).toMatch(/FOR SELECT\s+USING \(public\.current_user_role\(\) = 'admin'\)/);
+        expect(migration).toMatch(/DROP POLICY IF EXISTS "site_events: admin read"/);
+    });
+
+    it('the function refuses a flood and never raises', () => {
+        expect(migration).toMatch(/>= 60 THEN/);
+        expect(migration).toMatch(/EXCEPTION WHEN OTHERS THEN\s+RETURN false/);
+    });
+
+    it('nothing identifying is stored or sent: no user id, email, IP or user agent', () => {
+        const table = migration.slice(migration.indexOf('CREATE TABLE'), migration.indexOf(');', migration.indexOf('CREATE TABLE')));
+        expect(table).not.toMatch(/user_id|email|ip_|user_agent/);
+        const send = service.slice(service.indexOf('async logSiteEvent'), service.indexOf('// ── Access logging'));
+        expect(send).toMatch(/p_browser_token: this\.getBrowserToken\(\)/);
+        expect(send).not.toMatch(/this\.user|navigator/);
+        expect(send).toMatch(/catch \{/);
+    });
+
+    it('the events are recorded where they happen, through the one hook', () => {
+        const home = read('src/components/home/HomeView.jsx');
+        expect(home).toMatch(/record\(SITE_EVENTS\.HOME_VIEW, \{ slug: shownSlug, once: true \}\)/);
+        expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_OPEN/);
+        expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_RESET/);
+        expect(read('src/App.jsx')).toMatch(/recordEvent\(SITE_EVENTS\.CHART_VIEW/);
+        const hook = read('src/hooks/useSiteEvents.js');
+        expect(hook).toMatch(/shouldRecord\(\{ role: userRole, popout \}\)/);
+        // Nobody else calls the service directly, or the curator skip is bypassable.
+        const callers = consumersOf('logSiteEvent', ['src/services/DataService.js']);
+        expect(callers).toEqual([expect.stringMatching(/hooks[\\/]useSiteEvents\.js$/)]);
+    });
+});
+
+describe('Home is where a bare address lands (#448 layer 5)', () => {
+    const app = read('src/App.jsx');
+
+    it('the first view is Home, and Vehicles & Specs is reached by saying so', () => {
+        expect(app).toMatch(/useState\('home'\)/);
+        expect(app).not.toMatch(/const \[view, setView\] = useState\('vehicles'\)/);
+        // The mount parse names it, or a link to ?tab=vehicles would land on Home.
+        expect(app).toMatch(/if \(tab === 'vehicles'\) \{\s+setView\('vehicles'\);/);
+    });
+
+    it('the wordmark goes Home', () => {
+        expect(read('src/components/shell/AppNav.jsx')).toMatch(/\(onHome \?\? onNavigate\)\('home'\)/);
+    });
+
+    it('nothing writes the address while the app loads, so a link to another tab survives the first render', () => {
+        const home = app.slice(app.indexOf('Keep URL in sync while on Home'));
+        expect(home.slice(0, 500)).toMatch(/view !== 'home' \|\| loading/);
     });
 });

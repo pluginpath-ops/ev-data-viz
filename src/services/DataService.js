@@ -712,6 +712,86 @@ class DataService {
     return data;
   }
 
+  // ── Featured comparisons (#448) ───────────────────────────────────────────
+
+  /**
+   * Every featured comparison the reader may see: the listed ones, and for a
+   * curator the unlisted too (the RLS policy decides, migration 089), newest
+   * listed first. Raw rows; utils/featuredComparisons.js normalizes them.
+   *
+   * Resilient like getChartHelp: Home is the landing page, so a missing table
+   * (089 not yet applied) is an empty list and a console note, not a broken
+   * first screen.
+   */
+  async getFeaturedComparisons() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('featured_comparisons')
+      .select('*')
+      .order('listed_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205') {
+        console.warn('featured_comparisons unavailable — is migration 089 applied?', error.message);
+        return [];
+      }
+      throw error;
+    }
+    return data || [];
+  }
+
+  /**
+   * Create a featured comparison. `fields` is { slug, title, blurb, vehicle_ids,
+   * charts, is_listed }. Returns the saved row, so the caller holds what the
+   * database stored (the slug it accepted, the listed_at it stamped).
+   */
+  async addFeaturedComparison(fields) {
+    const { data, error } = await getSupabase()
+      .from('featured_comparisons')
+      .insert({ ...fields, created_by: this.user?.id ?? null, updated_by: this.user?.id ?? null })
+      .select()
+      .single();
+    if (error) {
+      if (error.code === '23505') throw new Error(`There is already a featured comparison with the link name "${fields.slug}".`);
+      throw error;
+    }
+    return data;
+  }
+
+  /**
+   * Change a featured comparison. Reads the row back and raises on 0 rows: RLS
+   * does not refuse a filtered UPDATE, it matches nothing and PostgREST answers
+   * 204, which is how every vehicle save looked like it worked until 087.
+   */
+  async updateFeaturedComparison(id, fields) {
+    const { data, error } = await getSupabase()
+      .from('featured_comparisons')
+      .update({ ...fields, updated_at: new Date().toISOString(), updated_by: this.user?.id ?? null })
+      .eq('id', id)
+      .select();
+    if (error) {
+      if (error.code === '23505') throw new Error(`There is already a featured comparison with the link name "${fields.slug}".`);
+      throw error;
+    }
+    if (!data?.length) {
+      throw new Error('The featured comparison was not saved: it no longer exists, or your role does not allow editing it (is migration 089 applied?).');
+    }
+    return data[0];
+  }
+
+  /** Delete one (admin only, by policy). Raises on 0 rows, as the update does. */
+  async deleteFeaturedComparison(id) {
+    const { data, error } = await getSupabase()
+      .from('featured_comparisons')
+      .delete()
+      .eq('id', id)
+      .select('id');
+    if (error) throw error;
+    if (!data?.length) {
+      throw new Error('The featured comparison was not deleted: it no longer exists, or only an admin may delete one.');
+    }
+  }
+
   // ── Spec links ────────────────────────────────────────────────────────────
 
   async addSpecLink({ targetVehicleId, sourceRunId, efficiencyFactor, capacityFactor, notes }) {
@@ -4066,6 +4146,32 @@ class DataService {
     const { error } = await getSupabase()
       .from('performance_intervals').delete().eq('id', id);
     if (error) throw error;
+  }
+
+  // ── Site events (#448) ──────────────────────────────────────────────────────
+
+  /**
+   * Record that a reader did something worth counting (utils/siteEvents.js lists
+   * the events). Writes through the SECURITY DEFINER log_site_event (migration
+   * 090), which an anonymous visitor may call and which refuses anything not on
+   * its list or past its rate limit. Identity is the anonymous browser token:
+   * no user id, no IP. Never throws and never reaches the reader: counting must
+   * not get in the way of the thing being counted.
+   *
+   * @param {{ event: string, slug?: string|null, detail?: object }} opts
+   */
+  async logSiteEvent({ event, slug = null, detail = {} }) {
+    if (!this.useSupabase) return;
+    try {
+      await getSupabase().rpc('log_site_event', {
+        p_event:         event,
+        p_browser_token: this.getBrowserToken(),
+        p_slug:          slug,
+        p_detail:        detail,
+      });
+    } catch {
+      // Intentionally swallowed, as for access logging.
+    }
   }
 
   // ── Access logging ──────────────────────────────────────────────────────────

@@ -32,8 +32,11 @@ import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
+import { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT } from '../utils/chartUrlState';
 import { wrapCanvasText } from '../utils/wrapCanvasText';
 import { countParts, legendWorthShowing } from '../utils/plotCaption';
+import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
+import FeatureChartButton from './home/FeatureChartButton';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -76,13 +79,16 @@ const hasDataForType = (run, type) => {
 // used to roll its own toggle against chartConfig — one more copy of the
 // behaviour, and the reason a run could be switched off here and come back.
 export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = VEHICLE_PALETTE,
+    chartType = DEFAULT_RANGE_CHART_TYPE, effUnit = DEFAULT_EFFICIENCY_UNIT,
     handSet = false, verboseLabels = false, correctionMode = 'none', correctionTarget = undefined, testSpread = true }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
     const chartInstance = useRef(null);
-    const [chartType,    setChartType]    = useState('range-vehicle-bar');
-    const [effUnit,      setEffUnit]      = useState('mi_kwh'); // 'mi_kwh' | 'wh_mi'
+    // The chart type and efficiency unit live in chartConfig (App), so a link
+    // and the pop-out carry them; this view only asks for a change.
+    const setChartType = rangeChartType => setChartConfig(prev => ({ ...prev, rangeChartType }));
+    const setEffUnit   = unit => setChartConfig(prev => ({ ...prev, effUnit: unit }));
     const [copiedUrl,    setCopiedUrl]    = useState(false);
 
     // ── Axis scale state — yMin defaults to 0, rest auto ─────────────────────
@@ -796,6 +802,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (
                     <>
+                        <FeatureChartButton />
                         <button
                             onClick={() => {
                                 navigator.clipboard.writeText(window.location.href).then(() => {
@@ -819,7 +826,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     </>
                 )}
             >
-                <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px', position: 'relative' }}>
+                <div style={{ height: presentationMode ? PRESENTED_HEIGHT : '500px', position: 'relative' }}>
                     {/* Canvas always mounted so ref stays valid */}
                     <canvas
                         ref={chartRef}

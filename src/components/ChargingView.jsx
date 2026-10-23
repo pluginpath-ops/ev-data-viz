@@ -49,6 +49,8 @@ import { statisticalRuns } from '../utils/runListing';
 import { reportedRangeRun } from '../utils/testedRange';
 import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
+import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
+import FeatureChartButton from './home/FeatureChartButton';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
@@ -996,6 +998,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 toggleRun={toggleRun}
                 setChartConfig={setChartConfig}
                 presentationMode={presentationMode}
+                chartType={chartConfig.rangeChartType}
+                effUnit={chartConfig.effUnit}
                 palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
                 // Without this the Range sub-tab could never return to Hand-set:
                 // selecting it wrote chartConfig.handSet, the prop defaulted to
@@ -1339,6 +1343,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 loadingMessage="Loading run data…"
                 exportControls={!presentationMode && (
                     <>
+                        <FeatureChartButton />
                         <button
                             onClick={() => chartInstance.current?.resetZoom()}
                             className="chart-copy-btn"
@@ -1368,7 +1373,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     </>
                 )}
             >
-                <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : '500px' }}>
+                <div style={{ height: presentationMode ? PRESENTED_HEIGHT : '500px' }}>
                     <canvas ref={chartRef}></canvas>
                 </div>
             </PlotFrame>

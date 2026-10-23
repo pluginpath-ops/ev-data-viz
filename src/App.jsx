@@ -15,8 +15,16 @@ import RoadTripView from './components/RoadTripView';
 import PopoutView from './components/PopoutView';
 import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
-import { VEHICLE_TABLE_PARAM_PREFIX } from './utils/vehicleTable';
-import { decodeCorrection, encodeCorrection, DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from './utils/correctionSettings';
+import { DEFAULT_READER_MODE } from './utils/correctionSettings';
+import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './utils/chartDefaults';
+import { chartStateOf, resetStateOf, chartParamsFromSearch, defaultChartTitle } from './utils/featuredComparisons';
+import { useFeaturedComparisons } from './hooks/useFeaturedComparisons';
+import { useSiteEvents } from './hooks/useSiteEvents';
+import { SITE_EVENTS } from './utils/siteEvents';
+import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext';
+import HomeView from './components/home/HomeView';
+import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
+import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink } from './utils/chartUrlState';
 import SpecsChartView from './components/SpecsChartView';
 import SpecsScatterView from './components/SpecsScatterView';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -32,7 +40,7 @@ import { NavigationContext } from './context/NavigationContext';
 import { platformHref } from './utils/platforms';
 import { decodeVehicleFilters, encodeVehicleFilters } from './utils/vehicleFilters';
 import ReferenceSection, { REFERENCE_SUBTABS, DEFAULT_REFERENCE_SUBTAB, referenceSubtabFromParam } from './components/reference/ReferenceSection';
-import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
+import { prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
 import { applyVehicleBases, withVehicleBase, NO_VEHICLE_BASES } from './utils/vehicleBase';
 import { VehicleBaseContext } from './context/VehicleBaseContext';
@@ -70,7 +78,7 @@ const VEHICLES_STRIP_ITEMS = [
  * Hiding is not clearing. The selection survives the trip and the chips are
  * back the moment a view uses them again.
  */
-const SELECTION_INERT_VIEWS = new Set(['runs', 'epa', 'reference', 'admin', 'playground']);
+const SELECTION_INERT_VIEWS = new Set(['home', 'runs', 'epa', 'reference', 'admin', 'playground']);
 
 export default function App() {
     const {
@@ -131,7 +139,11 @@ export default function App() {
 
 
     const [activeVehicle, setActiveVehicle] = useState(null);
-    const [view, setView] = useState('vehicles');
+    // Home is where a bare address lands (#448): a first-time visitor meets the
+    // featured comparison, not the full vehicle grid. Every other tab is reached
+    // by its own ?tab=, which the mount parse below turns into a view; a tab name
+    // it does not know stays here.
+    const [view, setView] = useState('home');
     // Which Runs-tab sub-tab is showing (Charging & Range / Inherited /
     // Performance / EPA). Lifted out of RunsView so it can be persisted in the
     // URL the same way activeVehicle is.
@@ -172,7 +184,7 @@ export default function App() {
     }));
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare' | 'epacurves' | …
-    const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
+    const [compareConfig, setCompareConfig] = useState(defaultCompareConfig);
     // Which range test supplies the miles for which charging test. Global to the
     // chart session rather than per-view, so two charts on one screen can never
     // disagree about what "range" means. See utils/pairings.js.
@@ -191,71 +203,9 @@ export default function App() {
     // (see useSyncedScale). Reported by that chart in the main tab; received by a
     // pop-out.
     const [viewScale, setViewScale] = useState(null);
-    const [epaConfig, setEpaConfig] = useState({
-        yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null,
-        // Which curves are drawn, and any colors overridden for them (#221).
-        // Held here rather than inside EpaCurvesView so they reach the URL and
-        // the pop-out, exactly as every other chart's selection does.
-        selectedMappings: [], mappingColors: {},
-        // The real-world overlay (null | 'corrected' | 'uncorrected'). Here, not
-        // in the view, so a link can open the chart with its tests showing: an
-        // explainer's modeled-efficiency card links in with epa_ov=corrected.
-        overlay: null,
-    });
-    const [roadTripConfig, setRoadTripConfig] = useState({
-        mode: 'distance', startSoc: 90, minSoc: 10, destinationMinSoc: 10,
-        legDistance: 150, chargeTime: 30,
-        totalDistance: 500, speed: 70,
-        overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
-        yAxis: 'chargeTime',      // 'distance' | 'chargeTime' | 'byTest'
-        xAxis: 'totalTime',       // 'totalTime' | 'driveTime' | 'speed' | 'tripDist'
-        sweepYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' (sweep modes only)
-        towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
-        towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
-        towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured
-        perRun: {},               // { [runId]: { minSoc?, legDistance?, chargeTime? } } — per-run overrides
-    });
-    const [chartConfig, setChartConfig] = useState({
-        xAxis: 'soc',
-        yAxis: 'chargeRate',
-        y2Axis: null,
-        selectedRuns: [],
-        // Time-axis alignment is on by default (#195): unaligned, every run
-        // starts at zero whatever SoC it began at, which compares nothing.
-        // alignRaw is the opt-out.
-        alignRaw: false,
-        // null means "follow the data" — the lowest SoC every selected run
-        // actually reaches. A fixed 10 looked like a default and behaved like a
-        // decision, drawing a run that began at 25% from t=0 alongside runs that
-        // began at 10%.
-        raceThreshold: null,
-        xMin: null,
-        xMax: null,
-        yMin: 0,
-        yMax: null,
-        y2Min: null,
-        y2Max: null,
-        showLine:   true,
-        showPoints: false,
-        // Where series colors come from: each vehicle's curated color by
-        // default, or a SERIES_PALETTES id to assign from that set instead.
-        seriesPalette: VEHICLE_PALETTE,
-        // Whether hand-set colors are in force over that base. Choosing a
-        // palette parks them; selecting Hand-set brings them back.
-        handSet: false,
-        // { [vehicleId]: hex } — a color asked of one car for this session
-        // (utils/vehicleBase.js). Lives here so the pop-out window gets it with
-        // the rest of the chart's state.
-        vehicleBases: NO_VEHICLE_BASES,
-        specsField:     null,   // selected field key for Spec Chart mode
-        scatterXField:  null,   // selected X field key for Spec Scatter mode
-        scatterYField:  null,   // selected Y field key for Spec Scatter mode
-        // The reader's correction (utils/correctionSettings.js): what every
-        // chart corrects range for, and the conditions every corrected figure
-        // — the vehicle table's composite range included — is corrected to.
-        correctionMode:   DEFAULT_READER_MODE,
-        correctionTarget: DEFAULT_CORRECTION_TARGET,
-    });
+    const [epaConfig, setEpaConfig] = useState(defaultEpaConfig);
+    const [roadTripConfig, setRoadTripConfig] = useState(defaultRoadTripConfig);
+    const [chartConfig, setChartConfig] = useState(defaultChartConfig);
     // The vehicles as the charts should draw them: a session base replaces the
     // vehicle's color on the copy, so every chart, sidebar accent and swatch
     // that reads `vehicle.color` follows without knowing a second layer exists.
@@ -315,6 +265,10 @@ export default function App() {
     const [referencePlatformId, setReferencePlatformId] = useState(null);
     // The explainer showing under Reference › Explainers (#355), by slug, or null for the list.
     const [referenceTopic, setReferenceTopic] = useState(null);
+    // Home (#448): the featured comparison named by ?fc=, or null for the newest
+    // listed; and the editor request (a chart to save, or a comparison to edit).
+    const [homeSlug, setHomeSlug] = useState(null);
+    const [featuredEditor, setFeaturedEditor] = useState(null);
 
     const handleChartModeChange = (newMode) => {
         const categoryKey = categoryForMode(newMode).key;
@@ -355,6 +309,33 @@ export default function App() {
         chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, viewScale,
         setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer, setViewScale,
     });
+
+    // The featured comparisons (#448), loaded once here so Home and the editor
+    // share one list. The pop-out has no Home and loads nothing.
+    // A chart tab or mode opened, however the reader got there (#448). One event
+    // per change of tab or mode; a curator's own and the pop-out's are skipped.
+    const recordEvent = useSiteEvents();
+    useEffect(() => {
+        if (loading || !isChartCategory(view)) return;
+        recordEvent(SITE_EVENTS.CHART_VIEW, { detail: { mode: chartMode } });
+    }, [loading, view, chartMode, recordEvent]);
+
+    const featured = useFeaturedComparisons({ enabled: !isPopout });
+    const canCurate = isContributor;
+
+    /** The chart on screen, as the address now states it, into the editor. */
+    const featureThisChart = () => {
+        const params = chartParamsFromSearch(window.location.search);
+        if (!params) return;
+        setFeaturedEditor({ add: { title: defaultChartTitle(chartMode), params }, vehicleIds: selectedVehicles });
+    };
+
+    const featuredContext = {
+        comparisons: featured.comparisons, loading: featured.loading, error: featured.error,
+        canCurate, canDelete: isAdmin,
+        openEditor: setFeaturedEditor,
+        featureThisChart: isPopout || !canCurate ? null : featureThisChart,
+    };
 
     /**
      * Open a test in Tests & Data from a figure that rests on it — the vehicle
@@ -404,6 +385,51 @@ export default function App() {
         }
         navigateTo(tab);
     };
+
+    /**
+     * Put one chart of a featured comparison on screen (#448): its vehicles, and
+     * its saved settings laid over a clean slate, so the previous chart's tweaks
+     * do not leak in. A history entry, so Back returns to Home. From here the
+     * reader's changes are theirs; Home's reset puts the comparison back.
+     *
+     * Replacing a selection of two or more is the caller's to warn about
+     * (featuredComparisons.replacesSelection) — this does what it is told.
+     */
+    const openFeaturedChart = useCallback((comparison, index) => {
+        const state = chartStateOf(comparison, index, vehicles);
+        if (!state) return;
+        history.pushState(
+            { view: state.view, chartMode: state.chartMode },
+            '',
+            `?tab=${state.view}&m=${state.chartMode}`, // URL sync effect replaces with full params
+        );
+        lastModeByCategory.current[state.view] = state.chartMode;
+        const parentTab = categoryForMode(state.chartMode).navParent;
+        if (parentTab) lastModeUnderTab.current[parentTab] = state.chartMode;
+        setVehicleSelection(state.vehicleIds);
+        setChartMode(state.chartMode);
+        setChartConfig(state.chartConfig);
+        setCompareConfig(state.compareConfig);
+        setRoadTripConfig(state.roadTripConfig);
+        setEpaConfig(state.epaConfig);
+        setPairings(state.pairings);
+        setView(state.view);
+        window.scrollTo(0, 0);
+    }, [vehicles, setVehicleSelection]);
+
+    /**
+     * Put the site back to a featured comparison: its vehicles and its
+     * correction, every other setting at a fresh visitor's. Stays where it is.
+     */
+    const resetToComparison = useCallback((comparison) => {
+        const state = resetStateOf(comparison, vehicles);
+        setVehicleSelection(state.vehicleIds);
+        setChartConfig(state.chartConfig);
+        setCompareConfig(state.compareConfig);
+        setRoadTripConfig(state.roadTripConfig);
+        setEpaConfig(state.epaConfig);
+        setPairings(state.pairings);
+    }, [vehicles, setVehicleSelection]);
 
     /**
      * A platform's page, from anywhere a platform is named (#354). A history
@@ -516,6 +542,17 @@ export default function App() {
             setView('playground');
             return;
         }
+        if (tab === 'home') {
+            setHomeSlug(p.get('fc') || null);
+            setView('home');
+            return;
+        }
+        // Vehicles & Specs is no longer the default, so a link to it must say so.
+        // Its sub-nav and filters read their own state from the address.
+        if (tab === 'vehicles') {
+            setView('vehicles');
+            return;
+        }
         if (tab === 'reference') {
             const pid = p.get('pid') || null;
             setReferenceSubtab(referenceSubtabFromParam(p.get('sub'), pid));
@@ -539,84 +576,14 @@ export default function App() {
             return;
         }
         if (!isChartCategory(tab)) return;
-        pendingUrlState.current = {
-            vehicleIds:    (p.get('v')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
-            runIds:        (p.get('r')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
-            xAxis:         p.get('x')  || null,
-            yAxis:         p.get('y')  || null,
-            y2Axis:        p.get('y2') || null,
-            alignRaw:      p.get('raw') === '1',
-            raceThreshold: p.get('rt')  ? Number(p.get('rt'))  : null,
-            xMin:  p.get('xn')  !== null && p.get('xn')  !== '' ? Number(p.get('xn'))  : null,
-            xMax:  p.get('xx')  !== null && p.get('xx')  !== '' ? Number(p.get('xx'))  : null,
-            yMin:  p.get('yn')  !== null && p.get('yn')  !== '' ? Number(p.get('yn'))  : 0,
-            yMax:  p.get('yx')  !== null && p.get('yx')  !== '' ? Number(p.get('yx'))  : null,
-            y2Min: p.get('y2n') !== null && p.get('y2n') !== '' ? Number(p.get('y2n')) : null,
-            y2Max: p.get('y2x') !== null && p.get('y2x') !== '' ? Number(p.get('y2x')) : null,
-            showLine:   p.get('line') !== '0', // default to true if not present, false if explicitly set to 0
-            showPoints: p.get('pts') === '1', // default to false if not present, true if explicitly set to 1
-            compositeSpread: p.get('cspread') !== '0',
-            addedSpread:     p.get('aspread') === '1',
-            // Guard against a stale or hand-edited ?m= — an unknown mode would
-            // otherwise fall through to the charging chart with no indication why.
-            chartMode:     ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE,
-            scatterXField: p.get('scx') || null,
-            scatterYField: p.get('scy') || null,
-            correction:    decodeCorrection(window.location.search),
-        };
-
-        // Charge Compare config
-        const cmpSoc  = p.get('cmp_soc');
-        const cmpMins = p.get('cmp_mins');
-        const cmpMi   = p.get('cmp_mi');
-        if (cmpSoc != null || cmpMins != null || cmpMi != null) {
-            setCompareConfig(prev => ({
-                ...prev,
-                ...(cmpSoc  != null && { startSoc: Number(cmpSoc)  }),
-                ...(cmpMins != null && { xMinutes: Number(cmpMins) }),
-                ...(cmpMi   != null && { mMiles:   Number(cmpMi)   }),
-            }));
-        }
-
-        // Pairings — global across chart modes, so read unconditionally.
-        const pairsParam = p.get('pairs');
-        if (pairsParam) setPairings(decodePairings(pairsParam));
-
-        // Road Trip config
-        const n = (key) => { const v = p.get(key); return v != null ? Number(v) : null; };
-        const rtOverride = {
-            ...(p.get('rt_m')  && { mode:             p.get('rt_m')           }),
-            ...(n('rt_ss') != null && { startSoc:     n('rt_ss')               }),
-            ...(n('rt_ms') != null && { minSoc:        n('rt_ms')               }),
-            ...(n('rt_ld') != null && { legDistance:   n('rt_ld')               }),
-            ...(n('rt_ct') != null && { chargeTime:    n('rt_ct')               }),
-            ...(n('rt_td') != null && { totalDistance: n('rt_td')               }),
-            ...(n('rt_sp') != null && { speed:         n('rt_sp')               }),
-            ...(n('rt_oh') != null && { overhead:      n('rt_oh')               }),
-            ...(p.get('rt_ya') && { yAxis:              p.get('rt_ya')          }),
-            ...(p.get('rt_xa') && { xAxis:              p.get('rt_xa')          }),
-            ...(p.get('rt_sya') && { sweepYAxis:         p.get('rt_sya')         }),
-            ...(p.get('rt_tw') === '1' && { towingMode: true                    }),
-            ...(n('rt_te') != null && { towingEfficiency:   n('rt_te')          }),
-            ...(n('rt_tr') != null && { towingRefSpeedMph:  n('rt_tr')          }),
-        };
-        if (Object.keys(rtOverride).length > 0) setRoadTripConfig(prev => ({ ...prev, ...rtOverride }));
-
-        // Modeled Efficiency · selected vehicles (EPA Curves) config
-        const epaYa = p.get('epa_ya');
-        const epaSel = p.get('epa_m');
-        const epaOverride = {};
-        if (epaYa) epaOverride.yAxis = epaYa;
-        const epaOv = p.get('epa_ov');
-        if (epaOv === 'corrected' || epaOv === 'uncorrected') epaOverride.overlay = epaOv;
-        if (epaSel) {
-            // Mapping ids are numeric; `filter(Boolean)` runs BEFORE the map
-            // because Number('') is 0 and 0 is finite, so `epa_m=` alone would
-            // decode to a selection of the mapping with id zero.
-            epaOverride.selectedMappings = epaSel.split(',').filter(Boolean)
-                .map(Number).filter(Number.isFinite);
-        }
-        if (Object.keys(epaOverride).length > 0) setEpaConfig(prev => ({ ...prev, ...epaOverride }));
+        // One parse for the whole query (utils/chartUrlState.js). The main chart's
+        // state waits for the data to load; the per-mode configs apply now.
+        const parsed = parseChartUrl(window.location.search);
+        pendingUrlState.current = parsed.chart;
+        if (parsed.compare)  setCompareConfig(prev => ({ ...prev, ...parsed.compare }));
+        if (parsed.pairings) setPairings(parsed.pairings);
+        if (parsed.roadTrip) setRoadTripConfig(prev => ({ ...prev, ...parsed.roadTrip }));
+        if (parsed.epa)      setEpaConfig(prev => ({ ...prev, ...parsed.epa }));
     }, []);
 
     // ── Handle browser back/forward ─────────────────────────────────────────
@@ -656,39 +623,13 @@ export default function App() {
         urlApplied.current = true;
         const s = pendingUrlState.current;
 
-        // Derive vehicle IDs from run IDs, then merge with any explicit v= IDs
-        // (v= carries vehicles that have no runs selected)
-        const runIdSet = new Set(s.runIds.map(String));
-        const fromRuns = vehicles
-            .filter(v => (v.runs || []).some(r => runIdSet.has(String(r.id))))
-            .map(v => v.id);
-        const vehicleIds = [...new Set([...s.vehicleIds, ...fromRuns])];
+        // Vehicles from the plotted tests as well as v= (v= carries only those
+        // with no plotted test).
+        const vehicleIds = vehicleIdsOfLink(s, vehicles);
         if (vehicleIds.length > 0) setVehicleSelection(vehicleIds);
         if (s.chartMode) setChartMode(s.chartMode);
 
-        setChartConfig(prev => ({
-            ...prev,
-            ...(s.xAxis         && { xAxis: s.xAxis }),
-            ...(s.yAxis         && { yAxis: s.yAxis }),
-            ...(s.y2Axis        && { y2Axis: s.y2Axis }),
-            ...(s.runIds.length  > 0 && s.chartMode === 'charging' && { selectedRuns: s.runIds }),
-            alignRaw:      s.alignRaw,
-            raceThreshold: s.raceThreshold,
-            xMin:          s.xMin,
-            xMax:          s.xMax,
-            yMin:          s.yMin,
-            yMax:          s.yMax,
-            y2Min:         s.y2Min ?? null,
-            y2Max:         s.y2Max ?? null,
-            showLine:      s.showLine ?? true, // default to true if not present, false if explicitly set to 0
-            showPoints:    s.showPoints ?? false, // default to false if not present, true if explicitly set to 1
-            compositeSpread: s.compositeSpread ?? true,
-            addedSpread:     s.addedSpread ?? false,
-            ...(s.scatterXField && { scatterXField: s.scatterXField }),
-            ...(s.scatterYField && { scatterYField: s.scatterYField }),
-            correctionMode:   s.correction.mode,
-            correctionTarget: s.correction.target,
-        }));
+        setChartConfig(prev => chartConfigFromParsed(s, prev));
         // Land on the category that owns the restored mode.
         setView(categoryForMode(s.chartMode).key);
     }, [loading]);
@@ -731,105 +672,11 @@ export default function App() {
     useEffect(() => {
         if (isPopout) return;   // pop-out doesn't manage its own URL
         if (!isChartCategory(view)) return;
-        const p = new URLSearchParams();
-        p.set('tab', view);
-        if (chartMode === 'charging' && chartConfig.selectedRuns.length > 0)  p.set('r', chartConfig.selectedRuns.join(','));
-        // Include v= only for selected vehicles that have no runs in r (run-less selections).
-        // r= is written for the charging chart alone, so in every other mode
-        // (Range & Efficiency included) no vehicle is covered by it and v= must
-        // carry the whole selection — the charging run selection lingers in
-        // chartConfig and would otherwise drop those vehicles from the link.
-        const runVehicleIds = chartMode === 'charging'
-            ? new Set(
-                vehicles
-                    .filter(v => (v.runs || []).some(r => chartConfig.selectedRuns.includes(r.id)))
-                    .map(v => String(v.id))
-            )
-            : new Set();
-        const runlessVehicles = selectedVehicles.filter(id => !runVehicleIds.has(String(id)));
-        if (runlessVehicles.length > 0)           p.set('v', runlessVehicles.join(','));
-        // x / y / y2 are the Charging Curves axes; no other chart reads them.
-        if (chartMode === 'charging') {
-            p.set('x', chartConfig.xAxis);
-            p.set('y', chartConfig.yAxis);
-            if (chartConfig.y2Axis)               p.set('y2',   chartConfig.y2Axis);
-        }
-        if (chartConfig.alignRaw)                 p.set('raw', '1');
-        if (chartConfig.raceThreshold != null)    p.set('rt',   String(chartConfig.raceThreshold));
-        if (chartConfig.xMin != null)             p.set('xn',   String(chartConfig.xMin));
-        if (chartConfig.xMax != null)             p.set('xx',   String(chartConfig.xMax));
-        if (chartConfig.yMin != null && chartConfig.yMin !== 0) p.set('yn', String(chartConfig.yMin));
-        if (chartConfig.yMax != null)             p.set('yx',   String(chartConfig.yMax));
-        if (chartConfig.y2Min != null)            p.set('y2n',  String(chartConfig.y2Min));
-        if (chartConfig.y2Max != null)            p.set('y2x',  String(chartConfig.y2Max));
-        if (chartConfig.showLine === false)       p.set('line',   '0'); // default to true if not present, false if explicitly set to 0
-        if (chartConfig.showPoints)               p.set('pts',    '1');
-        if (chartConfig.compositeSpread === false) p.set('cspread', '0');
-        if (chartConfig.addedSpread)              p.set('aspread', '1');
-        if (chartMode !== 'charging')             p.set('m', chartMode);
-        // One correction for every chart and the table, so written for every mode.
-        for (const [key, value] of encodeCorrection({ mode: chartConfig.correctionMode, target: chartConfig.correctionTarget })) p.set(key, value);
-
-        // Charge Compare options
-        if (chartMode === 'compare') {
-            p.set('cmp_soc',  compareConfig.startSoc);
-            p.set('cmp_mins', compareConfig.xMinutes);
-            p.set('cmp_mi',   compareConfig.mMiles);
-        }
-
-        // Pairings apply to every chart mode, so they are written whenever any
-        // exist rather than being scoped to one tab. Omitted when empty so an
-        // untouched chart keeps a clean URL.
-        const pairsEncoded = encodePairings(pairings);
-        if (pairsEncoded) p.set('pairs', pairsEncoded);
-
-        // Road Trip options
-        if (chartMode === 'roadtrip') {
-            const rt = roadTripConfig;
-            p.set('rt_m',  rt.mode);
-            p.set('rt_ss', rt.startSoc);
-            p.set('rt_ms', rt.minSoc);
-            p.set('rt_ld', rt.legDistance);
-            p.set('rt_ct', rt.chargeTime);
-            p.set('rt_td', rt.totalDistance);
-            p.set('rt_sp', rt.speed);
-            p.set('rt_oh', rt.overhead);
-            p.set('rt_ya',  rt.yAxis);
-            p.set('rt_xa',  rt.xAxis);
-            if (rt.sweepYAxis !== 'totalTime')     p.set('rt_sya', rt.sweepYAxis);
-            if (rt.towingMode)                    p.set('rt_tw', '1');
-            if (rt.towingMode) {
-                p.set('rt_te', rt.towingEfficiency);
-                p.set('rt_tr', rt.towingRefSpeedMph);
-            }
-        }
-
-        // Spec Scatter options
-        if (chartMode === 'specscatter') {
-            if (chartConfig.scatterXField) p.set('scx', chartConfig.scatterXField);
-            if (chartConfig.scatterYField) p.set('scy', chartConfig.scatterYField);
-        }
-
-        // Modeled Efficiency · selected vehicles (EPA Curves) options
-        if (chartMode === 'epacurves') {
-            if (epaConfig.yAxis && epaConfig.yAxis !== 'kwh100mi') p.set('epa_ya', epaConfig.yAxis);
-            // Written whenever anything is selected. Without it the curves a
-            // link was sent to show are whatever BOOTSTRAP happens to pick on
-            // the recipient's machine.
-            if (epaConfig.selectedMappings?.length) p.set('epa_m', epaConfig.selectedMappings.join(','));
-            if (epaConfig.overlay) p.set('epa_ov', epaConfig.overlay);
-        }
-
-        // The vehicle table writes its own columns, sort and filters (vt_*);
-        // carry them over rather than wiping them on every selection change.
-        if (chartMode === 'specstable') {
-            for (const [key, value] of new URLSearchParams(window.location.search)) {
-                if (key.startsWith(VEHICLE_TABLE_PARAM_PREFIX)) p.append(key, value);
-            }
-            // Vehicles & Specs' filters, the same parameters Cards and List write (#338).
-            for (const [key, value] of encodeVehicleFilters(vehicleFilters)) p.set(key, value);
-        }
-
+        const p = buildChartParams({
+            view, chartMode, chartConfig, selectedVehicles, vehicles,
+            compareConfig, roadTripConfig, epaConfig, pairings,
+            vehicleFilters, currentSearch: window.location.search,
+        });
         history.replaceState({ view, chartMode }, '', '?' + p.toString());
     }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings, vehicleFilters]);
 
@@ -868,6 +715,15 @@ export default function App() {
         p.set('sub', epaSubtab);
         history.replaceState({ view: 'epa', subtab: epaSubtab }, '', '?' + p.toString());
     }, [isPopout, view, epaSubtab]);
+
+    // ── Keep URL in sync while on Home (#448) ───────────────────────────────
+    // The tab, and fc= when a particular comparison was asked for.
+    useEffect(() => {
+        if (isPopout || view !== 'home' || loading) return;
+        const p = new URLSearchParams({ tab: 'home' });
+        if (homeSlug) p.set('fc', homeSlug);
+        history.replaceState({ view: 'home' }, '', '?' + p.toString());
+    }, [isPopout, view, loading, homeSlug]);
 
     // ── Keep URL in sync while on Vehicles & Specs' Cards or List (#338) ────
     // Only the filters: the tab alone otherwise. The table writes its own
@@ -1021,7 +877,8 @@ export default function App() {
 
     return (
         <ScaleSyncContext.Provider value={scaleSync}>
-        <NavigationContext.Provider value={{ openPlatform, openExplainer }}>
+        <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison }}>
+        <FeaturedComparisonsContext.Provider value={featuredContext}>
         <VehicleBaseContext.Provider value={vehicleBaseApi}>
             {showAuthModal && (
                 <AuthModal
@@ -1213,6 +1070,7 @@ export default function App() {
                 </nav>
 
                 <main className="page-container py-6 flex-1 flex flex-col">
+                    {view === 'home' && <HomeView slug={homeSlug} onSlugChange={setHomeSlug} />}
                     {view === 'vehicles' && (
                         <VehiclesView
                             vehicles={vehicles}
@@ -1337,6 +1195,10 @@ export default function App() {
                             setXMinutes={v => setCompareConfig(p => ({ ...p, xMinutes: v }))}
                             setMMiles={v => setCompareConfig(p => ({ ...p, mMiles: v }))}
                             setStartSoc={v => setCompareConfig(p => ({ ...p, startSoc: v }))}
+                            orientation={compareConfig.orientation}
+                            setOrientation={o => setCompareConfig(p => ({ ...p, orientation: o }))}
+                            selectedKeys={compareConfig.selected}
+                            onSelectedChange={keys => setCompareConfig(p => ({ ...p, selected: keys }))}
                             pairings={pairings}
                             setPairings={setPairings}
                             verboseLabels={chartConfig.verboseLabels ?? false}
@@ -1451,6 +1313,18 @@ export default function App() {
                     )}
                 </main>
 
+                {featuredEditor && (
+                    <FeaturedComparisonEditor
+                        request={featuredEditor}
+                        comparisons={featured.comparisons}
+                        vehicles={vehicles}
+                        canDelete={isAdmin}
+                        onSave={(c) => (c.id == null ? featured.create(c) : featured.save(c))}
+                        onDelete={featured.remove}
+                        onClose={() => setFeaturedEditor(null)}
+                    />
+                )}
+
                 {/* Footer, and the ~100px of clear space below it.
                     Every bottom-anchored panel here — the delete/undo bar, the
                     reorder bar, the notification banner — is fixed to the
@@ -1489,6 +1363,7 @@ export default function App() {
                 </div>
             )}
         </VehicleBaseContext.Provider>
+        </FeaturedComparisonsContext.Provider>
         </NavigationContext.Provider>
         </ScaleSyncContext.Provider>
     );
