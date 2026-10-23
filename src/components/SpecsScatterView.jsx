@@ -332,7 +332,7 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
                 </>
             )}
         >
-            <div style={{ height: `${Math.max(400, vehicles.length * 40)}px`, position: 'relative' }}>
+            <div style={{ height: '480px', position: 'relative' }}>
                 <canvas ref={canvasRef} />
             </div>
         </PlotFrame>

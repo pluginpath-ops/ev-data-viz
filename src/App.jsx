@@ -748,9 +748,12 @@ export default function App() {
             : new Set();
         const runlessVehicles = selectedVehicles.filter(id => !runVehicleIds.has(String(id)));
         if (runlessVehicles.length > 0)           p.set('v', runlessVehicles.join(','));
-        p.set('x', chartConfig.xAxis);
-        p.set('y', chartConfig.yAxis);
-        if (chartConfig.y2Axis)                   p.set('y2',   chartConfig.y2Axis);
+        // x / y / y2 are the Charging Curves axes; no other chart reads them.
+        if (chartMode === 'charging') {
+            p.set('x', chartConfig.xAxis);
+            p.set('y', chartConfig.yAxis);
+            if (chartConfig.y2Axis)               p.set('y2',   chartConfig.y2Axis);
+        }
         if (chartConfig.alignRaw)                 p.set('raw', '1');
         if (chartConfig.raceThreshold != null)    p.set('rt',   String(chartConfig.raceThreshold));
         if (chartConfig.xMin != null)             p.set('xn',   String(chartConfig.xMin));
