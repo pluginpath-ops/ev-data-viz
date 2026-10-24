@@ -3,9 +3,10 @@ import {
     slugify, uniqueSlug, chartParamsFromSearch, chartModeOf, defaultChartTitle,
     normalizeComparison, comparisonToRow, comparisonProblems, comparisonToShow,
     addChart, removeChart, moveChart, renameChart, captionChart,
-    liveVehicleIds, chartStateOf, resetStateOf, replacesSelection, vehiclesInOrder, moveVehicle,
+    explicitChartParams, liveVehicleIds, chartStateOf, resetStateOf, replacesSelection, vehiclesInOrder, moveVehicle,
 } from '../featuredComparisons';
 import { buildChartParams } from '../chartUrlState';
+import { decodeVehicleTableParams, vehicleTableStartSearch, DEFAULT_VEHICLE_COLUMNS } from '../vehicleTable';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from '../chartDefaults';
 
 const vehicles = [
@@ -259,5 +260,41 @@ describe('the order of a comparison\'s vehicles is the curator\'s', () => {
         expect(moveVehicle(c, 2, 0).vehicleIds).toEqual([2, 3, 1]);
         expect(moveVehicle(c, 0, 5)).toBe(c);
         expect(c.vehicleIds).toEqual([3, 1, 2]);   // not mutated
+    });
+});
+
+describe('a saved vehicle table does not borrow the reader\'s columns', () => {
+    it('says Overview outright when the address says nothing, since nothing means "what you last used"', () => {
+        expect(explicitChartParams('tab=specifications&m=specstable')).toContain('vt_preset=overview');
+        const remembered = { view: 'vt_preset=value' };
+        // Without it, the reader's remembered Value preset wins over the curator's table...
+        expect(vehicleTableStartSearch('tab=specifications&m=specstable', remembered)).toBe('vt_preset=value');
+        // ...and with it, the address is the table's own.
+        const saved = explicitChartParams('tab=specifications&m=specstable');
+        expect(vehicleTableStartSearch(saved, remembered)).toBe(saved);
+        expect(decodeVehicleTableParams(saved).columns).toEqual(DEFAULT_VEHICLE_COLUMNS);
+    });
+
+    it('leaves a table that already names its columns alone', () => {
+        const p = 'tab=specifications&m=specstable&vt_preset=value&vt_home=0.2';
+        expect(explicitChartParams(p)).toBe(p);
+    });
+
+    it('drops the Vehicles & Specs filters, which are the reader\'s, and keeps the rest', () => {
+        const out = new URLSearchParams(explicitChartParams('tab=specifications&m=specstable&q=ioniq&mk=Tesla&vt_preset=value&corr=none'));
+        expect(out.has('q')).toBe(false);
+        expect(out.has('mk')).toBe(false);
+        expect(out.get('vt_preset')).toBe('value');
+        expect(out.get('corr')).toBe('none');
+    });
+
+    it('does nothing to a chart that is not the table', () => {
+        const p = 'tab=efficiency&m=range&q=x';
+        expect(explicitChartParams(p)).toBe(p);
+        expect(chartParamsFromSearch('?tab=efficiency&m=range&v=1&r=2')).toBe('tab=efficiency&m=range&r=2');
+    });
+
+    it('applies when a table is saved from the address', () => {
+        expect(chartParamsFromSearch('?tab=specifications&m=specstable&v=1,2&q=a')).toBe('tab=specifications&m=specstable&vt_preset=overview');
     });
 });

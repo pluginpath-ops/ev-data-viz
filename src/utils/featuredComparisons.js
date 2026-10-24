@@ -19,6 +19,8 @@ import { parseChartUrl, chartConfigFromParsed, vehicleIdsOfLink } from './chartU
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './chartDefaults';
 import { DEFAULT_READER_MODE, DEFAULT_CORRECTION_TARGET } from './correctionSettings';
 import { categoryForMode, isChartCategory } from '../constants/chartNav';
+import { VEHICLE_FILTER_PARAMS } from './vehicleFilters';
+import { VEHICLE_TABLE_PARAM_PREFIX } from './vehicleTable';
 
 /**
  * Parameters of a chart link that belong to the comparison or the window, not
@@ -60,6 +62,27 @@ export function chartParamsFromSearch(search) {
     const p = new URLSearchParams(search ?? '');
     if (!isChartCategory(p.get('tab'))) return '';
     for (const key of NOT_A_CHARTS_OWN) p.delete(key);
+    return explicitChartParams(p.toString());
+}
+
+/**
+ * A saved chart's parameters with nothing left to a default the reader's own
+ * settings could change. Only the vehicle table has such a default.
+ *
+ * The table's address leaves out whatever is the default: the Overview preset
+ * writes no `vt_` parameter at all, and a table opened with none falls back to
+ * the columns the reader last used, remembered in their browser. A saved
+ * Overview table would then show a reader their own remembered columns instead
+ * of the curator's, so it says `vt_preset=overview` outright.
+ *
+ * Its filters are dropped. A comparison names its vehicles itself; a filter
+ * would only change which others the real table lists beneath them.
+ */
+export function explicitChartParams(params) {
+    const p = new URLSearchParams(params ?? '');
+    if (p.get('m') !== 'specstable') return p.toString();
+    for (const key of [...p.keys()]) if (VEHICLE_FILTER_PARAMS.has(key)) p.delete(key);
+    if (![...p.keys()].some(k => k.startsWith(VEHICLE_TABLE_PARAM_PREFIX))) p.set('vt_preset', 'overview');
     return p.toString();
 }
 

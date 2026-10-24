@@ -7556,6 +7556,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     pointer-events: none;
 }
 
+/* A table with no checkbox column (the read-only one on Home, #448) pins the name
+   at the left edge. The offsets above are the checkbox column's width; with no
+   such column the pinned name sat 2.25rem in from the edge and drew over the
+   start of the column beside it, cutting its first letters off. More specific
+   than the phone rule below, so it wins there too. */
+.guide-table.is-read-only .sticky-name { left: 0; }
+.guide-table.is-read-only .guide-th.sticky-name .guide-th-name { margin-left: 0; }
+
 /* On a phone the pinned block WAS the table. 36px + 288px is 324 of a 349px
    scroller — 93%, leaving 25px for the other nine columns, so the sideways
    scroll the pin exists to survive had nothing left to scroll.
@@ -9031,6 +9039,11 @@ a.is-test-link:focus-visible {
     @apply relative;
     min-height: 8rem;
 }
+/* A table panel takes the whole row. */
+.home-panel.is-wide {
+    grid-column: 1 / -1;
+}
+
 /* A shop window: a click anywhere on the chart opens it on its own tab. */
 .home-panel-cover {
     @apply absolute inset-0 w-full h-full;
