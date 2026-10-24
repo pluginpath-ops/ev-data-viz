@@ -1,7 +1,7 @@
 import { useLayoutEffect, useState } from 'react';
 
 /**
- * Whether the chips row's actions (Clear all, ＋ Add) should stack.
+ * Whether the chips row's actions (Clear, ＋ Add) should stack.
  *
  * Side by side while the chips fit on one line; stacked once they wrap, when
  * the row is two chips tall anyway and a column of two buttons costs no

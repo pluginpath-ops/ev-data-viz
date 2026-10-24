@@ -254,6 +254,8 @@ export const SECTIONS = [
             { cls: 'btn btn-danger',    as: 'button', label: 'Danger',    note: 'Destructive. Delete, Remove.' },
             { cls: 'btn-icon-danger',   as: 'button', label: 'Danger · icon',
               note: 'A destructive glyph that stays quiet until you approach it — a row × , a clear-column ×.' },
+            { cls: 'btn-symbol',        as: 'span',   label: '⌧',
+              note: 'A text symbol leading a button label — ⌧ on the chips row\'s Clear. Text, not an image, so it takes the button\'s color in either theme.' },
             { cls: 'btn-tab',        as: 'button', label: 'Nav tab',   note: 'Top-level navigation. Add `.active` for the current one.' },
             { cls: 'btn-tab active', as: 'button', label: 'Nav tab · active' },
             { cls: 'btn-subtab',        as: 'button', label: 'Sub-tab',

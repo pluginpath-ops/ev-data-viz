@@ -981,7 +981,7 @@ export default function App() {
                           * below it for good — a fifteen-vehicle selection used
                           * to pin a third of a phone viewport, and the chart
                           * sidebar sizes itself against this height. The label
-                          * and Clear all sit outside the scroller so the way
+                          * and Clear sit outside the scroller so the way
                           * out of a large selection never scrolls away. */}
                         <div className="selected-strip-row" ref={stripRowRef}>
                             <span className="text-micro">Selected</span>
@@ -1056,10 +1056,10 @@ export default function App() {
                                     })}
                                     </div>
                             )}
-                            {/* Clear all and ＋ Add: side by side while the
+                            {/* Clear and ＋ Add: side by side while the
                               * chips fit on one line, stacked once they wrap
                               * (useStackedStripActions). ＋ Add is LAST, so the
-                              * first chip's Clear all appears beside it rather
+                              * first chip's Clear appears beside it rather
                               * than moving it. */}
                             <div
                                 ref={stripActionsRef}
@@ -1076,8 +1076,12 @@ export default function App() {
                                     <button
                                         onClick={clearAllSelections}
                                         className="btn btn-secondary"
+                                        title="Clear the selection"
                                     >
-                                        Clear all
+                                        {/* ⌧ is the ISO "clear" key: all of it,
+                                          * where ⌫ would read as one entry. */}
+                                        <span className="btn-symbol" aria-hidden="true">⌧</span>
+                                        Clear
                                     </button>
                                 )}
                                 <VehicleQuickAdd

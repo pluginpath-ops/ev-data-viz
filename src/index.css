@@ -1950,15 +1950,15 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     align-items: center;
     gap: 8px;
 }
-/* The label and Clear all keep their width: squeezed by the chips at 375px,
-   "Clear all" wrapped to two lines and made the strip taller than the chips it
+/* The label and Clear keep their width: squeezed by the chips at 375px,
+   what was "Clear all" wrapped to two lines and made the strip taller than the chips it
    was there to remove. */
 .selected-strip-row > .text-micro,
 .selected-strip-actions > .btn {
     flex: none;
     white-space: nowrap;
 }
-/* Clear all and ＋ Add, pushed to the right edge. Side by side while the chips
+/* Clear and ＋ Add, pushed to the right edge. Side by side while the chips
    fit on one line; stacked once they wrap, when the row is two chips tall
    anyway. `.is-stacked` is set by useStackedStripActions, which measures the
    buttons at their own widths — so they keep them when stacked rather than
@@ -1970,6 +1970,11 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     row-gap: 4px;
     flex: none;
     margin-left: auto;
+}
+/* A text symbol leading a button's label — ⌧ on Clear. Text, not an image, so
+   it takes the button's own color in either theme. */
+.btn-symbol {
+    margin-right: 0.35em;
 }
 .selected-strip-actions.is-stacked {
     flex-direction: column;
@@ -1984,14 +1989,14 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * third of a phone viewport.
  *
  * The cap is two chip rows exactly: 2 × 26px of chip plus the 8px between
- * them. `Selected` and `Clear all` stay OUTSIDE this box, so the way out of a
+ * them. `Selected` and `Clear` stay OUTSIDE this box, so the way out of a
  * large selection is never the thing that scrolled away. */
 .selected-chip-scroll {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    /* Takes the slack on ONE line with the label and Clear all. Giving the
+    /* Takes the slack on ONE line with the label and Clear. Giving the
        chips their own full-width line was measurably worse: it bought them
        80px of width and cost 34px of header on every screen below, which is
        the resource this cap exists to protect. */
@@ -2005,7 +2010,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* ── Vehicle quick-add ───────────────────────────────────────────────────────
  *
  * "＋ Add" at the right end of the chips row, last in `.selected-strip-actions`,
- * and the checklist it opens. Last so that the Clear all the first chip brings
+ * and the checklist it opens. Last so that the Clear the first chip brings
  * appears beside it rather than pushing it along. */
 /* The list scrolls; the search above it does not, so the field you are typing
    in never scrolls away from the rows it is narrowing. */
