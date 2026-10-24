@@ -801,17 +801,8 @@ export default function EpaCurvesView({
     const methodologyModels = methodologyEntries.filter(e => e.model);
     const methodologyGaps   = methodologyEntries.filter(e => !e.model);
 
-    // ── Empty state ───────────────────────────────────────────────────────────
-    if (selectedVehicleIds.length === 0) {
-        return (
-            <div>
-                <h2 className="page-title mb-6">Modeled Efficiency · selected vehicles</h2>
-                <div className="empty-state">
-                    <p className="text-lg">No vehicles selected. Select vehicles from the Vehicles tab to see their modeled efficiency beside their tests.</p>
-                </div>
-            </div>
-        );
-    }
+    // Nothing selected never reaches here: App draws SelectionEmptyState, the
+    // same for every chart, and PresentedChart only draws with a selection.
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (

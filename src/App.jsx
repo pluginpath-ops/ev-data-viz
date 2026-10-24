@@ -34,7 +34,7 @@ import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/
 import Playground from './components/playground/Playground';
 import { explorerStateFromUrl } from './components/epa/curves/EpaCurveExplorer';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
-import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
+import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, entryModeFor, labelForMode, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
 import SpecChartKind from './components/SpecChartKind';
 import { NavigationContext } from './context/NavigationContext';
 import { platformHref } from './utils/platforms';
@@ -46,6 +46,7 @@ import { applyVehicleBases, withVehicleBase, NO_VEHICLE_BASES } from './utils/ve
 import { VehicleBaseContext } from './context/VehicleBaseContext';
 import VehicleSwatch from './components/VehicleSwatch';
 import VehicleQuickAdd from './components/VehicleQuickAdd';
+import SelectionEmptyState from './components/SelectionEmptyState';
 import { useStackedStripActions } from './hooks/useStackedStripActions';
 import { buildVehicleLabels } from './utils/seriesLabel';
 
@@ -308,7 +309,7 @@ export default function App() {
     const navigateToChartCategory = (categoryKey) => {
         const category = categoryByKey(categoryKey);
         if (!category) return;
-        const mode = entryModeFor(category, lastModeByCategory.current[categoryKey], selectedVehicles.length > 0);
+        const mode = entryModeFor(category, lastModeByCategory.current[categoryKey]);
         if (mode) handleChartModeChange(mode);
     };
 
@@ -385,8 +386,7 @@ export default function App() {
             navigateTo(currentActiveVehicle ? 'runs' : tab);
             return;
         }
-        const modeDef = mode ? categoryForMode(mode).modes.find(m => m.key === mode) : null;
-        if (modeDef && (selectedVehicles.length > 0 || !modeNeedsSelection(modeDef))) {
+        if (mode && categoryForMode(mode).modes.some(m => m.key === mode)) {
             handleChartModeChange(mode);
             return;
         }
@@ -909,7 +909,6 @@ export default function App() {
                         onOpenVehicle={openVehiclePage}
                         onCloseVehicle={closeVehicle}
                         onHome={navigateTo}
-                        hasSelection={selectedVehicles.length > 0}
                         isAdmin={isAdmin}
                         user={user}
                         userRole={userRole}
@@ -938,11 +937,7 @@ export default function App() {
                         <SubTabStrip
                             items={[
                                 ...parentStrip.items,
-                                ...chartModesUnder(parentStrip.tab).map(m => ({
-                                    ...m,
-                                    disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
-                                    hint: 'Select a vehicle first',
-                                })),
+                                ...chartModesUnder(parentStrip.tab),
                             ]}
                             // On a vehicle's page no item is current: the header's
                             // opened vehicle is.
@@ -962,11 +957,7 @@ export default function App() {
                         />
                     ) : (
                         <SubTabStrip
-                            items={(activeChartCategory?.modes ?? []).map(m => ({
-                                ...m,
-                                // A chart with nothing to plot is not somewhere to go.
-                                disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
-                            }))}
+                            items={activeChartCategory?.modes ?? []}
                             activeKey={chartMode}
                             onSelect={handleChartModeChange}
                             end={showsPopout && popoutButton}
@@ -1180,6 +1171,13 @@ export default function App() {
                             onFocused={clearFocusRun}
                         />
                     )}
+                    {/* Every chart but the vehicle table plots the selection.
+                      * With none, it says so and points at ＋ Add rather than
+                      * being unreachable; the views below draw only once
+                      * there is something to plot. */}
+                    {activeChartCategory && chartMode !== 'specstable' && selectedVehicles.length === 0 && (
+                        <SelectionEmptyState chart={labelForMode(chartMode)} />
+                    )}
                     {/* ChargingView is the fall-through: it renders for any mode NOT
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
@@ -1254,7 +1252,7 @@ export default function App() {
                             onFieldChange={(x, y) => setChartConfig(p => ({ ...p, scatterXField: x, scatterYField: y }))}
                         />
                     )}
-                    {activeChartCategory && chartMode === 'epacurves' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'epacurves' && (
                         <EpaCurvesView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
