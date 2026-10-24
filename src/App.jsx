@@ -17,7 +17,7 @@ import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
 import { DEFAULT_READER_MODE } from './utils/correctionSettings';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './utils/chartDefaults';
-import { chartStateOf, resetStateOf, chartParamsFromSearch, defaultChartTitle } from './utils/featuredComparisons';
+import { chartStateOf, resetStateOf, chartParamsFromSearch, defaultChartTitle, explicitChartParams } from './utils/featuredComparisons';
 import { useFeaturedComparisons } from './hooks/useFeaturedComparisons';
 import { useSiteEvents } from './hooks/useSiteEvents';
 import { SITE_EVENTS } from './utils/siteEvents';
@@ -38,7 +38,7 @@ import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForM
 import SpecChartKind from './components/SpecChartKind';
 import { NavigationContext } from './context/NavigationContext';
 import { platformHref } from './utils/platforms';
-import { decodeVehicleFilters, encodeVehicleFilters } from './utils/vehicleFilters';
+import { decodeVehicleFilters, encodeVehicleFilters, EMPTY_VEHICLE_FILTERS } from './utils/vehicleFilters';
 import ReferenceSection, { REFERENCE_SUBTABS, DEFAULT_REFERENCE_SUBTAB, referenceSubtabFromParam } from './components/reference/ReferenceSection';
 import { prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
@@ -398,11 +398,17 @@ export default function App() {
     const openFeaturedChart = useCallback((comparison, index) => {
         const state = chartStateOf(comparison, index, vehicles);
         if (!state) return;
+        // The vehicle table reads its columns, sort and prices from the address when
+        // it opens, so for it the saved link goes in whole; every other chart gets
+        // its settings as state and a bare address that the URL sync completes.
+        // The Vehicles & Specs filters are the reader's: a table opens unfiltered.
+        const isTable = state.chartMode === 'specstable';
         history.pushState(
             { view: state.view, chartMode: state.chartMode },
             '',
-            `?tab=${state.view}&m=${state.chartMode}`, // URL sync effect replaces with full params
+            isTable ? `?${explicitChartParams(comparison.charts[index].params)}` : `?tab=${state.view}&m=${state.chartMode}`,
         );
+        if (isTable) setVehicleFilters(EMPTY_VEHICLE_FILTERS);
         lastModeByCategory.current[state.view] = state.chartMode;
         const parentTab = categoryForMode(state.chartMode).navParent;
         if (parentTab) lastModeUnderTab.current[parentTab] = state.chartMode;
@@ -415,7 +421,7 @@ export default function App() {
         setPairings(state.pairings);
         setView(state.view);
         window.scrollTo(0, 0);
-    }, [vehicles, setVehicleSelection]);
+    }, [vehicles, setVehicleSelection, setVehicleFilters]);
 
     /**
      * Put the site back to a featured comparison: its vehicles and its

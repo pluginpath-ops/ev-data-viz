@@ -1072,7 +1072,7 @@ describe('the seams that broke before', () => {
         expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
         expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
         expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
-        expect(read('src/components/VehicleTable.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\)\}/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\)\}/);
         expect(read('src/components/tables/TableCell.jsx'), 'without borrowing the test peek').toMatch(/const noteLink = test \?\? link/);
     });
 
@@ -1126,7 +1126,7 @@ describe('the seams that broke before', () => {
         expect(runs).toMatch(/data-run-id=\{run\.id\}/);
         expect(runs).toMatch(/is-link-target/);
         // The table hands each cell its test, and the cell links the note.
-        expect(read('src/components/VehicleTable.jsx')).toMatch(/test=\{testLink\(row\.tests\[col\.key\]/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/test=\{testLink\(row\.tests\[col\.key\]/);
         expect(read('src/components/tables/TableCell.jsx')).toMatch(/is-test-link/);
         expect(read('src/index.css')).toMatch(/\.card\.is-link-target\s*\{/);
     });
@@ -1162,10 +1162,18 @@ describe('the seams that broke before', () => {
         // "Pin is local, select is global": the word stays out of this table.
         expect(table.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')).not.toMatch(/pin/i);
         // The selected band says it is kept across the site, at the top.
-        expect(table).toMatch(/Selected · \{selectedRows\.length\}[\s\S]*maintained site-wide, at the top/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/Selected · \{selectedRows\.length\}[\s\S]*maintained site-wide, at the top/);
 
         // The mechanisms are shared, not copied.
-        for (const f of ['src/components/VehicleTable.jsx', 'src/components/epa/guide/GuideTable.jsx']) {
+        // The vehicle table's grid is its own file since #448 (Home draws the same
+        // one, read-only), so the vehicle table is checked in two places.
+        const grid = read('src/components/vehicles/VehicleTableGrid.jsx');
+        expect(grid, 'the grid must use the shared sort header').toMatch(/import SortHeader from/);
+        expect(grid, 'the grid must draw data cells through TableCell').toMatch(/<TableCell/);
+        expect(grid, 'the grid must not draw its own bar markup').not.toMatch(/guide-spark/);
+        expect(table, 'the live table must draw through the shared grid').toMatch(/<VehicleTableGrid/);
+        expect(table, 'the live table must restate clipped cells with useCellPeek').toMatch(/useCellPeek\([^)]*\)[\s\S]*peekProps=\{peekProps\}[\s\S]*peek=\{cellPeek\}/);
+        for (const f of ['src/components/epa/guide/GuideTable.jsx']) {
             expect(read(f), `${f} must use the shared sort header`).toMatch(/import SortHeader from/);
             // Cells go through TableCell, which restates clipped text on hover;
             // a bare <td> for data would clip silently again.
@@ -1177,11 +1185,11 @@ describe('the seams that broke before', () => {
         // The vehicle table's name TEXT opens the vehicle's card in a popover;
         // the rest of the name cell picks the row, as in the guide table. Other
         // cells open details.
-        expect(table).toMatch(/<VehicleCardPopover/);
-        expect(table).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggle\(row\.id\); \}\}/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/<VehicleCardPopover/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/onClick=\{selectable \? \(e\) => \{ e\.stopPropagation\(\); onToggle\(row\.id\); \} : undefined\}/);
         expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggleSelect\(row\.id\); \}\}/);
         // Community flags reach the table's cells (flagging itself stays in View Specs).
-        expect(table).toMatch(/flagged=\{row\.flagged\.has\(col\.key\)\}/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/flagged=\{row\.flagged\.has\(col\.key\)\}/);
         expect(read('src/hooks/useCellPeek.jsx'), 'a flagged cell must peek even when it fits').toMatch(/dataset\.peek !== 'always'/);
         // Widths by what a column holds are one vocabulary in both column lists,
         // and the shared header is what turns it into a class.
@@ -2174,7 +2182,7 @@ describe('a unit is stated in the cell, not the header (#446)', () => {
     });
 
     it('both tables hand each cell its column\'s unit, and only where the cell has a value', () => {
-        expect(read('src/components/VehicleTable.jsx')).toMatch(/unit=\{col\.numeric \? cellUnit\(unitFor\(col, units\), row\.values\[col\.key\]\)/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/unit=\{col\.numeric \? cellUnit\(unitFor\(col, units\), row\.values\[col\.key\]\)/);
         expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/unit=\{cellUnit\(col\.unit, row\[col\.key\]\)\}/);
     });
 
@@ -2191,7 +2199,7 @@ describe('a unit is stated in the cell, not the header (#446)', () => {
     it('the pinned name header says "drag to reorder columns", in both tables, and not on a phone', () => {
         expect(header).toMatch(/text-nano guide-th-reorder">drag to reorder columns</);
         expect(read('src/components/tables/ColumnPicker.jsx'), 'the picker\'s own role').toMatch(/className="text-nano">Shown · drag to reorder</);
-        expect(read('src/components/VehicleTable.jsx')).toMatch(/reorderHint=\{col\.sticky\}/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/reorderHint=\{!!drag && col\.sticky\}/);
         expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/reorderHint=\{col\.sticky\}/);
         const css = read('src/index.css');
         expect(css).toMatch(/\.guide-th-reorder \{\s*position: absolute;/);
@@ -2669,5 +2677,65 @@ describe('Home offers the other featured comparisons and a link to this one (#44
     it('the copied link names this comparison, so a shared link stays on the one shared', () => {
         expect(home).toMatch(/\?tab=home&fc=\$\{encodeURIComponent\(shown\.slug\)\}/);
         expect(home).toMatch(/navigator\.clipboard\?\.writeText\(url\)/);
+    });
+});
+
+describe('the vehicle table can be a featured comparison\'s panel (#448)', () => {
+    const presented = read('src/components/vehicles/PresentedVehicleTable.jsx');
+    const grid = read('src/components/vehicles/VehicleTableGrid.jsx');
+    const app = read('src/App.jsx');
+
+    it('Home draws it, full width, from the saved settings and the correction', () => {
+        const panel = read('src/components/home/FeaturedChartPanel.jsx');
+        expect(panel).toMatch(/seed\.chartMode === 'specstable'/);
+        expect(panel).toMatch(/<PresentedVehicleTable/);
+        expect(panel).toMatch(/search=\{explicitChartParams\(chart\.params\)\}/);
+        expect(panel).toMatch(/correctionTarget=\{seed\.chartConfig\.correctionTarget\}/);
+        expect(read('src/index.css')).toMatch(/\.home-panel\.is-wide \{\s*grid-column: 1 \/ -1;/);
+    });
+
+    it('the live table and the Home table are one grid', () => {
+        expect(presented).toMatch(/<VehicleTableGrid/);
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/<VehicleTableGrid/);
+    });
+
+    it('it touches neither the address nor the reader\'s remembered columns', () => {
+        const code = presented.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+        expect(code).not.toMatch(/window\.|history\.|localStorage|readMemory|writeMemory/);
+        // Settings come from the saved parameters, with no memory to fall back on.
+        expect(code).toMatch(/decodeVehicleTableParams\(search\)/);
+    });
+
+    it('it is read-only: no selection, no sorting, no dragging', () => {
+        expect(presented).toMatch(/selectable=\{false\}/);
+        expect(presented).not.toMatch(/sort=|drag=|onToggle|toggleVehicleSelection|setVehicleSelection/);
+        // Nothing over it, so it scrolls sideways; a click on a row opens it instead.
+        expect(presented).toMatch(/rowProps=\{\{ cols, units, maxima, onOpen \}\}/);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/\{!isTable && <button type="button" className="home-panel-cover"/);
+        // And no card popover on the name: nothing to select there.
+        expect(grid).toMatch(/selectable \? \(\s*<VehicleCardPopover/);
+        expect(grid).toMatch(/\{selectable && <th className="guide-th guide-th-select/);
+    });
+
+    it('without a checkbox column the pinned name sits at the edge, not over its neighbor', () => {
+        expect(grid).toMatch(/guide-table\$\{selectable \? '' : ' is-read-only'\}/);
+        const css = read('src/index.css');
+        expect(css).toMatch(/\.guide-table\.is-read-only \.sticky-name \{ left: 0; \}/);
+        expect(css).toMatch(/\.guide-table\.is-read-only \.guide-th\.sticky-name \.guide-th-name \{ margin-left: 0; \}/);
+    });
+
+    it('its rows are the comparison\'s vehicles, in the comparison\'s order', () => {
+        expect(presented).toMatch(/vehiclesInOrder\(vehicleIds, vehicles\)/);
+        expect(presented).toMatch(/ordered\.map\(v => byId\.get\(String\(v\.id\)\)\)/);
+    });
+
+    it('opening it hands the real table the saved link whole and an unfiltered fleet', () => {
+        const open = app.slice(app.indexOf('const openFeaturedChart'), app.indexOf('const resetToComparison'));
+        expect(open).toMatch(/explicitChartParams\(comparison\.charts\[index\]\.params\)/);
+        expect(open).toMatch(/setVehicleFilters\(EMPTY_VEHICLE_FILTERS\)/);
+    });
+
+    it('a curator saves it from the table\'s own control row, as an ordinary button', () => {
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/<FeatureChartButton className="btn btn-secondary" \/>/);
     });
 });
