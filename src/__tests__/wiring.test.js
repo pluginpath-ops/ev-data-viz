@@ -990,7 +990,7 @@ describe('the seams that broke before', () => {
         expect(app).toMatch(/view=\{headerTab\}/);
         expect(app, 'only top-level categories are tabs').toMatch(/chartCategories=\{TOP_CHART_CATEGORIES\}/);
         expect(app, 'EPA\'s own sub-tabs are its All EVs section').toMatch(/group: 'All EVs'/);
-        expect(app, 'a tab\'s sub-nav must carry the chart modes under it').toMatch(/\.\.\.chartModesUnder\(parentStrip\.tab\)\.map/);
+        expect(app, 'a tab\'s sub-nav must carry the chart modes under it').toMatch(/\.\.\.chartModesUnder\(parentStrip\.tab\)/);
         expect(app).toMatch(/epa:\s+\{ tab: 'epa'/);
         expect(app, 'a chart mode keeps its pop-out wherever it is drawn').toMatch(/end=\{showsPopout && popoutButton\}[\s\S]*end=\{showsPopout && popoutButton\}/);
         expect(app, 'and showsPopout covers every chart mode').toMatch(/const showsPopout = Boolean\(activeChartCategory\)/);
@@ -1140,11 +1140,16 @@ describe('the seams that broke before', () => {
         // selection change wipes the reader's columns, sort and filters.
         expect(read('src/utils/chartUrlState.js')).toMatch(/startsWith\(VEHICLE_TABLE_PARAM_PREFIX\)/);
 
-        // Its tab is a way to pick vehicles, so it must never wait for a pick:
-        // the top nav gates on the modes, and entering lands on one that works.
-        expect(read('src/components/shell/AppNav.jsx')).toMatch(/modes\.every\(modeNeedsSelection\)/);
+        // No chart waits for a pick any more: tabs and sub-tabs are never
+        // disabled for an empty selection, entering restores the remembered
+        // mode, and an empty chart says so and points at ＋ Add (the vehicle
+        // quick-add) instead of drawing a blank page.
+        expect(read('src/components/shell/AppNav.jsx')).not.toMatch(/Select a vehicle first/);
+        expect(app).not.toMatch(/Select a vehicle first/);
         expect(app).toMatch(/entryModeFor\(/);
-        expect(app, 'sub-tabs must disable the charts that need a selection').toMatch(/disabled: selectedVehicles\.length === 0 && modeNeedsSelection/);
+        expect(app, 'an empty chart must show the shared empty state')
+            .toMatch(/chartMode !== 'specstable' && selectedVehicles\.length === 0 && \(\s*<SelectionEmptyState/);
+        expect(read('src/components/SelectionEmptyState.jsx')).toMatch(/＋ Add/);
 
         // Selecting here IS the app's selection — no second, local notion of chosen.
         const table = read('src/components/VehicleTable.jsx');

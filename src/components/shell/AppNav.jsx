@@ -1,7 +1,6 @@
 import { useIsCompact } from '../../hooks/useIsCompact';
 import NavMenu from './NavMenu';
 import AccountMenu from './AccountMenu';
-import { modeNeedsSelection } from '../../constants/chartNav';
 
 /**
  * The 50px chrome bar: wordmark, top-level tabs, account block.
@@ -37,7 +36,6 @@ export default function AppNav({
     onOpenVehicle,
     onCloseVehicle,
     onHome,
-    hasSelection,
     isAdmin,
     user,
     userRole,
@@ -58,8 +56,8 @@ export default function AppNav({
      * between the buttons this replaced.
      */
     const items = [
-        // Home (#448): the featured comparison a curator chose. Not gated on a
-        // selection, and not a chart category: it draws its own charts.
+        // Home (#448): the featured comparison a curator chose. Not a chart
+        // category: it draws its own charts.
         { key: 'home', label: 'Home' },
         // Vehicles & Specs (#338): the cards and list, and — drawn under it —
         // the vehicle table and the spec chart. Specs are front and center by
@@ -69,25 +67,14 @@ export default function AppNav({
         // opened from a card, row, chip or tested figure, and shown in the
         // header as the opened vehicle beneath Vehicles & Specs.
         // One top-level tab per chart category (those drawn under another tab
-        // are left out by the caller). They plot the vehicle selection, so
-        // they wait for one, unless a mode inside can show something without
-        // it.
-        ...chartCategories.map(({ key, label, modes }) => {
-            const gated = !hasSelection && modes.every(modeNeedsSelection);
-            return {
-                key,
-                label,
-                chart: true,
-                disabled: gated,
-                hint: gated ? 'Select a vehicle first' : undefined,
-            };
-        }),
-        // Reference data, not a chart: the guide covers every EV EPA has rated,
-        // so it is deliberately NOT gated on a vehicle selection the way the
-        // chart categories above are.
+        // are left out by the caller). They plot the vehicle selection but do
+        // not wait for one: with nothing selected each says so and points at
+        // ＋ Add, which is in the chips row above it.
+        ...chartCategories.map(({ key, label }) => ({ key, label, chart: true })),
+        // Reference data, not a chart: the guide covers every EV EPA has rated.
         { key: 'epa', label: 'EPA' },
         // Reference (#338): what is true of every EV, selected or not —
-        // platforms and explainers. Not gated on a selection, like EPA.
+        // platforms and explainers.
         { key: 'reference', label: 'Reference' },
         ...(isAdmin ? [{ key: 'admin', label: 'Admin' }] : []),
     ];
@@ -101,7 +88,7 @@ export default function AppNav({
     const select = (key) => {
         if (key === OPENED) { onOpenVehicle?.(); return; }
         const item = items.find(i => i.key === key);
-        if (!item || item.disabled) return;
+        if (!item) return;
         if (item.chart) onNavigateChartCategory(key);
         else onNavigate(key);
     };
@@ -122,15 +109,13 @@ export default function AppNav({
                 <NavMenu items={menuItems} activeKey={openedActive ? OPENED : view} onSelect={select} level="main" />
             ) : (
                 <div className="nav-tab-group">
-                    {items.map(({ key, label, disabled, hint }) => {
+                    {items.map(({ key, label }) => {
                         const tab = (
                             <button
                                 key={key}
                                 type="button"
                                 onClick={() => select(key)}
-                                disabled={disabled}
                                 className={`btn-tab ${view === key ? 'active' : ''}`}
-                                title={hint}
                             >
                                 {label}
                             </button>

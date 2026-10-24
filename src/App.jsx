@@ -34,7 +34,7 @@ import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/
 import Playground from './components/playground/Playground';
 import { explorerStateFromUrl } from './components/epa/curves/EpaCurveExplorer';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
-import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
+import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, entryModeFor, labelForMode, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
 import SpecChartKind from './components/SpecChartKind';
 import { NavigationContext } from './context/NavigationContext';
 import { platformHref } from './utils/platforms';
@@ -45,6 +45,9 @@ import { isEpaPartnerId } from './utils/rangeSource';
 import { applyVehicleBases, withVehicleBase, NO_VEHICLE_BASES } from './utils/vehicleBase';
 import { VehicleBaseContext } from './context/VehicleBaseContext';
 import VehicleSwatch from './components/VehicleSwatch';
+import VehicleQuickAdd from './components/VehicleQuickAdd';
+import SelectionEmptyState from './components/SelectionEmptyState';
+import { useStackedStripActions } from './hooks/useStackedStripActions';
 import { buildVehicleLabels } from './utils/seriesLabel';
 
 /* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
@@ -183,6 +186,9 @@ export default function App() {
         vehiclePage: 1,
     }));
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
+    const stripRowRef = useRef(null);
+    const chipScrollRef = useRef(null);
+    const stripActionsRef = useRef(null);
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare' | 'epacurves' | …
     const [compareConfig, setCompareConfig] = useState(defaultCompareConfig);
     // Which range test supplies the miles for which charging test. Global to the
@@ -215,6 +221,8 @@ export default function App() {
     const chipNames = useMemo(
         () => buildVehicleLabels(selectedVehicles.map(id => vehicles.find(v => v.id === id))),
         [selectedVehicles, vehicles]);
+    // Keyed on the chips' names, so a name that widens re-measures too.
+    const stackStripActions = useStackedStripActions(stripRowRef, chipScrollRef, stripActionsRef, chipNames);
     const chartVehicles = useMemo(
         () => applyVehicleBases(vehicles, vehicleBases), [vehicles, vehicleBases]);
     const vehicleBaseApi = useMemo(() => ({
@@ -301,7 +309,7 @@ export default function App() {
     const navigateToChartCategory = (categoryKey) => {
         const category = categoryByKey(categoryKey);
         if (!category) return;
-        const mode = entryModeFor(category, lastModeByCategory.current[categoryKey], selectedVehicles.length > 0);
+        const mode = entryModeFor(category, lastModeByCategory.current[categoryKey]);
         if (mode) handleChartModeChange(mode);
     };
 
@@ -378,8 +386,7 @@ export default function App() {
             navigateTo(currentActiveVehicle ? 'runs' : tab);
             return;
         }
-        const modeDef = mode ? categoryForMode(mode).modes.find(m => m.key === mode) : null;
-        if (modeDef && (selectedVehicles.length > 0 || !modeNeedsSelection(modeDef))) {
+        if (mode && categoryForMode(mode).modes.some(m => m.key === mode)) {
             handleChartModeChange(mode);
             return;
         }
@@ -908,7 +915,6 @@ export default function App() {
                         onOpenVehicle={openVehiclePage}
                         onCloseVehicle={closeVehicle}
                         onHome={navigateTo}
-                        hasSelection={selectedVehicles.length > 0}
                         isAdmin={isAdmin}
                         user={user}
                         userRole={userRole}
@@ -937,11 +943,7 @@ export default function App() {
                         <SubTabStrip
                             items={[
                                 ...parentStrip.items,
-                                ...chartModesUnder(parentStrip.tab).map(m => ({
-                                    ...m,
-                                    disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
-                                    hint: 'Select a vehicle first',
-                                })),
+                                ...chartModesUnder(parentStrip.tab),
                             ]}
                             // On a vehicle's page no item is current: the header's
                             // opened vehicle is.
@@ -961,11 +963,7 @@ export default function App() {
                         />
                     ) : (
                         <SubTabStrip
-                            items={(activeChartCategory?.modes ?? []).map(m => ({
-                                ...m,
-                                // A chart with nothing to plot is not somewhere to go.
-                                disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
-                            }))}
+                            items={activeChartCategory?.modes ?? []}
                             activeKey={chartMode}
                             onSelect={handleChartModeChange}
                             end={showsPopout && popoutButton}
@@ -980,15 +978,14 @@ export default function App() {
                           * below it for good — a fifteen-vehicle selection used
                           * to pin a third of a phone viewport, and the chart
                           * sidebar sizes itself against this height. The label
-                          * and Clear all sit outside the scroller so the way
+                          * and Clear sit outside the scroller so the way
                           * out of a large selection never scrolls away. */}
-                        <div className="selected-strip-row">
+                        <div className="selected-strip-row" ref={stripRowRef}>
                             <span className="text-micro">Selected</span>
                             {selectedVehicles.length === 0 ? (
                                 <span className="text-meta">None</span>
                             ) : (
-                                <>
-                                    <div className="selected-chip-scroll">
+                                    <div className="selected-chip-scroll" ref={chipScrollRef}>
                                     {selectedVehicles.map((vehicleId, idx) => {
                                         const vehicle = vehicles.find(v => v.id === vehicleId);
                                         if (!vehicle) return null;
@@ -1055,21 +1052,41 @@ export default function App() {
                                         );
                                     })}
                                     </div>
-                                    {/* Not btn-warning. Orange is the single
-                                      * "active / now" signal in this design and
-                                      * nothing else is allowed to use it — that
-                                      * is the only reason it answers "where am
-                                      * I" from across the room. Clearing a
-                                      * selection is neither active nor a
-                                      * warning; it is an ordinary action. */}
+                            )}
+                            {/* Clear and ＋ Add: side by side while the
+                              * chips fit on one line, stacked once they wrap
+                              * (useStackedStripActions). ＋ Add is LAST, so the
+                              * first chip's Clear appears beside it rather
+                              * than moving it. */}
+                            <div
+                                ref={stripActionsRef}
+                                className={`selected-strip-actions${stackStripActions ? ' is-stacked' : ''}`}
+                            >
+                                {/* Not btn-warning. Orange is the single
+                                  * "active / now" signal in this design and
+                                  * nothing else is allowed to use it — that
+                                  * is the only reason it answers "where am
+                                  * I" from across the room. Clearing a
+                                  * selection is neither active nor a
+                                  * warning; it is an ordinary action. */}
+                                {selectedVehicles.length > 0 && (
                                     <button
                                         onClick={clearAllSelections}
                                         className="btn btn-secondary"
+                                        title="Clear the selection"
                                     >
-                                        Clear all
+                                        {/* ⌧ is the ISO "clear" key: all of it,
+                                          * where ⌫ would read as one entry. */}
+                                        <span className="btn-symbol" aria-hidden="true">⌧</span>
+                                        Clear
                                     </button>
-                                </>
-                            )}
+                                )}
+                                <VehicleQuickAdd
+                                    vehicles={chartVehicles}
+                                    selectedIds={selectedVehicles}
+                                    onToggle={toggleVehicleSelection}
+                                />
+                            </div>
                         </div>
                         </div>
                     </div>}
@@ -1160,6 +1177,13 @@ export default function App() {
                             onFocused={clearFocusRun}
                         />
                     )}
+                    {/* Every chart but the vehicle table plots the selection.
+                      * With none, it says so and points at ＋ Add rather than
+                      * being unreachable; the views below draw only once
+                      * there is something to plot. */}
+                    {activeChartCategory && chartMode !== 'specstable' && selectedVehicles.length === 0 && (
+                        <SelectionEmptyState chart={labelForMode(chartMode)} />
+                    )}
                     {/* ChargingView is the fall-through: it renders for any mode NOT
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
@@ -1234,7 +1258,7 @@ export default function App() {
                             onFieldChange={(x, y) => setChartConfig(p => ({ ...p, scatterXField: x, scatterYField: y }))}
                         />
                     )}
-                    {activeChartCategory && chartMode === 'epacurves' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'epacurves' && (
                         <EpaCurvesView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
