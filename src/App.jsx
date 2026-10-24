@@ -45,6 +45,8 @@ import { isEpaPartnerId } from './utils/rangeSource';
 import { applyVehicleBases, withVehicleBase, NO_VEHICLE_BASES } from './utils/vehicleBase';
 import { VehicleBaseContext } from './context/VehicleBaseContext';
 import VehicleSwatch from './components/VehicleSwatch';
+import VehicleQuickAdd from './components/VehicleQuickAdd';
+import { useStackedStripActions } from './hooks/useStackedStripActions';
 import { buildVehicleLabels } from './utils/seriesLabel';
 
 /* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
@@ -183,6 +185,9 @@ export default function App() {
         vehiclePage: 1,
     }));
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
+    const stripRowRef = useRef(null);
+    const chipScrollRef = useRef(null);
+    const stripActionsRef = useRef(null);
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare' | 'epacurves' | …
     const [compareConfig, setCompareConfig] = useState(defaultCompareConfig);
     // Which range test supplies the miles for which charging test. Global to the
@@ -215,6 +220,8 @@ export default function App() {
     const chipNames = useMemo(
         () => buildVehicleLabels(selectedVehicles.map(id => vehicles.find(v => v.id === id))),
         [selectedVehicles, vehicles]);
+    // Keyed on the chips' names, so a name that widens re-measures too.
+    const stackStripActions = useStackedStripActions(stripRowRef, chipScrollRef, stripActionsRef, chipNames);
     const chartVehicles = useMemo(
         () => applyVehicleBases(vehicles, vehicleBases), [vehicles, vehicleBases]);
     const vehicleBaseApi = useMemo(() => ({
@@ -976,13 +983,12 @@ export default function App() {
                           * sidebar sizes itself against this height. The label
                           * and Clear all sit outside the scroller so the way
                           * out of a large selection never scrolls away. */}
-                        <div className="selected-strip-row">
+                        <div className="selected-strip-row" ref={stripRowRef}>
                             <span className="text-micro">Selected</span>
                             {selectedVehicles.length === 0 ? (
                                 <span className="text-meta">None</span>
                             ) : (
-                                <>
-                                    <div className="selected-chip-scroll">
+                                    <div className="selected-chip-scroll" ref={chipScrollRef}>
                                     {selectedVehicles.map((vehicleId, idx) => {
                                         const vehicle = vehicles.find(v => v.id === vehicleId);
                                         if (!vehicle) return null;
@@ -1049,21 +1055,37 @@ export default function App() {
                                         );
                                     })}
                                     </div>
-                                    {/* Not btn-warning. Orange is the single
-                                      * "active / now" signal in this design and
-                                      * nothing else is allowed to use it — that
-                                      * is the only reason it answers "where am
-                                      * I" from across the room. Clearing a
-                                      * selection is neither active nor a
-                                      * warning; it is an ordinary action. */}
+                            )}
+                            {/* Clear all and ＋ Add: side by side while the
+                              * chips fit on one line, stacked once they wrap
+                              * (useStackedStripActions). ＋ Add is LAST, so the
+                              * first chip's Clear all appears beside it rather
+                              * than moving it. */}
+                            <div
+                                ref={stripActionsRef}
+                                className={`selected-strip-actions${stackStripActions ? ' is-stacked' : ''}`}
+                            >
+                                {/* Not btn-warning. Orange is the single
+                                  * "active / now" signal in this design and
+                                  * nothing else is allowed to use it — that
+                                  * is the only reason it answers "where am
+                                  * I" from across the room. Clearing a
+                                  * selection is neither active nor a
+                                  * warning; it is an ordinary action. */}
+                                {selectedVehicles.length > 0 && (
                                     <button
                                         onClick={clearAllSelections}
                                         className="btn btn-secondary"
                                     >
                                         Clear all
                                     </button>
-                                </>
-                            )}
+                                )}
+                                <VehicleQuickAdd
+                                    vehicles={chartVehicles}
+                                    selectedIds={selectedVehicles}
+                                    onToggle={toggleVehicleSelection}
+                                />
+                            </div>
                         </div>
                         </div>
                     </div>}

@@ -62,6 +62,7 @@ a house one, so that a new reader already knows it.
 | One choice, always visible, of two or three — or more when every option is a short word and the row may scroll sideways (the preset picker's eight) | **segmented control** | Apple HIG *segmented control* | `.stats-segmented`, `.account-segmented`; `.preset-picker` wraps one |
 | Row 3 — the removable selected-vehicle pills | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip` |
 | The capped box the chips scroll inside | **chip scroller** | — | `.selected-chip-scroll` — two rows, then it scrolls |
+| "＋ Add" at the right end of the chips row, and the search-and-tick list it opens to grow the selection from any tab | **the vehicle quick-add** — a checklist: a click toggles a vehicle at once, ✓ marks the selected, and the panel and its search stay put. Not "picker" alone, which is the run picker's | — | [VehicleQuickAdd.jsx](../src/components/VehicleQuickAdd.jsx), `.vehicle-quick-add` |
 | The centred max-width content column | **page container** | — | `.page-container` |
 
 `.app-nav` is the header **and** its rows; the class predates this document.
