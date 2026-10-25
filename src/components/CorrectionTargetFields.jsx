@@ -1,6 +1,7 @@
 import { useAppContext } from '../context/AppContext';
 import InfoIcon from './InfoIcon';
 import AccessoryLoadReference from './AccessoryLoadReference';
+import ExplainerLink from '../explainers/ExplainerLink';
 import {
     CORRECTION_TARGET_RANGES, DEFAULT_CORRECTION_TARGET, normalizeCorrectionTarget, targetDiffers,
     speedText, tempText, altitudeText, accessoryText,
@@ -69,6 +70,7 @@ export default function CorrectionTargetFields({ target, onChange, fields = null
                         <>
                             <p>{ABOUT}</p>
                             <p>{ACCESSORY_ABOUT}</p>
+                            <p><ExplainerLink topic="heating-cooling-and-range" /></p>
                             <AccessoryLoadReference />
                         </>
                     )}
