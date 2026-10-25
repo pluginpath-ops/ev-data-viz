@@ -2589,6 +2589,41 @@ describe('site events are counted without knowing who (#448 layer 4)', () => {
     });
 });
 
+describe('the site events are read by an admin, in counts (#477)', () => {
+    const service = read('src/services/DataService.js');
+    const panel = read('src/components/admin/SiteEventsPanel.jsx');
+    const stats = read('src/utils/siteEventStats.js');
+
+    it('is an Admin sub-tab, reachable by ?sub= and drawn from the one panel', () => {
+        const admin = read('src/components/AdminView.jsx');
+        expect(admin).toMatch(/\{ id: 'events',\s+label: 'Site Events' \}/);
+        expect(admin).toMatch(/events:\s+'[^']+'/);
+        expect(admin).toMatch(/subtab === 'events' && <SiteEventsPanel \/>/);
+    });
+
+    it('reads through the admin policy, bounded, and says when it was cut', () => {
+        const read_ = service.slice(service.indexOf('async getSiteEvents'), service.indexOf('// ── Access logging'));
+        expect(read_).toMatch(/\.from\('site_events'\)/);
+        expect(read_).toMatch(/\.order\('id', \{ ascending: false \}\)/);
+        expect(read_).toMatch(/truncated: true/);
+        expect(panel).toMatch(/cap: EVENT_ROW_CAP/);
+        expect(panel).toMatch(/data\?\.truncated/);
+    });
+
+    it('asks for no identity: the select names no user, email or address column', () => {
+        const read_ = service.slice(service.indexOf('async getSiteEvents'), service.indexOf('// ── Access logging'));
+        expect(read_).toMatch(/\.select\('id, created_at, event, browser_token, slug, detail'\)/);
+        expect(panel).not.toMatch(/user_id|ip_address|user_agent/);
+    });
+
+    it('the panel shows n beside what it ranks, and the counting module carries the threshold', () => {
+        expect(stats).toMatch(/export const MIN_N_TO_RANK = /);
+        expect(panel).toMatch(/MIN_N_TO_RANK/);
+        expect(panel).toMatch(/TooFew/);
+        expect(panel).toMatch(/a browser, not a person|browsers, not of people/);
+    });
+});
+
 describe('Home is where a bare address lands (#448 layer 5)', () => {
     const app = read('src/App.jsx');
 

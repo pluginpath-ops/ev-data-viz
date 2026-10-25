@@ -15,6 +15,7 @@ import TagRegistry from './admin/TagRegistry';
 import PlatformRegistry from './admin/PlatformRegistry';
 import DataChecksPanel from './admin/DataChecksPanel';
 import PublishedResultsPanel from './admin/PublishedResultsPanel';
+import SiteEventsPanel from './admin/SiteEventsPanel';
 
 const SUBTABS = [
     { id: 'roles',     label: 'Roles & Permissions' },
@@ -23,6 +24,7 @@ const SUBTABS = [
     { id: 'checks',    label: 'Data Checks' },
     { id: 'results',   label: 'Published Results' },
     { id: 'brands',    label: 'Brands, Platforms & Tags' },
+    { id: 'events',    label: 'Site Events' },
     { id: 'constants', label: 'Model Constants' },
     { id: 'interface', label: 'Interface Settings' },
     { id: 'playground', label: 'Playground' },
@@ -40,6 +42,7 @@ const SUBTITLES = {
     feguide:   'Import EPA\'s published label figures, and link them to EPA test vehicles.',
     checks:    'Every vehicle against its own sources — range, battery capacity, weight, drive type, voltage and performance — with the limits tunable in place.',
     results:   'Import published performance results in bulk, and keep one list of the sources they come from.',
+    events:    'What readers open on the site, counted by browser — to choose featured comparisons with that in view.',
     brands:    'One brand list for vehicles and EPA filings. Rename, merge, and map EPA\'s division spellings.',
     constants: 'Tune the EPA model math (local sandbox).',
     interface: 'Site-wide appearance settings.',
@@ -229,6 +232,8 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                     <TagRegistry />
                 </div>
             )}
+
+            {subtab === 'events' && <SiteEventsPanel />}
 
             {subtab === 'constants' && <ConstantsKnobs />}
 
