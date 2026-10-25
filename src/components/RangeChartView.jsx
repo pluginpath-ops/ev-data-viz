@@ -8,6 +8,7 @@ import { runTooltipLines } from '../utils/tooltipHelpers';
 import { useChartReadout } from '../hooks/useChartReadout';
 import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
 import { whenNewRangeOfRun } from '../utils/testedRange';
+import { fullPackRange } from '../utils/fullPackRange';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import { correctionFactor, correctionNote, runConditions } from '../utils/conditionCorrection';
@@ -52,18 +53,12 @@ const CHART_TYPES = [
 ];
 
 // ── Range helper ──────────────────────────────────────────────────────────────
-// Projected full-range: distance × (100 / SoC_used).
-// Falls back to raw distance_miles when SoC fields are absent.
-const calcRange = (run) => {
-    const d = run.distance_miles;
-    if (!d || d <= 0) return null;
-    const start = run.start_soc;
-    const end   = run.end_soc;
-    if (start != null && end != null) {
-        const used = start - end;
-        if (used > 0) return Math.round((d * 100) / used);
-    }
-    return Math.round(d);
+// Projected full-range (utils/fullPackRange): the test's SoC window where it
+// logged one, else its own efficiency × the vehicle's capacity, else the raw
+// distance. Called on a CORRECTED run, so the correction scales the result.
+const calcRange = (run, vehicle = run?.vehicle) => {
+    const range = fullPackRange(run, vehicle);
+    return range ? Math.round(range.mi) : null;
 };
 
 
@@ -178,7 +173,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
         const isSpeed    = chartType.includes('-speed-');
         const effLabelStr = getEffLabel(effUnit, units);
         const getY       = isRange
-            ? (run) => convDistance(calcRange(run), units)
+            ? (run) => convDistance(calcRange(run, run.vehicle), units)
             : (run) => calcEff(run.distance_miles, run.energy_kwh, effUnit, units);
         const yLabel     = isRange ? `Range (${distanceLabel(units)})` : `Efficiency (${effLabelStr})`;
 
@@ -768,11 +763,15 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         // Efficiency is deliberately NOT here: it is what the
                         // chart plots, so a badge repeating it beside every row
                         // is the answer printed on the question.
-                        const rawRange    = calcRange(run);
+                        // As measured, not corrected: the bars carry the correction.
+                        const basis       = fullPackRange(run, selectedVehicles.find(v => v.id === run.vehicle_id));
+                        const rawRange    = basis ? Math.round(basis.mi) : null;
                         const range       = rawRange != null ? convDistance(rawRange, units) : null;
                         const dl          = distanceLabel(units);
-                        const socUsed     = (run.start_soc != null && run.end_soc != null) ? run.start_soc - run.end_soc : null;
-                        const isProjected = socUsed != null && socUsed !== 100;
+                        const isProjected = basis != null && basis.basis !== 'distance' && !(basis.basis === 'soc-window' && basis.socUsed === 100);
+                        const projectedFrom = basis?.basis === 'efficiency'
+                            ? `Projected from its own efficiency: ${basis.miPerKwh.toFixed(2)} mi/kWh × ${basis.capacityKwh} kWh${basis.capacityLabel ? ` (${basis.capacityLabel})` : ''}`
+                            : `Projected from ${run.distance_miles} mi driven over ${basis?.socUsed}% SoC`;
                         const canPlot     = hasDataForType(run, chartType);
                         const isChecked   = selectedRuns.some(id => String(id) === String(run.id));
                         return (
@@ -795,9 +794,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                                 {range != null && (
                                     <span
                                         className="badge-micro"
-                                        title={isProjected
-                                            ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC`
-                                            : 'Measured distance'}
+                                        title={isProjected ? projectedFrom : 'Measured distance'}
                                     >
                                         {range} {dl}{isProjected ? ' ⟳' : ''}
                                     </span>

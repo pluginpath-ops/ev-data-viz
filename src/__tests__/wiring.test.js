@@ -1577,6 +1577,19 @@ describe('one correction, everywhere it is applied', () => {
     });
 });
 
+describe('the Range chart scales a test to a full pack (utils/fullPackRange)', () => {
+    it('draws its bars and its selector badge from the one helper', () => {
+        // The bar and the badge beside the test were each doing their own SoC
+        // arithmetic, and a test with energy but no SoC window was drawn at its
+        // raw distance — a 23-mile "range" beside 250-mile ones.
+        const view = read('src/components/RangeChartView.jsx');
+        expect(view).toMatch(/from '\.\.\/utils\/fullPackRange'/);
+        expect(view, 'the bar').toMatch(/calcRange\(run, run\.vehicle\)/);
+        expect(view, 'the badge, with the vehicle that holds the capacity').toMatch(/fullPackRange\(run, selectedVehicles\.find/);
+        expect(view, 'no second copy of the SoC arithmetic').not.toMatch(/\* 100\) \/ used/);
+    });
+});
+
 describe('constants exposed for tuning are reachable in the Admin panel', () => {
     it('offers every correction constant as a knob', () => {
         // AERO_FRACTION drives every correction magnitude. It was made
