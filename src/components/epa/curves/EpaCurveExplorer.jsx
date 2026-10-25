@@ -3,6 +3,8 @@ import Chart from 'chart.js/auto';
 import { useTheme } from '../../../hooks/useTheme';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
+import { useAxisLimits } from '../../../hooks/useAxisLimits';
+import { AXIS_LIMITS_PARAM, encodeAxisLimits } from '../../../utils/axisLimits';
 import { buildEpaCurveFromModel } from '../../../utils/epaDerivations';
 import { DEFAULT_SS_ETA, CURVE_SPEED_RANGE, CURVE_REFERENCE_MPH } from '../../../constants/epa';
 import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../utils/epaCurveSubjects';
@@ -148,13 +150,12 @@ export function explorerStateFromUrl(search = window.location.search) {
 
 /**
  * @param {boolean}  presentationMode  the pop-out: the plot alone, no controls
- * @param {Object}   synced            `{ selected, yAxis, conditions, scale }` pushed by the
+ * @param {Object}   synced            `{ selected, yAxis, conditions }` pushed by the
  *                                     window that has the controls; replaces local state
  * @param {Function} onStateChange     called with that same shape whenever it
  *                                     changes, and with null on unmount, so App can
  *                                     broadcast it to a pop-out
  */
-const NO_SCALE = { xMin: null, xMax: null, yMin: null, yMax: null };
 
 export default function EpaCurveExplorer({ presentationMode = false, synced = null, onStateChange = null }) {
     const { getTestVehiclesForCurves, units } = useAppContext();
@@ -170,12 +171,13 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
     const [yAxisOwn, setYAxis] = useState(initial.yAxis);
     const selected = synced ? synced.selected : selectedOwn;
     const yAxis    = synced ? synced.yAxis    : yAxisOwn;
-    // Manual axis bounds, null = auto. Not persisted to the URL: the record
-    // selection and the axis choice describe WHAT is plotted and are worth
-    // sharing, where a zoom is tuning for the session.
-    const [scaleOwn, setScale] = useState(NO_SCALE);
-    // A pop-out has no controls to set these, so it takes the other window's.
-    const scale = synced?.scale ?? scaleOwn;
+    // Manual axis bounds, null = auto. In chartConfig like every chart's (#478):
+    // the copied URL carries them as `ax`, and the pop-out, which has no controls
+    // to set them, gets them in the chartConfig the main tab broadcasts rather
+    // than in `synced`. (They were once left out of the URL as "tuning for the
+    // session"; a link to a chart zoomed to the interesting part should open
+    // there.)
+    const { limits: scale, setLimit: setScaleLimit } = useAxisLimits('epaexplorer');
 
     // The same controls the vehicle-driven curves use, from the same module —
     // two views computing air density slightly differently would be invisible
@@ -247,7 +249,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
     // Tell App what is on screen so it can broadcast it to a pop-out. Keyed on the
     // serialised state because `conditions.values` is a new object every render,
     // which would otherwise report on every render.
-    const reportKey = JSON.stringify({ selected, yAxis, conditions: conditions.values, scale });
+    const reportKey = JSON.stringify({ selected, yAxis, conditions: conditions.values });
     useEffect(() => {
         if (!onStateChange || presentationMode) return;
         onStateChange(JSON.parse(reportKey));
@@ -261,8 +263,10 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
         p.set('sub', 'curves');
         if (selected.length) p.set('c', selected.join(','));
         if (yAxis !== 'kwh100mi') p.set('cy', yAxis);
+        const limitsParam = encodeAxisLimits(scale, 'epaexplorer');
+        if (limitsParam) p.set(AXIS_LIMITS_PARAM, limitsParam); else p.delete(AXIS_LIMITS_PARAM);
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [selected, yAxis, presentationMode]);
+    }, [selected, yAxis, scale, presentationMode]);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -579,7 +583,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                                 yMin={scale.yMin} yMax={scale.yMax}
                                 xAxisLabel={`Speed (${speedLabel(units)})`}
                                 yAxisLabel={`${axis.label} (${axis.unit})`}
-                                onChange={(key, value) => setScale(p => ({ ...p, [key]: value }))}
+                                onChange={setScaleLimit}
                             />}
                         </>
                     )}

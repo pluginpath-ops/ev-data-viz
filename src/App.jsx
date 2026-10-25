@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { VEHICLE_PALETTE } from './utils/colorUtils';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
-import { ScaleSyncContext } from './hooks/useSyncedScale';
+import { AxisLimitsProvider } from './hooks/useAxisLimits';
+import { AXIS_LIMITS_PARAM, decodeAxisLimits, withAxisLimits } from './utils/axisLimits';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import AppNav from './components/shell/AppNav';
 import SubTabStrip from './components/shell/SubTabStrip';
@@ -205,10 +206,6 @@ export default function App() {
             ? { ...explorerStateFromUrl(), conditions: null }
             : null;
     });
-    // Axis limits of the chart on screen, for the charts that keep them locally
-    // (see useSyncedScale). Reported by that chart in the main tab; received by a
-    // pop-out.
-    const [viewScale, setViewScale] = useState(null);
     const [epaConfig, setEpaConfig] = useState(defaultEpaConfig);
     const [roadTripConfig, setRoadTripConfig] = useState(defaultRoadTripConfig);
     const [chartConfig, setChartConfig] = useState(defaultChartConfig);
@@ -314,8 +311,8 @@ export default function App() {
     };
 
     const { isPopout, sendState } = useChartSync({
-        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, viewScale,
-        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer, setViewScale,
+        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer,
+        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer,
     });
 
     // The featured comparisons (#448), loaded once here so Home and the editor
@@ -578,7 +575,17 @@ export default function App() {
             // Nothing to wait for — the guide loads its own data and needs no
             // vehicle, role or selection resolved first, so the sub-tab is set
             // here rather than parked on a ref the way runs and admin need.
-            setEpaSubtab(epaSubtabFromParam(p.get('sub')));
+            const sub = p.get('sub');
+            setEpaSubtab(epaSubtabFromParam(sub));
+            // Modeled Efficiency · All EVs is a sub-tab, not a chart mode, so the
+            // chart link's parse below never sees it; its limits come from the
+            // same `ax` parameter.
+            if (sub === 'curves' && p.get(AXIS_LIMITS_PARAM) !== null) {
+                setChartConfig(prev => ({
+                    ...prev,
+                    axisLimits: withAxisLimits(prev.axisLimits, 'epaexplorer', decodeAxisLimits(p.get(AXIS_LIMITS_PARAM), 'epaexplorer')),
+                }));
+            }
             setView('epa');
             return;
         }
@@ -815,7 +822,7 @@ export default function App() {
     // ── Broadcast chart state to any open pop-out windows ───────────────────
     useEffect(() => {
         sendState();
-    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, viewScale, sendState]);
+    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, sendState]);
 
     // The header tab a view is shown under (#338): a vehicle's page (the
     // `runs` view) is under Vehicles & Specs; a chart category drawn under
@@ -830,13 +837,6 @@ export default function App() {
             // A sub-tab opens its own top level: Platforms is the list, Explainers the index.
             select: (key) => { setReferenceSubtab(key); setReferencePlatformId(null); setReferenceTopic(null); } },
     }[headerTab] ?? null;
-
-    // Who holds axis limits that live inside a chart: the main tab reports them,
-    // a pop-out receives them (useSyncedScale).
-    const scaleSync = useMemo(
-        () => ({ synced: isPopout ? viewScale : null, report: isPopout ? null : setViewScale }),
-        [isPopout, viewScale],
-    );
 
     // Where the pop-out is offered: any chart mode, and the EPA curve explorer,
     // which is a sub-tab rather than a mode but follows the same channel (#259).
@@ -871,7 +871,7 @@ export default function App() {
 
     if (isPopout) {
         return (
-            <ScaleSyncContext.Provider value={scaleSync}>
+            <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
             <PopoutView
                 vehicles={chartVehicles}
                 selectedVehicles={selectedVehicles}
@@ -884,12 +884,12 @@ export default function App() {
                 pairings={pairings}
                 epaExplorer={epaExplorer}
             />
-            </ScaleSyncContext.Provider>
+            </AxisLimitsProvider>
         );
     }
 
     return (
-        <ScaleSyncContext.Provider value={scaleSync}>
+        <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
         <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison }}>
         <FeaturedComparisonsContext.Provider value={featuredContext}>
         <VehicleBaseContext.Provider value={vehicleBaseApi}>
@@ -1395,6 +1395,6 @@ export default function App() {
         </VehicleBaseContext.Provider>
         </FeaturedComparisonsContext.Provider>
         </NavigationContext.Provider>
-        </ScaleSyncContext.Provider>
+        </AxisLimitsProvider>
     );
 }

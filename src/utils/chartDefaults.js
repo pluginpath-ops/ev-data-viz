@@ -30,12 +30,10 @@ export function defaultChartConfig() {
         // decision, drawing a run that began at 25% from t=0 alongside runs that
         // began at 10%.
         raceThreshold: null,
-        xMin: null,
-        xMax: null,
-        yMin: 0,
-        yMax: null,
-        y2Min: null,
-        y2Max: null,
+        // Every chart's axis limits, keyed by chart and holding only the charts
+        // someone has set (utils/axisLimits.js). Here, not in each view, so the
+        // link, the pop-out and a Home panel carry them (#478).
+        axisLimits: {},
         showLine:   true,
         showPoints: false,
         // Where series colors come from: each vehicle's curated color by
@@ -91,7 +89,7 @@ export function defaultRoadTripConfig() {
 
 export function defaultEpaConfig() {
     return {
-        yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null,
+        yAxis: 'kwh100mi',
         // Which curves are drawn, and any colors overridden for them (#221).
         // Held here rather than inside EpaCurvesView so they reach the URL and
         // the pop-out, exactly as every other chart's selection does.

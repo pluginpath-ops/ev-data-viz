@@ -35,6 +35,7 @@ import { useRunSelection } from '../hooks/useRunSelection';
 import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
+import { useAxisLimits } from '../hooks/useAxisLimits';
 
 
 // ── Highway band plugin ───────────────────────────────────────────────────────
@@ -224,7 +225,7 @@ function mappingColor(baseColor, mappingIdx) {
  * Props:
  *   vehicles           {Array}    — full vehicles array from context (with epa_mappings)
  *   selectedVehicleIds {Array}    — currently selected vehicle IDs
- *   epaConfig          {object}   — { yAxis, xMin, xMax, yMin, yMax }
+ *   epaConfig          {object}   — { yAxis, selectedMappings, mappingColors, overlay }
  *   setEpaConfig       {function}
  *   presentationMode   {boolean}  — strips controls for popout window
  */
@@ -269,7 +270,10 @@ export default function EpaCurvesView({
     const setOverlayMode = (mode) => setEpaConfig?.(prev => ({ ...prev, overlay: mode }));
 
 
-    const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
+    const { yAxis } = epaConfig;
+    // Axis limits live in chartConfig, not here (#478). They were epaConfig
+    // fields, which the pop-out carried but the chart link never wrote or read.
+    const { limits: { xMin, xMax, yMin, yMax }, setLimit } = useAxisLimits('epacurves');
 
     // ── Vehicle lists ─────────────────────────────────────────────────────────
 
@@ -1016,7 +1020,7 @@ export default function EpaCurvesView({
                     xMin={xMin} xMax={xMax} yMin={yMin} yMax={yMax}
                     xAxisLabel={`Speed (${speedLabel(units)})`}
                     yAxisLabel={yAxisLabel(yAxis, units)}
-                    onChange={(key, value) => setEpaConfig(p => ({ ...p, [key]: value }))}
+                    onChange={setLimit}
                 />
             )}
 

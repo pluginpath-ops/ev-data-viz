@@ -6,6 +6,7 @@ import {
     explicitChartParams, liveVehicleIds, chartStateOf, resetStateOf, replacesSelection, vehiclesInOrder, moveVehicle,
 } from '../featuredComparisons';
 import { buildChartParams } from '../chartUrlState';
+import { axisLimitsOf } from '../axisLimits';
 import { decodeVehicleTableParams, vehicleTableStartSearch, DEFAULT_VEHICLE_COLUMNS } from '../vehicleTable';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from '../chartDefaults';
 
@@ -173,6 +174,27 @@ describe('putting a saved chart on screen', () => {
 
     it('is null for a chart that is not there', () => {
         expect(chartStateOf(c, 7, vehicles)).toBeNull();
+    });
+
+    it('draws each chart with the axis limits saved in its link (#478)', () => {
+        const saved = {
+            ...c,
+            charts: [
+                // a link saved before #478, Charging Curves' limits as xn/xx/yn/yx
+                { title: '', params: 'tab=efficiency&m=charging&x=soc&y=chargeRate&xn=10&xx=80&yx=250' },
+                // and one saved after, for each of the charts that kept them locally
+                { title: '', params: 'tab=efficiency&m=range&ax=yx400' },
+                { title: '', params: 'tab=efficiency&m=roadtrip&ax=xx6_yn1' },
+                { title: '', params: 'tab=performance&m=perfcurve&ax=xx5' },
+            ],
+        };
+        const limits = (i, chart) => axisLimitsOf(chartStateOf(saved, i, vehicles).chartConfig.axisLimits, chart);
+        expect(limits(0, 'charging')).toMatchObject({ xMin: 10, xMax: 80, yMin: 0, yMax: 250 });
+        expect(limits(1, 'range')).toMatchObject({ yMax: 400, yMin: 0 });
+        expect(limits(2, 'roadtrip')).toMatchObject({ xMax: 6, yMin: 1 });
+        expect(limits(3, 'perfcurve')).toMatchObject({ xMax: 5 });
+        // ...and another chart's limits do not leak into the next panel
+        expect(limits(2, 'range')).toEqual(axisLimitsOf({}, 'range'));
     });
 
     it('resets to the comparison\'s vehicles and the correction its first chart used', () => {

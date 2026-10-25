@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { correctionSummary } from '../utils/correctionSettings';
 import SectionBand from './SectionBand';
 import SidebarDisplaySection from './SidebarDisplaySection';
-import { useSyncedScale } from '../hooks/useSyncedScale';
+import { useAxisLimits } from '../hooks/useAxisLimits';
+import { hoursToMinutes } from '../utils/axisLimits';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
 import { vehicleLabel } from '../utils/specHelpers';
@@ -665,15 +666,18 @@ export default function RoadTripView({
         (new URLSearchParams(window.location.search).get('rt_r') || '')
             .split(',').filter(Boolean)
     ).current;
-    const [axisScaleOwn, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
-    // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
-    const axisScale = useSyncedScale(axisScaleOwn);
+    // Axis limits, in chartConfig (#478) so the chart link, a Home panel and the
+    // pop-out carry them. Stored as typed: in the unit the control's label names,
+    // which for a time axis is HOURS (the plot is in minutes, so those go through
+    // hoursToMinutes where they are drawn). One set for the chart whatever its
+    // axes: changing an axis keeps the limits, as it always did here — Reset is
+    // the reader's.
+    const { limits: axisLimits, setLimit: onAxisChange } = useAxisLimits('roadtrip');
     const [copiedUrl, setCopiedUrl] = useState(false);
     // PROTOTYPE, local to this view: not in chartConfig, not in the URL.
     const [showTestSpread, setShowTestSpread] = useState(false);
     const [sortCol, setSortCol] = useState(null);   // column key or null
     const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
-    const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
 
     const dl = distanceLabel(units);
     const sl = speedLabel(units);
@@ -1278,15 +1282,15 @@ export default function RoadTripView({
                     scales: {
                         x: {
                             type: 'linear',
-                            min: axisScale.xMin ?? sweepMinDisplay,
-                            max: axisScale.xMax ?? sweepMaxDisplay,
+                            min: axisLimits.xMin ?? sweepMinDisplay,
+                            max: axisLimits.xMax ?? sweepMaxDisplay,
                             title: { display: true, text: `Travel Speed (${sl})`, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: sweepStepDisplay, color: tickColor },
                             grid: { color: gridColor },
                         },
                         y: {
-                            min: axisScale.yMin != null ? axisScale.yMin * 60 : iceSpeedYMin,
-                            max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
+                            min: hoursToMinutes(axisLimits.yMin) ?? iceSpeedYMin,
+                            max: hoursToMinutes(axisLimits.yMax) ?? undefined,
                             title: { display: true, text: speedYLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
                             grid: { color: gridColor },
@@ -1384,15 +1388,15 @@ export default function RoadTripView({
                     scales: {
                         x: {
                             type: 'linear',
-                            min: axisScale.xMin ?? legMinDisplay,
-                            max: axisScale.xMax ?? legMaxDisplay,
+                            min: axisLimits.xMin ?? legMinDisplay,
+                            max: axisLimits.xMax ?? legMaxDisplay,
                             title: { display: true, text: `${dl} Between Charges`, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: legStepDisplay, color: tickColor },
                             grid: { color: gridColor },
                         },
                         y: {
-                            min: axisScale.yMin != null ? axisScale.yMin * 60 : iceDistYMin,
-                            max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
+                            min: hoursToMinutes(axisLimits.yMin) ?? iceDistYMin,
+                            max: hoursToMinutes(axisLimits.yMax) ?? undefined,
                             title: { display: true, text: sweepLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
                             grid: { color: gridColor },
@@ -1588,8 +1592,8 @@ export default function RoadTripView({
                     x: {
                         type: 'linear',
                         title: { display: true, text: isDriveTimeXAxis ? 'Drive Time' : 'Elapsed Time', font: { size: fonts.axis }, color: legendColor },
-                        min: axisScale.xMin != null ? axisScale.xMin * 60 : autoXMin,
-                        max: axisScale.xMax != null ? axisScale.xMax * 60 : autoXMax,
+                        min: hoursToMinutes(axisLimits.xMin) ?? autoXMin,
+                        max: hoursToMinutes(axisLimits.xMax) ?? autoXMax,
                         ticks: {
                             stepSize: 30,
                             color: tickColor,
@@ -1604,8 +1608,8 @@ export default function RoadTripView({
                     },
                     y: isByTestMode ? {
                         reverse: false,
-                        min: axisScale.yMin ?? 0,
-                        max: axisScale.yMax ?? (validEntries.length + 1), // +1 for ICE lane
+                        min: axisLimits.yMin ?? 0,
+                        max: axisLimits.yMax ?? (validEntries.length + 1), // +1 for ICE lane
                         title: { display: false },
                         ticks: {
                             stepSize: 0.5,
@@ -1655,15 +1659,15 @@ export default function RoadTripView({
                     } : isChargeTimeMode ? {
                         reverse: true,
                         title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: fonts.axis }, color: legendColor },
-                        min: axisScale.yMin ?? 0,
-                        max: axisScale.yMax ?? autoYMax,
+                        min: axisLimits.yMin ?? 0,
+                        max: axisLimits.yMax ?? autoYMax,
                         ticks: { color: tickColor },
                         grid: { color: gridColor },
                     } : {
                         reverse: true,
                         title: { display: true, text: `Distance Traveled (${dl})`, font: { size: fonts.axis }, color: legendColor },
-                        min: axisScale.yMin ?? 0,
-                        max: axisScale.yMax ?? autoYMax,
+                        min: axisLimits.yMin ?? 0,
+                        max: axisLimits.yMax ?? autoYMax,
                         ticks: { color: tickColor },
                         grid: { color: gridColor },
                     },
@@ -1742,7 +1746,7 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, speedSweepResults, distSweepResults, spreadSweep, spreadTimeline, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisScale, isDark]);
+    }, [simResults, speedSweepResults, distSweepResults, spreadSweep, spreadTimeline, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisLimits, isDark]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
@@ -2262,8 +2266,8 @@ export default function RoadTripView({
             {/* ── Axis Scale Controls (card provided by AxisScaleControls) ─ */}
             {!loading && (simResults.some(Boolean) || speedSweepResults?.length > 0 || distSweepResults?.length > 0) && !presentationMode && (
                 <AxisScaleControls
-                    xMin={axisScale.xMin} xMax={axisScale.xMax}
-                    yMin={axisScale.yMin} yMax={axisScale.yMax}
+                    xMin={axisLimits.xMin} xMax={axisLimits.xMax}
+                    yMin={axisLimits.yMin} yMax={axisLimits.yMax}
                     onChange={onAxisChange}
                     showX={true}
                     showY2={false}

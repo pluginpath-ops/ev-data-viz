@@ -25,6 +25,7 @@ const AXIS_FIGURES = {
 };
 import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
+import { useAxisLimits } from '../hooks/useAxisLimits';
 import { minimumCommonSoc, alignmentExclusion, alignmentOffset, alignSeries, overExtrapolated } from '../utils/socAlignment';
 import { sessionFor } from '../utils/testSessions';
 import { correctionFactor, runConditions } from '../utils/conditionCorrection';
@@ -79,6 +80,9 @@ const stripUnits = (label) => label.replace(/\s*\(.*?\)$/, '');
 export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig, setChartConfig, chartMode, pairings = {}, setPairings = () => {}, presentationMode = false }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
+    // Charging Curves' axis limits. Range & Efficiency, which this view also
+    // hosts, keeps its own set under its own key (RangeChartView).
+    const { limits, setLimit } = useAxisLimits('charging');
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const [runDataCache, setRunDataCache] = useState({});
@@ -920,15 +924,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         title: { display: true, text: xLabel, color: legendColor },
                         ticks: { color: tickColor },
                         grid:  { color: gridColor },
-                        ...(chartConfig.xMin != null ? { min: chartConfig.xMin } : {}),
-                        ...(chartConfig.xMax != null ? { max: chartConfig.xMax } : {}),
+                        ...(limits.xMin != null ? { min: limits.xMin } : {}),
+                        ...(limits.xMax != null ? { max: limits.xMax } : {}),
                     },
                     y: {
                         title: { display: true, text: yLabel, color: legendColor },
                         ticks: { color: tickColor },
                         grid:  { color: gridColor },
-                        ...(chartConfig.yMin != null ? { min: chartConfig.yMin } : {}),
-                        ...(chartConfig.yMax != null ? { max: chartConfig.yMax } : {}),
+                        ...(limits.yMin != null ? { min: limits.yMin } : {}),
+                        ...(limits.yMax != null ? { max: limits.yMax } : {}),
                     },
                     ...(chartConfig.y2Axis ? {
                         y2: {
@@ -938,8 +942,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             title:    { display: true, text: y2Label, color: legendColor },
                             ticks:    { color: tickColor },
                             grid:     { drawOnChartArea: false, color: gridColor },
-                            ...(chartConfig.y2Min != null ? { min: chartConfig.y2Min } : {}),
-                            ...(chartConfig.y2Max != null ? { max: chartConfig.y2Max } : {}),
+                            ...(limits.y2Min != null ? { min: limits.y2Min } : {}),
+                            ...(limits.y2Max != null ? { max: limits.y2Max } : {}),
                         },
                     } : {}),
                 }
@@ -951,7 +955,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 chartInstance.current.destroy();
             }
         };
-    }, [chartConfig, selectedVehicles, runDataCache, units, isDark, colorMap, liveComposites, compositeMembers]);
+    }, [chartConfig, limits, selectedVehicles, runDataCache, units, isDark, colorMap, liveComposites, compositeMembers]);
 
     // ── The frame's caption ──────────────────────────────────────────────────
     // Computed here rather than inside the chart effect, because the frame is
@@ -1386,10 +1390,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             {!presentationMode && <div className="card mb-6">
 
                 <AxisScaleControls
-                    xMin={chartConfig.xMin}  xMax={chartConfig.xMax}
-                    yMin={chartConfig.yMin}  yMax={chartConfig.yMax}
-                    y2Min={chartConfig.y2Min} y2Max={chartConfig.y2Max}
-                    onChange={(key, val) => setChartConfig(prev => ({ ...prev, [key]: val }))}
+                    xMin={limits.xMin}  xMax={limits.xMax}
+                    yMin={limits.yMin}  yMax={limits.yMax}
+                    y2Min={limits.y2Min} y2Max={limits.y2Max}
+                    onChange={setLimit}
                     showY2={!!chartConfig.y2Axis}
                     card={false}
                 />
