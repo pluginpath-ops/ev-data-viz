@@ -78,7 +78,7 @@ import { interpolate } from './interpolate';
 import { trimRamp } from './socAlignment';
 import { isCompositeRun, compositeClassRank } from './runUtils';
 import { resolveVoltageClass, VOLTAGE_CLASSES } from './platforms';
-import { currentClassOf, chargerCurrentText } from './chargerCurrentClass';
+import { currentClassOf, chargerCurrentText, DEFAULT_CHARGER_CURRENT_A } from './chargerCurrentClass';
 import { convTemp, tempLabel } from './unitConversions';
 
 /** Fewest tests a composite is offered from. At one, the composite IS the test,
@@ -548,6 +548,13 @@ export function compositeCurves(vehicle, pointsByRunId = {}) {
                 chargerCurrentA,
                 ...built,
                 inferredTests: members.filter(t => classes.get(t.run.id).inferred).map(t => t.run.name),
+                // Said only on a composite split by current: there, a test nobody
+                // classified sits in a class on the strength of a default, and
+                // can hold its neighbours' stretches back without anyone having
+                // chosen it. With no split, no class is involved.
+                assumedCurrentTests: chargerCurrentA != null
+                    ? members.filter(t => t.run.charger_current_class_a == null).map(t => t.run.name)
+                    : [],
             });
             continue;
         }
@@ -752,6 +759,7 @@ export function compositeRecord(curve, fingerprint) {
         tests: curve.tests,
         heldBack: curve.heldBack,
         inferredTests: curve.inferredTests ?? [],
+        assumedCurrentTests: curve.assumedCurrentTests ?? [],
         conditions: curve.conditions,
     };
 }
@@ -827,8 +835,8 @@ export function compositeConditions(curve, units = 'imperial') {
 
 /**
  * Everything a reader needs beside a composite, as one line: its conditions,
- * which tests had their charger class read from the curve, and which
- * charger-limited stretches it left out. The picker row and the chart's notes
+ * which tests had their charger class read from the curve or their charger
+ * current read as the default, and which charger-limited stretches it left out. The picker row and the chart's notes
  * say the same thing, so it is said once, here.
  */
 export function compositeNote(curve, units = 'imperial') {
@@ -837,6 +845,8 @@ export function compositeNote(curve, units = 'imperial') {
         compositeConditions(curve, units),
         curve.inferredTests?.length
             ? `charger class read from the curve, not recorded: ${curve.inferredTests.join(', ')}` : '',
+        curve.assumedCurrentTests?.length
+            ? `charger current not recorded, read as ${DEFAULT_CHARGER_CURRENT_A} A: ${curve.assumedCurrentTests.join(', ')}` : '',
         curve.heldBack?.length
             ? `charger-limited stretches left out: ${curve.heldBack.map(h => `${h.name} ${span(h)}`).join(', ')}` : '',
     ].filter(Boolean).join(' · ');

@@ -305,6 +305,26 @@ describe('charger current class (migration 092)', () => {
         expect(curves.map(c => [c.chargerCurrentA, c.tests.length])).toEqual([[700, 3], [500, 2]]);
     });
 
+    it('names the tests whose current was only assumed, on a split composite and nowhere else', () => {
+        // Test 5 outdraws tests 3 and 4 and was never classified: it reads as 500 A and
+        // holds their stretches back — which the composite must say.
+        const runs = [run(1, on(600)), run(2, on(600)), run(3, on(500)), run(4, on(500)), run(5)];
+        const pts = { 1: fast(), 2: fast(), 3: slow(), 4: slow(), 5: fast() };
+        const { curves } = compositeCurves(vehicleOf(400, runs), pts);
+        const five = curves.find(c => c.chargerCurrentA === 500);
+        expect(five.assumedCurrentTests).toEqual(['test 5']);
+        expect(five.heldBack.map(h => h.name)).toContain('test 3');
+        expect(compositeNote(five)).toContain('charger current not recorded, read as 500 A: test 5');
+        expect(curves.find(c => c.chargerCurrentA === 600).assumedCurrentTests).toEqual([]);
+        // The record carries it, so the stored composite says it too.
+        expect(compositeNote({ ...five, ...planCompositeRebuild(vehicleOf(400, runs), pts).writes.find(w => w.composite.chargerCurrentA === 500).composite }))
+            .toContain('read as 500 A: test 5');
+        // No split, no class involved: nothing to say.
+        const plain = compositeCurves(vehicleOf(400, [run(1), run(2), run(3)]), { 1: fast(), 2: fast(), 3: fast() }).curves[0];
+        expect(plain.assumedCurrentTests).toEqual([]);
+        expect(compositeNote(plain)).not.toContain('not recorded');
+    });
+
     it('stores which class a composite stands for, and updates it in place on a rebuild', () => {
         const runs = [run(1, on(600)), run(2, on(600)), run(3, on(500)), run(4, on(500))];
         const v = vehicleOf(400, runs);
