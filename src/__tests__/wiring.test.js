@@ -1601,6 +1601,16 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         }
     });
 
+    it('offers the accessory load on the correction target, and writes it to the link only when set (#449)', () => {
+        const fields = read('src/components/CorrectionTargetFields.jsx');
+        expect(fields, 'the row must resolve auto through the temperature').toMatch(/effectiveAccessoryW\(/);
+        expect(fields, 'and say which state it is in, in the owner’s words').toMatch(/set by you/);
+        expect(fields, 'and let the reader give it back').toMatch(/accessoryW: null/);
+        const settings = read('src/utils/correctionSettings.js');
+        expect(settings, 'c_acc is read and written with the other target parameters').toMatch(/accessoryW: 'c_acc'/);
+        expect(settings, 'auto is the default, so an untouched page writes nothing').toMatch(/accessoryW: null/);
+    });
+
     it('reads the accessory load in the correction and takes a run’s own consumption to it (#449)', () => {
         const correction = read('src/utils/conditionCorrection.js');
         expect(correction, 'the correction must import the accessory load').toMatch(/from '\.\/accessoryLoad'/);

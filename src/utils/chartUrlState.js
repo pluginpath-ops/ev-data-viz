@@ -17,7 +17,7 @@
  *
  * ── What the query holds, by mode ────────────────────────────────────────────
  *   every chart   tab m v  raw rt  line pts cspread aspread  corr c_spd c_tmp
- *                 c_alt  pairs
+ *                 c_alt c_acc  pairs
  *   axis limits   ax (utils/axisLimits.js) for the five modes that have them
  *                 — charging range roadtrip perfcurve epacurves. The
  *                 xn xx yn yx y2n y2x of links written before #478 are still read.

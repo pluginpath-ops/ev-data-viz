@@ -8544,6 +8544,10 @@ a.is-test-link:focus-visible {
     width: 100%;
     accent-color: var(--color-primary);
 }
+/* The accessory load while it follows the temperature: grey, as an untouched
+   control reads, so that blue means "set by you". The thumb and the filled bar
+   take the one accent color. */
+.assumption-slider.is-auto { accent-color: var(--color-text-muted); }
 
 /* ── Correction target ───────────────────────────────────────────────────────
    What corrected figures are corrected to (CorrectionTargetFields): a heading
@@ -8561,7 +8565,7 @@ a.is-test-link:focus-visible {
 .correction-target .section-action { margin-left: auto; }
 .correction-target-row {
     display: grid;
-    grid-template-columns: 4.25em minmax(0, 1fr) 4.5em;
+    grid-template-columns: 5.25em minmax(0, 1fr) 4.5em;
     align-items: center;
     gap: 8px;
 }

@@ -185,7 +185,7 @@ export const EPA_DEFAULTS = {
     // heats it — a heat pump draws roughly half a resistive heater, and the
     // line cannot tell them apart. The slopes are a starting point, not a fit
     // (owner, 2026-10-25), read against the reference table in
-    // epa/accessoryReference.jsx, whose own figures are unsourced: heating at
+    // AccessoryLoadReference.jsx, whose own figures are unsourced: heating at
     // 50 W/°F is 1,700 W at 32°F (between its heat-pump and resistive columns)
     // and 3,300 W at 0°F (inside the heat pump's); cooling at 70 W/°F is 1,000 W
     // at 80°F, the low end of its A/C column. The truth is probably very much

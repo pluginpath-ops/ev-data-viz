@@ -4,8 +4,13 @@ import {
     airDensityRatio, temperatureDensityRatio, averageGradePercent,
     STANDARD_TEMP_F, DEFAULT_ACCESSORY_W,
 } from '../../utils/epaDerivations';
-import { AccessoryLoadReferenceTable, MIN_TEMP_F, MAX_TEMP_F } from './accessoryReference';
+import AccessoryLoadReference from '../AccessoryLoadReference';
 import NumberInput from '../NumberInput';
+
+// Sane bounds for the ambient-temperature viewing condition; far outside this
+// the ideal-gas density approximation isn't meaningful anyway.
+const MIN_TEMP_F = -100;
+const MAX_TEMP_F = 150;
 
 /**
  * The viewing conditions an EPA curve can be re-plotted under (#237).
@@ -162,7 +167,7 @@ export default function ViewingConditions({ conditions }) {
                             title="EV auxiliary load reference"
                             text="Everything the car draws that is not traction — HVAC, battery conditioning, lighting."
                         >
-                            <AccessoryLoadReferenceTable />
+                            <AccessoryLoadReference />
                         </InfoIcon>
                     </span>
                     <NumberInput
