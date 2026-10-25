@@ -752,7 +752,14 @@ describe('the seams that broke before', () => {
     it('lets a variant inherit color, photo and tags by pointer, and keeps editors on own values', () => {
         // Resolved where the figures are, so every reader of the fleet sees it.
         const ctx = read('src/context/AppContext.jsx');
-        expect(ctx).toMatch(/withVehicleFigures\(withPlatforms\(withInheritance\(shown\), platformsById\)\)/);
+        expect(ctx).toMatch(/withVehicleFigures\(withPlatforms\(withInheritance\(shown, manufacturers\), platformsById\)\)/);
+        // The brand's color (#311) reaches the fleet only through that second
+        // argument, and is set from Admin and pulled from the card.
+        expect(read('src/components/admin/BrandRegistry.jsx')).toMatch(/updateManufacturer\(id, updates\)/);
+        expect(read('src/components/admin/BrandRegistry.jsx')).toMatch(/onSave\(brand\.id, \{ color: hex \}\)/);
+        expect(read('src/components/VehiclesView.jsx')).toMatch(/<PullColorButton vehicle=\{vehicle\} onUpdate=\{onUpdate\} \/>/);
+        expect(read('src/components/vehicles/PullColorButton.jsx')).toMatch(/sampleImageColor/);
+        expect(read('src/components/EditVehicleForm.jsx')).toMatch(/Clear color/);
         expect(ctx, 'createVariant must link every run the source shows that the lineage does not bring').toMatch(/dataService\.createVariant\(source, variantLinkPlan\(source\)\)/);
 
         // Editors read own values. A form seeded from the resolved ones saves

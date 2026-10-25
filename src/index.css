@@ -3804,6 +3804,20 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     white-space: nowrap;
 }
 
+.vehicle-media-color-pull {
+    padding: 1px 6px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-chip);
+    background-color: rgba(8, 12, 18, 0.72);
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    white-space: nowrap;
+    cursor: pointer;
+}
+.vehicle-media-color-pull:hover:not(:disabled) { background-color: rgba(8, 12, 18, 0.9); }
+.vehicle-media-color-pull:disabled { cursor: progress; }
+
 /* Top-right of the band, on a dark plate so it stays readable over any photo. */
 .vehicle-media-badge {
     /* inline-flex so the same badge works as a full-width control in a button

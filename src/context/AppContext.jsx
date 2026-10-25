@@ -39,7 +39,7 @@ export function AppProvider({ children }) {
     const [userRole, setUserRole] = useState(null); // 'admin'|'contributor'|'user'|null
     const [loading, setLoading] = useState(true);
     const [headerImageUrl, setHeaderImageUrl] = useState('');
-    const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success' }
+    const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success', action?: { label, onClick } }
     const [specCustomFieldSuggestions, setSpecCustomFieldSuggestions] = useState({}); // { [category]: Set<normalizedKey> }
     const [specVouches, setSpecVouches] = useState({});   // { [vehicleId]: { count, myVouch } }
     const [runVotes, setRunVotes] = useState({});          // { [runId]: { vouch, flag, myVote } }
@@ -61,6 +61,8 @@ export function AppProvider({ children }) {
 
     const showError   = (message) => setAppNotification({ message, type: 'error' });
     const showSuccess = (message) => setAppNotification({ message, type: 'success' });
+    // A success with one thing to take back: the banner draws `action` as a button.
+    const showUndoable = (message, label, onClick) => setAppNotification({ message, type: 'success', action: { label, onClick } });
     const clearNotification = () => setAppNotification(null);
 
     // ── Access logging helpers ────────────────────────────────────────────────
@@ -2131,8 +2133,8 @@ export function AppProvider({ children }) {
             runs: isContributor ? v.runs : (v.runs || []).filter(isListed),
             pooledRuns: poolOf(v.runs, sessionOf),
         }));
-        return withVehicleFigures(withPlatforms(withInheritance(shown), platformsById));
-    }, [vehicles, isContributor, platformsById, testSessions]);
+        return withVehicleFigures(withPlatforms(withInheritance(shown, manufacturers), platformsById));
+    }, [vehicles, isContributor, platformsById, testSessions, manufacturers]);
     const visibleVehicles = useMemo(
         () => fleet.filter(v => listedFor(v, { isContributor, userId: user?.id })),
         [fleet, isContributor, user?.id],
@@ -2155,6 +2157,7 @@ export function AppProvider({ children }) {
         headerImageUrl,
         appNotification,
         clearNotification,
+        showUndoable,
         uploadHeaderImage,
         publishModelConstant,
         clearPublishedConstants,

@@ -7,7 +7,10 @@
  * same car with a stated difference, so the things a reader RECOGNISES it by
  * come down the same chain:
  *
- *   color   the nearest vehicle in the chain with one set, else the palette
+ *   color   the nearest vehicle in the chain with one set, else the brand's
+ *           default color (`manufacturers.color`, set in Admin), else the
+ *           palette. The brand color is the weakest layer: any color a vehicle
+ *           or its source carries, hand-set or pulled from the photo, wins
  *   photo   the nearest vehicle IN THE SAME MODEL LINE with a photo (same
  *           make and model, trim ignored: `sameModelLine`); image_url,
  *           image_thumb_url and image_focal_y travel together, so a
@@ -57,6 +60,11 @@ const PHOTO_KEYS = ['image_url', 'image_thumb_url', 'image_focal_y'];
 const PLATFORM_KEYS = ['mechanical_platform_id', 'electrical_platform_id'];
 
 const hasColor = (v) => v?.color != null && v.color !== '';
+
+/* Where a brand's color comes from, in the shape `inheritedFrom.color` has for
+   a vehicle: `brand` is what tells the card "Brand color" from "Inherited
+   from <vehicle>", and the absence of an `id` that any lineage link could use. */
+const brandRef = (m) => ({ id: null, name: m.name, brand: true });
 const hasPhoto = (v) => Boolean(v?.image_url || v?.image_thumb_url);
 
 /* A name as a list of comparable tokens: case, punctuation and anything in
@@ -250,12 +258,18 @@ export function ownValues(vehicle) {
  *   own            { color, image_url, image_thumb_url, image_focal_y,
  *                    mechanical_platform_id, electrical_platform_id, tags } as stored
  *   inheritedFrom  { color, photo, mechanical_platform_id, electrical_platform_id,
- *                  tags } — a { id, name } source for each, or null when the
+ *                  tags } — a { id, name } source for each (a brand's color is
+ *                  { id: null, name, brand: true }), or null when the
  *                  vehicle's own value (or none) is shown; tags is
  *                  { [tagId]: { id, name } } for inherited tags
  */
-export function withInheritance(vehicles = []) {
+export function withInheritance(vehicles = [], manufacturers = []) {
     const byId = new Map(vehicles.map(v => [v.id, v]));
+    const brandById = new Map(manufacturers.filter(m => m?.color).map(m => [m.id, m]));
+    // The brand's default, for a vehicle whose own and inherited colors are
+    // both absent. Read from the registry, not `vehicle.manufacturer`, which is
+    // a snapshot taken when the fleet loaded.
+    const brandFor = (vehicle) => brandById.get(vehicle.manufacturer_id ?? vehicle.manufacturer?.id);
     return vehicles.map(vehicle => {
         const own = {
             color: vehicle.color ?? null,
@@ -268,8 +282,11 @@ export function withInheritance(vehicles = []) {
         };
         const none = { color: null, photo: null, mechanical_platform_id: null, electrical_platform_id: null, tags: {} };
         const chain = inheritanceChain(vehicle, byId);
+        const brand = hasColor(vehicle) ? null : brandFor(vehicle);
         if (chain.length === 0) {
-            return { ...vehicle, own, inheritedFrom: none };
+            return brand
+                ? { ...vehicle, color: brand.color, own, inheritedFrom: { ...none, color: brandRef(brand) } }
+                : { ...vehicle, own, inheritedFrom: none };
         }
 
         const resolved = {};
@@ -280,6 +297,9 @@ export function withInheritance(vehicles = []) {
             if (source) {
                 resolved.color = source.color;
                 inheritedFrom.color = sourceRef(source);
+            } else if (brand) {
+                resolved.color = brand.color;
+                inheritedFrom.color = brandRef(brand);
             }
         }
 
