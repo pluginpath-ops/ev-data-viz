@@ -4174,6 +4174,40 @@ class DataService {
     }
   }
 
+  /**
+   * Read the site events since a moment, newest first, for Admin → Site Events
+   * (#477). Direct reads of the table are revoked for everyone but the admin
+   * read policy (migration 090), which RLS applies without raising: a
+   * non-admin gets no rows, not an error, and the view is admin-only anyway.
+   *
+   * Bounded: at most `cap` rows. Past it the OLDEST are left out and
+   * `truncated` is true, so the caller can say the window is shorter than asked.
+   * Paged by id (unique, and in time order) as fetchAllRows says it must be.
+   *
+   * @param {{ since?: string|null, cap: number }} opts  `since` an ISO timestamp, or null for all
+   * @returns {Promise<{ rows: object[], truncated: boolean, missing: boolean }>}
+   *          `missing`: migration 090 is not applied here yet
+   */
+  async getSiteEvents({ since = null, cap }) {
+    if (!this.useSupabase) return { rows: [], truncated: false, missing: false };
+    const rows = [];
+    for (let from = 0; rows.length < cap; from += PAGE_SIZE) {
+      let query = getSupabase()
+        .from('site_events')
+        .select('id, created_at, event, browser_token, slug, detail')
+        .order('id', { ascending: false });
+      if (since) query = query.gte('created_at', since);
+      const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
+      if (error) {
+        if (isMissingRelation(error)) return { rows: [], truncated: false, missing: true };
+        throw error;
+      }
+      rows.push(...(data || []));
+      if (!data || data.length < PAGE_SIZE) return { rows, truncated: false, missing: false };
+    }
+    return { rows: rows.slice(0, cap), truncated: true, missing: false };
+  }
+
   // ── Access logging ──────────────────────────────────────────────────────────
 
   /**

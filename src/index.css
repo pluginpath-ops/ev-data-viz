@@ -9222,3 +9222,61 @@ a.is-test-link:focus-visible {
 @media (prefers-reduced-motion: reduce) {
     .scroll-more { animation: none; }
 }
+
+
+/* ── Admin → Site Events (#477) ──────────────────────────────────────────────
+   Counts of what readers open, in tables. The type is the table's own: a name
+   in body size with its slug under it in `.text-caption`, figures in the data
+   face. A row with too few observations is muted, not removed — a comparison
+   nobody opened reads as an answer; one that vanished reads as a bug. */
+.events-view {
+    @apply flex flex-col gap-4;
+}
+.events-caveats {
+    @apply mt-1 pl-4;
+    list-style: disc;
+}
+.events-section-head {
+    @apply flex items-center justify-between gap-3 mb-1;
+}
+.events-table {
+    @apply w-full;
+    border-collapse: collapse;
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+}
+.events-table th {
+    @apply px-3 py-2 text-left align-bottom whitespace-nowrap;
+    position: sticky;
+    top: 0;
+    background-color: var(--color-surface-muted);
+    border-bottom: 1px solid var(--color-border);
+    font-weight: 700;
+    color: var(--color-text-header-label);
+}
+.events-table td {
+    @apply px-3 py-2 align-top;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+.events-table .numeric {
+    @apply text-right;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+.events-table tr.is-sparse td { opacity: 0.6; }
+.events-name {
+    font-size: var(--fs-body);
+    font-weight: 600;
+}
+.events-charts li.is-unopened { color: var(--color-text-faint); }
+.events-bar-column { width: 40%; }
+.events-bar-track {
+    height: 0.75rem;
+    border-radius: var(--radius-track);
+    background-color: var(--color-surface-sunken);
+    overflow: hidden;
+}
+.events-bar {
+    height: 100%;
+    background-color: var(--color-primary);
+}
