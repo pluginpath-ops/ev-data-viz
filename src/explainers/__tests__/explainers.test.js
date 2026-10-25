@@ -121,9 +121,15 @@ describe('peakOnCharger', () => {
 describe('topics', () => {
     it('reads every content file, and each has a title', () => {
         expect(TOPICS.map(t => t.slug).sort()).toEqual(['400v-charger-compatibility', '400v-vs-800v',
-            'epa-battery-figures', 'epa-drive-cycles', 'epa-test-procedures', 'epa-vs-real-world', 'reading-modeled-efficiency',
-            'wind-and-range-tests']);
+            'epa-battery-figures', 'epa-drive-cycles', 'epa-test-procedures', 'epa-vs-real-world', 'heating-cooling-and-range',
+            'reading-modeled-efficiency', 'wind-and-range-tests']);
         for (const t of TOPICS) expect(t.title).not.toBe(t.slug);
+    });
+
+    it('keeps the heating and cooling page a draft while it cites the unsourced reference table (#449)', () => {
+        const page = TOPICS.find(t => t.slug === 'heating-cooling-and-range');
+        expect(page.unverified).toEqual(['evbench-accessory-reference-table']);
+        expect(page.isDraft).toBe(true);
     });
 
     it('lets only a draft cite an unverified fact', () => {

@@ -1886,6 +1886,235 @@
         }
       ],
       "status": "verified"
+    },
+    {
+      "id": "physics-accessory-energy-per-mile",
+      "claim": "A steady draw in watts costs watt-hours per mile in proportion to the time a mile takes, so it is the watts divided by the speed: 2,000 W is about 29 Wh/mi at 70 mph and 40 Wh/mi at 50 mph.",
+      "value": {
+        "watts": 2000,
+        "wh_per_mi_at_70": 28.57,
+        "wh_per_mi_at_50": 40
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Arithmetic: W ÷ mph = Wh/mi",
+          "url": null,
+          "accessed": "2026-10-25"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "evbench-assumed-test-accessory-load",
+      "claim": "No EVBench test records its heating, cooling or other non-traction draw, so a range test is assumed to have run at a base accessory load of 300 W (DEFAULT_ACCESSORY_W), plus a heater or A/C once the outside temperature leaves about 60–70 °F.",
+      "value": {
+        "base_w": 300,
+        "comfort_band_f": [
+          60,
+          70
+        ]
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench constants DEFAULT_ACCESSORY_W and ACCESSORY_COMFORT_BAND_F in src/constants/epa.js; owner's decision, 2026-10-21 and 2026-10-25 (issue #449)",
+          "url": null,
+          "accessed": "2026-10-25"
+        }
+      ],
+      "status": "verified",
+      "note": "An EVBench modelling assumption, not a measurement of any car. The base load is an Admin setting; the published value on the site may differ from the compiled 300 W."
+    },
+    {
+      "id": "evbench-accessory-load-curve",
+      "claim": "The assumed load rises in a straight line: 50 W for each °F below 60 °F and 70 W for each °F above 70 °F, the same for every car. That is 2,300 W at 20 °F, 3,300 W at 0 °F, 1,000 W at 80 °F and 2,400 W at 100 °F.",
+      "value": {
+        "heat_w_per_f": 50,
+        "cool_w_per_f": 70,
+        "w_at_20f": 2300,
+        "w_at_0f": 3300,
+        "w_at_80f": 1000,
+        "w_at_100f": 2400
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench constants ACCESSORY_HEAT_W_PER_F and ACCESSORY_COOL_W_PER_F in src/constants/epa.js; owner's starting point, 2026-10-25, to be tuned (issue #475); figures by arithmetic",
+          "url": null,
+          "accessed": "2026-10-25"
+        }
+      ],
+      "status": "verified",
+      "note": "A starting point, not a fit. The owner's view is that the truth probably depends heavily on a car's size and shape."
+    },
+    {
+      "id": "evbench-test-cabin-setpoint",
+      "claim": "Most range tests are run with the cabin held at about 68–72 °F, which a car does on its own at about 65 °F outside.",
+      "value": {
+        "cabin_f": [
+          68,
+          72
+        ],
+        "outside_f": 65
+      },
+      "sources": [],
+      "status": "observed",
+      "rationale": "The owner's experience of range tests and testers' own reports (2026-10-21). No published record. An EVBench range test that logged cabin temperature against outside temperature would make it a rank-B figure."
+    },
+    {
+      "id": "evbench-accessory-worked-cold",
+      "claim": "A 20 °F test at 70 mph using 350 Wh/mi, corrected to 70 °F, gains about 16.7% in range once its assumed 2,300 W heater is taken out; air density alone would give about 7.3%.",
+      "value": {
+        "with_accessory": 0.167,
+        "air_density_only": 0.073,
+        "wh_per_mi": 350,
+        "mph": 70,
+        "temp_f": 20
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench correction model (src/utils/conditionCorrection.js, accessoryLoad.js) at the 0.70 aero fraction; arithmetic",
+          "url": null,
+          "accessed": "2026-10-25"
+        }
+      ],
+      "status": "verified",
+      "note": "The output of EVBench's model for a made-up test, not a measurement."
+    },
+    {
+      "id": "evbench-accessory-worked-hot",
+      "claim": "A 95 °F test at 70 mph using 300 Wh/mi, corrected to 70 °F, gains about 5.7% once its assumed A/C is taken out, where air density alone would take about 3.1% off.",
+      "value": {
+        "with_accessory": 0.057,
+        "air_density_only": -0.031,
+        "wh_per_mi": 300,
+        "mph": 70,
+        "temp_f": 95
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench correction model at the 0.70 aero fraction; arithmetic",
+          "url": null,
+          "accessed": "2026-10-25"
+        }
+      ],
+      "status": "verified",
+      "note": "The output of EVBench's model for a made-up test, not a measurement."
+    },
+    {
+      "id": "evbench-accessory-small-at-70",
+      "claim": "Because the base load costs more per mile at lower speed, correcting a mild-weather test to a different speed moves the result by a fraction of a percent more than air and rolling resistance alone would: about 0.2% for a 65 or 75 mph test brought to 70 mph, about 0.5% for an 80 mph test.",
+      "value": {
+        "at_65": 0.002,
+        "at_75": -0.002,
+        "at_80": -0.005
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench correction model; arithmetic",
+          "url": null,
+          "accessed": "2026-10-25"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "epa-hvac-in-five-cycle-tests",
+      "claim": "In EPA's five fuel economy tests the city, highway and high-speed tests run with no heating, ventilation or air conditioning; the hot test at 95 °F has the HVAC set to cool the cabin; the cold test at 20 °F has it set to specific settings for heat and defrost.",
+      "value": {
+        "hot_f": 95,
+        "cold_f": 20
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA, \"Fuel Economy and EV Range Testing\" (page dated July 1, 2026)",
+          "url": "https://www.epa.gov/greenvehicles/fuel-economy-and-ev-range-testing",
+          "accessed": "2026-10-25"
+        }
+      ],
+      "status": "verified",
+      "note": "The page does not give the cold test's heater and defrost settings. They were not found in the sources reached for this page."
+    },
+    {
+      "id": "epa-sc03-conditions",
+      "claim": "The SC03 air-conditioning test is run at a nominal 95 °F, about 40% relative humidity and a solar heat load of 850 W/m², with the air conditioner at maximum, on recirculate, the fan on its highest setting and the temperature at full cool (72 °F for automatic systems).",
+      "value": {
+        "ambient_f": 95,
+        "humidity_grains_per_lb": 100,
+        "solar_w_m2": 850,
+        "auto_setpoint_f": 72
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "40 CFR 86.160-00, \"Exhaust emission test procedure for SC03 emissions\" (paragraphs (a) and (c))",
+          "url": "https://www.law.cornell.edu/cfr/text/40/86.160-00",
+          "accessed": "2026-10-25"
+        }
+      ],
+      "status": "verified",
+      "note": "The regulation is written for exhaust emissions testing. It is the public statement of the SC03 conditions; how EPA's EV procedure applies them to an EV is not stated there."
+    },
+    {
+      "id": "aaa-ev-range-hvac",
+      "claim": "AAA's 2019 chassis-dynamometer tests of five electric cars found that at 20 °F with the climate system in use the average driving range fell by 41% compared with 75 °F, and at 95 °F with air conditioning in use it fell by 17%.",
+      "value": {
+        "cold_f": 20,
+        "cold_loss": 0.41,
+        "hot_f": 95,
+        "hot_loss": 0.17,
+        "cars": 5
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "AAA Newsroom, \"Cold weather reduces electric vehicle range\" (February 2019), tests with the Automotive Research Center, Los Angeles",
+          "url": "https://newsroom.aaa.com/2019/02/cold-weather-reduces-electric-vehicle-range/",
+          "accessed": "2026-10-25"
+        }
+      ],
+      "status": "verified",
+      "note": "Five cars, one per maker, each rated at least 100 miles. Tesla disputed the results, citing its own fleet data. The press release does not state the cabin temperature set."
+    },
+    {
+      "id": "physics-heat-pump-vs-resistive",
+      "claim": "A heat pump moves two to three units of heat for each unit of electricity it uses where a resistive heater makes one, so for the same heat it draws roughly a half to a third as much; in deep cold the advantage shrinks toward nothing.",
+      "value": {
+        "cop_range": [
+          2,
+          3
+        ],
+        "resistive_cop": 1
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "General engineering: a resistive element turns all of its electricity into heat (a coefficient of performance of 1) and a heat pump's coefficient exceeds 1 and falls with outdoor temperature. Context only; the 2–3 range is a round figure, not any one car's."
+    },
+    {
+      "id": "evbench-accessory-reference-table",
+      "claim": "The accessory-load reference table in EVBench lists heat-pump, resistive-heater, air-conditioning, battery-conditioning and lighting draws in watts at seven outside temperatures from 0 °F to 105 °F, for example 2,500–4,000 W for a heat pump at 0 °F and 1,000–1,500 W of A/C at 80 °F.",
+      "value": {
+        "ac_80f_w": [
+          1000,
+          1500
+        ],
+        "heat_pump_0f_w": [
+          2500,
+          4000
+        ],
+        "resistive_0f_w": [
+          4000,
+          6000
+        ]
+      },
+      "sources": [],
+      "status": "unverified",
+      "note": "A curator's reference table (src/components/AccessoryLoadReference.jsx) with no source recorded. No laboratory measurement of heater or A/C power by outside temperature was found when this was checked on 2026-10-25; the nearest published material was a simulation study (SAE 2021-01-0207) finding a heat-pump car 20–40% more energy efficient than a resistive one in the cold, and consumer-press tables without sources. A page that cites this stays a draft."
     }
   ]
 }
