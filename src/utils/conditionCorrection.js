@@ -38,15 +38,33 @@
  * than correcting none. `correctionModel` leaves room for the EPA path to be
  * offered later as a marked refinement.
  *
+ * ── Heating and cooling (#449) ───────────────────────────────────────────────
+ *
+ * Cold air is denser and costs more aero drag — about 6% of consumption at
+ * 20°F versus 70°F — but a winter range test typically loses 20–40%, and most
+ * of the rest is the heater. So every corrected mode also swaps the test's
+ * ASSUMED accessory load (accessoryLoad.js: a base draw, plus a heater or A/C
+ * outside a comfort band around 65°F) for the target's, converted to range
+ * through the test's own consumption and its speed, because a heater costs
+ * watts per hour, not watts per mile. A 20°F test corrected to 70°F gains
+ * about 17% rather than the 7% of density alone.
+ *
+ * Built in two steps: the aero model above re-prices the traction share (its
+ * ratio is the `tractionScale` accessoryFactor takes), and the accessory load
+ * is swapped around it. The result is still the one factor both quantities
+ * share.
+ *
  * ── What this does NOT do ────────────────────────────────────────────────────
  *
- * Temperature is corrected for AIR DENSITY ONLY. Cold air is denser and so
- * costs more aero drag — about 6% of consumption at 20°F versus 70°F. But a
- * winter range test typically loses 20–40%, and the rest is cabin heating,
- * battery conditioning, tyre pressure and regen limits, none of which is
- * modelled here. Hence the mode names say "aero": calling a winter test
- * "corrected to 70°F" when a fifth of the penalty has been removed would be an
- * authoritative-looking number that is still mostly wrong.
+ * No test records its heating or cooling, so BOTH loads are assumed, from the
+ * temperature alone, as one line for every car. A heat pump draws about half a
+ * resistive heater; the line is one answer for both. It is steady state: the
+ * pull-down of a hot-soaked cabin is not in it, and neither are the battery
+ * conditioning (folded into the line, not modelled apart), cold tyres, the
+ * regen a cold pack refuses, or the extra cell resistance. Time spent stopped
+ * is not counted, and the ramps are straight lines. Below freezing the error
+ * in the assumed load is comparable to the effect, so a figure corrected from
+ * or to 0–30°F is a rough one.
  *
  * Pure module — no React, no database.
  */
@@ -55,19 +73,22 @@ import {
     AERO_FRACTION, REFERENCE_SPEED_MPH, STANDARD_CONDITIONS, ASSUMED_TEST_CONDITIONS,
 } from '../constants/epa';
 import { airDensityRatio, temperatureDensityRatio, apparentAirspeed } from './epaDerivations';
+import { assumedAccessoryW, effectiveAccessoryW, accessoryFactor } from './accessoryLoad';
 
 /**
  * Correction modes, in the order they appear in the picker. Each names what it
  * actually corrects, so a reader cannot infer a completeness the model lacks.
+ *
+ * The keys are in shared links (`corr=aero`), so they outlive the labels:
+ * 'aero' still reads as the aero model even now that every corrected mode also
+ * swaps the assumed accessory load. "Temp" in a label covers both of
+ * temperature's effects, air density and heating or cooling (#449); there is
+ * deliberately no mode that corrects one without the other.
  */
 export const CORRECTION_MODES = [
-    { key: 'none',      label: 'No correction',                       axes: [] },
-    { key: 'aero',      label: 'Speed, altitude & temp (aero)',       axes: ['speed', 'altitude', 'temperature'] },
-    { key: 'aero_wind', label: 'Speed, altitude, temp & wind (aero)', axes: ['speed', 'altitude', 'temperature', 'wind'] },
-    // Reserved for the phases agreed in #188. Listing them here rather than in
-    // the UI keeps the vocabulary in one place as they arrive.
-    // { key: 'aero_hvac',      label: '+ HVAC',            axes: [...,'hvac'] },
-    // { key: 'aero_wind_hvac', label: '+ wind and HVAC',   axes: [...] },
+    { key: 'none',      label: 'No correction',                 axes: [] },
+    { key: 'aero',      label: 'Speed, altitude & temp',        axes: ['speed', 'altitude', 'temperature', 'accessory'] },
+    { key: 'aero_wind', label: 'Speed, altitude, temp & wind',  axes: ['speed', 'altitude', 'temperature', 'wind', 'accessory'] },
 ];
 
 export const DEFAULT_CORRECTION_MODE = 'none';
@@ -94,7 +115,20 @@ export function runConditions(run, session = null) {
         temperatureF: run?.temperature_f ?? session?.temperature_f,
         windMph:      run?.avg_wind_speed_mph,
         windDirDeg:   run?.wind_direction_deg,
+        whPerMile:    consumptionWhPerMile(run),
     };
+}
+
+/**
+ * The test's own consumption, in Wh/mi, or null when it recorded no energy (or
+ * no distance). A heater's watts become range through this figure, so the test
+ * that measured its consumption is corrected from it and one that did not is
+ * corrected from ASSUMED_TEST_CONSUMPTION_WH_MI, and says so.
+ */
+function consumptionWhPerMile(run) {
+    const kwh = Number(run?.energy_kwh);
+    const miles = Number(run?.distance_miles);
+    return kwh > 0 && miles > 0 ? (kwh * 1000) / miles : null;
 }
 
 /**
@@ -147,17 +181,22 @@ function airSpeedSquared(speedMph, windMph, windDirDeg = null) {
  * > 1 means the test was made HARDER than standard and the car is better than
  * it measured; < 1 means the conditions flattered it.
  *
- * @param {Object} conditions  { speedMph, speedBasis, altitudeFt, temperatureF, windMph, windDirDeg } as tested;
- *                              the wind is read only by a mode with the 'wind' axis
+ * @param {Object} conditions  { speedMph, speedBasis, altitudeFt, temperatureF, windMph, windDirDeg, whPerMile } as tested;
+ *                              the wind is read only by a mode with the 'wind' axis, the consumption
+ *                              only by one with 'accessory' (a blank takes ASSUMED_TEST_CONSUMPTION_WH_MI)
  * @param {Object} [opts]
  * @param {string} [opts.mode]         a CORRECTION_MODES key
- * @param {Object} [opts.target]       standard conditions to correct TO
+ * @param {Object} [opts.target]       conditions to correct TO: { speedMph, altitudeFt, temperatureF }
+ *                                     and optionally `accessoryW` (null = the temperature's own, "auto")
  * @param {number} [opts.aeroFraction] override, e.g. towing
  * @param {Object} [opts.assumed]      what a blank axis is taken as (ASSUMED_TEST_CONDITIONS)
  * @returns {{ factor: number, applied: string[], missing: string[], skipped: Array,
- *             assumed: Array<{ axis: string, value: number }> }}
+ *             assumed: Array<{ axis: string, value: number }>,
+ *             assumedConsumptionWhMi: number|null }}
  *   `missing` lists every blank axis; `assumed` the ones corrected from an
- *   assumed value (wind is never assumed: a blank wind is calm air)
+ *   assumed value (wind is never assumed: a blank wind is calm air);
+ *   `assumedConsumptionWhMi` is the consumption taken for a test that recorded
+ *   no energy, null when it measured one
  */
 export function correctionFactor(conditions, {
     mode = DEFAULT_CORRECTION_MODE,
@@ -166,7 +205,7 @@ export function correctionFactor(conditions, {
     assumed: assumedConditions = ASSUMED_TEST_CONDITIONS,
 } = {}) {
     const axes = modeAxes(mode);
-    if (!axes.length) return { factor: 1, applied: [], missing: [], skipped: [], assumed: [] };
+    if (!axes.length) return { factor: 1, applied: [], missing: [], skipped: [], assumed: [], assumedConsumptionWhMi: null };
 
     const applied = [];
     const missing = [];
@@ -230,11 +269,36 @@ export function correctionFactor(conditions, {
     const airSq    = useWind ? airSpeedSquared(runSpeed, Number(conditions.windMph), conditions.windDirDeg) : null;
     const atRun    = loadTerm(runSpeed,        runDensity,    aeroFraction, airSq);
     const atTarget = loadTerm(target.speedMph, targetDensity, aeroFraction);
-    if (!atRun || atRun <= 0) return { factor: 1, applied: [], missing, skipped, assumed: [] };
+    if (!atRun || atRun <= 0) return { factor: 1, applied: [], missing, skipped, assumed: [], assumedConsumptionWhMi: null };
 
     // Consumption ratio inverted: a harder test (higher load) means the car
     // deserves a BETTER corrected efficiency than it measured.
-    return { factor: atRun / atTarget, applied, missing, skipped, assumed };
+    let factor = atRun / atTarget;
+    let assumedConsumptionWhMi = null;
+
+    // The heater or A/C the test is assumed to have run, swapped for the
+    // target's. It is priced at the test's own average moving speed, so a mixed
+    // cycle — whose speed the aero axis cannot use — still has one to give.
+    if (axes.includes('accessory')) {
+        const heldSpeed = Number(conditions?.speedMph);
+        const accessory = accessoryFactor({
+            consumptionWhMi: conditions?.whPerMile,
+            runW:            assumedAccessoryW(runTemp),
+            runSpeedMph:     heldSpeed > 0 ? heldSpeed : runSpeed,
+            targetW:         effectiveAccessoryW(target),
+            targetSpeedMph:  target.speedMph,
+            tractionScale:   atTarget / atRun,
+        });
+        if (accessory.factor == null) {
+            skipped.push({ axis: 'accessory', reason: accessory.skipped });
+        } else {
+            factor = accessory.factor;
+            assumedConsumptionWhMi = accessory.assumedConsumptionWhMi;
+            applied.push('accessory');
+        }
+    }
+
+    return { factor, applied, missing, skipped, assumed, assumedConsumptionWhMi };
 }
 
 /**
@@ -245,6 +309,9 @@ export function correctionFactor(conditions, {
  */
 export const speedCorrected = (result) =>
     !!(result?.applied?.includes('speed') || result?.assumed?.some(a => a.axis === 'speed'));
+
+// An axis as a reader is told of it: the accessory term is "accessory load".
+const axisName = (axis) => (axis === 'accessory' ? 'accessory load' : axis);
 
 const ASSUMED_TEXT = {
     speed:       v => `${v} mph`,
@@ -270,18 +337,21 @@ export function applyCorrection({ miPerKwh, miPerSoc }, factor) {
  * A short human note for a corrected series — what moved it, and by how much.
  * Charts show this so a corrected number never passes for a measured one.
  */
-export function correctionNote({ factor, applied, missing, skipped, assumed = [] }) {
+export function correctionNote({ factor, applied, missing, skipped, assumed = [], assumedConsumptionWhMi = null }) {
     // A skipped axis is worth saying even when nothing was corrected: "not
     // corrected because we cannot" is a different claim from "not corrected".
     if (!applied?.length && !skipped?.length && !assumed?.length) return null;
 
     const parts = [];
-    const moved = [...(applied ?? []), ...assumed.map(a => a.axis)];
+    const moved = [...(applied ?? []), ...assumed.map(a => a.axis)].map(axisName);
     if (moved.length) {
         const pct = (factor - 1) * 100;
         parts.push(`corrected ${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% for ${moved.join(', ')}`);
     }
-    for (const s of skipped ?? []) parts.push(`${s.axis} not corrected (${s.reason})`);
+    for (const s of skipped ?? []) parts.push(`${axisName(s.axis)} not corrected (${s.reason})`);
+    // The heater's watts became range through a consumption the test did not
+    // record, so the figure leans on a stand-in, and says so.
+    if (assumedConsumptionWhMi != null) parts.push(`consumption not recorded, taken as ${assumedConsumptionWhMi} Wh/mi`);
     // An assumed value is said every time it is used: it is a stand-in, and the
     // figure leans on it.
     for (const a of assumed) parts.push(`${a.axis} not recorded, taken as ${ASSUMED_TEXT[a.axis](a.value)}`);

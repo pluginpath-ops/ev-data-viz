@@ -151,8 +151,9 @@ export const CHART_HELP_DEFAULTS = {
             'speed, and to compare cars on the same physical basis regardless of ' +
             'marketing claims. The shaded band marks typical 65–75 mph highway speeds. ' +
             'Switch the Y axis between energy use (kWh/100mi, Wh/mi), efficiency (mi/kWh, ' +
-            'MPGe) and estimated Range. Set viewing conditions — altitude, temperature, ' +
-            'accessory load, wind and grade — to see how they move the curve; a ▲ on a ' +
+            'MPGe) and estimated Range. Set the conditions — altitude, temperature ' +
+            'and accessory load (the same sliders as the other charts, which always apply ' +
+            'here) and wind and elevation change — to see how they move the curve; a ▲ on a ' +
             'label means a condition is applied. Turn on the real-world overlay to plot ' +
             'the vehicle’s own range tests as points, raw or corrected to the same ' +
             'conditions. With no conditions set it assumes flat ground, no wind, steady ' +

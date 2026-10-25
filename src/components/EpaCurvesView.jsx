@@ -13,7 +13,7 @@ import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, resolveCurveEta, resolvePrimaryCoeffs, correctMeasuredConsumption, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, resolveCurveEta, resolvePrimaryCoeffs, correctMeasuredConsumption, curveAccessoryW } from '../utils/epaDerivations';
 import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
@@ -28,14 +28,17 @@ import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
 import CollapsibleSection from './CollapsibleSection';
-import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE } from '../constants/epa';
+import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE, STANDARD_CONDITIONS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromTestVehicle, NO_RECORD_REASONS } from '../utils/epaRecordFromTestVehicle';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useRunSelection } from '../hooks/useRunSelection';
-import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
+import WindAndElevationFields from './epa/WindAndElevationFields';
+import CorrectionTargetFields from './CorrectionTargetFields';
+import { normalizeCorrectionTarget, accessoryText } from '../utils/correctionSettings';
+import { useViewingConditions } from '../hooks/useViewingConditions';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import { useAxisLimits } from '../hooks/useAxisLimits';
@@ -231,8 +234,12 @@ function mappingColor(baseColor, mappingIdx) {
  * Props:
  *   vehicles           {Array}    — full vehicles array from context (with epa_mappings)
  *   selectedVehicleIds {Array}    — currently selected vehicle IDs
- *   epaConfig          {object}   — { yAxis, selectedMappings, mappingColors, overlay }
+ *   epaConfig          {object}   — { yAxis, selectedMappings, mappingColors, overlay, extras }
  *   setEpaConfig       {function}
+ *   correctionTarget   {object}   — the site-wide correction target (altitude, temperature and
+ *                                   accessory load; speed is the x axis). Modeled Efficiency does
+ *                                   not follow the "Correct:" mode: it is a model, with no measured
+ *                                   figure to leave uncorrected, so the target always applies (#449)
  *   presentationMode   {boolean}  — strips controls for popout window
  */
 export default function EpaCurvesView({
@@ -243,6 +250,7 @@ export default function EpaCurvesView({
     presentationMode = false,
     palette = VEHICLE_PALETTE,
     setChartConfig = null,
+    correctionTarget = undefined,
 }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
@@ -252,19 +260,29 @@ export default function EpaCurvesView({
 
     // ── UI state ──────────────────────────────────────────────────────────────
     const [urlCopied,        setUrlCopied]        = useState(false);
-    // Altitude, temperature, and accessory load are viewing conditions (like the
-    // unit toggle): they scale the plotted curve at plot time for ALL curves.
-    // Never persisted; never affect stored coefficients, accessory fields, or
-    // the standard-condition η.
-    // Viewing conditions — altitude, temperature, accessory load, wind, grade.
-    // Shared with the certification-anchored curves (#237) rather than kept
-    // here, so the two cannot compute air density differently.
-    const conditions = useViewingConditions();
+    // The curve is drawn under the SHARED correction target — altitude,
+    // temperature and accessory load, the same sliders every chart and the
+    // vehicle table read — and under two extras of its own, wind and elevation
+    // gain/loss, held in the hook and mirrored to epaConfig so a pop-out is
+    // driven by them (it has no controls, and used to draw standard conditions
+    // whatever the main window showed). Display-time only: none of it touches
+    // stored coefficients, accessory fields, or the standard-condition η.
+    // Shared with the certification-anchored curves (#237), so the two cannot
+    // compute air density slightly differently.
+    const conditions = useViewingConditions({
+        driven: presentationMode ? (epaConfig.extras ?? null) : null,
+        target: correctionTarget,
+    });
     const {
-        densityRatio, densityAdjusted, accessoryAdjusted, accessoryOverrideWNum,
+        densityRatio, densityAdjusted, accessoryAdjusted, accessoryDeltaW,
         windAdjusted, windSpeedMphNum, windDirectionDegNum,
         gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted,
     } = conditions.derived;
+    const extrasKey = JSON.stringify(conditions.values);
+    useEffect(() => {
+        if (presentationMode) return;
+        setEpaConfig?.(prev => (JSON.stringify(prev.extras) === extrasKey ? prev : { ...prev, extras: JSON.parse(extrasKey) }));
+    }, [extrasKey, presentationMode, setEpaConfig]);
 
     // Overlay real-world range-test points on top of the curve. null = off.
     // 'corrected' scales each point (temp, wind, and elevation gain/loss) to
@@ -486,7 +504,7 @@ export default function EpaCurvesView({
 
                 const useableKwh       = resolveUseableKwh(epaTestVehicle, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaTestVehicle, effectiveVehicle);
-                const curve            = buildEpaCurveFromModel(epaTestVehicle, useableKwh, densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum);
+                const curve            = buildEpaCurveFromModel(epaTestVehicle, useableKwh, densityRatio, curveAccessoryW(epaTestVehicle, accessoryDeltaW), windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
@@ -529,7 +547,7 @@ export default function EpaCurvesView({
                 if (overlayMode) {
                     const viewConditions = {
                         densityRatio,
-                        accessoryOverrideW:     accessoryOverrideWNum,
+                        accessoryDeltaW,
                         windSpeedMph:           windSpeedMphNum,
                         windDirectionDeg:       windDirectionDegNum,
                         elevationGainFt:        gradeGainFtNum,
@@ -587,7 +605,7 @@ export default function EpaCurvesView({
             });
         });
         return { datasets: result, missingWeightWarnings };
-    }, [vehiclesWithEpa, vehicles, yAxis, units, shown, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode, nameOf]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, shown, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryDeltaW, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode, nameOf]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -700,16 +718,18 @@ export default function EpaCurvesView({
         // read as absent, not as zero, on a chart whose whole subject is the
         // conditions it was drawn under.
         const num = v => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
-        const t = num(c.tempF);
         const w = num(c.windSpeedMph);
-        const el = num(c.elevationFt);
-        if (t != null) parts.push(fmtTemp(t, units));
+        // The target's figures, named only where they differ from the standard
+        // conditions the curve is anchored to: a default chart says nothing.
+        const target = normalizeCorrectionTarget(correctionTarget);
+        if (target.temperatureF !== STANDARD_CONDITIONS.temperatureF) parts.push(fmtTemp(target.temperatureF, units));
         parts.push(w ? `${fmtSpeed(w, units)} wind` : 'still air');
-        if (el) parts.push(`${Math.round(el)} ft`);
+        if (target.altitudeFt !== STANDARD_CONDITIONS.altitudeFt) parts.push(`${Math.round(target.altitudeFt)} ft`);
+        if (target.accessoryW != null) parts.push(`${accessoryText(target.accessoryW)} accessories`);
         if (overlayMode) parts.push(`${overlayMode === 'corrected' ? 'corrected' : 'raw'} tests overlaid`);
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [conditions, overlayMode, units]);
+    }, [conditions, correctionTarget, overlayMode, units]);
 
     // The curves are EPA's tests; the overlay, when on, adds ours.
     const overlayRuns = useMemo(
@@ -838,9 +858,9 @@ export default function EpaCurvesView({
                             Overlay real-world tests
                             <InfoIcon
                                 title="Overlay real-world tests"
-                                text="Plot this vehicle's own range-test points over its curve — corrected to the viewing conditions above, or exactly as recorded."
+                                text="Plot this vehicle's own range-test points over its curve — corrected to the conditions above, or exactly as recorded."
                             >
-                                    <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature, wind, and elevation gain/loss to match the curve's current viewing conditions above — an apples-to-apples comparison.</p>
+                                    <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature, accessory load, wind, and elevation gain/loss to match the conditions the curve is drawn under — an apples-to-apples comparison.</p>
                                     <p className="mt-1.5"><strong>Uncorrected:</strong> the raw measured value as recorded, unadjusted — not a valid comparison across different test conditions, but useful to see the true recorded data.</p>
                             </InfoIcon>
                         </span>
@@ -869,13 +889,25 @@ export default function EpaCurvesView({
                         </div>
                     </div>
 
-                    {/* The viewing-condition controls, shared with the
-                        certification-anchored curves (#237). The overlay above
-                        stays here: it plots a VEHICLE's own range runs, which
-                        that view has no way to reach. */}
+                    {/* The shared correction target, less its speed (speed is
+                        this chart's x axis), and Modeled Efficiency's own
+                        extras. No "Correct:" dropdown: the sliders always
+                        apply, because a modelled curve has no measured value
+                        to leave uncorrected. The overlay above stays here: it
+                        plots a VEHICLE's own range runs, which the
+                        certification view has no way to reach. */}
+                    {setChartConfig && (
+                        <div className="chart-rail-group">
+                            <CorrectionTargetFields
+                                fields={['temperatureF', 'altitudeFt', 'accessoryW']}
+                                target={correctionTarget}
+                                onChange={t => setChartConfig(prev => ({ ...prev, correctionTarget: t }))}
+                            />
+                        </div>
+                    )}
                     <div className="chart-rail-group">
-                        <span className="text-micro">Viewing conditions</span>
-                        <ViewingConditions conditions={conditions} />
+                        <span className="text-micro">Wind &amp; elevation change</span>
+                        <WindAndElevationFields conditions={conditions} />
                     </div>
 
 

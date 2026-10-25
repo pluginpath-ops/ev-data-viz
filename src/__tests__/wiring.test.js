@@ -54,10 +54,12 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
                      'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js',
-                     'epaCertifications.js', 'featuredComparisons.js'];
+                     'epaCertifications.js', 'featuredComparisons.js', 'accessoryLoad.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
+        'accessoryLoad.accessoryWhPerMile':
+            'Reached through accessoryFactor; exported so the watts-per-mph conversion is tested on its own.',
         'featuredComparisons.slugify':
             'Reached through uniqueSlug; exported so the slug rule is tested on its own.',
         'sources.domainOf':
@@ -210,7 +212,7 @@ describe('the seams that broke before', () => {
         // Backspacing a field to retype it committed Number('') (0) or a
         // clamp's floor, and the next digits appended: "100" → "1" → "120".
         const files = ['ChargeCompareView', 'RoadTripView', 'ChargingView', 'AxisScaleControls',
-            'admin/ConstantsKnobs', 'admin/TypographyKnobs', 'epa/ViewingConditions'];
+            'admin/ConstantsKnobs', 'admin/TypographyKnobs', 'epa/WindAndElevationFields'];
         for (const f of files) {
             const src = read(`src/components/${f}.jsx`);
             expect(src, `${f} uses the shared field`).toMatch(/<NumberInput/);
@@ -1584,6 +1586,62 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
                            'STD_SPEED_MPH', 'STD_ALTITUDE_FT', 'STD_TEMP_F']) {
             expect(knobs, `${key} is tunable but absent from the Admin knobs`).toContain(key);
         }
+    });
+
+    it('offers every assumed heating and cooling constant as a knob (#449)', () => {
+        // The slopes are a starting point the owner means to tune once #475
+        // compares predicted corrections with actual tests, so each has to be
+        // reachable from Admin and resolved through the override layers.
+        const knobs = read('src/constants/knobs.js');
+        const epa = read('src/constants/epa.js');
+        for (const key of ['DEFAULT_ACCESSORY_W', 'ACCESSORY_COMFORT_BAND_F', 'ACCESSORY_HEAT_W_PER_F',
+                           'ACCESSORY_COOL_W_PER_F', 'ASSUMED_TEST_CONSUMPTION_WH_MI']) {
+            expect(knobs, `${key} is tunable but absent from the Admin knobs`).toContain(`key: '${key}'`);
+            expect(epa, `${key} is not resolved through the override layers`).toMatch(new RegExp(`resolve\\('${key}'`));
+        }
+    });
+
+    it('offers the accessory load on the correction target, and writes it to the link only when set (#449)', () => {
+        const fields = read('src/components/CorrectionTargetFields.jsx');
+        expect(fields, 'the row must resolve auto through the temperature').toMatch(/effectiveAccessoryW\(/);
+        expect(fields, 'and say which state it is in, in the owner’s words').toMatch(/set by you/);
+        expect(fields, 'and let the reader give it back').toMatch(/accessoryW: null/);
+        const settings = read('src/utils/correctionSettings.js');
+        expect(settings, 'c_acc is read and written with the other target parameters').toMatch(/accessoryW: 'c_acc'/);
+        expect(settings, 'auto is the default, so an untouched page writes nothing').toMatch(/accessoryW: null/);
+    });
+
+    it('draws both Modeled Efficiency views under the shared correction target, without its speed (#449)', () => {
+        for (const f of ['src/components/EpaCurvesView.jsx', 'src/components/epa/curves/EpaCurveExplorer.jsx']) {
+            const src = read(f);
+            expect(src, `${f} must offer the shared sliders`).toMatch(/<CorrectionTargetFields/);
+            expect(src, `${f}: speed is its x axis, so no speed slider`).toMatch(/fields=\{\['temperatureF', 'altitudeFt', 'accessoryW'\]\}/);
+            expect(src, `${f} must hand the target to the hook, or it draws standard conditions`).toMatch(/useViewingConditions\(\{[^}]*target: correctionTarget/);
+            expect(src, `${f} scales the accessory load by the target's difference`).toMatch(/curveAccessoryW\(/);
+            expect(src, `${f} does not follow the "Correct:" mode: it is a model`).not.toMatch(/correctionMode/);
+        }
+        expect(read('src/hooks/useViewingConditions.js'), 'the extras are only wind and elevation change')
+            .not.toMatch(/setElevationFt|setTempF|setAccessoryOverrideW/);
+    });
+
+    it('carries the target, and the extras, to both pop-outs (#449)', () => {
+        // The Selected-vehicles pop-out used to call the hook with nothing
+        // driving it and silently draw standard conditions.
+        expect(read('src/components/PopoutView.jsx')).toMatch(/<EpaCurveExplorer[^>]*correctionTarget=\{chartConfig\?\.correctionTarget\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/<EpaCurvesView[\s\S]{0,400}correctionTarget=\{chartConfig\?\.correctionTarget\}/);
+        expect(read('src/App.jsx')).toMatch(/<EpaSection[^>]*correctionTarget=\{chartConfig\.correctionTarget\}[^>]*setChartConfig=\{setChartConfig\}/);
+        const view = read('src/components/EpaCurvesView.jsx');
+        expect(view, 'the extras travel in epaConfig').toMatch(/driven: presentationMode \? \(epaConfig\.extras/);
+        expect(view, 'and are written there by the window that has the controls').toMatch(/extras: JSON\.parse\(extrasKey\)/);
+        expect(read('src/utils/chartUrlState.js'), 'the extras stay out of the link (#476 is the compact key)').not.toMatch(/windSpeed|gradeGain|extras/);
+    });
+
+    it('reads the accessory load in the correction and takes a run’s own consumption to it (#449)', () => {
+        const correction = read('src/utils/conditionCorrection.js');
+        expect(correction, 'the correction must import the accessory load').toMatch(/from '\.\/accessoryLoad'/);
+        expect(correction, 'and apply it in the corrected modes').toMatch(/accessoryFactor\(/);
+        expect(correction, 'every caller builds its conditions here, so the consumption reaches them all').toMatch(/whPerMile:\s+consumptionWhPerMile\(run\)/);
+        expect(correction, 'the retired placeholders must not come back').not.toMatch(/aero_hvac/);
     });
 
     it('defines every knob it advertises', () => {

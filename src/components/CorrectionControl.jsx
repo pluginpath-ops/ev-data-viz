@@ -10,9 +10,9 @@ import { DEFAULT_READER_MODE } from '../utils/correctionSettings';
  * still here, and choosing it is what a link records.
  *
  * Each option names the axes it actually corrects, so nobody infers a
- * completeness the model does not have — "temp (aero)" is not the same claim as
- * "corrected to 70°F", because cabin heating and battery conditioning are not
- * modelled and they dominate a winter test.
+ * completeness the model does not have — "temp" is air density plus an ASSUMED
+ * heating or cooling load, not a measurement of either, and battery
+ * conditioning, cold tyres and regen limits are not modelled.
  *
  * The target (correctionSettings.js) appears once a mode is chosen: with None
  * there is nothing for it to do. It is the same setting the vehicle table's
@@ -24,7 +24,7 @@ import { DEFAULT_READER_MODE } from '../utils/correctionSettings';
 export default function CorrectionControl({ mode = DEFAULT_READER_MODE, target, setChartConfig }) {
     return (
         <>
-            <label className="rail-select-row" title="Re-price measured range and efficiency to a common basis. Only the aerodynamic effect of temperature is modelled.">
+            <label className="rail-select-row" title="Re-price measured range and efficiency to a common basis. Temperature covers air density and an assumed heating or cooling load; battery conditioning, cold tyres and regen limits are not modelled.">
                 {/* .text-label rather than a hand-written `text-sm font-medium
                     text-secondary`: it is the semantic class for exactly this, and
                     sharing it is what makes this row and the color row above it

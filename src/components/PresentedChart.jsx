@@ -132,6 +132,7 @@ export default function PresentedChart({
                 epaConfig={epaConfig || { yAxis: 'kwh100mi' }}
                 setEpaConfig={setEpaConfig ?? (() => {})}
                 palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
+                correctionTarget={chartConfig?.correctionTarget}
                 presentationMode
             />
         )}

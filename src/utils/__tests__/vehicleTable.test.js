@@ -399,7 +399,7 @@ describe('tested range columns (#335)', () => {
     });
 
     it('says why a composite is blank', () => {
-        const cold = row([test({ temperature_f: 30 })]);
+        const cold = row([test({ temperature_f: -10 })]);
         expect(cold.values['tested.composite_range_mi']).toBeNull();
         expect(cold.notes['tested.composite_range_mi']).toBe('1 test: outside the temperature band');
         const narrow = row([test({ temperature_f: 70, start_soc: 56, end_soc: 10 })]);

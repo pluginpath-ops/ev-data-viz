@@ -1,19 +1,14 @@
-import { DEFAULT_ACCESSORY_W } from '../../utils/epaDerivations';
+import { DEFAULT_ACCESSORY_W } from '../constants/epa';
 
 /**
- * Shared pieces of the EPA viewing-condition controls.
+ * The accessory-load reference table: what a car draws that is not traction,
+ * by ambient temperature. Shared by the correction target's Accessory Load row
+ * (CorrectionTargetFields) and Modeled Efficiency's, so the two cannot show
+ * different tables for the same load (#449).
  *
- * Split out of EpaCurvesView so ViewingConditions can be used by both the
- * vehicle-driven curves and the certification-anchored ones without either
- * importing from the other's view.
+ * The figures are a curator's reference, not sourced: the explainer ledger
+ * tags them unverified until one is.
  */
-
-// Sane bounds for the ambient-temperature viewing condition; far outside this
-// the ideal-gas density approximation isn't meaningful anyway.
-export const MIN_TEMP_F = -100;
-export const MAX_TEMP_F = 150;
-
-// ── Accessory-load reference table (for the Accessory Load info tooltip) ─────
 
 // Steady-state auxiliary draw by ambient temperature, in watts. Heat-pump and
 // resistive rows are alternative heating methods for the same job, not
@@ -30,10 +25,10 @@ const ACCESSORY_LOAD_REFERENCE_W = [
     { ambient: '105°F', heatPump: '—',           resistive: '—',         ac: '3000–5000**', battery: '1000–3000', lighting: '100–300' },
 ];
 
-export function AccessoryLoadReferenceTable() {
+export default function AccessoryLoadReference() {
     return (
         <div>
-            <p className="font-semibold mb-1">EV Auxiliary Load Reference (steady-state, W)</p>
+            <p className="text-label">Accessory load reference (steady-state, W)</p>
             <table className="accessory-load-table">
                 <thead>
                     <tr>
@@ -58,8 +53,8 @@ export function AccessoryLoadReferenceTable() {
                     ))}
                 </tbody>
             </table>
-            <p className="mt-1.5 text-[10px] leading-snug opacity-80">
-                *At 0°F, heat pump COP approaches its floor, so most heating duty shifts to the resistive backup element. **Assumes a stabilized cabin; hot-soak or high solar load can push this higher during pull-down. Heat pump/resistive are alternative heating methods, not simultaneous loads. Battery conditioning is steady-state maintenance, not active DC-fast-charge preconditioning. Curve default is {DEFAULT_ACCESSORY_W}W.
+            <p className="text-meta">
+                *At 0°F, heat pump COP approaches its floor, so most heating duty shifts to the resistive backup element. **Assumes a stabilized cabin; hot-soak or high solar load can push this higher during pull-down. Heat pump/resistive are alternative heating methods, not simultaneous loads. Battery conditioning is steady-state maintenance, not active DC-fast-charge preconditioning. The EPA curves assume {DEFAULT_ACCESSORY_W} W (Admin → Model Constants); a range test is assumed to carry it plus a heater or A/C once the weather leaves about 60–70°F.
             </p>
         </div>
     );
