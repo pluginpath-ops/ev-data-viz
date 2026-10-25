@@ -12,6 +12,7 @@ import Chart from 'chart.js/auto';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import PlotFrame from '../charts/PlotFrame';
 import { useChartPng } from '../../hooks/useChartPng';
+import { useSourceLine } from '../../hooks/useSourceLine';
 
 export default function PerformanceCompareChart({
     title,
@@ -21,7 +22,7 @@ export default function PerformanceCompareChart({
     valueModes,          // optional [{ key, label }] — e.g. braking distance vs g
     valueMode,
     onValueModeChange,
-    rows,                // [{ id, name, value, display, badge, sub, fullData, flags, sourceCount }]
+    rows,                // [{ id, name, value, display, badge, sub, sourceName, fullData, flags, sourceCount }]
     axisLabel,
     barMode,
     isDark,
@@ -53,8 +54,15 @@ export default function PerformanceCompareChart({
     }, [valueModes, valueMode, axisLabel]);
 
     const [urlCopied, setUrlCopied] = useState(false);
+    // The deriver's placeholder for a result with no source is not a source.
+    const sourceRuns = useMemo(
+        () => withData.map(r => ({ id: r.id, source: r.sourceName === 'Unattributed' ? '' : r.sourceName })),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [rows]);
+    const sourceLine = useSourceLine({ runs: sourceRuns });
+
     const { copyPng, copied, preview, dismissPreview } =
-        useChartPng(chartRef, { title, subtitle: plotSubtitle,
+        useChartPng(chartRef, { title, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(withData.length) });
 
     useEffect(() => {
@@ -210,6 +218,7 @@ export default function PerformanceCompareChart({
             <PlotFrame
                 title={title}
                 subtitle={plotSubtitle}
+                sourceLine={sourceLine}
                 preview={preview}
                 onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (

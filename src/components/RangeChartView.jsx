@@ -31,6 +31,7 @@ import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/color
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { useSourceLine } from '../hooks/useSourceLine';
 import SpeedBadge from './charts/SpeedBadge';
 import { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT } from '../utils/chartUrlState';
 import { wrapCanvasText } from '../utils/wrapCanvasText';
@@ -643,8 +644,10 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
         return parts.join(' · ');
     }, [plottableRuns, chartType, effUnit, verboseLabels, correctionMode, correctionTarget, units]);
 
+    const sourceLine = useSourceLine({ runs: plottableRuns });
+
     const { copyPng, copied, preview, dismissPreview } =
-        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: plottableRuns.map(r => r.id).join(',') });
 
     return (
@@ -784,6 +787,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             <PlotFrame
                 title={plotTitle}
                 subtitle={plotSubtitle}
+                sourceLine={sourceLine}
                 preview={preview}
                 onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (

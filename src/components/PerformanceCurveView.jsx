@@ -25,6 +25,7 @@ import { buildSyntheticCurve, tracedCurvePoints, segmentAccelerationG } from '..
 import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { useSourceLine } from '../hooks/useSourceLine';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 
 /** Okabe-Ito, matching the palette the other charts use for run colors. */
@@ -166,9 +167,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             // quickest run isn't necessarily in its most recent session.
             const allRuns = (sessionsByVehicle[v.id] || [])
                 .filter(s => s.test_type === 'accel')
-                .flatMap(s => (s.performance_runs || []).filter(
-                    r => (r.performance_run_points || []).length >= 2,
-                ));
+                .flatMap(s => (s.performance_runs || [])
+                    .filter(r => (r.performance_run_points || []).length >= 2)
+                    // A run is sourced by its session; carried here for the source line.
+                    .map(r => ({ ...r, _sourceName: s.source_name, _sourceUrl: s.source_url || s.spreadsheet_url })));
             if (allRuns.length === 0) continue;
 
             let chosen;
@@ -205,6 +207,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         seq: `#${(run.sequence ?? 0) + 1}`,
                         points,
                         zeroTo60: run.zero_to_60_sec,
+                        sourceName: run._sourceName ?? null,
+                        sourceUrl: run._sourceUrl ?? null,
                     });
                 }
             }
@@ -220,6 +224,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     out.push({
                         vehicle: v,
                         source: summary.source_name || 'published',
+                        sourceName: summary.source_name ?? null,
+                        sourceUrl: summary.source_url ?? null,
                         points: synth.points,
                         synthetic: true,
                         basis: synth.basis,
@@ -428,8 +434,15 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         return parts.join(' · ');
     }, [showG]);
 
+    // Each plotted curve is a run of a session, or a published figure; both
+    // carry their source's name.
+    const sourceRuns = useMemo(
+        () => series.map((c, i) => ({ id: `${c.runId ?? 'published'}:${i}`, source: c.sourceName, sourceUrl: c.sourceUrl })),
+        [series]);
+    const sourceLine = useSourceLine({ runs: sourceRuns });
+
     const { copyPng, copied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(series.length) });
 
     const [urlCopied, setUrlCopied] = useState(false);
@@ -532,6 +545,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 <PlotFrame
                     title={plotTitle}
                     subtitle={plotSubtitle}
+                    sourceLine={sourceLine}
                     preview={preview}
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (

@@ -13,7 +13,8 @@ import { useTheme } from '../hooks/useTheme';
 import { MI_TO_KM, convDistance, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, pricedAtSpeedMph, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { figureSources } from '../utils/vehicleFigures';
+import { figureSources, epaCredits } from '../utils/vehicleFigures';
+import { useSourceLine } from '../hooks/useSourceLine';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
@@ -1846,8 +1847,23 @@ export default function RoadTripView({
     }, [validEntries, isSpeedMode, totalDistance, speed, mode, legDistance, chargeTime,
         startSoc, minSoc, towingMode, units, dl, sl, verboseLabels]);
 
+    // Source line: each trip prices a charging test against a range test, or
+    // against the EPA range; the capacity may be EPA tested.
+    const sourceRuns = useMemo(
+        () => validEntries.flatMap(e => [e.run, isEpaPartnerId(e.rangeRun?.id) ? null : e.rangeRun]).filter(Boolean),
+        [validEntries]);
+    const sourceEpa = useMemo(() => {
+        const entryVehicles = validEntries.map(e => e.vehicle);
+        const epaPriced = validEntries.filter(e => isEpaPartnerId(e.rangeRun?.id)).map(e => e.vehicle);
+        return {
+            label: epaCredits(epaPriced, { range: true }).label,
+            tests: epaCredits(entryVehicles, { capacity: true }).tests,
+        };
+    }, [validEntries]);
+    const sourceLine = useSourceLine({ runs: sourceRuns, epa: sourceEpa });
+
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(validEntries.length) });
 
     const dispLeg          = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
@@ -2194,6 +2210,7 @@ export default function RoadTripView({
                 <PlotFrame
                     title={plotTitle}
                     subtitle={plotSubtitle}
+                    sourceLine={sourceLine}
                     preview={preview}
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
