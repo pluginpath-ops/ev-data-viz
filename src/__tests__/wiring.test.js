@@ -212,7 +212,7 @@ describe('the seams that broke before', () => {
         // Backspacing a field to retype it committed Number('') (0) or a
         // clamp's floor, and the next digits appended: "100" → "1" → "120".
         const files = ['ChargeCompareView', 'RoadTripView', 'ChargingView', 'AxisScaleControls',
-            'admin/ConstantsKnobs', 'admin/TypographyKnobs', 'epa/ViewingConditions'];
+            'admin/ConstantsKnobs', 'admin/TypographyKnobs', 'epa/WindAndElevationFields'];
         for (const f of files) {
             const src = read(`src/components/${f}.jsx`);
             expect(src, `${f} uses the shared field`).toMatch(/<NumberInput/);
@@ -1609,6 +1609,31 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         const settings = read('src/utils/correctionSettings.js');
         expect(settings, 'c_acc is read and written with the other target parameters').toMatch(/accessoryW: 'c_acc'/);
         expect(settings, 'auto is the default, so an untouched page writes nothing').toMatch(/accessoryW: null/);
+    });
+
+    it('draws both Modeled Efficiency views under the shared correction target, without its speed (#449)', () => {
+        for (const f of ['src/components/EpaCurvesView.jsx', 'src/components/epa/curves/EpaCurveExplorer.jsx']) {
+            const src = read(f);
+            expect(src, `${f} must offer the shared sliders`).toMatch(/<CorrectionTargetFields/);
+            expect(src, `${f}: speed is its x axis, so no speed slider`).toMatch(/fields=\{\['temperatureF', 'altitudeFt', 'accessoryW'\]\}/);
+            expect(src, `${f} must hand the target to the hook, or it draws standard conditions`).toMatch(/useViewingConditions\(\{[^}]*target: correctionTarget/);
+            expect(src, `${f} scales the accessory load by the target's difference`).toMatch(/curveAccessoryW\(/);
+            expect(src, `${f} does not follow the "Correct:" mode: it is a model`).not.toMatch(/correctionMode/);
+        }
+        expect(read('src/hooks/useViewingConditions.js'), 'the extras are only wind and elevation change')
+            .not.toMatch(/setElevationFt|setTempF|setAccessoryOverrideW/);
+    });
+
+    it('carries the target, and the extras, to both pop-outs (#449)', () => {
+        // The Selected-vehicles pop-out used to call the hook with nothing
+        // driving it and silently draw standard conditions.
+        expect(read('src/components/PopoutView.jsx')).toMatch(/<EpaCurveExplorer[^>]*correctionTarget=\{chartConfig\?\.correctionTarget\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/<EpaCurvesView[\s\S]{0,400}correctionTarget=\{chartConfig\?\.correctionTarget\}/);
+        expect(read('src/App.jsx')).toMatch(/<EpaSection[^>]*correctionTarget=\{chartConfig\.correctionTarget\}[^>]*setChartConfig=\{setChartConfig\}/);
+        const view = read('src/components/EpaCurvesView.jsx');
+        expect(view, 'the extras travel in epaConfig').toMatch(/driven: presentationMode \? \(epaConfig\.extras/);
+        expect(view, 'and are written there by the window that has the controls').toMatch(/extras: JSON\.parse\(extrasKey\)/);
+        expect(read('src/utils/chartUrlState.js'), 'the extras stay out of the link (#476 is the compact key)').not.toMatch(/windSpeed|gradeGain|extras/);
     });
 
     it('reads the accessory load in the correction and takes a run’s own consumption to it (#449)', () => {

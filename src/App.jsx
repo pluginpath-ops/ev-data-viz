@@ -1293,7 +1293,7 @@ export default function App() {
                             onCorrectionTargetChange={t => setChartConfig(prev => ({ ...prev, correctionTarget: t }))}
                         />
                     )}
-                    {view === 'epa' && <EpaSection subtab={epaSubtab} onExplorerState={setEpaExplorer} />}
+                    {view === 'epa' && <EpaSection subtab={epaSubtab} onExplorerState={setEpaExplorer} correctionTarget={chartConfig.correctionTarget} setChartConfig={setChartConfig} />}
                     {view === 'reference' && (
                         <ReferenceSection
                             subtab={referenceSubtab}
