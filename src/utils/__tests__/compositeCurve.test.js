@@ -4,7 +4,9 @@ import {
     smoothAlongSoc, SMOOTHING_HALF_WINDOW, SMOOTHING_MAX_GAP, compositeNote,
     planCompositeRebuild, compositeFingerprint, staleComposites, COMPOSITE_VERSION,
     compositeLabel, compositeConditions, PLATEAU_SHARE, HELD_BACK_MARGIN, compositeFrom, earliestStart, spreadAlong, fullStart,
+    splitByCurrent,
 } from '../compositeCurve';
+import { nativeComposite, compositesFirst } from '../runUtils';
 
 /**
  * A test sampled at every whole % from `from` to `to`, power from `kwAt(soc)`.
@@ -232,6 +234,103 @@ describe('compositeCurves', () => {
     it('reports eligible tests whose points are not loaded yet', () => {
         const { missing } = compositeCurves(vehicleOf(800, [run(1), run(2)]), { 1: fast() });
         expect(missing).toEqual([2]);
+    });
+});
+
+describe('charger current class (migration 092)', () => {
+    const vehicleOf = (classV, runs) => ({
+        id: 'v', runs, platforms: { electrical: classV ? { voltage_class_v: classV } : null }, specs: {},
+    });
+    const fast = () => test({ kwAt: car });
+    const slow = () => test({ kwAt: onLesserCharger });
+    const on = (a) => ({ charger_current_class_a: a });
+
+    it('leaves every test in one composite when nobody recorded a class: all read as 500 A', () => {
+        const { curves } = compositeCurves(vehicleOf(400, [run(1), run(2), run(3)]), { 1: fast(), 2: fast(), 3: slow() });
+        expect(curves).toHaveLength(1);
+        expect(curves[0].chargerCurrentA).toBeNull();
+        expect(compositeLabel(curves[0])).toBe('composite (3 tests)');
+        // The flat stretch is still set aside by the existing algorithm.
+        expect(curves[0].heldBack[0].runId).toBe(3);
+    });
+
+    it('splits by current only when a lower class is seen held back — nothing dropped', () => {
+        const runs = [run(1, on(600)), run(2, on(600)), run(3, on(500)), run(4, on(500))];
+        const { curves, setAside } = compositeCurves(vehicleOf(400, runs), { 1: fast(), 2: fast(), 3: slow(), 4: slow() });
+        expect(curves.map(c => c.chargerCurrentA)).toEqual([600, 500]);
+        expect(compositeLabel(curves[0])).toBe('composite on 600 A chargers (2 tests)');
+        expect(compositeLabel(curves[1])).toBe('composite on 500 A chargers (2 tests)');
+        // The 500 A composite is the car on that charger, not a damaged curve: nothing held back inside it.
+        expect(at(curves[1], 20).chargeRate).toBeCloseTo(onLesserCharger(20));
+        expect(curves.flatMap(c => c.heldBack)).toEqual([]);
+        expect(setAside).toEqual([]);
+    });
+
+    it('does not split when the lower class was not limited', () => {
+        // A lower-rated charger the car never outgrew: every test draws the same.
+        const runs = [run(1, on(600)), run(2, on(600)), run(3, on(500)), run(4, on(500))];
+        const { curves } = compositeCurves(vehicleOf(400, runs), { 1: fast(), 2: fast(), 3: fast(), 4: fast() });
+        expect(curves).toHaveLength(1);
+        expect(curves[0].chargerCurrentA).toBeNull();
+        expect(curves[0].tests).toHaveLength(4);
+    });
+
+    it('reads a recorded 500 and a blank alike', () => {
+        const a = splitByCurrent([1, 2, 3].map(id => ({ run: run(id, id === 3 ? on(500) : {}), points: id === 3 ? slow() : fast() })));
+        expect(a).toHaveLength(1);
+        expect(a[0].chargerCurrentA).toBeNull();
+    });
+
+    it('names a limited class with one test rather than averaging it in', () => {
+        const runs = [run(1, on(600)), run(2, on(600)), run(3, on(500))];
+        const { curves, setAside } = compositeCurves(vehicleOf(400, runs), { 1: fast(), 2: fast(), 3: slow() });
+        expect(curves.map(c => c.chargerCurrentA)).toEqual([600]);
+        expect(setAside).toEqual([expect.objectContaining({ runId: 3, reason: expect.stringContaining('only test on 500 A chargers') })]);
+    });
+
+    it('splits inside a voltage class on an 800 V car, and labels both', () => {
+        // All recorded on 800 V chargers, so the curve is not read as a lower VOLTAGE class.
+        const v = { charger_voltage_class: 800 };
+        const runs = [run(1, { ...on(600), ...v }), run(2, { ...on(600), ...v }), run(3, { ...on(500), ...v }), run(4, { ...on(500), ...v })];
+        const { curves } = compositeCurves(vehicleOf(800, runs), { 1: fast(), 2: fast(), 3: slow(), 4: slow() });
+        expect(curves.map(c => [c.chargerClassV, c.chargerCurrentA])).toEqual([[800, 600], [800, 500]]);
+        expect(compositeLabel(curves[1])).toBe('composite on 800 V, 500 A chargers (2 tests)');
+    });
+
+    it('merges a lower class that is not limited into the class above it', () => {
+        const runs = [run(1, on(700)), run(2, on(700)), run(3, on(600)), run(4, on(500)), run(5, on(500))];
+        const pts = { 1: fast(), 2: fast(), 3: fast(), 4: slow(), 5: slow() };
+        const { curves } = compositeCurves(vehicleOf(400, runs), pts);
+        // 500 A is limited and closes its own group; 600 A was not, so it joins 700 A.
+        expect(curves.map(c => [c.chargerCurrentA, c.tests.length])).toEqual([[700, 3], [500, 2]]);
+    });
+
+    it('stores which class a composite stands for, and updates it in place on a rebuild', () => {
+        const runs = [run(1, on(600)), run(2, on(600)), run(3, on(500)), run(4, on(500))];
+        const v = vehicleOf(400, runs);
+        const pts = { 1: fast(), 2: fast(), 3: slow(), 4: slow() };
+        const first = planCompositeRebuild(v, pts);
+        expect(first.writes.map(w => w.composite.chargerCurrentA)).toEqual([600, 500]);
+        expect(first.writes.map(w => w.name)).toEqual(['Composite on 600 A chargers (2 tests)', 'Composite on 500 A chargers (2 tests)']);
+        const stored = first.writes.map((w, i) => ({ id: 100 + i, kind: 'charging', synthetic: true, composite: w.composite }));
+        const again = planCompositeRebuild({ ...v, runs: [...runs, ...stored] }, pts);
+        expect(again.writes.map(w => w.id)).toEqual([100, 101]);
+        expect(again.deletes).toEqual([]);
+    });
+
+    it('moves the fingerprint only when a class is recorded, so unclassified composites stay current', () => {
+        const base = compositeFingerprint(vehicleOf(400, [run(1), run(2)]));
+        expect(compositeFingerprint(vehicleOf(400, [run(1, { charger_current_class_a: null }), run(2)]))).toBe(base);
+        expect(compositeFingerprint(vehicleOf(400, [run(1, on(600)), run(2)]))).not.toBe(base);
+    });
+
+    it('puts the highest current class first, like the highest voltage class', () => {
+        const comp = (id, composite) => ({ id, kind: 'charging', synthetic: true, composite });
+        const runs = [comp(1, { chargerClassV: null, chargerCurrentA: 500 }), comp(2, { chargerClassV: null, chargerCurrentA: 600 })];
+        expect(nativeComposite(runs).id).toBe(2);
+        expect(compositesFirst(runs).map(r => r.id)).toEqual([2, 1]);
+        // A composite with no split outranks a split one.
+        expect(nativeComposite([...runs, comp(3, { chargerClassV: null, chargerCurrentA: null })]).id).toBe(3);
     });
 });
 

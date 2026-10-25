@@ -7,7 +7,9 @@ import { autoMapHeaders } from '../utils/csvColumnMapping';
 import PreconditionedSelect from './PreconditionedSelect';
 import { toPreconditioned, preconditionedFormValue } from '../utils/runPreconditioning';
 import ChargerClassSelect from './ChargerClassSelect';
+import ChargerCurrentSelect from './ChargerCurrentSelect';
 import { toChargerClass, chargerClassFormValue } from '../utils/runChargerClass';
+import { toChargerCurrent, chargerCurrentFormValue } from '../utils/chargerCurrentClass';
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
@@ -492,6 +494,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         speedBasis: '',
         preconditioned: '',
         chargerVoltageClass: '',
+        chargerCurrentClass: '',
         altitudeFt: '',
         elevationGainFt: '',
         windSpeedMph: '',
@@ -592,7 +595,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: '', softwareVersion: '', conditions: '', dataFlags: ['charging'], sourcePick: NO_SOURCE_PICK, startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', chargerVoltageClass: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
+        setRunMetadata({ name: '', date: '', softwareVersion: '', conditions: '', dataFlags: ['charging'], sourcePick: NO_SOURCE_PICK, startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', chargerVoltageClass: '', chargerCurrentClass: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -874,6 +877,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             speedBasis: run.speed_basis ?? '',
             preconditioned: preconditionedFormValue(run.preconditioned),
             chargerVoltageClass: chargerClassFormValue(run.charger_voltage_class),
+            chargerCurrentClass: chargerCurrentFormValue(run.charger_current_class_a),
             altitudeFt: run.altitude_ft ?? '',
             elevationGainFt: run.elevation_gain_ft ?? '',
             windSpeedMph: run.avg_wind_speed_mph ?? '',
@@ -887,7 +891,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setSavingData(true);
         try {
             // Convert dataFlags → boolean columns and drop the flags field
-            const { dataFlags, preconditioned, chargerVoltageClass, sourcePick, storedSource, ...formRest } = editFormData;
+            const { dataFlags, preconditioned, chargerVoltageClass, chargerCurrentClass, sourcePick, storedSource, ...formRest } = editFormData;
             // Sent only when it changed, so saving any other field never names
             // a column an unmigrated database lacks (migrations 073, 076).
             const storedRun = vehicle.runs?.find(r => r.id === runId);
@@ -897,6 +901,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 ...(toPreconditioned(preconditioned) !== (storedRun?.preconditioned ?? null) ? { preconditioned } : {}),
                 ...(toChargerClass(chargerVoltageClass) !== toChargerClass(storedRun?.charger_voltage_class)
                     ? { chargerVoltageClass } : {}),
+                ...(toChargerCurrent(chargerCurrentClass) !== toChargerCurrent(storedRun?.charger_current_class_a)
+                    ? { chargerCurrentClass } : {}),
                 kind: dataFlags.includes('range') ? 'range' : 'charging',
                 calculated_fields: editCalculatedFields,
             });
@@ -1610,6 +1616,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     value={runMetadata.chargerVoltageClass}
                                                     onChange={v => setRunMetadata({ ...runMetadata, chargerVoltageClass: v })}
                                                 />
+                                                <ChargerCurrentSelect
+                                                    value={runMetadata.chargerCurrentClass}
+                                                    onChange={v => setRunMetadata({ ...runMetadata, chargerCurrentClass: v })}
+                                                />
                                             </div>
                                         )}
 
@@ -2184,6 +2194,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             <ChargerClassSelect
                                                 value={editFormData.chargerVoltageClass}
                                                 onChange={v => setEditFormData({ ...editFormData, chargerVoltageClass: v })}
+                                            />
+                                            <ChargerCurrentSelect
+                                                value={editFormData.chargerCurrentClass}
+                                                onChange={v => setEditFormData({ ...editFormData, chargerCurrentClass: v })}
                                             />
                                         </div>
                                     )}

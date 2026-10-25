@@ -45,13 +45,23 @@ export const isCompositeRun = (r) => !!r?.composite;
 export const filterTests = (runs) => (runs || []).filter(r => !isCompositeRun(r));
 
 /**
+ * How native a stored composite is to its car, larger first: its charger
+ * VOLTAGE class, then its charger CURRENT class (#313). A composite with no
+ * class of either kind is the whole car's and outranks both. So an 800 V car's
+ * 800 V composite leads its 400 V one, and on a car split by current its
+ * highest class leads.
+ */
+export const compositeClassRank = (composite) =>
+    (composite?.chargerClassV ?? 1e4) * 1e4 + (composite?.chargerCurrentA ?? 9999);
+
+/**
  * Runs with the composite curves first — the vehicle's own charger class ahead
  * of a lower one — and everything else in its existing order. Every list of a
  * vehicle's runs shows the composites at the top: they stand for the car, and
  * are its default unless a test is marked DEF.
  */
 export function compositesFirst(runs) {
-    const rank = (r) => (isCompositeRun(r) ? -(r.composite.chargerClassV ?? 1e4) : 0);
+    const rank = (r) => (isCompositeRun(r) ? -compositeClassRank(r.composite) : 0);
     return [...(runs || [])].sort((a, b) => rank(a) - rank(b));
 }
 
@@ -64,8 +74,7 @@ export function compositesFirst(runs) {
  */
 export function nativeComposite(runs) {
     const composites = (runs || []).filter(r => isCompositeRun(r) && !r._inherited && !(r.isHidden || r.is_hidden));
-    return composites.sort((a, b) =>
-        (b.composite.chargerClassV ?? Infinity) - (a.composite.chargerClassV ?? Infinity))[0] ?? null;
+    return composites.sort((a, b) => compositeClassRank(b.composite) - compositeClassRank(a.composite))[0] ?? null;
 }
 
 /**
