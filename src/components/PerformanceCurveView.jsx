@@ -12,6 +12,8 @@
 import SidebarDisplaySection from './SidebarDisplaySection';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
+import { useChartReadout } from '../hooks/useChartReadout';
+import { readoutNumber } from '../utils/readoutAtX';
 import { dataService } from '../services/DataService';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
@@ -45,6 +47,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     const { isDark } = useTheme();
     const canvasRef  = useRef(null);
     const chartRef   = useRef(null);
+    const readout    = useChartReadout();
 
     const [sessionsByVehicle, setSessionsByVehicle] = useState(null);
     const [summariesByVehicle, setSummariesByVehicle] = useState({});
@@ -295,6 +298,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             const data = s.gSegments.map(seg => ({ x: (seg.x0 + seg.x1) / 2, y: seg.g }));
             return [{
                 label: `${s.label} · g`,
+                // One row with its curve's speed (#455).
+                readoutGroup: String(i),
                 data,
                 yAxisID: 'yG',
                 borderColor: c,
@@ -306,13 +311,41 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             }];
         });
 
+        const readoutConfig = {
+            title: (x) => `${readoutNumber(x)} s`,
+            subtitle: ['Speed (mph)', showG ? 'Acceleration (g)' : null].filter(Boolean).join(' · '),
+            describe(row, { nearest }) {
+                const sr = series[Number(row.key)];
+                const g = row.companions[0];
+                const lines = [];
+                if (nearest && sr?.synthetic) {
+                    lines.push(`Reconstructed from ${sr.basis.join(' + ')}`);
+                    if (sr.flags.includes('mixed-rollout')) lines.push('⚠ 0–60 is a no-rollout figure paired with a ¼-mile ET, which is not');
+                    if (sr.flags.includes('non-monotonic')) lines.push('⚠ The published figures disagree with each other');
+                }
+                const credit = { sourceUrl: sr?.sourceUrl, name: sr?.fullLabel };
+                return {
+                    name: sr?.label ?? row.label,
+                    value: `${readoutNumber(row.y)} mph`,
+                    companion: g ? `${readoutNumber(g.y)} g` : null,
+                    flag: sr?.synthetic ? `Reconstructed from ${sr.basis.join(' + ')}` : null,
+                    detail: lines,
+                    sources: nearest && sr && (sr.sourceName || sr.sourceUrl)
+                        ? [{ label: sr.sourceName ?? 'Source', run: credit }]
+                        : null,
+                };
+            },
+        };
+
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
+            plugins: [readout.plugin(readoutConfig)],
             data: {
                 datasets: series.map((s, i) => {
                     const c = seriesColors[i];
                     return {
                     label: s.label,
+                    readoutGroup: String(i),
                     data: s.points,
                     // Named explicitly: without it Chart.js assigns the dataset to
                     // the FIRST y-scale in definition order, which put speed on the
@@ -355,40 +388,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                                 })),
                         },
                     },
-                    tooltip: {
-                        callbacks: {
-                            title: (items) => `${items[0].parsed.x.toFixed(3)} s`,
-                            // Tooltip shows the untruncated name, so the legend can
-                            // stay short without losing which vehicle a line is.
-                            label: (c) => {
-                                // g datasets are concatenated after the speed ones,
-                                // so anything past series.length is an acceleration
-                                // span and is measured in g, not mph.
-                                if (c.datasetIndex >= series.length) {
-                                    const sr = series[c.datasetIndex - series.length];
-                                    const seg = sr?.gSegments?.[c.dataIndex];
-                                    const line = `${c.dataset.label}: ${c.parsed.y.toFixed(3)} g`;
-                                    // Say so rather than quietly showing a bound as if
-                                    // it were a reading.
-                                    return seg?.clamped
-                                        ? [line, `Capped at this run's recorded peak (computed ${seg.rawG.toFixed(3)} g over ${(seg.x1 - seg.x0).toFixed(3)} s)`]
-                                        : line;
-                                }
-                                const sr = series[c.datasetIndex];
-                                const lines = [`${sr?.fullLabel ?? c.dataset.label}: ${c.parsed.y.toFixed(0)} mph`];
-                                if (sr?.synthetic) {
-                                    lines.push(`Reconstructed from ${sr.basis.join(' + ')}`);
-                                    if (sr.flags.includes('mixed-rollout')) {
-                                        lines.push('⚠ 0–60 is a no-rollout figure paired with a ¼-mile ET, which is not');
-                                    }
-                                    if (sr.flags.includes('non-monotonic')) {
-                                        lines.push('⚠ The published figures disagree with each other');
-                                    }
-                                }
-                                return lines;
-                            },
-                        },
-                    },
+                    // The readout answers hovers here (#455): every curve at the
+                    // cursor's time, with a curve's acceleration beside its speed.
+                    tooltip: { enabled: false },
                 },
                 scales: {
                     x: {
@@ -420,7 +422,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [series, isDark, presentationMode, scale, colorMap, showG]);
+    }, [series, isDark, presentationMode, scale, colorMap, showG, readout]);
 
     // ── The frame's caption, and its export ─────────────────────────────────
     // The title was an <h3> above the card and the export flattened the canvas
@@ -577,8 +579,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         </>
                     )}
                 >
-                    <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
+                    <div className="chart-readout-host" style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
                         <canvas ref={canvasRef} />
+                        {readout.overlay}
                     </div>
                 </PlotFrame>
             )}

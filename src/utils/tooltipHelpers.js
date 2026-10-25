@@ -8,13 +8,15 @@ import { fmtSpeed, fmtTemp, fmtDistance } from './unitConversions';
  * @param {object|null} run  - Run object with optional: source, speed_mph, temperature_f, avg_wind_speed_mph, wind_direction_deg
  * @param {string[]} chartLines - Additional lines for the chart-specifics section.
  * @param {string} units - 'imperial' | 'metric'
+ * @param {{source?: boolean}} [opts] - `source: false` leaves the "Source:" line out, for the
+ *        readout (#455), which shows the source as a link instead.
  */
-export function runTooltipLines(run, chartLines = [], units = 'imperial') {
+export function runTooltipLines(run, chartLines = [], units = 'imperial', { source = true } = {}) {
     const lines = [];
 
     // ── Run specifics ──────────────────────────────────────────────────────────
     const runSection = [];
-    if (run?.source)               runSection.push(`Source: ${run.source}`);
+    if (source && run?.source)      runSection.push(`Source: ${run.source}`);
     if (run?.speed_mph     != null) runSection.push(`Speed: ${fmtSpeed(run.speed_mph, units)}`);
     if (run?.temperature_f != null) runSection.push(`Temp: ${fmtTemp(run.temperature_f, units)}`);
     if (run?.avg_wind_speed_mph != null) {

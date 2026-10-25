@@ -3428,6 +3428,193 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .plot-frame-sources a:hover { color: var(--color-text-primary); }
 .plot-frame-sources-gap { color: var(--color-warning-text, var(--color-text-meta)); }
 
+/* ── The readout (#455) ──────────────────────────────────────────────────────
+ *
+ * Every series at the X under the cursor: a crosshair, a dot on each line, and
+ * a box listing them. The DOM, not the canvas, so its source links can be
+ * clicked and so a PNG export — which copies the canvas — never carries a
+ * half-drawn hover. The box is a popover in everything but how it opens.
+ *
+ * The host is whatever wraps the canvas; the layer fills it and takes no
+ * pointer, so the chart under it keeps every hover, click and drag. */
+.chart-readout-host { position: relative; }
+
+.chart-readout-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.chart-crosshair {
+    position: absolute;
+    left: 0;
+    width: 0;
+    border-left: 1px dashed var(--color-text-meta);
+}
+
+/* Solid where the line has a real sample at this X; a ring where the value was
+   read off the line between two samples. --dot is the series color. */
+.chart-crosshair-dot {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    background-color: var(--dot);
+    border: 2px solid var(--color-popover);
+}
+.chart-crosshair-dot.is-interpolated {
+    background-color: var(--color-popover);
+    border-color: var(--dot);
+}
+
+.chart-readout {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: var(--z-tooltip);
+    width: max-content;
+    min-width: 12rem;
+    max-width: min(24rem, calc(100vw - 1rem));
+    padding: 6px 8px 5px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    line-height: 1.35;
+    color: var(--color-text-primary);
+    background-color: var(--color-popover);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-popover);
+    box-shadow: var(--shadow-popover, 0 4px 12px rgba(0, 0, 0, 0.3));
+    pointer-events: none;
+}
+
+/* Fixed: it holds still, so it can take the pointer and its links work. A long
+   list scrolls rather than outgrowing the window. */
+.chart-readout--fixed {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    max-height: min(32rem, calc(100vh - 1rem));
+}
+/* Only the list of runs scrolls: the header, the active run's detail and the
+   footer stay where they are, so a long list never pushes a source link out of
+   reach. */
+.chart-readout--fixed .chart-readout-list {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.chart-readout--fixed .chart-readout-row { flex: none; }
+
+/* Below the compact breakpoint a fixed readout is a bottom sheet, clear of the
+   finger that placed it. */
+.chart-readout--sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    max-width: none;
+    max-height: 45vh;
+    border-radius: var(--radius-popover) var(--radius-popover) 0 0;
+}
+
+.chart-readout-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 4px;
+    margin-bottom: 3px;
+    border-bottom: 1px solid var(--color-border);
+}
+.chart-readout-title { font-weight: 600; }
+.chart-readout-subtitle { margin: -1px 0 3px; color: var(--color-text-meta); }
+
+.chart-readout-list { display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0; }
+
+.chart-readout-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 6px;
+    padding: 1px 3px;
+    border-radius: var(--radius-mark);
+}
+/* The active line — the one the cursor is on, or in a fixed readout the one the
+   pointer is over: its detail and source are spelled out beneath. */
+.chart-readout-row.is-active { background-color: var(--color-hover-lift); }
+
+.chart-readout-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-secondary);
+}
+.chart-readout-row.is-active .chart-readout-name { color: var(--color-text-primary); }
+
+.chart-readout-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+    padding-left: 8px;
+    position: relative;
+}
+/* Hung to the left of the figure, out of flow, so a ≈ never shifts the numbers
+   off the column the other rows line up on. */
+.chart-readout-approx {
+    position: absolute;
+    right: 100%;
+    color: var(--color-text-meta);
+}
+.chart-readout-companion { color: var(--color-text-meta); }
+
+/* The ⚠ column: always present, so the values do not shift when a row has no
+   flag. */
+.chart-readout-flag-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 1.2em;
+}
+.chart-readout-flag { color: var(--color-warning-text); }
+
+/* Source names, each a link in a fixed readout. Hovering the readout it is
+   plain text, and the pointer passes through it. */
+.chart-readout-sources a {
+    color: var(--color-text-link);
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+}
+.chart-readout-sources a:hover { color: var(--color-text-primary); }
+
+.chart-readout-detail {
+    margin-top: 4px;
+    padding-top: 3px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-meta);
+}
+.chart-readout-detail-name { color: var(--color-text-primary); font-weight: 600; }
+
+.chart-readout-more { padding: 0 3px; color: var(--color-text-meta); }
+
+.chart-readout-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 10px;
+    margin-top: 4px;
+    padding-top: 3px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-meta);
+}
+
 /* Top-right of the frame, so an exported image carries its source. */
 .plot-frame-mark {
     flex: none;

@@ -12,6 +12,8 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { figureSources, epaCredits } from '../utils/vehicleFigures';
 import { useSourceLine } from '../hooks/useSourceLine';
+import { useChartReadout } from '../hooks/useChartReadout';
+import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
 
 /**
  * The resolved vehicle figures each derived axis divides or multiplies by
@@ -86,6 +88,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const { limits, setLimit } = useAxisLimits('charging');
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
+    const readout = useChartReadout();
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -802,6 +805,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     ...(live && live.tests.length < live.of ? [`${live.tests.length} of ${live.of} tests`] : []),
                 ].join(' · '),
                 figureSources:    sources,
+                // Read by the readout (#455): the short name, and the run's
+                // right-axis twin folded into the same row.
+                readoutLabel:     runLabel(run),
+                readoutGroup:     String(run.id),
                 data:             y1Points,
                 backgroundColor:  color,
                 borderColor:      color,
@@ -842,6 +849,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         tension:          0.1,
                         yAxisID:          'y2',
                         figureSources:    sources,
+                        readoutGroup:     String(run.id),
                     });
                 }
             }
@@ -863,9 +871,60 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
 
+        // What the readout says of a row: the value (the second axis' alongside
+        // it), a flag where a composite rests on few tests, and — on the nearest
+        // row only — the conditions and where the data came from.
+        const testById = new Map(vehicles.flatMap(v => (v.runs ?? []).map(r => [String(r.id), r])));
+        const sourcesOf = (run) => {
+            if (!run) return [];
+            const tests = run.composite
+                ? (run.composite.tests ?? []).map(t => testById.get(String(t.runId))).filter(Boolean)
+                : [run];
+            // One entry per distinct link; a test with a source name but no
+            // link is named only if no other test already names that source.
+            const seen = new Set();
+            const linked = new Set(tests.filter(t => t.source_url).map(t => t.source));
+            return tests
+                .filter(t => t.source_url || (t.source && !linked.has(t.source)))
+                .filter(t => { const k = `${t.source}|${t.source_url}`; return seen.has(k) ? false : (seen.add(k), true); })
+                .map(t => ({ label: t.source || 'Test source', run: t }));
+        };
+        const readoutConfig = {
+            title: (x) => `${nameOf(xLabel)}: ${withUnit(readoutNumber(x), unitOf(xLabel))}`,
+            subtitle: [yLabel, y2Label].filter(Boolean).join(' · '),
+            describe(row, { nearest }) {
+                const ds = datasets[row.datasetIndex];
+                const run = ds.runMeta;
+                const comp = run?.composite;
+                const raw = ds.data[row.dataIndex];
+                const lines = [];
+                if (nearest) {
+                    if (comp) {
+                        const n = raw?.n;
+                        lines.push(`From ${n} test${n === 1 ? '' : 's'} at this point`);
+                        // Best test, the mean (the curve itself), and one SD of
+                        // spread: the band's own lo is mean − SD.
+                        if (raw?.hi != null) lines.push(`Best ${Math.round(raw.hi)} - Avg ${Math.round(raw.y)} - Spread ${Math.round(raw.y - raw.lo)}`);
+                        lines.push(compositeConditions(comp, units));
+                    } else {
+                        lines.push(...runTooltipLines(run, (ds.figureSources ?? []).map(src => src.line), units, { source: false }));
+                    }
+                }
+                return {
+                    name: ds.readoutLabel,
+                    value: withUnit(readoutNumber(row.y), unitOf(yLabel)),
+                    companion: row.companions[0] ? withUnit(readoutNumber(row.companions[0].y), unitOf(y2Label)) : null,
+                    flag: comp && raw?.n < THIN_SUPPORT ? `Rests on ${raw.n} test${raw.n === 1 ? '' : 's'} here` : null,
+                    detail: lines.filter(Boolean),
+                    sources: nearest ? sourcesOf(run) : null,
+                };
+            },
+        };
+
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
             data: { datasets },
+            plugins: [readout.plugin(readoutConfig)],
             options: {
                 animation: false,
                 responsive: true,
@@ -884,35 +943,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 && !data.datasets[item.datasetIndex].spreadOf,
                         },
                     },
-                    tooltip: {
-                        displayColors: false,
-                        filter: (item) => !item.dataset?.spreadOf,
-                        callbacks: {
-                            title(ctx) {
-                                const run = ctx[0]?.dataset?.runMeta;
-                                if (!run) return undefined;
-                                return runLabel(run);
-                            },
-                            label(ctx) {
-                                const xl = axisOptions.find(a => a.value === chartConfig.xAxis)?.label ?? 'X';
-                                const yl = axisOptions.find(a => a.value === chartConfig.yAxis)?.label ?? 'Y';
-                                return [`${xl}: ${ctx.parsed.x}`, `${yl}: ${ctx.parsed.y}`];
-                            },
-                            afterLabel(ctx) {
-                                const comp = ctx.dataset?.runMeta?.composite;
-                                if (comp) {
-                                    const n = ctx.raw?.n;
-                                    const { hi, lo } = ctx.raw ?? {};
-                                    return [
-                                        `From ${n} test${n === 1 ? '' : 's'} at this point`,
-                                        hi != null ? `Test spread: best ${Math.round(hi)} kW, mean − 1 SD ${Math.round(lo)} kW` : null,
-                                        compositeConditions(comp, units),
-                                    ].filter(Boolean);
-                                }
-                                return runTooltipLines(ctx.dataset?.runMeta, (ctx.dataset?.figureSources ?? []).map(s => s.line), units);
-                            },
-                        },
-                    },
+                    // Off: the readout (#455) answers a hover for every series at
+                    // once, in the DOM, where its source links can be clicked.
+                    tooltip: { enabled: false },
                     zoom: {
                         zoom: {
                             drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
@@ -1391,8 +1424,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     </>
                 )}
             >
-                <div style={{ height: presentationMode ? PRESENTED_HEIGHT : '500px' }}>
+                <div className="chart-readout-host" style={{ height: presentationMode ? PRESENTED_HEIGHT : '500px' }}>
                     <canvas ref={chartRef}></canvas>
+                    {readout.overlay}
                 </div>
             </PlotFrame>
 

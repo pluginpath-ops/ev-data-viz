@@ -1,5 +1,7 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import Chart from 'chart.js/auto';
+import { useChartReadout } from '../hooks/useChartReadout';
+import { readoutNumber, withUnit } from '../utils/readoutAtX';
 import { useTheme } from '../hooks/useTheme';
 import { useAppContext } from '../context/AppContext';
 import { convSpeed, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
@@ -245,6 +247,7 @@ export default function EpaCurvesView({
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const canvasRef = useRef(null);
+    const readout = useChartReadout();
     const chartRef  = useRef(null);
 
     // ── UI state ──────────────────────────────────────────────────────────────
@@ -603,7 +606,14 @@ export default function EpaCurvesView({
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
-            plugins: [refPlugin, calloutPlugin],
+            plugins: [refPlugin, calloutPlugin, readout.plugin({
+                title: (x) => `${readoutNumber(x)} ${speedLabel(units)}`,
+                subtitle: yAxisLabel(yAxis, units),
+                describe: (row) => ({
+                    name: datasets[row.datasetIndex].label,
+                    value: withUnit(readoutNumber(row.y), yAxis === 'range_mi' ? distanceLabel(units) : yAxisLabel(yAxis, units)),
+                }),
+            })],
             data: { datasets },
             options: {
                 animation: false,
@@ -661,63 +671,15 @@ export default function EpaCurvesView({
                             },
                         },
                     },
-                    tooltip: {
-                        callbacks: {
-                            title(items) {
-                                const spd = items[0]?.parsed.x;
-                                return `${spd?.toFixed(1)} ${speedLabel(units)}`;
-                            },
-                            label(item) {
-                                const ds = item.dataset;
-                                if (ds._isOverlay) {
-                                    // Overlay points are already corrected/converted at build
-                                    // time (see the datasets useMemo) — use the plotted value
-                                    // directly rather than re-deriving from a curve.
-                                    const decimals = yAxis === 'range_mi' ? 0 : yAxis === 'mi_kwh' ? 2 : 1;
-                                    return `${ds.label}: ${item.parsed.y?.toFixed(decimals)} ${yAxisLabel(yAxis, units)}`;
-                                }
-                                const curve = ds._curve;
-                                const speedMph = units === 'metric'
-                                    ? item.parsed.x / 1.60934
-                                    : item.parsed.x;
-                                const pt = curve?.reduce((best, p) =>
-                                    Math.abs(p.mph - speedMph) < Math.abs(best.mph - speedMph) ? p : best
-                                , curve[0]);
-                                if (!pt) return ds.label;
-
-                                let valStr = '';
-                                if (yAxis === 'kwh100mi') {
-                                    valStr = pt.kwh100mi != null
-                                        ? `${(units === 'metric' ? pt.kwh100mi / 1.60934 : pt.kwh100mi).toFixed(1)} ${units === 'metric' ? 'kWh/100km' : 'kWh/100mi'}`
-                                        : '—';
-                                } else if (yAxis === 'wh_mi') {
-                                    const wh = pt.kwh100mi != null ? pt.kwh100mi * 10 : null;
-                                    valStr = wh != null
-                                        ? `${(units === 'metric' ? wh / 1.60934 : wh).toFixed(1)} ${units === 'metric' ? 'Wh/km' : 'Wh/mi'}`
-                                        : '—';
-                                } else if (yAxis === 'mi_kwh') {
-                                    valStr = pt.miPerKwh != null
-                                        ? `${(units === 'metric' ? pt.miPerKwh * 1.60934 : pt.miPerKwh).toFixed(2)} ${units === 'metric' ? 'km/kWh' : 'mi/kWh'}`
-                                        : '—';
-                                } else if (yAxis === 'mpge') {
-                                    valStr = pt.mpge != null ? `${pt.mpge.toFixed(1)} MPGe` : '—';
-                                } else if (yAxis === 'range_mi') {
-                                    valStr = pt.rangeMi != null
-                                        ? `${(units === 'metric' ? pt.rangeMi * 1.60934 : pt.rangeMi).toFixed(0)} ${distanceLabel(units)}`
-                                        : '—';
-                                }
-                                return `${ds.label}: ${valStr}`;
-                            },
-                        },
-                        mode: 'nearest',
-                        intersect: false,
-                    },
+                    // The readout answers hovers here (#455): the curves are
+                    // interpolated, the real-world overlay points are sampled.
+                    tooltip: { enabled: false },
                 },
             },
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [datasets, yAxis, units, isDark, xMin, xMax, yMin, yMax]);
+    }, [datasets, yAxis, units, isDark, xMin, xMax, yMin, yMax, readout]);
 
     // ── The frame's caption, and its export ─────────────────────────────────
     // The export was a hand-rolled copy of chartToPngDataUrl that drew the
@@ -1013,8 +975,9 @@ export default function EpaCurvesView({
                         </>
                     )}
                 >
-                    <div style={{ height: presentationMode ? PRESENTED_HEIGHT : 500 }}>
+                    <div className="chart-readout-host" style={{ height: presentationMode ? PRESENTED_HEIGHT : 500 }}>
                         <canvas ref={canvasRef} />
+                        {readout.overlay}
                     </div>
                     <p className="text-note mt-2">Shaded band — 65–75 mph typical highway</p>
                 </PlotFrame>
