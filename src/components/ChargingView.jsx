@@ -1326,7 +1326,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             )}
 
             {/* What measuring a composite from a start SoC changed (#408): a
-                composite too few of whose tests reach the start is not drawn,
+                composite none of whose tests reach the start is not drawn (one
+                is drawn from that test alone, dotted),
                 and a test that begins above it is left out of the mean. Named
                 for the same reason as the runs above — a screenshot shows
                 neither the selector nor the ⓘ. Outside race mode each
@@ -1336,7 +1337,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     {selectedComposites.filter(({ run }) => liveComposites[run.id] === null).map(({ run }) => (
                         <p key={run.id}>
                             ⚠ {run.name}: {raceActive
-                                ? `fewer than ${COMPOSITE_MIN_TESTS} of its tests reach ${raceThreshold}%`
+                                ? `none of its tests reach ${raceThreshold}%`
                                 : `fewer than ${COMPOSITE_MIN_TESTS} of its tests can be read`} — not drawn
                         </p>
                     ))}
