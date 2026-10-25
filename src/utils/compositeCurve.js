@@ -257,12 +257,19 @@ export function buildComposite(tests) {
         // Minutes to the next whole percent, from the same tests that counted
         // here. Averaged as time rather than derived from the averaged kW, so
         // no pack capacity has to be assumed.
+        // A step of ZERO minutes is a step: a logger that stamps whole seconds or
+        // minutes puts two percents on one reading (the R2's Ever test reads 1.9
+        // at 14% and 1.9 at 15%). Treating it as "no clock" stopped the clock
+        // for good the first time the only timed test hit one — the 500 A
+        // composite ran 1.7 minutes and ended at 14%. Dropping zeros from the
+        // mean instead would bias it up, since they are real elapsed time that
+        // rounding split unevenly; the sum over the run is what is conserved.
         const next = socs[i + 1];
         if (next == null) break;
         const steps = counted
             .map(({ s, at }) => {
                 const after = s.bySoc.get(next);
-                return at.t != null && after?.t != null && after.t > at.t ? after.t - at.t : null;
+                return at.t != null && after?.t != null && after.t >= at.t ? after.t - at.t : null;
             })
             .filter(dt => dt != null);
         if (steps.length) {
@@ -718,7 +725,7 @@ export function spreadAlong(series, xs) {
  * excluded — so Admin → Data checks can say which stored composites were built
  * the old way.
  */
-export const COMPOSITE_VERSION = 2;   // 2: inherited tests count; the clock starts at the first timed test
+export const COMPOSITE_VERSION = 3;   // 3: a zero-minute step keeps the clock running; 2: inherited tests count, the clock starts at the first timed test
 
 /**
  * What a vehicle's composites are built FROM, as one comparable string. A

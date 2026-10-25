@@ -237,6 +237,33 @@ describe('compositeCurves', () => {
     });
 });
 
+describe('the composite clock', () => {
+    /** A test whose logger stamps coarsely: two percents often share one reading. */
+    const coarse = (from, to, kw) => {
+        const pts = [];
+        let t = 0;
+        for (let soc = from; soc <= to; soc++) {
+            pts.push({ soc, chargeRate: kw, time: Math.floor(t * 2) / 2 });
+            t += 60 / kw;
+        }
+        return pts;
+    };
+
+    it('keeps running through a step of zero minutes — a single timed test must not stop it', () => {
+        // The second test has no clock at all (SoC and power only), as the R2's V3.5 test has none.
+        const noClock = test({ from: 10, to: 60, kwAt: () => 190 }).map(p => ({ ...p, time: null }));
+        const pts = coarse(8, 60, 180);
+        expect(pts.some((p, i) => i > 0 && p.time === pts[i - 1].time)).toBe(true);
+        const c = buildComposite([{ run: run(1), points: pts }, { run: run(2), points: noClock }]);
+        const timed = c.points.filter(p => p.time != null);
+        expect(timed[0].soc).toBe(8);
+        expect(timed.at(-1).soc).toBe(60);
+        // 52 percents at 180 kW on a 100 kWh pack is 17.3 minutes; the logger's half-minute floor and the smoothing take a little off.
+        expect(timed.at(-1).time).toBeGreaterThan(15);
+        expect(timed.at(-1).time).toBeLessThan(18);
+    });
+});
+
 describe('charger current class (migration 092)', () => {
     const vehicleOf = (classV, runs) => ({
         id: 'v', runs, platforms: { electrical: classV ? { voltage_class_v: classV } : null }, specs: {},
