@@ -1,4 +1,5 @@
 import ChartLoading from './ChartLoading';
+import SourceLine from './SourceLine';
 
 /**
  * The bordered frame a chart lives in — and the boundary a PNG export captures.
@@ -13,11 +14,14 @@ import ChartLoading from './ChartLoading';
  * reader finding out what an export does and does not include only after they
  * have already pasted it somewhere.
  *
+ * `sourceLine` is who the plotted data came from (useSourceLine); the export
+ * draws the same words as text, since a canvas cannot hold a link.
+ *
  * `loading` is the view's real data-loading state (#453). The indicator is
  * DOM laid over the frame, out of flow, and the export draws the canvas — so
  * it can appear and clear without moving anything or reaching a PNG.
  */
-export default function PlotFrame({ title, subtitle, exportControls, preview, onDismissPreview, loading = false, loadingMessage, children }) {
+export default function PlotFrame({ title, subtitle, sourceLine, exportControls, preview, onDismissPreview, loading = false, loadingMessage, children }) {
     return (
         <>
             {exportControls && (
@@ -55,6 +59,7 @@ export default function PlotFrame({ title, subtitle, exportControls, preview, on
                     <span className="plot-frame-mark" aria-hidden="true">EV<span>BENCH</span></span>
                 </div>
                 {children}
+                <SourceLine line={sourceLine} />
                 <ChartLoading loading={loading} message={loadingMessage} />
             </div>
         </>

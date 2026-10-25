@@ -220,7 +220,7 @@ export const SECTIONS = [
              + 'line, a band and a tick — and the axis has to match the data exactly.',
         specimens: [
             { composite: 'plot-frame', label: 'Plot frame',
-              covers: ['plot-frame', 'plot-frame-head', 'plot-frame-title', 'plot-frame-subtitle', 'plot-frame-mark'],
+              covers: ['plot-frame', 'plot-frame-head', 'plot-frame-title', 'plot-frame-subtitle', 'plot-frame-mark', 'plot-frame-sources', 'plot-frame-sources-gap'],
               note: 'The figure boundary a PNG export captures — title, subtitle, and the accent mark.' },
             { composite: 'stat-cell', label: 'Stat cell',
               covers: ['stat-cell', 'stat-cell-value', 'stat-cell-unit', 'stat-cell-basis', 'stat-cell-empty'],

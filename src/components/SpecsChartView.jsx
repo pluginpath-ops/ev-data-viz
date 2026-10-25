@@ -8,10 +8,11 @@ import {
     makeVehicleFields, buildFieldGroups, getFieldDef, extractValue, withEffectiveSpecs,
     detectMode, formatNumericLabel, vehicleColor,
 } from '../utils/specHelpers';
-import { fieldFigureSource } from '../utils/vehicleFigures';
+import { fieldFigureSource, epaCreditsForFields } from '../utils/vehicleFigures';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { useSourceLine } from '../hooks/useSourceLine';
 import { buildVehicleLabels } from '../utils/seriesLabel';
 import FeatureChartButton from './home/FeatureChartButton';
 
@@ -219,8 +220,13 @@ export default function SpecsChartView({ vehicles: picked, selectedField: contro
     // Units only: the vehicle count is visible on the chart (#443).
     const plotSubtitle = units === 'metric' ? 'metric' : 'imperial';
 
+    // Spec values are the manufacturer's; EPA is credited when a plotted field
+    // is an EPA-resolved figure.
+    const sourceEpa = useMemo(() => epaCreditsForFields(vehicles, [selectedField]), [vehicles, selectedField]);
+    const sourceLine = useSourceLine({ epa: sourceEpa });
+
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: vehicles.map(v => v.id).join(',') });
 
     return (
@@ -248,6 +254,7 @@ export default function SpecsChartView({ vehicles: picked, selectedField: contro
         <PlotFrame
             title={plotTitle}
             subtitle={plotSubtitle}
+            sourceLine={sourceLine}
             preview={preview}
             onDismissPreview={dismissPreview}
             exportControls={!presentationMode && (

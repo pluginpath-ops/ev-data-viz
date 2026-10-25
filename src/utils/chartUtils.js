@@ -19,6 +19,29 @@ const GAP = 10;
 
 
 /**
+ * Break a source line ("Data: A · B · C") between names so no line is wider
+ * than `maxWidth` device pixels. Measured with the font it is drawn in.
+ */
+function wrapSources(text, maxWidth, font) {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = font;
+    const [head, ...names] = text.split(' · ');
+    const lines = [];
+    let line = head;
+    for (const name of names) {
+        const next = `${line} · ${name}`;
+        if (line !== head && ctx.measureText(next).width > maxWidth) {
+            lines.push(line);
+            line = name;
+        } else {
+            line = next;
+        }
+    }
+    lines.push(line);
+    return lines;
+}
+
+/**
  * Render a Chart.js instance onto an offscreen canvas and return a PNG data URL.
  *
  * @param {object} chartInstance
@@ -26,6 +49,7 @@ const GAP = 10;
  * @param {string} [options.background]  Flat fill. Defaults to the panel token.
  * @param {string} [options.title]       Drawn above the plot, as in the frame.
  * @param {string} [options.subtitle]    The conditions the plot was drawn under.
+ * @param {string} [options.sources]    The source line, drawn under the plot.
  * @param {boolean} [options.wordmark]   Source mark, top-right. Default true.
  */
 export function chartToPngDataUrl(chartInstance, options = {}) {
@@ -35,6 +59,7 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
         background = theme.background,
         title = null,
         subtitle = null,
+        sources = null,
         wordmark = true,
     } = opts;
 
@@ -59,10 +84,16 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
         ? px((title ? TITLE_SIZE + 4 : 0) + (subtitle ? SUB_SIZE + 5 : 0) + GAP)
         : 0;
     const pad = hasChrome ? px(PAD) : 0;
+    // The source line sits under the plot, as in the frame (.plot-frame-sources).
+    // It wraps like the on-screen line does (.plot-frame-sources is flex-wrap):
+    // a long list of sources breaks between names, never off the canvas edge.
+    const LINE_H = SUB_SIZE + 3;
+    const sourceLines = sources ? wrapSources(sources, src.width, `400 ${px(SUB_SIZE)}px ${MONO}`) : [];
+    const footerH = sourceLines.length ? px(GAP + SUB_SIZE + (sourceLines.length - 1) * LINE_H) : 0;
 
     const offscreen = document.createElement('canvas');
     offscreen.width = src.width + pad * 2;
-    offscreen.height = src.height + headerH + pad * 2;
+    offscreen.height = src.height + headerH + footerH + pad * 2;
 
     const ctx = offscreen.getContext('2d');
     ctx.fillStyle = background;
@@ -106,6 +137,14 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
     }
 
     ctx.drawImage(src, pad, pad + headerH);
+    if (sourceLines.length) {
+        ctx.font = `400 ${px(SUB_SIZE)}px ${MONO}`;
+        ctx.fillStyle = theme.tick;
+        ctx.textAlign = 'left';
+        sourceLines.forEach((line, i) => {
+            ctx.fillText(line, pad, pad + headerH + src.height + px(GAP) + px(SUB_SIZE) * 0.8 + px(i * LINE_H));
+        });
+    }
     return offscreen.toDataURL('image/png');
 }
 

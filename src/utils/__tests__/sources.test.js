@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sameSource, domainOf, findSource, pickedSource, startingName, runSourceText, storedSourcePick } from '../sources';
+import { sameSource, domainOf, findSource, pickedSource, startingName, runSourceText, storedSourcePick, attributionFor, sourceLineText } from '../sources';
 
 const SOURCES = [
     { id: 1, name: 'Car and Driver', aliases: ['C&D', 'CD'], domains: ['caranddriver.com'], default_rollout_basis: 'rollout' },
@@ -139,5 +139,67 @@ describe('storedSourcePick', () => {
         expect(storedSourcePick(SOURCES, '')).toBeNull();
         expect(storedSourcePick(SOURCES, 'Oos Reviews')).toBeNull();
         expect(storedSourcePick([], 'Out of Spec')).toBeNull();
+    });
+});
+
+describe('attributionFor (the source line)', () => {
+    const SRC = [
+        { id: 1, name: 'Out of Spec', aliases: ['OoS'], domains: ['outofspecstudios.com'] },
+        { id: 2, name: 'State of Charge', aliases: [], domains: [] },
+    ];
+    const run = (id, source, extra = {}) => ({ id, source, ...extra });
+
+    it('merges spellings into the canonical name and orders by runs supplied', () => {
+        const out = attributionFor({
+            sources: SRC,
+            runs: [run(1, 'State of Charge'), run(2, 'OoS'), run(3, 'Out of Spec'), run(4, 'Out of Spec')],
+        });
+        expect(out.entries.map(e => e.name)).toEqual(['Out of Spec', 'State of Charge']);
+    });
+
+    it('links a source to its first listed domain, and leaves an unlisted one plain', () => {
+        const { entries } = attributionFor({ sources: SRC, runs: [run(1, 'Out of Spec'), run(2, 'Some Channel')] });
+        expect(entries.find(e => e.name === 'Out of Spec').url).toBe('https://outofspecstudios.com');
+        expect(entries.find(e => e.name === 'Some Channel').url).toBeNull();
+    });
+
+    it('counts a run with no source as unattributed, not as a credit', () => {
+        const out = attributionFor({ sources: SRC, runs: [run(1, ''), run(2, null), run(3, 'Out of Spec')] });
+        expect(out.unattributed).toBe(2);
+        expect(out.entries).toHaveLength(1);
+    });
+
+    it('credits a composite to the sources of the tests it was built from', () => {
+        const tests = { 10: run(10, 'Out of Spec'), 11: run(11, 'State of Charge') };
+        const composite = run(99, null, { composite: { tests: [{ runId: 10 }, { runId: 11 }, { runId: 12 }] } });
+        const out = attributionFor({ sources: SRC, runs: [composite], runById: id => tests[id] });
+        expect(out.entries.map(e => e.name).sort()).toEqual(['Out of Spec', 'State of Charge']);
+        expect(out.unattributed).toBe(0);
+    });
+
+    it('does not count a run twice, even when a composite and the test are both plotted', () => {
+        const test = run(10, 'Out of Spec');
+        const composite = run(99, null, { composite: { tests: [{ runId: 10 }] } });
+        const out = attributionFor({ sources: SRC, runs: [test, composite], runById: () => test });
+        expect(out.entries).toHaveLength(1);
+    });
+
+    it('names fueleconomy.gov for a label figure and EPA for test data, after the test sources', () => {
+        const out = attributionFor({ sources: SRC, runs: [run(1, 'Out of Spec')], epa: { label: true, tests: true } });
+        expect(out.entries.map(e => e.name)).toEqual(['Out of Spec', 'fueleconomy.gov', 'EPA']);
+        expect(out.entries[1].url).toBe('https://www.fueleconomy.gov');
+    });
+});
+
+describe('sourceLineText', () => {
+    const line = { entries: [{ name: 'Out of Spec' }, { name: 'EPA' }], unattributed: 2 };
+
+    it('joins the names, and says nothing when there are none', () => {
+        expect(sourceLineText(line)).toBe('Data: Out of Spec · EPA');
+        expect(sourceLineText({ entries: [], unattributed: 3 })).toBe('');
+    });
+
+    it('adds the gap only for a curator', () => {
+        expect(sourceLineText(line, true)).toBe('Data: Out of Spec · EPA · ⚠ 2 unattributed');
     });
 });

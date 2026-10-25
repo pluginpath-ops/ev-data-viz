@@ -10,7 +10,8 @@ import AxisScaleControls from './AxisScaleControls';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
-import { figureSources } from '../utils/vehicleFigures';
+import { figureSources, epaCredits } from '../utils/vehicleFigures';
+import { useSourceLine } from '../hooks/useSourceLine';
 
 /**
  * The resolved vehicle figures each derived axis divides or multiplies by
@@ -983,9 +984,21 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         return parts.join(' · ');
     }, [colorableRuns, selectedRuns, selectedVehicles, raceActive, raceThreshold, chartConfig.verboseLabels, chartConfig.correctionMode, chartConfig.correctionTarget, units, selectedComposites]);
 
+    // ── Source line: who the plotted runs, and any EPA figure, came from ─────
+    const sourceRuns = colorableRuns;
+    const fleetRuns = useMemo(() => selectedVehicles.flatMap(v => v.runs || []), [selectedVehicles]);
+    const sourceEpa = useMemo(() => {
+        const axes = [raceActive ? null : chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis].filter(Boolean);
+        const figures = new Set(axes.flatMap(a => AXIS_FIGURES[a] ?? []));
+        const testedRange = axes.some(a => a === 'range' || a === 'deltaRange')
+            && sourceRuns.some(r => isEpaPartnerId(rangePartnersOfCharging(pairings, r.id)[0]));
+        return epaCredits(selectedVehicles, { capacity: figures.has('capacity'), range: figures.has('range') || testedRange });
+    }, [raceActive, chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis, sourceRuns, selectedVehicles, pairings]);
+    const sourceLine = useSourceLine({ runs: sourceRuns, allRuns: fleetRuns, epa: sourceEpa });
+
     // ── PNG export ───────────────────────────────────────────────────────────
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: `${selectedRuns.join(',')}|${selectedComposites.length}` });
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -1337,6 +1350,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             <PlotFrame
                 title={plotTitle}
                 subtitle={plotSubtitle}
+                sourceLine={sourceLine}
                 preview={preview}
                 onDismissPreview={dismissPreview}
                 loading={loadingData}

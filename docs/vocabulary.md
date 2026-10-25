@@ -75,6 +75,7 @@ Renaming it is [tracked separately](#deferred-renames).
 |---|---|---|---|
 | The 320px control column beside a plot | **sidebar** | HTML `<aside>` | `.chart-rail`, `.chart-main` |
 | The bordered box that a PNG export captures | **figure** | HTML `<figure>` / `<figcaption>` | [PlotFrame.jsx](../src/components/charts/PlotFrame.jsx), `.plot-frame` |
+| The small "Data: …" credit along the bottom of a figure | **source line** | data-visualisation convention (the *source line* under a chart) | [SourceLine.jsx](../src/components/charts/SourceLine.jsx), `.plot-frame-sources`, [useSourceLine.js](../src/hooks/useSourceLine.js) |
 | The strip of PNG / URL / Reset-zoom buttons | **toolbar** | WAI-ARIA `toolbar` | `.chart-export-strip` |
 | The thumbnail of what PNG just copied | **export preview** | — | [useChartPng.js](../src/hooks/useChartPng.js), `.chart-png-preview` |
 | Canvas type sizes derived from `--fs-body` | **chart fonts** | — | [chartTheme.js](../src/utils/chartTheme.js) `chartFonts()` |

@@ -15,10 +15,14 @@ import LoadingSpinner from '../../LoadingSpinner';
 import CollapsibleSection from '../../CollapsibleSection';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../../utils/chartTheme';
 import PlotFrame from '../../charts/PlotFrame';
+import { useSourceLine } from '../../../hooks/useSourceLine';
 import { useChartPng } from '../../../hooks/useChartPng';
 import InfoIcon from '../../InfoIcon';
 import { EPA_EXPLAINERS } from '../../../utils/epaExplainers';
 import { fmtTemp, fmtSpeed } from '../../../utils/unitConversions';
+
+// Every curve here is EPA's test data.
+const EPA_TESTS = { tests: true };
 
 /**
  * EPA efficiency curves anchored on certification records (#237).
@@ -239,8 +243,10 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
         return parts.join(' · ');
     }, [conditions, units, gradeGainFtNum]);
 
+    const sourceLine = useSourceLine({ epa: EPA_TESTS });
+
     const { copyPng, copied: pngCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(plotted.length) });
     const [urlCopied, setUrlCopied] = useState(false);
 
@@ -498,6 +504,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                             <PlotFrame
                                 title={plotTitle}
                                 subtitle={plotSubtitle}
+                                sourceLine={sourceLine}
                                 preview={preview}
                                 onDismissPreview={dismissPreview}
                                 exportControls={!presentationMode && (

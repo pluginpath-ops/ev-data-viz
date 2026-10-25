@@ -3412,6 +3412,22 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: var(--color-text-meta);
 }
 
+/* Who the plotted data came from, along the bottom of the frame (the source
+   line). Names are links on screen; the PNG export draws them as plain text. */
+.plot-frame-sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 6px;
+    margin: 10px 0 0;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-meta);
+}
+.plot-frame-sources > * + *::before { content: '·'; margin-right: 6px; color: var(--color-text-faint); }
+.plot-frame-sources > span:first-child + *::before { content: none; }
+.plot-frame-sources a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+.plot-frame-sources a:hover { color: var(--color-text-primary); }
+.plot-frame-sources-gap { color: var(--color-warning-text, var(--color-text-meta)); }
+
 /* Top-right of the frame, so an exported image carries its source. */
 .plot-frame-mark {
     flex: none;

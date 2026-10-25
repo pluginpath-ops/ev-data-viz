@@ -2476,6 +2476,27 @@ describe('Home draws a featured comparison and curators can make one (#448 layer
     });
 });
 
+describe('every chart credits its data on a source line', () => {
+    const framed = ALL.filter(x => /<PlotFrame\b/.test(x.text) && !x.file.endsWith('PlotFrame.jsx'));
+
+    it('finds the chart views to check', () => {
+        expect(framed.length).toBeGreaterThanOrEqual(10);
+    });
+
+    it.each(framed.map(x => [x.file, x.text]))('%s gives each PlotFrame a sourceLine and the export its text', (file, text) => {
+        const frames = (text.match(/<PlotFrame\b/g) || []).length;
+        expect((text.match(/^\s*sourceLine=\{sourceLine\}/gm) || []).length).toBe(frames);
+        expect(text).toMatch(/useSourceLine\(/);
+        expect(text).toMatch(/sources:\s*sourceLine\.text/);
+    });
+
+    it('PlotFrame draws it and the PNG export carries it as text', () => {
+        expect(read('src/components/charts/PlotFrame.jsx')).toMatch(/<SourceLine line=\{sourceLine\}/);
+        expect(read('src/hooks/useChartPng.js')).toMatch(/sources: frame\?\.sources/);
+        expect(read('src/utils/chartUtils.js')).toMatch(/sourceLines\.forEach\(/);
+    });
+});
+
 describe('chart views show a loading indicator from their real loading state (#453)', () => {
     const plotFrame = read('src/components/charts/PlotFrame.jsx');
     const chartLoading = read('src/components/charts/ChartLoading.jsx');

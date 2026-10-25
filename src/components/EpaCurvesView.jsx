@@ -21,6 +21,7 @@ import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { useSourceLine } from '../hooks/useSourceLine';
 import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
@@ -35,6 +36,9 @@ import { useRunSelection } from '../hooks/useRunSelection';
 import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
+
+const NO_RUNS = [];
+const EPA_TESTS = { tests: true };
 
 
 // ── Highway band plugin ───────────────────────────────────────────────────────
@@ -741,8 +745,16 @@ export default function EpaCurvesView({
         return parts.join(' · ');
     }, [conditions, overlayMode, units]);
 
+    // The curves are EPA's tests; the overlay, when on, adds ours.
+    const overlayRuns = useMemo(
+        () => overlayMode
+            ? vehiclesWithEpa.flatMap(v => filterRangeRuns(v.runs).filter(r => !r._inherited && r.speed_mph != null && r.distance_miles > 0 && r.energy_kwh != null))
+            : NO_RUNS,
+        [overlayMode, vehiclesWithEpa]);
+    const sourceLine = useSourceLine({ runs: overlayRuns, epa: EPA_TESTS });
+
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(datasets.length) });
 
     const handleCopyUrl = () => {
@@ -973,6 +985,7 @@ export default function EpaCurvesView({
                 <PlotFrame
                     title={plotTitle}
                     subtitle={plotSubtitle}
+                    sourceLine={sourceLine}
                     preview={preview}
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (

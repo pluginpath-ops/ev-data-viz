@@ -10,7 +10,8 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, speedBasisNote, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { figureSources } from '../utils/vehicleFigures';
+import { figureSources, epaCredits } from '../utils/vehicleFigures';
+import { useSourceLine } from '../hooks/useSourceLine';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import { sessionFor } from '../utils/testSessions';
@@ -655,8 +656,20 @@ export default function ChargeCompareView({
     const title1 = `Range added in ${xMinutes} minutes`;
     const title2 = `Time to add ${units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} ${distanceLabel(units)}`;
     const plotSignature = activePairs.map(p2 => p2.key).join(',');
-    const png1 = useChartPng(chart1Instance, { title: title1, subtitle: plotSubtitle, signature: plotSignature });
-    const png2 = useChartPng(chart2Instance, { title: title2, subtitle: plotSubtitle, signature: plotSignature });
+
+    // Source line: each bar is a charging test priced from a range test, or
+    // from the vehicle's EPA range. Both frames draw from the same pairs.
+    const sourceRuns = useMemo(
+        () => activePairs.flatMap(p2 => [p2.chargingRun, p2.rangeSrc?.source === 'epa' ? null : p2.rangeRun]).filter(Boolean),
+        [activePairs]);
+    const fleetRuns = useMemo(() => selectedVehicles.flatMap(v => v.runs || []), [selectedVehicles]);
+    const sourceEpa = useMemo(() => epaCredits(
+        activePairs.filter(p2 => p2.rangeSrc?.source === 'epa').map(p2 => selectedVehicles.find(v => v.id === p2.rangeRun.vehicleId)),
+        { range: true }), [activePairs, selectedVehicles]);
+    const sourceLine = useSourceLine({ runs: sourceRuns, allRuns: fleetRuns, epa: sourceEpa });
+
+    const png1 = useChartPng(chart1Instance, { title: title1, subtitle: plotSubtitle, sources: sourceLine.text, signature: plotSignature });
+    const png2 = useChartPng(chart2Instance, { title: title2, subtitle: plotSubtitle, sources: sourceLine.text, signature: plotSignature });
 
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
@@ -1094,6 +1107,7 @@ export default function ChargeCompareView({
                     <PlotFrame
                         title={title1}
                         subtitle={plotSubtitle}
+                        sourceLine={sourceLine}
                         preview={png1.preview}
                         onDismissPreview={png1.dismissPreview}
                         loading={loading}
@@ -1127,6 +1141,7 @@ export default function ChargeCompareView({
                         <PlotFrame
                             title={title2}
                             subtitle={plotSubtitle}
+                            sourceLine={sourceLine}
                             preview={png2.preview}
                             onDismissPreview={png2.dismissPreview}
                             loading={loading}
