@@ -20,7 +20,7 @@ const GAP = 10;
 
 /**
  * Break a source line ("Data: A · B · C") between names so no line is wider
- * than `maxWidth` device pixels. Measured with the font it is drawn in.
+ * than `maxWidth` device pixels. A wrapped line begins with its separator dot. Measured with the font it is drawn in.
  */
 function wrapSources(text, maxWidth, font) {
     const ctx = document.createElement('canvas').getContext('2d');
@@ -32,7 +32,9 @@ function wrapSources(text, maxWidth, font) {
         const next = `${line} · ${name}`;
         if (line !== head && ctx.measureText(next).width > maxWidth) {
             lines.push(line);
-            line = name;
+            // The separator leads the continuation, as it does on screen, so the
+            // break never makes two names read as one ("CarWow" / "Estimated").
+            line = `· ${name}`;
         } else {
             line = next;
         }
