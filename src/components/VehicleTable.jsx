@@ -22,7 +22,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAsyncResource } from '../hooks/useAsyncResource';
-import SortHeader from './tables/SortHeader';
+import VehicleTableGrid from './vehicles/VehicleTableGrid';
+import FeatureChartButton from './home/FeatureChartButton';
 import ColumnPicker from './tables/ColumnPicker';
 import PresetPicker from './tables/PresetPicker';
 import { sessionFor } from '../utils/testSessions';
@@ -33,22 +34,18 @@ import TableCell from './tables/TableCell';
 import { useCellPeek } from '../hooks/useCellPeek';
 import TestPeek from './TestPeek';
 import { cellUnit, figureWithUnit } from '../utils/tableColumns';
-import { testHref } from '../utils/testDetails';
-import { platformHref } from '../utils/platforms';
-import { useNavigation } from '../context/NavigationContext';
 import VehicleFilterBar from './vehicles/VehicleFilterBar';
 import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { decodeVehicleFilters } from '../utils/vehicleFilters';
 import ViewSpecsModal from './ViewSpecsModal';
 import VehicleCardPopover from './vehicles/VehicleCardPopover';
-import { vehicleColor } from '../utils/specHelpers';
 import { groupPerformanceByVehicle } from '../utils/dataChecks';
 import { reorderSelectionBySort } from '../utils/sortSelection';
 import {
     VEHICLE_COLUMNS, DEFAULT_VEHICLE_COLUMNS, VEHICLE_TABLE_PARAM_PREFIX,
     vehicleColumnByKey, unitFor, needsPerformance, buildVehicleRows, formatVehicleCell,
     sortVehicleRows, firstSortDir,
-    vehicleBarMaxima, vehicleBarPercent, encodeVehicleTableParams, decodeVehicleTableParams,
+    vehicleBarMaxima, encodeVehicleTableParams, decodeVehicleTableParams,
     vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
     labelledColumn, needsAssumptions, assumptionsFor,
 } from '../utils/vehicleTable';
@@ -68,93 +65,6 @@ function readMemory() {
 
 function writeMemory({ view }) {
     try { if (view) window.localStorage.setItem(VIEW_KEY, view); else window.localStorage.removeItem(VIEW_KEY); } catch { /* no memory, no harm */ }
-}
-
-/** One vehicle. Rendered by the selected band and the body from the same component. */
-function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen, onOpenTest, onViewRuns, performanceCounts }) {
-    const { openPlatform } = useNavigation();
-    return (
-        <tr className={`guide-row${selected ? ' selected' : ''}`} data-row-id={row.id} onClick={() => onOpen(row.vehicle)}>
-            <td className="guide-td guide-td-select sticky-select" onClick={e => e.stopPropagation()}>
-                <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() => onToggle(row.id)}
-                    aria-label={selected ? `Remove ${row.values.name} from the selection` : `Add ${row.values.name} to the selection`}
-                />
-            </td>
-            {cols.map(col => {
-                // An asterisk on the tested range where its peek has a when-new
-                // range to justify it (whenNewRange: only a pack well down).
-                const text = formatVehicleCell(row, col, units);
-                // The asterisk closes the figure, unit included: "512 mi*".
-                const mark = col.key === 'tested.range_mi' && row.whenNew ? '*' : '';
-                if (col.key === 'name') {
-                    return (
-                        // The name TEXT opens the vehicle's card in a popover; the
-                        // rest of the cell — the margin around it and the swatch —
-                        // selects, like the checkbox beside it, so the row's
-                        // biggest target still does what it always did. Every other
-                        // cell opens View Specs.
-                        <TableCell
-                            key={col.key}
-                            className="sticky-name"
-                            restate={text + mark}
-                            onClick={(e) => { e.stopPropagation(); onToggle(row.id); }}
-                        >
-                            <span className="vehicle-table-name">
-                                {/* The vehicle's series color, so a row ties to the
-                                    same vehicle on every chart. */}
-                                <span className="series-swatch" style={{ backgroundColor: vehicleColor(row.vehicle, row.index) }} aria-hidden="true" />
-                                <VehicleCardPopover
-                                    vehicle={row.vehicle}
-                                    units={units}
-                                    performanceCounts={performanceCounts}
-                                    selected={selected}
-                                    onViewRuns={onViewRuns}
-                                    onViewSpecs={onOpen}
-                                    onOpenTest={onOpenTest}
-                                >
-                                    <span className="guide-cell-name">{text}</span>
-                                </VehicleCardPopover>
-                            </span>
-                        </TableCell>
-                    );
-                }
-                return (
-                    <TableCell
-                        key={col.key}
-                        numeric={col.numeric}
-                        text={text}
-                        unit={col.numeric ? cellUnit(unitFor(col, units), row.values[col.key]) : null}
-                        mark={mark}
-                        pct={vehicleBarPercent(row, col, maxima)}
-                        note={row.notes[col.key]}
-                        flagged={row.flagged.has(col.key)}
-                        test={testLink(row.tests[col.key], onOpenTest)}
-                        testKey={col.key}
-                        link={platformNoteLink(row.links?.[col.key], openPlatform)}
-                    />
-                );
-            })}
-        </tr>
-    );
-}
-
-/**
- * A cell's test as TableCell links it: the href always, and an in-app open
- * where the table has one. The pop-out window has none — it holds only the
- * table — so there a click opens the test in a new tab instead.
- */
-/** A "from <platform>" note as TableCell links it (#354). */
-function platformNoteLink(link, openPlatform) {
-    if (link?.platformId == null) return null;
-    return { href: platformHref(link.platformId), onOpen: openPlatform ? () => openPlatform(link.platformId) : null };
-}
-
-function testLink(ref, onOpenTest) {
-    if (!ref) return null;
-    return { href: testHref(ref), onOpen: onOpenTest ? () => onOpenTest(ref) : null };
 }
 
 /**
@@ -283,7 +193,6 @@ export default function VehicleTable({
     const byId = useMemo(() => new Map(rows.map(r => [r.id, r])), [rows]);
     const selectedRows = selectedVehicles.map(id => byId.get(id)).filter(Boolean);
     const bodyRows = sorted.filter(r => !selectedVehicles.includes(r.id));
-    const span = cols.length + 1;
 
     const sortBy = (key) => {
         const dir = key === sortKey ? (sortDir === 'asc' ? 'desc' : 'asc') : firstSortDir(vehicleColumnByKey(key));
@@ -324,6 +233,8 @@ export default function VehicleTable({
                         correctionTarget={correctionTarget} onCorrectionTargetChange={setCorrectionTarget}
                     />
                 )}
+                {/* The table has no chart toolbar, so its Save as featured comparison is here. */}
+                <FeatureChartButton className="btn btn-secondary" />
                 <ColumnPicker
                     columns={pickable}
                     visible={columns}
@@ -335,46 +246,17 @@ export default function VehicleTable({
                 {wantsPerformance && performanceLoading && <span className="text-meta">loading tested results…</span>}
             </VehicleFilterBar>
 
-            <div className="guide-table-container">
-                <table className="guide-table" {...peekProps}>
-                    <thead>
-                        <tr>
-                            <th className="guide-th guide-th-select sticky-select" />
-                            {cols.map(col => (
-                                <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={sortBy}
-                                    dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} reorderHint={col.sticky} />
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {selectedRows.length > 0 && (
-                            <>
-                                <tr className="vehicle-table-band">
-                                    <td colSpan={span}>
-                                        <div className="guide-band-content">
-                                            <span className="text-nano">Selected · {selectedRows.length}</span>
-                                            <span className="text-note">maintained site-wide, at the top</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {selectedRows.map(row => (
-                                    <VehicleTableRow key={`selected-${row.id}`} row={row} selected {...rowProps} />
-                                ))}
-                                <tr className="vehicle-table-band-spacer"><td colSpan={span} /></tr>
-                            </>
-                        )}
-                        {bodyRows.map(row => (
-                            <VehicleTableRow key={row.id} row={row} selected={false} {...rowProps} />
-                        ))}
-                    </tbody>
-                </table>
-                {cellPeek}
-                {bodyRows.length === 0 && selectedRows.length === 0 && (
-                    <div className="empty-state">
-                        {rows.length ? 'No vehicles match these filters.' : 'No vehicles yet.'}
-                    </div>
-                )}
-            </div>
+            <VehicleTableGrid
+                cols={cols}
+                sort={{ key: sortKey, dir: sortDir, onSort: sortBy }}
+                drag={{ dragProps, dragClass }}
+                selectedRows={selectedRows}
+                bodyRows={bodyRows}
+                rowProps={rowProps}
+                peekProps={peekProps}
+                peek={cellPeek}
+                emptyText={rows.length ? 'No vehicles match these filters.' : 'No vehicles yet.'}
+            />
 
             {viewing && <ViewSpecsModal vehicle={viewing} onClose={() => setViewing(null)} />}
         </div>

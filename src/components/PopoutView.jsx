@@ -18,7 +18,7 @@ export default function PopoutView({
         return (
             <div className="popout-root">
                 <div className="popout-watermark">EVBench | Live</div>
-                <EpaCurveExplorer presentationMode synced={epaExplorer} />
+                <EpaCurveExplorer presentationMode synced={epaExplorer} correctionTarget={chartConfig?.correctionTarget} />
             </div>
         );
     }

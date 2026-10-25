@@ -15,7 +15,8 @@ import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
  * cannot be present on one chart and missing on the next.
  *
  * @param {{current: object}} chartRef  Ref holding the Chart.js INSTANCE.
- * @param {{title: string, subtitle: string}} frame  Caption drawn onto the PNG.
+ * @param {{title: string, subtitle: string, sources?: string}} frame  Caption drawn onto the PNG;
+ *        `sources` is the source line's text (useSourceLine).
  */
 export function useChartPng(chartRef, frame) {
     const [copied, setCopied] = useState(false);
@@ -30,7 +31,7 @@ export function useChartPng(chartRef, frame) {
     // string of what is plotted) to keep a change of selection clearing the
     // preview. A plain object dependency would be a new identity every render
     // and clear it instantly.
-    const caption = `${frame?.title ?? ''}|${frame?.subtitle ?? ''}|${frame?.signature ?? ''}`;
+    const caption = `${frame?.title ?? ''}|${frame?.subtitle ?? ''}|${frame?.signature ?? ''}|${frame?.sources ?? ''}`;
     const firstRun = useRef(true);
     useEffect(() => {
         if (firstRun.current) { firstRun.current = false; return; }
@@ -40,7 +41,7 @@ export function useChartPng(chartRef, frame) {
     const copyPng = async () => {
         const chart = chartRef?.current;
         if (!chart) return;
-        const opts = { title: frame?.title, subtitle: frame?.subtitle };
+        const opts = { title: frame?.title, subtitle: frame?.subtitle, sources: frame?.sources };
         try {
             setPreview(await copyChartAsPng(chart, opts));
             setCopied(true);

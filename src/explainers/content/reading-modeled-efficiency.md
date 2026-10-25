@@ -2,7 +2,7 @@
 slug: reading-modeled-efficiency
 title: Reading the Modeled Efficiency chart
 related: [epa-vs-real-world, road-load-and-efficiency, epa-battery-figures]
-linked_from: [Modeled Efficiency "About this chart" (#370), curve tier legend, viewing conditions]
+linked_from: [Modeled Efficiency "About this chart" (#370), curve tier legend, the conditions panel]
 status: DRAFT
 ---
 
@@ -80,17 +80,22 @@ real one. The list of cars that flag catches could be its own finding.
 
 ## Changing the conditions
 
-The curve starts at standard lab conditions: sea level, mild temperature, no wind, flat road. The
-viewing conditions let you move it:
+The curve starts at standard lab conditions: sea level, mild temperature, no wind, flat road. The same sliders
+as the other charts (temperature, altitude and accessory load) let you move it, and a pair of extras of its own,
+wind and elevation change:
 - **Elevation and temperature** change air density, and with it aerodynamic drag. At 5,000 ft the air is
   about 14% thinner, and 20 °F air is about 11% denser than 75 °F air
-  [[fact:physics-air-density-drag]]. These change air density *only*. They don't model a cold battery or
-  cabin heat, and those are usually the bigger winter hit.
+  [[fact:physics-air-density-drag]]. These change air density *only*.
 - **Accessory load** covers heat, A/C, battery conditioning and the lights. It matters most at low speed,
-  where the car is slow to cover a mile and the draw keeps running.
+  where the car is slow to cover a mile and the draw keeps running [[fact:physics-accessory-energy-per-mile]].
+  It follows the temperature slider until you set it yourself. How EVBench assumes it for a test is in
+  [How heating and cooling change a range test](heating-cooling-and-range).
 - **Wind** changes the speed of the air over the car, so a headwind acts like driving faster.
 - **Elevation gain or loss** adds a one-off cost for a net climb over a route. It gives back only part of a
   net descent, because regen doesn't recover everything. It's usually left at 0 for round trips.
+
+Unlike the other charts, this one doesn't follow the "Correct:" setting: it draws a model, so there is no
+measured figure to leave uncorrected, and the sliders always apply.
 
 ::: figure conditions-sweep One curve at standard conditions, then at 5,000 ft, at 20 °F with heat on, and into a 15 mph headwind. Four lines on one chart.
 
@@ -103,7 +108,7 @@ the explainer version should be simpler (fewer knobs, one car) rather than dupli
 ## Laying real tests over the curve
 
 On the selected-vehicles chart, EVBench's range tests for that car can be drawn on top of its curve:
-- **Corrected** points are adjusted to the chart's current conditions (temperature, wind, elevation) so they
+- **Corrected** points are adjusted to the chart's current conditions (temperature, accessory load, wind, elevation) so they
   compare like for like with the curve.
 - **Uncorrected** points are exactly as recorded. They're not a fair comparison when the conditions
   differ, but they're the real data.

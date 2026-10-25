@@ -1,7 +1,13 @@
 import NumberInput from './NumberInput';
 /**
  * Shared Y/X axis min-max scale controls.
- * Used below charts in ChargingView, RangeChartView, RoadTripView, EpaCurvesView.
+ * Used below charts in ChargingView, RangeChartView, RoadTripView, EpaCurvesView,
+ * PerformanceCurveView and EpaCurveExplorer.
+ *
+ * Its values and its `onChange` come from `useAxisLimits(chartKey)` (#478), so
+ * every chart's limits are stored, linked and popped out the same way:
+ *     const { limits, setLimit } = useAxisLimits('range');
+ *     <AxisScaleControls xMin={limits.xMin} … onChange={setLimit} />
  *
  * Props:
  *   xMin, xMax, yMin, yMax        – current values (null = auto)

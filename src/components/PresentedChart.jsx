@@ -8,6 +8,7 @@ import { DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import EpaCurvesView from './EpaCurvesView';
 import PerformanceCompareView from './PerformanceCompareView';
 import PerformanceCurveView from './PerformanceCurveView';
+import { AxisLimitsProvider } from '../hooks/useAxisLimits';
 
 /**
  * One chart, drawn from a bundle of state with no controls around it.
@@ -24,6 +25,11 @@ import PerformanceCurveView from './PerformanceCurveView';
  * settle that selection for it — without them a chart that starts empty and
  * fills itself on first sight of its vehicles stays blank.
  *
+ * Its axis limits are the chartConfig's (`axisLimits`, #478), served to whichever
+ * view draws through AxisLimitsProvider below. A Home panel's chartConfig is its
+ * own copy, so the limits a curator saved are the ones it draws with; the
+ * pop-out's is the main tab's.
+ *
  * The vehicle table is not here: it reads the site's live selection, filters
  * and URL, so it cannot be drawn from a bundle.
  */
@@ -33,7 +39,7 @@ export default function PresentedChart({
     setCompareConfig = null, setRoadTripConfig = null, setEpaConfig = null,
 }) {
     return (
-        <>
+        <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
         {selectedVehicles.length > 0 && chartMode === 'specs' && (
             <SpecsChartView
                 vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
@@ -126,9 +132,10 @@ export default function PresentedChart({
                 epaConfig={epaConfig || { yAxis: 'kwh100mi' }}
                 setEpaConfig={setEpaConfig ?? (() => {})}
                 palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
+                correctionTarget={chartConfig?.correctionTarget}
                 presentationMode
             />
         )}
-        </>
+        </AxisLimitsProvider>
     );
 }

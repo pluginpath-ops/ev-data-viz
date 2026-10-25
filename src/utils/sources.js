@@ -254,3 +254,83 @@ export function linkProblem(sourceName, url) {
         || rule.hosts.some(d => host && onDomain(host, d));
     return ok ? null : { problem: 'rule', expected: rule.label };
 }
+
+// ── The source line under a chart ───────────────────────────────────────────
+
+/** EPA's figures come from two places, and a chart credits the one it draws. */
+const EPA_CREDITS = {
+    label: { name: 'fueleconomy.gov', url: 'https://www.fueleconomy.gov' },
+    tests: { name: 'EPA',             url: 'https://www.epa.gov' },
+};
+
+/**
+ * Who a chart's data came from, read at render time from what is plotted.
+ *
+ * A composite is nobody's test: it credits the sources of the tests it was
+ * built from (`composite.tests`, resolved through `runById`). A run with no
+ * source counts as unattributed rather than being credited to nobody quietly,
+ * so the curator's view can say how many. Names are the listed source's
+ * canonical spelling, so "OoS" and "Out of Spec" are one credit; an unlisted
+ * name is credited as typed. The link is the source's first listed domain.
+ *
+ * @param {Object} args
+ * @param {Array}  args.runs      the runs plotted
+ * @param {Array}  [args.sources] rows of the sources table
+ * @param {(id) => Object|undefined} [args.runById]  resolves a composite's tests
+ * @param {{ label?: boolean, tests?: boolean }} [args.epa]
+ *        label  the chart draws an EPA label figure (fueleconomy.gov)
+ *        tests  it draws EPA test or certification data (EPA)
+ * @returns {{ entries: Array<{ name: string, url: string|null }>, unattributed: number }}
+ *          test sources by how many plotted runs each supplied, then EPA
+ */
+export function attributionFor({ runs = [], sources = [], runById = () => undefined, epa = {} } = {}) {
+    const counts = new Map();   // canonical or typed name → { name, url, n }
+    let unattributed = 0;
+    const seen = new Set();
+
+    const credit = (run) => {
+        const text = String(run?.source ?? '').trim();
+        const link = run?.sourceUrl ?? run?.source_url ?? '';
+        const found = findSource(sources, { name: text, url: link });
+        const name = found?.source.name ?? text;
+        if (!name) { unattributed += 1; return; }
+        const key = name.toLowerCase();
+        const domain = found?.source.domains?.[0];
+        const entry = counts.get(key) ?? { name, url: domain ? `https://${domain}` : null, n: 0 };
+        entry.n += 1;
+        counts.set(key, entry);
+    };
+
+    for (const run of runs) {
+        if (!run || seen.has(run.id)) continue;
+        seen.add(run.id);
+        if (run.composite) {
+            for (const t of run.composite.tests ?? []) {
+                if (seen.has(t.runId)) continue;
+                seen.add(t.runId);
+                const test = runById(t.runId);
+                if (test) credit(test);
+            }
+        } else {
+            credit(run);
+        }
+    }
+
+    const entries = [...counts.values()]
+        .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name))
+        .map(({ name, url }) => ({ name, url }));
+    if (epa.label) entries.push(EPA_CREDITS.label);
+    if (epa.tests) entries.push(EPA_CREDITS.tests);
+    return { entries, unattributed };
+}
+
+/**
+ * The line as plain text, for the PNG export where a link cannot live.
+ * `showGaps` is the curator's: it says how many plotted runs have no source.
+ * Empty when there is nothing to say.
+ */
+export function sourceLineText({ entries = [], unattributed = 0 } = {}, showGaps = false) {
+    const parts = entries.map(e => e.name);
+    if (showGaps && unattributed > 0) parts.push(`⚠ ${unattributed} unattributed`);
+    return parts.length ? `Data: ${parts.join(' · ')}` : '';
+}

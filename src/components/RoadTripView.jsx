@@ -2,7 +2,10 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { correctionSummary } from '../utils/correctionSettings';
 import SectionBand from './SectionBand';
 import SidebarDisplaySection from './SidebarDisplaySection';
-import { useSyncedScale } from '../hooks/useSyncedScale';
+import { useAxisLimits } from '../hooks/useAxisLimits';
+import { useChartReadout } from '../hooks/useChartReadout';
+import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
+import { hoursToMinutes } from '../utils/axisLimits';
 import Chart from 'chart.js/auto';
 import ZoomPlugin from 'chartjs-plugin-zoom';
 import { vehicleLabel } from '../utils/specHelpers';
@@ -12,7 +15,8 @@ import { useTheme } from '../hooks/useTheme';
 import { MI_TO_KM, convDistance, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, pricedAtSpeedMph, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { figureSources } from '../utils/vehicleFigures';
+import { figureSources, epaCredits } from '../utils/vehicleFigures';
+import { useSourceLine } from '../hooks/useSourceLine';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
 import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import VerboseLabelToggle from './VerboseLabelToggle';
@@ -145,6 +149,65 @@ function finishTooltipLine(dataset) {
 function spreadTooltipLine(dataset, index) {
     const step = dataset._spreadSteps?.[index];
     return step ? [`Across ${testsPhrase(step.n, dataset._spreadUnlisted, dataset._spreadEstimated)}: ${formatTime(step.lo)} – ${formatTime(step.hi)}`] : [];
+}
+
+/**
+ * What the readout says of a sweep chart (#455). The speed and distance sweeps
+ * are functions of X, so every vehicle reads at the cursor. The timeline has its
+ * own (`timelineReadout`): there the rows also say what each vehicle is DOING at
+ * that moment, so it reads segments rather than a sweep step.
+ *
+ * A sweep is modeled from the tests, not a test, so a row has no source of its
+ * own — the source line under the plot credits the tests.
+ */
+function sweepReadout({ xTitle, yTitle }) {
+    return {
+        title: (x) => `${nameOf(xTitle)}: ${withUnit(readoutNumber(x), unitOf(xTitle))}`,
+        subtitle: yTitle,
+        describe(row, { nearest }, datasets) {
+            const ds = datasets[row.datasetIndex];
+            const spread = nearest
+                ? spreadTooltipLine(ds, row.dataIndex).map(l => (row.interpolated ? `${l} (nearest step)` : l))
+                : [];
+            return { name: ds._fullLabel ?? ds.label, value: formatTime(row.y), detail: spread };
+        },
+    };
+}
+
+/**
+ * The leg of a simulated trip that a time falls in. On the Elapsed Time axis
+ * that is the segment spanning it; on Drive Time, stops take no time, so only
+ * driving legs occupy the axis and a stop is never "at" an X.
+ */
+function segmentAtTime(segments, x, driveTimeAxis) {
+    if (!driveTimeAxis) {
+        return segments.find(seg => x >= seg.startTime && x <= seg.endTime) ?? null;
+    }
+    let driven = 0;
+    for (const seg of segments) {
+        if (seg.type !== 'drive') continue;
+        const span = seg.endTime - seg.startTime;
+        if (x <= driven + span) return seg;
+        driven += span;
+    }
+    return null;
+}
+
+/** A leg in words, for the readout's active row. */
+function segmentLines(seg, sim, units, dl) {
+    if (seg.type === 'drive') {
+        return [
+            `Driving: ${Math.round(convDistance(seg.startDist, units))}${dl} → ${Math.round(convDistance(seg.endDist, units))}${dl}`,
+            `SoC: ${seg.startSoc}% → ${seg.endSoc}%`,
+            `Duration: ${formatTime(seg.endTime - seg.startTime)}`,
+        ];
+    }
+    const rangeAdded = (seg.endSoc - seg.startSoc) / 100 * sim._batteryKwh * sim._correctedMiPerKwh;
+    return [
+        `Charging: ${seg.startSoc}% → ${seg.endSoc}%`,
+        `+${Math.round(convDistance(rangeAdded, units))} ${dl} range`,
+        `Charge time: ${formatTime(seg.endTime - seg.startTime)}`,
+    ];
 }
 
 /** "7 range tests (5 unlisted, 2 estimated)" — what the shading's n is made of (#394). */
@@ -655,6 +718,7 @@ export default function RoadTripView({
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const canvasRef = useRef(null);
+    const readout   = useChartReadout();
     const chartRef  = useRef(null);
 
     const [runDataCache, setRunDataCache] = useState({});
@@ -665,15 +729,18 @@ export default function RoadTripView({
         (new URLSearchParams(window.location.search).get('rt_r') || '')
             .split(',').filter(Boolean)
     ).current;
-    const [axisScaleOwn, setAxisScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
-    // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
-    const axisScale = useSyncedScale(axisScaleOwn);
+    // Axis limits, in chartConfig (#478) so the chart link, a Home panel and the
+    // pop-out carry them. Stored as typed: in the unit the control's label names,
+    // which for a time axis is HOURS (the plot is in minutes, so those go through
+    // hoursToMinutes where they are drawn). One set for the chart whatever its
+    // axes: changing an axis keeps the limits, as it always did here — Reset is
+    // the reader's.
+    const { limits: axisLimits, setLimit: onAxisChange } = useAxisLimits('roadtrip');
     const [copiedUrl, setCopiedUrl] = useState(false);
     // PROTOTYPE, local to this view: not in chartConfig, not in the URL.
     const [showTestSpread, setShowTestSpread] = useState(false);
     const [sortCol, setSortCol] = useState(null);   // column key or null
     const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
-    const onAxisChange = (key, val) => setAxisScale(prev => ({ ...prev, [key]: val }));
 
     const dl = distanceLabel(units);
     const sl = speedLabel(units);
@@ -1267,9 +1334,11 @@ export default function RoadTripView({
                 _isIce: true,
             });
 
+            const speedReadout = sweepReadout({ xTitle: `Travel Speed (${sl})`, yTitle: speedYLabel });
             chartRef.current = new Chart(canvasRef.current, {
                 type: 'line',
                 data: { datasets: speedDatasets },
+                plugins: [readout.plugin({ ...speedReadout, describe: (row, o) => speedReadout.describe(row, o, speedDatasets) })],
                 options: {
                     animation: false,
                     responsive: true,
@@ -1278,15 +1347,15 @@ export default function RoadTripView({
                     scales: {
                         x: {
                             type: 'linear',
-                            min: axisScale.xMin ?? sweepMinDisplay,
-                            max: axisScale.xMax ?? sweepMaxDisplay,
+                            min: axisLimits.xMin ?? sweepMinDisplay,
+                            max: axisLimits.xMax ?? sweepMaxDisplay,
                             title: { display: true, text: `Travel Speed (${sl})`, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: sweepStepDisplay, color: tickColor },
                             grid: { color: gridColor },
                         },
                         y: {
-                            min: axisScale.yMin != null ? axisScale.yMin * 60 : iceSpeedYMin,
-                            max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
+                            min: hoursToMinutes(axisLimits.yMin) ?? iceSpeedYMin,
+                            max: hoursToMinutes(axisLimits.yMax) ?? undefined,
                             title: { display: true, text: speedYLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
                             grid: { color: gridColor },
@@ -1295,17 +1364,8 @@ export default function RoadTripView({
                     plugins: {
                         legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor,
                             filter: (item, data) => !data.datasets[item.datasetIndex]._spread } },
-                        tooltip: {
-                            filter: item => !item.dataset._spread,
-                            callbacks: {
-                                title: items => items[0]?.dataset._fullLabel ?? items[0]?.dataset.label ?? '',
-                                label: ctx => [
-                                    `Speed: ${ctx.parsed.x} ${sl}`,
-                                    `${speedYLabel}: ${formatTime(ctx.parsed.y)}`,
-                                    ...spreadTooltipLine(ctx.dataset, ctx.dataIndex),
-                                ],
-                            },
-                        },
+                        // The readout answers hovers here (#455).
+                        tooltip: { enabled: false },
                         zoom: {
                             zoom: {
                                 drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
@@ -1373,9 +1433,11 @@ export default function RoadTripView({
                 _isIce: true,
             });
 
+            const distReadout = sweepReadout({ xTitle: `Distance between charges (${dl})`, yTitle: sweepLabel });
             chartRef.current = new Chart(canvasRef.current, {
                 type: 'line',
                 data: { datasets: distDatasets },
+                plugins: [readout.plugin({ ...distReadout, describe: (row, o) => distReadout.describe(row, o, distDatasets) })],
                 options: {
                     animation: false,
                     responsive: true,
@@ -1384,15 +1446,15 @@ export default function RoadTripView({
                     scales: {
                         x: {
                             type: 'linear',
-                            min: axisScale.xMin ?? legMinDisplay,
-                            max: axisScale.xMax ?? legMaxDisplay,
+                            min: axisLimits.xMin ?? legMinDisplay,
+                            max: axisLimits.xMax ?? legMaxDisplay,
                             title: { display: true, text: `${dl} Between Charges`, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: legStepDisplay, color: tickColor },
                             grid: { color: gridColor },
                         },
                         y: {
-                            min: axisScale.yMin != null ? axisScale.yMin * 60 : iceDistYMin,
-                            max: axisScale.yMax != null ? axisScale.yMax * 60 : undefined,
+                            min: hoursToMinutes(axisLimits.yMin) ?? iceDistYMin,
+                            max: hoursToMinutes(axisLimits.yMax) ?? undefined,
                             title: { display: true, text: sweepLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: { stepSize: 30, callback: val => formatTime(val), color: tickColor },
                             grid: { color: gridColor },
@@ -1401,17 +1463,7 @@ export default function RoadTripView({
                     plugins: {
                         legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor,
                             filter: (item, data) => !data.datasets[item.datasetIndex]._spread } },
-                        tooltip: {
-                            filter: item => !item.dataset._spread,
-                            callbacks: {
-                                title: items => items[0]?.dataset._fullLabel ?? items[0]?.dataset.label ?? '',
-                                label: ctx => [
-                                    `${dl} between charges: ${ctx.parsed.x} ${dl}`,
-                                    `${sweepLabel}: ${formatTime(ctx.parsed.y)}`,
-                                    ...spreadTooltipLine(ctx.dataset, ctx.dataIndex),
-                                ],
-                            },
-                        },
+                        tooltip: { enabled: false },
                         zoom: {
                             zoom: {
                                 drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
@@ -1456,6 +1508,7 @@ export default function RoadTripView({
                 pointBorderColor: entry.color,
                 fill: false,
                 _simIndex: i,
+                _lane: i,
             };
         }).filter(Boolean);
         datasets.push(...(isByTestMode
@@ -1531,6 +1584,7 @@ export default function RoadTripView({
                 pointRadius: 0,
                 fill: false,
                 _isIce: true,
+                _lane: iceLane,
             });
         } else {
             datasets.unshift({
@@ -1572,6 +1626,31 @@ export default function RoadTripView({
         // the first charging stop.
         const autoXMin = 0;
 
+        // Every vehicle at the time under the cursor (#455): how far along it is
+        // (or its charge, in lanes), what it is doing, and — on the active row —
+        // that leg in full. Elapsed time is a function of distance and the trip
+        // never doubles back, so each line has one value at each X; on the Drive
+        // Time axis a stop is a vertical run and reads as the value after it.
+        const timelineReadout = {
+            title: (x) => `${isDriveTimeXAxis ? 'Drive time' : 'Elapsed time'}: ${formatTime(x)}`,
+            subtitle: isByTestMode ? 'Battery charge, a lane per test'
+                : isChargeTimeMode ? 'Cumulative charge time' : `Distance traveled (${dl})`,
+            describe(row, { nearest, x }) {
+                const ds = datasets[row.datasetIndex];
+                const sim = ds._simIndex != null ? simResults[ds._simIndex] : null;
+                const seg = sim ? segmentAtTime(sim.segments, x, isDriveTimeXAxis) : null;
+                const value = isByTestMode ? `${Math.round((row.y - ds._lane) * 100)}%`
+                    : isChargeTimeMode ? formatTime(row.y)
+                    : `${readoutNumber(row.y)} ${dl}`;
+                return {
+                    name: ds._fullLabel ?? ds.label,
+                    value,
+                    companion: seg ? (seg.type === 'drive' ? 'driving' : 'charging') : null,
+                    detail: nearest ? [...(seg ? segmentLines(seg, sim, units, dl) : []), ...finishTooltipLine(ds)] : [],
+                };
+            },
+        };
+
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
             data: { datasets },
@@ -1588,8 +1667,8 @@ export default function RoadTripView({
                     x: {
                         type: 'linear',
                         title: { display: true, text: isDriveTimeXAxis ? 'Drive Time' : 'Elapsed Time', font: { size: fonts.axis }, color: legendColor },
-                        min: axisScale.xMin != null ? axisScale.xMin * 60 : autoXMin,
-                        max: axisScale.xMax != null ? axisScale.xMax * 60 : autoXMax,
+                        min: hoursToMinutes(axisLimits.xMin) ?? autoXMin,
+                        max: hoursToMinutes(axisLimits.xMax) ?? autoXMax,
                         ticks: {
                             stepSize: 30,
                             color: tickColor,
@@ -1604,8 +1683,8 @@ export default function RoadTripView({
                     },
                     y: isByTestMode ? {
                         reverse: false,
-                        min: axisScale.yMin ?? 0,
-                        max: axisScale.yMax ?? (validEntries.length + 1), // +1 for ICE lane
+                        min: axisLimits.yMin ?? 0,
+                        max: axisLimits.yMax ?? (validEntries.length + 1), // +1 for ICE lane
                         title: { display: false },
                         ticks: {
                             stepSize: 0.5,
@@ -1655,15 +1734,15 @@ export default function RoadTripView({
                     } : isChargeTimeMode ? {
                         reverse: true,
                         title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: fonts.axis }, color: legendColor },
-                        min: axisScale.yMin ?? 0,
-                        max: axisScale.yMax ?? autoYMax,
+                        min: axisLimits.yMin ?? 0,
+                        max: axisLimits.yMax ?? autoYMax,
                         ticks: { color: tickColor },
                         grid: { color: gridColor },
                     } : {
                         reverse: true,
                         title: { display: true, text: `Distance Traveled (${dl})`, font: { size: fonts.axis }, color: legendColor },
-                        min: axisScale.yMin ?? 0,
-                        max: axisScale.yMax ?? autoYMax,
+                        min: axisLimits.yMin ?? 0,
+                        max: axisLimits.yMax ?? autoYMax,
                         ticks: { color: tickColor },
                         grid: { color: gridColor },
                     },
@@ -1675,49 +1754,8 @@ export default function RoadTripView({
                         labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor,
                             filter: (item, data) => !data.datasets[item.datasetIndex]._spread },
                     },
-                    tooltip: {
-                        displayColors: true,
-                        filter: item => !item.dataset._spread,
-                        callbacks: {
-                            afterLabel: ctx => finishTooltipLine(ctx.dataset),
-                            title: (items) => {
-                                if (!items.length) return '';
-                                return items[0].dataset._fullLabel ?? items[0].dataset.label;
-                            },
-                            label: (ctx) => {
-                                const dsIdx = ctx.datasetIndex;
-                                const ptIdx = ctx.dataIndex;
-                                const sim = simResults[
-                                    validEntries.findIndex((_, i) =>
-                                        datasets.findIndex(d => d._simIndex === i) === dsIdx
-                                    )
-                                ];
-                                if (!sim) return '';
-
-                                const segIdx = Math.floor(ptIdx / 2);
-                                const seg = sim.segments[segIdx];
-                                if (!seg) return '';
-
-                                if (seg.type === 'drive') {
-                                    const d1 = Math.round(convDistance(seg.startDist, units));
-                                    const d2 = Math.round(convDistance(seg.endDist, units));
-                                    return [
-                                        `Driving: ${d1}${dl} → ${d2}${dl}`,
-                                        `SoC: ${seg.startSoc}% → ${seg.endSoc}%`,
-                                        `Duration: ${formatTime(seg.endTime - seg.startTime)}`,
-                                    ];
-                                } else {
-                                    const rangeAdded = (seg.endSoc - seg.startSoc) / 100
-                                        * sim._batteryKwh * sim._correctedMiPerKwh;
-                                    return [
-                                        `Charging: ${seg.startSoc}% → ${seg.endSoc}%`,
-                                        `+${Math.round(convDistance(rangeAdded, units))} ${dl} range`,
-                                        `Charge time: ${formatTime(seg.endTime - seg.startTime)}`,
-                                    ];
-                                }
-                            },
-                        },
-                    },
+                    // The readout answers hovers here (#455).
+                    tooltip: { enabled: false },
                     zoom: {
                         zoom: {
                             drag: {
@@ -1731,7 +1769,7 @@ export default function RoadTripView({
                     },
                 },
             },
-            plugins: [makeRoadTripPlugin(simResults.map((s, i) => {
+            plugins: [readout.plugin(timelineReadout), makeRoadTripPlugin(simResults.map((s, i) => {
                 return datasets.find(d => d._simIndex === i) ? s : null;
             }).filter(Boolean), units, yAxis, iceTime,
                 isByTestMode ? { laneIndex: iceLane, gasStops: iceGasStopSegs, totalTimeMin: iceTime } : null,
@@ -1742,7 +1780,7 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, speedSweepResults, distSweepResults, spreadSweep, spreadTimeline, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisScale, isDark]);
+    }, [simResults, speedSweepResults, distSweepResults, spreadSweep, spreadTimeline, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisLimits, isDark]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
@@ -1842,8 +1880,23 @@ export default function RoadTripView({
     }, [validEntries, isSpeedMode, totalDistance, speed, mode, legDistance, chargeTime,
         startSoc, minSoc, towingMode, units, dl, sl, verboseLabels]);
 
+    // Source line: each trip prices a charging test against a range test, or
+    // against the EPA range; the capacity may be EPA tested.
+    const sourceRuns = useMemo(
+        () => validEntries.flatMap(e => [e.run, isEpaPartnerId(e.rangeRun?.id) ? null : e.rangeRun]).filter(Boolean),
+        [validEntries]);
+    const sourceEpa = useMemo(() => {
+        const entryVehicles = validEntries.map(e => e.vehicle);
+        const epaPriced = validEntries.filter(e => isEpaPartnerId(e.rangeRun?.id)).map(e => e.vehicle);
+        return {
+            label: epaCredits(epaPriced, { range: true }).label,
+            tests: epaCredits(entryVehicles, { capacity: true }).tests,
+        };
+    }, [validEntries]);
+    const sourceLine = useSourceLine({ runs: sourceRuns, epa: sourceEpa });
+
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(validEntries.length) });
 
     const dispLeg          = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
@@ -2190,6 +2243,7 @@ export default function RoadTripView({
                 <PlotFrame
                     title={plotTitle}
                     subtitle={plotSubtitle}
+                    sourceLine={sourceLine}
                     preview={preview}
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
@@ -2228,8 +2282,9 @@ export default function RoadTripView({
                         </>
                     )}
                 >
-                    <div style={{ height: `${isSweepMode ? 400 : yAxis === 'byTest' ? Math.max(300, validEntries.length * 120) : Math.max(400, validEntries.length * 40 + 200)}px`, position: 'relative' }}>
+                    <div className="chart-readout-host" style={{ height: `${isSweepMode ? 400 : yAxis === 'byTest' ? Math.max(300, validEntries.length * 120) : Math.max(400, validEntries.length * 40 + 200)}px` }}>
                         <canvas ref={canvasRef} />
+                        {readout.overlay}
                     </div>
                     {(spreadSweep || spreadTimeline) && (
                         <p className="text-note text-center mt-1">
@@ -2262,8 +2317,8 @@ export default function RoadTripView({
             {/* ── Axis Scale Controls (card provided by AxisScaleControls) ─ */}
             {!loading && (simResults.some(Boolean) || speedSweepResults?.length > 0 || distSweepResults?.length > 0) && !presentationMode && (
                 <AxisScaleControls
-                    xMin={axisScale.xMin} xMax={axisScale.xMax}
-                    yMin={axisScale.yMin} yMax={axisScale.yMax}
+                    xMin={axisLimits.xMin} xMax={axisLimits.xMax}
+                    yMin={axisLimits.yMin} yMax={axisLimits.yMax}
                     onChange={onAxisChange}
                     showX={true}
                     showY2={false}

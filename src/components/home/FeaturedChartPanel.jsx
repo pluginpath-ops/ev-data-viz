@@ -3,7 +3,8 @@ import PresentedChart from '../PresentedChart';
 import MarkdownText from '../MarkdownText';
 import { useAppContext } from '../../context/AppContext';
 import { useInView } from '../../hooks/useInView';
-import { chartStateOf, defaultChartTitle, vehiclesInOrder } from '../../utils/featuredComparisons';
+import PresentedVehicleTable from '../vehicles/PresentedVehicleTable';
+import { chartStateOf, defaultChartTitle, vehiclesInOrder, explicitChartParams } from '../../utils/featuredComparisons';
 
 /**
  * One chart of a featured comparison, drawn on Home from its saved settings.
@@ -35,8 +36,12 @@ export default function FeaturedChartPanel({ comparison, index, onOpen }) {
     // In the comparison's order: it is the order the series are drawn and listed in.
     const shown = vehiclesInOrder(seed.vehicleIds, vehicles);
 
+    // The vehicle table is not a chart: it has no frame to size, and a table is too
+    // wide for half a row, so its panel takes the whole row.
+    const isTable = seed.chartMode === 'specstable';
+
     return (
-        <section ref={ref} className="home-panel" aria-label={chart.title}>
+        <section ref={ref} className={`home-panel${isTable ? ' is-wide' : ''}`} aria-label={chart.title}>
             <header className="home-panel-head">
                 <div className="home-panel-heading">
                     <h3 className="section-title">{chart.title}</h3>
@@ -48,7 +53,16 @@ export default function FeaturedChartPanel({ comparison, index, onOpen }) {
             </header>
             <MarkdownText text={chart.caption} />
             <div className="home-panel-body">
-                {near && shown.length > 0 && (
+                {near && isTable && (
+                    <PresentedVehicleTable
+                        vehicleIds={seed.vehicleIds}
+                        search={explicitChartParams(chart.params)}
+                        correctionTarget={seed.chartConfig.correctionTarget}
+                        correctionMode={seed.chartConfig.correctionMode}
+                        onOpen={onOpen}
+                    />
+                )}
+                {near && !isTable && shown.length > 0 && (
                     <PresentedChart
                         vehicles={shown}
                         selectedVehicles={shown.map(v => v.id)}
@@ -64,11 +78,13 @@ export default function FeaturedChartPanel({ comparison, index, onOpen }) {
                         pairings={seed.pairings}
                     />
                 )}
-                {near && shown.length === 0 && (
+                {near && !isTable && shown.length === 0 && (
                     <p className="text-note">None of this comparison's vehicles are available any more.</p>
                 )}
-                {/* Over the chart, so a click anywhere on the panel opens it. */}
-                <button type="button" className="home-panel-cover" onClick={onOpen} aria-label={`Open ${chart.title}`} tabIndex={-1} />
+                {/* Over the chart, so a click anywhere on the panel opens it. Not over
+                    a table, which scrolls sideways under the reader's finger and opens
+                    from its own rows. */}
+                {!isTable && <button type="button" className="home-panel-cover" onClick={onOpen} aria-label={`Open ${chart.title}`} tabIndex={-1} />}
             </div>
         </section>
     );

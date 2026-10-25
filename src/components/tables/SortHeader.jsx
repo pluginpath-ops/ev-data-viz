@@ -16,6 +16,9 @@ import { nameLines } from '../../utils/tableColumns';
  *
  * `col.holds` sets the column's width by what it holds (see vehicleTable.js).
  *
+ * With no `onSort` the header is a plain label: no click, no sort caret, no
+ * "sort by" promise. The read-only table on Home draws headers this way (#448).
+ *
  * `dragProps`/`dragClass` come from hooks/useColumnDrag and make the header a
  * handle on the column order — the same list the column picker drags. A drag
  * fires no click, so moving a column never re-sorts by it.
@@ -33,13 +36,13 @@ export default function SortHeader({ col, sortKey, sortDir, onSort, dragProps, d
         <th
             className={`guide-th column-header ${col.numeric ? 'numeric' : ''} ${active ? 'active' : ''} ${col.sticky ? 'sticky-name' : ''} ${col.holds ?? ''} ${dragClass}`}
             {...dragProps}
-            onClick={() => onSort(col.key)}
+            onClick={onSort ? () => onSort(col.key) : undefined}
             // The drag hint goes LAST, on its own line, and only where the
             // header really drags — the fixed column would promise a move it
             // refuses.
-            title={[col.hint || `Sort by ${col.fullLabel ?? col.label}`, dragProps?.draggable && 'Drag to reorder']
+            title={[col.hint || (onSort ? `Sort by ${col.fullLabel ?? col.label}` : (col.fullLabel ?? col.label)), dragProps?.draggable && 'Drag to reorder']
                 .filter(Boolean).join('\n')}
-            aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+            aria-sort={onSort ? (active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
         >
             <span className="guide-th-name">
                 {head}{qualifier && <><br />{qualifier}</>}

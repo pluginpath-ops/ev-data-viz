@@ -100,8 +100,7 @@ export const CHART_CATEGORIES = [
         modes: [
             // Key kept: it is the URL and chart-help identifier (see the note
             // at the top). The table it names became the vehicle table in #315.
-            // It needs no selection because it is where one is made.
-            { key: 'specstable',  label: 'Table', needsSelection: false },
+            { key: 'specstable',  label: 'Table' },
             // One sub-nav item, "Chart", for the two spec charts: a bar or a
             // scatter of the table's columns, switched above the plot. The
             // scatter is drawn AS the bar's item (`navAlias`), so the sub-nav
@@ -166,19 +165,17 @@ export function categoryForMode(mode) {
 }
 
 /**
- * Whether a mode can show anything with no vehicles selected. Every chart
- * plots the selection, so that is the default; a mode opts out by saying so.
+ * The mode to open a category on: the remembered one, else its first.
+ *
+ * No chart waits for a selection any more. They used to — a chart tab was
+ * disabled, and a remembered chart skipped, until something was selected —
+ * because the Vehicles tab was the only place to select from, so an empty
+ * chart was a dead end. The vehicle quick-add put "＋ Add" in the chips row
+ * above every chart, which makes an empty chart a place to start; each one
+ * shows SelectionEmptyState until there is something to plot.
  */
-export const modeNeedsSelection = (mode) => mode?.needsSelection !== false;
-
-/**
- * The mode to open a category on. The remembered one when it can show
- * something, otherwise the first mode that can — so a tab entered with nothing
- * selected lands on a view that works rather than on an empty chart.
- */
-export function entryModeFor(category, remembered, hasSelection) {
-    const usable = category.modes.filter(m => hasSelection || !modeNeedsSelection(m));
-    return usable.find(m => m.key === remembered)?.key ?? usable[0]?.key ?? null;
+export function entryModeFor(category, remembered) {
+    return category.modes.find(m => m.key === remembered)?.key ?? category.modes[0]?.key ?? null;
 }
 
 /** Human label for a mode key, for titles and tooltips. */

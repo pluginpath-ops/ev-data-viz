@@ -278,6 +278,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
                 fullName: labels.get(i)?.full ?? v.name,
                 value: e.value, display: e.display, badge: e.badge,
                 sub: barMode === 'source' ? null : e.sourceName,
+                sourceName: e.sourceName,
                 fullData: e.origin === 'session',
                 sourceCount: v.entries.length,
                 flags: e.flags || [], windowLabel: e.windowLabel,

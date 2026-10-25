@@ -213,7 +213,7 @@ export const LEDGER = [
     },
     {
         key: 'arbitrary-text-size',
-        count: 95,  // 96 → 95: the Admin EPA list's Test Group line became .text-caption (#374)
+        count: 94,  // 96 → 95: the Admin EPA list's Test Group line became .text-caption (#374); 95 → 94: the accessory-load reference footnote became .text-meta (#449)
         scope: 'src/**/*.jsx',
         what: 'Font sizes written as arbitrary values — `text-[10px]`, `text-[11px]`. '
             + 'Every one is a size the global UI-scale knob cannot move and the type '

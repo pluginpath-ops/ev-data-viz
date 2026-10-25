@@ -1,24 +1,35 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import Chart from 'chart.js/auto';
+import { useChartReadout } from '../../../hooks/useChartReadout';
+import { readoutNumber, withUnit } from '../../../utils/readoutAtX';
 import { useTheme } from '../../../hooks/useTheme';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
-import { buildEpaCurveFromModel } from '../../../utils/epaDerivations';
-import { DEFAULT_SS_ETA, CURVE_SPEED_RANGE, CURVE_REFERENCE_MPH } from '../../../constants/epa';
-import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../utils/epaCurveSubjects';
+import { useAxisLimits } from '../../../hooks/useAxisLimits';
+import { AXIS_LIMITS_PARAM, encodeAxisLimits } from '../../../utils/axisLimits';
+import { buildEpaCurveFromModel, curveAccessoryW } from '../../../utils/epaDerivations';
+import { DEFAULT_SS_ETA, CURVE_SPEED_RANGE, CURVE_REFERENCE_MPH, STANDARD_CONDITIONS } from '../../../constants/epa';
+import { curveSubjects, disambiguateLabels } from '../../../utils/epaCurveSubjects';
 import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
 import CurveSubjectPicker from './CurveSubjectPicker';
-import ViewingConditions, { useViewingConditions } from '../ViewingConditions';
+import WindAndElevationFields from '../WindAndElevationFields';
+import CorrectionTargetFields from '../../CorrectionTargetFields';
+import { useViewingConditions } from '../../../hooks/useViewingConditions';
+import { normalizeCorrectionTarget, accessoryText } from '../../../utils/correctionSettings';
 import AxisScaleControls from '../../AxisScaleControls';
 import LoadingSpinner from '../../LoadingSpinner';
 import CollapsibleSection from '../../CollapsibleSection';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../../utils/chartTheme';
 import PlotFrame from '../../charts/PlotFrame';
+import { useSourceLine } from '../../../hooks/useSourceLine';
 import { useChartPng } from '../../../hooks/useChartPng';
 import InfoIcon from '../../InfoIcon';
 import { EPA_EXPLAINERS } from '../../../utils/epaExplainers';
 import { fmtTemp, fmtSpeed } from '../../../utils/unitConversions';
+
+// Every curve here is EPA's test data.
+const EPA_TESTS = { tests: true };
 
 /**
  * EPA efficiency curves anchored on certification records (#237).
@@ -148,18 +159,26 @@ export function explorerStateFromUrl(search = window.location.search) {
 
 /**
  * @param {boolean}  presentationMode  the pop-out: the plot alone, no controls
- * @param {Object}   synced            `{ selected, yAxis, conditions, scale }` pushed by the
+ * @param {Object}   correctionTarget  the site-wide correction target: altitude, temperature and
+ *                                     accessory load are drawn under it (speed is the x axis). The
+ *                                     "Correct:" mode does not govern this chart — it is a model,
+ *                                     with no measured figure to leave uncorrected (#449)
+ * @param {Function} setChartConfig    where the sliders write the target (App's chartConfig)
+ * @param {Object}   synced            `{ selected, yAxis, conditions }` pushed by the
  *                                     window that has the controls; replaces local state
  * @param {Function} onStateChange     called with that same shape whenever it
  *                                     changes, and with null on unmount, so App can
  *                                     broadcast it to a pop-out
  */
-const NO_SCALE = { xMin: null, xMax: null, yMin: null, yMax: null };
 
-export default function EpaCurveExplorer({ presentationMode = false, synced = null, onStateChange = null }) {
+export default function EpaCurveExplorer({
+    presentationMode = false, synced = null, onStateChange = null,
+    correctionTarget = undefined, setChartConfig = null,
+}) {
     const { getTestVehiclesForCurves, units } = useAppContext();
     const { isDark } = useTheme();
     const canvasRef = useRef(null);
+    const readout = useChartReadout();
     const chartRef = useRef(null);
 
     const load = useCallback(() => getTestVehiclesForCurves(), [getTestVehiclesForCurves]);
@@ -170,21 +189,26 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
     const [yAxisOwn, setYAxis] = useState(initial.yAxis);
     const selected = synced ? synced.selected : selectedOwn;
     const yAxis    = synced ? synced.yAxis    : yAxisOwn;
-    // Manual axis bounds, null = auto. Not persisted to the URL: the record
-    // selection and the axis choice describe WHAT is plotted and are worth
-    // sharing, where a zoom is tuning for the session.
-    const [scaleOwn, setScale] = useState(NO_SCALE);
-    // A pop-out has no controls to set these, so it takes the other window's.
-    const scale = synced?.scale ?? scaleOwn;
+    // Manual axis bounds, null = auto. In chartConfig like every chart's (#478):
+    // the copied URL carries them as `ax`, and the pop-out, which has no controls
+    // to set them, gets them in the chartConfig the main tab broadcasts rather
+    // than in `synced`. (They were once left out of the URL as "tuning for the
+    // session"; a link to a chart zoomed to the interesting part should open
+    // there.)
+    const { limits: scale, setLimit: setScaleLimit } = useAxisLimits('epaexplorer');
 
     // The same controls the vehicle-driven curves use, from the same module —
     // two views computing air density slightly differently would be invisible
     // until someone compared one car in both.
-    const conditions = useViewingConditions(synced?.conditions ?? null);
+    // The extras (wind, elevation change) are this chart's own and reach a
+    // pop-out in `synced.conditions`; the target is the site's and reaches it in
+    // chartConfig, like every chart's.
+    const conditions = useViewingConditions({ driven: synced?.conditions ?? null, target: correctionTarget });
     const {
-        densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum,
+        densityRatio, accessoryDeltaW, windSpeedMphNum, windDirectionDegNum,
         gradeGainFtNum, gradeDistanceMilesNum,
     } = conditions.derived;
+    const target = normalizeCorrectionTarget(correctionTarget);
 
     const subjects = useMemo(() => curveSubjects(testVehicles ?? []), [testVehicles]);
     const byKey = useMemo(() => new Map(subjects.map(s => [s.key, s])), [subjects]);
@@ -228,26 +252,29 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
         // on a chart whose whole subject is the conditions it was drawn under.
         const c = conditions.values ?? {};
         const num = v => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
-        const t = num(c.tempF);
         const w = num(c.windSpeedMph);
-        const el = num(c.elevationFt);
-        if (t != null) parts.push(fmtTemp(t, units));
+        // The target's figures, named only where they differ from the standard
+        // conditions the curve is anchored to: a default chart says nothing.
+        if (target.temperatureF !== STANDARD_CONDITIONS.temperatureF) parts.push(fmtTemp(target.temperatureF, units));
         parts.push(w ? `${fmtSpeed(w, units)} wind` : 'still air');
-        if (el) parts.push(`${Math.round(el)} ft`);
+        if (target.altitudeFt !== STANDARD_CONDITIONS.altitudeFt) parts.push(`${Math.round(target.altitudeFt)} ft`);
+        if (target.accessoryW != null) parts.push(`${accessoryText(target.accessoryW)} accessories`);
         parts.push(gradeGainFtNum ? 'graded' : 'level');
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [conditions, units, gradeGainFtNum]);
+    }, [conditions, units, gradeGainFtNum, target.temperatureF, target.altitudeFt, target.accessoryW]);
+
+    const sourceLine = useSourceLine({ epa: EPA_TESTS });
 
     const { copyPng, copied: pngCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(plotted.length) });
     const [urlCopied, setUrlCopied] = useState(false);
 
     // Tell App what is on screen so it can broadcast it to a pop-out. Keyed on the
     // serialised state because `conditions.values` is a new object every render,
     // which would otherwise report on every render.
-    const reportKey = JSON.stringify({ selected, yAxis, conditions: conditions.values, scale });
+    const reportKey = JSON.stringify({ selected, yAxis, conditions: conditions.values });
     useEffect(() => {
         if (!onStateChange || presentationMode) return;
         onStateChange(JSON.parse(reportKey));
@@ -261,8 +288,10 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
         p.set('sub', 'curves');
         if (selected.length) p.set('c', selected.join(','));
         if (yAxis !== 'kwh100mi') p.set('cy', yAxis);
+        const limitsParam = encodeAxisLimits(scale, 'epaexplorer');
+        if (limitsParam) p.set(AXIS_LIMITS_PARAM, limitsParam); else p.delete(AXIS_LIMITS_PARAM);
         window.history.replaceState({ view: 'epa' }, '', `?${p.toString()}`);
-    }, [selected, yAxis, presentationMode]);
+    }, [selected, yAxis, scale, presentationMode]);
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -271,14 +300,14 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
 
         const datasets = plotted.map((s) => {
             const curve = buildEpaCurveFromModel(
-                s.testVehicle, s.useableKwh ?? 0, densityRatio, accessoryOverrideWNum,
+                s.testVehicle, s.useableKwh ?? 0, densityRatio, curveAccessoryW(s.testVehicle, accessoryDeltaW),
                 windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum,
             );
             return {
                 label: displayNames.get(s.key) ?? s.label,
                 // Read by the legend to mark a curve the current axis qualifies.
-                // Kept off the label itself so the tooltip's first line stays
-                // the name and nothing else.
+                // Kept off the label itself so the readout's row stays the name
+                // and nothing else.
                 _flagged: axis.etaSensitive && !s.etaMeasured,
                 data: curve
                     .filter(pt => pt[yAxis] != null)
@@ -310,7 +339,15 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
             data: { datasets },
-            plugins: [makeReferencePlugin(
+            plugins: [readout.plugin({
+                title: (x) => `${readoutNumber(x)} ${speedLabel(units)}`,
+                subtitle: `${axis.label} · ${axis.unit}`,
+                describe: (row) => ({
+                    name: datasets[row.datasetIndex].label,
+                    value: withUnit(readoutNumber(row.y), axis.unit),
+                    flag: datasets[row.datasetIndex]._flagged ? 'Uses an assumed efficiency on this axis' : null,
+                }),
+            }), makeReferencePlugin(
                 refX,
                 refLabel,
                 `SPEED · ${speedLabel(units)}`,
@@ -373,30 +410,15 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                             },
                         },
                     },
-                    tooltip: {
-                        // Three lines: the name with its color, then each axis
-                        // with its unit. The default put the x value in the
-                        // title and crammed name and y value onto one line,
-                        // which read differently from every other chart here.
-                        callbacks: {
-                            title: () => '',
-                            label: (ctx) => curveTooltipLines({
-                                name: ctx.dataset.label, x: ctx.parsed.x, y: ctx.parsed.y,
-                                xUnit: speedLabel(units), yUnit: axis.unit, digits: axis.digits,
-                            })[0],
-                            afterLabel: (ctx) => curveTooltipLines({
-                                name: ctx.dataset.label, x: ctx.parsed.x, y: ctx.parsed.y,
-                                xUnit: speedLabel(units), yUnit: axis.unit, digits: axis.digits,
-                            }).slice(1),
-                        },
-                    },
+                    // The readout answers hovers here (#455).
+                    tooltip: { enabled: false },
                 },
             },
         });
         return () => chartRef.current?.destroy();
     }, [plotted, yAxis, axis, units, isDark, displayNames, scale, colorByKey,
-        densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum,
-        gradeGainFtNum, gradeDistanceMilesNum]);
+        densityRatio, accessoryDeltaW, windSpeedMphNum, windDirectionDegNum,
+        gradeGainFtNum, gradeDistanceMilesNum, readout]);
 
     if (loading) return <LoadingSpinner />;
     if (error) return <div className="empty-state">Certification records could not be loaded.</div>;
@@ -448,6 +470,21 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                         </span>
                     </div>
 
+                    {/* The shared correction target, less its speed (speed is
+                        this chart's x axis). No "Correct:" dropdown: the sliders
+                        always apply, because a modelled curve has no measured
+                        value to leave uncorrected. Not offered in a view that
+                        cannot write it (setChartConfig). */}
+                    {setChartConfig && (
+                        <div className="chart-rail-group">
+                            <CorrectionTargetFields
+                                fields={['temperatureF', 'altitudeFt', 'accessoryW']}
+                                target={correctionTarget}
+                                onChange={t => setChartConfig(prev => ({ ...prev, correctionTarget: t }))}
+                            />
+                        </div>
+                    )}
+
                     {/* Closed by default, so the sidebar's height goes to the
                         record list instead. These scale the curve at plot time
                         and are almost always left alone — but a reader who HAS
@@ -456,12 +493,10 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                     <div className="chart-rail-group">
                         <CollapsibleSection
                             className="collapsible-section--flush"
-                            title={<span className="text-micro">Viewing conditions</span>}
-                            subtitle={conditions.anyAdjusted
-                                ? 'adjusted — not standard conditions'
-                                : 'standard'}
+                            title={<span className="text-micro">Wind &amp; elevation change</span>}
+                            subtitle={conditions.extrasAdjusted ? 'adjusted' : 'none'}
                         >
-                            <ViewingConditions conditions={conditions} />
+                            <WindAndElevationFields conditions={conditions} />
                         </CollapsibleSection>
                     </div>
 
@@ -498,6 +533,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                             <PlotFrame
                                 title={plotTitle}
                                 subtitle={plotSubtitle}
+                                sourceLine={sourceLine}
                                 preview={preview}
                                 onDismissPreview={dismissPreview}
                                 exportControls={!presentationMode && (
@@ -524,8 +560,9 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                                     </>
                                 )}
                             >
-                                <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460, position: 'relative' }}>
+                                <div className="chart-readout-host" style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
                                     <canvas ref={canvasRef} />
+                                    {readout.overlay}
                                 </div>
                             </PlotFrame>
 
@@ -579,7 +616,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                                 yMin={scale.yMin} yMax={scale.yMax}
                                 xAxisLabel={`Speed (${speedLabel(units)})`}
                                 yAxisLabel={`${axis.label} (${axis.unit})`}
-                                onChange={(key, value) => setScale(p => ({ ...p, [key]: value }))}
+                                onChange={setScaleLimit}
                             />}
                         </>
                     )}

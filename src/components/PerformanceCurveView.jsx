@@ -12,6 +12,8 @@
 import SidebarDisplaySection from './SidebarDisplaySection';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
+import { useChartReadout } from '../hooks/useChartReadout';
+import { readoutNumber } from '../utils/readoutAtX';
 import { dataService } from '../services/DataService';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
@@ -19,12 +21,13 @@ import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import AxisScaleControls from './AxisScaleControls';
-import { useSyncedScale } from '../hooks/useSyncedScale';
+import { useAxisLimits } from '../hooks/useAxisLimits';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve, tracedCurvePoints, segmentAccelerationG } from '../utils/performanceDerivations';
 import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { useSourceLine } from '../hooks/useSourceLine';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 
 /** Okabe-Ito, matching the palette the other charts use for run colors. */
@@ -44,6 +47,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     const { isDark } = useTheme();
     const canvasRef  = useRef(null);
     const chartRef   = useRef(null);
+    const readout    = useChartReadout();
 
     const [sessionsByVehicle, setSessionsByVehicle] = useState(null);
     const [summariesByVehicle, setSummariesByVehicle] = useState({});
@@ -55,9 +59,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     // 'vehicle' — one line per vehicle, its single quickest run
     // 'all'     — every run, for run-to-run consistency
     const [grouping, setGrouping] = useState('mode');
-    const [scaleOwn, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
-    // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
-    const scale = useSyncedScale(scaleOwn);
+    // Axis limits, in chartConfig (#478) so the chart link, a Home panel and the
+    // pop-out carry them — including the Focus select below, which sets xMax.
+    const { limits: scale, setLimit: setScaleLimit } = useAxisLimits('perfcurve');
     // Only consulted when grouping is 'all'; null means "not curated yet", which
     // shows everything rather than an empty chart on first switch.
     const [pickedRunIds, setPickedRunIds] = useState(null);
@@ -166,9 +170,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             // quickest run isn't necessarily in its most recent session.
             const allRuns = (sessionsByVehicle[v.id] || [])
                 .filter(s => s.test_type === 'accel')
-                .flatMap(s => (s.performance_runs || []).filter(
-                    r => (r.performance_run_points || []).length >= 2,
-                ));
+                .flatMap(s => (s.performance_runs || [])
+                    .filter(r => (r.performance_run_points || []).length >= 2)
+                    // A run is sourced by its session; carried here for the source line.
+                    .map(r => ({ ...r, _sourceName: s.source_name, _sourceUrl: s.source_url || s.spreadsheet_url })));
             if (allRuns.length === 0) continue;
 
             let chosen;
@@ -205,6 +210,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         seq: `#${(run.sequence ?? 0) + 1}`,
                         points,
                         zeroTo60: run.zero_to_60_sec,
+                        sourceName: run._sourceName ?? null,
+                        sourceUrl: run._sourceUrl ?? null,
                     });
                 }
             }
@@ -220,6 +227,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     out.push({
                         vehicle: v,
                         source: summary.source_name || 'published',
+                        sourceName: summary.source_name ?? null,
+                        sourceUrl: summary.source_url ?? null,
                         points: synth.points,
                         synthetic: true,
                         basis: synth.basis,
@@ -289,6 +298,8 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             const data = s.gSegments.map(seg => ({ x: (seg.x0 + seg.x1) / 2, y: seg.g }));
             return [{
                 label: `${s.label} · g`,
+                // One row with its curve's speed (#455).
+                readoutGroup: String(i),
                 data,
                 yAxisID: 'yG',
                 borderColor: c,
@@ -300,13 +311,41 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             }];
         });
 
+        const readoutConfig = {
+            title: (x) => `${readoutNumber(x)} s`,
+            subtitle: ['Speed (mph)', showG ? 'Acceleration (g)' : null].filter(Boolean).join(' · '),
+            describe(row, { nearest }) {
+                const sr = series[Number(row.key)];
+                const g = row.companions[0];
+                const lines = [];
+                if (nearest && sr?.synthetic) {
+                    lines.push(`Reconstructed from ${sr.basis.join(' + ')}`);
+                    if (sr.flags.includes('mixed-rollout')) lines.push('⚠ 0–60 is a no-rollout figure paired with a ¼-mile ET, which is not');
+                    if (sr.flags.includes('non-monotonic')) lines.push('⚠ The published figures disagree with each other');
+                }
+                const credit = { sourceUrl: sr?.sourceUrl, name: sr?.fullLabel };
+                return {
+                    name: sr?.label ?? row.label,
+                    value: `${readoutNumber(row.y)} mph`,
+                    companion: g ? `${readoutNumber(g.y)} g` : null,
+                    flag: sr?.synthetic ? `Reconstructed from ${sr.basis.join(' + ')}` : null,
+                    detail: lines,
+                    sources: nearest && sr && (sr.sourceName || sr.sourceUrl)
+                        ? [{ label: sr.sourceName ?? 'Source', run: credit }]
+                        : null,
+                };
+            },
+        };
+
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
+            plugins: [readout.plugin(readoutConfig)],
             data: {
                 datasets: series.map((s, i) => {
                     const c = seriesColors[i];
                     return {
                     label: s.label,
+                    readoutGroup: String(i),
                     data: s.points,
                     // Named explicitly: without it Chart.js assigns the dataset to
                     // the FIRST y-scale in definition order, which put speed on the
@@ -349,40 +388,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                                 })),
                         },
                     },
-                    tooltip: {
-                        callbacks: {
-                            title: (items) => `${items[0].parsed.x.toFixed(3)} s`,
-                            // Tooltip shows the untruncated name, so the legend can
-                            // stay short without losing which vehicle a line is.
-                            label: (c) => {
-                                // g datasets are concatenated after the speed ones,
-                                // so anything past series.length is an acceleration
-                                // span and is measured in g, not mph.
-                                if (c.datasetIndex >= series.length) {
-                                    const sr = series[c.datasetIndex - series.length];
-                                    const seg = sr?.gSegments?.[c.dataIndex];
-                                    const line = `${c.dataset.label}: ${c.parsed.y.toFixed(3)} g`;
-                                    // Say so rather than quietly showing a bound as if
-                                    // it were a reading.
-                                    return seg?.clamped
-                                        ? [line, `Capped at this run's recorded peak (computed ${seg.rawG.toFixed(3)} g over ${(seg.x1 - seg.x0).toFixed(3)} s)`]
-                                        : line;
-                                }
-                                const sr = series[c.datasetIndex];
-                                const lines = [`${sr?.fullLabel ?? c.dataset.label}: ${c.parsed.y.toFixed(0)} mph`];
-                                if (sr?.synthetic) {
-                                    lines.push(`Reconstructed from ${sr.basis.join(' + ')}`);
-                                    if (sr.flags.includes('mixed-rollout')) {
-                                        lines.push('⚠ 0–60 is a no-rollout figure paired with a ¼-mile ET, which is not');
-                                    }
-                                    if (sr.flags.includes('non-monotonic')) {
-                                        lines.push('⚠ The published figures disagree with each other');
-                                    }
-                                }
-                                return lines;
-                            },
-                        },
-                    },
+                    // The readout answers hovers here (#455): every curve at the
+                    // cursor's time, with a curve's acceleration beside its speed.
+                    tooltip: { enabled: false },
                 },
                 scales: {
                     x: {
@@ -414,7 +422,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [series, isDark, presentationMode, scale, colorMap, showG]);
+    }, [series, isDark, presentationMode, scale, colorMap, showG, readout]);
 
     // ── The frame's caption, and its export ─────────────────────────────────
     // The title was an <h3> above the card and the export flattened the canvas
@@ -428,8 +436,15 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         return parts.join(' · ');
     }, [showG]);
 
+    // Each plotted curve is a run of a session, or a published figure; both
+    // carry their source's name.
+    const sourceRuns = useMemo(
+        () => series.map((c, i) => ({ id: `${c.runId ?? 'published'}:${i}`, source: c.sourceName, sourceUrl: c.sourceUrl })),
+        [series]);
+    const sourceLine = useSourceLine({ runs: sourceRuns });
+
     const { copyPng, copied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(series.length) });
 
     const [urlCopied, setUrlCopied] = useState(false);
@@ -450,13 +465,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             <label className="axis-label">Focus</label>
                             <select
                                 value={scale.xMax == null ? 'full' : 'launch'}
-                                onChange={e => setScale(prev => ({
-                                    ...prev,
-                                    // A merged drag ladder stretches the axis to ~13 s and
-                                    // squeezes the whole 0-60 into the left quarter, which
-                                    // reads as if the low-speed splits had gone missing.
-                                    xMax: e.target.value === 'launch' ? 5 : null,
-                                }))}
+                                // A merged drag ladder stretches the axis to ~13 s and
+                                // squeezes the whole 0-60 into the left quarter, which
+                                // reads as if the low-speed splits had gone missing.
+                                onChange={e => setScaleLimit('xMax', e.target.value === 'launch' ? 5 : null)}
                                 className="form-input"
                             >
                                 <option value="full">Full run</option>
@@ -535,6 +547,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 <PlotFrame
                     title={plotTitle}
                     subtitle={plotSubtitle}
+                    sourceLine={sourceLine}
                     preview={preview}
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
@@ -566,8 +579,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                         </>
                     )}
                 >
-                    <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
+                    <div className="chart-readout-host" style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
                         <canvas ref={canvasRef} />
+                        {readout.overlay}
                     </div>
                 </PlotFrame>
             )}
@@ -580,7 +594,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 <AxisScaleControls
                     xMin={scale.xMin} xMax={scale.xMax}
                     yMin={scale.yMin} yMax={scale.yMax}
-                    onChange={(key, val) => setScale(prev => ({ ...prev, [key]: val }))}
+                    onChange={setScaleLimit}
                     xAxisLabel="X-Axis Scale (s)"
                     yAxisLabel="Y-Axis Scale (mph)"
                 />

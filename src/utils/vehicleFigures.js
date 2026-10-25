@@ -212,11 +212,33 @@ export function figureSources(vehicle, { capacity = false, range = false } = {},
     return out;
 }
 
+/**
+ * Which EPA credits a chart's figures earn (the source line). An EPA label
+ * range is fueleconomy.gov's; an EPA-tested capacity is from EPA's own test
+ * records. An "expected" or unsorted range is neither, so it earns nothing.
+ *
+ * @param {Array} vehicles
+ * @param {{capacity?: boolean, range?: boolean}} uses  as for figureSources
+ * @returns {{ label: boolean, tests: boolean }}
+ */
+export function epaCredits(vehicles = [], { capacity = false, range = false } = {}) {
+    return {
+        label: range && vehicles.some(v => v?.epaRangeMi > 0 && v.epaRangeBasis === 'epa-label'),
+        tests: capacity && vehicles.some(v => v?.socWindowKwh > 0 && v.socWindowBasis === 'epa-tested'),
+    };
+}
+
 /** The Spec Chart / Scatter fields that ARE a resolved figure (specHelpers.makeVehicleFields). */
 const FIELD_FIGURE = {
     'vehicle.socWindowKwh': 'capacity',
     'vehicle.epaRangeMi':   'range',
 };
+
+/** epaCredits for the spec fields a chart plots (those that ARE a resolved figure). */
+export function epaCreditsForFields(vehicles, fieldKeys = []) {
+    const figures = fieldKeys.map(k => FIELD_FIGURE[k]);
+    return epaCredits(vehicles, { capacity: figures.includes('capacity'), range: figures.includes('range') });
+}
 
 /**
  * The source of a spec field's value, when that field is a resolved figure;

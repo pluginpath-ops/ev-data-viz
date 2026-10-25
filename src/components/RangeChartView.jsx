@@ -2,10 +2,13 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import SidebarDisplaySection from './SidebarDisplaySection';
 import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
-import { useSyncedScale } from '../hooks/useSyncedScale';
+import { useAxisLimits } from '../hooks/useAxisLimits';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
+import { useChartReadout } from '../hooks/useChartReadout';
+import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
 import { whenNewRangeOfRun } from '../utils/testedRange';
+import { fullPackRange } from '../utils/fullPackRange';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import { correctionFactor, correctionNote, runConditions } from '../utils/conditionCorrection';
@@ -31,6 +34,7 @@ import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/color
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { useSourceLine } from '../hooks/useSourceLine';
 import SpeedBadge from './charts/SpeedBadge';
 import { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT } from '../utils/chartUrlState';
 import { wrapCanvasText } from '../utils/wrapCanvasText';
@@ -49,18 +53,12 @@ const CHART_TYPES = [
 ];
 
 // ── Range helper ──────────────────────────────────────────────────────────────
-// Projected full-range: distance × (100 / SoC_used).
-// Falls back to raw distance_miles when SoC fields are absent.
-const calcRange = (run) => {
-    const d = run.distance_miles;
-    if (!d || d <= 0) return null;
-    const start = run.start_soc;
-    const end   = run.end_soc;
-    if (start != null && end != null) {
-        const used = start - end;
-        if (used > 0) return Math.round((d * 100) / used);
-    }
-    return Math.round(d);
+// Projected full-range (utils/fullPackRange): the test's SoC window where it
+// logged one, else its own efficiency × the vehicle's capacity, else the raw
+// distance. Called on a CORRECTED run, so the correction scales the result.
+const calcRange = (run, vehicle = run?.vehicle) => {
+    const range = fullPackRange(run, vehicle);
+    return range ? Math.round(range.mi) : null;
 };
 
 
@@ -85,37 +83,24 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
     const chartInstance = useRef(null);
+    const readout       = useChartReadout();
     // The chart type and efficiency unit live in chartConfig (App), so a link
     // and the pop-out carry them; this view only asks for a change.
     const setChartType = rangeChartType => setChartConfig(prev => ({ ...prev, rangeChartType }));
     const setEffUnit   = unit => setChartConfig(prev => ({ ...prev, effUnit: unit }));
     const [copiedUrl,    setCopiedUrl]    = useState(false);
 
-    // ── Axis scale state — yMin defaults to 0, rest auto ─────────────────────
-    const [xMinOwn, setXMin] = useState(null);
-    const [xMaxOwn, setXMax] = useState(null);
-    const [yMinOwn, setYMin] = useState(0);
-    const [yMaxOwn, setYMax] = useState(null);
-    // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
-    const { xMin, xMax, yMin, yMax } = useSyncedScale({
-        xMin: xMinOwn, xMax: xMaxOwn, yMin: yMinOwn, yMax: yMaxOwn,
-    });
+    // ── Axis limits — yMin defaults to 0, rest auto ──────────────────────────
+    // In chartConfig (#478), so a chart link, a Home panel and the pop-out all
+    // draw with the limits the sender set; this view used to keep them here.
+    const { limits: { xMin, xMax, yMin, yMax }, setLimit, resetLimits } = useAxisLimits('range');
     const [showPoints,       setShowPoints]       = useState(true);
-    const handleScaleChange = (key, val) => {
-        if (key === 'xMin') setXMin(val);
-        else if (key === 'xMax') setXMax(val);
-        else if (key === 'yMin') setYMin(val);
-        else if (key === 'yMax') setYMax(val);
-    };
 
     // Reset all scale overrides (back to defaults) when switching chart types,
     // since axis semantics change between chart types.
     const handleChartTypeChange = (newType) => {
         setChartType(newType);
-        setXMin(null);
-        setXMax(null);
-        setYMin(0);
-        setYMax(null);
+        resetLimits();
     };
 
     // ── Derived: all range runs across selected vehicles ──────────────────────
@@ -188,7 +173,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
         const isSpeed    = chartType.includes('-speed-');
         const effLabelStr = getEffLabel(effUnit, units);
         const getY       = isRange
-            ? (run) => convDistance(calcRange(run), units)
+            ? (run) => convDistance(calcRange(run, run.vehicle), units)
             : (run) => calcEff(run.distance_miles, run.energy_kwh, effUnit, units);
         const yLabel     = isRange ? `Range (${distanceLabel(units)})` : `Efficiency (${effLabelStr})`;
 
@@ -517,12 +502,40 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             },
         };
 
+        // The line chart reads every vehicle at the X under the cursor (#455).
+        // Each point is a DIFFERENT test, so a vehicle is read at the nearest
+        // test within a unit of X and never interpolated between two tests —
+        // that would invent a figure neither of them produced. The bar chart
+        // keeps its per-bar tooltip.
+        const readoutConfig = built.kind === 'line' ? {
+            title: (x) => `${nameOf(built.xLabel)}: ${withUnit(readoutNumber(x), unitOf(built.xLabel))}`,
+            subtitle: built.yLabel,
+            describe(row, { nearest, x }) {
+                const ds = built.data.datasets[row.datasetIndex];
+                const run = ds.runMetas?.[row.dataIndex];
+                const lines = [];
+                if (nearest && run) {
+                    lines.push(run.name);
+                    if (Math.abs(row.x - x) > 1e-9) lines.push(`Nearest test: ${readoutNumber(row.x)}`);
+                    lines.push(...runTooltipLines(run, [run._correction?.note ?? null].filter(Boolean), units, { source: false }));
+                }
+                return {
+                    name: ds.label,
+                    value: withUnit(readoutNumber(row.y), unitOf(built.yLabel)),
+                    detail: lines,
+                    sources: nearest && run && (run.source || run.source_url) ? [{ label: run.source || 'Test source', run }] : null,
+                };
+            },
+        } : null;
+        // Sampled, not interpolated — see above.
+        if (readoutConfig) built.data.datasets.forEach(d => { d.readoutMode = 'sample'; });
+
         chartInstance.current = new Chart(chartRef.current.getContext('2d'), {
             type:    built.kind,
             data:    built.data,
             plugins: built.kind === 'bar' ? [barGroupPlugin, testSpreadHoverPlugin(built.flatRuns, {
                 describe: (p, row) => testPointLines(p.run, `${p.value} ${row._yUnit}`, units, p.run._correction?.note, p.estimateNote),
-            })] : [],
+            })] : [readout.plugin(readoutConfig)],
             options: {
                 layout: {
                     padding: {
@@ -542,6 +555,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     // more distinct series — the line charts' vehicles.
                     legend: { display: legendWorthShowing(built.data.datasets) },
                     tooltip: {
+                        enabled: built.kind !== 'line',
                         displayColors: false,
                         filter: suppressBarTooltip,
                         callbacks: {
@@ -657,8 +671,10 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
         return parts.join(' · ');
     }, [plottableRuns, chartType, effUnit, verboseLabels, correctionMode, correctionTarget, units]);
 
+    const sourceLine = useSourceLine({ runs: plottableRuns });
+
     const { copyPng, copied, preview, dismissPreview } =
-        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle,
+        useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: plottableRuns.map(r => r.id).join(',') });
 
     return (
@@ -747,11 +763,15 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         // Efficiency is deliberately NOT here: it is what the
                         // chart plots, so a badge repeating it beside every row
                         // is the answer printed on the question.
-                        const rawRange    = calcRange(run);
+                        // As measured, not corrected: the bars carry the correction.
+                        const basis       = fullPackRange(run, selectedVehicles.find(v => v.id === run.vehicle_id));
+                        const rawRange    = basis ? Math.round(basis.mi) : null;
                         const range       = rawRange != null ? convDistance(rawRange, units) : null;
                         const dl          = distanceLabel(units);
-                        const socUsed     = (run.start_soc != null && run.end_soc != null) ? run.start_soc - run.end_soc : null;
-                        const isProjected = socUsed != null && socUsed !== 100;
+                        const isProjected = basis != null && basis.basis !== 'distance' && !(basis.basis === 'soc-window' && basis.socUsed === 100);
+                        const projectedFrom = basis?.basis === 'efficiency'
+                            ? `Projected from its own efficiency: ${basis.miPerKwh.toFixed(2)} mi/kWh × ${basis.capacityKwh} kWh${basis.capacityLabel ? ` (${basis.capacityLabel})` : ''}`
+                            : `Projected from ${run.distance_miles} mi driven over ${basis?.socUsed}% SoC`;
                         const canPlot     = hasDataForType(run, chartType);
                         const isChecked   = selectedRuns.some(id => String(id) === String(run.id));
                         return (
@@ -774,9 +794,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                                 {range != null && (
                                     <span
                                         className="badge-micro"
-                                        title={isProjected
-                                            ? `Projected from ${run.distance_miles} mi driven over ${socUsed}% SoC`
-                                            : 'Measured distance'}
+                                        title={isProjected ? projectedFrom : 'Measured distance'}
                                     >
                                         {range} {dl}{isProjected ? ' ⟳' : ''}
                                     </span>
@@ -798,6 +816,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             <PlotFrame
                 title={plotTitle}
                 subtitle={plotSubtitle}
+                sourceLine={sourceLine}
                 preview={preview}
                 onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (
@@ -826,12 +845,13 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     </>
                 )}
             >
-                <div style={{ height: presentationMode ? PRESENTED_HEIGHT : '500px', position: 'relative' }}>
+                <div className="chart-readout-host" style={{ height: presentationMode ? PRESENTED_HEIGHT : '500px' }}>
                     {/* Canvas always mounted so ref stays valid */}
                     <canvas
                         ref={chartRef}
                         style={{ display: plottableRuns.length > 0 ? 'block' : 'none' }}
                     />
+                    {readout.overlay}
                     {plottableRuns.length === 0 && (
                         <div className="absolute inset-0 flex items-center justify-center text-meta">
                             <div className="text-center">
@@ -856,7 +876,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 <AxisScaleControls
                     xMin={xMin} xMax={xMax}
                     yMin={yMin} yMax={yMax}
-                    onChange={handleScaleChange}
+                    onChange={setLimit}
                     showX={CHART_TYPES.find(t => t.key === chartType)?.kind === 'line'}
                 />
             )}

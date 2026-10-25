@@ -16,8 +16,11 @@
  * and gets URLSearchParams back.
  *
  * ── What the query holds, by mode ────────────────────────────────────────────
- *   every chart   tab m v  raw rt xn xx yn yx y2n y2x  line pts cspread
- *                 aspread  corr c_spd c_tmp c_alt  pairs
+ *   every chart   tab m v  raw rt  line pts cspread aspread  corr c_spd c_tmp
+ *                 c_alt c_acc  pairs
+ *   axis limits   ax (utils/axisLimits.js) for the five modes that have them
+ *                 — charging range roadtrip perfcurve epacurves. The
+ *                 xn xx yn yx y2n y2x of links written before #478 are still read.
  *   charging      x y y2 (the axes), r (the plotted tests)
  *   range         r (the plotted tests), rc (chart type), eff (efficiency unit)
  *   compare       cmp_soc cmp_mins cmp_mi  cmp_o (orientation)  cmp_sel (the
@@ -31,6 +34,9 @@
 import { ALL_CHART_MODES, DEFAULT_CHART_MODE } from '../constants/chartNav';
 import { decodeCorrection, encodeCorrection } from './correctionSettings';
 import { encodePairings, decodePairings } from './pairings';
+import {
+    AXIS_LIMITS_PARAM, axisLimitsOf, axisLimitsOfLink, encodeAxisLimits, hasAxisLimits, withAxisLimits,
+} from './axisLimits';
 import { encodeVehicleFilters } from './vehicleFilters';
 import { VEHICLE_TABLE_PARAM_PREFIX } from './vehicleTable';
 
@@ -54,7 +60,6 @@ export const DEFAULT_COMPARE_ORIENTATION = 'horizontal';
 // non-number as it came rather than turning it into NaN.
 const idOf = id => (isNaN(Number(id)) ? id : Number(id));
 const idList = raw => (raw?.split(',').filter(Boolean) || []).map(idOf);
-const numOrNull = raw => (raw !== null && raw !== '' ? Number(raw) : null);
 
 /**
  * Everything a chart link says, as the page applies it.
@@ -71,6 +76,9 @@ export function parseChartUrl(search) {
 
     const rangeChartType = p.get('rc');
     const effUnit = p.get('eff');
+    // A stale or hand-edited ?m= would otherwise fall through to the charging
+    // chart with no indication why.
+    const chartMode = ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE;
 
     const chart = {
         vehicleIds:    idList(p.get('v')),
@@ -80,20 +88,15 @@ export function parseChartUrl(search) {
         y2Axis:        p.get('y2') || null,
         alignRaw:      p.get('raw') === '1',
         raceThreshold: p.get('rt')  ? Number(p.get('rt'))  : null,
-        xMin:  numOrNull(p.get('xn')),
-        xMax:  numOrNull(p.get('xx')),
-        // A missing yn is zero, not "auto": every chart's y axis starts at zero.
-        yMin:  p.get('yn') !== null && p.get('yn') !== '' ? Number(p.get('yn')) : 0,
-        yMax:  numOrNull(p.get('yx')),
-        y2Min: numOrNull(p.get('y2n')),
-        y2Max: numOrNull(p.get('y2x')),
+        // The limits of the chart this link opens: all six, defaults filled in,
+        // so a link that names none sets none. null for a mode with no axis
+        // limits. Only that chart's — the link says nothing of the others.
+        axisLimits:    axisLimitsOfLink(p, chartMode),
         showLine:   p.get('line') !== '0', // on unless the link says 0
         showPoints: p.get('pts') === '1',  // off unless the link says 1
         compositeSpread: p.get('cspread') !== '0',
         addedSpread:     p.get('aspread') === '1',
-        // A stale or hand-edited ?m= would otherwise fall through to the
-        // charging chart with no indication why.
-        chartMode:     ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE,
+        chartMode,
         scatterXField: p.get('scx') || null,
         scatterYField: p.get('scy') || null,
         specsField:    p.get('sf')  || null,
@@ -171,9 +174,9 @@ export function parseChartUrl(search) {
  * defaults (#448).
  *
  * Fields the link does not name keep what `base` has, except the ones that are
- * written as "absent means the default" (the limits, the display toggles, the
- * correction), which a link always sets: a missing yn is a zero axis, not
- * "whatever the page had".
+ * written as "absent means the default" (the opened chart's axis limits, the
+ * display toggles, the correction), which a link always sets: a link with no
+ * `ax` is an Auto axis, not "whatever the page had".
  *
  * @param {object} chart  `parseChartUrl(...).chart`
  * @param {object} base   the chartConfig to lay it over
@@ -188,12 +191,9 @@ export function chartConfigFromParsed(chart, base) {
         ...(s.runIds.length > 0 && (s.chartMode === 'charging' || s.chartMode === 'range') && { selectedRuns: s.runIds }),
         alignRaw:      s.alignRaw,
         raceThreshold: s.raceThreshold,
-        xMin:          s.xMin,
-        xMax:          s.xMax,
-        yMin:          s.yMin,
-        yMax:          s.yMax,
-        y2Min:         s.y2Min ?? null,
-        y2Max:         s.y2Max ?? null,
+        // The opened chart's limits replace the config's; every other chart's
+        // stay as they were (the link does not say what they are).
+        ...(s.axisLimits && { axisLimits: withAxisLimits(base.axisLimits, s.chartMode, s.axisLimits) }),
         showLine:      s.showLine ?? true,
         showPoints:    s.showPoints ?? false,
         compositeSpread: s.compositeSpread ?? true,
@@ -275,12 +275,13 @@ export function buildChartParams({
     }
     if (chartConfig.alignRaw)                 p.set('raw', '1');
     if (chartConfig.raceThreshold != null)    p.set('rt',   String(chartConfig.raceThreshold));
-    if (chartConfig.xMin != null)             p.set('xn',   String(chartConfig.xMin));
-    if (chartConfig.xMax != null)             p.set('xx',   String(chartConfig.xMax));
-    if (chartConfig.yMin != null && chartConfig.yMin !== 0) p.set('yn', String(chartConfig.yMin));
-    if (chartConfig.yMax != null)             p.set('yx',   String(chartConfig.yMax));
-    if (chartConfig.y2Min != null)            p.set('y2n',  String(chartConfig.y2Min));
-    if (chartConfig.y2Max != null)            p.set('y2x',  String(chartConfig.y2Max));
+    // The opened chart's axis limits, only those off its defaults. Written for
+    // every mode that has them, so a chart added to AXIS_LIMIT_CHARTS is in the
+    // link without anyone remembering to write it here.
+    if (hasAxisLimits(chartMode)) {
+        const packed = encodeAxisLimits(axisLimitsOf(chartConfig.axisLimits, chartMode), chartMode);
+        if (packed) p.set(AXIS_LIMITS_PARAM, packed);
+    }
     if (chartConfig.showLine === false)       p.set('line',   '0');
     if (chartConfig.showPoints)               p.set('pts',    '1');
     if (chartConfig.compositeSpread === false) p.set('cspread', '0');

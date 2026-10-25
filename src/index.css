@@ -1950,13 +1950,35 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     align-items: center;
     gap: 8px;
 }
-/* The label and Clear all keep their width: squeezed by the chips at 375px,
-   "Clear all" wrapped to two lines and made the strip taller than the chips it
+/* The label and Clear keep their width: squeezed by the chips at 375px,
+   what was "Clear all" wrapped to two lines and made the strip taller than the chips it
    was there to remove. */
 .selected-strip-row > .text-micro,
-.selected-strip-row > .btn {
+.selected-strip-actions > .btn {
     flex: none;
     white-space: nowrap;
+}
+/* Clear and ＋ Add, pushed to the right edge. Side by side while the chips
+   fit on one line; stacked once they wrap, when the row is two chips tall
+   anyway. `.is-stacked` is set by useStackedStripActions, which measures the
+   buttons at their own widths — so they keep them when stacked rather than
+   stretching, and line up on the right. */
+.selected-strip-actions {
+    display: flex;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 4px;
+    flex: none;
+    margin-left: auto;
+}
+/* A text symbol leading a button's label — ⌧ on Clear. Text, not an image, so
+   it takes the button's own color in either theme. */
+.btn-symbol {
+    margin-right: 0.35em;
+}
+.selected-strip-actions.is-stacked {
+    flex-direction: column;
+    align-items: flex-end;
 }
 /* Two rows of chips, then it scrolls.
  *
@@ -1967,14 +1989,14 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * third of a phone viewport.
  *
  * The cap is two chip rows exactly: 2 × 26px of chip plus the 8px between
- * them. `Selected` and `Clear all` stay OUTSIDE this box, so the way out of a
+ * them. `Selected` and `Clear` stay OUTSIDE this box, so the way out of a
  * large selection is never the thing that scrolled away. */
 .selected-chip-scroll {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    /* Takes the slack on ONE line with the label and Clear all. Giving the
+    /* Takes the slack on ONE line with the label and Clear. Giving the
        chips their own full-width line was measurably worse: it bought them
        80px of width and cost 34px of header on every screen below, which is
        the resource this cap exists to protect. */
@@ -1983,6 +2005,44 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     max-height: 3.75rem;
     overflow-y: auto;
     scrollbar-width: thin;
+}
+
+/* ── Vehicle quick-add ───────────────────────────────────────────────────────
+ *
+ * "＋ Add" at the right end of the chips row, last in `.selected-strip-actions`,
+ * and the checklist it opens. Last so that the Clear the first chip brings
+ * appears beside it rather than pushing it along. */
+/* The list scrolls; the search above it does not, so the field you are typing
+   in never scrolls away from the rows it is narrowing. */
+.vehicle-quick-add-list {
+    max-height: 18rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    margin: 0 -12px;
+}
+.vehicle-quick-add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+}
+/* A fixed column, so names line up whether or not a row is ticked. */
+.vehicle-quick-add-check {
+    flex: none;
+    width: 1em;
+    text-align: center;
+    font-weight: 700;
+    /* Selection's orange, as on a selected vehicle card's accent border
+       (.vehicle-card.is-selected): the same vehicles, marked the same way. */
+    color: var(--color-accent-orange);
+}
+.vehicle-quick-add-empty {
+    @apply px-3 py-2 italic;
 }
 
 /* ── Tested figure ──────────────────────────────────────────────────────────
@@ -3349,6 +3409,209 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     margin: 3px 0 0;
     font-family: var(--font-mono);
     font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-meta);
+}
+
+/* Who the plotted data came from, along the bottom of the frame (the source
+   line). Names are links on screen; the PNG export draws them as plain text. */
+.plot-frame-sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 6px;
+    margin: 10px 0 0;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-meta);
+}
+.plot-frame-sources > * + *::before { content: '·'; margin-right: 6px; color: var(--color-text-faint); }
+.plot-frame-sources > span:first-child + *::before { content: none; }
+.plot-frame-sources a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+.plot-frame-sources a:hover { color: var(--color-text-primary); }
+.plot-frame-sources-gap { color: var(--color-warning-text, var(--color-text-meta)); }
+
+/* ── The readout (#455) ──────────────────────────────────────────────────────
+ *
+ * Every series at the X under the cursor: a crosshair, a dot on each line, and
+ * a box listing them. The DOM, not the canvas, so its source links can be
+ * clicked and so a PNG export — which copies the canvas — never carries a
+ * half-drawn hover. The box is a popover in everything but how it opens.
+ *
+ * The host is whatever wraps the canvas; the layer fills it and takes no
+ * pointer, so the chart under it keeps every hover, click and drag. */
+.chart-readout-host { position: relative; }
+
+.chart-readout-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.chart-crosshair {
+    position: absolute;
+    left: 0;
+    width: 0;
+    border-left: 1px dashed var(--color-text-meta);
+}
+
+/* Solid where the line has a real sample at this X; a ring where the value was
+   read off the line between two samples. --dot is the series color. */
+.chart-crosshair-dot {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    background-color: var(--dot);
+    border: 2px solid var(--color-popover);
+}
+.chart-crosshair-dot.is-interpolated {
+    background-color: var(--color-popover);
+    border-color: var(--dot);
+}
+
+.chart-readout {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: var(--z-tooltip);
+    width: max-content;
+    min-width: 12rem;
+    max-width: min(24rem, calc(100vw - 1rem));
+    padding: 6px 8px 5px;
+    font-family: var(--font-sans);
+    font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
+    line-height: 1.35;
+    color: var(--color-text-primary);
+    background-color: var(--color-popover);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-popover);
+    box-shadow: var(--shadow-popover, 0 4px 12px rgba(0, 0, 0, 0.3));
+    pointer-events: none;
+}
+
+/* Fixed: it holds still, so it can take the pointer and its links work. A long
+   list scrolls rather than outgrowing the window. */
+.chart-readout--fixed {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    max-height: min(32rem, calc(100vh - 1rem));
+}
+/* Only the list of runs scrolls: the header, the active run's detail and the
+   footer stay where they are, so a long list never pushes a source link out of
+   reach. */
+.chart-readout--fixed .chart-readout-list {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.chart-readout--fixed .chart-readout-row { flex: none; }
+
+/* Below the compact breakpoint a fixed readout is a bottom sheet, clear of the
+   finger that placed it. */
+.chart-readout--sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: auto;
+    max-width: none;
+    max-height: 45vh;
+    border-radius: var(--radius-popover) var(--radius-popover) 0 0;
+}
+
+.chart-readout-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 4px;
+    margin-bottom: 3px;
+    border-bottom: 1px solid var(--color-border);
+}
+.chart-readout-title { font-weight: 600; }
+.chart-readout-subtitle { margin: -1px 0 3px; color: var(--color-text-meta); }
+
+.chart-readout-list { display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0; }
+
+.chart-readout-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 6px;
+    padding: 1px 3px;
+    border-radius: var(--radius-mark);
+}
+/* The active line — the one the cursor is on, or in a fixed readout the one the
+   pointer is over: its detail and source are spelled out beneath. */
+.chart-readout-row.is-active { background-color: var(--color-hover-lift); }
+
+.chart-readout-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-secondary);
+}
+.chart-readout-row.is-active .chart-readout-name { color: var(--color-text-primary); }
+
+.chart-readout-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+    padding-left: 8px;
+    position: relative;
+}
+/* Hung to the left of the figure, out of flow, so a ≈ never shifts the numbers
+   off the column the other rows line up on. */
+.chart-readout-approx {
+    position: absolute;
+    right: 100%;
+    color: var(--color-text-meta);
+}
+.chart-readout-companion { color: var(--color-text-meta); }
+
+/* The ⚠ column: always present, so the values do not shift when a row has no
+   flag. */
+.chart-readout-flag-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 1.2em;
+}
+.chart-readout-flag { color: var(--color-warning-text); }
+
+/* Source names, each a link in a fixed readout. Hovering the readout it is
+   plain text, and the pointer passes through it. */
+.chart-readout-sources a {
+    color: var(--color-text-link);
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+}
+.chart-readout-sources a:hover { color: var(--color-text-primary); }
+
+.chart-readout-detail {
+    margin-top: 4px;
+    padding-top: 3px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-meta);
+}
+.chart-readout-detail-name { color: var(--color-text-primary); font-weight: 600; }
+
+.chart-readout-more { padding: 0 3px; color: var(--color-text-meta); }
+
+.chart-readout-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 10px;
+    margin-top: 4px;
+    padding-top: 3px;
+    border-top: 1px solid var(--color-border);
     color: var(--color-text-meta);
 }
 
@@ -7570,6 +7833,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     pointer-events: none;
 }
 
+/* A table with no checkbox column (the read-only one on Home, #448) pins the name
+   at the left edge. The offsets above are the checkbox column's width; with no
+   such column the pinned name sat 2.25rem in from the edge and drew over the
+   start of the column beside it, cutting its first letters off. More specific
+   than the phone rule below, so it wins there too. */
+.guide-table.is-read-only .sticky-name { left: 0; }
+.guide-table.is-read-only .guide-th.sticky-name .guide-th-name { margin-left: 0; }
+
 /* On a phone the pinned block WAS the table. 36px + 288px is 324 of a 349px
    scroller — 93%, leaving 25px for the other nine columns, so the sideways
    scroll the pin exists to survive had nothing left to scroll.
@@ -8287,6 +8558,10 @@ a.is-test-link:focus-visible {
     width: 100%;
     accent-color: var(--color-primary);
 }
+/* The accessory load while it follows the temperature: grey, as an untouched
+   control reads, so that blue means "set by you". The thumb and the filled bar
+   take the one accent color. */
+.assumption-slider.is-auto { accent-color: var(--color-text-muted); }
 
 /* ── Correction target ───────────────────────────────────────────────────────
    What corrected figures are corrected to (CorrectionTargetFields): a heading
@@ -8304,7 +8579,7 @@ a.is-test-link:focus-visible {
 .correction-target .section-action { margin-left: auto; }
 .correction-target-row {
     display: grid;
-    grid-template-columns: 4.25em minmax(0, 1fr) 4.5em;
+    grid-template-columns: 5.25em minmax(0, 1fr) 4.5em;
     align-items: center;
     gap: 8px;
 }
@@ -9045,6 +9320,11 @@ a.is-test-link:focus-visible {
     @apply relative;
     min-height: 8rem;
 }
+/* A table panel takes the whole row. */
+.home-panel.is-wide {
+    grid-column: 1 / -1;
+}
+
 /* A shop window: a click anywhere on the chart opens it on its own tab. */
 .home-panel-cover {
     @apply absolute inset-0 w-full h-full;
@@ -9162,4 +9442,62 @@ a.is-test-link:focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
     .scroll-more { animation: none; }
+}
+
+
+/* ── Admin → Site Events (#477) ──────────────────────────────────────────────
+   Counts of what readers open, in tables. The type is the table's own: a name
+   in body size with its slug under it in `.text-caption`, figures in the data
+   face. A row with too few observations is muted, not removed — a comparison
+   nobody opened reads as an answer; one that vanished reads as a bug. */
+.events-view {
+    @apply flex flex-col gap-4;
+}
+.events-caveats {
+    @apply mt-1 pl-4;
+    list-style: disc;
+}
+.events-section-head {
+    @apply flex items-center justify-between gap-3 mb-1;
+}
+.events-table {
+    @apply w-full;
+    border-collapse: collapse;
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+}
+.events-table th {
+    @apply px-3 py-2 text-left align-bottom whitespace-nowrap;
+    position: sticky;
+    top: 0;
+    background-color: var(--color-surface-muted);
+    border-bottom: 1px solid var(--color-border);
+    font-weight: 700;
+    color: var(--color-text-header-label);
+}
+.events-table td {
+    @apply px-3 py-2 align-top;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+.events-table .numeric {
+    @apply text-right;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+.events-table tr.is-sparse td { opacity: 0.6; }
+.events-name {
+    font-size: var(--fs-body);
+    font-weight: 600;
+}
+.events-charts li.is-unopened { color: var(--color-text-faint); }
+.events-bar-column { width: 40%; }
+.events-bar-track {
+    height: 0.75rem;
+    border-radius: var(--radius-track);
+    background-color: var(--color-surface-sunken);
+    overflow: hidden;
+}
+.events-bar {
+    height: 100%;
+    background-color: var(--color-primary);
 }
