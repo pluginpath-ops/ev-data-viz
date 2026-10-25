@@ -7325,6 +7325,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* The tally sits hard right, away from the controls: it is the ANSWER to them,
    not one of them. */
+.count-filter-input {
+    width: 4rem;
+}
 .guide-filter-tally {
     display: flex;
     align-items: baseline;
