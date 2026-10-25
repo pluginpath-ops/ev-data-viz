@@ -195,15 +195,18 @@ export function resampleBySoc(points) {
  * One composite from a set of tests taken under the same charger condition.
  *
  * @param {Array<{run: Object, points: Array}>} tests
+ * @param {Object} [opts]
+ * @param {number} [opts.minTests]  fewest tests to build from; COMPOSITE_MIN_TESTS unless a
+ *   caller is drawing a composite that already exists, as compositeFrom is (1)
  * @returns {{
  *   points: Array<{soc: number, chargeRate: number, time: number|null, n: number,
  *                  spreadHi: number|null, spreadLo: number|null}>,   see testSpread
  *   tests: Array<{runId, name}>,
  *   heldBack: Array<{runId, name, from: number, to: number}>,
  *   conditions: {tempMinF: number|null, tempMaxF: number|null, preconditioned: {yes, no, unknown}},
- * } | null}  null when fewer than COMPOSITE_MIN_TESTS tests have any data
+ * } | null}  null when fewer than `minTests` tests have any data
  */
-export function buildComposite(tests) {
+export function buildComposite(tests, { minTests = COMPOSITE_MIN_TESTS } = {}) {
     const series = (tests ?? [])
         .map(({ run, points }) => {
             const bySoc = resampleBySoc(points);
@@ -212,7 +215,7 @@ export function buildComposite(tests) {
             return { run, bySoc, peak };
         })
         .filter(s => s.bySoc.size > 0);
-    if (series.length < COMPOSITE_MIN_TESTS) return null;
+    if (series.length < minTests) return null;
 
     const socs = [...new Set(series.flatMap(s => [...s.bySoc.keys()]))].sort((a, b) => a - b);
     const heldAt = new Map(series.map(s => [s.run.id, []]));   // runId → SoCs set aside
@@ -593,6 +596,23 @@ export function countsFrom(points) {
 }
 
 /**
+ * The lowest SoC from which a test WITH A CLOCK counts — where a composite
+ * measured from a start can first be drawn against time. A test logged with SoC
+ * and power only (the R2's V3.5 and HYC400 tests) has points and no minutes, so
+ * a composite resting on such tests alone has a line against SoC and none
+ * against time. Null when no test has a clock.
+ *
+ * @param {Array<{run: Object, points: Array}>} tests
+ */
+export function clockedStart(tests) {
+    const starts = (tests ?? [])
+        .filter(t => (t.points ?? []).some(p => finite(p.time)))
+        .map(t => countsFrom(t.points))
+        .filter(s => s != null);
+    return starts.length ? Math.min(...starts) : null;
+}
+
+/**
  * The lowest SoC a composite can be measured from: where COMPOSITE_MIN_TESTS
  * of its tests have begun counting. Lower and the "composite" is one test.
  * Null when fewer than that many tests count at all.
@@ -631,6 +651,13 @@ export function fullStart(tests) {
  * (earliestStart) — the owner's rule: added is always computed back as far
  * as the data, or the chart's common start, allows.
  *
+ * A start that only ONE test reaches still draws, from that test alone (owner,
+ * 2026-10-26). The two-test floor decides whether a car HAS a composite; this
+ * is drawing one that exists, and a chart already draws it dotted where one test
+ * covers a stretch (THIN_SUPPORT). Refusing at one test threw away the line when
+ * the reader most wanted to see what the car does from a low start. It says so:
+ * `tests.length` of `of`, no spread band (one test has none), dotted.
+ *
  * Range is the mean of the tests' own range readings, where they have one.
  * The chart prefers the vehicle's range source when one exists, as it does
  * for the stored composite.
@@ -643,7 +670,8 @@ export function fullStart(tests) {
  *
  * @returns {{points: Array, tests: Array, left: Array<{runId, name}>, start: number,
  *   of: number, fullStart: number|null} | null}
- *   null when fewer than COMPOSITE_MIN_TESTS reach the start
+ *   null when no test reaches the start (or, with no start given, fewer than
+ *   COMPOSITE_MIN_TESTS tests have begun counting at all)
  */
 export function compositeFrom(tests, startSoc = null) {
     const wanted = startSoc ?? earliestStart(tests);
@@ -655,7 +683,7 @@ export function compositeFrom(tests, startSoc = null) {
         const from = countsFrom(t.points);
         (from != null && from <= start ? reaching : left).push(t);
     }
-    const built = buildComposite(reaching);
+    const built = buildComposite(reaching, { minTests: 1 });
     if (!built) return null;
     const from = built.points.filter(p => p.soc >= start);
     // No clock at the start means no time FROM it: a later zero would read as

@@ -1603,6 +1603,19 @@ describe('the charger current class (#313, migration 092)', () => {
     });
 });
 
+describe('race mode draws a composite from a start one test reaches', () => {
+    it('lets compositeFrom build from one test, and no other caller', () => {
+        const composite = read('src/utils/compositeCurve.js');
+        expect(composite).toMatch(/buildComposite\(reaching, \{ minTests: 1 \}\)/);
+        expect((composite.match(/minTests: 1/g) || []).length, 'only the live build lowers the floor').toBe(1);
+        const view = read('src/components/ChargingView.jsx');
+        expect(view, 'the warning is for no test, not for one').toMatch(/none of its tests reach/);
+        expect(view, 'the legend says how many tests it rests on').toMatch(/live\.tests\.length < live\.of/);
+        expect(view, 'a composite with no clock says why it is not on a time axis').toMatch(/noClockComposites/);
+        expect(view).toMatch(/no time data, so it cannot be drawn against time/);
+    });
+});
+
 describe('the Range chart scales a test to a full pack (utils/fullPackRange)', () => {
     it('draws its bars and its selector badge from the one helper', () => {
         // The bar and the badge beside the test were each doing their own SoC
