@@ -497,11 +497,19 @@ class DataService {
     return data;
   }
 
-  async updateManufacturer(id, { name, country }) {
-    const { error } = await getSupabase()
-      .from('manufacturers')
-      .update({ name, country: country || null })
-      .eq('id', id);
+  // Written on PRESENCE: a save that sends only `color` must not null the
+  // country, which this used to do to every field it was not handed. The
+  // brand registry's parent_name was never reaching the table at all.
+  // `color` needs migration 091; an update that does not carry it works
+  // without.
+  async updateManufacturer(id, updates) {
+    const row = {};
+    if ('name' in updates) row.name = updates.name;
+    if ('country' in updates) row.country = updates.country || null;
+    if ('parent_name' in updates) row.parent_name = updates.parent_name || null;
+    if ('color' in updates) row.color = updates.color || null;
+    if (Object.keys(row).length === 0) return;
+    const { error } = await getSupabase().from('manufacturers').update(row).eq('id', id);
     if (error) throw error;
   }
 

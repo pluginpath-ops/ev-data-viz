@@ -350,9 +350,17 @@ export default function EditVehicleForm({
                             onChange={hex => onFormChange({ ...formData, color: hex })}
                             onReset={() => onFormChange({ ...formData, color: null })}
                         />
+                        {formData.color && (
+                            <button type="button" className="btn btn-secondary"
+                                onClick={() => onFormChange({ ...formData, color: null })}>
+                                Clear color
+                            </button>
+                        )}
                         <span className="text-note">
                             {formData.color
                                 ? 'Every chart draws this vehicle from here, shading its tests off it.'
+                                : inheritedColor?.brand
+                                    ? `${inheritedColor.name} brand color. Set one to override it.`
                                 : inheritedColor
                                     ? `Inherited from ${inheritedColor.name}. Set one to override it.`
                                     : 'Unset — the palette chooses. The press-car color is usually the one that stands out.'}

@@ -438,3 +438,37 @@ describe('unlisted sources (in the fleet, not listed for this reader)', () => {
         expect(lineageRole(get(3), index)).toBe('has-variants');
     });
 });
+
+describe('the brand color (#311)', () => {
+    const brands = [{ id: 7, name: 'Rivian', color: '#e07b00' }, { id: 8, name: 'Bare', color: null }];
+    const withBrands = (fleet) => Object.fromEntries(withInheritance(fleet, brands).map(x => [x.id, x]));
+
+    it('colors a vehicle with none of its own, and says it is the brand\'s', () => {
+        const out = withBrands([v(1, { manufacturer_id: 7 }), v(2, { manufacturer_id: 8 }), v(3)]);
+        expect(out[1].color).toBe('#e07b00');
+        expect(out[1].inheritedFrom.color).toEqual({ id: null, name: 'Rivian', brand: true });
+        expect(out[1].own.color).toBeNull();
+        expect(out[2].color).toBeNull();
+        expect(out[3].color).toBeNull();
+    });
+
+    it('is the weakest layer: its own color, then a source\'s, both beat the brand', () => {
+        const out = withBrands([
+            v(1, { manufacturer_id: 7, color: '#111111' }),
+            v(2, { manufacturer_id: 7, spec_source_vehicle_id: 1 }),
+            v(3, { manufacturer_id: 7, spec_source_vehicle_id: 4 }),
+            v(4, { manufacturer_id: 7 }),
+        ]);
+        expect(out[1].color).toBe('#111111');
+        expect(out[1].inheritedFrom.color).toBeNull();
+        expect(out[2].color).toBe('#111111');
+        expect(out[2].inheritedFrom.color.id).toBe(1);
+        // A source with nothing of its own passes on the brand's, not a copy of it.
+        expect(out[3].color).toBe('#e07b00');
+        expect(out[3].inheritedFrom.color.brand).toBe(true);
+    });
+
+    it('changes nothing when no brand colors are given', () => {
+        expect(byId([v(1, { manufacturer_id: 7 })])[1].color).toBeNull();
+    });
+});

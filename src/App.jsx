@@ -1352,6 +1352,14 @@ export default function App() {
                         }`}>
                             {appNotification.message}
                         </p>
+                        {appNotification.action && (
+                            <button
+                                onClick={() => { appNotification.action.onClick(); clearNotification(); }}
+                                className="btn btn-secondary text-sm"
+                            >
+                                ↩ {appNotification.action.label}
+                            </button>
+                        )}
                         <button
                             onClick={clearNotification}
                             className={`text-lg leading-none opacity-50 hover:opacity-100 transition ${

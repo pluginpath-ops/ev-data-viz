@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
+import SeriesColorPicker from '../SeriesColorPicker';
+import { DEFAULT_RUN_COLOR } from '../../utils/colorUtils';
 
 /**
  * The brand registry (#149, #243).
@@ -15,6 +17,10 @@ import { useAsyncResource } from '../../hooks/useAsyncResource';
  *   • The Fuel Economy Guide, whose `division` column is EPA's raw filing text
  *     and lists the same company more than once — `Lucid` and `Lucid USA Inc.`
  *     split the public Make facet in two.
+ *
+ * Each brand also carries a default series color (#311): the color its vehicles
+ * are drawn in until they have one of their own. It saves on pick, not with the
+ * name and parent, because it is a choice made by looking at a swatch.
  *
  * Aliases are what join them. EPA's text is never rewritten: migration 053 keeps
  * the guide faithful to the source, so an alias maps for display and the filing
@@ -104,6 +110,15 @@ function BrandRow({ brand, brands, usage, aliases, parents, onSave, onMerge, onD
                     list="brand-parent-options"
                     aria-label="Corporate parent"
                 />
+                <div className="brand-color" title={brand.color ? 'Default color for this brand\'s vehicles with none of their own' : 'No default color — the palette chooses'}>
+                    <SeriesColorPicker
+                        value={brand.color || DEFAULT_RUN_COLOR}
+                        stored={brand.color ?? null}
+                        label={brand.name}
+                        onChange={hex => onSave(brand.id, { color: hex })}
+                        onReset={() => onSave(brand.id, { color: null })}
+                    />
+                </div>
                 <div className="brand-counts text-meta">
                     {known ? (
                         <>

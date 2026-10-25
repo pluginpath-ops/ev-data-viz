@@ -12,6 +12,7 @@ import { useAppContext } from '../context/AppContext';
 import { distanceUnit } from '../utils/unitConversions';
 import VehicleCardFigures, { TagPills, epaRangeValue, epaRangeBasisMark, epaRangeTitle } from './vehicles/VehicleCardFigures';
 import VehicleMedia from './vehicles/VehicleMedia';
+import PullColorButton from './vehicles/PullColorButton';
 import { CARD_BAND_HEIGHT } from '../utils/cardBand';
 import TestedFigure from './vehicles/TestedFigure';
 import { PlatformLine } from './vehicles/PlatformLine';
@@ -321,10 +322,13 @@ export default function VehiclesView({
                                 onReset={() => onUpdate(vehicle.id, { color: null })}
                             />
                             <span className="vehicle-media-color-caption">
-                                {vehicle.inheritedFrom?.color
-                                    ? `Inherited from ${vehicle.inheritedFrom.color.name}`
-                                    : vehicle.color ? 'Series color' : 'No color set'}
+                                {vehicle.inheritedFrom?.color?.brand
+                                    ? `${vehicle.inheritedFrom.color.name} brand color`
+                                    : vehicle.inheritedFrom?.color
+                                        ? `Inherited from ${vehicle.inheritedFrom.color.name}`
+                                        : vehicle.color ? 'Series color' : 'No color set'}
                             </span>
+                            <PullColorButton vehicle={vehicle} onUpdate={onUpdate} />
                         </div>
                     )}
                 </VehicleMedia>
