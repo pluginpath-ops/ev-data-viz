@@ -18,6 +18,9 @@
  *
  *   { search: '', facets: { make: { in: [], out: [], all: false }, … } }
  *
+ * Beside the facets, `counts` bounds how many tests of a kind a vehicle has
+ * (below): `{ range: { min: 4, max: null } }` is "at least 4 range tests".
+ *
  * A facet with nothing in it may be absent. `in` narrows to vehicles with any
  * (or, with `all`, every) of its values; `out` drops vehicles with any of its.
  *
@@ -108,7 +111,41 @@ export const VEHICLE_FACETS = [
 const FACET_BY_KEY = new Map(VEHICLE_FACETS.map(f => [f.key, f]));
 export const vehicleFacetByKey = (key) => FACET_BY_KEY.get(key) ?? null;
 
-export const EMPTY_VEHICLE_FILTERS = Object.freeze({ search: '', facets: Object.freeze({}) });
+export const EMPTY_VEHICLE_FILTERS = Object.freeze({ search: '', facets: Object.freeze({}), counts: Object.freeze({}) });
+
+// ── Test counts ──────────────────────────────────────────────────────────────
+
+/**
+ * "More than 3 range tests", "fewer than 2 charging tests": a bound on how many
+ * tests of a kind a vehicle has, by the number its card shows (listed tests;
+ * the unlisted pool is not counted). Each kind of DATA_CATEGORIES takes an
+ * inclusive `min` and `max`, either of which may be absent. Curators only, as
+ * the Curation facet is: it is a question about the data, not about a car.
+ */
+const countKey = (key) => DATA_CATEGORIES.some(c => c.key === key);
+
+/** One kind's bounds, never undefined: `{ min: number|null, max: number|null }`. */
+export function countRange(filters, key) {
+    const r = filters?.counts?.[key];
+    return { min: r?.min ?? null, max: r?.max ?? null };
+}
+
+/** Bound one kind's test count; both null removes the filter. */
+export function setCountRange(filters, key, { min = null, max = null }) {
+    if (!countKey(key)) return filters;
+    const counts = { ...(filters?.counts ?? {}) };
+    if (min == null && max == null) delete counts[key];
+    else counts[key] = { min, max };
+    return { ...EMPTY_VEHICLE_FILTERS, ...filters, counts };
+}
+
+/** How a bound reads: "≥ 4", "≤ 1", "2–4", "= 3". */
+export function countRangeText({ min, max }) {
+    if (min != null && max != null) return min === max ? `= ${min}` : `${min}–${max}`;
+    return min != null ? `≥ ${min}` : `≤ ${max}`;
+}
+
+const countPass = (n, { min, max }) => (min == null || n >= min) && (max == null || n <= max);
 
 const EMPTY_FACET = Object.freeze({ in: [], out: [], all: false });
 
@@ -120,6 +157,7 @@ export function facetState(filters, key) {
 /** Whether anything narrows the vehicles shown. */
 export function filtersActive(filters) {
     if (filters?.search?.trim()) return true;
+    if (Object.keys(filters?.counts ?? {}).length) return true;
     return Object.values(filters?.facets ?? {}).some(f => f.in?.length || f.out?.length);
 }
 
@@ -221,6 +259,12 @@ export function searchMatches(vehicle, needle) {
 export function vehicleMatches(vehicle, filters, ctx, { skip = null } = {}) {
     const needle = filters?.search?.trim().toLowerCase();
     if (!searchMatches(vehicle, needle)) return false;
+    if (ctx.curator) {
+        for (const c of DATA_CATEGORIES) {
+            const range = countRange(filters, c.key);
+            if ((range.min != null || range.max != null) && !countPass(c.count(vehicle, ctx.performanceCounts), range)) return false;
+        }
+    }
     for (const facet of VEHICLE_FACETS) {
         if (facet.key === skip || (facet.curatorOnly && !ctx.curator)) continue;
         if (!facetMatches(facet, facetState(filters, facet.key), vehicle, ctx)) return false;
@@ -278,11 +322,19 @@ export function activeFilterChips(filters, { curator = false } = {}) {
             chips.push({ id: `${facet.key}:out:${v}`, facet: facet.key, value: v, mode: 'out', text: `not ${fmt(v)}` });
         }
     }
+    if (curator) {
+        for (const c of DATA_CATEGORIES) {
+            const range = countRange(filters, c.key);
+            if (range.min == null && range.max == null) continue;
+            chips.push({ id: `count:${c.key}`, facet: c.key, mode: 'count', text: `${c.label} tests ${countRangeText(range)}` });
+        }
+    }
     return chips;
 }
 
 /** Remove one chip's filter. */
 export function removeChip(filters, chip) {
+    if (chip.mode === 'count') return setCountRange(filters, chip.facet, {});
     return chip.mode === 'out'
         ? toggleExclude(filters, chip.facet, chip.value)
         : toggleInclude(filters, chip.facet, chip.value);
@@ -291,8 +343,11 @@ export function removeChip(filters, chip) {
 // ── URL ──────────────────────────────────────────────────────────────────────
 
 /** Every parameter the filters own, for a caller that rebuilds a query string. */
+const countParam = (key) => `n_${key}`;
+
 export const VEHICLE_FILTER_PARAMS = new Set([
     'q', ...VEHICLE_FACETS.flatMap(f => [f.param, `${f.param}_all`]),
+    ...DATA_CATEGORIES.map(c => countParam(c.key)),
 ]);
 
 /** Filters → query parameters; only what is set. */
@@ -304,6 +359,12 @@ export function encodeVehicleFilters(filters) {
         const parts = [...st.in, ...st.out.map(v => `-${v}`)];
         if (parts.length) p.set(facet.param, parts.join(','));
         if (st.all && facet.anyAll && st.in.length) p.set(`${facet.param}_all`, '1');
+    }
+    // "4-" at least 4, "-1" at most 1, "2-4" between, "3" exactly 3.
+    for (const c of DATA_CATEGORIES) {
+        const { min, max } = countRange(filters, c.key);
+        if (min == null && max == null) continue;
+        p.set(countParam(c.key), min != null && min === max ? String(min) : `${min ?? ''}-${max ?? ''}`);
     }
     return p;
 }
@@ -326,5 +387,13 @@ export function decodeVehicleFilters(search) {
         if (facet.legacy) for (const v of p.getAll(facet.legacy)) if (v && !st.in.includes(v)) st.in.push(v);
         if (st.in.length || st.out.length) facets[facet.key] = st;
     }
-    return { search: p.get('q') ?? p.get('vt_q') ?? '', facets };
+    const counts = {};
+    for (const c of DATA_CATEGORIES) {
+        const m = /^(\d*)(-?)(\d*)$/.exec((p.get(countParam(c.key)) ?? '').trim());
+        if (!m || (!m[1] && !m[3])) continue;
+        const min = m[1] ? Number(m[1]) : null;
+        const max = m[2] ? (m[3] ? Number(m[3]) : null) : min;   // a bare "3" is exactly 3
+        counts[c.key] = { min, max };
+    }
+    return { search: p.get('q') ?? p.get('vt_q') ?? '', facets, counts };
 }

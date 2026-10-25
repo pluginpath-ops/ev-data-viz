@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import TestCountFilter from './TestCountFilter';
 import GuideFacetMenu from '../epa/guide/GuideFacetMenu';
 import {
     VEHICLE_FACETS, facetState, filtersActive, vehicleFacetCounts, activeFilterChips, removeChip,
@@ -54,6 +55,7 @@ export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, sho
                         />
                     );
                 })}
+                {ctx.curator && <TestCountFilter filters={filters} onChange={onChange} />}
                 {children}
                 <div className="guide-filter-tally">
                     <span className="text-data">{shownCount?.toLocaleString()}</span>
