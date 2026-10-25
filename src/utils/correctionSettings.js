@@ -26,10 +26,9 @@
  * what correctionFactor does when a caller names no mode, and a function that
  * silently corrected would be the opposite of its rule.
  *
- * The temperature range stays mild on purpose. Temperature is corrected for
- * air density only, so "corrected to 20°F" would be a number that is mostly
- * wrong — cabin heat and battery conditioning dominate a cold test, and none
- * of that is modelled.
+ * Temperature is corrected for air density and for the heating or cooling a
+ * test is assumed to have used (accessoryLoad.js). Neither is a measurement, so
+ * a figure corrected to or from an extreme is a rough one.
  *
  * Pure module — no React.
  */

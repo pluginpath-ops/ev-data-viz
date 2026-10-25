@@ -178,14 +178,38 @@ export const EPA_DEFAULTS = {
     ASSUMED_TEST_TEMP_F:      70,
     ASSUMED_TEST_ALTITUDE_FT: 0,
 
+    // The heating and cooling a range test is assumed to have run with (#449).
+    // No test records its HVAC use, so the load is a stand-in: DEFAULT_ACCESSORY_W
+    // while the cabin holds itself, plus a heater or A/C once the weather leaves
+    // the comfort band. One straight line each way, for every car, whatever
+    // heats it — a heat pump draws roughly half a resistive heater, and the
+    // line cannot tell them apart. The slopes are a starting point, not a fit
+    // (owner, 2026-10-25), read against the reference table in
+    // epa/accessoryReference.jsx, whose own figures are unsourced: heating at
+    // 50 W/°F is 1,700 W at 32°F (between its heat-pump and resistive columns)
+    // and 3,300 W at 0°F (inside the heat pump's); cooling at 70 W/°F is 1,000 W
+    // at 80°F, the low end of its A/C column. The truth is probably very much
+    // vehicle size and shape dependent; #475 will compare predicted corrections
+    // with actual tests before anything is fitted.
+    ACCESSORY_COMFORT_BAND_F: [60, 70],   // °F: no heating or cooling inside it
+    ACCESSORY_HEAT_W_PER_F:   50,         // W for each °F below the band
+    ACCESSORY_COOL_W_PER_F:   70,         // W for each °F above the band
+    // What a range test is taken to have used, in Wh/mi, when it records no
+    // energy — the load in watts is turned into range through the test's OWN
+    // consumption, and a blank has to be taken as something.
+    ASSUMED_TEST_CONSUMPTION_WH_MI: 300,
+
     // Which range tests the composite range (utils/compositeRange.js) takes.
-    // Temperature is corrected for air density only, so a test outside a mild
-    // band carries cabin-heat, AC and battery-conditioning losses no
-    // correction removes — it is left out rather than "corrected". Speed is
-    // corrected fully, but the further a test is from the target the more the
-    // single fleet-wide AERO_FRACTION is doing the work, so a test more than
-    // this far from it is left out too.
-    COMPOSITE_RANGE_TEMP_BAND:     [50, 95],  // °F, as tested
+    // Temperature is corrected for air density and for the assumed heating and
+    // cooling load (ACCESSORY_*), so the band can be wide. Its edges still
+    // matter: below freezing the error in that load (battery conditioning, cold
+    // tyres, heat pump against resistive heater) is comparable to the effect
+    // itself, and hot-soak A/C pull-down is not in the line either. The owner
+    // chose [0, 100] on 2026-10-25 knowing that. Speed is corrected fully,
+    // but the further a test is from the target the more the single
+    // fleet-wide AERO_FRACTION is doing the work, so a test more than this
+    // far from it is left out too.
+    COMPOSITE_RANGE_TEMP_BAND:     [0, 100],  // °F, as tested
     COMPOSITE_RANGE_SPEED_GAP_MPH: 15,        // mph from the target speed
 
     // How far the EPA label range may sit from the vehicle's spec range before
@@ -345,6 +369,16 @@ export const ASSUMED_TEST_CONDITIONS = {
     temperatureF: resolve('ASSUMED_TEST_TEMP_F',      EPA_DEFAULTS.ASSUMED_TEST_TEMP_F),
     altitudeFt:   resolve('ASSUMED_TEST_ALTITUDE_FT', EPA_DEFAULTS.ASSUMED_TEST_ALTITUDE_FT),
 };
+
+/** The heating and cooling a range test is assumed to have run with (#449). */
+export const ACCESSORY_COMFORT_BAND_F =
+    resolve('ACCESSORY_COMFORT_BAND_F', EPA_DEFAULTS.ACCESSORY_COMFORT_BAND_F);
+export const ACCESSORY_HEAT_W_PER_F =
+    resolve('ACCESSORY_HEAT_W_PER_F', EPA_DEFAULTS.ACCESSORY_HEAT_W_PER_F);
+export const ACCESSORY_COOL_W_PER_F =
+    resolve('ACCESSORY_COOL_W_PER_F', EPA_DEFAULTS.ACCESSORY_COOL_W_PER_F);
+export const ASSUMED_TEST_CONSUMPTION_WH_MI =
+    resolve('ASSUMED_TEST_CONSUMPTION_WH_MI', EPA_DEFAULTS.ASSUMED_TEST_CONSUMPTION_WH_MI);
 
 export const COMPOSITE_RANGE_TEMP_BAND =
     resolve('COMPOSITE_RANGE_TEMP_BAND', EPA_DEFAULTS.COMPOSITE_RANGE_TEMP_BAND);

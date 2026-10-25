@@ -59,7 +59,7 @@ export function AccessoryLoadReferenceTable() {
                 </tbody>
             </table>
             <p className="mt-1.5 text-[10px] leading-snug opacity-80">
-                *At 0°F, heat pump COP approaches its floor, so most heating duty shifts to the resistive backup element. **Assumes a stabilized cabin; hot-soak or high solar load can push this higher during pull-down. Heat pump/resistive are alternative heating methods, not simultaneous loads. Battery conditioning is steady-state maintenance, not active DC-fast-charge preconditioning. Curve default is {DEFAULT_ACCESSORY_W}W.
+                *At 0°F, heat pump COP approaches its floor, so most heating duty shifts to the resistive backup element. **Assumes a stabilized cabin; hot-soak or high solar load can push this higher during pull-down. Heat pump/resistive are alternative heating methods, not simultaneous loads. Battery conditioning is steady-state maintenance, not active DC-fast-charge preconditioning. The EPA curves assume {DEFAULT_ACCESSORY_W} W (Admin → Model Constants); a range test is assumed to carry it plus a heater or A/C once the weather leaves about 60–70°F.
             </p>
         </div>
     );

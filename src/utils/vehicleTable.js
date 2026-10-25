@@ -200,7 +200,7 @@ const RANGE_TESTED_COLUMNS = [
     { key: 'tested.composite_range_mi', label: 'Composite range', unitGroup: 'distance', better: 'higher', digits: 0, scale: 'range',
       assumption: ['conditions'],
       labelFor: ({ conditions, units }) => `Composite range, ${speedText(conditions.speedMph, units)}`,
-      hint: 'The mean of the vehicle’s steady-state range tests, each scaled to a full pack and corrected to the speed, temperature and altitude under Assumptions, in calm air. Tests on a mixed cycle, far from the target speed, or outside a mild temperature band are left out: temperature is corrected for air density only, so a cold test’s heating losses would survive any correction. A blank altitude is corrected from the assumed test altitude, and the note says so; a blank wind is calm air. How many tests made it is beneath.' },
+      hint: 'The mean of the vehicle’s steady-state range tests, each scaled to a full pack and corrected to the speed, temperature and altitude under Assumptions, in calm air. Tests on a mixed cycle, far from the target speed, or outside the temperature band are left out: below freezing the heating a test is assumed to have used is the least certain part of the correction. A blank altitude is corrected from the assumed test altitude, and the note says so; a blank wind is calm air. How many tests made it is beneath.' },
     { key: 'tested.composite_efficiency_mi_kwh', label: 'Composite efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
       better: 'higher', digits: 2, scale: 'efficiency', assumption: ['conditions'],
       labelFor: ({ conditions, units }) => `Composite eff., ${speedText(conditions.speedMph, units)}`,

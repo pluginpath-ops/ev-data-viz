@@ -30,7 +30,7 @@ describe('compositeRange', () => {
             test({ speed_mph: null }),
             test({ speed_mph: 50 }),
             test({ temperature_f: null }),
-            test({ temperature_f: 30 }),
+            test({ temperature_f: -10 }),
         ]), { target: STD });
         expect(c.rangeMi).toBeNull();
         expect(c.leftOut.map(o => o.reason)).toEqual(['mixed', 'noSpeed', 'speedGap', 'noTemp', 'temperature']);
@@ -73,11 +73,14 @@ describe('wind correction (aero_wind)', () => {
         // An out-and-back: (80² + 60²) / 2 = 70² + 10², so the aero share rises by
         // 100/4900 — about +1.4% overall at a 0.70 aero fraction.
         expect(at({ windMph: 10 })).toBeCloseTo(1.014, 3);
-        // The same as the two legs taken one at a time.
-        expect(at({ windMph: 10 })).toBeCloseTo((at({ windMph: 10, windDirDeg: 0 }) + at({ windMph: 10, windDirDeg: 180 })) / 2, 6);
+        // The same as the two legs taken one at a time, to 0.1%, not to six
+        // places: the accessory load (#449) makes the factor very slightly
+        // non-linear in the aero load, so the mean of two legs' factors is no
+        // longer exactly the factor of their mean load.
+        expect(Math.abs(at({ windMph: 10 }) - (at({ windMph: 10, windDirDeg: 0 }) + at({ windMph: 10, windDirDeg: 180 })) / 2)).toBeLessThan(0.001);
         // An out-and-back in a quartering wind costs the same: the legs' cross terms cancel.
-        expect((at({ windMph: 10, windDirDeg: 45 }) + at({ windMph: 10, windDirDeg: 225 })) / 2).toBeCloseTo(at({ windMph: 10 }), 6);
-        // A crosswind adds the same w², by the apparent-wind law.
+        expect(Math.abs((at({ windMph: 10, windDirDeg: 45 }) + at({ windMph: 10, windDirDeg: 225 })) / 2 - at({ windMph: 10 }))).toBeLessThan(0.001);
+        // A crosswind adds the same w², by the apparent-wind law (exactly: one air speed).
         expect(at({ windMph: 10, windDirDeg: 90 })).toBeCloseTo(at({ windMph: 10 }), 6);
     });
 

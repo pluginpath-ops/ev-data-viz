@@ -54,10 +54,12 @@ describe('utilities built for the UI are reached by the UI', () => {
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
                      'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js',
-                     'epaCertifications.js', 'featuredComparisons.js'];
+                     'epaCertifications.js', 'featuredComparisons.js', 'accessoryLoad.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
+        'accessoryLoad.accessoryWhPerMile':
+            'Reached through accessoryFactor; exported so the watts-per-mph conversion is tested on its own.',
         'featuredComparisons.slugify':
             'Reached through uniqueSlug; exported so the slug rule is tested on its own.',
         'sources.domainOf':
@@ -1584,6 +1586,27 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
                            'STD_SPEED_MPH', 'STD_ALTITUDE_FT', 'STD_TEMP_F']) {
             expect(knobs, `${key} is tunable but absent from the Admin knobs`).toContain(key);
         }
+    });
+
+    it('offers every assumed heating and cooling constant as a knob (#449)', () => {
+        // The slopes are a starting point the owner means to tune once #475
+        // compares predicted corrections with actual tests, so each has to be
+        // reachable from Admin and resolved through the override layers.
+        const knobs = read('src/constants/knobs.js');
+        const epa = read('src/constants/epa.js');
+        for (const key of ['DEFAULT_ACCESSORY_W', 'ACCESSORY_COMFORT_BAND_F', 'ACCESSORY_HEAT_W_PER_F',
+                           'ACCESSORY_COOL_W_PER_F', 'ASSUMED_TEST_CONSUMPTION_WH_MI']) {
+            expect(knobs, `${key} is tunable but absent from the Admin knobs`).toContain(`key: '${key}'`);
+            expect(epa, `${key} is not resolved through the override layers`).toMatch(new RegExp(`resolve\\('${key}'`));
+        }
+    });
+
+    it('reads the accessory load in the correction and takes a run’s own consumption to it (#449)', () => {
+        const correction = read('src/utils/conditionCorrection.js');
+        expect(correction, 'the correction must import the accessory load').toMatch(/from '\.\/accessoryLoad'/);
+        expect(correction, 'and apply it in the corrected modes').toMatch(/accessoryFactor\(/);
+        expect(correction, 'every caller builds its conditions here, so the consumption reaches them all').toMatch(/whPerMile:\s+consumptionWhPerMile\(run\)/);
+        expect(correction, 'the retired placeholders must not come back').not.toMatch(/aero_hvac/);
     });
 
     it('defines every knob it advertises', () => {

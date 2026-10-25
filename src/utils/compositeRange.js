@@ -23,8 +23,10 @@
  *   · within COMPOSITE_RANGE_SPEED_GAP_MPH of the target speed — further out
  *     the one fleet-wide aero fraction is doing most of the work.
  *   · a temperature inside COMPOSITE_RANGE_TEMP_BAND. Temperature is corrected
- *     for air density only; a cold test's heating and battery losses are
- *     not modelled, so a cold test is left out, not "corrected".
+ *     for air density and for the assumed heating or cooling load
+ *     (accessoryLoad.js), so the band is wide; its edges are where that
+ *     assumed load is least certain — the owner chose 0–100°F on 2026-10-25
+ *     knowing the error below freezing is comparable to the effect.
  *
  * A blank altitude is corrected from the assumed test conditions
  * (ASSUMED_TEST_CONDITIONS), which is correctionFactor's rule; a blank wind is
