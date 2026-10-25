@@ -990,7 +990,7 @@ describe('the seams that broke before', () => {
         expect(view, 'the test spread must be shaded').toMatch(/edge\('spreadLo'\)/);
         expect(view, 'its ⓘ sits where a source link would').toMatch(/renderRunSource=\{run => isCompositeRun\(run\)/);
         expect(read('src/components/RunSelector.jsx'), 'a derived row is told apart by its name').toMatch(/run-name-derived/);
-        expect(read('src/utils/colorUtils.js'), 'a composite wears the vehicle color').toMatch(/r\.composite \? -\(r\.composite\.chargerClassV/);
+        expect(read('src/utils/colorUtils.js'), 'a composite wears the vehicle color').toMatch(/r\.composite \? -compositeClassRank\(r\.composite\)/);
         expect(read('src/utils/chartUrlState.js'), 'the spread toggle rides the URL').toMatch(/p\.set\('cspread'/);
     });
 
@@ -1581,6 +1581,25 @@ describe('one correction, everywhere it is applied', () => {
         // And the mode: a reader who turns correction off on a chart must see
         // the table's reported-test figures as measured too.
         expect(app, 'the table must get the reader\'s correction mode').toMatch(/<VehicleTable[^>]*correctionMode=\{chartConfig\.correctionMode/);
+    });
+});
+
+describe('the charger current class (#313, migration 092)', () => {
+    it('is written by the form, normalised on the way in and out, and read by the composite', () => {
+        const runs = read('src/components/RunsView.jsx');
+        expect(runs, 'both forms offer it').toMatch(/<ChargerCurrentSelect[\s\S]+<ChargerCurrentSelect/);
+        expect(runs, 'an edit sends it only when it changed').toMatch(/toChargerCurrent\(chargerCurrentClass\) !== toChargerCurrent\(storedRun\?\.charger_current_class_a\)/);
+        const data = read('src/services/DataService.js');
+        expect(data, 'add').toMatch(/charger_current_class_a: toChargerCurrent\(/);
+        expect(data, 'update').toMatch(/updates\.chargerCurrentClass !== undefined/);
+        expect(read('src/context/AppContext.jsx'), 'import').toMatch(/charger_current_class_a = toChargerCurrent/);
+        const composite = read('src/utils/compositeCurve.js');
+        expect(composite, 'the composite buckets by it').toMatch(/currentClassOf\(/);
+        expect(composite, 'and stores which class a composite stands for').toMatch(/chargerCurrentA: curve\.chargerCurrentA/);
+        expect(read('src/utils/runUtils.js'), 'the native composite ranks by it').toMatch(/compositeClassRank\(b\.composite\)/);
+        const migration = read('supabase/migrations/092_runs_charger_current_class.sql');
+        expect(migration).toMatch(/ADD COLUMN IF NOT EXISTS charger_current_class_a/);
+        expect(migration, 'one stored composite per voltage AND current class').toMatch(/chargerCurrentA/);
     });
 });
 

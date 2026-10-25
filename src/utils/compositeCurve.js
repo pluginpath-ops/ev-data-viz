@@ -33,6 +33,17 @@
  * Everything set aside is NAMED, with the SoC span, never silently dropped —
  * the stance `alignmentExclusion` takes for race mode.
  *
+ * ## Charger current (migration 092)
+ *
+ * Chargers of one voltage still differ in the current they allow: a Supercharger
+ * holds an R2 near 500 A where another stall lets it draw 600 A and up. A test
+ * records its charger's current class, null read as DEFAULT_CHARGER_CURRENT_A.
+ * Tests are bucketed by it, and the composite is split by it ONLY when a lower
+ * class is seen limited — held back against the tests of the classes above it
+ * across LOWER_CLASS_SPAN points of SoC, by the same detection as above. Then
+ * each class gets a composite of its own and nothing is dropped; with no such
+ * event every test stays in one, whatever its class (owner, 2026-10-26).
+ *
  * ## What it is quoted at
  *
  * Unweighted mean of the readings that count, per 1% of SoC. With 2–4 tests a
@@ -65,8 +76,9 @@
 import { isExcluded } from './runListing';
 import { interpolate } from './interpolate';
 import { trimRamp } from './socAlignment';
-import { isCompositeRun } from './runUtils';
+import { isCompositeRun, compositeClassRank } from './runUtils';
 import { resolveVoltageClass, VOLTAGE_CLASSES } from './platforms';
+import { currentClassOf, chargerCurrentText, DEFAULT_CHARGER_CURRENT_A } from './chargerCurrentClass';
 import { convTemp, tempLabel } from './unitConversions';
 
 /** Fewest tests a composite is offered from. At one, the composite IS the test,
@@ -92,6 +104,12 @@ export const HELD_BACK_MARGIN = 1.12;
 export const THIN_SUPPORT = 2;
 
 const finite = (x) => x != null && x !== '' && Number.isFinite(Number(x));
+
+/** "400 V", "500 A", "800 V, 500 A": the chargers a composite stands for, by what is known of them. */
+const chargerOn = (voltageClass, currentA) => [
+    voltageClass != null ? `${voltageClass} V` : null,
+    currentA != null ? chargerCurrentText(currentA) : null,
+].filter(Boolean).join(', ');
 
 /**
  * Whether a run may feed a composite: a measured charging test, not excluded
@@ -239,12 +257,19 @@ export function buildComposite(tests) {
         // Minutes to the next whole percent, from the same tests that counted
         // here. Averaged as time rather than derived from the averaged kW, so
         // no pack capacity has to be assumed.
+        // A step of ZERO minutes is a step: a logger that stamps whole seconds or
+        // minutes puts two percents on one reading (the R2's Ever test reads 1.9
+        // at 14% and 1.9 at 15%). Treating it as "no clock" stopped the clock
+        // for good the first time the only timed test hit one — the 500 A
+        // composite ran 1.7 minutes and ended at 14%. Dropping zeros from the
+        // mean instead would bias it up, since they are real elapsed time that
+        // rounding split unevenly; the sum over the run is what is conserved.
         const next = socs[i + 1];
         if (next == null) break;
         const steps = counted
             .map(({ s, at }) => {
                 const after = s.bySoc.get(next);
-                return at.t != null && after?.t != null && after.t > at.t ? after.t - at.t : null;
+                return at.t != null && after?.t != null && after.t >= at.t ? after.t - at.t : null;
             })
             .filter(dt => dt != null);
         if (steps.length) {
@@ -434,6 +459,54 @@ export function chargerClassOf(tests, vehicleClassV) {
 }
 
 /**
+ * Split one voltage group's tests by the CURRENT class of the charger, but only
+ * where a lower class is seen limited.
+ *
+ * A class is limited when, composed with the tests of its own class and every
+ * class above it, its tests are held back (the ceiling detection in
+ * buildComposite) across LOWER_CLASS_SPAN or more points of SoC. A limited class
+ * closes a group; so does the top class. A class that is NOT limited joins the
+ * next group up, so with no limit anywhere there is one group and no split.
+ *
+ * @param {Array<{run: Object, points: Array}>} members
+ * @returns {Array<{chargerCurrentA: number|null, members: Array}>}  null current = not split
+ */
+export function splitByCurrent(members) {
+    const buckets = new Map();
+    for (const t of members) {
+        const a = currentClassOf(t.run);
+        if (!buckets.has(a)) buckets.set(a, []);
+        buckets.get(a).push(t);
+    }
+    if (buckets.size < 2) return [{ chargerCurrentA: null, members }];
+
+    const classes = [...buckets.keys()].sort((x, y) => x - y);
+    const limited = new Set();
+    for (const a of classes.slice(0, -1)) {
+        const probe = buildComposite(members.filter(t => currentClassOf(t.run) >= a));
+        const ofClass = new Set(buckets.get(a).map(t => t.run.id));
+        const spanByRun = new Map();
+        for (const h of probe?.heldBack ?? []) {
+            if (!ofClass.has(h.runId)) continue;
+            spanByRun.set(h.runId, (spanByRun.get(h.runId) ?? 0) + (h.to - h.from + 1));
+        }
+        if ([...spanByRun.values()].some(span => span >= LOWER_CLASS_SPAN)) limited.add(a);
+    }
+    if (!limited.size) return [{ chargerCurrentA: null, members }];
+
+    const groups = [];
+    let pending = [];
+    for (const a of classes) {
+        pending = pending.concat(buckets.get(a));
+        if (limited.has(a) || a === classes[classes.length - 1]) {
+            groups.push({ chargerCurrentA: a, members: pending });
+            pending = [];
+        }
+    }
+    return groups;
+}
+
+/**
  * A vehicle's composite curves.
  *
  * A 400 V car (or one whose class is unknown) gets one, with charger-limited
@@ -461,23 +534,34 @@ export function compositeCurves(vehicle, pointsByRunId = {}) {
 
     const classes = chargerClassOf(tests, vehicleClassV);
     const split = vehicleClassV === 800;
-    const groups = new Map();   // charger class (null = one curve, no split) → tests
+    const voltageGroups = new Map();   // charger voltage class (null = one curve, no split) → tests
     for (const t of tests) {
         const key = split ? (classes.get(t.run.id).classV ?? vehicleClassV) : null;
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(t);
+        if (!voltageGroups.has(key)) voltageGroups.set(key, []);
+        voltageGroups.get(key).push(t);
     }
+    // Then, inside each, by charger current — only where a lower class is seen limited.
+    const groups = [...voltageGroups].flatMap(([chargerClassV, members]) =>
+        splitByCurrent(members).map(g => ({ chargerClassV, chargerCurrentA: g.chargerCurrentA, members: g.members })));
 
     const curves = [];
     const setAside = [];
-    for (const [chargerClassV, members] of groups) {
+    for (const { chargerClassV, chargerCurrentA, members } of groups) {
         const built = buildComposite(members);
         if (built) {
             curves.push({
-                key: `${vehicle.id}:${chargerClassV ?? 'all'}`,
+                key: `${vehicle.id}:${chargerClassV ?? 'all'}:${chargerCurrentA ?? 'all'}`,
                 chargerClassV,
+                chargerCurrentA,
                 ...built,
                 inferredTests: members.filter(t => classes.get(t.run.id).inferred).map(t => t.run.name),
+                // Said only on a composite split by current: there, a test nobody
+                // classified sits in a class on the strength of a default, and
+                // can hold its neighbours' stretches back without anyone having
+                // chosen it. With no split, no class is involved.
+                assumedCurrentTests: chargerCurrentA != null
+                    ? members.filter(t => t.run.charger_current_class_a == null).map(t => t.run.name)
+                    : [],
             });
             continue;
         }
@@ -488,14 +572,14 @@ export function compositeCurves(vehicle, pointsByRunId = {}) {
             setAside.push({
                 runId: run.id,
                 name: run.name,
-                reason: chargerClassV != null
-                    ? `the only test on ${chargerClassV} V chargers${inferred ? ' (inferred from its curve)' : ''} — a composite needs ${COMPOSITE_MIN_TESTS}`
+                reason: (chargerClassV != null || chargerCurrentA != null)
+                    ? `the only test on ${chargerOn(chargerClassV, chargerCurrentA)} chargers${inferred ? ' (inferred from its curve)' : ''} — a composite needs ${COMPOSITE_MIN_TESTS}`
                     : `the only test — a composite needs ${COMPOSITE_MIN_TESTS}`,
             });
         }
     }
     // Highest class first: the car's own condition, then what slows it.
-    curves.sort((a, b) => (b.chargerClassV ?? Infinity) - (a.chargerClassV ?? Infinity));
+    curves.sort((a, b) => compositeClassRank(b) - compositeClassRank(a));
     return { curves, setAside, missing };
 }
 
@@ -641,7 +725,7 @@ export function spreadAlong(series, xs) {
  * excluded — so Admin → Data checks can say which stored composites were built
  * the old way.
  */
-export const COMPOSITE_VERSION = 2;   // 2: inherited tests count; the clock starts at the first timed test
+export const COMPOSITE_VERSION = 3;   // 3: a zero-minute step keeps the clock running; 2: inherited tests count, the clock starts at the first timed test
 
 /**
  * What a vehicle's composites are built FROM, as one comparable string. A
@@ -658,7 +742,10 @@ export function compositeFingerprint(vehicle) {
     const tests = (vehicle?.runs ?? []).filter(compositeEligible)
         .map(r => [r.id, r.name ?? '', r.charger_voltage_class ?? '', r.temperature_f ?? '',
                    r.preconditioned ?? '', r.dataPointCount ?? '', r.charge_summary?.peakKw ?? '',
-                   r._capacityFactor ?? ''].join(':'))
+                   r._capacityFactor ?? '',
+                   // Only when recorded: a test nobody classified by current must not
+                   // make every stored composite look out of date (migration 092).
+                   ...(r.charger_current_class_a != null ? [`${r.charger_current_class_a}A`] : [])].join(':'))
         .sort();
     return `class=${vehicleVoltageClass(vehicle) ?? '?'}|${tests.join(',')}`;
 }
@@ -673,11 +760,13 @@ export function compositeRunName(curve) {
 export function compositeRecord(curve, fingerprint) {
     return {
         chargerClassV: curve.chargerClassV ?? null,
+        chargerCurrentA: curve.chargerCurrentA ?? null,
         version: COMPOSITE_VERSION,
         fingerprint,
         tests: curve.tests,
         heldBack: curve.heldBack,
         inferredTests: curve.inferredTests ?? [],
+        assumedCurrentTests: curve.assumedCurrentTests ?? [],
         conditions: curve.conditions,
     };
 }
@@ -699,9 +788,10 @@ export function planCompositeRebuild(vehicle, pointsByRunId) {
     const { curves } = compositeCurves(vehicle, pointsByRunId);
     const fingerprint = compositeFingerprint(vehicle);
     const stored = storedComposites(vehicle);
-    const byClass = new Map(stored.map(r => [r.composite.chargerClassV ?? null, r]));
+    const classKey = (c) => `${c.chargerClassV ?? ''}|${c.chargerCurrentA ?? ''}`;
+    const byClass = new Map(stored.map(r => [classKey(r.composite), r]));
     const writes = curves.map(curve => ({
-        id: byClass.get(curve.chargerClassV ?? null)?.id ?? null,
+        id: byClass.get(classKey(curve))?.id ?? null,
         name: compositeRunName(curve),
         composite: compositeRecord(curve, fingerprint),
         points: curve.points,
@@ -727,7 +817,8 @@ export const mayHaveComposite = (vehicle) =>
 /** The legend's name for a composite: "composite (3 tests)", "composite on 400 V chargers (2 tests)". */
 export function compositeLabel(curve) {
     const n = curve.tests.length;
-    const on = curve.chargerClassV != null ? ` on ${curve.chargerClassV} V chargers` : '';
+    const on = (curve.chargerClassV != null || curve.chargerCurrentA != null)
+        ? ` on ${chargerOn(curve.chargerClassV, curve.chargerCurrentA)} chargers` : '';
     return `composite${on} (${n} test${n === 1 ? '' : 's'})`;
 }
 
@@ -751,8 +842,8 @@ export function compositeConditions(curve, units = 'imperial') {
 
 /**
  * Everything a reader needs beside a composite, as one line: its conditions,
- * which tests had their charger class read from the curve, and which
- * charger-limited stretches it left out. The picker row and the chart's notes
+ * which tests had their charger class read from the curve or their charger
+ * current read as the default, and which charger-limited stretches it left out. The picker row and the chart's notes
  * say the same thing, so it is said once, here.
  */
 export function compositeNote(curve, units = 'imperial') {
@@ -761,6 +852,8 @@ export function compositeNote(curve, units = 'imperial') {
         compositeConditions(curve, units),
         curve.inferredTests?.length
             ? `charger class read from the curve, not recorded: ${curve.inferredTests.join(', ')}` : '',
+        curve.assumedCurrentTests?.length
+            ? `charger current not recorded, read as ${DEFAULT_CHARGER_CURRENT_A} A: ${curve.assumedCurrentTests.join(', ')}` : '',
         curve.heldBack?.length
             ? `charger-limited stretches left out: ${curve.heldBack.map(h => `${h.name} ${span(h)}`).join(', ')}` : '',
     ].filter(Boolean).join(' · ');

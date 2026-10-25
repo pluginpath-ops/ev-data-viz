@@ -17,6 +17,7 @@ import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows
 import { planCompositeRebuild, compositeEligible, mayHaveComposite, storedComposites } from '../utils/compositeCurve';
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
+import { toChargerCurrent } from '../utils/chargerCurrentClass';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -1313,6 +1314,9 @@ class DataService {
       // The same rule for the charger's class (migration 076).
       ...(toChargerClass(run.chargerVoltageClass ?? run.charger_voltage_class) != null
         ? { charger_voltage_class: toChargerClass(run.chargerVoltageClass ?? run.charger_voltage_class) } : {}),
+      // And for its current class (migration 092).
+      ...(toChargerCurrent(run.chargerCurrentClass ?? run.charger_current_class_a) != null
+        ? { charger_current_class_a: toChargerCurrent(run.chargerCurrentClass ?? run.charger_current_class_a) } : {}),
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -1561,6 +1565,7 @@ class DataService {
       ...(updates.qualityOverride !== undefined ? { quality_override: updates.qualityOverride } : {}),
       ...(updates.preconditioned !== undefined ? { preconditioned: toPreconditioned(updates.preconditioned) } : {}),
       ...(updates.chargerVoltageClass !== undefined ? { charger_voltage_class: toChargerClass(updates.chargerVoltageClass) } : {}),
+      ...(updates.chargerCurrentClass !== undefined ? { charger_current_class_a: toChargerCurrent(updates.chargerCurrentClass) } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }

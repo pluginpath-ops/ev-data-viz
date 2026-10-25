@@ -16,6 +16,8 @@
  *                        #D55E00 rather than jumping to a cool blue.
  */
 
+import { compositeClassRank } from './runUtils';
+
 // Colorblind-safe 7-color Okabe-Ito palette (excludes black)
 export const OKABE_ITO = [
     '#E69F00', // orange
@@ -382,7 +384,7 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
             // vehicle rather than for one session, so it is the line that wears
             // the vehicle's color, and the tests behind it take the shades. On
             // an 800 V car the 800 V composite leads the 400 V one.
-            const rank = (r) => (r.composite ? -(r.composite.chargerClassV ?? 1e4) : 0)
+            const rank = (r) => (r.composite ? -compositeClassRank(r.composite) : 0)
                 + Number(!(r.isDefault || r.is_default));
             const ranked = [...plottedMine].sort((a, b) => rank(a) - rank(b));
             const shades = rampFrom(vehicle.color, ranked.length);

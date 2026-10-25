@@ -5,6 +5,7 @@ import { listedFor } from '../utils/vehicleListing';
 import { withPlatforms } from '../utils/platforms';
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
+import { toChargerCurrent } from '../utils/chargerCurrentClass';
 import { mayHaveComposite, staleComposites, storedComposites } from '../utils/compositeCurve';
 
 /** Vehicles rebuilt at once by Admin → Rebuild composites. Enough to overlap
@@ -565,6 +566,7 @@ export function AppProvider({ children }) {
                     case 'speedBasis':     normalized.speed_basis       = v || null; break;
                     case 'preconditioned':  normalized.preconditioned     = toPreconditioned(v); break;
                     case 'chargerVoltageClass': normalized.charger_voltage_class = toChargerClass(v); break;
+                    case 'chargerCurrentClass': normalized.charger_current_class_a = toChargerCurrent(v); break;
                     case 'altitudeFt':      normalized.altitude_ft       = toNum(v);  break;
                     case 'elevationGainFt': normalized.elevation_gain_ft  = toNum(v);  break;
                     case 'sourceUrl':       normalized.source_url         = v;         break;
