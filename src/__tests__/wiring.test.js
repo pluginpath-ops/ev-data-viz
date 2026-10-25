@@ -2860,3 +2860,62 @@ describe('the vehicle table can be a featured comparison\'s panel (#448)', () =>
         expect(read('src/components/VehicleTable.jsx')).toMatch(/<FeatureChartButton className="btn btn-secondary" \/>/);
     });
 });
+
+describe('the line charts read every series at the cursor\'s X (#455)', () => {
+    // The charts whose lines are functions of X. Each swaps Chart.js's canvas
+    // tooltip for the readout, mounts its overlay beside the canvas, and passes
+    // the plugin to the chart it builds. A view that did only some of those
+    // would have no tooltip at all, which is the failure this checks for.
+    const READ_EVERY_SERIES = [
+        'src/components/ChargingView.jsx',
+        'src/components/RangeChartView.jsx',
+        'src/components/RoadTripView.jsx',
+        'src/components/PerformanceCurveView.jsx',
+        'src/components/EpaCurvesView.jsx',
+        'src/components/epa/curves/EpaCurveExplorer.jsx',
+    ];
+
+    for (const file of READ_EVERY_SERIES) {
+        it(`${file.split('/').pop()} builds, mounts and hosts the readout`, () => {
+            const src = read(file);
+            expect(src).toMatch(/useChartReadout\(\)/);
+            expect(src).toMatch(/readout\.plugin\(/);
+            expect(src).toMatch(/\{readout\.overlay\}/);
+            expect(src).toMatch(/className="chart-readout-host"/);
+            expect(src).toMatch(/tooltip: \{[^}]*enabled: (false|built\.kind !== 'line')/);
+        });
+    }
+
+    it('the charts that must deviate keep a tooltip, and say why', () => {
+        // Range & Efficiency draws bars from the same Chart: bars keep theirs.
+        expect(read('src/components/RangeChartView.jsx')).toMatch(/enabled: built\.kind !== 'line'[\s\S]{0,80}filter: suppressBarTooltip/);
+        // Road Trip: all three of its charts read through the one readout, the
+        // timeline with its own describe (it says what each vehicle is DOING).
+        const trip = read('src/components/RoadTripView.jsx');
+        expect(trip.match(/readout\.plugin\(/g)).toHaveLength(3);
+        expect(trip).toMatch(/tooltip: \{ enabled: false \}/);
+        expect(trip).not.toMatch(/displayColors: true/);
+        // The spec scatter plots one point per vehicle; there is no shared X.
+        expect(read('src/components/SpecsScatterView.jsx')).not.toMatch(/useChartReadout/);
+    });
+
+    it('the readout\'s source links are RunSourceLinks, not a second renderer', () => {
+        expect(read('src/components/charts/ChartReadout.jsx')).toMatch(/import RunSourceLinks from '\.\.\/RunSourceLinks'/);
+    });
+
+    it('the PNG export knows nothing of the readout: it is DOM, so it cannot be half-captured', () => {
+        expect(read('src/utils/chartUtils.js')).not.toMatch(/readout|crosshair/i);
+    });
+
+    it('the readout clears when the chart it belongs to is rebuilt', () => {
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/beforeDestroy\(\) \{ detach\?\.\(\)/);
+        expect(hook).toMatch(/store\.set\(IDLE\);\s*\};\s*\}/);
+    });
+
+    it('a drag is a box-zoom, never a click that fixes the readout', () => {
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/CLICK_SLOP/);
+        expect(hook).toMatch(/if \(press\.dragged\) \{ clear\(\); return; \}/);
+    });
+});

@@ -14,6 +14,9 @@
  * per half — because the charging test and the range test are two runs with two
  * sources, not one run with two columns.
  *
+ * `children` replaces the ↗ where the link should be a name (the chart readout
+ * lists a source by its name, #455). Still one anchor, still one renderer.
+ *
  * Renders nothing for a run with no source, and nothing for a synthetic row
  * (the EPA range option) — there is no test behind it to credit.
  */
@@ -30,7 +33,7 @@ const sourceOf = (run) => run.source_url ?? run.sourceUrl ?? null;
  */
 const WHAT = { charging: 'Charging test source', range: 'Range test source' };
 
-export default function RunSourceLinks({ run, className = '' }) {
+export default function RunSourceLinks({ run, className = '', children }) {
     const href = run ? sourceOf(run) : null;
     if (!href) return null;
 
@@ -50,7 +53,7 @@ export default function RunSourceLinks({ run, className = '' }) {
             onClick={e => e.stopPropagation()}
             className={`run-source-link ${className}`.trim()}
         >
-            ↗
+            {children ?? '↗'}
         </a>
     );
 }

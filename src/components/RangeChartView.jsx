@@ -5,6 +5,8 @@ import AxisScaleControls from './AxisScaleControls';
 import { useAxisLimits } from '../hooks/useAxisLimits';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
+import { useChartReadout } from '../hooks/useChartReadout';
+import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
 import { whenNewRangeOfRun } from '../utils/testedRange';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
@@ -86,6 +88,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
     const chartInstance = useRef(null);
+    const readout       = useChartReadout();
     // The chart type and efficiency unit live in chartConfig (App), so a link
     // and the pop-out carry them; this view only asks for a change.
     const setChartType = rangeChartType => setChartConfig(prev => ({ ...prev, rangeChartType }));
@@ -504,12 +507,40 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
             },
         };
 
+        // The line chart reads every vehicle at the X under the cursor (#455).
+        // Each point is a DIFFERENT test, so a vehicle is read at the nearest
+        // test within a unit of X and never interpolated between two tests —
+        // that would invent a figure neither of them produced. The bar chart
+        // keeps its per-bar tooltip.
+        const readoutConfig = built.kind === 'line' ? {
+            title: (x) => `${nameOf(built.xLabel)}: ${withUnit(readoutNumber(x), unitOf(built.xLabel))}`,
+            subtitle: built.yLabel,
+            describe(row, { nearest, x }) {
+                const ds = built.data.datasets[row.datasetIndex];
+                const run = ds.runMetas?.[row.dataIndex];
+                const lines = [];
+                if (nearest && run) {
+                    lines.push(run.name);
+                    if (Math.abs(row.x - x) > 1e-9) lines.push(`Nearest test: ${readoutNumber(row.x)}`);
+                    lines.push(...runTooltipLines(run, [run._correction?.note ?? null].filter(Boolean), units, { source: false }));
+                }
+                return {
+                    name: ds.label,
+                    value: withUnit(readoutNumber(row.y), unitOf(built.yLabel)),
+                    detail: lines,
+                    sources: nearest && run && (run.source || run.source_url) ? [{ label: run.source || 'Test source', run }] : null,
+                };
+            },
+        } : null;
+        // Sampled, not interpolated — see above.
+        if (readoutConfig) built.data.datasets.forEach(d => { d.readoutMode = 'sample'; });
+
         chartInstance.current = new Chart(chartRef.current.getContext('2d'), {
             type:    built.kind,
             data:    built.data,
             plugins: built.kind === 'bar' ? [barGroupPlugin, testSpreadHoverPlugin(built.flatRuns, {
                 describe: (p, row) => testPointLines(p.run, `${p.value} ${row._yUnit}`, units, p.run._correction?.note, p.estimateNote),
-            })] : [],
+            })] : [readout.plugin(readoutConfig)],
             options: {
                 layout: {
                     padding: {
@@ -529,6 +560,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     // more distinct series — the line charts' vehicles.
                     legend: { display: legendWorthShowing(built.data.datasets) },
                     tooltip: {
+                        enabled: built.kind !== 'line',
                         displayColors: false,
                         filter: suppressBarTooltip,
                         callbacks: {
@@ -816,12 +848,13 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     </>
                 )}
             >
-                <div style={{ height: presentationMode ? PRESENTED_HEIGHT : '500px', position: 'relative' }}>
+                <div className="chart-readout-host" style={{ height: presentationMode ? PRESENTED_HEIGHT : '500px' }}>
                     {/* Canvas always mounted so ref stays valid */}
                     <canvas
                         ref={chartRef}
                         style={{ display: plottableRuns.length > 0 ? 'block' : 'none' }}
                     />
+                    {readout.overlay}
                     {plottableRuns.length === 0 && (
                         <div className="absolute inset-0 flex items-center justify-center text-meta">
                             <div className="text-center">

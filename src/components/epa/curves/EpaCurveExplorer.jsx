@@ -1,5 +1,7 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import Chart from 'chart.js/auto';
+import { useChartReadout } from '../../../hooks/useChartReadout';
+import { readoutNumber, withUnit } from '../../../utils/readoutAtX';
 import { useTheme } from '../../../hooks/useTheme';
 import { useAppContext } from '../../../context/AppContext';
 import { useAsyncResource } from '../../../hooks/useAsyncResource';
@@ -7,7 +9,7 @@ import { useAxisLimits } from '../../../hooks/useAxisLimits';
 import { AXIS_LIMITS_PARAM, encodeAxisLimits } from '../../../utils/axisLimits';
 import { buildEpaCurveFromModel } from '../../../utils/epaDerivations';
 import { DEFAULT_SS_ETA, CURVE_SPEED_RANGE, CURVE_REFERENCE_MPH } from '../../../constants/epa';
-import { curveSubjects, curveTooltipLines, disambiguateLabels } from '../../../utils/epaCurveSubjects';
+import { curveSubjects, disambiguateLabels } from '../../../utils/epaCurveSubjects';
 import { PALETTE } from '../../../utils/specHelpers';
 import { convSpeed, speedLabel } from '../../../utils/unitConversions';
 import CurveSubjectPicker from './CurveSubjectPicker';
@@ -165,6 +167,7 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
     const { getTestVehiclesForCurves, units } = useAppContext();
     const { isDark } = useTheme();
     const canvasRef = useRef(null);
+    const readout = useChartReadout();
     const chartRef = useRef(null);
 
     const load = useCallback(() => getTestVehiclesForCurves(), [getTestVehiclesForCurves]);
@@ -287,8 +290,8 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
             return {
                 label: displayNames.get(s.key) ?? s.label,
                 // Read by the legend to mark a curve the current axis qualifies.
-                // Kept off the label itself so the tooltip's first line stays
-                // the name and nothing else.
+                // Kept off the label itself so the readout's row stays the name
+                // and nothing else.
                 _flagged: axis.etaSensitive && !s.etaMeasured,
                 data: curve
                     .filter(pt => pt[yAxis] != null)
@@ -320,7 +323,15 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
             data: { datasets },
-            plugins: [makeReferencePlugin(
+            plugins: [readout.plugin({
+                title: (x) => `${readoutNumber(x)} ${speedLabel(units)}`,
+                subtitle: `${axis.label} · ${axis.unit}`,
+                describe: (row) => ({
+                    name: datasets[row.datasetIndex].label,
+                    value: withUnit(readoutNumber(row.y), axis.unit),
+                    flag: datasets[row.datasetIndex]._flagged ? 'Uses an assumed efficiency on this axis' : null,
+                }),
+            }), makeReferencePlugin(
                 refX,
                 refLabel,
                 `SPEED · ${speedLabel(units)}`,
@@ -383,30 +394,15 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                             },
                         },
                     },
-                    tooltip: {
-                        // Three lines: the name with its color, then each axis
-                        // with its unit. The default put the x value in the
-                        // title and crammed name and y value onto one line,
-                        // which read differently from every other chart here.
-                        callbacks: {
-                            title: () => '',
-                            label: (ctx) => curveTooltipLines({
-                                name: ctx.dataset.label, x: ctx.parsed.x, y: ctx.parsed.y,
-                                xUnit: speedLabel(units), yUnit: axis.unit, digits: axis.digits,
-                            })[0],
-                            afterLabel: (ctx) => curveTooltipLines({
-                                name: ctx.dataset.label, x: ctx.parsed.x, y: ctx.parsed.y,
-                                xUnit: speedLabel(units), yUnit: axis.unit, digits: axis.digits,
-                            }).slice(1),
-                        },
-                    },
+                    // The readout answers hovers here (#455).
+                    tooltip: { enabled: false },
                 },
             },
         });
         return () => chartRef.current?.destroy();
     }, [plotted, yAxis, axis, units, isDark, displayNames, scale, colorByKey,
         densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum,
-        gradeGainFtNum, gradeDistanceMilesNum]);
+        gradeGainFtNum, gradeDistanceMilesNum, readout]);
 
     if (loading) return <LoadingSpinner />;
     if (error) return <div className="empty-state">Certification records could not be loaded.</div>;
@@ -535,8 +531,9 @@ export default function EpaCurveExplorer({ presentationMode = false, synced = nu
                                     </>
                                 )}
                             >
-                                <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460, position: 'relative' }}>
+                                <div className="chart-readout-host" style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 460 }}>
                                     <canvas ref={canvasRef} />
+                                    {readout.overlay}
                                 </div>
                             </PlotFrame>
 
