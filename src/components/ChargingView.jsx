@@ -48,7 +48,7 @@ import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE, withAlpha } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
-import { compositeConditions, compositeExplainer, compositeFrom, earliestStart, spreadAlong, THIN_SUPPORT, COMPOSITE_MIN_TESTS } from '../utils/compositeCurve';
+import { compositeConditions, compositeExplainer, compositeFrom, earliestStart, clockedStart, spreadAlong, THIN_SUPPORT, COMPOSITE_MIN_TESTS } from '../utils/compositeCurve';
 import { statisticalRuns } from '../utils/runListing';
 import { reportedRangeRun } from '../utils/testedRange';
 import { countParts } from '../utils/plotCaption';
@@ -531,6 +531,23 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         }
         return out;
     }, [compositesFromStart, selectedComposites, compositeMembers, raceActive, raceThreshold, runDataCache]);
+
+    // A live composite built from tests that have no clock cannot be drawn
+    // against time: it has points and no minutes. Said, with the lowest start
+    // that brings in a test that does have one — otherwise the line simply is
+    // not there, and the legend gives no reason.
+    const noClockComposites = useMemo(() => {
+        if (!raceActive) return [];
+        return selectedComposites.flatMap(({ run }) => {
+            const live = liveComposites[run.id];
+            if (!live || live.points.some(p => p.time != null)) return [];
+            return [{
+                run,
+                names: live.tests.map(t => t.name),
+                clockStart: clockedStart(compositeMembers[membersKey(run)]),
+            }];
+        });
+    }, [raceActive, selectedComposites, liveComposites, compositeMembers]);
 
     // Runs drawn partly outside their own data, and by how much. Under the
     // limit this is a defensible short projection; past it, it is a guess
@@ -1342,6 +1359,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         </p>
                     ))}
                     {raceActive && <p className="text-xs mt-1">Lower the start to include it.</p>}
+                </div>
+            )}
+            {noClockComposites.length > 0 && (
+                <div className="roadtrip-warning mb-3">
+                    {noClockComposites.map(({ run, names, clockStart }) => (
+                        <p key={run.id}>
+                            ⚠ {run.name}: {names.join(', ')} {names.length === 1 ? 'has' : 'have'} no time data, so it cannot be drawn against time
+                            {clockStart != null && clockStart > raceThreshold
+                                ? ` — start at ${clockStart}% or higher to include a test that has`
+                                : ' — plot it against SoC instead'}
+                        </p>
+                    ))}
                 </div>
             )}
             {(() => {

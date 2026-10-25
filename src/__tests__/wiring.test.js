@@ -1611,6 +1611,8 @@ describe('race mode draws a composite from a start one test reaches', () => {
         const view = read('src/components/ChargingView.jsx');
         expect(view, 'the warning is for no test, not for one').toMatch(/none of its tests reach/);
         expect(view, 'the legend says how many tests it rests on').toMatch(/live\.tests\.length < live\.of/);
+        expect(view, 'a composite with no clock says why it is not on a time axis').toMatch(/noClockComposites/);
+        expect(view).toMatch(/no time data, so it cannot be drawn against time/);
     });
 });
 

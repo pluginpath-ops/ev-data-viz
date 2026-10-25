@@ -4,7 +4,7 @@ import {
     smoothAlongSoc, SMOOTHING_HALF_WINDOW, SMOOTHING_MAX_GAP, compositeNote,
     planCompositeRebuild, compositeFingerprint, staleComposites, COMPOSITE_VERSION,
     compositeLabel, compositeConditions, PLATEAU_SHARE, HELD_BACK_MARGIN, compositeFrom, earliestStart, spreadAlong, fullStart,
-    splitByCurrent,
+    splitByCurrent, clockedStart,
 } from '../compositeCurve';
 import { nativeComposite, compositesFirst } from '../runUtils';
 
@@ -234,6 +234,35 @@ describe('compositeCurves', () => {
     it('reports eligible tests whose points are not loaded yet', () => {
         const { missing } = compositeCurves(vehicleOf(800, [run(1), run(2)]), { 1: fast() });
         expect(missing).toEqual([2]);
+    });
+});
+
+describe('clockedStart', () => {
+    const noClock = (opts) => test(opts).map(p => ({ ...p, time: null }));
+
+    it('is where a test with a clock first counts, ignoring tests with none', () => {
+        const tests = [
+            { run: run(1), points: noClock({ from: 0, kwAt: car }) },
+            { run: run(2), points: test({ from: 12, kwAt: car }) },
+            { run: run(3), points: test({ from: 20, kwAt: car }) },
+        ];
+        expect(clockedStart(tests)).toBe(12);
+    });
+
+    it('is null when nothing has a clock', () => {
+        expect(clockedStart([{ run: run(1), points: noClock({ kwAt: car }) }])).toBeNull();
+        expect(clockedStart([])).toBeNull();
+    });
+
+    it('is what a live composite from a start reached only by a clockless test cannot give', () => {
+        const tests = [
+            { run: run(1), points: noClock({ from: 0, kwAt: car }) },
+            { run: run(2), points: test({ from: 12, kwAt: car }) },
+        ];
+        const c = compositeFrom(tests, 10);
+        expect(c.tests.map(t => t.runId)).toEqual([1]);
+        expect(c.points.every(p => p.time == null)).toBe(true);
+        expect(clockedStart(tests)).toBeGreaterThan(10);
     });
 });
 

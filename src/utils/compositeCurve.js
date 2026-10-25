@@ -596,6 +596,23 @@ export function countsFrom(points) {
 }
 
 /**
+ * The lowest SoC from which a test WITH A CLOCK counts — where a composite
+ * measured from a start can first be drawn against time. A test logged with SoC
+ * and power only (the R2's V3.5 and HYC400 tests) has points and no minutes, so
+ * a composite resting on such tests alone has a line against SoC and none
+ * against time. Null when no test has a clock.
+ *
+ * @param {Array<{run: Object, points: Array}>} tests
+ */
+export function clockedStart(tests) {
+    const starts = (tests ?? [])
+        .filter(t => (t.points ?? []).some(p => finite(p.time)))
+        .map(t => countsFrom(t.points))
+        .filter(s => s != null);
+    return starts.length ? Math.min(...starts) : null;
+}
+
+/**
  * The lowest SoC a composite can be measured from: where COMPOSITE_MIN_TESTS
  * of its tests have begun counting. Lower and the "composite" is one test.
  * Null when fewer than that many tests count at all.
