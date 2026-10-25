@@ -1,15 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import {
-    parseChartUrl, buildChartParams,
+    parseChartUrl, buildChartParams, chartConfigFromParsed,
     RANGE_CHART_TYPES, DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION,
 } from '../chartUrlState';
 import { DEFAULT_READER_MODE, DEFAULT_CORRECTION_TARGET } from '../correctionSettings';
+import { defaultChartConfig } from '../chartDefaults';
+import { AXIS_LIMIT_CHARTS, axisLimitsOf } from '../axisLimits';
 
 const baseConfig = () => ({
     xAxis: 'soc', yAxis: 'chargeRate', y2Axis: null, selectedRuns: [],
     alignRaw: false, raceThreshold: null,
-    xMin: null, xMax: null, yMin: 0, yMax: null, y2Min: null, y2Max: null,
+    axisLimits: {},
     showLine: true, showPoints: false,
     compositeSpread: true, addedSpread: false,
     specsField: null, scatterXField: null, scatterYField: null,
@@ -134,14 +136,16 @@ describe('the settings that already travelled still do', () => {
     it('round-trips axes, limits, display and correction', () => {
         const chartConfig = {
             ...baseConfig(), xAxis: 'time', yAxis: 'soc', y2Axis: 'chargeRate', alignRaw: true,
-            raceThreshold: 12, xMin: 5, xMax: 60, yMin: 10, yMax: 90, showLine: false, showPoints: true,
+            raceThreshold: 12, axisLimits: { charging: { xMin: 5, xMax: 60, yMin: 10, yMax: 90 } },
+            showLine: false, showPoints: true,
             compositeSpread: false, addedSpread: true,
             correctionMode: 'aero', correctionTarget: { speedMph: 65, temperatureF: 75, altitudeFt: 1000 },
         };
         const { chart } = parseChartUrl(build({ chartConfig }));
         expect(chart).toMatchObject({
             xAxis: 'time', yAxis: 'soc', y2Axis: 'chargeRate', alignRaw: true, raceThreshold: 12,
-            xMin: 5, xMax: 60, yMin: 10, yMax: 90, showLine: false, showPoints: true,
+            axisLimits: { xMin: 5, xMax: 60, yMin: 10, yMax: 90, y2Min: null, y2Max: null },
+            showLine: false, showPoints: true,
             compositeSpread: false, addedSpread: true,
             correction: { mode: 'aero', target: { speedMph: 65, temperatureF: 75, altitudeFt: 1000 } },
         });
@@ -149,7 +153,7 @@ describe('the settings that already travelled still do', () => {
 
     it('reads an empty query as the defaults', () => {
         const { chart, compare, pairings, roadTrip, epa } = parseChartUrl('');
-        expect(chart).toMatchObject({ chartMode: 'charging', yMin: 0, showLine: true, showPoints: false, runIds: [], vehicleIds: [] });
+        expect(chart).toMatchObject({ chartMode: 'charging', axisLimits: { yMin: 0, yMax: null }, showLine: true, showPoints: false, runIds: [], vehicleIds: [] });
         expect([compare, pairings, roadTrip, epa]).toEqual([null, null, null, null]);
     });
 
@@ -167,5 +171,93 @@ describe('the settings that already travelled still do', () => {
         expect(parsed.roadTrip).toMatchObject({ mode: 'distance', startSoc: 90, legDistance: 150, speed: 70 });
         const epa = parseChartUrl(build({ chartMode: 'epacurves', epaConfig: { yAxis: 'whmi', selectedMappings: [4, 9], overlay: 'corrected' } })).epa;
         expect(epa).toEqual({ yAxis: 'whmi', selectedMappings: [4, 9], overlay: 'corrected' });
+    });
+});
+
+// ── Axis limits (#478) ───────────────────────────────────────────────────────
+// Every chart that has Axis Scale controls keeps its limits in
+// chartConfig.axisLimits and the link writes them as one `ax` parameter.
+describe('axis limits travel with the chart link (#478)', () => {
+    const chartsWithLimits = Object.keys(AXIS_LIMIT_CHARTS).filter(k => k !== 'epaexplorer');
+    const set = { xMin: 5, xMax: 60, yMin: 2, yMax: 90, y2Min: -1.5, y2Max: 0.25 };
+    const withLimits = (chart, limits) => ({ ...baseConfig(), axisLimits: { [chart]: limits } });
+
+    it.each(chartsWithLimits)('%s: limits survive build -> parse -> apply', (mode) => {
+        const q = build({ chartMode: mode, chartConfig: withLimits(mode, set) });
+        const parsed = parseChartUrl(q);
+        expect(parsed.chart.chartMode).toBe(mode);
+        expect(parsed.chart.axisLimits).toEqual(set);
+        // ...and applied to a fresh page, as a featured comparison's panel is.
+        const applied = chartConfigFromParsed(parsed.chart, defaultChartConfig());
+        expect(axisLimitsOf(applied.axisLimits, mode)).toEqual(set);
+    });
+
+    it.each(chartsWithLimits)('%s: is ONE parameter, and an untouched chart has none', (mode) => {
+        const limited = new URLSearchParams(build({ chartMode: mode, chartConfig: withLimits(mode, set) }));
+        expect(limited.getAll('ax')).toHaveLength(1);
+        for (const legacy of ['xn', 'xx', 'yn', 'yx', 'y2n', 'y2x']) expect(limited.has(legacy)).toBe(false);
+        expect(new URLSearchParams(build({ chartMode: mode })).has('ax')).toBe(false);
+    });
+
+    it('writes only the limits that differ from the chart\'s own defaults', () => {
+        // Charging Curves and Range start the Y axis at zero; the others at Auto.
+        expect(new URLSearchParams(build({ chartMode: 'charging', chartConfig: withLimits('charging', { yMin: 0, yMax: 120 }) })).get('ax')).toBe('yx120');
+        expect(new URLSearchParams(build({ chartMode: 'roadtrip', chartConfig: withLimits('roadtrip', { yMin: 0 }) })).get('ax')).toBe('yn0');
+    });
+
+    it('keeps a Y minimum put back to Auto, where the default is zero', () => {
+        const q = build({ chartMode: 'range', chartConfig: withLimits('range', { yMin: null, xMax: 80 }) });
+        expect(new URLSearchParams(q).get('ax')).toBe('xx80_yna');
+        expect(parseChartUrl(q).chart.axisLimits).toMatchObject({ xMax: 80, yMin: null });
+    });
+
+    it('writes the opened chart\'s limits and no other chart\'s', () => {
+        const chartConfig = { ...baseConfig(), axisLimits: { charging: { xMax: 40 }, range: { yMax: 500 } } };
+        expect(new URLSearchParams(build({ chartMode: 'range', chartConfig })).get('ax')).toBe('yx500');
+        expect(new URLSearchParams(build({ chartMode: 'charging', chartConfig })).get('ax')).toBe('xx40');
+        // A chart with no axis limits writes none, whatever the config holds.
+        expect(new URLSearchParams(build({ chartMode: 'compare', chartConfig })).has('ax')).toBe(false);
+        expect(parseChartUrl('m=compare&ax=xx40').chart.axisLimits).toBeNull();
+    });
+
+    it('applying a link leaves the other charts\' limits as they were', () => {
+        const base = { ...defaultChartConfig(), axisLimits: { range: { yMax: 500 } } };
+        const { chart } = parseChartUrl('m=charging&ax=xx40');
+        expect(chartConfigFromParsed(chart, base).axisLimits).toEqual({ range: { yMax: 500 }, charging: { ...axisLimitsOf({}, 'charging'), xMax: 40 } });
+        // ...and a link that names none puts the opened chart back to Auto.
+        expect(chartConfigFromParsed(parseChartUrl('m=range').chart, base).axisLimits).toEqual({});
+    });
+
+    it('survives the pop-out\'s structured clone', () => {
+        const chartConfig = withLimits('roadtrip', set);
+        expect(axisLimitsOf(structuredClone(chartConfig).axisLimits, 'roadtrip')).toEqual(set);
+    });
+});
+
+describe('links written before #478 still open as they did', () => {
+    it('reads xn xx yn yx y2n y2x as Charging Curves\' limits', () => {
+        const { chart } = parseChartUrl('tab=efficiency&x=soc&y=chargeRate&xn=10&xx=80&yn=5&yx=200&y2n=1&y2x=2');
+        expect(chart.axisLimits).toEqual({ xMin: 10, xMax: 80, yMin: 5, yMax: 200, y2Min: 1, y2Max: 2 });
+    });
+
+    it('reads a missing yn as zero, as it always did', () => {
+        expect(parseChartUrl('xx=80').chart.axisLimits).toEqual({ xMin: null, xMax: 80, yMin: 0, yMax: null, y2Min: null, y2Max: null });
+    });
+
+    it('does not hand another chart the limits Charging Curves left in the link', () => {
+        // Before #478 these were written for every mode and read by one. A Range
+        // link carrying xn=10 meant "Charging Curves had x from 10", not Range.
+        for (const mode of ['range', 'roadtrip', 'perfcurve', 'epacurves']) {
+            expect(parseChartUrl(`m=${mode}&xn=10&yx=200`).chart.axisLimits).toEqual(axisLimitsOf({}, mode));
+        }
+    });
+
+    it('prefers the packed parameter when a link has both', () => {
+        expect(parseChartUrl('xn=10&ax=xx40').chart.axisLimits).toMatchObject({ xMin: null, xMax: 40 });
+    });
+
+    it('ignores what it cannot read rather than losing the chart', () => {
+        expect(parseChartUrl('ax=xx40_bogus_yxNaN_y2n').chart.axisLimits).toMatchObject({ xMax: 40, yMax: null });
+        expect(parseChartUrl('xn=abc').chart.axisLimits).toMatchObject({ xMin: null });
     });
 });

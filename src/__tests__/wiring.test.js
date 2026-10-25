@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { AXIS_LIMIT_CHARTS } from '../utils/axisLimits';
 
 /**
  * Does anything actually CALL the thing?
@@ -1900,7 +1901,7 @@ describe('the EPA curve explorer follows the pop-out channel (#259)', () => {
     it('the explorer reports its state up, and App broadcasts it', () => {
         expect(read('src/components/epa/EpaSection.jsx')).toMatch(/<EpaCurveExplorer onStateChange=\{onExplorerState\}/);
         expect(app).toMatch(/<EpaSection subtab=\{epaSubtab\} onExplorerState=\{setEpaExplorer\}/);
-        expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, viewScale, sendState\]/);
+        expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, sendState\]/);
     });
 
     it('the channel carries it both ways, null included', () => {
@@ -1915,23 +1916,82 @@ describe('the EPA curve explorer follows the pop-out channel (#259)', () => {
     });
 });
 
-describe('charts that hold their axis limits locally reach the pop-out (#259)', () => {
-    const sync = read('src/hooks/useChartSync.js');
-    const app = read('src/App.jsx');
+describe('every chart\'s axis limits go through one door (#478)', () => {
+    // Axis limits once lived in four places: chartConfig (Charging Curves),
+    // epaConfig (Modeled Efficiency), and component state in Range & Efficiency,
+    // Road Trip, the Acceleration Curve and the All EVs explorer. Only the first
+    // reached the chart link; the pop-out got the rest through a side channel
+    // (#259) and a Home panel got none. They are now chartConfig.axisLimits, read
+    // and written through useAxisLimits, which is why the link, the pop-out and a
+    // Home panel carry them with no further wiring.
+    const CHARTS = {
+        'src/components/ChargingView.jsx':                  'charging',
+        'src/components/RangeChartView.jsx':                'range',
+        'src/components/RoadTripView.jsx':                  'roadtrip',
+        'src/components/PerformanceCurveView.jsx':          'perfcurve',
+        'src/components/EpaCurvesView.jsx':                 'epacurves',
+        'src/components/epa/curves/EpaCurveExplorer.jsx':   'epaexplorer',
+    };
 
-    it('the three charts draw with the synced limits', () => {
-        // Charging Curves and Modeled Efficiency keep theirs in synced config;
-        // these three keep theirs in component state the pop-out never saw.
-        expect(read('src/components/PerformanceCurveView.jsx')).toMatch(/const scale = useSyncedScale\(scaleOwn\)/);
-        expect(read('src/components/RangeChartView.jsx')).toMatch(/= useSyncedScale\(\{\s*xMin: xMinOwn/);
-        expect(read('src/components/RoadTripView.jsx')).toMatch(/const axisScale = useSyncedScale\(axisScaleOwn\)/);
+    it('every view that draws Axis Scale controls reads and writes through useAxisLimits', () => {
+        const withControls = ALL.filter(x => /<AxisScaleControls\b/.test(x.text) && !x.file.endsWith('AxisScaleControls.jsx')).map(x => x.file);
+        expect(withControls.sort(), 'a chart view with Axis Scale controls that is not in CHARTS above').toEqual(Object.keys(CHARTS).sort());
+        for (const [file, key] of Object.entries(CHARTS)) {
+            const text = read(file);
+            expect(text, `${file} must ask for the '${key}' limits`).toMatch(new RegExp(`useAxisLimits\\('${key}'\\)`));
+            expect(text, `${file} must hand the controls the hook's setter`).toMatch(/<AxisScaleControls[\s\S]*?onChange=\{(setLimit|setScaleLimit|onAxisChange)\}/);
+            expect(text, `${file} must not hold its own limits`).not.toMatch(/useState\(\s*\{\s*xMin|useSyncedScale|NO_SCALE|setXMin|setScale\b/);
+        }
     });
 
-    it('the main tab reports, the pop-out receives, over the same channel', () => {
-        expect(app).toMatch(/synced: isPopout \? viewScale : null, report: isPopout \? null : setViewScale/);
-        expect(app, 'both trees need the provider').toMatch(/<ScaleSyncContext\.Provider value=\{scaleSync\}>[\s\S]*<ScaleSyncContext\.Provider value=\{scaleSync\}>/);
-        expect(sync).toMatch(/if \('viewScale' in data\) setViewScale\(data\.viewScale\)/);
-        expect((sync.match(/viewScale,\n/g) || []).length).toBeGreaterThanOrEqual(2);
+    it('every key the views ask for is registered, and every registered key has a view', () => {
+        expect(Object.values(CHARTS).sort()).toEqual(Object.keys(AXIS_LIMIT_CHARTS).sort());
+    });
+
+    it('nothing outside the hook keeps limits in chartConfig or epaConfig by field name', () => {
+        // The flat xMin/xMax/yMin/yMax/y2Min/y2Max fields are gone from both configs.
+        const defaults = read('src/utils/chartDefaults.js');
+        expect(defaults).toMatch(/axisLimits: \{\}/);
+        expect(defaults).not.toMatch(/\bxMin\b|\byMax\b|\by2Min\b/);
+        expect(read('src/components/EpaCurvesView.jsx')).not.toMatch(/setEpaConfig\([^)]*(xMin|yMax)/);
+    });
+
+    it('the link writes them for every mode that has them, and reads them back onto the config', () => {
+        const link = read('src/utils/chartUrlState.js');
+        expect(link).toMatch(/if \(hasAxisLimits\(chartMode\)\)[\s\S]*?encodeAxisLimits\(axisLimitsOf\(chartConfig\.axisLimits, chartMode\), chartMode\)/);
+        expect(link).toMatch(/axisLimits:\s+axisLimitsOfLink\(p, chartMode\)/);
+        expect(link).toMatch(/withAxisLimits\(base\.axisLimits, s\.chartMode, s\.axisLimits\)/);
+        // ...and the six separate parameters are not written any more.
+        expect(link).not.toMatch(/p\.set\('(xn|xx|yn|yx|y2n|y2x)'/);
+    });
+
+    it('a Home panel draws with its own copy, and the main window and the pop-out with the site\'s', () => {
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/<AxisLimitsProvider chartConfig=\{chartConfig\} setChartConfig=\{setChartConfig\}>/);
+        const app = read('src/App.jsx');
+        expect((app.match(/<AxisLimitsProvider chartConfig=\{chartConfig\} setChartConfig=\{setChartConfig\}>/g) || []).length,
+            'both trees (pop-out and main) need the provider').toBe(2);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/chartConfig=\{chartConfig\}\s+setChartConfig=\{setChartConfig\}/);
+    });
+
+    it('the pop-out gets them in the chartConfig the main tab broadcasts, both ways', () => {
+        const sync = read('src/hooks/useChartSync.js');
+        expect(sync).toMatch(/setChartConfig\(data\.chartConfig\)/);
+        expect((sync.match(/^\s+chartConfig,$/gm) || []).length, 'the main tab posts chartConfig on request and on change').toBeGreaterThanOrEqual(2);
+        expect(sync, 'no side channel for limits any more').not.toMatch(/viewScale|ScaleSync/);
+        expect(read('src/App.jsx')).toMatch(/\[chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, sendState\]/);
+    });
+
+    it('Modeled Efficiency · All EVs writes them to its own address and App reads them back', () => {
+        const explorer = read('src/components/epa/curves/EpaCurveExplorer.jsx');
+        expect(explorer).toMatch(/encodeAxisLimits\(scale, 'epaexplorer'\)/);
+        expect(explorer).toMatch(/p\.set\(AXIS_LIMITS_PARAM, limitsParam\)/);
+        expect(read('src/App.jsx')).toMatch(/sub === 'curves' && p\.get\(AXIS_LIMITS_PARAM\) !== null[\s\S]*?decodeAxisLimits\(p\.get\(AXIS_LIMITS_PARAM\), 'epaexplorer'\)/);
+    });
+
+    it('Road Trip converts hours to minutes in one helper', () => {
+        const road = read('src/components/RoadTripView.jsx');
+        expect(road).toMatch(/hoursToMinutes\(axisLimits\./);
+        expect(road, 'a stored limit must not be multiplied by hand at the plot').not.toMatch(/axisLimits\.\w+ \* 60/);
     });
 });
 

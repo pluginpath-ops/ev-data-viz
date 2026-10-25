@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import SidebarDisplaySection from './SidebarDisplaySection';
 import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
-import { useSyncedScale } from '../hooks/useSyncedScale';
+import { useAxisLimits } from '../hooks/useAxisLimits';
 import RunSelector from './RunSelector';
 import { runTooltipLines } from '../utils/tooltipHelpers';
 import { whenNewRangeOfRun } from '../utils/testedRange';
@@ -91,31 +91,17 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const setEffUnit   = unit => setChartConfig(prev => ({ ...prev, effUnit: unit }));
     const [copiedUrl,    setCopiedUrl]    = useState(false);
 
-    // ── Axis scale state — yMin defaults to 0, rest auto ─────────────────────
-    const [xMinOwn, setXMin] = useState(null);
-    const [xMaxOwn, setXMax] = useState(null);
-    const [yMinOwn, setYMin] = useState(0);
-    const [yMaxOwn, setYMax] = useState(null);
-    // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
-    const { xMin, xMax, yMin, yMax } = useSyncedScale({
-        xMin: xMinOwn, xMax: xMaxOwn, yMin: yMinOwn, yMax: yMaxOwn,
-    });
+    // ── Axis limits — yMin defaults to 0, rest auto ──────────────────────────
+    // In chartConfig (#478), so a chart link, a Home panel and the pop-out all
+    // draw with the limits the sender set; this view used to keep them here.
+    const { limits: { xMin, xMax, yMin, yMax }, setLimit, resetLimits } = useAxisLimits('range');
     const [showPoints,       setShowPoints]       = useState(true);
-    const handleScaleChange = (key, val) => {
-        if (key === 'xMin') setXMin(val);
-        else if (key === 'xMax') setXMax(val);
-        else if (key === 'yMin') setYMin(val);
-        else if (key === 'yMax') setYMax(val);
-    };
 
     // Reset all scale overrides (back to defaults) when switching chart types,
     // since axis semantics change between chart types.
     const handleChartTypeChange = (newType) => {
         setChartType(newType);
-        setXMin(null);
-        setXMax(null);
-        setYMin(0);
-        setYMax(null);
+        resetLimits();
     };
 
     // ── Derived: all range runs across selected vehicles ──────────────────────
@@ -856,7 +842,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 <AxisScaleControls
                     xMin={xMin} xMax={xMax}
                     yMin={yMin} yMax={yMax}
-                    onChange={handleScaleChange}
+                    onChange={setLimit}
                     showX={CHART_TYPES.find(t => t.key === chartType)?.kind === 'line'}
                 />
             )}

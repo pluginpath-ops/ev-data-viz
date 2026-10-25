@@ -19,7 +19,7 @@ import { useTheme } from '../hooks/useTheme';
 import LoadingSpinner from './LoadingSpinner';
 import ChartInfoBubble from './ChartInfoBubble';
 import AxisScaleControls from './AxisScaleControls';
-import { useSyncedScale } from '../hooks/useSyncedScale';
+import { useAxisLimits } from '../hooks/useAxisLimits';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve, tracedCurvePoints, segmentAccelerationG } from '../utils/performanceDerivations';
 import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
@@ -55,9 +55,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     // 'vehicle' — one line per vehicle, its single quickest run
     // 'all'     — every run, for run-to-run consistency
     const [grouping, setGrouping] = useState('mode');
-    const [scaleOwn, setScale] = useState({ xMin: null, xMax: null, yMin: null, yMax: null });
-    // The limits to draw with: the main tab's, in a pop-out (useSyncedScale).
-    const scale = useSyncedScale(scaleOwn);
+    // Axis limits, in chartConfig (#478) so the chart link, a Home panel and the
+    // pop-out carry them — including the Focus select below, which sets xMax.
+    const { limits: scale, setLimit: setScaleLimit } = useAxisLimits('perfcurve');
     // Only consulted when grouping is 'all'; null means "not curated yet", which
     // shows everything rather than an empty chart on first switch.
     const [pickedRunIds, setPickedRunIds] = useState(null);
@@ -450,13 +450,10 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             <label className="axis-label">Focus</label>
                             <select
                                 value={scale.xMax == null ? 'full' : 'launch'}
-                                onChange={e => setScale(prev => ({
-                                    ...prev,
-                                    // A merged drag ladder stretches the axis to ~13 s and
-                                    // squeezes the whole 0-60 into the left quarter, which
-                                    // reads as if the low-speed splits had gone missing.
-                                    xMax: e.target.value === 'launch' ? 5 : null,
-                                }))}
+                                // A merged drag ladder stretches the axis to ~13 s and
+                                // squeezes the whole 0-60 into the left quarter, which
+                                // reads as if the low-speed splits had gone missing.
+                                onChange={e => setScaleLimit('xMax', e.target.value === 'launch' ? 5 : null)}
                                 className="form-input"
                             >
                                 <option value="full">Full run</option>
@@ -580,7 +577,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                 <AxisScaleControls
                     xMin={scale.xMin} xMax={scale.xMax}
                     yMin={scale.yMin} yMax={scale.yMax}
-                    onChange={(key, val) => setScale(prev => ({ ...prev, [key]: val }))}
+                    onChange={setScaleLimit}
                     xAxisLabel="X-Axis Scale (s)"
                     yAxisLabel="Y-Axis Scale (mph)"
                 />
