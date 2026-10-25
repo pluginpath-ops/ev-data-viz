@@ -40,7 +40,7 @@ import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
 import { displayImageUrl } from '../utils/imageRenditions';
 import { isRangeRun, runKindFrom, linkableRuns, linkableCounts, isCompositeRun } from '../utils/runUtils';
-import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
+import { isTimestampValue, timestampToMs, wallClockTimestamp } from '../utils/parseElapsedTime';
 import RunCard from './runs/RunCard';
 import CompositeRunCard from './runs/CompositeRunCard';
 import LineageChargingNote from './runs/LineageChargingNote';
@@ -2418,9 +2418,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                         {/* Timestamp cell — read-only, only rendered when column is visible */}
                                                                         {editData?.some(r => r.timestamp != null) && (
                                                                             <td className="px-2 py-0.5 text-secondary whitespace-nowrap text-[11px] font-mono select-all">
-                                                                                {row.timestamp
-                                                                                    ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                                                                                    : <span className="text-meta">—</span>}
+                                                                                {!row.timestamp
+                                                                                    ? <span className="text-meta">—</span>
+                                                                                    : wallClockTimestamp(row.timestamp)
+                                                                                        ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                                                                        // An elapsed timecode shows as written; it is not saved
+                                                                                        : row.timestamp}
                                                                             </td>
                                                                         )}
                                                                         {['soc','chargeRate','time','range','temperature'].map(field => (

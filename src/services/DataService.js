@@ -4,6 +4,7 @@ import { fetchSiteSettings, updateCachedSetting, MODEL_CONSTANTS_KEY } from './s
 import { vehicleLabel } from '../utils/specHelpers';
 import { passDown } from '../utils/vehicleDeletion';
 import { roundTo, } from '../utils/unitConversions';
+import { wallClockTimestamp } from '../utils/parseElapsedTime';
 import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
 import { demotionUpdates, acceptGuideTags, guideOverlay, isCuratorOwned } from '../utils/feGuidePromotion';
@@ -94,7 +95,7 @@ function normalisePoint(point, runId, frame) {
   return {
     run_id:      runId,
     frame,
-    timestamp:   point.timestamp ?? null,
+    timestamp:   wallClockTimestamp(point.timestamp),  // timecodes are durations, not moments
     soc:         roundField(point.soc,         1),  // 0–100 %,   1 dp  e.g. 42.5
     charge_rate: roundField(point.chargeRate,  2),  // kW,        2 dp  e.g. 150.00
     time_value:  roundField(point.time,        1),  // min/s,     1 dp
