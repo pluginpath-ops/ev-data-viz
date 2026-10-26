@@ -3,7 +3,7 @@ import { correctionSummary } from '../utils/correctionSettings';
 import SectionBand from './SectionBand';
 import SidebarDisplaySection from './SidebarDisplaySection';
 import { useAxisLimits } from '../hooks/useAxisLimits';
-import { useChartReadout } from '../hooks/useChartReadout';
+import { useChartReadout, CLICK_SLOP } from '../hooks/useChartReadout';
 import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
 import { hoursToMinutes } from '../utils/axisLimits';
 import Chart from 'chart.js/auto';
@@ -1372,7 +1372,7 @@ export default function RoadTripView({
                         tooltip: { enabled: false },
                         zoom: {
                             zoom: {
-                                drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
+                                drag: { enabled: true, threshold: CLICK_SLOP, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
                                 mode: 'xy',
                             },
                         },
@@ -1470,7 +1470,7 @@ export default function RoadTripView({
                         tooltip: { enabled: false },
                         zoom: {
                             zoom: {
-                                drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
+                                drag: { enabled: true, threshold: CLICK_SLOP, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
                                 mode: 'xy',
                             },
                         },
@@ -1764,6 +1764,7 @@ export default function RoadTripView({
                         zoom: {
                             drag: {
                                 enabled: true,
+                                threshold: CLICK_SLOP,
                                 backgroundColor: 'rgba(59,130,246,0.08)',
                                 borderColor: '#3b82f6',
                                 borderWidth: 1,

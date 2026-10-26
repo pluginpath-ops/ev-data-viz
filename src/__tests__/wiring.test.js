@@ -3058,6 +3058,17 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
         expect(hook).toMatch(/store\.set\(IDLE\);\s*\};\s*\}/);
     });
 
+    it('the zoom plugin and the readout agree on what a click is (#456)', () => {
+        // The plugin's default drag threshold is 0, so a click that moved 2px
+        // fixed the readout and zoomed the chart.
+        for (const file of ['src/components/ChargingView.jsx', 'src/components/RoadTripView.jsx']) {
+            const src = read(file);
+            const drags = src.match(/drag: \{\s*enabled: true,\s*threshold: CLICK_SLOP/g) ?? [];
+            expect(drags.length, file).toBe(src.match(/drag: \{/g).length);
+            expect(src).toMatch(/import \{ useChartReadout, CLICK_SLOP \}/);
+        }
+    });
+
     it('a drag is a box-zoom, never a click that fixes the readout', () => {
         const hook = read('src/hooks/useChartReadout.jsx');
         expect(hook).toMatch(/CLICK_SLOP/);

@@ -12,7 +12,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { figureSources, epaCredits } from '../utils/vehicleFigures';
 import { useSourceLine } from '../hooks/useSourceLine';
-import { useChartReadout } from '../hooks/useChartReadout';
+import { useChartReadout, CLICK_SLOP } from '../hooks/useChartReadout';
 import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
 
 /**
@@ -966,7 +966,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     tooltip: { enabled: false },
                     zoom: {
                         zoom: {
-                            drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
+                            drag: { enabled: true, threshold: CLICK_SLOP, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
                             mode: 'xy',
                         },
                     },

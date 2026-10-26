@@ -90,8 +90,15 @@ function createStore() {
     };
 }
 
-/** Movement under this is a click; over it, a drag (box-zoom, or a touch scrub). */
-const CLICK_SLOP = 4;
+/**
+ * Movement under this is a click; over it, a drag (box-zoom, or a touch scrub).
+ * The charts hand the same number to the zoom plugin as `drag.threshold`, so
+ * the two agree on what a click is: without it a click that wandered 2px fixed
+ * the readout AND zoomed the chart (the plugin's default threshold is 0). 20px
+ * is generous on purpose — a box-zoom smaller than that is not a zoom anyone
+ * meant, and a hand resting on a trackpad moves more than 4.
+ */
+export const CLICK_SLOP = 20;
 const SCRUB_SLOP = 8;
 
 function readoutPlugin(store, config) {
