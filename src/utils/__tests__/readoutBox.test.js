@@ -87,3 +87,12 @@ describe('placeReadoutBox', () => {
         expect(at.left + size.width).toBeLessThanOrEqual(area.right);
     });
 });
+
+describe('layoutReadoutBox as a side panel', () => {
+    it('is one column however many series, and lists all twelve within the plot height', () => {
+        const box = layoutReadoutBox({ ...base, maxHeight: 400, maxWidth: 340, maxColumns: 1, rows: rows(12) });
+        expect(box.columns).toHaveLength(1);
+        expect(box.columns[0].indices).toHaveLength(12);
+        expect(box.hidden).toBe(0);
+    });
+});

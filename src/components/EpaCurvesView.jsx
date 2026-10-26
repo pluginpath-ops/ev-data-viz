@@ -42,6 +42,7 @@ import { useViewingConditions } from '../hooks/useViewingConditions';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import { useAxisLimits } from '../hooks/useAxisLimits';
+import CopyPngButton from './charts/CopyPngButton';
 
 const NO_RUNS = [];
 const EPA_TESTS = { tests: true };
@@ -739,7 +740,7 @@ export default function EpaCurvesView({
         [overlayMode, vehiclesWithEpa]);
     const sourceLine = useSourceLine({ runs: overlayRuns, epa: EPA_TESTS });
 
-    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+    const { copyPng, copyPngBeside, copiedBeside, copied: imageCopied, preview, dismissPreview } =
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(datasets.length) });
 
@@ -996,14 +997,7 @@ export default function EpaCurvesView({
                             >
                                 {urlCopied ? '✓ Copied' : '🔗 URL'}
                             </button>
-                            <button
-                                onClick={copyPng}
-                                disabled={!datasets.length}
-                                className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                                title="Copy the framed chart as a PNG"
-                            >
-                                {imageCopied ? '✓ Copied' : 'PNG'}
-                            </button>
+                            <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} disabled={!datasets.length} />
                         </>
                     )}
                 >

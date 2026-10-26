@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import ChartReadout from '../components/charts/ChartReadout';
 import { readingsAtX, autoTolerance } from '../utils/readoutAtX';
+import { prepareFixedReadout } from '../utils/drawFixedReadout';
 
 /**
  * The readout: every series at the X under the cursor, in one box with a
@@ -54,7 +55,11 @@ import { readingsAtX, autoTolerance } from '../utils/readoutAtX';
 export function useChartReadout() {
     const [store] = useState(createStore);
     const plugin = useCallback((config) => readoutPlugin(store, config), [store]);
-    return { plugin, overlay: <ChartReadout store={store} />, store };
+    // Whether a readout is fixed, as a boolean so a view re-renders when it is
+    // fixed or cleared and not on every hover frame. The PNG-beside button
+    // enables on it.
+    const fixed = useSyncExternalStore(store.subscribe, () => store.get().mode === 'fixed');
+    return { plugin, overlay: <ChartReadout store={store} />, store, fixed };
 }
 
 const IDLE = { mode: 'off' };
@@ -143,6 +148,15 @@ function attach(chart, config, store) {
 
     const clear = () => { mode = 'off'; down = null; store.set(IDLE); };
     store.actions = { clear };
+
+    // The PNG export asks every chart whether it has anything to add to the
+    // picture (chartToPngDataUrl). A FIXED readout does — it is what the reader
+    // chose to keep — and a hover one never does: it follows a cursor that has
+    // gone to click the button.
+    chart.$exportExtra = (options) => {
+        const s = store.get();
+        return s.mode === 'fixed' ? prepareFixedReadout(chart, s, options) : null;
+    };
 
     // One update per frame, the latest wins.
     const schedule = (fn) => {
@@ -239,7 +253,9 @@ function attach(chart, config, store) {
     const onDocDown = (e) => {
         if (mode !== 'fixed') return;
         const t = e.target;
-        if (t === canvas || t?.closest?.('.chart-readout')) return;
+        // The copy buttons too: clearing on the PNG button's own press would
+        // export a chart without the readout it was fixed to be exported with.
+        if (t === canvas || t?.closest?.('.chart-readout, .chart-export-strip, .chart-copy-btn')) return;
         clear();
     };
 
@@ -292,6 +308,7 @@ function attach(chart, config, store) {
         // A rebuilt chart starts without a readout: its axes, series or units
         // may be different, and a fixed one would be a stale answer.
         store.actions = null;
+        delete chart.$exportExtra;
         store.set(IDLE);
     };
 }

@@ -41,6 +41,7 @@ import { wrapCanvasText } from '../utils/wrapCanvasText';
 import { countParts, legendWorthShowing } from '../utils/plotCaption';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
+import CopyPngButton from './charts/CopyPngButton';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -673,7 +674,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
     const sourceLine = useSourceLine({ runs: plottableRuns });
 
-    const { copyPng, copied, preview, dismissPreview } =
+    const { copyPng, copyPngBeside, copiedBeside, copied, preview, dismissPreview } =
         useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: plottableRuns.map(r => r.id).join(',') });
 
@@ -834,14 +835,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                         >
                             {copiedUrl ? '✓ Copied' : '🔗 URL'}
                         </button>
-                        <button
-                            onClick={copyPng}
-                            disabled={plottableRuns.length === 0}
-                            className={`chart-copy-btn disabled:opacity-40 disabled:cursor-not-allowed ${copied ? 'chart-copy-btn-active' : ''}`}
-                            title="Copy the framed chart as a PNG"
-                        >
-                            {copied ? '✓ Copied' : 'PNG'}
-                        </button>
+                        <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={copied} copiedBeside={copiedBeside} disabled={plottableRuns.length === 0} />
                     </>
                 )}
             >

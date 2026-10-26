@@ -27,6 +27,7 @@ import { useChartPng } from '../../../hooks/useChartPng';
 import InfoIcon from '../../InfoIcon';
 import { EPA_EXPLAINERS } from '../../../utils/epaExplainers';
 import { fmtTemp, fmtSpeed } from '../../../utils/unitConversions';
+import CopyPngButton from '../../charts/CopyPngButton';
 
 // Every curve here is EPA's test data.
 const EPA_TESTS = { tests: true };
@@ -266,7 +267,7 @@ export default function EpaCurveExplorer({
 
     const sourceLine = useSourceLine({ epa: EPA_TESTS });
 
-    const { copyPng, copied: pngCopied, preview, dismissPreview } =
+    const { copyPng, copyPngBeside, copiedBeside, copied: pngCopied, preview, dismissPreview } =
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(plotted.length) });
     const [urlCopied, setUrlCopied] = useState(false);
@@ -550,13 +551,7 @@ export default function EpaCurveExplorer({
                                         >
                                             {urlCopied ? '✓ Copied' : '🔗 URL'}
                                         </button>
-                                        <button
-                                            onClick={copyPng}
-                                            className={`chart-copy-btn ${pngCopied ? 'chart-copy-btn-active' : ''}`}
-                                            title="Copy the framed chart as a PNG"
-                                        >
-                                            {pngCopied ? '✓ Copied' : 'PNG'}
-                                        </button>
+                                        <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={pngCopied} copiedBeside={copiedBeside} />
                                     </>
                                 )}
                             >

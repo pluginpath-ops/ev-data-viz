@@ -55,6 +55,7 @@ import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
+import CopyPngButton from './charts/CopyPngButton';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
@@ -1051,7 +1052,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const sourceLine = useSourceLine({ runs: sourceRuns, allRuns: fleetRuns, epa: sourceEpa });
 
     // ── PNG export ───────────────────────────────────────────────────────────
-    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+    const { copyPng, copyPngBeside, copiedBeside, copied: imageCopied, preview, dismissPreview } =
         useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: `${selectedRuns.join(',')}|${selectedComposites.length}` });
 
@@ -1444,13 +1445,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         >
                             {copied ? '✓ Copied' : '🔗 URL'}
                         </button>
-                        <button
-                            onClick={copyPng}
-                            className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                            title="Copy the framed chart as a PNG"
-                        >
-                            {imageCopied ? '✓ Copied' : 'PNG'}
-                        </button>
+                        <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                     </>
                 )}
             >

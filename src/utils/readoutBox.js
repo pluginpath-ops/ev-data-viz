@@ -48,23 +48,24 @@ export function fitText(text, maxWidth, measure) {
  * @param {number} p.gap           gap between name and value, and between columns
  * @param {number} p.maxHeight
  * @param {number} p.maxWidth
+ * @param {number} [p.maxColumns]  default BOX_MAX_COLUMNS; the side panel uses 1
  * @returns {{width: number, height: number, columns: {indices: number[], nameWidth: number, valueWidth: number, x: number}[],
  *            names: string[], hidden: number, headHeight: number, moreY: number|null}}
  */
-export function layoutReadoutBox({ rows, title, subtitle, measure, lineHeight, padding, swatch, gap, maxHeight, maxWidth }) {
+export function layoutReadoutBox({ rows, title, subtitle, measure, lineHeight, padding, swatch, gap, maxHeight, maxWidth, maxColumns = BOX_MAX_COLUMNS }) {
     const headHeight = padding + lineHeight + (subtitle ? lineHeight : 0) + gap / 2;
     const innerH = maxHeight - headHeight - padding;
 
     let perColumn = Math.max(1, Math.floor(innerH / lineHeight));
-    const capacity = perColumn * BOX_MAX_COLUMNS;
+    const capacity = perColumn * maxColumns;
     let hidden = 0;
     if (rows.length > capacity) {
         // One line of the budget goes to the "+n more" note.
         perColumn = Math.max(1, Math.floor((innerH - lineHeight) / lineHeight));
-        hidden = Math.max(0, rows.length - perColumn * BOX_MAX_COLUMNS);
+        hidden = Math.max(0, rows.length - perColumn * maxColumns);
     }
     const shown = rows.length - hidden;
-    const nColumns = Math.min(BOX_MAX_COLUMNS, Math.ceil(shown / perColumn)) || 1;
+    const nColumns = Math.min(maxColumns, Math.ceil(shown / perColumn)) || 1;
     // Balanced columns read better than a full one beside a stub.
     const rowsIn = Math.ceil(shown / nColumns);
 

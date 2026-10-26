@@ -47,6 +47,7 @@ import { countsAside } from '../utils/rangeTestSpread';
 import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
 import FeatureChartButton from './home/FeatureChartButton';
+import CopyPngButton from './charts/CopyPngButton';
 
 Chart.register(ZoomPlugin);
 
@@ -1895,7 +1896,7 @@ export default function RoadTripView({
     }, [validEntries]);
     const sourceLine = useSourceLine({ runs: sourceRuns, epa: sourceEpa });
 
-    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+    const { copyPng, copyPngBeside, copiedBeside, copied: imageCopied, preview, dismissPreview } =
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(validEntries.length) });
 
@@ -2272,13 +2273,7 @@ export default function RoadTripView({
                             >
                                 {copiedUrl ? '✓ Copied' : '🔗 URL'}
                             </button>
-                            <button
-                                onClick={copyPng}
-                                className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                                title="Copy the framed chart as a PNG"
-                            >
-                                {imageCopied ? '✓ Copied' : 'PNG'}
-                            </button>
+                            <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                         </>
                     )}
                 >

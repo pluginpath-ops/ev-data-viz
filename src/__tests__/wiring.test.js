@@ -3013,8 +3013,33 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
         expect(read('src/components/charts/ChartReadout.jsx')).toMatch(/import RunSourceLinks from '\.\.\/RunSourceLinks'/);
     });
 
-    it('the PNG export knows nothing of the readout: it is DOM, so it cannot be half-captured', () => {
-        expect(read('src/utils/chartUtils.js')).not.toMatch(/readout|crosshair/i);
+    it('the PNG export draws a FIXED readout through one seam, and never a hover one (#456)', () => {
+        // chartUtils knows nothing of the readout by name: it asks the chart.
+        const utils = read('src/utils/chartUtils.js');
+        expect(utils).not.toMatch(/readout|crosshair/i);
+        expect(utils).toMatch(/chartInstance\.\$exportExtra\?\.\(\{ side \}\)/);
+        expect(utils).toMatch(/extra\?\.draw\(ctx/);
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/chart\.\$exportExtra = /);
+        expect(hook).toMatch(/s\.mode === 'fixed' \? prepareFixedReadout\(/);
+        expect(hook).toMatch(/delete chart\.\$exportExtra/);
+    });
+
+    it('every chart that fixes a readout offers [PNG | Side readout] as one control (#456)', () => {
+        for (const file of READ_EVERY_SERIES) {
+            const src = read(file);
+            expect(src, file).toMatch(/<CopyPngButton readout=\{readout\} onCopy=\{copyPng\} onCopyBeside=\{copyPngBeside\}/);
+        }
+        expect(read('src/hooks/useChartPng.js')).toMatch(/copyPngBeside = \(\) => copy\(true\)/);
+    });
+
+    it('pressing the copy buttons does not clear the readout they are about to export (#456)', () => {
+        expect(read('src/hooks/useChartReadout.jsx')).toMatch(/closest\?\.\('\.chart-readout, \.chart-export-strip, \.chart-copy-btn'\)/);
+    });
+
+    it('the fixed readout is not in the URL or the pop-out: it is a reader\'s inspection, not a setting (#456)', () => {
+        expect(read('src/utils/chartUrlState.js')).not.toMatch(/readout/i);
+        expect(read('src/hooks/useChartSync.js')).not.toMatch(/readout/i);
     });
 
     it('the readout clears when the chart it belongs to is rebuilt', () => {
