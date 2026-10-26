@@ -1,4 +1,4 @@
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import ChartReadout from '../components/charts/ChartReadout';
 import { readingsAtX, autoTolerance } from '../utils/readoutAtX';
 import { prepareFixedReadout } from '../utils/drawFixedReadout';
@@ -55,11 +55,21 @@ import { prepareFixedReadout } from '../utils/drawFixedReadout';
 export function useChartReadout() {
     const [store] = useState(createStore);
     const plugin = useCallback((config) => readoutPlugin(store, config), [store]);
-    // Whether a readout is fixed, as a boolean so a view re-renders when it is
-    // fixed or cleared and not on every hover frame. The PNG-beside button
-    // enables on it.
-    const fixed = useSyncExternalStore(store.subscribe, () => store.get().mode === 'fixed');
-    return { plugin, overlay: <ChartReadout store={store} />, store, fixed };
+    // Stable across renders, so a chart effect that lists `readout` among its
+    // dependencies is not rebuilt (which would also clear the readout) by a
+    // render it did not cause. Whether it is FIXED is deliberately not here:
+    // that changes, and putting it on this object re-rendered the view and
+    // rebuilt the chart the moment a readout was fixed — see useReadoutFixed.
+    return useMemo(() => ({ plugin, overlay: <ChartReadout store={store} />, store }), [plugin, store]);
+}
+
+/**
+ * Whether the readout is fixed, as a boolean — for the component that needs it
+ * (the Side readout button), so that only it re-renders when one is fixed or
+ * cleared, and never on a hover frame.
+ */
+export function useReadoutFixed(readout) {
+    return useSyncExternalStore(readout.store.subscribe, () => readout.store.get().mode === 'fixed');
 }
 
 const IDLE = { mode: 'off' };

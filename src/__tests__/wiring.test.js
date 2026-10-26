@@ -3033,6 +3033,16 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
         expect(read('src/hooks/useChartPng.js')).toMatch(/copyPngBeside = \(\) => copy\(true\)/);
     });
 
+    it('fixing a readout re-renders the button, never the view: a chart effect listing `readout` would rebuild and clear it (#456)', () => {
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/return useMemo\(\(\) => \(\{ plugin, overlay: <ChartReadout store=\{store\} \/>, store \}\), \[plugin, store\]\);/);
+        expect(read('src/components/charts/CopyPngButton.jsx')).toMatch(/useReadoutFixed\(readout\)/);
+    });
+
+    it('Road Trip\'s valid entries are memoized: a fresh array each render rebuilt the chart and cleared a fixed readout (#456)', () => {
+        expect(read('src/components/RoadTripView.jsx')).toMatch(/const validEntries\s+= useMemo\(\(\) => runEntries\.filter\(/);
+    });
+
     it('pressing the copy buttons does not clear the readout they are about to export (#456)', () => {
         expect(read('src/hooks/useChartReadout.jsx')).toMatch(/closest\?\.\('\.chart-readout, \.chart-export-strip, \.chart-copy-btn'\)/);
     });

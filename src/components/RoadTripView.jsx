@@ -960,7 +960,10 @@ export default function RoadTripView({
             .sort((a, b) => (vehicleOrder.get(a.vehicle.id) ?? 999) - (vehicleOrder.get(b.vehicle.id) ?? 999));
     }, [selectedRunIds, allPairsInfo, selectedVehicles]);
 
-    const validEntries  = runEntries.filter(e => e.miPerKwh && e.batteryKwh);
+    // Memoized: it is a dependency of the simulations and of every chart's build
+    // effect, so a fresh array each render rebuilt the chart on ANY re-render —
+    // which also cleared a readout fixed on it (#456).
+    const validEntries  = useMemo(() => runEntries.filter(e => e.miPerKwh && e.batteryKwh), [runEntries]);
 
     // The chart legend's labels, computed once and shared. `buildSeriesLabels`
     // works out the minimum that makes each series unambiguous — vehicle first,
