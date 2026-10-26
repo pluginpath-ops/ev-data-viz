@@ -508,13 +508,13 @@ describe('EPA efficiency and electricity cost (#335)', () => {
             const [r] = buildVehicleRows([labelled]);
             const battery = 3 / ASSUMED_CHARGER_EFF;
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (battery * (1 - DC_FAST_LOSS)));
-            expect(r.notes['calc.costPer100Fast']).toBe('est. avg. DC efficiency');
+            expect(r.notes['calc.costPer100Fast']).toBe('est.');
         });
 
         it('takes out the cert\'s own measured charging efficiency where it has one', () => {
             const [r] = buildVehicleRows([withCharger(0.9)]);
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 / 0.9 * (1 - DC_FAST_LOSS)));
-            expect(r.notes['calc.costPer100Fast']).toBe('est. avg. DC efficiency');
+            expect(r.notes['calc.costPer100Fast']).toBe('est.');
         });
 
         it('costs less than the wall basis it replaced, and the home figure keeps the wall basis', () => {
@@ -526,7 +526,17 @@ describe('EPA efficiency and electricity cost (#335)', () => {
         it('prices an unlabelled vehicle on range ÷ battery, grossed up by the DC loss alone', () => {
             const [r] = buildVehicleRows([unlabelled]);
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 * (1 - DC_FAST_LOSS)));
-            expect(r.notes['calc.costPer100Fast']).toBe('est. avg. DC efficiency');
+            expect(r.notes['calc.costPer100Fast']).toBe('est.');
+        });
+
+        it('links every fast figure\'s estimate note to the explainer, with the takeaway as its tooltip', () => {
+            for (const v of [labelled, unlabelled]) {
+                const [r] = buildVehicleRows([v]);
+                expect(r.links['calc.costPer100Fast']).toMatchObject({ explainer: 'dc-fast-charging-loss' });
+                expect(r.links['calc.costPer100Fast'].title).toContain(`${Math.round(DC_FAST_LOSS * 100)}%`);
+            }
+            const [home] = buildVehicleRows([labelled]);
+            expect(home.links['calc.costPer100Home']).toBeUndefined();
         });
 
         it('is blank with neither a label nor a battery', () => {

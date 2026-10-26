@@ -1083,7 +1083,7 @@ describe('the seams that broke before', () => {
         expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
         expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
         expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
-        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\)\}/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\) \?\? explainerNoteLink\(row\.links\?\.\[col\.key\], openExplainer\)\}/);
         expect(read('src/components/tables/TableCell.jsx'), 'without borrowing the test peek').toMatch(/const noteLink = test \?\? link/);
     });
 
@@ -1674,6 +1674,10 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         const figures = read('src/utils/vehicleFigures.js');
         expect(figures, 'the cert\'s own charging efficiency must reach the table').toMatch(/chargerEfficiency: measuredChargerEfficiency/);
         expect(table, 'and be read from the resolved range').toMatch(/vehicle\.epaRange\?\.chargerEfficiency/);
+        // The estimate note on every fast cell must reach the explainer, with its tooltip.
+        expect(table, 'the fast column must carry its note link').toMatch(/noteLink: fastCostNoteLink/);
+        expect(table, 'and the table must hand it to the cell').toMatch(/links\[col\.key\] = col\.noteLink\(\)/);
+        expect(read('src/components/tables/TableCell.jsx'), 'and the cell must show the tooltip').toMatch(/title=\{noteLink\.title\}/);
         // The default and the evidence behind it must say the same number.
         const ledger = JSON.parse(read('src/explainers/facts.json')).facts.find(f => f.id === 'dc-fast-round-trip-pairs');
         expect(epa, 'the default must be the ledger\'s').toContain(`DC_FAST_LOSS: ${ledger.value.evbench_default},`);

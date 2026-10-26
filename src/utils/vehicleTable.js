@@ -469,8 +469,14 @@ const costPer100Fast = ([epa, battery], price, chargerEff) => {
     const eff = batteryEfficiency(epa, battery, chargerEff);
     return eff > 0 ? (price * 100) / (eff * (1 - DC_FAST_LOSS)) : null;
 };
-// Every fast cell rests on the assumed average DC loss, label or not, so every one says so.
-const fastCostNote = ([epa, battery]) => (epa != null || battery != null ? 'est. avg. DC efficiency' : null);
+// Every fast cell rests on the assumed average DC loss, label or not, so every one says so: briefly, as a link
+// to the page that explains it, with the takeaway in its tooltip (fastCostNoteLink).
+const fastCostNote = ([epa, battery]) => (epa != null || battery != null ? 'est.' : null);
+const fastCostNoteLink = () => ({
+    explainer: 'dc-fast-charging-loss',
+    title: `Estimated. A DC fast session is taken to lose about ${Math.round(DC_FAST_LOSS * 100)}% between the port and the pack, `
+        + 'an average from charge-then-drive tests, not the AC charging loss the label carries. Click for how it was measured.',
+});
 
 const CALCULATED_COLUMNS = [
     { key: 'calc.efficiency', label: 'Efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
@@ -539,7 +545,8 @@ const CALCULATED_COLUMNS = [
       inputs: ['figures.epaEfficiency', 'calc.efficiency'],
       calc: (inputs, { fastPrice }, { chargerEff }) => costPer100Fast(inputs, fastPrice, chargerEff),
       note: fastCostNote,
-      hint: 'The DC fast-charging price set under Assumptions × 100 ÷ the battery-side efficiency, grossed up by the DC fast charging loss (Admin → Model Constants): what a session loses between the car’s port and the pack’s output, cooling, auxiliary draw and the pack’s own losses among it. A DC session bypasses the onboard charger, so it does not pay the AC charging loss the home cost carries, and the station’s own conversion is not billed. Battery-side: the label’s efficiency with the charging loss taken back out (the certification’s own where it measured one, else the fleet median), or range ÷ battery without a label. Every figure is marked as an estimate, since the session loss is an assumed average. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
+      noteLink: fastCostNoteLink,
+      hint: 'The DC fast-charging price set under Assumptions × 100 ÷ the battery-side efficiency, grossed up by the DC fast charging loss (Admin → Model Constants): what a session loses between the car’s port and the pack’s output, cooling, auxiliary draw and the pack’s own losses among it. A DC session bypasses the onboard charger, so it does not pay the AC charging loss the home cost carries, and the station’s own conversion is not billed. Battery-side: the label’s efficiency with the charging loss taken back out (the certification’s own where it measured one, else the fleet median), or range ÷ battery without a label. Every figure is marked est., since the session loss is an assumed average; the mark links to the page that explains it. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
     { key: 'calc.weightPerHp', label: 'Weight per hp', unit: 'lb/hp', metric: ['kg/kW', LBS_TO_KG / HP_TO_KW],
       better: 'lower', digits: 1,
       // The cells are kg/kW in metric, so the name follows the unit.
@@ -869,6 +876,8 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
                 continue;
             }
             notes[col.key] = col.note?.(inputs, calcContext, extra) ?? (fromTest ? 'tested' : null);
+            // A note that points at its explanation (an explainer), where the column has one.
+            if (col.noteLink && notes[col.key]) links[col.key] = col.noteLink();
             // "Tested" links to the charging test the time came from — as does
             // a blank explained by that test's reach.
             tests[col.key] = col.charging && usedSummary && (fromTest || notes[col.key]) ? (isAdd ? addTest : chargeTest) : null;

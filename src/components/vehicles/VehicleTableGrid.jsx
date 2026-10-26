@@ -5,6 +5,7 @@ import { useNavigation } from '../../context/NavigationContext';
 import { cellUnit } from '../../utils/tableColumns';
 import { testHref } from '../../utils/testDetails';
 import { platformHref } from '../../utils/platforms';
+import { explainerHref } from '../../explainers/ExplainerLink';
 import { vehicleColor } from '../../utils/specHelpers';
 import { unitFor, formatVehicleCell, vehicleBarPercent } from '../../utils/vehicleTable';
 
@@ -19,7 +20,7 @@ import { unitFor, formatVehicleCell, vehicleBarPercent } from '../../utils/vehic
 
 /** One vehicle. Rendered by the selected band and the body from the same component. */
 function VehicleTableRow({ row, cols, units, maxima, selected, selectable = true, onToggle, onOpen, onOpenTest, onViewRuns, performanceCounts }) {
-    const { openPlatform } = useNavigation();
+    const { openPlatform, openExplainer } = useNavigation();
     return (
         <tr className={`guide-row${selected ? ' selected' : ''}`} data-row-id={row.id} onClick={() => onOpen?.(row.vehicle)}>
             {selectable && (
@@ -88,7 +89,7 @@ function VehicleTableRow({ row, cols, units, maxima, selected, selectable = true
                         flagged={row.flagged.has(col.key)}
                         test={testLink(row.tests[col.key], onOpenTest)}
                         testKey={col.key}
-                        link={platformNoteLink(row.links?.[col.key], openPlatform)}
+                        link={platformNoteLink(row.links?.[col.key], openPlatform) ?? explainerNoteLink(row.links?.[col.key], openExplainer)}
                     />
                 );
             })}
@@ -105,6 +106,12 @@ function VehicleTableRow({ row, cols, units, maxima, selected, selectable = true
 function platformNoteLink(link, openPlatform) {
     if (link?.platformId == null) return null;
     return { href: platformHref(link.platformId), onOpen: openPlatform ? () => openPlatform(link.platformId) : null };
+}
+
+/** An "est." note that points at the explainer behind it, its tooltip the takeaway (#506). */
+function explainerNoteLink(link, openExplainer) {
+    if (!link?.explainer) return null;
+    return { href: explainerHref(link.explainer), title: link.title, onOpen: openExplainer ? () => openExplainer(link.explainer) : null };
 }
 
 function testLink(ref, onOpenTest) {

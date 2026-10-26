@@ -107,6 +107,7 @@ export default function TableCell({
                         <a
                             className="vehicle-table-note is-test-link"
                             href={noteLink.href}
+                            title={noteLink.title}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 // A plain click navigates in place; a modified
