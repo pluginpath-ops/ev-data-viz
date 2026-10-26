@@ -2960,6 +2960,11 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     min-height: 0;
 }
 
+/* The vehicle filter bar in a chart's sidebar (spec chart, #450): its own
+   bottom margin is for the page it was written for, and the sidebar spaces its
+   groups itself. */
+.chart-rail .guide-filter-strip { margin-bottom: 0; }
+
 /* ── One scroller per sidebar ───────────────────────────────────────────────
  *
  * A rail that scrolls AND a list inside it that scrolls is two scrollbars in
@@ -6148,23 +6153,80 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply text-left;
 }
 
-/* ── Specs comparison chart ──────────────────────────────────────────────────── */
+/* ── Spec chart (#450) ───────────────────────────────────────────────────────
+   A column of the vehicle table, plotted. The sidebar is the standard chart
+   sidebar; what is particular to this chart is the field picker in it, the
+   plot's canvas box, and the note that says how many vehicles dropped. */
+.spec-chart-canvas { position: relative; }
+.spec-chart-canvas.is-scatter { height: 640px; }
+.spec-chart-dropped { margin-top: 8px; }
 
-.specs-chart-card {
-    @apply rounded-xl p-6;
-    background-color: var(--color-card);
+/* The field picker (tables/FieldPicker), on `.guide-facet-panel`'s stack: the column picker's rows, choosing what
+   to draw rather than what to show. A list that scrolls inside the sidebar so a
+   hundred-odd columns cannot push the sections below it off the screen. */
+.field-picker-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 320px;
+    overflow-y: auto;
+    /* Room for the scrollbar beside the rows, not over them: an overlay
+       scrollbar sat on the Y toggle at the right edge. */
+    scrollbar-gutter: stable;
+    padding-right: 6px;
+}
+/* A picker row selects; it does not drag, unlike the column picker's. */
+.field-picker-row { cursor: default; }
+.field-picker-row.is-selected { background-color: var(--color-primary-surface); }
+.field-picker-choice {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+    cursor: pointer;
+}
+/* The X and Y toggles on a scatter's picker row. */
+.field-picker-axis {
+    flex: none;
+    /* 2pt wider and 1pt taller than the nano type alone gives. */
+    width: calc(1.6em + 2pt);
+    padding: calc(1px + 0.5pt) 0;
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-mark);
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-meta);
+}
+.field-picker-axis:hover { background-color: var(--color-hover-lift); }
+.field-picker-axis.active {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
 }
 
-.specs-chart-controls {
-    @apply flex items-center gap-3 mb-5;
+/* The chart icon in a table's column header (SortHeader `plot`): the click
+   target that opens the column plotted. Small and quiet beside the name, so the
+   header still reads as a sort control; it is its own button, so a click on it
+   never sorts and a drag from the header never starts on it. */
+.column-plot-button {
+    display: inline-flex;
+    vertical-align: middle;
+    margin-left: 4px;
+    padding: 1px 2px;
+    border-radius: var(--radius-mark);
+    color: var(--color-text-meta);
+    cursor: pointer;
 }
-
-.specs-chart-field-select {
-    @apply rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-border-strong);
-    color: var(--color-text-primary);
+.column-plot-button:hover:not(:disabled) {
+    background-color: var(--color-hover-lift);
+    color: var(--color-primary);
+}
+/* No vehicle selected: shown, because the icon is how a reader learns the
+   column can be plotted, but plainly unavailable. */
+.column-plot-button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
 }
 
 /* ── Road trip simulation ────────────────────────────────────────────────────── */

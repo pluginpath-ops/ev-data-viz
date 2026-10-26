@@ -117,6 +117,7 @@ function testLink(ref, onOpenTest) {
  * @param {Array}  cols        the columns, labelled (labelledColumn)
  * @param {{ key, dir, onSort }|null} sort   null: headers do not sort and show no caret
  * @param {{ dragProps, dragClass }|null} drag   null: headers do not drag
+ * @param {{ enabled, onPlot }|null} plot   null: headers carry no chart icon (#450)
  * @param {boolean} selectable  a checkbox column and a selected band; false for a read-only table
  * @param {Array}  selectedRows  the selected band, above the body
  * @param {Array}  bodyRows
@@ -125,7 +126,7 @@ function testLink(ref, onOpenTest) {
  * @param {*}      [peek]       the cell peek's panel, drawn after the table
  */
 export default function VehicleTableGrid({
-    cols, sort = null, drag = null, selectable = true,
+    cols, sort = null, drag = null, plot = null, selectable = true,
     selectedRows = [], bodyRows, rowProps, peekProps = {}, peek = null, emptyText = '',
 }) {
     const span = cols.length + (selectable ? 1 : 0);
@@ -137,7 +138,8 @@ export default function VehicleTableGrid({
                         {selectable && <th className="guide-th guide-th-select sticky-select" />}
                         {cols.map(col => (
                             <SortHeader key={col.key} col={col} sortKey={sort?.key ?? null} sortDir={sort?.dir} onSort={sort?.onSort ?? null}
-                                dragProps={drag?.dragProps(col.key)} dragClass={drag?.dragClass(col.key)} reorderHint={!!drag && col.sticky} />
+                                dragProps={drag?.dragProps(col.key)} dragClass={drag?.dragClass(col.key)} reorderHint={!!drag && col.sticky}
+                                plot={plot && col.key !== 'name' ? plot : null} />
                         ))}
                     </tr>
                 </thead>

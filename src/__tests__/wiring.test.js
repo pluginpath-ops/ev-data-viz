@@ -820,7 +820,7 @@ describe('the seams that broke before', () => {
 
         expect(read('src/components/vehicles/VehicleCardFigures.jsx')).toMatch(/<PlatformLine vehicle=\{vehicle\} \/>/);
         expect(read('src/components/ViewSpecsModal.jsx')).toMatch(/<PlatformFacts vehicle=\{liveVehicle\} \/>/);
-        expect(read('src/components/VehicleTable.jsx')).toMatch(/buildVehicleRows\(vehicles, \{[^}]*platformsById/);
+        expect(read('src/hooks/useVehicleRows.js')).toMatch(/buildVehicleRows\(vehicles, \{[^}]*platformsById/);
     });
 
     it('carries the #352 spec fields to a column, the importer and View Specs', async () => {
@@ -1011,7 +1011,8 @@ describe('the seams that broke before', () => {
         const app = read('src/App.jsx');
         expect(app, 'App owns Cards or List now').toMatch(/viewMode=\{vehiclesMode\}/);
         expect(app).toMatch(/vehicles: \{ tab: 'vehicles', items: VEHICLES_STRIP_ITEMS/);
-        expect(app, 'the bar/scatter switch must be drawn for both spec charts').toMatch(/<SpecChartKind mode=\{chartMode\} onChange=\{handleChartModeChange\} \/>/);
+        expect(app, 'the spec chart is handed the mode switch').toMatch(/onModeChange=\{handleChartModeChange\}/);
+        expect(read('src/components/SpecChart.jsx'), 'the bar/scatter switch lives in the spec chart sidebar').toMatch(/<SpecChartKind mode=\{mode\} onChange=\{onModeChange\} \/>/);
         expect(app, 'a header tab returns to the chart mode last shown under it').toMatch(/onNavigate=\{navigateToTab\}/);
         expect(read('src/components/VehiclesView.jsx'), 'the in-page toggle is gone').not.toMatch(/setViewMode/);
         expect(read('src/components/shell/SubTabStrip.jsx'), 'sections are labelled').toMatch(/subtab-section-label/);
@@ -1158,7 +1159,10 @@ describe('the seams that broke before', () => {
         expect(app).not.toMatch(/Select a vehicle first/);
         expect(app).toMatch(/entryModeFor\(/);
         expect(app, 'an empty chart must show the shared empty state')
-            .toMatch(/chartMode !== 'specstable' && selectedVehicles\.length === 0 && \(\s*<SelectionEmptyState/);
+            .toMatch(/chartMode !== 'specstable' && selectedVehicles\.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && \(\s*<SelectionEmptyState/);
+        // The spec chart can plot every filtered vehicle, so it shows the same
+        // empty state itself, with its way out, instead of vanishing.
+        expect(read('src/components/SpecChart.jsx')).toMatch(/<SelectionEmptyState chart="Chart"/);
         expect(read('src/components/SelectionEmptyState.jsx')).toMatch(/＋ Add/);
 
         // Selecting here IS the app's selection — no second, local notion of chosen.
@@ -2010,7 +2014,7 @@ describe('the EPA curve explorer follows the pop-out channel (#259)', () => {
 
     it('the explorer reports its state up, and App broadcasts it', () => {
         expect(read('src/components/epa/EpaSection.jsx')).toMatch(/<EpaCurveExplorer onStateChange=\{onExplorerState\}/);
-        expect(app).toMatch(/<EpaSection subtab=\{epaSubtab\} onExplorerState=\{setEpaExplorer\}/);
+        expect(app).toMatch(/<EpaSection subtab=\{epaSubtab\} onPlotColumn=\{plotColumn\} onExplorerState=\{setEpaExplorer\}/);
         expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, sendState\]/);
     });
 
@@ -2163,7 +2167,7 @@ describe('the vehicle swatch is connected (#308, #317)', () => {
 
     it('session bases live in chartConfig, so the pop-out window receives them', () => {
         expect(read('src/utils/chartDefaults.js')).toMatch(/vehicleBases: NO_VEHICLE_BASES/);
-        expect(app).toMatch(/useState\(defaultChartConfig\)/);
+        expect(app).toMatch(/\.\.\.defaultChartConfig\(\),/);
         // useChartSync ships the whole chartConfig; if that ever narrows to named
         // fields, this is where it is noticed.
         expect(read('src/hooks/useChartSync.js')).toMatch(/chartConfig,/);
@@ -3027,5 +3031,70 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
         const hook = read('src/hooks/useChartReadout.jsx');
         expect(hook).toMatch(/CLICK_SLOP/);
         expect(hook).toMatch(/if \(press\.dragged\) \{ clear\(\); return; \}/);
+    });
+});
+
+describe('the spec chart plots the vehicle table’s columns (#450)', () => {
+    const app = read('src/App.jsx');
+    const chart = read('src/components/SpecChart.jsx');
+
+    it('reads the table’s own rows, through the one builder, not the spec schema', () => {
+        expect(chart).toMatch(/useVehicleRows\(/);
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/useVehicleRows\(/);
+        for (const f of ['SpecChart', 'SpecsChartView', 'SpecsScatterView']) {
+            expect(read(`src/components/${f}.jsx`), `${f} must not read the spec schema directly`).not.toMatch(/makeVehicleFields|buildFieldGroups|extractValue/);
+        }
+        expect(chart).toMatch(/plotValues\(/);
+    });
+
+    it('draws the selected vehicles in their series colors, as the other charts do', () => {
+        expect(app, 'chartVehicles carry the session color bases').toMatch(/chartVehicles\.find\(v => v\.id === id\)[\s\S]{0,200}fleet=\{chartVehicles\}/);
+        expect(chart).toMatch(/resolveChartColors\(/);
+        expect(chart).not.toMatch(/vehicleColor\(/);
+    });
+
+    it('shares the table’s assumptions through chartConfig, so chart and cell agree', () => {
+        expect(read('src/utils/chartDefaults.js')).toMatch(/assumptions:\s+\{ \.\.\.DEFAULT_ASSUMPTIONS \}/);
+        expect(app).toMatch(/assumptions=\{chartConfig\.assumptions\}/);
+        expect(app).toMatch(/onAssumptionsChange=\{a => setChartConfig/);
+        expect(chart).toMatch(/chartConfig\.assumptions/);
+        // Both frames hold the same fields; the link carries them in the spec modes.
+        expect(read('src/components/VehicleTableAssumptions.jsx')).toMatch(/<VehicleAssumptionFields/);
+        expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<VehicleAssumptionFields/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/chartMode === 'specs' \|\| chartMode === 'specscatter'\)[\s\S]{0,120}encodeAssumptionParams\(chartConfig\.assumptions\)/);
+    });
+
+    it('lists its columns through the field picker, a variant of the column picker’s matching', () => {
+        expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<FieldPicker mode="dual"/);
+        expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<FieldPicker mode="single"/);
+        expect(read('src/components/tables/FieldPicker.jsx')).toMatch(/columnMatches\(/);
+        expect(read('src/components/tables/ColumnPicker.jsx')).toMatch(/columnMatches\(/);
+    });
+
+    it('puts the chart icon on both tables’ headers, and it opens the column plotted', () => {
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/plot=\{plot && col\.key !== 'name'/);
+        expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/plot=\{plot && col\.plotAs/);
+        expect(read('src/components/tables/SortHeader.jsx')).toMatch(/e\.stopPropagation\(\); plot\.onPlot\(col\.key\)/);
+        expect(app).toMatch(/onPlotColumn=\{plotColumn\}/);
+        expect(app).toMatch(/specsField: key[\s\S]{0,80}handleChartModeChange\('specs'\)/);
+    });
+
+    it('every guide column that claims a vehicle-table twin names a column that exists', async () => {
+        const { GUIDE_COLUMNS } = await import('../utils/feGuideBrowse');
+        const { vehicleColumnByKey } = await import('../utils/vehicleTable');
+        const claimed = GUIDE_COLUMNS.filter(c => c.plotAs);
+        expect(claimed.length).toBeGreaterThan(0);
+        for (const c of claimed) expect(vehicleColumnByKey(c.plotAs), `${c.key} → ${c.plotAs}`).not.toBeNull();
+    });
+
+    it('can plot every vehicle the filters leave, with the table’s own filter bar', () => {
+        expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<VehicleFilterBar/);
+        expect(chart).toMatch(/useFilteredVehicles\(/);
+        expect(app).toMatch(/filters=\{vehicleFilters\}\s+onFiltersChange=\{setVehicleFilters\}\s+chartConfig/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/chartConfig\.specScope === 'all'[\s\S]{0,160}encodeVehicleFilters\(vehicleFilters\)/);
+    });
+
+    it('keeps the old chart keys alive in saved links', () => {
+        expect(chart).toMatch(/currentFieldKey\(chartConfig\.specsField\)/);
     });
 });

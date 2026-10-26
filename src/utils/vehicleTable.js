@@ -948,16 +948,26 @@ function chargeNote(best, units) {
     return parts.join(' · ') || null;
 }
 
+/**
+ * A numeric value in the unit the reader sees it in (`unitFor`): NaN where it
+ * is not a number. The cell draws this and the spec chart plots it, so the two
+ * cannot disagree about a conversion.
+ */
+export function displayNumber(col, raw, units = 'imperial') {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return NaN;
+    return col.metric && units === 'metric' ? n * col.metric[1]
+        : col.unitGroup ? convValue(n, col.unitGroup, units) : n;
+}
+
 /** One cell's text. Absent is an em dash — a fact, not a zero. */
 export function formatVehicleCell(row, col, units = 'imperial') {
     const raw = row?.values?.[col.key];
     if (raw == null || raw === '') return '—';
     if (col.type === 'boolean') return raw ? 'Yes' : 'No';
     if (col.numeric) {
-        const n = Number(raw);
-        if (!Number.isFinite(n)) return String(raw);
-        const shown = col.metric && units === 'metric' ? n * col.metric[1]
-            : col.unitGroup ? convValue(n, col.unitGroup, units) : n;
+        const shown = displayNumber(col, raw, units);
+        if (!Number.isFinite(shown)) return String(raw);
         return shown.toLocaleString('en-US', { maximumFractionDigits: col.digits ?? 2 });
     }
     return String(raw);
@@ -1000,6 +1010,24 @@ export function vehicleBarPercent(row, col, maxima) {
 export const VEHICLE_TABLE_PARAM_PREFIX = 'vt_';
 
 /**
+ * The assumptions as query parameters, only those that differ from the
+ * defaults. Their own function because two views write them: the table, and the
+ * spec chart, whose sidebar edits the same assumptions (#450).
+ */
+export function encodeAssumptionParams(assumptions = DEFAULT_ASSUMPTIONS) {
+    const p = new URLSearchParams();
+    const a = normalizeAssumptions(assumptions);
+    if (a.addDistance !== DEFAULT_ASSUMPTIONS.addDistance) p.set('vt_add', String(a.addDistance));
+    if (a.windowFrom !== DEFAULT_ASSUMPTIONS.windowFrom || a.windowTo !== DEFAULT_ASSUMPTIONS.windowTo) {
+        p.set('vt_win', `${a.windowFrom}-${a.windowTo}`);
+    }
+    if (a.homePrice !== DEFAULT_ASSUMPTIONS.homePrice) p.set('vt_home', String(a.homePrice));
+    if (a.fastPrice !== DEFAULT_ASSUMPTIONS.fastPrice) p.set('vt_fast', String(a.fastPrice));
+    if (a.rangeBasis !== DEFAULT_ASSUMPTIONS.rangeBasis) p.set('vt_basis', a.rangeBasis);
+    return p;
+}
+
+/**
  * Columns, sort and assumptions as query parameters — only what differs from
  * the defaults. Filters are not the table's (vehicleFilters.js, #338); the old
  * `vt_q` and facet parameters are still read there.
@@ -1026,14 +1054,7 @@ export function encodeVehicleTableParams({ columns, sortKey, sortDir, modifiedFr
         p.set('vt_sort', sortKey);
         if (sortDir === 'desc') p.set('vt_dir', 'desc');
     }
-    const a = normalizeAssumptions(assumptions);
-    if (a.addDistance !== DEFAULT_ASSUMPTIONS.addDistance) p.set('vt_add', String(a.addDistance));
-    if (a.windowFrom !== DEFAULT_ASSUMPTIONS.windowFrom || a.windowTo !== DEFAULT_ASSUMPTIONS.windowTo) {
-        p.set('vt_win', `${a.windowFrom}-${a.windowTo}`);
-    }
-    if (a.homePrice !== DEFAULT_ASSUMPTIONS.homePrice) p.set('vt_home', String(a.homePrice));
-    if (a.fastPrice !== DEFAULT_ASSUMPTIONS.fastPrice) p.set('vt_fast', String(a.fastPrice));
-    if (a.rangeBasis !== DEFAULT_ASSUMPTIONS.rangeBasis) p.set('vt_basis', a.rangeBasis);
+    for (const [key, value] of encodeAssumptionParams(assumptions)) p.set(key, value);
     return p;
 }
 

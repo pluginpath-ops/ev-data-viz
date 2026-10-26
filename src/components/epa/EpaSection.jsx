@@ -66,10 +66,10 @@ export function epaSubtabFromParam(raw) {
  * The state went with it, to App.jsx, alongside the runs and admin sub-tabs
  * that were already lifted for the same reason: the URL is owned up there.
  */
-export default function EpaSection({ subtab = DEFAULT_EPA_SUBTAB, onExplorerState = null, correctionTarget = undefined, setChartConfig = null }) {
+export default function EpaSection({ subtab = DEFAULT_EPA_SUBTAB, onExplorerState = null, correctionTarget = undefined, setChartConfig = null, onPlotColumn = null }) {
     return (
         <div className="flex flex-col gap-4">
-            {subtab === 'browse'     && <EpaGuideView subtab={subtab} />}
+            {subtab === 'browse'     && <EpaGuideView subtab={subtab} onPlotColumn={onPlotColumn} />}
             {subtab === 'labelstats' && <EpaStatsView subtab={subtab} dataset="guide" />}
             {subtab === 'certstats'  && <EpaStatsView subtab={subtab} dataset="cert" />}
             {subtab === 'curves'     && <EpaCurveExplorer onStateChange={onExplorerState} correctionTarget={correctionTarget} setChartConfig={setChartConfig} />}

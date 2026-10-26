@@ -250,6 +250,14 @@ export function decorateRow(row, brandIndex) {
  * decimals, and showing 154.2 where the source says 154.214 quietly discards
  * the precision that makes the derivation check meaningful.
  */
+/*
+ * `plotAs` names the vehicle table column a guide column is the same figure as
+ * (#450), which is what its header chart icon opens in the spec chart. The
+ * guide's rows are EPA configurations and the spec chart plots vehicles, so
+ * only a column with a vehicle-table twin carries one; the rest have no icon
+ * rather than one that plots something else. Battery pack is not mapped: the
+ * guide's is the GROSS pack and the table's Battery is the resolved window.
+ */
 export const GUIDE_COLUMNS = [
     // Identity. Configuration leads and is sticky in the table — it is the only
     // column that says which car a row is, so it has to survive a sideways
@@ -261,16 +269,16 @@ export const GUIDE_COLUMNS = [
       hint: 'Corporate parent: Chevrolet, Cadillac and GMC all read General Motors. Blank until a curator sets it.' },
     { key: 'division',         label: 'EPA division', group: 'Identity',
       hint: 'The division exactly as EPA filed it, before brand resolution.' },
-    { key: 'model_year',       label: 'Year',        group: 'Identity',   numeric: true,  digits: 0, default: true, holds: 'short-values', unitless: true },
+    { key: 'model_year',       label: 'Year',        group: 'Identity',   numeric: true,  digits: 0, default: true, holds: 'short-values', unitless: true, plotAs: 'year' },
     { key: 'model_type_index', label: 'Model type',  group: 'Identity',   holds: 'short-values',
       hint: 'EPA’s own index for a model type. Part of the natural key — carline alone is not unique.' },
     { key: 'smog_test_group',  label: 'Test Group',  group: 'Identity',
       hint: 'EPA’s smog Test Group. Configurations certified together share one; it is not unique per configuration.' },
 
     // Label figures — the window sticker. Range first: it is what people come for.
-    { key: 'label_comb_range_mi', label: 'Range',      unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true },
-    { key: 'label_hwy_range_mi',  label: 'Hwy range',  unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true },
-    { key: 'label_city_range_mi', label: 'City range', unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true },
+    { key: 'label_comb_range_mi', label: 'Range',      unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true, plotAs: 'figures.epaRangeMi' },
+    { key: 'label_hwy_range_mi',  label: 'Hwy range',  unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true, plotAs: 'figures.epaHwyMi' },
+    { key: 'label_city_range_mi', label: 'City range', unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true, plotAs: 'figures.epaCityMi' },
     { key: 'label_comb_mpge',     label: 'Combined',   unit: 'MPGe', group: 'Label', numeric: true, digits: 0, default: true },
     { key: 'label_city_mpge',     label: 'City',       unit: 'MPGe', group: 'Label', numeric: true, digits: 0 },
     { key: 'label_hwy_mpge',      label: 'Hwy',        unit: 'MPGe', group: 'Label', numeric: true, digits: 0 },

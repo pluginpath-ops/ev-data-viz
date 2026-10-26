@@ -295,45 +295,46 @@ export const CHART_HELP_DEFAULTS = {
     specs: {
         title: 'About the Spec Chart',
         data_source:
-            'A simple side-by-side bar comparison of one spec across the selected ' +
-            'vehicles. Values come from each vehicle’s structured spec sheet (the `specs` ' +
-            'data on the vehicle record, including any custom fields) — not from test ' +
-            'data. Pick any field from the dropdown.',
+            'One field of the vehicle table plotted across the selected vehicles. It reads ' +
+            'the table’s own figures — specs, resolved battery and EPA range, tested results ' +
+            'and the calculated fields — so a bar is the number its table cell shows, under ' +
+            'the same correction and assumptions. Pick any field in the sidebar, or click the ' +
+            'chart icon on a field header in the table.',
         how_to_read:
-            'One bar per vehicle for the chosen spec, so you can rank them at a glance. ' +
-            'Numeric specs (battery, power, price…) are drawn to scale with the value ' +
-            'shown inside the bar; yes/no specs show a green “Yes” or red “No”; text specs ' +
-            '(e.g. drivetrain) just show the label. A grey stub means the value is missing ' +
-            'for that vehicle.',
+            'One bar per vehicle for the chosen field, so you can rank them at a glance. ' +
+            'Numeric fields are drawn to scale with the value shown inside the bar; yes/no and ' +
+            'text fields give every vehicle an equal-height bar with its value printed ' +
+            'inside. A vehicle with no value for the field is not drawn, and a note under the ' +
+            'chart says how many were left out.',
         key_terms:
-            'Spec — a structured attribute on the vehicle (battery kWh, horsepower, seats, …).\n' +
-            'Numeric / boolean / text — the three value types, drawn differently.\n' +
+            'Field — one of the figures the vehicle table offers, in the same groups as its field picker.\n' +
+            'Assumptions — the inputs behind calculated fields (charge window, stop distance, prices); ' +
+            'the same ones the table uses, in the sidebar when a plotted field needs them.\n' +
             'Units follow your imperial/metric toggle.',
         math_approach:
-            'No calculation — it reads the stored spec value and converts units for ' +
-            'display only (e.g. kW↔hp, mi↔km). Bars show the raw values; missing values ' +
-            'are drawn as a small grey stub.',
+            'No calculation of its own — it plots what the table computes, converting units ' +
+            'for display only (e.g. kW↔hp, mi↔km). Bars show the raw values from zero.',
     },
 
     specscatter: {
         title: 'About the Spec Scatter chart',
         data_source:
-            'Plots two numeric specs against each other — one dot per selected vehicle — ' +
-            'to reveal relationships (e.g. battery size vs range, power vs price). Both ' +
-            'axes come from the vehicles’ structured spec sheets (`specs`); only numeric ' +
-            'fields are offered.',
+            'Plots two numeric fields of the vehicle table against each other — one dot per ' +
+            'selected vehicle — to reveal relationships (e.g. battery size vs range, power vs ' +
+            'price). Both axes are the table’s own figures; only numeric fields are offered.',
         how_to_read:
-            'Each dot is a vehicle (X = one spec, Y = another); the dashed grey line is a ' +
+            'Each dot is a vehicle (X = one field, Y = another); the dashed grey line is a ' +
             'best-fit trend across all plotted vehicles. Use it to spot correlations and ' +
             'outliers — a car well above the line is doing better than its peers on the Y ' +
-            'spec for its X value. Vehicles missing either value aren’t plotted.',
+            'field for its X value. Vehicles missing either value aren’t plotted; a note ' +
+            'under the chart says how many.',
         key_terms:
             'Trend line — a least-squares straight-line fit through the dots.\n' +
             'Outlier — a vehicle far from the trend.\n' +
             'Correlation — how tightly the dots track the line.\n' +
-            'Axes are numeric specs only; units follow your imperial/metric toggle.',
+            'Axes are numeric fields only; units follow your imperial/metric toggle.',
         math_approach:
-            'Dots are the stored spec values (unit-converted for display). The trend line ' +
+            'Dots are the table’s values (unit-converted for display). The trend line ' +
             'is an ordinary least-squares regression (the slope and intercept that ' +
             'minimise squared vertical error), drawn from the lowest to the highest X. ' +
             'It’s descriptive only — it doesn’t imply causation, and a few vehicles can ' +

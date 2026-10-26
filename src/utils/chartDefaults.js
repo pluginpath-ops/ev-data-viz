@@ -13,6 +13,7 @@
 import { VEHICLE_PALETTE } from './colorUtils';
 import { NO_VEHICLE_BASES } from './vehicleBase';
 import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from './correctionSettings';
+import { DEFAULT_ASSUMPTIONS } from './vehicleTable';
 import { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION } from './chartUrlState';
 
 export function defaultChartConfig() {
@@ -46,13 +47,20 @@ export function defaultChartConfig() {
         // (utils/vehicleBase.js). Lives here so the pop-out window gets it with
         // the rest of the chart's state.
         vehicleBases: NO_VEHICLE_BASES,
-        specsField:     null,   // selected field key for Spec Chart mode
+        // The vehicle table's assumptions (utils/vehicleTable.js): the charge
+        // window, the stop distance, electricity prices. Here so the table and
+        // the spec chart, which plots its calculated columns, share one set.
+        assumptions:    { ...DEFAULT_ASSUMPTIONS },
+        // What the spec chart plots: the 'selection', or 'all' the vehicles the
+        // filters leave (#450).
+        specScope:      'selection',
+        specsField:     null,   // selected column key for the spec chart's bars (a table column, #450)
         // Range & Efficiency's chart type and efficiency unit. Held here, not in
         // the view, so a link — and the pop-out — draw the chart the sender saw.
         rangeChartType: DEFAULT_RANGE_CHART_TYPE,
         effUnit:        DEFAULT_EFFICIENCY_UNIT,
-        scatterXField:  null,   // selected X field key for Spec Scatter mode
-        scatterYField:  null,   // selected Y field key for Spec Scatter mode
+        scatterXField:  null,   // selected X column key for the spec chart's scatter
+        scatterYField:  null,   // selected Y column key for the spec chart's scatter
         // The reader's correction (utils/correctionSettings.js): what every
         // chart corrects range for, and the conditions every corrected figure
         // — the vehicle table's composite range included — is corrected to.
