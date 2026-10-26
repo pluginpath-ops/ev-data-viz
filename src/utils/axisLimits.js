@@ -78,8 +78,8 @@ export const AXIS_LIMIT_CHARTS = {
 export const NO_AXIS_LIMITS = {
     compare:      'Charge Stop draws bars whose axis is the value itself; it has no Axis Scale controls',
     perfcompare:  'Performance Compare draws bars; it has no Axis Scale controls',
-    specs:        'The Spec chart is a bar chart of one field; it has no Axis Scale controls',
-    specscatter:  'The Spec scatter fits its axes to the two fields chosen; it has no Axis Scale controls',
+    specs:        'The Spec chart is a bar chart of one table column; it has no Axis Scale controls',
+    specscatter:  'The Spec scatter fits its axes to the two columns chosen; it has no Axis Scale controls',
     specstable:   'The vehicle table is not a plot',
 };
 

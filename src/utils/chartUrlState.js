@@ -38,7 +38,7 @@ import {
     AXIS_LIMITS_PARAM, axisLimitsOf, axisLimitsOfLink, encodeAxisLimits, hasAxisLimits, withAxisLimits,
 } from './axisLimits';
 import { encodeVehicleFilters } from './vehicleFilters';
-import { VEHICLE_TABLE_PARAM_PREFIX } from './vehicleTable';
+import { VEHICLE_TABLE_PARAM_PREFIX, encodeAssumptionParams } from './vehicleTable';
 
 /** The Range & Efficiency chart types, in the order the view lists them. */
 export const RANGE_CHART_TYPES = [
@@ -100,6 +100,7 @@ export function parseChartUrl(search) {
         scatterXField: p.get('scx') || null,
         scatterYField: p.get('scy') || null,
         specsField:    p.get('sf')  || null,
+        specScope:     p.get('ss') === 'all' ? 'all' : null,
         // An unknown value is dropped, not applied: the view would otherwise
         // be handed a chart type it has no entry for.
         rangeChartType: RANGE_CHART_TYPES.includes(rangeChartType) ? rangeChartType : null,
@@ -201,6 +202,8 @@ export function chartConfigFromParsed(chart, base) {
         ...(s.scatterXField && { scatterXField: s.scatterXField }),
         ...(s.scatterYField && { scatterYField: s.scatterYField }),
         ...(s.specsField    && { specsField: s.specsField }),
+        // A link names its scope either way: absent means the selection.
+        ...((s.chartMode === 'specs' || s.chartMode === 'specscatter') && { specScope: s.specScope ?? 'selection' }),
         ...(s.rangeChartType && { rangeChartType: s.rangeChartType }),
         ...(s.effUnit       && { effUnit: s.effUnit }),
         correctionMode:   s.correction.mode,
@@ -332,7 +335,7 @@ export function buildChartParams({
         }
     }
 
-    // The spec chart's field, and the scatter's two
+    // The spec chart's column, and the scatter's two (table column keys)
     if (chartMode === 'specs' && chartConfig.specsField) p.set('sf', chartConfig.specsField);
     if (chartMode === 'specscatter') {
         if (chartConfig.scatterXField) p.set('scx', chartConfig.scatterXField);
@@ -347,6 +350,18 @@ export function buildChartParams({
         // the recipient's machine.
         if (epaConfig.selectedMappings?.length) p.set('epa_m', epaConfig.selectedMappings.join(','));
         if (epaConfig.overlay) p.set('epa_ov', epaConfig.overlay);
+    }
+
+    // The spec chart plots the table's calculated columns, so a link to it
+    // carries the assumptions behind them (the table's own `vt_` ones, #450).
+    if (chartMode === 'specs' || chartMode === 'specscatter') {
+        for (const [key, value] of encodeAssumptionParams(chartConfig.assumptions)) p.set(key, value);
+        // Plotting every vehicle the filters leave, rather than the selection:
+        // the link carries the filters that decide which (#450).
+        if (chartConfig.specScope === 'all') {
+            p.set('ss', 'all');
+            for (const [key, value] of encodeVehicleFilters(vehicleFilters)) p.set(key, value);
+        }
     }
 
     // The vehicle table writes its own columns, sort and filters (vt_*);

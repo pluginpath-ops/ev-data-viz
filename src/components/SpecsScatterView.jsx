@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import Chart from 'chart.js/auto';
-import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
-import { convValue, formatSpecValue } from '../utils/unitConversions';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
-import {
-    makeVehicleFields, buildFieldGroups, getFieldDef, extractValue, withEffectiveSpecs,
-    vehicleColor, formatNumericLabel,
-} from '../utils/specHelpers';
 import { fieldFigureSource, epaCreditsForFields } from '../utils/vehicleFigures';
+import { placeLabels } from '../utils/labelPlacement';
+import { axisTitle, betterNote, missingNote } from '../utils/specChart';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -39,137 +35,98 @@ const pointLabelPlugin = {
     afterDatasetsDraw(chart) {
         const ctx = chart.ctx;
         const fonts = chartFonts();
+        ctx.save();
+        ctx.font = `${fonts.badge}px ${fonts.sans}`;
+        ctx.fillStyle = '#6b7280';
+        ctx.textBaseline = 'middle';
+        const area = chart.chartArea;
+        const maxW = (area.right - area.left) * 0.4;
+        const h = fonts.badge + 2;
         // Last dataset is the trend line — skip it
-        const vehicleDatasets = chart.data.datasets.length - 1;
-        for (let di = 0; di < vehicleDatasets; di++) {
-            const pts = chart.getDatasetMeta(di).data;
-            if (!pts.length) continue;
-            const pt = pts[0];
-            ctx.save();
-            ctx.font = `${fonts.badge}px ${fonts.sans}`;
-            ctx.fillStyle = '#6b7280';
-            ctx.textBaseline = 'middle';
-            const x = pt.x + 10;
-            const y = pt.y;
-            const maxW = chart.chartArea.right - x - 4;
-            if (maxW > 20) {
-                let text = chart.data.datasets[di].label;
-                while (text.length > 1 && ctx.measureText(text).width > maxW) {
-                    text = text.slice(0, -1);
-                }
-                if (text !== chart.data.datasets[di].label) text += '…';
-                ctx.fillText(text, x, y);
-            }
-            ctx.restore();
+        const labeled = [];
+        for (let di = 0; di < chart.data.datasets.length - 1; di++) {
+            const pt = chart.getDatasetMeta(di).data[0];
+            if (!pt) continue;
+            let text = chart.data.datasets[di].label;
+            while (text.length > 1 && ctx.measureText(text).width > maxW) text = text.slice(0, -1);
+            if (text !== chart.data.datasets[di].label) text += '…';
+            labeled.push({ text, x: pt.x, y: pt.y, w: ctx.measureText(text).width, h });
         }
+        // Each label beside its dot where there is room; a crowded one is left
+        // off (the tooltip still names it) rather than printed over its neighbors.
+        const spots = placeLabels(labeled, area);
+        labeled.forEach((item, i) => {
+            if (spots[i]) ctx.fillText(item.text, spots[i].x, spots[i].y + item.h / 2);
+        });
+        ctx.restore();
     },
 };
 
 // ── SpecsScatterView ──────────────────────────────────────────────────────────
 
-export default function SpecsScatterView({ vehicles: picked, xField: xProp, yField: yProp, onFieldChange, presentationMode = false }) {
-    const { units, vehicles: allVehicles } = useAppContext();
-    const vehicles = useMemo(() => withEffectiveSpecs(picked, allVehicles), [picked, allVehicles]);
+/**
+ * Two numeric columns of the vehicle table against each other, one point per
+ * selected vehicle (#450). The container (SpecChart) works the figures out from
+ * the table's rows; a vehicle missing either one is not drawn and is counted.
+ *
+ * Props:
+ *   xPlot, yPlot  {object}  plotValues() of each column
+ *   xCol, yCol    {object}  the table columns, labelled
+ *   colorOf       {(vehicleId) => string}
+ *   units         {string}
+ */
+export default function SpecsScatterView({ xPlot, yPlot, xCol, yCol, colorOf, units, scope = 'selection', presentationMode = false }) {
     const { isDark } = useTheme();
+    const [copiedUrl, setCopiedUrl] = useState(false);
 
-    const vehicleFields = useMemo(() => makeVehicleFields(units), [units]);
-    const fieldGroups   = useMemo(() => buildFieldGroups(vehicles, vehicleFields), [vehicles, vehicleFields]);
-
-    // Numeric-only field groups (scatter only makes sense for numeric data)
-    const numericGroups = useMemo(() =>
-        fieldGroups
-            .map(g => ({ ...g, fields: g.fields.filter(f => f.type === 'number' || f.type === 'integer') }))
-            .filter(g => g.fields.length > 0),
-        [fieldGroups],
-    );
-    const allNumericFields = useMemo(() => numericGroups.flatMap(g => g.fields), [numericGroups]);
-
-    const [localX, setLocalX] = useState('');
-    const [localY, setLocalY] = useState('');
-    const [copiedUrl,   setCopiedUrl]   = useState(false);
-
-    const xField = xProp || localX;
-    const yField = yProp || localY;
-
-    const setFields = (x, y) => {
-        setLocalX(x);
-        setLocalY(y);
-        onFieldChange?.(x, y);
-    };
-
-    // Auto-select first two numeric fields that have data
-    useEffect(() => {
-        if (xField && yField) return;
-        const withData = allNumericFields.filter(f =>
-            vehicles.some(v => {
-                const val = extractValue(v, f.key);
-                return val !== null && val !== undefined && val !== '';
-            }),
-        );
-        const newX = xField || withData[0]?.key || '';
-        const newY = yField || withData[1]?.key || withData[0]?.key || '';
-        if (newX !== xField || newY !== yField) setFields(newX, newY);
-    }, [allNumericFields, vehicles]); // eslint-disable-line react-hooks/exhaustive-deps
+    // A point needs both axes: the vehicles that have an X and a Y.
+    const pairs = useMemo(() => {
+        const yById = new Map(yPlot.points.map(p => [p.row.id, p]));
+        return xPlot.points
+            .filter(p => yById.has(p.row.id))
+            .map(x => ({ x, y: yById.get(x.row.id) }));
+    }, [xPlot, yPlot]);
+    const total = xPlot.total;
+    const plottedVehicles = useMemo(() => pairs.map(p => p.x.row.vehicle), [pairs]);
 
     const canvasRef = useRef(null);
     const chartRef  = useRef(null);
 
+    const xLabel = axisTitle(xCol, units);
+    const yLabel = axisTitle(yCol, units);
+
     useEffect(() => {
-        if (!xField || !yField || !canvasRef.current || !vehicles.length) return;
+        if (!canvasRef.current || !pairs.length) return;
 
         // From the stylesheet, not retyped here — see utils/chartTheme.
         const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
         const fonts = applyChartDefaults(Chart);
 
-        const xDef = allNumericFields.find(f => f.key === xField) || getFieldDef(xField, vehicleFields);
-        const yDef = allNumericFields.find(f => f.key === yField) || getFieldDef(yField, vehicleFields);
-
-        const xLabel = allNumericFields.find(f => f.key === xField)?.label || xField;
-        const yLabel = allNumericFields.find(f => f.key === yField)?.label || yField;
-
-        // Convert raw values to display values
-        const toNum = (raw, def) => {
-            if (raw === null || raw === undefined || raw === '') return null;
-            const n = parseFloat(String(raw));
-            if (isNaN(n)) return null;
-            return def.unitGroup ? convValue(n, def.unitGroup, units) : n;
-        };
-
-        const formatVal = (raw, def) => {
-            if (raw === null || raw === undefined || raw === '') return '—';
-            if (def.unitGroup) return formatSpecValue(raw, def.unitGroup, units);
-            return formatNumericLabel(parseFloat(String(raw)));
-        };
-
         // Build per-vehicle datasets (one point each)
-        const vehicleNames = buildVehicleLabels(vehicles);
-        const vehicleDatasets = vehicles.map((v, i) => {
-            const rawX = extractValue(v, xField);
-            const rawY = extractValue(v, yField);
-            const numX = toNum(rawX, xDef);
-            const numY = toNum(rawY, yDef);
-            const color = vehicleColor(v, i);
+        const vehicleNames = buildVehicleLabels(plottedVehicles);
+        const basis = (source) => (source ? ` (${source.basis})` : '');
+        const vehicleDatasets = pairs.map(({ x, y }) => {
+            const v = x.row.vehicle;
+            const color = colorOf(v.id);
             return {
-                label:           vehicleNames.get(v.id)?.short ?? v.name,
-                data:            numX != null && numY != null ? [{ x: numX, y: numY }] : [],
+                label:           vehicleNames.get(v.id)?.short ?? x.row.values.name,
+                data:            [{ x: x.value, y: y.value }],
                 backgroundColor: color,
                 borderColor:     color,
                 pointRadius:     8,
                 pointHoverRadius: 11,
-                _rawX: rawX,
-                _rawY: rawY,
+                _textX: x.text,
+                _textY: y.text,
                 // Resolved figures name their source (#323, #324); null otherwise.
-                _sourceX: fieldFigureSource(v, xField, units),
-                _sourceY: fieldFigureSource(v, yField, units),
+                _sourceX: fieldFigureSource(v, xCol.key, units),
+                _sourceY: fieldFigureSource(v, yCol.key, units),
                 _manufacturer: v.manufacturer?.name ?? null,
                 _year: v.year ?? null,
             };
         });
 
         // Compute trend line across all vehicles that have both values
-        const scatterPts = vehicleDatasets
-            .filter(ds => ds.data.length > 0)
-            .map(ds => ds.data[0]);
+        const scatterPts = vehicleDatasets.map(ds => ds.data[0]);
 
         const reg = linearRegression(scatterPts);
         let trendData = [];
@@ -222,10 +179,9 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
                             },
                             label: ctx => {
                                 const ds = ctx.dataset;
-                                const basis = (source) => (source ? ` (${source.basis})` : '');
                                 return [
-                                    `${xLabel}: ${formatVal(ds._rawX, xDef)}${basis(ds._sourceX)}`,
-                                    `${yLabel}: ${formatVal(ds._rawY, yDef)}${basis(ds._sourceY)}`,
+                                    `${xCol.label}: ${ds._textX}${basis(ds._sourceX)}`,
+                                    `${yCol.label}: ${ds._textY}${basis(ds._sourceY)}`,
                                 ];
                             },
                         },
@@ -243,67 +199,34 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [xField, yField, vehicles, allNumericFields, vehicleFields, units, isDark]);
+    }, [pairs, plottedVehicles, xCol, yCol, xLabel, yLabel, colorOf, units, isDark]);
 
     // ── The frame's caption, and its export ─────────────────────────────────
     // Both axes lived in <select>s above the canvas and the export flattened
     // the canvas alone, so a pasted scatter was a cloud of dots with tick
     // numbers and no statement of what was plotted against what.
-    const plotTitle = useMemo(() => {
-        const x = allNumericFields.find(f => f.key === xField)?.label || xField;
-        const y = allNumericFields.find(f => f.key === yField)?.label || yField;
-        return x && y ? `${y} vs ${x}` : 'Compare specs';
-    }, [allNumericFields, xField, yField]);
+    const plotTitle = `${yCol.label} vs ${xCol.label}`;
 
-    // Units only: the vehicle count is visible on the chart (#443).
-    const plotSubtitle = units === 'metric' ? 'metric' : 'imperial';
+    // Units only: the vehicle count is visible on the chart (#443). Which way
+    // is better, for each axis that has a best.
+    const plotSubtitle = [
+        units === 'metric' ? 'metric' : 'imperial',
+        ...[['X', xCol], ['Y', yCol]].map(([axis, c]) => betterNote(c) && `${axis}: ${betterNote(c)}`),
+    ].filter(Boolean).join(' · ');
 
-    // Spec values are the manufacturer's; EPA is credited when a plotted field
-    // is an EPA-resolved figure.
-    const sourceEpa = useMemo(() => epaCreditsForFields(vehicles, [xField, yField]), [vehicles, xField, yField]);
+    // Spec values are the manufacturer's; EPA is credited when a plotted
+    // column is an EPA-resolved figure.
+    const sourceEpa = useMemo(() => epaCreditsForFields(plottedVehicles, [xCol.key, yCol.key]), [plottedVehicles, xCol.key, yCol.key]);
     const sourceLine = useSourceLine({ epa: sourceEpa });
 
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
-            signature: vehicles.map(v => v.id).join(',') });
+            signature: pairs.map(p => p.x.row.id).join(',') });
+
+    const dropped = missingNote(total - pairs.length, total, scope);
 
     return (
         <>
-        <div className="specs-chart-card mb-4">
-            <div className="specs-chart-controls">
-                <label className="text-sm font-medium text-secondary">X-Axis:</label>
-                <select
-                    className="form-input specs-chart-field-select"
-                    value={xField}
-                    onChange={e => setFields(e.target.value, yField)}
-                >
-                    {numericGroups.map(group => (
-                        <optgroup key={group.groupLabel} label={group.groupLabel}>
-                            {group.fields.map(f => (
-                                <option key={f.key} value={f.key}>{f.label}</option>
-                            ))}
-                        </optgroup>
-                    ))}
-                </select>
-
-                <label className="text-sm font-medium text-secondary ml-3">Y-Axis:</label>
-                <select
-                    className="form-input specs-chart-field-select"
-                    value={yField}
-                    onChange={e => setFields(xField, e.target.value)}
-                >
-                    {numericGroups.map(group => (
-                        <optgroup key={group.groupLabel} label={group.groupLabel}>
-                            {group.fields.map(f => (
-                                <option key={f.key} value={f.key}>{f.label}</option>
-                            ))}
-                        </optgroup>
-                    ))}
-                </select>
-            </div>
-
-        </div>
-
         <PlotFrame
             title={plotTitle}
             subtitle={plotSubtitle}
@@ -335,10 +258,11 @@ export default function SpecsScatterView({ vehicles: picked, xField: xProp, yFie
                 </>
             )}
         >
-            <div style={{ height: '640px', position: 'relative' }}>
+            <div className="spec-chart-canvas is-scatter">
                 <canvas ref={canvasRef} />
             </div>
         </PlotFrame>
+        {dropped && <p className="text-note spec-chart-dropped">{dropped}</p>}
         {!presentationMode && <ChartInfoBubble chartKey="specscatter" />}
         </>
     );

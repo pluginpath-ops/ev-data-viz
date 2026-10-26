@@ -232,6 +232,10 @@ export function epaCredits(vehicles = [], { capacity = false, range = false } = 
 const FIELD_FIGURE = {
     'vehicle.socWindowKwh': 'capacity',
     'vehicle.epaRangeMi':   'range',
+    // The same two figures under the vehicle table's column keys, which the
+    // spec chart plots since #450.
+    'figures.socWindowKwh': 'capacity',
+    'figures.epaRangeMi':   'range',
 };
 
 /** epaCredits for the spec fields a chart plots (those that ARE a resolved figure). */

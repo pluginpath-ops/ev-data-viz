@@ -75,6 +75,16 @@ export function nameLines(label) {
     return [`${label.slice(0, at)},`, label.slice(at + 2).replace(/ /g, '\u00a0')];
 }
 
+/**
+ * Whether a column answers a text filter: by name, full name, unit or group, so
+ * "cargo" finds every cargo column whether or not it is shown. Shared by the
+ * column picker and the spec chart's field picker (#450).
+ */
+export function columnMatches(col, needle, unitOf = (c) => c.unit) {
+    const n = String(needle ?? '').trim().toLowerCase();
+    return !n || [col.label, col.fullLabel, unitOf(col), col.group].some(t => t && String(t).toLowerCase().includes(n));
+}
+
 /** The unit a cell states: its column's, and only where the cell holds a value. */
 export const cellUnit = (unit, value) => (isBlank(value) ? null : unit ?? null);
 

@@ -21,12 +21,13 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { useAsyncResource } from '../hooks/useAsyncResource';
+import { useVehicleRows } from '../hooks/useVehicleRows';
 import VehicleTableGrid from './vehicles/VehicleTableGrid';
 import FeatureChartButton from './home/FeatureChartButton';
 import ColumnPicker from './tables/ColumnPicker';
 import PresetPicker from './tables/PresetPicker';
-import { sessionFor } from '../utils/testSessions';
+import { PLOT_NEEDS_SELECTION } from './tables/SortHeader';
+import { readMemory, writeMemory } from '../utils/vehicleTableStorage';
 import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import VehicleTableAssumptions from './VehicleTableAssumptions';
 import useColumnDrag from '../hooks/useColumnDrag';
@@ -39,33 +40,15 @@ import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { decodeVehicleFilters } from '../utils/vehicleFilters';
 import ViewSpecsModal from './ViewSpecsModal';
 import VehicleCardPopover from './vehicles/VehicleCardPopover';
-import { groupPerformanceByVehicle } from '../utils/dataChecks';
 import { reorderSelectionBySort } from '../utils/sortSelection';
 import {
     VEHICLE_COLUMNS, DEFAULT_VEHICLE_COLUMNS, VEHICLE_TABLE_PARAM_PREFIX,
-    vehicleColumnByKey, unitFor, needsPerformance, buildVehicleRows, formatVehicleCell,
+    vehicleColumnByKey, unitFor, needsPerformance, formatVehicleCell,
     sortVehicleRows, firstSortDir,
     vehicleBarMaxima, encodeVehicleTableParams, decodeVehicleTableParams,
     vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
     labelledColumn, needsAssumptions, assumptionsFor,
 } from '../utils/vehicleTable';
-
-/*
- * Columns and sort are kept across visits; the reasoning is at
- * vehicleTableStartSearch. Storage can be missing or refuse a write (a private
- * window, blocked site data), and the table must still work, so every touch is
- * guarded and a failure just means no memory. Filters are not the table's to
- * remember since #338: they are Vehicles & Specs', held by App.
- */
-const VIEW_KEY = 'evbench.vehicleTable.view';
-
-function readMemory() {
-    try { return { view: window.localStorage.getItem(VIEW_KEY) ?? '' }; } catch { return { view: '' }; }
-}
-
-function writeMemory({ view }) {
-    try { if (view) window.localStorage.setItem(VIEW_KEY, view); else window.localStorage.removeItem(VIEW_KEY); } catch { /* no memory, no harm */ }
-}
 
 /**
  * Props:
@@ -80,10 +63,12 @@ export default function VehicleTable({
     // The reader's correction mode, set on the charts' Correct control. Read
     // only here: 'none' shows the reported test's figures as measured.
     correctionMode = DEFAULT_READER_MODE,
+    assumptions: sharedAssumptions = null, onAssumptionsChange = null,
+    // Open a column plotted in the spec chart; absent in the pop-out window.
+    onPlotColumn = null,
 }) {
     const {
-        vehicles, selectedVehicles, toggleVehicleSelection, setVehicleSelection, units, platformsById,
-        getPerformanceSummaries, getPerformanceSessions, performanceCounts, testSessions,
+        vehicles, selectedVehicles, toggleVehicleSelection, setVehicleSelection, units, performanceCounts,
     } = useAppContext();
 
     const [initial] = useState(() => decodeVehicleTableParams(
@@ -97,7 +82,12 @@ export default function VehicleTable({
     const [localFilters, setLocalFilters] = useState(() => decodeVehicleFilters(window.location.search));
     const filters = sharedFilters ?? localFilters;
     const setFilters = onFiltersChange ?? setLocalFilters;
-    const [assumptions, setAssumptions] = useState(initial.assumptions);
+    // The assumptions are App's (chartConfig) so the spec chart's sidebar edits
+    // the same ones and the chart agrees with the cell the reader came from
+    // (#450). The pop-out window keeps its own.
+    const [localAssumptions, setLocalAssumptions] = useState(initial.assumptions);
+    const assumptions = sharedAssumptions ?? localAssumptions;
+    const setAssumptions = onAssumptionsChange ?? setLocalAssumptions;
     // The site-wide correction target (correctionSettings.js), App's. The
     // pop-out window shows the one it was handed and keeps any change local.
     const [localTarget, setLocalTarget] = useState(sharedTarget ?? DEFAULT_CORRECTION_TARGET);
@@ -126,29 +116,10 @@ export default function VehicleTable({
     }, [columns, sortKey, sortDir, modifiedFrom, assumptions]);
 
     // Tested results are fetched only while a tested column is shown or sorted
-    // by: sessions carry every run and split, which is the heaviest read here.
-    const wantsPerformance = needsPerformance([...columns, sortKey]);
-    const idsKey = vehicles.map(v => v.id).join(',');
-    const loadPerformance = useCallback(async () => {
-        if (!wantsPerformance || !idsKey) return null;
-        const ids = vehicles.map(v => v.id);
-        const [summaries, sessions] = await Promise.all([getPerformanceSummaries(ids), getPerformanceSessions(ids)]);
-        return groupPerformanceByVehicle(summaries ?? [], sessions ?? []);
-        // Keyed on the ids, not the fleet array: every save hands back a new
-        // array, and refetching every run after each edit elsewhere is waste.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [wantsPerformance, idsKey]);
-    const { data: performance, loading: performanceLoading } = useAsyncResource(loadPerformance, [loadPerformance]);
-
-    // A range test's session supplies the conditions it omits, which the
-    // composite range corrects for.
-    const rows     = useMemo(
-        () => buildVehicleRows(vehicles, {
-            performance, assumptions, units, platformsById, correctionTarget, correctionMode,
-            sessionOf: r => sessionFor(testSessions, r),
-        }),
-        [vehicles, performance, assumptions, units, platformsById, testSessions, correctionTarget, correctionMode],
-    );
+    // by (useVehicleRows).
+    const { rows, performance, wantsPerformance, performanceLoading } = useVehicleRows({
+        keys: [...columns, sortKey], assumptions, correctionTarget, correctionMode,
+    });
     // A tested cell peeks with its test — which one, why, and its conditions —
     // rather than restating its own text. One peek for every clipped cell in
     // the table, rather than one per cell.
@@ -244,12 +215,14 @@ export default function VehicleTable({
                     onChange={changeColumns}
                 />
                 {wantsPerformance && performanceLoading && <span className="text-meta">loading tested results…</span>}
+                {onPlotColumn && selectedVehicles.length === 0 && <span className="text-meta">{PLOT_NEEDS_SELECTION}</span>}
             </VehicleFilterBar>
 
             <VehicleTableGrid
                 cols={cols}
                 sort={{ key: sortKey, dir: sortDir, onSort: sortBy }}
                 drag={{ dragProps, dragClass }}
+                plot={onPlotColumn ? { enabled: selectedVehicles.length > 0, onPlot: onPlotColumn } : null}
                 selectedRows={selectedRows}
                 bodyRows={bodyRows}
                 rowProps={rowProps}

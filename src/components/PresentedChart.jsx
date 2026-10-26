@@ -2,8 +2,7 @@ import ChargingView from './ChargingView';
 import { VEHICLE_PALETTE } from '../utils/colorUtils';
 import ChargeCompareView from './ChargeCompareView';
 import RoadTripView from './RoadTripView';
-import SpecsChartView from './SpecsChartView';
-import SpecsScatterView from './SpecsScatterView';
+import SpecChart from './SpecChart';
 import { DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import EpaCurvesView from './EpaCurvesView';
 import PerformanceCompareView from './PerformanceCompareView';
@@ -40,10 +39,14 @@ export default function PresentedChart({
 }) {
     return (
         <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
-        {selectedVehicles.length > 0 && chartMode === 'specs' && (
-            <SpecsChartView
-                vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
-                selectedField={chartConfig.specsField}
+        {selectedVehicles.length > 0 && (chartMode === 'specs' || chartMode === 'specscatter') && (
+            <SpecChart
+                mode={chartMode}
+                vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
+                chartConfig={chartConfig}
+                setChartConfig={setChartConfig ?? (() => {})}
+                correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
+                correctionTarget={chartConfig?.correctionTarget}
                 presentationMode
             />
         )}
@@ -60,15 +63,6 @@ export default function PresentedChart({
             <PerformanceCurveView
                 vehicles={vehicles}
                 selectedVehicleIds={selectedVehicles}
-                presentationMode
-            />
-        )}
-
-        {selectedVehicles.length > 0 && chartMode === 'specscatter' && (
-            <SpecsScatterView
-                vehicles={vehicles.filter(v => selectedVehicles.includes(v.id))}
-                xField={chartConfig.scatterXField}
-                yField={chartConfig.scatterYField}
                 presentationMode
             />
         )}

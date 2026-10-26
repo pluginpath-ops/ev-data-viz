@@ -17,6 +17,8 @@ import PopoutView from './components/PopoutView';
 import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
 import { DEFAULT_READER_MODE } from './utils/correctionSettings';
+import { decodeVehicleTableParams, vehicleTableStartSearch } from './utils/vehicleTable';
+import { readMemory } from './utils/vehicleTableStorage';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './utils/chartDefaults';
 import { chartStateOf, resetStateOf, chartParamsFromSearch, defaultChartTitle, explicitChartParams } from './utils/featuredComparisons';
 import { useFeaturedComparisons } from './hooks/useFeaturedComparisons';
@@ -26,8 +28,7 @@ import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext
 import HomeView from './components/home/HomeView';
 import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
 import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink } from './utils/chartUrlState';
-import SpecsChartView from './components/SpecsChartView';
-import SpecsScatterView from './components/SpecsScatterView';
+import SpecChart from './components/SpecChart';
 import EpaCurvesView from './components/EpaCurvesView';
 import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
@@ -36,7 +37,6 @@ import Playground from './components/playground/Playground';
 import { explorerStateFromUrl } from './components/epa/curves/EpaCurveExplorer';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
 import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, entryModeFor, labelForMode, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
-import SpecChartKind from './components/SpecChartKind';
 import { NavigationContext } from './context/NavigationContext';
 import { platformHref } from './utils/platforms';
 import { decodeVehicleFilters, encodeVehicleFilters, EMPTY_VEHICLE_FILTERS } from './utils/vehicleFilters';
@@ -208,7 +208,13 @@ export default function App() {
     });
     const [epaConfig, setEpaConfig] = useState(defaultEpaConfig);
     const [roadTripConfig, setRoadTripConfig] = useState(defaultRoadTripConfig);
-    const [chartConfig, setChartConfig] = useState(defaultChartConfig);
+    // The vehicle table's assumptions live in chartConfig, not in the table, so
+    // the spec chart's sidebar and the table read and write the same ones (#450).
+    // Read once from the address, else from what the table remembered.
+    const [chartConfig, setChartConfig] = useState(() => ({
+        ...defaultChartConfig(),
+        assumptions: decodeVehicleTableParams(vehicleTableStartSearch(window.location.search, readMemory())).assumptions,
+    }));
     // The vehicles as the charts should draw them: a session base replaces the
     // vehicle's color on the copy, so every chart, sidebar accent and swatch
     // that reads `vehicle.color` follows without knowing a second layer exists.
@@ -376,6 +382,15 @@ export default function App() {
      * A header tab that is not a chart category. Returns to the chart mode last
      * shown under it, if there was one and it can still show; else its own view.
      */
+    /**
+     * A table column's chart icon: open that column plotted, as bars, in the
+     * spec chart (#450). The scatter is one switch away.
+     */
+    const plotColumn = (key) => {
+        setChartConfig(prev => ({ ...prev, specsField: key }));
+        handleChartModeChange('specs');
+    };
+
     const navigateToTab = (tab) => {
         const mode = lastModeUnderTab.current[tab];
         // The vehicle's page is a place under Vehicles & Specs too (#338).
@@ -1181,7 +1196,7 @@ export default function App() {
                       * With none, it says so and points at ＋ Add rather than
                       * being unreachable; the views below draw only once
                       * there is something to plot. */}
-                    {activeChartCategory && chartMode !== 'specstable' && selectedVehicles.length === 0 && (
+                    {activeChartCategory && chartMode !== 'specstable' && selectedVehicles.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && (
                         <SelectionEmptyState chart={labelForMode(chartMode)} />
                     )}
                     {/* ChargingView is the fall-through: it renders for any mode NOT
@@ -1240,22 +1255,18 @@ export default function App() {
                             setChartConfig={setChartConfig}
                         />
                     )}
-                    {activeChartCategory && selectedVehicles.length > 0 && (chartMode === 'specs' || chartMode === 'specscatter') && (
-                        <SpecChartKind mode={chartMode} onChange={handleChartModeChange} />
-                    )}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specs' && (
-                        <SpecsChartView
-                            vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
-                            selectedField={chartConfig.specsField}
-                            onFieldChange={field => setChartConfig(p => ({ ...p, specsField: field }))}
-                        />
-                    )}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specscatter' && (
-                        <SpecsScatterView
-                            vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
-                            xField={chartConfig.scatterXField}
-                            yField={chartConfig.scatterYField}
-                            onFieldChange={(x, y) => setChartConfig(p => ({ ...p, scatterXField: x, scatterYField: y }))}
+                    {activeChartCategory && (chartMode === 'specs' || chartMode === 'specscatter') && (
+                        <SpecChart
+                            mode={chartMode}
+                            onModeChange={handleChartModeChange}
+                            vehicles={selectedVehicles.map(id => chartVehicles.find(v => v.id === id)).filter(Boolean)}
+                            fleet={chartVehicles}
+                            filters={vehicleFilters}
+                            onFiltersChange={setVehicleFilters}
+                            chartConfig={chartConfig}
+                            setChartConfig={setChartConfig}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                            correctionTarget={chartConfig.correctionTarget}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'epacurves' && (
@@ -1291,9 +1302,12 @@ export default function App() {
                             correctionTarget={chartConfig.correctionTarget}
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
                             onCorrectionTargetChange={t => setChartConfig(prev => ({ ...prev, correctionTarget: t }))}
+                            assumptions={chartConfig.assumptions}
+                            onAssumptionsChange={a => setChartConfig(prev => ({ ...prev, assumptions: a }))}
+                            onPlotColumn={plotColumn}
                         />
                     )}
-                    {view === 'epa' && <EpaSection subtab={epaSubtab} onExplorerState={setEpaExplorer} correctionTarget={chartConfig.correctionTarget} setChartConfig={setChartConfig} />}
+                    {view === 'epa' && <EpaSection subtab={epaSubtab} onPlotColumn={plotColumn} onExplorerState={setEpaExplorer} correctionTarget={chartConfig.correctionTarget} setChartConfig={setChartConfig} />}
                     {view === 'reference' && (
                         <ReferenceSection
                             subtab={referenceSubtab}

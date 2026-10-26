@@ -193,7 +193,7 @@ function Cluster({ group, span, rowProps }) {
 export default function GuideTable({
     rows, visibleColumns, onColumnsChange, sortKey, sortDir, onSort,
     selectedIds, onToggleSelect, onOpenRow, vehicleLinks, barMaxima,
-    pinnedRows = [], onUnpinAll, onOpenCompare, clustered = false,
+    pinnedRows = [], onUnpinAll, onOpenCompare, clustered = false, plot = null,
 }) {
     // Mapped from the visible list rather than filtered out of GUIDE_COLUMNS:
     // the order the reader arranged is the order they get, and filtering would
@@ -214,7 +214,8 @@ export default function GuideTable({
                         <th className="guide-th guide-th-select sticky-select" />
                         {cols.map(col => (
                             <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={onSort}
-                                dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} reorderHint={col.sticky} />
+                                dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} reorderHint={col.sticky}
+                                plot={plot && col.plotAs ? { enabled: plot.enabled, onPlot: () => plot.onPlot(col.plotAs) } : null} />
                         ))}
                     </tr>
                 </thead>

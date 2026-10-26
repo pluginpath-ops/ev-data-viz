@@ -225,7 +225,7 @@ export const LEDGER = [
     },
     {
         key: 'hex-literal',
-        count: 44,
+        count: 40,  // 44 → 40: the spec chart's hard-coded yes/no greens and reds, and its grey, went when yes/no became vehicle-colored bars (#450)
         scope: 'src/**/*.jsx',
         what: 'Raw hex colors in component source. Mostly canvas drawing and the '
             + '`#3b82f6` default series color, repeated at eight call sites rather '
@@ -266,7 +266,7 @@ export const LEDGER = [
     },
     {
         key: 'apply-palette',
-        count: 17,
+        count: 16,  // 17 → 16: .specs-chart-field-select's @apply focus:ring-blue-500 went with the select it styled (#450)
         scope: 'src/index.css',
         what: 'Semantic classes whose @apply line reaches for a palette color. These '
             + 'are the sharpest kind of drift: the class NAME says the right thing, so '
