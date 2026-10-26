@@ -35,6 +35,7 @@ import { wrapCanvasText } from '../utils/wrapCanvasText';
 import { countParts } from '../utils/plotCaption';
 import { PRESENTED_HALF_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
+import { pointsKnownEmpty } from '../utils/runPoints';
 
 
 /**
@@ -489,7 +490,9 @@ export default function ChargeCompareView({
                 try {
                     if (dataService.useSupabase) {
                         const run = allRuns.find(r => String(r.id) === String(runId));
-                        if (run?._inherited) {
+                        if (pointsKnownEmpty(run)) {
+                            updates[runId] = [];
+                        } else if (run?._inherited) {
                             updates[runId] = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
                         } else {
                             updates[runId] = await dataService.getRunData(runId);

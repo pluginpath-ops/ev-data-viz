@@ -169,8 +169,10 @@ function shapeRun(r) {
     isExcluded: r.is_excluded === undefined ? !!r.is_hidden : !!r.is_excluded,
     // A curator's "I have looked; count it" (migration 080, runListing).
     qualityOverride: !!r.quality_override,
-    // data_points(count) returns [{ count: N }]; normalise to a plain number
-    dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
+    // data_points(count) returns [{ count: N }]; normalise to a plain number.
+    // null when the select carried no embed at all: "not counted" is not "none",
+    // and utils/runPoints.js skips a fetch only for a counted 0.
+    dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : null,
   };
 }
 
@@ -2034,7 +2036,13 @@ class DataService {
     // session is re-read: the merged rows alone are only part of it.
     result.chargeSummary = await this.refreshChargeSummary(runId);
 
-    return result; // { updated: N, inserted: M, populatedFields?: [...], chargeSummary }
+    // The run's point count after the merge, for the caller to put back in
+    // state: charts skip the points request for a test counted at 0 (#497).
+    const { count } = await getSupabase()
+      .from('data_points').select('id', { count: 'exact', head: true }).eq('run_id', runId);
+    if (count != null) result.rowCount = count;
+
+    return result; // { updated: N, inserted: M, rowCount?: N, populatedFields?: [...], chargeSummary }
   }
 
   /**

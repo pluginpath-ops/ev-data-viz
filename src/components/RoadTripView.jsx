@@ -48,6 +48,7 @@ import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyPngButton from './charts/CopyPngButton';
+import { pointsKnownEmpty } from '../utils/runPoints';
 
 Chart.register(ZoomPlugin);
 
@@ -1017,7 +1018,9 @@ export default function RoadTripView({
                 try {
                     if (dataService.useSupabase) {
                         const run = allRuns.find(r => String(r.id) === String(runId));
-                        if (run?._inherited) {
+                        if (pointsKnownEmpty(run)) {
+                            updates[runId] = [];
+                        } else if (run?._inherited) {
                             updates[runId] = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
                         } else {
                             updates[runId] = await dataService.getRunData(runId);

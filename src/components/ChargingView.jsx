@@ -56,6 +56,7 @@ import NumberInput from './NumberInput';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyPngButton from './charts/CopyPngButton';
+import { pointsKnownEmpty } from '../utils/runPoints';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
@@ -258,7 +259,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         // non-linear shape; prefer it. Most range tests are scalar (distance +
         // SoC bounds), so the linear miPerSoc model is the usual path.
         let lookup = null;
-        if (src.sourceRun?.id && !isEpaPartnerId(src.sourceRun.id)) {
+        // A range test known to have no points is the usual case (#497): the
+        // linear path below is what the lookup's null would have led to anyway.
+        if (src.sourceRun?.id && !isEpaPartnerId(src.sourceRun.id) && !pointsKnownEmpty(src.sourceRun)) {
             try {
                 lookup = await dataService.buildRangePerSocLookup(src.sourceRun.id);
             } catch (_) { /* fall through to linear */ }
@@ -290,7 +293,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     let runData;
                     if (dataService.useSupabase) {
                         const run = allRuns.find(r => String(r.id) === String(runId));
-                        if (run?._inherited) {
+                        if (pointsKnownEmpty(run)) {
+                            runData = [];
+                        } else if (run?._inherited) {
                             runData = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
                         } else {
                             runData = await dataService.getRunData(runId);

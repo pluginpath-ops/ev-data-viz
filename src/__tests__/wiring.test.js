@@ -3144,3 +3144,22 @@ describe('the spec chart plots the vehicle table’s columns (#450)', () => {
         expect(chart).toMatch(/currentFieldKey\(chartConfig\.specsField\)/);
     });
 });
+
+describe('point requests are skipped for a test counted at zero (#497)', () => {
+    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s asks pointsKnownEmpty before fetching', (name) => {
+        expect(read(`src/components/${name}.jsx`)).toMatch(/pointsKnownEmpty\(/);
+    });
+
+    it('Charging Curves skips the range-per-SoC lookup for a source with no points', () => {
+        expect(read('src/components/ChargingView.jsx')).toMatch(/!pointsKnownEmpty\(src\.sourceRun\)/);
+    });
+
+    it('a write that changes a run\'s points puts the new count back in state, on its copies too', () => {
+        const ctx = read('src/context/AppContext.jsx');
+        expect(ctx.match(/withPointCount\(/g)?.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('a run read without the count embed is "unknown" (null), not "none" (0)', () => {
+        expect(read('src/services/DataService.js')).toMatch(/\?\s*\(r\.data_points\[0\]\?\.count \?\? 0\) : null/);
+    });
+});
