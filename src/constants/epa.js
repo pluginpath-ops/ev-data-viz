@@ -153,7 +153,8 @@ export const EPA_DEFAULTS = {
     // What a DC fast session loses between the car's port and the pack's DC
     // output (what the inverter draws), as a fraction of the energy the
     // station bills (#506). The same span the AC figure above covers, so the
-    // two are comparable, but not the 0.145 above: that recharge runs the
+    // two are comparable, but not the AC loss above (0.145 assumed, about 0.115 at
+    // the median of the 2025 certifications): that recharge runs the
     // onboard charger for hours. A DC session bypasses it, and the station's
     // own conversion (about 3%) is not billed. What is left is the cable and
     // port, cooling and battery heating (including the preconditioning on the

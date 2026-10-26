@@ -1174,8 +1174,14 @@
       "id": "epa-charger-efficiency-is-ac",
       "claim": "The ratio of the certification's DC energy to its AC recharge energy is an AC (Level 2) charging efficiency, measured over a recharge that includes the manufacturer's onboard charger. It is not a DC fast-charging figure, which bypasses the onboard charger.",
       "value": {
-        "basis": "AC, wall to pack",
-        "evbench_assumed": 0.855
+        "basis": "AC, outlet to pack output",
+        "evbench_assumed": 0.855,
+        "median_efficiency": 0.885,
+        "quartiles": [0.872, 0.894],
+        "min": 0.805,
+        "max": 0.918,
+        "n": 174,
+        "model_year": 2025
       },
       "sources": [
         {
@@ -1189,10 +1195,16 @@
           "title": "EVBench: deriveChargerEfficiency (epaDerivations.js) divides total_dc_energy_kwh by ac_recharge_kwh; the 0.855 default is the Rivian R2 (85.5%) and Ford Lightning ER (85.6%) records",
           "url": null,
           "accessed": "2026-10-26"
+        },
+        {
+          "rank": "B",
+          "title": "EVBench Certification Statistics, \"Charger efficiency by class\", per certification record, model year 2025, n = 174 of 212 test vehicles (30 could not be derived and 8 were set aside as impossible): median 0.885, lower and upper quartiles 0.872 and 0.894, range 0.805 to 0.918",
+          "url": null,
+          "accessed": "2026-10-26"
         }
       ],
       "status": "verified",
-      "note": "Good 2017: \"The recharge energy includes any losses due to inefficiencies of the manufacturer’s charger.\" Issue #506. Not accessed again on 2026-10-26: the EPA wording is the one `epa-mpge-at-the-wall` already cites."
+      "note": "Good 2017: \"The recharge energy includes any losses due to inefficiencies of the manufacturer’s charger.\" Issue #506. Not accessed again on 2026-10-26: the EPA wording is the one `epa-mpge-at-the-wall` already cites. The measured ratio is DC energy discharged ÷ AC energy in, so it spans the outlet to the pack's DC output, not to the wheels. The 0.855 fallback was set from the two records that reported both sides, before the distribution above (median 0.885) existed, and is due a review."
     },
     {
       "id": "dc-fast-car-side-loss",
@@ -1246,7 +1258,7 @@
       "sources": [
         {
           "rank": "B",
-          "title": "Out of Spec Motoring, \"10% challenge\" charge-then-drive tests (nine videos, linked per test in the value). Charge for 15 minutes from about 10%, then drive until the state of charge returns to 10%. Figures as read from each video by the owner",
+          "title": "Out of Spec Testing, \"10% challenge\" charge-then-drive tests (nine videos, linked per test in the value). Charge for 15 minutes from about 10%, then drive until the state of charge returns to 10%. Figures as read from each video by the owner",
           "url": "https://www.youtube.com/watch?v=LgZClJTLQWc",
           "accessed": "2026-10-26"
         }
@@ -1254,6 +1266,13 @@
       "status": "observed",
       "rationale": "The owner read the added kWh from the charger or the car and the consumed kWh from the trip meter or mi/kWh readout in each video, 2026-10-26. EVBench has not re-derived them from the footage. It would become verified with a timestamp per figure, or an EVBench test run on the same procedure. The R1T row lists both trucks, from one video.",
       "note": "Why this is the right basis: the start and end are the same SoC, so the stored energy is equal and the difference is lost, between the port and the pack's DC output (what the inverter draws). That is the span the EPA's DC ÷ AC recharge ratio covers for AC, and the one EVBench's battery-side efficiency is measured on. It includes the cable and port, cooling, heating (the preconditioning on the way in too), auxiliary draw, and the pack's own losses charging and discharging. Precision: the SoC threshold resolves to about 1% of the pack, which on a 25–30 kWh charge is a few percent of error per test; mi/kWh readouts to 0.01–0.1 add the ranges shown. Conditions were not logged (ambient temperature, starting SoC, charger curve), so the spread cannot be assigned to maker or platform: Rivian alone runs 7.7–12.7%, and the two R1Ts, with tight readings, differ by 2.7 points. A 15-minute stop at about 10% SoC may be the high-loss, front-loaded-heating end, so a long 10–80% stop may read lower (a guess, untested); to test that, the owner is looking for 10–80% charges with a same-vehicle range test (70% of range). The Cayenne held 350 kW for much of its session."
+    },
+    {
+      "id": "car-reports-charging-energy-breakdown",
+      "claim": "Some cars report where a charge's energy went themselves. Rivian and BMW are among them.",
+      "sources": [],
+      "status": "observed",
+      "rationale": "The owner's first-hand knowledge of what these cars display (2026-10-26): Rivian reports energy at the port, into the battery and the session's auxiliary load, and BMW breaks its charging losses out as well. Not a published record; an EVBench note of the screens, or the owner's manuals, would make it verified. Context only."
     },
     {
       "id": "dc-fast-single-video-readings",
