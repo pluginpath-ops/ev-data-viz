@@ -1171,6 +1171,196 @@
       "note": "EPA page: \"account for losses from the charging cable… moves the measurement from the vehicle to the outlet in the wall\". Good 2017: \"The recharge energy includes any losses due to inefficiencies of the manufacturer’s charger.\""
     },
     {
+      "id": "epa-charger-efficiency-is-ac",
+      "claim": "The ratio of the certification's DC energy to its AC recharge energy is an AC (Level 2) charging efficiency, measured over a recharge that includes the manufacturer's onboard charger. It is not a DC fast-charging figure, which bypasses the onboard charger.",
+      "value": {
+        "basis": "AC, wall to pack",
+        "evbench_assumed": 0.855
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA (D. Good), \"EPA Test Procedures for Electric Vehicles and Plug-in Hybrids\", draft summary, 14 Nov 2017",
+          "url": "https://www.fueleconomy.gov/feg/pdfs/EPA%20test%20procedure%20for%20EVs-PHEVs-11-14-2017.pdf",
+          "accessed": "2026-09-29"
+        },
+        {
+          "rank": "C",
+          "title": "EVBench: deriveChargerEfficiency (epaDerivations.js) divides total_dc_energy_kwh by ac_recharge_kwh; the 0.855 default is the Rivian R2 (85.5%) and Ford Lightning ER (85.6%) records",
+          "url": null,
+          "accessed": "2026-10-26"
+        }
+      ],
+      "status": "verified",
+      "note": "Good 2017: \"The recharge energy includes any losses due to inefficiencies of the manufacturer’s charger.\" Issue #506. Not accessed again on 2026-10-26: the EPA wording is the one `epa-mpge-at-the-wall` already cites."
+    },
+    {
+      "id": "dc-fast-car-side-loss",
+      "claim": "In ADAC's DC fast-charging test of four cars (30 kWh each), the energy lost inside the car, between the charger's output and the battery, was 1–6% when the battery was preconditioned (23 °C or 0 °C) and 6–10% when it was not, at 0 °C. That counts what reaches the battery, not the pack's own losses.",
+      "value": {
+        "preconditioned_23c_pct": { "ioniq_6": 1, "megane_e_tech": 4, "model_y": 3, "id3": 3 },
+        "preconditioned_0c_pct": { "ioniq_6": 1, "megane_e_tech": 6, "model_y": 4, "id3": 5 },
+        "not_preconditioned_0c_pct": { "ioniq_6": 6, "megane_e_tech": 8, "model_y": 10, "id3": 7 },
+        "mean_preconditioned_pct": 3.4,
+        "mean_not_preconditioned_pct": 7.75
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "ADAC, \"Ladeverluste beim Elektroauto\" (Teil II, DC), published 6 Aug 2026; table \"Ladeverluste im Fahrzeug\"",
+          "url": "https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste-elektroauto-studie/",
+          "accessed": "2026-10-26"
+        },
+        {
+          "rank": "D",
+          "title": "firmenauto.de (H. Holzer), 11 Jun 2025, on an earlier ADAC release: 300 kW Alpitronic charger, losses \"1–3%\" at 23 °C and up to 10% at 0 °C, mostly battery climate control",
+          "url": "https://www.firmenauto.de/fahrzeuge/pkw/adac-test-ladeverluste-e-autos-schnellladen-vs-wallbox-und-winterbedingungen/",
+          "accessed": "2026-10-26"
+        }
+      ],
+      "status": "verified",
+      "note": "Energy measured at the grid, the charger's output and the battery. The page gives no charger power, no SoC window and no test dates for the DC tests, and does not say outright that the table leaves out the station's 3%: that is read from its heading. The Mégane and ID.3 have no active battery conditioning; the Ioniq 6 is the only 800 V car, so a voltage-class difference cannot be separated from it (n = 1). Means are of the cells, not weighted. Cooling at high power is described but not quantified; whether pack-internal resistive heat is counted is not stated, and the heating done on the drive in (preconditioning) is outside it. So it is the first part of DC_FAST_LOSS, not the whole (#506): see dc-fast-round-trip-pairs."
+    },
+    {
+      "id": "dc-fast-round-trip-pairs",
+      "claim": "Charging a car for 15 minutes on a DC fast charger and then driving it back down to the same state of charge used 6.0–12.7% less energy than the charger delivered, across nine cars: a mean of 9.4% and a median of 9.3%.",
+      "value": {
+        "unit": "kWh; loss = 1 − consumed ÷ added",
+        "tests": [
+          { "car": "Audi e-tron (2019)", "added": 35.38, "miles": 73.2, "mi_per_kwh": 2.2, "consumed": 33.27, "loss_pct": 6.0, "loss_range_pct": [3.8, 8.1], "url": "https://www.youtube.com/watch?v=SLjm2HZhfA8&t=779s" },
+          { "car": "Kia EV6", "added": 48.8, "miles": 132.2, "mi_per_kwh": 2.9, "consumed": 45.6, "loss_pct": 6.6, "loss_range_pct": [4.9, 8.2], "url": "https://www.youtube.com/watch?v=SYHlXdCE0Ok" },
+          { "car": "Rivian R1S (Gen 1)", "added": 44.9, "miles": 86.6, "mi_per_kwh": 2.09, "consumed": 41.44, "consumed_displayed": 42, "loss_pct": 7.7, "loss_pct_displayed": 6.5, "url": "https://www.youtube.com/watch?v=AHK_smK7IMc" },
+          { "car": "VW ID.4", "added": 26.2, "miles": 60, "mi_per_kwh": 2.5, "consumed": 24.0, "loss_pct": 8.4, "loss_range_pct": [6.5, 10.3], "url": "https://www.youtube.com/watch?v=q2pQQm0oGKA" },
+          { "car": "Rivian R1T (max pack)", "added": 47.21, "miles": 84.4, "mi_per_kwh": 1.97, "consumed": 42.84, "loss_pct": 9.3, "loss_range_pct": [9.2, 9.4], "url": "https://www.youtube.com/watch?v=z9N_rkADLjE" },
+          { "car": "BMW iX3 50", "added": 64.25, "km": 238, "kwh_per_100km": 24.2, "consumed": 57.6, "loss_pct": 10.4, "loss_range_pct": [10.2, 10.5], "url": "https://www.youtube.com/watch?v=MJxe9U5qZYw" },
+          { "car": "Porsche Cayenne Electric", "added": 80.32, "miles": 185.8, "kwh_per_100mi": 38.2, "consumed": 70.98, "loss_pct": 11.6, "held_kw": 350, "url": "https://www.youtube.com/watch?v=K9HRYMit7Co&t=2127s" },
+          { "car": "Rivian R1T (large pack)", "added": 49.56, "miles": 85.0, "mi_per_kwh": 1.95, "consumed": 43.59, "loss_pct": 12.0, "loss_range_pct": [11.8, 12.2], "url": "https://www.youtube.com/watch?v=z9N_rkADLjE" },
+          { "car": "Rivian R2", "added": 48.12, "added_car_saw": 48.0, "miles": 92.8, "mi_per_kwh": 2.23, "consumed": 42, "consumed_calculated": 41.6, "loss_pct": 12.7, "loss_pct_calculated": 13.5, "url": "https://www.youtube.com/watch?v=LgZClJTLQWc" }
+        ],
+        "mean_loss_pct": 9.4,
+        "median_loss_pct": 9.3,
+        "min_loss_pct": 6.0,
+        "max_loss_pct": 12.7,
+        "evbench_default": 0.09
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Out of Spec Motoring, \"10% challenge\" charge-then-drive tests (nine videos, linked per test in the value). Charge for 15 minutes from about 10%, then drive until the state of charge returns to 10%. Figures as read from each video by the owner",
+          "url": "https://www.youtube.com/watch?v=LgZClJTLQWc",
+          "accessed": "2026-10-26"
+        }
+      ],
+      "status": "observed",
+      "rationale": "The owner read the added kWh from the charger or the car and the consumed kWh from the trip meter or mi/kWh readout in each video, 2026-10-26. EVBench has not re-derived them from the footage. It would become verified with a timestamp per figure, or an EVBench test run on the same procedure. The R1T row lists both trucks, from one video.",
+      "note": "Why this is the right basis: the start and end are the same SoC, so the stored energy is equal and the difference is lost, between the port and the pack's DC output (what the inverter draws). That is the span the EPA's DC ÷ AC recharge ratio covers for AC, and the one EVBench's battery-side efficiency is measured on. It includes the cable and port, cooling, heating (the preconditioning on the way in too), auxiliary draw, and the pack's own losses charging and discharging. Precision: the SoC threshold resolves to about 1% of the pack, which on a 25–30 kWh charge is a few percent of error per test; mi/kWh readouts to 0.01–0.1 add the ranges shown. Conditions were not logged (ambient temperature, starting SoC, charger curve), so the spread cannot be assigned to maker or platform: Rivian alone runs 7.7–12.7%, and the two R1Ts, with tight readings, differ by 2.7 points. A 15-minute stop at about 10% SoC may be the high-loss, front-loaded-heating end, so a long 10–80% stop may read lower (a guess, untested); to test that, the owner is looking for 10–80% charges with a same-vehicle range test (70% of range). The Cayenne held 350 kW for much of its session."
+    },
+    {
+      "id": "dc-fast-single-video-readings",
+      "claim": "Other single-video comparisons agree on the size: a Rivian R1S in the cold put 64.0 kWh into the battery from 65.4 kWh at the port (65.7 kWh from the charger), about 2% lost on the car side; another R1S session reported 1.9 kWh of auxiliary load over 63 kWh, about 3%; a 0→100% charge added 94.9 kWh and the drive back down consumed 86.63 kWh, 8.7% lost; and one reading of a 77% charge put about 12% lost.",
+      "value": {
+        "r1s_cold_charger_kwh": 65.7,
+        "r1s_cold_port_kwh": 65.4,
+        "r1s_cold_battery_kwh": 64.0,
+        "r1s_cold_car_side_pct": 2.1,
+        "r1s_aux_kwh": 1.9,
+        "r1s_aux_session_kwh": 63,
+        "full_cycle_added_kwh": 94.9,
+        "full_cycle_consumed_kwh": 86.63,
+        "full_cycle_loss_pct": 8.7,
+        "partial_charge_loss_pct": 12
+      },
+      "sources": [
+        {
+          "rank": "D",
+          "title": "R1S in cold weather, charger, port and battery kWh (video)",
+          "url": "https://www.youtube.com/watch?v=10EQgdUi2k4",
+          "accessed": "2026-10-26"
+        },
+        {
+          "rank": "D",
+          "title": "Full-pack consumption, 100% to 0% (video)",
+          "url": "https://youtu.be/cjsrDXdlrN0",
+          "accessed": "2026-10-26"
+        },
+        {
+          "rank": "D",
+          "title": "Full-pack charge, 0% to 100% (video)",
+          "url": "https://youtu.be/kDasec3jIv4",
+          "accessed": "2026-10-26"
+        },
+        {
+          "rank": "D",
+          "title": "77% of a 106 kWh pack, charger added about 91.5 kWh (video; the owner's reading, many assumptions)",
+          "url": "https://www.youtube.com/watch?v=rnpzekRoDP4",
+          "accessed": "2026-10-26"
+        }
+      ],
+      "status": "observed",
+      "rationale": "Read from the videos by the owner on 2026-10-26; not re-derived. The R1S figures are energy into the battery, which leaves the pack's internal resistance losses out. The 0→100% pair comes from two videos that may not be one car under one set of conditions, and the top-off at 100% inflates it. The 12% reading rests on assuming 106 kWh usable. Context only.",
+      "note": "The R1S 2% and 3% figures bound the first part of the loss: what reaches the battery. The round-trip pairs (dc-fast-round-trip-pairs) are the whole span."
+    },
+    {
+      "id": "dc-fast-billing-at-the-port",
+      "claim": "A DC fast charger bills the energy it delivers to the car's port, so the station's own AC-to-DC conversion loss is not on the driver's bill.",
+      "sources": [],
+      "status": "accepted",
+      "rationale": "How per-kWh DC fast charging is billed is treated as given across the industry and by the owner (#506): the charger's output is metered, not the grid draw behind it. It is general practice, not one network's figure. A network that bills by the minute or by energy accepted at the battery would differ, and a source for one network's rule would upgrade this to verified."
+    },
+    {
+      "id": "dc-fast-station-conversion-loss",
+      "claim": "A DC fast charger's own AC-to-DC conversion loss averaged about 3% in ADAC's test.",
+      "value": {
+        "station_loss_pct": 3
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "ADAC, \"Ladeverluste beim Elektroauto\" (Teil II, DC), published 6 Aug 2026",
+          "url": "https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste-elektroauto-studie/",
+          "accessed": "2026-10-26"
+        }
+      ],
+      "status": "verified",
+      "note": "ADAC: \"Die Umwandlungsverluste in der Schnellladesäule betrugen durchschnittlich 3 Prozent.\" Total grid-to-battery losses 5–15%. That the driver is not billed for it (billing is per kWh delivered to the car) is the owner's statement of how DC billing works (#506), not ADAC's, and is not sourced here."
+    },
+    {
+      "id": "dc-fast-charger-efficiency-temperature",
+      "claim": "Older (up to 50 kW) DC fast chargers converted AC to DC at 93% efficiency near 25 °C, falling to 39% at −25 °C.",
+      "value": {
+        "efficiency_25c": 0.93,
+        "efficiency_minus_25c": 0.39
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Trentadue et al. (JRC), \"Evaluation of Fast Charging Efficiency under Extreme Temperatures\", Energies 2018, 11(8):1937",
+          "url": "https://www.mdpi.com/1996-1073/11/8/1937",
+          "accessed": "2026-10-26"
+        }
+      ],
+      "status": "unverified",
+      "note": "Figures are from a search-result summary of the abstract (seven chargers, two cars, SAE J2894/1, DC delivered ÷ AC drawn). The paper itself was not opened: fetch it and quote the sentence before this is cited. Station side, so context for what the driver is not billed for, not part of the car-side loss."
+    },
+    {
+      "id": "dc-fast-model3-station-vs-car",
+      "claim": "One 2021 Model 3, charged 7% to 57% on an Electrify America CHAdeMO adapter under 50 kW, showed about 35.5 kWh received against 39 kWh dispensed by the station, a loss of about 10%, most of it while the thermal system ran below about 20% SoC.",
+      "value": {
+        "dispensed_kwh": 39,
+        "car_reported_kwh": 35.5
+      },
+      "sources": [
+        {
+          "rank": "D",
+          "title": "InsideEVs (T. Moloughney), \"Tesla Model 3 Charging Losses Explained\", Dec 2021",
+          "url": "https://insideevs.com/features/555906/tesla-charging-losses-explained/",
+          "accessed": "2026-10-26"
+        }
+      ],
+      "status": "verified",
+      "note": "One car, one session. The author calls it \"not a scientific experiment\" and the car's reading is a whole number of kWh. A cold-battery, low-power case: it agrees with ADAC's not-preconditioned row, not with a typical stop. Context only."
+    },
+    {
       "id": "epa-55-45-weighting",
       "claim": "The combined figure weights city 55% and highway 45%.",
       "value": {
