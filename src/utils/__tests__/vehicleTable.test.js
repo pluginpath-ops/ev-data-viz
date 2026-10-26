@@ -504,17 +504,17 @@ describe('EPA efficiency and electricity cost (#335)', () => {
             socWindowKwh: 100, epaRangeMi: 300, epaRange: { combinedMpge: 101.115, chargerEfficiency },
         });
 
-        it('takes the assumed AC loss out of the label, then adds the DC session loss, with no qualifier while there is a label', () => {
+        it('takes the assumed AC loss out of the label, then adds the DC session loss, and says the DC loss is an assumed average', () => {
             const [r] = buildVehicleRows([labelled]);
             const battery = 3 / ASSUMED_CHARGER_EFF;
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (battery * (1 - DC_FAST_LOSS)));
-            expect(r.notes['calc.costPer100Fast']).toBeNull();
+            expect(r.notes['calc.costPer100Fast']).toBe('est. avg. DC efficiency');
         });
 
         it('takes out the cert\'s own measured charging efficiency where it has one', () => {
             const [r] = buildVehicleRows([withCharger(0.9)]);
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 / 0.9 * (1 - DC_FAST_LOSS)));
-            expect(r.notes['calc.costPer100Fast']).toBeNull();
+            expect(r.notes['calc.costPer100Fast']).toBe('est. avg. DC efficiency');
         });
 
         it('costs less than the wall basis it replaced, and the home figure keeps the wall basis', () => {
