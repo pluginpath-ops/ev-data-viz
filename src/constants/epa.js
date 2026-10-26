@@ -144,17 +144,20 @@ export const EPA_DEFAULTS = {
     DEFAULT_SS_ETA:      0.929,
     DEFAULT_ACCESSORY_W: 300,         // constant accessory draw, watts
     // Used when AC recharge energy is unavailable. Was 0.88 from a read of CSI
-    // observations (~0.87–0.89); now 0.855, from the two cert records where BOTH
-    // sides are reported and the ratio is measured rather than inferred:
+    // observations (~0.87–0.89), then 0.855 from the two cert records where
+    // BOTH sides are reported (#206):
     //   Rivian R2 (MCT)        89,549.27 DC / 104,689 AC = 85.5%
     //   Ford Lightning ER (SCT) ~131 kWh usable / 152.974 = 85.6%
-    // Refine as more MCT records with real DC energy accumulate (#206).
-    ASSUMED_CHARGER_EFF: 0.855,
+    // Now 0.885, the fleet median: Certification Statistics, charger efficiency,
+    // model year 2025, n = 174 (quartiles 0.872–0.894, range 0.805–0.918). The
+    // two records above both sit below its lower quartile, so they were a low
+    // read of the fleet (#506). Refresh it as the data grows.
+    ASSUMED_CHARGER_EFF: 0.885,
     // What a DC fast session loses between the car's port and the pack's DC
     // output (what the inverter draws), as a fraction of the energy the
     // station bills (#506). The same span the AC figure above covers, so the
-    // two are comparable, but not the AC loss above (0.145 assumed, about 0.115 at
-    // the median of the 2025 certifications): that recharge runs the
+    // two are comparable, but not the AC loss above (0.115 assumed, the median of the
+    // 2025 certifications): that recharge runs the
     // onboard charger for hours. A DC session bypasses it, and the station's
     // own conversion (about 3%) is not billed. What is left is the cable and
     // port, cooling and battery heating (including the preconditioning on the

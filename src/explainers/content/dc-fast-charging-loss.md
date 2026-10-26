@@ -89,11 +89,10 @@ alongside, comparing what was added to about 70% of the range it drove.
 
 The Cost/100 mi, fast column does three things. It starts from the label's efficiency, which is measured on a Level 2 charger. It
 takes the AC charging loss back out, using the certification's own measured figure where EPA recorded one and an assumed
-85.5% where it did not (set from two records, before the 88.5% median above was available)
-[[fact:epa-charger-efficiency-is-ac]]. It then adds the 9% that a fast session loses [[fact:dc-fast-round-trip-pairs]], and prices that at the fast-charging price you set. As a
+88.5%, the median above, where it did not [[fact:epa-charger-efficiency-is-ac]]. It then adds the 9% that a fast session loses [[fact:dc-fast-round-trip-pairs]], and prices that at the fast-charging price you set. As a
 worked example (arithmetic, not a measurement): a car whose label says 3.0 miles per kWh on a Level 2 charger would need
-3.0 ÷ 0.855 = 3.51 miles per kWh at the pack, and about 3.19 miles per kWh at the port after a 9% loss. At 50¢ per kWh
-that is $15.66 per 100 miles. The old basis, which carried the AC loss into a DC session, said $16.67. The home figure
+3.0 ÷ 0.885 = 3.39 miles per kWh at the pack, and about 3.08 miles per kWh at the port after a 9% loss. At 50¢ per kWh
+that is $16.21 per 100 miles. The old basis, which carried the AC loss into a DC session, said $16.67. The home figure
 is unchanged: a home charger does run the onboard charger, and its loss is the one EPA measured.
 
 ## What we could not establish
@@ -108,14 +107,12 @@ is unchanged: a home charger does run the onboard charger, and its loss is the o
 Owner: looking for 10–80% charging tests with a reliable paired (same-vehicle) range test, to compare the energy
 added to 70% of the range driven. When some turn up, add them to `dc-fast-round-trip-pairs` and see whether the
 mean moves. Also open: a per-vehicle value where a pair exists (not built; this page argues against fitting
-platforms from unlogged videos), and the INL AVTA DC-charger efficiency tests, which the research could not read. Also: the assumed AC charger
-efficiency (0.855, from two records) sits below the fleet median of 0.885; it is the fallback for a car with no measured
-ratio, so a review would move those cars' fast cost slightly (not done here).
+platforms from unlogged videos), and the INL AVTA DC-charger efficiency tests, which the research could not read.
 :::
 
 ::: engineers
 Let η_label be the label's efficiency on a Level 2 charger (mi/kWh), η_AC the AC charging efficiency (the cert's total DC energy ÷
-AC recharge energy where measured or pinned, else the assumed 0.855 [[fact:epa-charger-efficiency-is-ac]]), L the DC
+AC recharge energy where measured or pinned, else the assumed 0.885 [[fact:epa-charger-efficiency-is-ac]]), L the DC
 fast charging loss, and p the DC fast price (per kWh). With no label, the battery-side efficiency η_b is range ÷
 battery instead.
 

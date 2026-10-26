@@ -1175,7 +1175,7 @@
       "claim": "The ratio of the certification's DC energy to its AC recharge energy is an AC (Level 2) charging efficiency, measured over a recharge that includes the manufacturer's onboard charger. It is not a DC fast-charging figure, which bypasses the onboard charger.",
       "value": {
         "basis": "AC, outlet to pack output",
-        "evbench_assumed": 0.855,
+        "evbench_assumed": 0.885,
         "median_efficiency": 0.885,
         "quartiles": [0.872, 0.894],
         "min": 0.805,
@@ -1192,7 +1192,7 @@
         },
         {
           "rank": "C",
-          "title": "EVBench: deriveChargerEfficiency (epaDerivations.js) divides total_dc_energy_kwh by ac_recharge_kwh; the 0.855 default is the Rivian R2 (85.5%) and Ford Lightning ER (85.6%) records",
+          "title": "EVBench: deriveChargerEfficiency (epaDerivations.js) divides total_dc_energy_kwh by ac_recharge_kwh; the 0.885 default is the fleet median below; it was 0.855, from the Rivian R2 (85.5%) and Ford Lightning ER (85.6%) records",
           "url": null,
           "accessed": "2026-10-26"
         },
@@ -1204,7 +1204,7 @@
         }
       ],
       "status": "verified",
-      "note": "Good 2017: \"The recharge energy includes any losses due to inefficiencies of the manufacturer’s charger.\" Issue #506. Not accessed again on 2026-10-26: the EPA wording is the one `epa-mpge-at-the-wall` already cites. The measured ratio is DC energy discharged ÷ AC energy in, so it spans the outlet to the pack's DC output, not to the wheels. The 0.855 fallback was set from the two records that reported both sides, before the distribution above (median 0.885) existed, and is due a review."
+      "note": "Good 2017: \"The recharge energy includes any losses due to inefficiencies of the manufacturer’s charger.\" Issue #506. Not accessed again on 2026-10-26: the EPA wording is the one `epa-mpge-at-the-wall` already cites. The measured ratio is DC energy discharged ÷ AC energy in, so it spans the outlet to the pack's DC output, not to the wheels. The fallback (ASSUMED_CHARGER_EFF) was 0.855, set from the two records that reported both sides, and is now this median, 0.885 (#506)."
     },
     {
       "id": "dc-fast-car-side-loss",
