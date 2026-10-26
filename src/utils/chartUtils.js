@@ -53,6 +53,8 @@ function wrapSources(text, maxWidth, font) {
  * @param {string} [options.subtitle]    The conditions the plot was drawn under.
  * @param {string} [options.sources]    The source line, drawn under the plot.
  * @param {boolean} [options.wordmark]   Source mark, top-right. Default true.
+ * @param {boolean} [options.side]       Ask the chart to put what it adds in a panel
+ *        BESIDE the plot (the canvas grows) rather than over it.
  */
 export function chartToPngDataUrl(chartInstance, options = {}) {
     const opts = typeof options === 'string' ? { background: options } : options;
@@ -63,6 +65,7 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
         subtitle = null,
         sources = null,
         wordmark = true,
+        side = false,
     } = opts;
 
     const src = chartInstance.canvas;
@@ -93,8 +96,13 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
     const sourceLines = sources ? wrapSources(sources, src.width, `400 ${px(SUB_SIZE)}px ${MONO}`) : [];
     const footerH = sourceLines.length ? px(GAP + SUB_SIZE + (sourceLines.length - 1) * LINE_H) : 0;
 
+    // A chart may add to its export what the canvas itself does not carry (a
+    // reading the reader fixed at an X, #456, which is DOM on screen). It says
+    // how much room it wants beside the plot, then draws after the plot is on.
+    const extra = chartInstance.$exportExtra?.({ side }) ?? null;
+
     const offscreen = document.createElement('canvas');
-    offscreen.width = src.width + pad * 2;
+    offscreen.width = src.width + px(extra?.sideWidth ?? 0) + pad * 2;
     offscreen.height = src.height + headerH + footerH + pad * 2;
 
     const ctx = offscreen.getContext('2d');
@@ -139,6 +147,7 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
     }
 
     ctx.drawImage(src, pad, pad + headerH);
+    extra?.draw(ctx, { x: pad, y: pad + headerH, dpr });
     if (sourceLines.length) {
         ctx.font = `400 ${px(SUB_SIZE)}px ${MONO}`;
         ctx.fillStyle = theme.tick;

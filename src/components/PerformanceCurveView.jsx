@@ -29,6 +29,7 @@ import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import { useSourceLine } from '../hooks/useSourceLine';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
+import CopyPngButton from './charts/CopyPngButton';
 
 /** Okabe-Ito, matching the palette the other charts use for run colors. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
@@ -443,7 +444,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         [series]);
     const sourceLine = useSourceLine({ runs: sourceRuns });
 
-    const { copyPng, copied, preview, dismissPreview } =
+    const { copyPng, copyPngBeside, copiedBeside, copied, preview, dismissPreview } =
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(series.length) });
 
@@ -569,13 +570,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                             >
                                 {urlCopied ? '✓ Copied' : '🔗 URL'}
                             </button>
-                            <button
-                                onClick={copyPng}
-                                className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
-                                title="Copy the framed chart as a PNG"
-                            >
-                                {copied ? '✓ Copied' : 'PNG'}
-                            </button>
+                            <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={copied} copiedBeside={copiedBeside} />
                         </>
                     )}
                 >

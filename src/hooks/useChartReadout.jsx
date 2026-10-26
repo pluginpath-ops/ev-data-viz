@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import ChartReadout from '../components/charts/ChartReadout';
 import { readingsAtX, autoTolerance } from '../utils/readoutAtX';
+import { prepareFixedReadout } from '../utils/drawFixedReadout';
 
 /**
  * The readout: every series at the X under the cursor, in one box with a
@@ -54,7 +55,21 @@ import { readingsAtX, autoTolerance } from '../utils/readoutAtX';
 export function useChartReadout() {
     const [store] = useState(createStore);
     const plugin = useCallback((config) => readoutPlugin(store, config), [store]);
-    return { plugin, overlay: <ChartReadout store={store} />, store };
+    // Stable across renders, so a chart effect that lists `readout` among its
+    // dependencies is not rebuilt (which would also clear the readout) by a
+    // render it did not cause. Whether it is FIXED is deliberately not here:
+    // that changes, and putting it on this object re-rendered the view and
+    // rebuilt the chart the moment a readout was fixed — see useReadoutFixed.
+    return useMemo(() => ({ plugin, overlay: <ChartReadout store={store} />, store }), [plugin, store]);
+}
+
+/**
+ * Whether the readout is fixed, as a boolean — for the component that needs it
+ * (the Side readout button), so that only it re-renders when one is fixed or
+ * cleared, and never on a hover frame.
+ */
+export function useReadoutFixed(readout) {
+    return useSyncExternalStore(readout.store.subscribe, () => readout.store.get().mode === 'fixed');
 }
 
 const IDLE = { mode: 'off' };
@@ -75,8 +90,15 @@ function createStore() {
     };
 }
 
-/** Movement under this is a click; over it, a drag (box-zoom, or a touch scrub). */
-const CLICK_SLOP = 4;
+/**
+ * Movement under this is a click; over it, a drag (box-zoom, or a touch scrub).
+ * The charts hand the same number to the zoom plugin as `drag.threshold`, so
+ * the two agree on what a click is: without it a click that wandered 2px fixed
+ * the readout AND zoomed the chart (the plugin's default threshold is 0). 20px
+ * is generous on purpose — a box-zoom smaller than that is not a zoom anyone
+ * meant, and a hand resting on a trackpad moves more than 4.
+ */
+export const CLICK_SLOP = 20;
 const SCRUB_SLOP = 8;
 
 function readoutPlugin(store, config) {
@@ -143,6 +165,15 @@ function attach(chart, config, store) {
 
     const clear = () => { mode = 'off'; down = null; store.set(IDLE); };
     store.actions = { clear };
+
+    // The PNG export asks every chart whether it has anything to add to the
+    // picture (chartToPngDataUrl). A FIXED readout does — it is what the reader
+    // chose to keep — and a hover one never does: it follows a cursor that has
+    // gone to click the button.
+    chart.$exportExtra = (options) => {
+        const s = store.get();
+        return s.mode === 'fixed' ? prepareFixedReadout(chart, s, options) : null;
+    };
 
     // One update per frame, the latest wins.
     const schedule = (fn) => {
@@ -239,7 +270,9 @@ function attach(chart, config, store) {
     const onDocDown = (e) => {
         if (mode !== 'fixed') return;
         const t = e.target;
-        if (t === canvas || t?.closest?.('.chart-readout')) return;
+        // The copy buttons too: clearing on the PNG button's own press would
+        // export a chart without the readout it was fixed to be exported with.
+        if (t === canvas || t?.closest?.('.chart-readout, .chart-export-strip, .chart-copy-btn')) return;
         clear();
     };
 
@@ -292,6 +325,7 @@ function attach(chart, config, store) {
         // A rebuilt chart starts without a readout: its axes, series or units
         // may be different, and a fixed one would be a stale answer.
         store.actions = null;
+        delete chart.$exportExtra;
         store.set(IDLE);
     };
 }

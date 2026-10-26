@@ -12,7 +12,7 @@ import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels } from '../utils/seriesLabel';
 import { figureSources, epaCredits } from '../utils/vehicleFigures';
 import { useSourceLine } from '../hooks/useSourceLine';
-import { useChartReadout } from '../hooks/useChartReadout';
+import { useChartReadout, CLICK_SLOP } from '../hooks/useChartReadout';
 import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
 
 /**
@@ -55,6 +55,7 @@ import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
+import CopyPngButton from './charts/CopyPngButton';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
@@ -965,7 +966,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     tooltip: { enabled: false },
                     zoom: {
                         zoom: {
-                            drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
+                            drag: { enabled: true, threshold: CLICK_SLOP, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
                             mode: 'xy',
                         },
                     },
@@ -1051,7 +1052,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const sourceLine = useSourceLine({ runs: sourceRuns, allRuns: fleetRuns, epa: sourceEpa });
 
     // ── PNG export ───────────────────────────────────────────────────────────
-    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+    const { copyPng, copyPngBeside, copiedBeside, copied: imageCopied, preview, dismissPreview } =
         useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: `${selectedRuns.join(',')}|${selectedComposites.length}` });
 
@@ -1444,13 +1445,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         >
                             {copied ? '✓ Copied' : '🔗 URL'}
                         </button>
-                        <button
-                            onClick={copyPng}
-                            className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                            title="Copy the framed chart as a PNG"
-                        >
-                            {imageCopied ? '✓ Copied' : 'PNG'}
-                        </button>
+                        <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                     </>
                 )}
             >

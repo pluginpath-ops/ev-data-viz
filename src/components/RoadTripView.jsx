@@ -3,7 +3,7 @@ import { correctionSummary } from '../utils/correctionSettings';
 import SectionBand from './SectionBand';
 import SidebarDisplaySection from './SidebarDisplaySection';
 import { useAxisLimits } from '../hooks/useAxisLimits';
-import { useChartReadout } from '../hooks/useChartReadout';
+import { useChartReadout, CLICK_SLOP } from '../hooks/useChartReadout';
 import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
 import { hoursToMinutes } from '../utils/axisLimits';
 import Chart from 'chart.js/auto';
@@ -47,6 +47,7 @@ import { countsAside } from '../utils/rangeTestSpread';
 import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
 import FeatureChartButton from './home/FeatureChartButton';
+import CopyPngButton from './charts/CopyPngButton';
 
 Chart.register(ZoomPlugin);
 
@@ -959,7 +960,10 @@ export default function RoadTripView({
             .sort((a, b) => (vehicleOrder.get(a.vehicle.id) ?? 999) - (vehicleOrder.get(b.vehicle.id) ?? 999));
     }, [selectedRunIds, allPairsInfo, selectedVehicles]);
 
-    const validEntries  = runEntries.filter(e => e.miPerKwh && e.batteryKwh);
+    // Memoized: it is a dependency of the simulations and of every chart's build
+    // effect, so a fresh array each render rebuilt the chart on ANY re-render —
+    // which also cleared a readout fixed on it (#456).
+    const validEntries  = useMemo(() => runEntries.filter(e => e.miPerKwh && e.batteryKwh), [runEntries]);
 
     // The chart legend's labels, computed once and shared. `buildSeriesLabels`
     // works out the minimum that makes each series unambiguous — vehicle first,
@@ -1368,7 +1372,7 @@ export default function RoadTripView({
                         tooltip: { enabled: false },
                         zoom: {
                             zoom: {
-                                drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
+                                drag: { enabled: true, threshold: CLICK_SLOP, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
                                 mode: 'xy',
                             },
                         },
@@ -1466,7 +1470,7 @@ export default function RoadTripView({
                         tooltip: { enabled: false },
                         zoom: {
                             zoom: {
-                                drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
+                                drag: { enabled: true, threshold: CLICK_SLOP, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
                                 mode: 'xy',
                             },
                         },
@@ -1760,6 +1764,7 @@ export default function RoadTripView({
                         zoom: {
                             drag: {
                                 enabled: true,
+                                threshold: CLICK_SLOP,
                                 backgroundColor: 'rgba(59,130,246,0.08)',
                                 borderColor: '#3b82f6',
                                 borderWidth: 1,
@@ -1895,7 +1900,7 @@ export default function RoadTripView({
     }, [validEntries]);
     const sourceLine = useSourceLine({ runs: sourceRuns, epa: sourceEpa });
 
-    const { copyPng, copied: imageCopied, preview, dismissPreview } =
+    const { copyPng, copyPngBeside, copiedBeside, copied: imageCopied, preview, dismissPreview } =
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(validEntries.length) });
 
@@ -2272,13 +2277,7 @@ export default function RoadTripView({
                             >
                                 {copiedUrl ? '✓ Copied' : '🔗 URL'}
                             </button>
-                            <button
-                                onClick={copyPng}
-                                className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                                title="Copy the framed chart as a PNG"
-                            >
-                                {imageCopied ? '✓ Copied' : 'PNG'}
-                            </button>
+                            <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                         </>
                     )}
                 >

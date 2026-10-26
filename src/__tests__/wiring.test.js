@@ -3017,14 +3017,60 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
         expect(read('src/components/charts/ChartReadout.jsx')).toMatch(/import RunSourceLinks from '\.\.\/RunSourceLinks'/);
     });
 
-    it('the PNG export knows nothing of the readout: it is DOM, so it cannot be half-captured', () => {
-        expect(read('src/utils/chartUtils.js')).not.toMatch(/readout|crosshair/i);
+    it('the PNG export draws a FIXED readout through one seam, and never a hover one (#456)', () => {
+        // chartUtils knows nothing of the readout by name: it asks the chart.
+        const utils = read('src/utils/chartUtils.js');
+        expect(utils).not.toMatch(/readout|crosshair/i);
+        expect(utils).toMatch(/chartInstance\.\$exportExtra\?\.\(\{ side \}\)/);
+        expect(utils).toMatch(/extra\?\.draw\(ctx/);
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/chart\.\$exportExtra = /);
+        expect(hook).toMatch(/s\.mode === 'fixed' \? prepareFixedReadout\(/);
+        expect(hook).toMatch(/delete chart\.\$exportExtra/);
+    });
+
+    it('every chart that fixes a readout offers [PNG | Side readout] as one control (#456)', () => {
+        for (const file of READ_EVERY_SERIES) {
+            const src = read(file);
+            expect(src, file).toMatch(/<CopyPngButton readout=\{readout\} onCopy=\{copyPng\} onCopyBeside=\{copyPngBeside\}/);
+        }
+        expect(read('src/hooks/useChartPng.js')).toMatch(/copyPngBeside = \(\) => copy\(true\)/);
+    });
+
+    it('fixing a readout re-renders the button, never the view: a chart effect listing `readout` would rebuild and clear it (#456)', () => {
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/return useMemo\(\(\) => \(\{ plugin, overlay: <ChartReadout store=\{store\} \/>, store \}\), \[plugin, store\]\);/);
+        expect(read('src/components/charts/CopyPngButton.jsx')).toMatch(/useReadoutFixed\(readout\)/);
+    });
+
+    it('Road Trip\'s valid entries are memoized: a fresh array each render rebuilt the chart and cleared a fixed readout (#456)', () => {
+        expect(read('src/components/RoadTripView.jsx')).toMatch(/const validEntries\s+= useMemo\(\(\) => runEntries\.filter\(/);
+    });
+
+    it('pressing the copy buttons does not clear the readout they are about to export (#456)', () => {
+        expect(read('src/hooks/useChartReadout.jsx')).toMatch(/closest\?\.\('\.chart-readout, \.chart-export-strip, \.chart-copy-btn'\)/);
+    });
+
+    it('the fixed readout is not in the URL or the pop-out: it is a reader\'s inspection, not a setting (#456)', () => {
+        expect(read('src/utils/chartUrlState.js')).not.toMatch(/readout/i);
+        expect(read('src/hooks/useChartSync.js')).not.toMatch(/readout/i);
     });
 
     it('the readout clears when the chart it belongs to is rebuilt', () => {
         const hook = read('src/hooks/useChartReadout.jsx');
         expect(hook).toMatch(/beforeDestroy\(\) \{ detach\?\.\(\)/);
         expect(hook).toMatch(/store\.set\(IDLE\);\s*\};\s*\}/);
+    });
+
+    it('the zoom plugin and the readout agree on what a click is (#456)', () => {
+        // The plugin's default drag threshold is 0, so a click that moved 2px
+        // fixed the readout and zoomed the chart.
+        for (const file of ['src/components/ChargingView.jsx', 'src/components/RoadTripView.jsx']) {
+            const src = read(file);
+            const drags = src.match(/drag: \{\s*enabled: true,\s*threshold: CLICK_SLOP/g) ?? [];
+            expect(drags.length, file).toBe(src.match(/drag: \{/g).length);
+            expect(src).toMatch(/import \{ useChartReadout, CLICK_SLOP \}/);
+        }
     });
 
     it('a drag is a box-zoom, never a click that fixes the readout', () => {
