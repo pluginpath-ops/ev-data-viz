@@ -3176,8 +3176,55 @@ describe('the three chart views load points in one batch, not one test at a time
         expect(text).not.toMatch(/dataService\.buildRangePerSocLookup\(/);
     });
 
-    it('the batch is the existing getPointsForRuns, which chunks its id list', () => {
-        expect(read('src/utils/runPoints.js')).toMatch(/dataService\.getPointsForRuns\(/);
+    it('the batch is getPointsForRuns (through the shared cache), which chunks its id list', () => {
+        expect(read('src/utils/runPoints.js')).toMatch(/dataService\.getPointsForRuns(Cached)?\(/);
         expect(read('src/services/DataService.js')).toMatch(/POINTS_IDS_PER_REQUEST/);
+    });
+});
+
+describe('the shared points cache is read by the chart views and cleared by every write (#498)', () => {
+    const service = read('src/services/DataService.js');
+    // The text of one method, from its signature to the next method at the same indent.
+    const body = (name) => {
+        const start = service.search(new RegExp(`\\n  (async )?${name}\\(`));
+        expect(start, `${name} exists`).toBeGreaterThan(-1);
+        const rest = service.slice(start + 1);
+        const next = rest.slice(1).search(/\n {2}(async |get |#|static )?[A-Za-z#_]+\([^)]*\) \{/);
+        return rest.slice(0, next === -1 ? undefined : next + 1);
+    };
+
+    it('the shared loader reads through the cached methods only', () => {
+        const text = read('src/utils/runPoints.js');
+        expect(text).toMatch(/getPointsForRunsCached\(/);
+        expect(text).toMatch(/getRunDataCached\(/);
+        expect(text).not.toMatch(/dataService\.getRunData\(|dataService\.getPointsForRuns\(/);
+    });
+
+    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s loads through the shared loader — and Home\'s panels render these views', (name) => {
+        expect(read(`src/components/${name}.jsx`)).toMatch(/loadRunPoints\(/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(new RegExp(`<${name}\\b`));
+    });
+
+    it.each(['addRun', 'replaceRunData', 'mergeRunData', 'writeCompositePoints', 'deleteRun', 'deleteVehicle', 'importTableauSessions', 'signOut', 'initialize'])(
+        '%s invalidates cached points', (name) => {
+            expect(body(name)).toMatch(/invalidateRunPoints\(/);
+        });
+
+    it('the writers that race a read invalidate on both sides of the write', () => {
+        for (const name of ['replaceRunData', 'mergeRunData', 'writeCompositePoints']) {
+            expect(body(name).match(/invalidateRunPoints\(/g)?.length, name).toBeGreaterThanOrEqual(2);
+        }
+    });
+
+    it('a fresh vehicle read reconciles the cache against the new counts', () => {
+        expect(body('getVehicles')).toMatch(/reconcileRunPoints\(/);
+    });
+
+    it('the callers that must see the table as it is NOW stay uncached', () => {
+        for (const name of ['duplicateRun', 'copyRunToVehicle', 'refreshChargeSummary', 'backfillChargeSummaries']) {
+            expect(body(name), name).not.toMatch(/Cached\(/);
+        }
+        expect(read('src/components/RunsView.jsx')).not.toMatch(/Cached\(/);
+        expect(body('rebuildComposites')).toMatch(/getPointsForRuns\(/);
     });
 });

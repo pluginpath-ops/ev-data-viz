@@ -83,8 +83,8 @@ export function runsByIdString(vehicles) {
 // One test as the per-test path read it: an inherited test through its source
 // run, scaled by its link; anything else by its own id, unscaled.
 const readOne = (dataService, runId, run) => run?._inherited
-    ? dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1)
-    : dataService.getRunData(runId);
+    ? dataService.getRunDataCached(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1)
+    : dataService.getRunDataCached(runId);
 
 /**
  * Points for several tests at once (#496), keyed by the id each was asked
@@ -92,7 +92,7 @@ const readOne = (dataService, runId, run) => run?._inherited
  * round trip instead of one per test.
  *
  *   - a test counted at 0 points is [] without a request (#497);
- *   - the rest go to dataService.getPointsForRuns together. Each is passed as
+ *   - the rest go to dataService.getPointsForRunsCached together (one request, and none at all for what the shared cache holds). Each is passed as
  *     a bare {id} (or, inherited, its source id and factors) so the batch
  *     scales exactly what getRunData would have;
  *   - a test whose id is not numeric cannot go in a run_id=in.(…) query and
@@ -119,7 +119,7 @@ export async function loadRunPoints(dataService, ids, runsById) {
     };
     if (batch.length) {
         try {
-            const got = await dataService.getPointsForRuns(batch.map(({ id, run }) => run?._inherited
+            const got = await dataService.getPointsForRunsCached(batch.map(({ id, run }) => run?._inherited
                 ? { id, _realRunId: run._realRunId, _efficiencyFactor: run._efficiencyFactor ?? 1, _capacityFactor: run._capacityFactor ?? 1 }
                 : { id }));
             for (const { id } of batch) out[id] = got[id] ?? [];

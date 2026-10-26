@@ -47,7 +47,7 @@ async function oldLoop(missing, vehicles) {
 }
 
 describe('loadRunPoints', () => {
-    beforeEach(() => { db = fakePointsDb(ROWS); dataService.useSupabase = true; });
+    beforeEach(() => { db = fakePointsDb(ROWS); dataService.useSupabase = true; dataService.invalidateRunPoints(); });
 
     const selections = {
         'own tests': [1, 2, 4],
@@ -113,6 +113,7 @@ describe('getPointsForRuns chunking', () => {
         const many = {};
         for (let i = 1; i <= 250; i++) many[i] = curve(3, i % 50);
         db = fakePointsDb(many);
+        dataService.invalidateRunPoints();
         const runs = Array.from({ length: 250 }, (_, i) => ({ id: i + 1 }));
         const all = await dataService.getPointsForRuns(runs);
         expect(db.requests.filter(r => r.from === 0)).toHaveLength(3);          // 100 + 100 + 50
@@ -124,6 +125,7 @@ describe('getPointsForRuns chunking', () => {
 describe('rangePerSocLookup', () => {
     it('is what buildRangePerSocLookup returns', async () => {
         db = fakePointsDb({ 1: curve(30), 2: [{ soc: 10, range_value: 50 }], 3: [] });
+        dataService.invalidateRunPoints();
         for (const id of [1, 2, 3]) {
             const viaService = await dataService.buildRangePerSocLookup(id);
             const direct = rangePerSocLookup(await dataService.getRunData(id));
@@ -142,6 +144,7 @@ describe('rangeAtFrom', () => {
     };
     it.each([[1, 'a curve of its own'], [2, 'one point only: linear'], [3, 'no points: linear']])('range test %i (%s) maps every SoC as before', async (id) => {
         db = fakePointsDb({ 1: curve(30), 2: [{ soc: 10, range_value: 50 }], 3: [] });
+        dataService.invalidateRunPoints();
         const src = { miPerSoc: 3.2 };
         const before = await oldRangeAt(src, id);
         const after = rangeAtFrom(src, await dataService.getRunData(id));
