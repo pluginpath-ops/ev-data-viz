@@ -3144,3 +3144,87 @@ describe('the spec chart plots the vehicle table’s columns (#450)', () => {
         expect(chart).toMatch(/currentFieldKey\(chartConfig\.specsField\)/);
     });
 });
+
+describe('point requests are skipped for a test counted at zero (#497)', () => {
+    it('Charging Curves asks pointsKnownEmpty before it looks up a range test\'s points', () => {
+        expect(read('src/components/ChargingView.jsx')).toMatch(/pointsKnownEmpty\(/);
+    });
+
+    it('the shared loader (every view\'s point read) asks it before fetching', () => {
+        expect(read('src/utils/runPoints.js')).toMatch(/if \(pointsKnownEmpty\(run\)\)/);
+    });
+
+    it('Charging Curves skips the range-per-SoC lookup for a source with no points', () => {
+        expect(read('src/components/ChargingView.jsx')).toMatch(/!pointsKnownEmpty\(src\.sourceRun\)/);
+    });
+
+    it('a write that changes a run\'s points puts the new count back in state, on its copies too', () => {
+        const ctx = read('src/context/AppContext.jsx');
+        expect(ctx.match(/withPointCount\(/g)?.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('a run read without the count embed is "unknown" (null), not "none" (0)', () => {
+        expect(read('src/services/DataService.js')).toMatch(/\?\s*\(r\.data_points\[0\]\?\.count \?\? 0\) : null/);
+    });
+});
+
+describe('the three chart views load points in one batch, not one test at a time (#496)', () => {
+    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s reads through loadRunPoints and never awaits getRunData itself', (name) => {
+        const text = read(`src/components/${name}.jsx`);
+        expect(text).toMatch(/loadRunPoints\(dataService,/);
+        expect(text).not.toMatch(/dataService\.getRunData\(/);
+        expect(text).not.toMatch(/dataService\.buildRangePerSocLookup\(/);
+    });
+
+    it('the batch is getPointsForRuns (through the shared cache), which chunks its id list', () => {
+        expect(read('src/utils/runPoints.js')).toMatch(/dataService\.getPointsForRuns(Cached)?\(/);
+        expect(read('src/services/DataService.js')).toMatch(/POINTS_IDS_PER_REQUEST/);
+    });
+});
+
+describe('the shared points cache is read by the chart views and cleared by every write (#498)', () => {
+    const service = read('src/services/DataService.js');
+    // The text of one method, from its signature to the next method at the same indent.
+    const body = (name) => {
+        const start = service.search(new RegExp(`\\n  (async )?${name}\\(`));
+        expect(start, `${name} exists`).toBeGreaterThan(-1);
+        const rest = service.slice(start + 1);
+        const next = rest.slice(1).search(/\n {2}(async |get |#|static )?[A-Za-z#_]+\([^)]*\) \{/);
+        return rest.slice(0, next === -1 ? undefined : next + 1);
+    };
+
+    it('the shared loader reads through the cached methods only', () => {
+        const text = read('src/utils/runPoints.js');
+        expect(text).toMatch(/getPointsForRunsCached\(/);
+        expect(text).toMatch(/getRunDataCached\(/);
+        expect(text).not.toMatch(/dataService\.getRunData\(|dataService\.getPointsForRuns\(/);
+    });
+
+    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s loads through the shared loader — and Home\'s panels render these views', (name) => {
+        expect(read(`src/components/${name}.jsx`)).toMatch(/loadRunPoints\(/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(new RegExp(`<${name}\\b`));
+    });
+
+    it.each(['addRun', 'replaceRunData', 'mergeRunData', 'writeCompositePoints', 'deleteRun', 'deleteVehicle', 'importTableauSessions', 'signOut', 'initialize'])(
+        '%s invalidates cached points', (name) => {
+            expect(body(name)).toMatch(/invalidateRunPoints\(/);
+        });
+
+    it('the writers that race a read invalidate on both sides of the write', () => {
+        for (const name of ['replaceRunData', 'mergeRunData', 'writeCompositePoints']) {
+            expect(body(name).match(/invalidateRunPoints\(/g)?.length, name).toBeGreaterThanOrEqual(2);
+        }
+    });
+
+    it('a fresh vehicle read reconciles the cache against the new counts', () => {
+        expect(body('getVehicles')).toMatch(/reconcileRunPoints\(/);
+    });
+
+    it('the callers that must see the table as it is NOW stay uncached', () => {
+        for (const name of ['duplicateRun', 'copyRunToVehicle', 'refreshChargeSummary', 'backfillChargeSummaries']) {
+            expect(body(name), name).not.toMatch(/Cached\(/);
+        }
+        expect(read('src/components/RunsView.jsx')).not.toMatch(/Cached\(/);
+        expect(body('rebuildComposites')).toMatch(/getPointsForRuns\(/);
+    });
+});

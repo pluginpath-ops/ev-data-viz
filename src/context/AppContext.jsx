@@ -22,6 +22,7 @@ import { toSessionRow, sessionFor } from '../utils/testSessions';
 import { isListed, poolOf } from '../utils/runListing';
 import { createWriteGuard } from '../utils/writeGuard';
 import { passDown } from '../utils/vehicleDeletion';
+import { withPointCount } from '../utils/runPoints';
 import { chargingLineage, lineageInheritors } from '../utils/lineageCharging';
 
 const AppContext = createContext(null);
@@ -733,6 +734,9 @@ export function AppProvider({ children }) {
                         : r) }
                     : v
             ));
+            // The run's copies elsewhere (inherited tests) hold the old count
+            // too, and a chart skips the points request for a test counted at 0.
+            setVehicles(prev => withPointCount(prev, runId, result.rowCount));
             if (feedsComposites(vehicleId, runId)) await refreshCompositesAround(vehicleId, runId);
             return result;
         } catch (error) {
@@ -759,6 +763,9 @@ export function AppProvider({ children }) {
                         : v
                 ));
             }
+            // A merge can take a run from no points to some: the new count goes
+            // to the run and its copies, or a chart would keep skipping it.
+            if (result?.rowCount != null) setVehicles(prev => withPointCount(prev, runId, result.rowCount));
             if (feedsComposites(vehicleId, runId)) await refreshCompositesAround(vehicleId, runId);
             return result;
         } catch (error) {

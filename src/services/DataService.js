@@ -18,6 +18,7 @@ import { planCompositeRebuild, compositeEligible, mayHaveComposite, storedCompos
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
 import { toChargerCurrent } from '../utils/chargerCurrentClass';
+import { rangePerSocLookup } from '../utils/runPoints';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -36,6 +37,17 @@ const roundField = roundTo;
  * the cap. Paging is for the reads that genuinely want every row.
  */
 const PAGE_SIZE = 1000;
+
+/** Test ids per data_points request: ~7 characters each, so a request stays far under any URL limit. */
+const POINTS_IDS_PER_REQUEST = 100;
+
+/**
+ * How many data points the shared points cache may hold (#498). The mirror's
+ * whole table is ~12,000 rows and a 16-vehicle selection ~2,000, so this keeps
+ * dozens of selections; at a few hundred bytes a row it is a few MB. Past it,
+ * the least recently read finished entries go first.
+ */
+const POINT_CACHE_MAX_ROWS = 60000;
 
 /**
  * Read every row a query matches, a page at a time.
@@ -146,6 +158,18 @@ function shapePoint(p, efficiencyFactor = 1, capacityFactor = 1) {
 }
 
 /**
+ * Each requested run's points, shaped and scaled by ITS factors, out of rows
+ * grouped by real run id — what getPointsForRuns and its cached twin share.
+ */
+function shapeRunPoints(runs, out, rowsByRunId) {
+  for (const r of runs) {
+    const rows = rowsByRunId.get(Number(r._realRunId ?? r.id)) ?? [];
+    out[r.id] = rows.map(p => shapePoint(p, r._efficiencyFactor ?? 1, r._capacityFactor ?? 1));
+  }
+  return out;
+}
+
+/**
  * A runs row as the app holds it. The one door every run comes through —
  * getVehicles, and a vehicle's runs re-read after its composites are rebuilt —
  * so the two can never shape a run differently.
@@ -169,8 +193,10 @@ function shapeRun(r) {
     isExcluded: r.is_excluded === undefined ? !!r.is_hidden : !!r.is_excluded,
     // A curator's "I have looked; count it" (migration 080, runListing).
     qualityOverride: !!r.quality_override,
-    // data_points(count) returns [{ count: N }]; normalise to a plain number
-    dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
+    // data_points(count) returns [{ count: N }]; normalise to a plain number.
+    // null when the select carried no embed at all: "not counted" is not "none",
+    // and utils/runPoints.js skips a fetch only for a counted 0.
+    dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : null,
   };
 }
 
@@ -303,6 +329,9 @@ class DataService {
     this.platformsAvailable = false;
     // Whether migration 086's battery_revision / capacity_factor exist; set by getVehicles().
     this.batteryRevisionAvailable = false;
+    // The shared points cache (#498): see getPointsForRunsCached.
+    this.pointCache = new Map();
+    this.pointCacheRows = 0;
   }
 
   get isAdmin()       { return this.role === 'admin'; }
@@ -317,6 +346,9 @@ class DataService {
     // Always use Supabase for reads when credentials are configured,
     // so unauthenticated visitors can see public vehicles.
     this.useSupabase = true;
+    // Who is asking decides which rows a read can see (RLS): never carry one
+    // identity's points into another's session.
+    this.invalidateRunPoints();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       this.user = user;
@@ -402,6 +434,10 @@ class DataService {
     // Migration 086 is applied when the rows carry its column: `*` brings it
     // back once it exists, and updateVehicle writes it only then.
     this.batteryRevisionAvailable = (data || []).some(v => 'battery_revision' in v);
+
+    // The runs were just counted fresh: any cached points that disagree with
+    // the count are from before someone else's change.
+    this.reconcileRunPoints(processed.flatMap(v => v.runs));
 
     // Pass 2: build flat run lookup maps, then attach inherited runs.
     // buildInheritedRuns needs to locate source runs across all vehicles.
@@ -860,19 +896,7 @@ class DataService {
    * fewer than two usable SoC+range point pairs.
    */
   async buildRangePerSocLookup(rangeTestRunId) {
-    const data = await this.getRunData(rangeTestRunId);
-    const pts = data
-      .filter(p => p.soc != null && p.range != null)
-      .sort((a, b) => a.soc - b.soc);
-    if (pts.length < 2) return null;
-    return (soc) => {
-      if (soc <= pts[0].soc)              return pts[0].range;
-      if (soc >= pts[pts.length - 1].soc) return pts[pts.length - 1].range;
-      const hi = pts.findIndex(p => p.soc >= soc);
-      const lo = hi - 1;
-      const t = (soc - pts[lo].soc) / (pts[hi].soc - pts[lo].soc);
-      return Math.round((pts[lo].range + t * (pts[hi].range - pts[lo].range)) * 10) / 10;
-    };
+    return rangePerSocLookup(await this.getRunDataCached(rangeTestRunId));
   }
 
   async deleteSpecLink(id) {
@@ -1257,6 +1281,8 @@ class DataService {
       return;
     }
     const { error } = await getSupabase().rpc('delete_vehicle_passing_down', { p_vehicle_id: vehicleId });
+    // Its runs go (or pass down to variants) with it: not worth working out which.
+    this.invalidateRunPoints();
     if (error) {
       // PGRST202: the function is not there yet. Falling back to a plain delete
       // would orphan the vehicle's variants, which is what the function exists
@@ -1330,6 +1356,7 @@ class DataService {
         const { error: batchError } = await getSupabase().from('data_points').insert(batch);
         if (batchError) throw batchError;
       }
+      this.invalidateRunPoints(newRun.id);
 
       const fieldsUpdate = {};
       if (populatedFields.length > 0)           fieldsUpdate.populated_fields  = populatedFields;
@@ -1516,6 +1543,7 @@ class DataService {
    */
   async writeCompositePoints(runId, points) {
     const sb = getSupabase();
+    this.invalidateRunPoints(runId);
     const { error: delError } = await sb.from('data_points').delete().eq('run_id', runId);
     if (delError) throw delError;
     const rows = points.map((p, frame) => ({
@@ -1529,6 +1557,7 @@ class DataService {
       const { error } = await sb.from('data_points').insert(rows.slice(i, i + 1000));
       if (error) throw error;
     }
+    this.invalidateRunPoints(runId);
   }
 
   async updateRun(vehicleId, runId, updates) {
@@ -1660,6 +1689,7 @@ class DataService {
       return;
     }
     const { error } = await getSupabase().from('runs').delete().eq('id', runId);
+    this.invalidateRunPoints(runId);
     if (error) throw error;
   }
 
@@ -1806,23 +1836,150 @@ class DataService {
     const out = Object.fromEntries(runs.map(r => [r.id, []]));
     const realIds = [...new Set(runs.map(r => Number(r._realRunId ?? r.id)))];
     if (!realIds.length) return out;
-    const data = await fetchAllRows(() => getSupabase()
+    return shapeRunPoints(runs, out, await this.#fetchPointRows(realIds));
+  }
+
+  /** Raw data_points rows for real run ids, grouped by run_id: chunked, paged, ordered. */
+  async #fetchPointRows(realIds) {
+    // Chunked so the id list never outgrows a URL (a Home page or a long
+    // selection can name hundreds); a run's rows all come from one chunk, so
+    // each run's own order is the query's. Chunks go side by side.
+    const chunks = [];
+    for (let i = 0; i < realIds.length; i += POINTS_IDS_PER_REQUEST) chunks.push(realIds.slice(i, i + POINTS_IDS_PER_REQUEST));
+    const data = (await Promise.all(chunks.map(ids => fetchAllRows(() => getSupabase()
       .from('data_points')
       .select('*')
-      .in('run_id', realIds)
+      .in('run_id', ids)
       .order('run_id', { ascending: true })
       .order('frame', { ascending: true })
-      .order('id', { ascending: true }));
+      .order('id', { ascending: true }))))).flat();
     const rowsByRunId = new Map();
     for (const p of data || []) {
       if (!rowsByRunId.has(p.run_id)) rowsByRunId.set(p.run_id, []);
       rowsByRunId.get(p.run_id).push(p);
     }
-    for (const r of runs) {
-      const rows = rowsByRunId.get(Number(r._realRunId ?? r.id)) ?? [];
-      out[r.id] = rows.map(p => shapePoint(p, r._efficiencyFactor ?? 1, r._capacityFactor ?? 1));
+    return rowsByRunId;
+  }
+
+  // ── The shared points cache (#498) ─────────────────────────────────────────
+  //
+  // What the chart views and Home panels read points through. Keyed by REAL run
+  // id and holding the raw rows (or the promise of them, so two readers asking
+  // at once share one request): an own test, an inherited test of the same run
+  // and a range lookup of it are one entry, and every reader applies its own
+  // efficiency/capacity factors on the way out — shapePoint makes new objects,
+  // so the cached rows are never handed out to be changed.
+  //
+  // It is deliberately NOT under getRunData / getPointsForRuns. Those stay
+  // uncached for the callers that must see the table as it is NOW: the edit
+  // table, CSV export, duplicate and copy, the charge-summary backfill, and
+  // the composite rebuild, which reads tests this very session may have just
+  // rewritten.
+  //
+  // WHEN AN ENTRY GOES (a stale chart is worse than a slow one):
+  //   invalidateRunPoints(runId)   after every write that changes a run's
+  //                                points: addRun, replaceRunData, mergeRunData,
+  //                                writeCompositePoints (so every composite
+  //                                rebuild), deleteRun; once before the write
+  //                                and once after, so a read racing it cannot
+  //                                keep the old rows
+  //   invalidateRunPoints()        everything: deleteVehicle (its runs pass
+  //                                down), a Tableau import, initialize and
+  //                                signOut (a new identity sees different rows)
+  //   a failed read                its entry is dropped, so the next ask retries
+  //   getVehicles()                an entry whose length disagrees with the
+  //                                run's fresh dataPointCount is dropped — what
+  //                                catches a change made in another session
+  //   POINT_CACHE_MAX_ROWS         least recently read finished entries first
+  // A run being unlisted or excluded changes the run row, not its points, so it
+  // is not here: the views choose which runs to ask for, the cache holds rows.
+
+  /** The raw rows of each real run id, from cache or one batched request; Map of id → Promise. */
+  #cachedRows(realIds) {
+    const out = new Map();
+    const missing = [];
+    for (const id of new Set(realIds)) {
+      const hit = this.pointCache.get(id);
+      if (hit) {
+        // Re-insert: Map order is read order, so the front is the stalest.
+        this.pointCache.delete(id);
+        this.pointCache.set(id, hit);
+        out.set(id, hit.rows);
+      } else {
+        missing.push(id);
+      }
+    }
+    if (missing.length) {
+      const batch = this.#fetchPointRows(missing);
+      for (const id of missing) {
+        const entry = { rows: batch.then(m => m.get(id) ?? []), size: null };
+        this.pointCache.set(id, entry);
+        out.set(id, entry.rows);
+        entry.rows.then(rows => {
+          // Dropped (invalidated) while it was in flight: do not count it.
+          if (this.pointCache.get(id) !== entry) return;
+          entry.size = rows.length;
+          this.pointCacheRows += rows.length;
+          this.#trimPointCache();
+        }, () => { if (this.pointCache.get(id) === entry) this.pointCache.delete(id); });
+      }
     }
     return out;
+  }
+
+  #trimPointCache() {
+    for (const [id, entry] of this.pointCache) {
+      if (this.pointCacheRows <= POINT_CACHE_MAX_ROWS || this.pointCache.size <= 1) return;
+      if (entry.size == null) continue;   // still loading: someone is waiting on it
+      this.pointCache.delete(id);
+      this.pointCacheRows -= entry.size;
+    }
+  }
+
+  /**
+   * Drop one run's cached points (by real run id), or all of them. Safe to call
+   * for an id that is not cached.
+   */
+  invalidateRunPoints(runId) {
+    if (runId === undefined) {
+      this.pointCache.clear();
+      this.pointCacheRows = 0;
+      return;
+    }
+    const entry = this.pointCache.get(Number(runId));
+    if (!entry) return;
+    this.pointCache.delete(Number(runId));
+    if (entry.size != null) this.pointCacheRows -= entry.size;
+  }
+
+  /** Drop cached points that no longer match what a fresh runs read says is there. */
+  reconcileRunPoints(runs) {
+    for (const r of runs) {
+      const entry = this.pointCache.get(Number(r.id));
+      if (entry?.size != null && r.dataPointCount != null && entry.size !== r.dataPointCount) {
+        this.invalidateRunPoints(r.id);
+      }
+    }
+  }
+
+  /** getRunData, through the shared cache. Same answer; for the chart views. */
+  async getRunDataCached(runId, efficiencyFactor = 1, capacityFactor = 1) {
+    const actualId = isInheritedRunId(runId) ? parseInheritedRunId(runId).realRunId : runId;
+    // An id that is not a run number cannot be cached by it: the plain read.
+    if (!Number.isFinite(Number(actualId))) return this.getRunData(runId, efficiencyFactor, capacityFactor);
+    const rows = await this.#cachedRows([Number(actualId)]).get(Number(actualId));
+    return rows.map(p => shapePoint(p, efficiencyFactor, capacityFactor));
+  }
+
+  /** getPointsForRuns, through the shared cache. Same answer; for the chart views. */
+  async getPointsForRunsCached(runs) {
+    const out = Object.fromEntries(runs.map(r => [r.id, []]));
+    const realIds = [...new Set(runs.map(r => Number(r._realRunId ?? r.id)))];
+    if (!realIds.length) return out;
+    const pending = this.#cachedRows(realIds);
+    const rowsByRunId = new Map();
+    await Promise.all([...pending].map(async ([id, rows]) => rowsByRunId.set(id, await rows)));
+    return shapeRunPoints(runs, out, rowsByRunId);
   }
 
   async toggleVehicleVisibility(vehicleId, newVisibility) {
@@ -1975,6 +2132,7 @@ class DataService {
       results.runsImported++;
       results.pointsImported += session.dataPoints.length;
     }
+    this.invalidateRunPoints();
     return results;
   }
 
@@ -2005,12 +2163,14 @@ class DataService {
       temperature: roundField(p.temperature, 1),
     }));
 
+    this.invalidateRunPoints(runId);
     const { data, error } = await getSupabase()
       .rpc('merge_run_data_points', {
         p_run_id:   runId,
         p_join_key: joinKey,
         p_rows:     rows,
       });
+    this.invalidateRunPoints(runId);
     if (error) throw error;
 
     // After a successful merge, union any newly-populated fields into populated_fields
@@ -2034,7 +2194,13 @@ class DataService {
     // session is re-read: the merged rows alone are only part of it.
     result.chargeSummary = await this.refreshChargeSummary(runId);
 
-    return result; // { updated: N, inserted: M, populatedFields?: [...], chargeSummary }
+    // The run's point count after the merge, for the caller to put back in
+    // state: charts skip the points request for a test counted at 0 (#497).
+    const { count } = await getSupabase()
+      .from('data_points').select('id', { count: 'exact', head: true }).eq('run_id', runId);
+    if (count != null) result.rowCount = count;
+
+    return result; // { updated: N, inserted: M, rowCount?: N, populatedFields?: [...], chargeSummary }
   }
 
   /**
@@ -2059,8 +2225,10 @@ class DataService {
       range_value: roundField(p.range,       1),
       temperature: roundField(p.temperature, 1),
     }));
+    this.invalidateRunPoints(runId);
     const { error } = await getSupabase()
       .rpc('replace_run_data_points', { p_run_id: runId, p_rows: rows });
+    this.invalidateRunPoints(runId);
     if (error) throw error;
 
     const populatedFields = detectPopulatedFields(points);
@@ -2081,6 +2249,7 @@ class DataService {
     this.user = null;
     this.role = null;
     this.useSupabase = false;
+    this.invalidateRunPoints();
   }
 
   // ── Admin RPCs ────────────────────────────────────────────────────────────

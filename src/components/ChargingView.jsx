@@ -56,6 +56,7 @@ import NumberInput from './NumberInput';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyPngButton from './charts/CopyPngButton';
+import { pointsKnownEmpty, loadRunPoints, runsByIdString, rangeAtFrom } from '../utils/runPoints';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
@@ -243,30 +244,25 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // authority than a figure derived from a measured range test, and treating
     // them as more authoritative was the anomaly.
     //
-    // Returns (soc) => miles, or null when no range test won ('recorded' and
-    // 'none' leave the run's own column alone). Deliberately UNCORRECTED:
-    // correction is a single multiplier applied at render time (rangeFactorFor),
-    // so the dropdown takes effect without refetching.
-    const rangeAtFor = async (runId, run) => {
+    // Returns the resolved source when a range test won ('recorded' and 'none'
+    // leave the run's own column alone), else null. Resolving is synchronous,
+    // so the loader can learn every run's source BEFORE it fetches, and fetch
+    // the points of all the tests and all their range lookups together.
+    const rangeSourceFor = (runId, run) => {
         const parentVehicle = parentOf(runId);
         const src = resolveRangeSource(run ?? { id: runId }, {
             vehicle: parentVehicle,
             explicitPairing: pairedRangeOf(parentVehicle, runId),
         });
-        if (src.miPerSoc == null) return null;
-        // A range test WITH its own SoC/range time series gives the real,
-        // non-linear shape; prefer it. Most range tests are scalar (distance +
-        // SoC bounds), so the linear miPerSoc model is the usual path.
-        let lookup = null;
-        if (src.sourceRun?.id && !isEpaPartnerId(src.sourceRun.id)) {
-            try {
-                lookup = await dataService.buildRangePerSocLookup(src.sourceRun.id);
-            } catch (_) { /* fall through to linear */ }
-        }
-        return lookup
-            ? (soc) => lookup(soc)
-            : (soc) => Math.round(soc * src.miPerSoc * 10) / 10;
+        return src.miPerSoc == null ? null : src;
     };
+
+    // The range test whose own SoC/range time series might give the real,
+    // non-linear shape — only a stored test counted as having points (#497;
+    // most range tests are scalar: distance + SoC bounds).
+    const lookupRunOf = (src) =>
+        src?.sourceRun?.id && !isEpaPartnerId(src.sourceRun.id) && !pointsKnownEmpty(src.sourceRun)
+            ? src.sourceRun : null;
 
     // Lazy-load data_points for newly selected runs — a composite's included:
     // it is a stored run with points like any test.
@@ -283,50 +279,49 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             if (missingIds.length === 0) return;
             setLoadingData(true);
             const updates = {};
-            // Build a flat lookup of all runs across all selected vehicles
-            const allRuns = vehicles.flatMap(v => v.runs || []);
-            for (const runId of missingIds) {
-                try {
-                    let runData;
-                    if (dataService.useSupabase) {
-                        const run = allRuns.find(r => String(r.id) === String(runId));
-                        if (run?._inherited) {
-                            runData = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
-                        } else {
-                            runData = await dataService.getRunData(runId);
+            if (dataService.useSupabase) {
+                // Every missing test's points in one go, and — alongside — the
+                // points of the range tests whose own curve could replace the
+                // linear model (#496). Range lookups are read unscaled, by the
+                // id the source run has, as buildRangePerSocLookup always did,
+                // so they go in with no run to scale them by.
+                const runsById = runsByIdString(vehicles);
+                const sourceOf = new Map();
+                for (const runId of missingIds) {
+                    const run = runsById.get(String(runId));
+                    const src = pointsKnownEmpty(run) ? null : rangeSourceFor(runId, run);
+                    if (src) sourceOf.set(runId, src);
+                }
+                const lookupIds = [...new Set([...sourceOf.values()].map(src => lookupRunOf(src)?.id).filter(Boolean))];
+                const [loaded, lookups] = await Promise.all([
+                    loadRunPoints(dataService, missingIds, runsById),
+                    lookupIds.length ? loadRunPoints(dataService, lookupIds, new Map()) : {},
+                ]);
+                for (const runId of missingIds) {
+                    try {
+                        let runData = loaded[runId] ?? [];
+                        const src = sourceOf.get(runId);
+                        if (runData.length > 0 && src) {
+                            const rangeAt = rangeAtFrom(src, lookups[lookupRunOf(src)?.id]);
+                            runData = runData.map(p => ({
+                                ...p,
+                                range: p.soc != null ? rangeAt(p.soc) : null,
+                            }));
                         }
-
-                        // Range axis, resolved on the same ranking as every other
-                        // chart (utils/rangeSource.js):
-                        //
-                        //   pairing → default range test → recorded range column
-                        //
-                        // A range test now outranks the recorded column outright,
-                        // not just when one was explicitly paired. The recorded
-                        // values are themselves mostly estimates — usually the car's
-                        // guess-o-meter — so they carry no more authority than a
-                        // figure derived from a measured range test, and treating
-                        // them as more authoritative was the anomaly.
-                        if (runData.length > 0) {
-                            const rangeAt = await rangeAtFor(runId, run);
-                            if (rangeAt) {
-                                runData = runData.map(p => ({
-                                    ...p,
-                                    range: p.soc != null ? rangeAt(p.soc) : null,
-                                }));
-                            }
-                        }
-                    } else {
-                        // localStorage: find run.data inline
-                        for (const v of vehicles) {
-                            const run = v.runs?.find(r => r.id === runId);
-                            if (run) { runData = run.data || []; break; }
-                        }
+                        updates[runId] = runData;
+                    } catch (err) {
+                        console.error(`Failed to load data for run ${runId}:`, err);
+                        updates[runId] = [];
                     }
-                    updates[runId] = runData ?? [];
-                } catch (err) {
-                    console.error(`Failed to load data for run ${runId}:`, err);
-                    updates[runId] = [];
+                }
+            } else {
+                // localStorage: find run.data inline
+                for (const runId of missingIds) {
+                    for (const v of vehicles) {
+                        const run = v.runs?.find(r => r.id === runId);
+                        if (run) { updates[runId] = run.data || []; break; }
+                    }
+                    updates[runId] ??= [];
                 }
             }
             setRunDataCache(prev => ({ ...prev, ...updates }));
