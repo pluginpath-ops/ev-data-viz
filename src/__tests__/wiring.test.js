@@ -1083,7 +1083,7 @@ describe('the seams that broke before', () => {
         expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
         expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
         expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
-        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\)\}/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\) \?\? explainerNoteLink\(row\.links\?\.\[col\.key\], openExplainer\)\}/);
         expect(read('src/components/tables/TableCell.jsx'), 'without borrowing the test peek').toMatch(/const noteLink = test \?\? link/);
     });
 
@@ -1655,6 +1655,33 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
             expect(knobs, `${key} is tunable but absent from the Admin knobs`).toContain(`key: '${key}'`);
             expect(epa, `${key} is not resolved through the override layers`).toMatch(new RegExp(`resolve\\('${key}'`));
         }
+    });
+
+    it('offers the DC fast charging loss as a knob, and prices the fast cost on it, not on the wall figure (#506)', () => {
+        const knobs = read('src/constants/knobs.js');
+        const epa = read('src/constants/epa.js');
+        expect(knobs, 'the loss is tunable but absent from the Admin knobs').toContain("key: 'DC_FAST_LOSS'");
+        expect(epa, 'and is not resolved through the override layers').toMatch(/resolve\('DC_FAST_LOSS'/);
+        const table = read('src/utils/vehicleTable.js');
+        const fast = table.slice(table.indexOf('const costPer100Fast'), table.indexOf('const CALCULATED_COLUMNS'));
+        expect(fast, 'the fast cost must be grossed up by the knob').toMatch(/1 - DC_FAST_LOSS/);
+        // The fast column must not go back to the AC wall basis: a DC session
+        // bypasses the onboard charger the home cost pays for.
+        expect(fast, 'the fast cost must not read wallEfficiency').not.toMatch(/wallEfficiency/);
+        expect(table, 'the fast column must read the cost it is built on').toMatch(/costPer100Fast\(inputs, fastPrice, chargerEff\)/);
+        // And the home figure stays on the wall basis.
+        expect(table, 'the home cost stays on wall-side efficiency').toMatch(/costPer100\(homePrice\)\(inputs\)/);
+        const figures = read('src/utils/vehicleFigures.js');
+        expect(figures, 'the cert\'s own charging efficiency must reach the table').toMatch(/chargerEfficiency: measuredChargerEfficiency/);
+        expect(table, 'and be read from the resolved range').toMatch(/vehicle\.epaRange\?\.chargerEfficiency/);
+        // The estimate note on every fast cell must reach the explainer, with its tooltip.
+        expect(table, 'the fast column must carry its note link').toMatch(/noteLink: fastCostNoteLink/);
+        expect(table, 'and the table must hand it to the cell').toMatch(/links\[col\.key\] = col\.noteLink\(\)/);
+        expect(read('src/components/tables/TableCell.jsx'), 'and the cell must show the tooltip').toMatch(/title=\{noteLink\.title\}/);
+        // The default and the evidence behind it must say the same number.
+        const ledger = JSON.parse(read('src/explainers/facts.json')).facts.find(f => f.id === 'dc-fast-round-trip-pairs');
+        expect(epa, 'the default must be the ledger\'s').toContain(`DC_FAST_LOSS: ${ledger.value.evbench_default},`);
+        expect(read('src/explainers/content/dc-fast-charging-loss.md'), 'and the explainer must cite the round trip').toContain('[[fact:dc-fast-round-trip-pairs]]');
     });
 
     it('offers the accessory load on the correction target, and writes it to the link only when set (#449)', () => {

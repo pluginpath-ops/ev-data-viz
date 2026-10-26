@@ -47,7 +47,9 @@ place.
 EPA's MPGe and kWh/100 mi are measured *at the wall*. The test recharges the car from an ordinary AC
 outlet with its own charger, and the energy that goes into that recharge, losses included, is what gets
 counted [[fact:epa-mpge-at-the-wall]]. That's what you pay for at home, so it's the right number for cost.
-It isn't the energy the battery delivered to the motors, which is smaller.
+It isn't the energy the battery delivered to the motors, which is smaller. It also isn't what a DC fast charge
+loses, which skips the car's own charger and loses energy in other places; that is the subject of
+[How much energy does DC fast charging lose?](dc-fast-charging-loss).
 
 ::: held
 Owner: worth a worked example. The same car's kWh/100 mi from the wall and from the battery, and what the

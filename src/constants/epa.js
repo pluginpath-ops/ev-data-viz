@@ -144,12 +144,34 @@ export const EPA_DEFAULTS = {
     DEFAULT_SS_ETA:      0.929,
     DEFAULT_ACCESSORY_W: 300,         // constant accessory draw, watts
     // Used when AC recharge energy is unavailable. Was 0.88 from a read of CSI
-    // observations (~0.87–0.89); now 0.855, from the two cert records where BOTH
-    // sides are reported and the ratio is measured rather than inferred:
+    // observations (~0.87–0.89), then 0.855 from the two cert records where
+    // BOTH sides are reported (#206):
     //   Rivian R2 (MCT)        89,549.27 DC / 104,689 AC = 85.5%
     //   Ford Lightning ER (SCT) ~131 kWh usable / 152.974 = 85.6%
-    // Refine as more MCT records with real DC energy accumulate (#206).
-    ASSUMED_CHARGER_EFF: 0.855,
+    // Now 0.885, the fleet median: Certification Statistics, charger efficiency,
+    // model year 2025, n = 174 (quartiles 0.872–0.894, range 0.805–0.918). The
+    // two records above both sit below its lower quartile, so they were a low
+    // read of the fleet (#506). Refresh it as the data grows.
+    ASSUMED_CHARGER_EFF: 0.885,
+    // What a DC fast session loses between the car's port and the pack's DC
+    // output (what the inverter draws), as a fraction of the energy the
+    // station bills (#506). The same span the AC figure above covers, so the
+    // two are comparable, but not the AC loss above (0.115 assumed, the median of the
+    // 2025 certifications): that recharge runs the
+    // onboard charger for hours. A DC session bypasses it, and the station's
+    // own conversion (about 3%) is not billed. What is left is the cable and
+    // port, cooling and battery heating (including the preconditioning on the
+    // way in), auxiliary draw, and the pack's own losses charging and
+    // discharging. Measured by charging for 15 minutes, then driving the same
+    // SoC back down (Out of Spec's 10% challenge): nine tests, 6.0–12.7%, mean
+    // 9.4%, median 9.3%, as the owner read them from the videos. The only
+    // measurement that stops at the battery (ADAC, four cars) is 1–6%
+    // preconditioned, which leaves the pack's internal losses out. 9% is the
+    // round number at the centre; it is one value on purpose, since the spread
+    // does not follow maker or platform in any way the unlogged conditions
+    // do not also explain. Sources and the gaps: explainers/facts.json,
+    // `dc-fast-round-trip-pairs`.
+    DC_FAST_LOSS: 0.09,
     // Condition correction (#188). The aero/rolling split is what lets a
     // measurement be re-priced for speed and air density without per-vehicle
     // road-load coefficients — see utils/conditionCorrection.js. These moved
@@ -352,6 +374,7 @@ export const DEFAULT_SS_ETA      = resolve('DEFAULT_SS_ETA',      EPA_DEFAULTS.D
 export const DEFAULT_ACCESSORY_W = resolve('DEFAULT_ACCESSORY_W', EPA_DEFAULTS.DEFAULT_ACCESSORY_W);
 export const ACCESSORY_LOAD_KW   = DEFAULT_ACCESSORY_W / 1000;  // derived (kW)
 export const ASSUMED_CHARGER_EFF = resolve('ASSUMED_CHARGER_EFF', EPA_DEFAULTS.ASSUMED_CHARGER_EFF);
+export const DC_FAST_LOSS        = resolve('DC_FAST_LOSS',        EPA_DEFAULTS.DC_FAST_LOSS);
 export const AERO_FRACTION        = resolve('AERO_FRACTION',        EPA_DEFAULTS.AERO_FRACTION);
 export const TOWING_AERO_FRACTION = resolve('TOWING_AERO_FRACTION', EPA_DEFAULTS.TOWING_AERO_FRACTION);
 export const REFERENCE_SPEED_MPH  = resolve('REFERENCE_SPEED_MPH',  EPA_DEFAULTS.REFERENCE_SPEED_MPH);

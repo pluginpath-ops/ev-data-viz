@@ -82,7 +82,11 @@ export const OUTLINE = [
                     blurb: 'The A, B and C of drag, and why EVBench measures η at 65 mph.' },
               ] },
             { slug: 'epa-battery-figures', title: 'What EPA says about the battery',
-              blurb: 'Gross against usable, pack voltage, and charging loss.' },
+              blurb: 'Gross against usable, pack voltage, and charging loss.',
+              children: [
+                  { slug: 'dc-fast-charging-loss', title: 'How much energy does DC fast charging lose?',
+                    blurb: 'Why the label’s charging loss is an AC figure, what a fast charge loses instead, and how EVBench came to 9%.' },
+              ] },
         ],
     },
 ];

@@ -9,6 +9,7 @@ import {
 } from '../vehicleTable';
 import { CHARGE_SUMMARY_VERSION } from '../chargeWindows';
 import { VEHICLE_TABLE_PRESETS } from '../vehicleTablePresets';
+import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS } from '../../constants/epa';
 
 const vehicle = (over = {}) => ({
     id: over.id ?? 1, name: 'R1S', make: 'Rivian', model: 'R1S', trim: 'Quad', year: 2025,
@@ -493,16 +494,62 @@ describe('EPA efficiency and electricity cost (#335)', () => {
     it('prices 100 miles at each assumed price, on EPA efficiency where there is one', () => {
         const [r] = buildVehicleRows([labelled]);
         expect(r.values['calc.costPer100Home']).toBeCloseTo(0.17 * 100 / 3);
-        expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / 3);
         expect(r.notes['calc.costPer100Home']).toBeNull();
         const [cheap] = buildVehicleRows([labelled], { assumptions: { homePrice: 0.1 } });
         expect(cheap.values['calc.costPer100Home']).toBeCloseTo(10 / 3);
     });
 
+    describe('a DC fast session pays the car\'s own loss, not the AC charging loss (#506)', () => {
+        const withCharger = (chargerEfficiency) => vehicle({
+            socWindowKwh: 100, epaRangeMi: 300, epaRange: { combinedMpge: 101.115, chargerEfficiency },
+        });
+
+        it('takes the assumed AC loss out of the label, then adds the DC session loss, and says the DC loss is an assumed average', () => {
+            const [r] = buildVehicleRows([labelled]);
+            const battery = 3 / ASSUMED_CHARGER_EFF;
+            expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (battery * (1 - DC_FAST_LOSS)));
+            expect(r.notes['calc.costPer100Fast']).toBe('est.');
+        });
+
+        it('takes out the cert\'s own measured charging efficiency where it has one', () => {
+            const [r] = buildVehicleRows([withCharger(0.9)]);
+            expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 / 0.9 * (1 - DC_FAST_LOSS)));
+            expect(r.notes['calc.costPer100Fast']).toBe('est.');
+        });
+
+        it('costs less than the wall basis it replaced, and the home figure keeps the wall basis', () => {
+            const [r] = buildVehicleRows([labelled]);
+            expect(r.values['calc.costPer100Fast']).toBeLessThan(0.48 * 100 / 3);
+            expect(r.values['calc.costPer100Home']).toBeCloseTo(0.17 * 100 / 3);
+        });
+
+        it('prices an unlabelled vehicle on range ÷ battery, grossed up by the DC loss alone', () => {
+            const [r] = buildVehicleRows([unlabelled]);
+            expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 * (1 - DC_FAST_LOSS)));
+            expect(r.notes['calc.costPer100Fast']).toBe('est.');
+        });
+
+        it('links every fast figure\'s estimate note to the explainer, with the takeaway as its tooltip', () => {
+            for (const v of [labelled, unlabelled]) {
+                const [r] = buildVehicleRows([v]);
+                expect(r.links['calc.costPer100Fast']).toMatchObject({ explainer: 'dc-fast-charging-loss' });
+                expect(r.links['calc.costPer100Fast'].title).toContain(`${Math.round(DC_FAST_LOSS * 100)}%`);
+            }
+            const [home] = buildVehicleRows([labelled]);
+            expect(home.links['calc.costPer100Home']).toBeUndefined();
+        });
+
+        it('is blank with neither a label nor a battery', () => {
+            const [r] = buildVehicleRows([vehicle({ id: 3 })]);
+            expect(r.values['calc.costPer100Fast']).toBeNull();
+            expect(r.notes['calc.costPer100Fast']).toBeNull();
+        });
+    });
+
     it('estimates from the battery-side efficiency, less charging losses, without a label — and says so', () => {
         const [r] = buildVehicleRows([unlabelled]);
         expect(r.values['calc.costPer100Home']).toBeGreaterThan(0.17 * 100 / 3);   // losses cost more
-        expect(r.notes['calc.costPer100Home']).toBe('est. from battery efficiency');
+        expect(r.notes['calc.costPer100Home']).toBe('est. recharge efficiency');
     });
 
     it('names the cost per 100 km for a metric reader, and converts it', () => {
