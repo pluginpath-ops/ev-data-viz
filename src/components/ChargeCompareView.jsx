@@ -35,7 +35,7 @@ import { wrapCanvasText } from '../utils/wrapCanvasText';
 import { countParts } from '../utils/plotCaption';
 import { PRESENTED_HALF_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
-import { pointsKnownEmpty } from '../utils/runPoints';
+import { loadRunPoints, runsByIdString } from '../utils/runPoints';
 
 
 /**
@@ -484,27 +484,15 @@ export default function ChargeCompareView({
             const missing = neededRunIds.filter(id => !(id in runDataCache));
             if (missing.length === 0) return;
             setLoading(true);
-            const updates = {};
-            const allRuns = vehicles.flatMap(v => v.runs || []);
-            for (const runId of missing) {
-                try {
-                    if (dataService.useSupabase) {
-                        const run = allRuns.find(r => String(r.id) === String(runId));
-                        if (pointsKnownEmpty(run)) {
-                            updates[runId] = [];
-                        } else if (run?._inherited) {
-                            updates[runId] = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
-                        } else {
-                            updates[runId] = await dataService.getRunData(runId);
-                        }
-                    } else {
-                        for (const v of vehicles) {
-                            const run = v.runs?.find(r => r.id === runId);
-                            if (run) { updates[runId] = run.data || []; break; }
-                        }
+            let updates = {};
+            if (dataService.useSupabase) {
+                updates = await loadRunPoints(dataService, missing, runsByIdString(vehicles));
+            } else {
+                for (const runId of missing) {
+                    for (const v of vehicles) {
+                        const run = v.runs?.find(r => r.id === runId);
+                        if (run) { updates[runId] = run.data || []; break; }
                     }
-                } catch {
-                    updates[runId] = [];
                 }
             }
             setRunDataCache(prev => ({ ...prev, ...updates }));

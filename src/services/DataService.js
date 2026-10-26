@@ -18,6 +18,7 @@ import { planCompositeRebuild, compositeEligible, mayHaveComposite, storedCompos
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
 import { toChargerCurrent } from '../utils/chargerCurrentClass';
+import { rangePerSocLookup } from '../utils/runPoints';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -36,6 +37,9 @@ const roundField = roundTo;
  * the cap. Paging is for the reads that genuinely want every row.
  */
 const PAGE_SIZE = 1000;
+
+/** Test ids per data_points request: ~7 characters each, so a request stays far under any URL limit. */
+const POINTS_IDS_PER_REQUEST = 100;
 
 /**
  * Read every row a query matches, a page at a time.
@@ -862,19 +866,7 @@ class DataService {
    * fewer than two usable SoC+range point pairs.
    */
   async buildRangePerSocLookup(rangeTestRunId) {
-    const data = await this.getRunData(rangeTestRunId);
-    const pts = data
-      .filter(p => p.soc != null && p.range != null)
-      .sort((a, b) => a.soc - b.soc);
-    if (pts.length < 2) return null;
-    return (soc) => {
-      if (soc <= pts[0].soc)              return pts[0].range;
-      if (soc >= pts[pts.length - 1].soc) return pts[pts.length - 1].range;
-      const hi = pts.findIndex(p => p.soc >= soc);
-      const lo = hi - 1;
-      const t = (soc - pts[lo].soc) / (pts[hi].soc - pts[lo].soc);
-      return Math.round((pts[lo].range + t * (pts[hi].range - pts[lo].range)) * 10) / 10;
-    };
+    return rangePerSocLookup(await this.getRunData(rangeTestRunId));
   }
 
   async deleteSpecLink(id) {
@@ -1808,13 +1800,18 @@ class DataService {
     const out = Object.fromEntries(runs.map(r => [r.id, []]));
     const realIds = [...new Set(runs.map(r => Number(r._realRunId ?? r.id)))];
     if (!realIds.length) return out;
-    const data = await fetchAllRows(() => getSupabase()
+    // Chunked so the id list never outgrows a URL (a Home page or a long
+    // selection can name hundreds); a run's rows all come from one chunk, so
+    // each run's own order is the query's. Chunks go side by side.
+    const chunks = [];
+    for (let i = 0; i < realIds.length; i += POINTS_IDS_PER_REQUEST) chunks.push(realIds.slice(i, i + POINTS_IDS_PER_REQUEST));
+    const data = (await Promise.all(chunks.map(ids => fetchAllRows(() => getSupabase()
       .from('data_points')
       .select('*')
-      .in('run_id', realIds)
+      .in('run_id', ids)
       .order('run_id', { ascending: true })
       .order('frame', { ascending: true })
-      .order('id', { ascending: true }));
+      .order('id', { ascending: true }))))).flat();
     const rowsByRunId = new Map();
     for (const p of data || []) {
       if (!rowsByRunId.has(p.run_id)) rowsByRunId.set(p.run_id, []);

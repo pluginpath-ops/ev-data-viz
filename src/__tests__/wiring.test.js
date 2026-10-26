@@ -3146,8 +3146,12 @@ describe('the spec chart plots the vehicle table’s columns (#450)', () => {
 });
 
 describe('point requests are skipped for a test counted at zero (#497)', () => {
-    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s asks pointsKnownEmpty before fetching', (name) => {
-        expect(read(`src/components/${name}.jsx`)).toMatch(/pointsKnownEmpty\(/);
+    it('Charging Curves asks pointsKnownEmpty before it looks up a range test\'s points', () => {
+        expect(read('src/components/ChargingView.jsx')).toMatch(/pointsKnownEmpty\(/);
+    });
+
+    it('the shared loader (every view\'s point read) asks it before fetching', () => {
+        expect(read('src/utils/runPoints.js')).toMatch(/if \(pointsKnownEmpty\(run\)\)/);
     });
 
     it('Charging Curves skips the range-per-SoC lookup for a source with no points', () => {
@@ -3161,5 +3165,19 @@ describe('point requests are skipped for a test counted at zero (#497)', () => {
 
     it('a run read without the count embed is "unknown" (null), not "none" (0)', () => {
         expect(read('src/services/DataService.js')).toMatch(/\?\s*\(r\.data_points\[0\]\?\.count \?\? 0\) : null/);
+    });
+});
+
+describe('the three chart views load points in one batch, not one test at a time (#496)', () => {
+    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s reads through loadRunPoints and never awaits getRunData itself', (name) => {
+        const text = read(`src/components/${name}.jsx`);
+        expect(text).toMatch(/loadRunPoints\(dataService,/);
+        expect(text).not.toMatch(/dataService\.getRunData\(/);
+        expect(text).not.toMatch(/dataService\.buildRangePerSocLookup\(/);
+    });
+
+    it('the batch is the existing getPointsForRuns, which chunks its id list', () => {
+        expect(read('src/utils/runPoints.js')).toMatch(/dataService\.getPointsForRuns\(/);
+        expect(read('src/services/DataService.js')).toMatch(/POINTS_IDS_PER_REQUEST/);
     });
 });
