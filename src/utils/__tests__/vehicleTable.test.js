@@ -526,7 +526,7 @@ describe('EPA efficiency and electricity cost (#335)', () => {
         it('prices an unlabelled vehicle on range ÷ battery, grossed up by the DC loss alone', () => {
             const [r] = buildVehicleRows([unlabelled]);
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 * (1 - DC_FAST_LOSS)));
-            expect(r.notes['calc.costPer100Fast']).toBe('est. from battery efficiency');
+            expect(r.notes['calc.costPer100Fast']).toBe('est. avg. DC efficiency');
         });
 
         it('is blank with neither a label nor a battery', () => {

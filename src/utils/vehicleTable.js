@@ -471,7 +471,7 @@ const costPer100Fast = ([epa, battery], price, chargerEff) => {
 };
 // Qualified only with no label at all: with one, the figure is the car's own, less a recharge loss that is
 // measured or the fleet median, and the cell does not need to say so.
-const fastCostNote = ([epa, battery]) => (epa == null && battery != null ? 'est. from battery efficiency' : null);
+const fastCostNote = ([epa, battery]) => (epa == null && battery != null ? 'est. avg. DC efficiency' : null);
 
 const CALCULATED_COLUMNS = [
     { key: 'calc.efficiency', label: 'Efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
