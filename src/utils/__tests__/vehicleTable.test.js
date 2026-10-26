@@ -504,14 +504,14 @@ describe('EPA efficiency and electricity cost (#335)', () => {
             socWindowKwh: 100, epaRangeMi: 300, epaRange: { combinedMpge: 101.115, chargerEfficiency },
         });
 
-        it('takes the assumed AC loss out of the label, then adds the DC session loss', () => {
+        it('takes the assumed AC loss out of the label, then adds the DC session loss, with no qualifier while there is a label', () => {
             const [r] = buildVehicleRows([labelled]);
             const battery = 3 / ASSUMED_CHARGER_EFF;
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (battery * (1 - DC_FAST_LOSS)));
-            expect(r.notes['calc.costPer100Fast']).toBe('est. battery-side');
+            expect(r.notes['calc.costPer100Fast']).toBeNull();
         });
 
-        it('takes out the cert\'s own measured charging efficiency where it has one, and drops the estimate mark', () => {
+        it('takes out the cert\'s own measured charging efficiency where it has one', () => {
             const [r] = buildVehicleRows([withCharger(0.9)]);
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 / 0.9 * (1 - DC_FAST_LOSS)));
             expect(r.notes['calc.costPer100Fast']).toBeNull();
@@ -539,7 +539,7 @@ describe('EPA efficiency and electricity cost (#335)', () => {
     it('estimates from the battery-side efficiency, less charging losses, without a label — and says so', () => {
         const [r] = buildVehicleRows([unlabelled]);
         expect(r.values['calc.costPer100Home']).toBeGreaterThan(0.17 * 100 / 3);   // losses cost more
-        expect(r.notes['calc.costPer100Home']).toBe('est. from battery efficiency');
+        expect(r.notes['calc.costPer100Home']).toBe('est. recharge efficiency');
     });
 
     it('names the cost per 100 km for a metric reader, and converts it', () => {

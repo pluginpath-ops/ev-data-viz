@@ -444,7 +444,8 @@ const costPer100 = (price) => ([epa, battery]) => {
     const wall = wallEfficiency(epa, battery);
     return wall > 0 ? (price * 100) / wall : null;
 };
-const costNote = ([epa, battery]) => (epa == null && battery != null ? 'est. from battery efficiency' : null);
+// Home with no label multiplies the battery-side figure by the assumed recharge efficiency, so that is what it says.
+const costNote = ([epa, battery]) => (epa == null && battery != null ? 'est. recharge efficiency' : null);
 
 /**
  * Battery-side miles per kWh, for a DC fast session: the label's wall figure
@@ -468,9 +469,9 @@ const costPer100Fast = ([epa, battery], price, chargerEff) => {
     const eff = batteryEfficiency(epa, battery, chargerEff);
     return eff > 0 ? (price * 100) / (eff * (1 - DC_FAST_LOSS)) : null;
 };
-const fastCostNote = ([epa, battery], { chargerEff }) =>
-    epa == null ? (battery != null ? 'est. from battery efficiency' : null)
-        : chargerEff == null ? 'est. battery-side' : null;
+// Qualified only with no label at all: with one, the figure is the car's own, less a recharge loss that is
+// measured or the fleet median, and the cell does not need to say so.
+const fastCostNote = ([epa, battery]) => (epa == null && battery != null ? 'est. from battery efficiency' : null);
 
 const CALCULATED_COLUMNS = [
     { key: 'calc.efficiency', label: 'Efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
@@ -538,8 +539,8 @@ const CALCULATED_COLUMNS = [
       fullLabelFor: ({ units }) => `Cost per 100 ${units === 'metric' ? 'km' : 'mi'}, DC fast`,
       inputs: ['figures.epaEfficiency', 'calc.efficiency'],
       calc: (inputs, { fastPrice }, { chargerEff }) => costPer100Fast(inputs, fastPrice, chargerEff),
-      note: (inputs, ctx, extra) => fastCostNote(inputs, extra),
-      hint: 'The DC fast-charging price set under Assumptions × 100 ÷ the battery-side efficiency, grossed up by the DC fast charging loss (Admin → Model Constants): what a session loses between the car’s port and the pack’s output, cooling, auxiliary draw and the pack’s own losses among it. A DC session bypasses the onboard charger, so it does not pay the AC charging loss the home cost carries, and the station’s own conversion is not billed. Battery-side: the label’s efficiency with the charging loss taken back out, or range ÷ battery without a label; marked as an estimate unless the certification measured that loss. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
+      note: fastCostNote,
+      hint: 'The DC fast-charging price set under Assumptions × 100 ÷ the battery-side efficiency, grossed up by the DC fast charging loss (Admin → Model Constants): what a session loses between the car’s port and the pack’s output, cooling, auxiliary draw and the pack’s own losses among it. A DC session bypasses the onboard charger, so it does not pay the AC charging loss the home cost carries, and the station’s own conversion is not billed. Battery-side: the label’s efficiency with the charging loss taken back out (the certification’s own where it measured one, else the fleet median), or range ÷ battery without a label, which is marked as an estimate. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
     { key: 'calc.weightPerHp', label: 'Weight per hp', unit: 'lb/hp', metric: ['kg/kW', LBS_TO_KG / HP_TO_KW],
       better: 'lower', digits: 1,
       // The cells are kg/kW in metric, so the name follows the unit.
