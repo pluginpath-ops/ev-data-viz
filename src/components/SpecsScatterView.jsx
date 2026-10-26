@@ -3,6 +3,7 @@ import Chart from 'chart.js/auto';
 import { useTheme } from '../hooks/useTheme';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import { fieldFigureSource, epaCreditsForFields } from '../utils/vehicleFigures';
+import { placeLabels } from '../utils/labelPlacement';
 import { axisTitle, betterNote, missingNote } from '../utils/specChart';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
@@ -34,29 +35,30 @@ const pointLabelPlugin = {
     afterDatasetsDraw(chart) {
         const ctx = chart.ctx;
         const fonts = chartFonts();
+        ctx.save();
+        ctx.font = `${fonts.badge}px ${fonts.sans}`;
+        ctx.fillStyle = '#6b7280';
+        ctx.textBaseline = 'middle';
+        const area = chart.chartArea;
+        const maxW = (area.right - area.left) * 0.4;
+        const h = fonts.badge + 2;
         // Last dataset is the trend line — skip it
-        const vehicleDatasets = chart.data.datasets.length - 1;
-        for (let di = 0; di < vehicleDatasets; di++) {
-            const pts = chart.getDatasetMeta(di).data;
-            if (!pts.length) continue;
-            const pt = pts[0];
-            ctx.save();
-            ctx.font = `${fonts.badge}px ${fonts.sans}`;
-            ctx.fillStyle = '#6b7280';
-            ctx.textBaseline = 'middle';
-            const x = pt.x + 10;
-            const y = pt.y;
-            const maxW = chart.chartArea.right - x - 4;
-            if (maxW > 20) {
-                let text = chart.data.datasets[di].label;
-                while (text.length > 1 && ctx.measureText(text).width > maxW) {
-                    text = text.slice(0, -1);
-                }
-                if (text !== chart.data.datasets[di].label) text += '…';
-                ctx.fillText(text, x, y);
-            }
-            ctx.restore();
+        const labeled = [];
+        for (let di = 0; di < chart.data.datasets.length - 1; di++) {
+            const pt = chart.getDatasetMeta(di).data[0];
+            if (!pt) continue;
+            let text = chart.data.datasets[di].label;
+            while (text.length > 1 && ctx.measureText(text).width > maxW) text = text.slice(0, -1);
+            if (text !== chart.data.datasets[di].label) text += '…';
+            labeled.push({ text, x: pt.x, y: pt.y, w: ctx.measureText(text).width, h });
         }
+        // Each label beside its dot where there is room; a crowded one is left
+        // off (the tooltip still names it) rather than printed over its neighbors.
+        const spots = placeLabels(labeled, area);
+        labeled.forEach((item, i) => {
+            if (spots[i]) ctx.fillText(item.text, spots[i].x, spots[i].y + item.h / 2);
+        });
+        ctx.restore();
     },
 };
 
