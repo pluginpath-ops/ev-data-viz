@@ -1707,6 +1707,18 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
             .not.toMatch(/setElevationFt|setTempF|setAccessoryOverrideW/);
     });
 
+    it('offers Road Trip no correction speed slider, and does not state the speed it hid', () => {
+        // Trip -> Speed is the only speed on that chart: the simulation re-prices
+        // from it (rangeSource.pricedAtSpeedMph), so the shared correction target's
+        // speed is redundant there. Hiding it must not change the shared setting.
+        const src = read('src/components/RoadTripView.jsx');
+        const noSpeed = "\\['temperatureF', 'altitudeFt', 'accessoryW'\\]";
+        expect(src, 'the control must hide the speed slider').toMatch(new RegExp(`<CorrectionControl[^>]*fields=\\{${noSpeed}\\}`));
+        expect(src, 'the collapsed summary must not state the hidden speed').toMatch(new RegExp(`correctionSummary\\([^)]*${noSpeed}\\)`));
+        expect(src, 'the shared target must not be rewritten from the trip speed').not.toMatch(/correctionTarget:\s*\{[^}]*speedMph/);
+        expect(read('src/components/CorrectionControl.jsx'), 'the control must pass fields on').toMatch(/<CorrectionTargetFields[^>]*fields=\{fields\}/);
+    });
+
     it('carries the target, and the extras, to both pop-outs (#449)', () => {
         // The Selected-vehicles pop-out used to call the hook with nothing
         // driving it and silently draw standard conditions.

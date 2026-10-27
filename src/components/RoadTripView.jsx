@@ -2082,7 +2082,7 @@ export default function RoadTripView({
                       * accent-filled button in a "Mode" group of one: it is a
                       * thing that is either on or off, which is what every
                       * other control in this region already is. */}
-                    <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={correctionSummary(correctionMode, correctionTarget, units)}>
+                    <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={correctionSummary(correctionMode, correctionTarget, units, ['temperatureF', 'altitudeFt', 'accessoryW'])}>
                         <div className="display-grid">
                             {setChartConfig && (
                                 <>
@@ -2097,7 +2097,7 @@ export default function RoadTripView({
                             </label>
                         </div>
                         {setChartConfig && (
-                            <CorrectionControl mode={correctionMode} target={correctionTarget} setChartConfig={setChartConfig} />
+                            <CorrectionControl mode={correctionMode} target={correctionTarget} setChartConfig={setChartConfig} fields={['temperatureF', 'altitudeFt', 'accessoryW']} />
                         )}
                     </SidebarDisplaySection>
 

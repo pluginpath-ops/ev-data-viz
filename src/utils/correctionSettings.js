@@ -109,11 +109,19 @@ export const accessoryText = (w) => `${Math.round(w).toLocaleString('en-US')} W`
  * "70 mph · 70°F · 0 ft" — the target as a summary or an exported caption
  * states it. The accessory load is named only when the reader set it: on auto
  * it follows the temperature, which the text already gives.
+ *
+ * @param {string[]} [fields]  which conditions to state, as
+ *   CorrectionTargetFields offers them. A chart that hides a slider must not
+ *   print the value it hid. Unset states all four.
  */
-export function correctionTargetText(target, units = 'imperial') {
+export function correctionTargetText(target, units = 'imperial', fields = null) {
     const t = normalizeCorrectionTarget(target);
-    const parts = [speedText(t.speedMph, units), tempText(t.temperatureF, units), altitudeText(t.altitudeFt, units)];
-    if (t.accessoryW != null) parts.push(accessoryText(t.accessoryW));
+    const shows = (key) => !fields || fields.includes(key);
+    const parts = [];
+    if (shows('speedMph')) parts.push(speedText(t.speedMph, units));
+    if (shows('temperatureF')) parts.push(tempText(t.temperatureF, units));
+    if (shows('altitudeFt')) parts.push(altitudeText(t.altitudeFt, units));
+    if (shows('accessoryW') && t.accessoryW != null) parts.push(accessoryText(t.accessoryW));
     return parts.join(' · ');
 }
 
@@ -131,10 +139,11 @@ export function correctionCaption(mode, target, units = 'imperial') {
 /**
  * The correction in a few words, for a collapsed sidebar section: closing the
  * section must never hide that the figures have been moved.
+ * `fields` is passed through to correctionTargetText.
  */
-export function correctionSummary(mode, target, units = 'imperial') {
+export function correctionSummary(mode, target, units = 'imperial', fields = null) {
     if (!mode || mode === 'none') return 'no correction';
-    return `to ${correctionTargetText(target, units)}`;
+    return `to ${correctionTargetText(target, units, fields)}`;
 }
 
 /** The reverse. Total: anything unreadable is the default. */

@@ -95,3 +95,17 @@ describe('correctionCaption', () => {
             .toBe('corrected for speed, altitude, temp & wind to 65 mph · 70°F · 1,000 ft');
     });
 });
+
+describe('correctionSummary, for a chart that hides a condition', () => {
+    const target = { speedMph: 65, temperatureF: 70, altitudeFt: 1000, accessoryW: 900 };
+    it('states all four unless told which to show', async () => {
+        const { correctionSummary } = await import('../correctionSettings');
+        expect(correctionSummary('aero_wind', target)).toBe('to 65 mph · 70°F · 1,000 ft · 900 W');
+    });
+    it('leaves out the speed when the chart offers no speed slider', async () => {
+        const { correctionSummary } = await import('../correctionSettings');
+        expect(correctionSummary('aero_wind', target, 'imperial', ['temperatureF', 'altitudeFt', 'accessoryW']))
+            .toBe('to 70°F · 1,000 ft · 900 W');
+        expect(correctionSummary('none', target, 'imperial', ['temperatureF'])).toBe('no correction');
+    });
+});
