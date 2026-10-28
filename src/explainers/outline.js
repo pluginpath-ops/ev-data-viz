@@ -89,6 +89,15 @@ export const OUTLINE = [
               ] },
         ],
     },
+    {
+        slug: 'ev-energy-sharing',
+        title: 'Using an EV as a power source',
+        blurb: 'Outlets, home backup and the grid: what each automaker allows, and what its hardware could do.',
+        children: [
+            { slug: 'v2l-v2h-v2g', title: 'Can your EV power your devices? Your home? The grid?',
+              blurb: 'And can it help pay for the car? V2L, V2H and V2G from Ford, GM and Tesla.' },
+        ],
+    },
 ];
 
 /** Every node, depth-first, with its path of ancestors (hub first). */
