@@ -267,7 +267,28 @@
     line-height: 1.55;
     color: var(--color-text-secondary);
 }
-.explainer-hubs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; align-items: start; }
+/* One hub per row: its head on the left, its tree on the right in as many
+   columns as fit. The hubs differ several-fold in length, so a grid of cards
+   left a hole under the short ones the height of the longest. */
+.explainer-hubs { display: flex; flex-direction: column; gap: 20px; }
+.explainer-hubs .explainer-hub {
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+}
+.explainer-hubs .explainer-hub-head { flex-direction: column; gap: 12px; }
+.explainer-hubs .explainer-hub-glyph { width: 96px; height: 60px; }
+/* The topics run down one column and a topic's children sit under it in as
+   many columns as fit, so a child is never read beside the wrong parent. */
+.explainer-hubs .explainer-tree .explainer-tree { display: block; columns: 2 16rem; column-gap: 24px; }
+.explainer-hubs .explainer-tree .explainer-tree > li { break-inside: avoid; }
+.explainer-hubs .explainer-tree .explainer-tree > li + li { margin-top: 4px; }
+@media (max-width: 700px) {
+    .explainer-hubs .explainer-hub { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .explainer-hubs .explainer-hub-head { flex-direction: row; }
+    .explainer-hubs .explainer-hub-glyph { width: 64px; height: 40px; }
+}
 .explainer-hub, .explainer-fits {
     --hub: var(--color-accent-blue);
     display: flex;

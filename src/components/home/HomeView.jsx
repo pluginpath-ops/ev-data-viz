@@ -5,7 +5,7 @@ import { useFeaturedComparisonsContext } from '../../context/FeaturedComparisons
 import { comparisonToShow, liveVehicleIds, replacesSelection, vehiclesInOrder } from '../../utils/featuredComparisons';
 import { buildVehicleLabels } from '../../utils/seriesLabel';
 import HomeIntro from './HomeIntro';
-import ScrollMoreHint from './ScrollMoreHint';
+import ScrollMoreHint from '../ScrollMoreHint';
 import MarkdownText from '../MarkdownText';
 import FeaturedChartPanel from './FeaturedChartPanel';
 import ReplaceSelectionDialog from './ReplaceSelectionDialog';
@@ -189,7 +189,7 @@ export default function HomeView({ slug, onSlugChange }) {
                 </>
             )}
 
-            <ScrollMoreHint />
+            <ScrollMoreHint target=".home-panel" label="Scroll to the next chart" />
 
             {pending && (
                 <ReplaceSelectionDialog
