@@ -9504,7 +9504,7 @@ a.is-test-link:focus-visible {
     text-underline-offset: 2px;
 }
 
-/* The "More" pill: another chart waits below the edge of the window (#448). */
+/* The "More" pill: another block (a Home chart, an explainer subject) waits below the edge of the window (#448). */
 .scroll-more {
     @apply fixed inline-flex items-center gap-2 font-mono uppercase;
     left: 50%;

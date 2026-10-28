@@ -2896,11 +2896,15 @@ describe('a featured comparison keeps its vehicles in the order the curator set 
     });
 });
 
-describe('Home says when there is more below the window (#448)', () => {
-    const hint = read('src/components/home/ScrollMoreHint.jsx');
+describe('Home and the Explainers landing say when there is more below the window (#448)', () => {
+    const hint = read('src/components/ScrollMoreHint.jsx');
 
-    it('Home shows the "More" pill', () => {
-        expect(read('src/components/home/HomeView.jsx')).toMatch(/<ScrollMoreHint \/>/);
+    it('Home shows the "More" pill over its panels', () => {
+        expect(read('src/components/home/HomeView.jsx')).toMatch(/<ScrollMoreHint target="\.home-panel"/);
+    });
+
+    it('the Explainers landing shows it over its subjects', () => {
+        expect(read('src/explainers/ExplainersSection.jsx')).toMatch(/<ScrollMoreHint target="\.explainer-hub"/);
     });
 
     it('it watches the panels as they scroll, resize and grow, and is gone when none is below', () => {

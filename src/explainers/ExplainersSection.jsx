@@ -2,6 +2,7 @@ import './explainers.css';
 import ExplainerLink from './ExplainerLink';
 import ExplainerPage from './ExplainerPage';
 import ExplainerTree, { HubGlyph } from './ExplainerTree';
+import ScrollMoreHint from '../components/ScrollMoreHint';
 import { OUTLINE, outlineNode, hubOf } from './outline';
 import { topicBySlug, visibleTopics } from './topics';
 
@@ -65,6 +66,7 @@ export default function ExplainersSection({ topic = null, onBack }) {
                     </section>
                 ))}
             </div>
+            <ScrollMoreHint target=".explainer-hub" label="Scroll to the next subject" />
         </div>
     );
 }

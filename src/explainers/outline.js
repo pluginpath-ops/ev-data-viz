@@ -9,46 +9,9 @@
  * page shows a hub by its title.
  */
 export const OUTLINE = [
-    {
-        slug: 'charging-speed',
-        title: 'What decides how fast an EV charges?',
-        blurb: 'Peak kW, the taper, and which limit is in charge at each point of a session.',
-        glyph: 'curve',
-        children: [
-            { slug: 'charging-curve-basics', title: 'Reading a charging curve',
-              blurb: 'kW against SoC, the taper, and why 10–80 % is the number to compare.' },
-            { slug: 'what-limits-charging', title: 'The five limits on charging speed',
-              blurb: 'The charger, the cable, the car’s wiring, the cells’ chemistry, and heat.',
-              children: [
-                  { slug: 'cell-chemistry-limits', title: 'What the cells allow',
-                    blurb: 'Lithium plating, SoC and temperature windows, LFP against NMC.' },
-                  { slug: 'heat-generation', title: 'Where the heat comes from',
-                    blurb: 'I²R, internal resistance, and why heat shapes the taper.' },
-                  { slug: 'heat-rejection', title: 'Getting the heat out',
-                    blurb: 'Cooling plates, cell formats, and the paths heat takes.' },
-              ] },
-            { slug: 'voltage-vs-charge-time', title: 'Does 800 V charge faster?',
-              blurb: 'Voltage raises the peak, and not necessarily the average.' },
-        ],
-    },
-    {
-        slug: 'pack-architecture',
-        title: 'How a battery pack is built',
-        blurb: 'From single cells to a pack: its voltage, its capacity, and how it is put together.',
-        glyph: 'cells',
-        children: [
-            { slug: 'series-and-parallel', title: 'Series and parallel',
-              blurb: 'How cells add up to a pack’s voltage and its capacity.' },
-            { slug: 'modules-vs-cell-to-pack', title: 'Modules, cell-to-pack and cell-to-body',
-              blurb: 'Three ways to package cells, and what each one trades away.' },
-            { slug: '400v-vs-800v', title: '400 V and 800 V packs',
-              blurb: 'What a higher pack voltage changes, and what it leaves alone.',
-              children: [
-                  { slug: '400v-charger-compatibility', title: 'How 800 V cars use 400 V chargers',
-                    blurb: 'Native, DC booster, motor boost and split pack, and where each runs out.' },
-              ] },
-        ],
-    },
+    // Listed in the order the landing shows them, set by hand: the subjects
+    // with the most readable pages first, so the page does not open on one
+    // with nothing to read. Revisit it as pages are written.
     {
         // Ordered by what a reader arrives asking, not by how the label is
         // built: "why doesn't my range match?" first, the lab procedure under it.
@@ -90,12 +53,52 @@ export const OUTLINE = [
         ],
     },
     {
+        slug: 'pack-architecture',
+        title: 'How a battery pack is built',
+        blurb: 'From single cells to a pack: its voltage, its capacity, and how it is put together.',
+        glyph: 'cells',
+        children: [
+            { slug: 'series-and-parallel', title: 'Series and parallel',
+              blurb: 'How cells add up to a pack’s voltage and its capacity.' },
+            { slug: 'modules-vs-cell-to-pack', title: 'Modules, cell-to-pack and cell-to-body',
+              blurb: 'Three ways to package cells, and what each one trades away.' },
+            { slug: '400v-vs-800v', title: '400 V and 800 V packs',
+              blurb: 'What a higher pack voltage changes, and what it leaves alone.',
+              children: [
+                  { slug: '400v-charger-compatibility', title: 'How 800 V cars use 400 V chargers',
+                    blurb: 'Native, DC booster, motor boost and split pack, and where each runs out.' },
+              ] },
+        ],
+    },
+    {
         slug: 'ev-energy-sharing',
         title: 'Using an EV as a power source',
         blurb: 'Outlets, home backup and the grid: what each automaker allows, and what its hardware could do.',
         children: [
             { slug: 'v2l-v2h-v2g', title: 'Can your EV power your devices? Your home? The grid?',
               blurb: 'And can it help pay for the car? V2L, V2H and V2G from Ford, GM and Tesla.' },
+        ],
+    },
+    {
+        slug: 'charging-speed',
+        title: 'What decides how fast an EV charges?',
+        blurb: 'Peak kW, the taper, and which limit is in charge at each point of a session.',
+        glyph: 'curve',
+        children: [
+            { slug: 'charging-curve-basics', title: 'Reading a charging curve',
+              blurb: 'kW against SoC, the taper, and why 10–80 % is the number to compare.' },
+            { slug: 'what-limits-charging', title: 'The five limits on charging speed',
+              blurb: 'The charger, the cable, the car’s wiring, the cells’ chemistry, and heat.',
+              children: [
+                  { slug: 'cell-chemistry-limits', title: 'What the cells allow',
+                    blurb: 'Lithium plating, SoC and temperature windows, LFP against NMC.' },
+                  { slug: 'heat-generation', title: 'Where the heat comes from',
+                    blurb: 'I²R, internal resistance, and why heat shapes the taper.' },
+                  { slug: 'heat-rejection', title: 'Getting the heat out',
+                    blurb: 'Cooling plates, cell formats, and the paths heat takes.' },
+              ] },
+            { slug: 'voltage-vs-charge-time', title: 'Does 800 V charge faster?',
+              blurb: 'Voltage raises the peak, and not necessarily the average.' },
         ],
     },
 ];
