@@ -2324,6 +2324,498 @@
       "sources": [],
       "status": "unverified",
       "note": "A curator's reference table (src/components/AccessoryLoadReference.jsx) with no source recorded. No laboratory measurement of heater or A/C power by outside temperature was found when this was checked on 2026-10-25; the nearest published material was a simulation study (SAE 2021-01-0207) finding a heat-pump car 20–40% more energy efficient than a resistive one in the cold, and consumer-press tables without sources. A page that cites this stays a draft."
+    },
+    {
+      "id": "v2x-modes-defined",
+      "claim": "V2L powers devices from outlets with no grid connection; V2H powers a home cut off from the grid, as a generator would; V2G runs connected to a live grid, offsetting the home's use or sending power past the meter.",
+      "sources": [],
+      "status": "accepted",
+      "rationale": "EVBench's definitions (owner, 2026-10-28), following the common industry use: V2H is usually described as backup with the home islanded. Running alongside a live grid is filed under V2G because the utility treats any grid-connected inverter the same, whether or not it exports. It defines words; it carries no figure."
+    },
+    {
+      "id": "ul1741-sb-ieee1547",
+      "claim": "UL 1741 SB tests an inverter's grid-support functions to IEEE 1547-2018 (ride-through, volt-var, anti-islanding); it is what US utilities ask for before an inverter may run connected to the grid.",
+      "sources": [],
+      "status": "accepted",
+      "rationale": "How US interconnection works: California Rule 21 and most utilities' interconnection rules require UL 1741 SB listing for grid-tied inverters, and every product page in this topic quotes it that way. Upgrade with a UL or utility source."
+    },
+    {
+      "id": "j3400-ac-no-neutral",
+      "claim": "An AC connection through a J1772 or J3400 (NACS) port carries 240 V between two lines plus ground, with no neutral, so a home's 120 V circuits need a neutral formed somewhere else.",
+      "value": {
+        "volts_line_to_line": 240
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Follows from the connectors' pinout, which has no neutral conductor; Tesla's Gateway carrying a neutral balancing transformer (tesla-gateway-neutral-transformer) is the practical consequence. Upgrade with SAE J3400 itself."
+    },
+    {
+      "id": "ford-fathom-onboard-inverter",
+      "claim": "The 2027 Ford Fathom has its bidirectional inverter built into the vehicle, with more than 10 kW of projected AC output, and is designed to meet UL 1741 and comply with IEEE 1547.",
+      "value": {
+        "kw_projected_min": 10
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Ford, From the Road, 'Your Truck Can Power Your Home. Ford Fathom Makes It More Affordable.' (2026-10-27)",
+          "url": "https://www.fromtheroad.ford.com/us/en/articles/2026/fathom-ev-bidirectional-home-power",
+          "accessed": "2026-10-27"
+        },
+        {
+          "rank": "A",
+          "title": "Ford, From the Road, 'Bidirectional EVs at a New Scale' (2026-10-27)",
+          "url": "https://www.fromtheroad.ford.com/us/en/articles/2026/bidirectional-evs-scale-utility-interconnection",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified",
+      "note": "'Designed to meet all applicable UL 1741 requirements': design intent, not a listing."
+    },
+    {
+      "id": "ford-fathom-home-power-station",
+      "claim": "Ford's Home Power Management needs only the Ford Home Power Station, plus utility approval and an active Ford trial or plan; home backup adds the Home Backup Power Panel, and Ford expects the Station to cost about half as much as its first-generation bidirectional charger.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Ford, From the Road (2026-10-27)",
+          "url": "https://www.fromtheroad.ford.com/us/en/articles/2026/fathom-ev-bidirectional-home-power",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified",
+      "note": "Verbatim: 'The only hardware required is Ford's Home Power Station'; footnote: 'requires available Ford Home Power Station, utility approval and an active Ford trial or plan.'"
+    },
+    {
+      "id": "ford-fathom-hpm-can-export",
+      "claim": "Home Power Management runs the truck alongside the grid with no site meter, so surplus can flow out past the meter: in practice it is V2G.",
+      "sources": [],
+      "status": "unverified",
+      "note": "EVBench's inference from ford-fathom-home-power-station: no meter is needed, so the inverter cannot follow the home's load to hold export at zero, and the utility approval Ford requires is approval for an inverter that can export. Ford has not used the term V2G. Needs a Ford statement or an interconnection filing."
+    },
+    {
+      "id": "tesla-m3y-powershare-needs-powerwall",
+      "claim": "Model 3 and Model Y Powershare Home Backup needs a Powerwall and a Wall Connector; the Powershare Gateway is listed for Cybertruck only.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Powershare (With / Without Powerwall spec tabs)",
+          "url": "https://www.tesla.com/powershare",
+          "accessed": "2026-10-27"
+        },
+        {
+          "rank": "A",
+          "title": "Tesla Support, Powershare",
+          "url": "https://www.tesla.com/support/powershare",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-m3y-grid-support-unavailable",
+      "claim": "Tesla says Powershare Grid Support is not available for Model 3 or Model Y.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Powershare",
+          "url": "https://www.tesla.com/powershare",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified",
+      "note": "'Feature not available for Model 3 or Model Y.'"
+    },
+    {
+      "id": "tesla-m3y-manual-max-draw",
+      "claim": "Tesla's Model 3 and Model Y owner's manuals say the car provides a maximum draw of 11.5 kW for Powershare Home Backup, which may be limited by the charging station.",
+      "value": {
+        "kw": 11.5
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Model 3 Owner's Manual, Powershare Home Backup",
+          "url": "https://www.tesla.com/ownersmanual/model3/en_us/GUID-E2615021-AB6F-4843-8747-C90D85D94DEA.html",
+          "accessed": "2026-10-28"
+        },
+        {
+          "rank": "A",
+          "title": "Tesla, Model Y Owner's Manual, Powershare Home Backup",
+          "url": "https://www.tesla.com/ownersmanual/modely/en_us/GUID-E2615021-AB6F-4843-8747-C90D85D94DEA.html",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified",
+      "note": "The wording is identical to the Cybertruck manual, and 11.5 kW is the 48 A Wall Connector ceiling, so it may be templated rather than a measured PCS2 Lite rating. The Model Y page's example screen shows 4.8 kW."
+    },
+    {
+      "id": "tesla-powershare-system-ratings",
+      "claim": "Tesla rates a Powershare system at 11.52 kW continuous, 240 V, with 185 A motor-start current with Powerwall and 110 A on the Powershare Gateway.",
+      "value": {
+        "kw": 11.52,
+        "lra_powerwall": 185,
+        "lra_gateway": 110
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Powershare spec tabs",
+          "url": "https://www.tesla.com/powershare",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-pcs-ul1741",
+      "claim": "Tesla says the Cybertruck's PCS2 and the Model 3/Y's PCS2 Lite inverters are certified pursuant to UL 1741, and the Powershare system meets UL 1741 CRD.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Powershare",
+          "url": "https://www.tesla.com/powershare",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-gateway-ul1741-sb",
+      "claim": "The Cybertruck's Powershare system with Gateway is listed to UL 9741, UL 1741, UL 1741 CRD for multimode and UL 1741 SB, and can be configured as V2G with V2H or as V2H only.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla Powershare System Installation Manual, System Specifications",
+          "url": "https://energylibrary.tesla.com/docs/Public/More/Powershare/InstallManual/HomeBackup/en-us/GUID-12254782-311E-47C3-8FF3-73BAFDE8F215.html",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-gateway-neutral-transformer",
+      "claim": "The Powershare Gateway contains a Neutral Balancing Transformer that provides the neutral off-grid, rated 18 A continuous neutral current and 4.32 kVA.",
+      "value": {
+        "neutral_amps": 18,
+        "kva": 4.32
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla Powershare System Installation Manual, Gateway Components and System Specifications",
+          "url": "https://energylibrary.tesla.com/docs/Public/More/Powershare/InstallManual/HomeBackup/en-us/GUID-BB39FEDC-C4D3-4AB1-9858-96C82563FADD.html",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-gateway-cost",
+      "claim": "Tesla puts the Powershare Gateway hardware at typically $1,950, with installation typically $2,000 to $4,000.",
+      "value": {
+        "usd_hardware": 1950,
+        "usd_install": [
+          2000,
+          4000
+        ]
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Powershare",
+          "url": "https://www.tesla.com/powershare",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-cybertruck-grid-support",
+      "claim": "Cybertruck Powershare Grid Support is available in limited markets, including Texas and a PG&E pilot in California approved in April 2026, the first AC-based V2G approved there.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Powershare",
+          "url": "https://www.tesla.com/powershare",
+          "accessed": "2026-10-27"
+        },
+        {
+          "rank": "A",
+          "title": "PG&E press release (2026-04-20)",
+          "url": "https://investor.pgecorp.com/news-events/press-releases/press-release-details/2026/PGE-and-Tesla-Turn-Cybertruck-into-a-Grid-Asset-Advancing-the-Future-of-Electric-Power-in-California/default.aspx",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified",
+      "note": "Texas utilities (CenterPoint, Oncor) are from Electrek 2026-02-11, rank D."
+    },
+    {
+      "id": "tesla-powerwall-credits-only",
+      "claim": "With a Powerwall installed, Tesla says Powershare is not co-optimized with Grid Support and energy credits come from the Powerwall only.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Powershare",
+          "url": "https://www.tesla.com/powershare",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-v2l-outputs",
+      "claim": "Cybertruck's 240 V bed outlet delivers up to 9.6 kW; the Model 3/Y Tesla Outlet Adapter gives one 120 V, 20 A outlet, 2.4 kW at most.",
+      "value": {
+        "cybertruck_kw": 9.6,
+        "m3y_kw": 2.4
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Powershare",
+          "url": "https://www.tesla.com/powershare",
+          "accessed": "2026-10-27"
+        },
+        {
+          "rank": "A",
+          "title": "Tesla Shop, Tesla Outlet Adapter",
+          "url": "https://shop.tesla.com/product/tesla-outlet-adapter",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-discharge-limit",
+      "claim": "Tesla owners set a Powershare discharge limit in the Tesla app, and discharge stops there; Tesla publishes no default or minimum.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Model Y Owner's Manual, Powershare Home Backup",
+          "url": "https://www.tesla.com/ownersmanual/modely/en_us/GUID-E2615021-AB6F-4843-8747-C90D85D94DEA.html",
+          "accessed": "2026-10-28"
+        },
+        {
+          "rank": "A",
+          "title": "Tesla, Cybertruck Owner's Manual, Powershare Grid Support",
+          "url": "https://www.tesla.com/ownersmanual/cybertruck/en_us/GUID-6B8ADFF9-C5EA-4160-9399-1C5182E55903.html",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "tesla-grid-support-warranty",
+      "claim": "Tesla says taking part in a Tesla-supported Powershare Grid Support program does not affect vehicle warranties.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla Learn, 'Powershare Helps You Get More from Your Cybertruck' (2026-08-17)",
+          "url": "https://www.tesla.com/learn/powershare-helps-you-get-more-cybertruck",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified",
+      "note": "No equivalent statement found for Home Backup. The Tesla Shop says damage from third-party bidirectional adapters or chargers is not covered."
+    },
+    {
+      "id": "gm-powershift-architecture",
+      "claim": "GM Energy's V2H sends DC from the car through the CCS1 PowerShift Charger to an offboard GM Energy Inverter; the charger charges over AC at up to 19.2 kW.",
+      "value": {
+        "ac_charge_kw": 19.2
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "GM Energy, V2H Bundle",
+          "url": "https://gmenergy.gm.com/vehicle-to-home/gm-energy-v2h-bundle",
+          "accessed": "2026-10-28"
+        },
+        {
+          "rank": "A",
+          "title": "GM Energy Inverter e1.11 specifications v5-2",
+          "url": "https://gmenergy.gm.com/content/dam/gmenergy/na/us/en/index/01-pdfs/gm-energy-inverter-specifications.pdf",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "gm-inverter-e111-ratings",
+      "claim": "The GM Energy Inverter e1.11 is rated 9.6 kW off-grid at 45 °C (4.8 kW at 55 °C) with 62 A motor-start current, and 11.52 kW on-grid, listed to UL 1741 SB, IEEE 1547-2018 and California Rule 21.",
+      "value": {
+        "off_grid_kw_45c": 9.6,
+        "off_grid_kw_55c": 4.8,
+        "lra": 62,
+        "on_grid_kw": 11.52
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "GM Energy Inverter e1.11 specifications v5-2",
+          "url": "https://gmenergy.gm.com/content/dam/gmenergy/na/us/en/index/01-pdfs/gm-energy-inverter-specifications.pdf",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "gm-v2h-outage-only",
+      "claim": "GM sells PowerShift V2H to power a home when the grid is down; its pages describe it only for outages.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "GM Energy, V2H Enablement Kit",
+          "url": "https://gmenergy.gm.com/vehicle-to-home/gm-energy-v2h-enablement-kit",
+          "accessed": "2026-10-28"
+        },
+        {
+          "rank": "A",
+          "title": "GM Energy, EV charging adapters FAQ",
+          "url": "https://gmenergy.gm.com/learn/ev-charging-adapters",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "gm-v2h-hardware",
+      "claim": "GM's V2H Enablement Kit is a Home Hub, the Inverter e1.11 and a Dark Start Battery (about 0.24 kWh, to start the system with the grid down), at $6,999 list; the V2H Bundle adds the PowerShift Charger for $8,998 list, installation extra.",
+      "value": {
+        "usd_kit": 6999,
+        "usd_bundle": 8998,
+        "dark_start_kwh": 0.24
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "GM Energy, V2H Enablement Kit",
+          "url": "https://gmenergy.gm.com/vehicle-to-home/gm-energy-v2h-enablement-kit",
+          "accessed": "2026-10-28"
+        },
+        {
+          "rank": "A",
+          "title": "GM Energy, V2H Bundle",
+          "url": "https://gmenergy.gm.com/vehicle-to-home/gm-energy-v2h-bundle",
+          "accessed": "2026-10-28"
+        },
+        {
+          "rank": "A",
+          "title": "GM Energy Dark Start Battery specifications",
+          "url": "https://gmenergy.gm.com/content/dam/gmenergy/na/us/en/index/01-pdfs/gm-energy-dark-start-battery-specifications.pdf",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified",
+      "note": "Promotional prices through 2026-11-02 were $5,599 and $6,748."
+    },
+    {
+      "id": "gm-nacs-adapter-swap",
+      "claim": "A NACS-port GM EV uses GM's PowerShift AC Adapter to charge from the PowerShift Charger and a separate CCS1 DC Adapter for V2H; the DC adapter does not support Level 2 charging.",
+      "value": {
+        "usd_ac_adapter": 116,
+        "usd_dc_adapter": 299
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "GM Energy, EV charging adapters (NACS tab and FAQ)",
+          "url": "https://gmenergy.gm.com/learn/ev-charging-adapters",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "gm-reserve-level",
+      "claim": "GM's app sets a Vehicle Battery Reserve Level at which V2H stops; GM publishes no number for it.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "GM Energy V2H Bundle User Manual v1-2 (Jan 2025)",
+          "url": "https://gmenergy.gm.com/content/dam/gmenergy/na/us/en/index/01-pdfs/gm-energy-v2h-bundle-user-guide.pdf",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "v2x-warranty-unpublished",
+      "claim": "Neither GM nor Ford publishes a vehicle-warranty statement on V2H, and Tesla publishes none for Home Backup.",
+      "sources": [],
+      "status": "unverified",
+      "note": "Absence found by EVBench searching GM Energy pages, the GM V2H manual, ford.com support and Tesla's Powershare pages on 2026-10-28. An absence cannot be sourced; recheck before the page drops DRAFT, or reword around it."
+    },
+    {
+      "id": "arbitrage-net-per-kwh",
+      "claim": "Shifting a kWh from off-peak to peak earns the peak price, less the off-peak price divided by round-trip efficiency, less battery wear per kWh.",
+      "value": {
+        "formula": "peak − off_peak ÷ η − wear"
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "Arithmetic",
+          "url": null,
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "v2x-arbitrage-examples",
+      "claim": "With illustrative tariffs, 85% round-trip efficiency, $0.04–0.06/kWh battery wear and volume capped by a home's evening load, daily time-of-use shifting earns roughly $250–600 a year in California and Texas and about nothing in a Midwest-style summer-only tariff; paid grid events add roughly $100–600 where they exist. The shifting figures assume energy beyond the home's own evening use earns nothing; markets that pay well for evening exports would earn more.",
+      "sources": [],
+      "status": "unverified",
+      "note": "EVBench's back-of-envelope (LocalDev/explainers/v2x). Tariffs, gas prices, efficiency and wear are illustrative, not current filed rates. Verify PG&E EV2-A, an ERCOT free-nights plan and a DTE/Consumers TOU tariff before publishing figures."
+    },
+    {
+      "id": "tesla-powershare-backup-duration",
+      "claim": "Tesla says that at 30 kWh a day, Powershare backs up a home for over three days from a Cybertruck, up to two days from a Standard Model 3/Y, and over two days from a Premium or Performance trim.",
+      "sources": [
+        {
+          "rank": "A",
+          "title": "Tesla, Powershare",
+          "url": "https://www.tesla.com/powershare",
+          "accessed": "2026-10-27"
+        }
+      ],
+      "status": "verified"
+    },
+    {
+      "id": "ev-battery-days-of-home-use",
+      "claim": "A typical US home uses about 30 kWh a day, so most EV batteries hold enough energy to run one for two days or more.",
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Arithmetic on common figures: EIA's average US household uses about 10,500 kWh a year (~29 kWh/day), and Tesla plans its own backup durations on 30 kWh/day (tesla-powershare-backup-duration). Upgrade with the EIA table."
+    },
+    {
+      "id": "nissan-leaf-v2h-v2g",
+      "claim": "The Nissan Leaf supports V2H and V2G through its CHAdeMO port, with Nissan approving Fermata Energy bidirectional chargers in the US since 2022; it has no built-in outlets.",
+      "sources": [
+        {
+          "rank": "D",
+          "title": "Electrek, 'Nissan Leaf getting first ever V2G charger' (2022-09-07)",
+          "url": "https://electrek.co/2022/09/07/the-nissan-leaf-getting-first-ever-v2g-charger/",
+          "accessed": "2026-10-28"
+        },
+        {
+          "rank": "D",
+          "title": "electrive, 'Nissan USA approves Fermata bidirectional charger' (2024-08-30)",
+          "url": "https://electrive.com/2024/08/30/nissan-usa-approves-fermata-bidirectional-charger",
+          "accessed": "2026-10-28"
+        }
+      ],
+      "status": "unverified",
+      "note": "Secondary press only; Nissan's own release (reposted by Automotive World) not fetched. 'No built-in outlets' is the owner's statement, unsourced."
+    },
+    {
+      "id": "islanded-backup-no-interconnection",
+      "claim": "Backup that cuts the home off from the grid before it runs, through a transfer switch or islanding contactor, is not interconnected, so it needs no UL 1741 SB listing or utility interconnection approval, just as a standby generator doesn't.",
+      "sources": [],
+      "status": "accepted",
+      "rationale": "How standby power is permitted in the US: NEC Article 702 optional standby systems with transfer equipment are not parallel with the utility, and UL 1741 SB / IEEE 1547 apply only to equipment that operates in parallel. Upgrade with an NEC or utility interconnection-handbook source."
     }
   ]
 }
