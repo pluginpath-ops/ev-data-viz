@@ -3273,9 +3273,18 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 }
 /* Two numbers for one setting — Trip Optimizer's legal range — with "to"
    between them, set as the unit beside it is. */
+/* Two fields where one usually sits, so no spinners: Firefox draws them inside
+   the box and at this width they left no room for the digits. Typed, like the
+   data-table cells, which drop them for the same reason. */
 .scenario-row.is-range {
     grid-template-columns: 42px 48px auto 48px minmax(0, 1fr);
 }
+.scenario-row.is-range .form-input {
+    appearance: textfield;
+    padding-inline: 4px;
+}
+.scenario-row.is-range .form-input::-webkit-inner-spin-button,
+.scenario-row.is-range .form-input::-webkit-outer-spin-button { appearance: none; margin: 0; }
 /* Above a plot: which of the plotted series a one-series chart (Trip
    Optimizer's map) is drawing, and the control to change it. In the frame,
    where the reader is looking, rather than in the sidebar. */
