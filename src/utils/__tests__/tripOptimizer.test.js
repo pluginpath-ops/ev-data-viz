@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     bestOf, envelopeBySpeed, envelopeByStop, nearBest, chargeWindow, nearestIndex, stopAxisFor,
-    speedIndexRange, withinSpeeds,
+    speedIndexRange, withinSpeeds, usefulStopCount,
     OPT_LEG_MI, OPT_CHARGE_MIN, OPT_SPEED_MPH,
 } from '../tripOptimizer';
 
@@ -75,5 +75,20 @@ describe('tripOptimizer', () => {
     it('searches the setting the sim holds fixed', () => {
         expect(stopAxisFor('time')).toEqual({ values: OPT_CHARGE_MIN, param: 'chargeTimeMinutes' });
         expect(stopAxisFor('distance').param).toBe('legDistanceMi');
+    });
+
+    it('cuts top stop plans that are blank or repeat the row below', () => {
+        // The fixed-time L: a one-stop speed repeats up the column, the rest go blank.
+        expect(usefulStopCount([
+            [600, 590, 590, 590],
+            [550, 540, null, null],
+        ])).toBe(2);
+        // A row that changes anything, anywhere, is kept — and so is all below it.
+        expect(usefulStopCount([
+            [600, 590, 590, 580],
+            [550, 540, null, null],
+        ])).toBe(4);
+        expect(usefulStopCount([[null, null]])).toBe(1);
+        expect(usefulStopCount(GRID)).toBe(3);
     });
 });

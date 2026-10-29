@@ -247,7 +247,9 @@ export const CHART_HELP_DEFAULTS = {
             'Each cell is one full trip simulation (see Road Trip). Speeds step by 1 mph, ' +
             'stop distances by 10 mi and stop times by 2.5 minutes; a plan that would charge ' +
             'past 95% or cannot finish is left blank. The fastest legal plan is the fastest cell in your legal range — ' +
-            'within the grid’s steps, so read it to the nearest step, not exactly.',
+            'within the grid’s steps, so read it to the nearest step, not exactly. The ' +
+            'charge-per-stop axis ends at the longest stop a full charge from your Min SoC ' +
+            'to 95% can use: past it every plan is blank or the same trip as the row below.',
     },
 
     perfcompare: {

@@ -60,7 +60,7 @@ export default function BestPlanTable({ rows, mode, speed, stopSetting, totalDis
                                     </tr>
                                 );
                             }
-                            const { best, fastest, near, stops, window: w } = grid;
+                            const { best, fastest, near, stops, trimmed, window: w } = grid;
                             const bestMph = OPT_SPEED_MPH[best.si];
                             const yoursDone = yours && yours.completed !== false;
                             const saves = yoursDone ? Math.round(yours.totalTimeMin - best.total) : null;
@@ -69,7 +69,9 @@ export default function BestPlanTable({ rows, mode, speed, stopSetting, totalDis
                             const edge = [
                                 best.si === OPT_SPEED_MPH.length - 1 && 'the fastest speed searched',
                                 best.si === 0 && 'the slowest speed searched',
-                                best.ti === stops.length - 1 && 'the longest stop searched',
+                                // Unless the grid was cut there: past the cut
+                                // is blank or the same trip (usefulStopCount).
+                                !trimmed && best.ti === stops.length - 1 && 'the longest stop searched',
                                 best.ti === 0 && 'the shortest stop searched',
                             ].filter(Boolean);
                             // When the range is what binds: the fastest plan sits

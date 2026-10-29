@@ -69,6 +69,30 @@ export function withinSpeeds(totals, [lo, hi]) {
     return totals.map((row, si) => (si >= lo && si <= hi ? row : row.map(() => null)));
 }
 
+/**
+ * How many stop plans, from the shortest, carry information: the rows past
+ * that are blank or repeat the row below them, and are cut from the grid.
+ *
+ * Two things fill the top of a grid with nothing. Under fixed charge time, a
+ * stop that can finish the trip charges only what it needs, so on a trip of
+ * one stop a longer allowance changes nothing — while every trip with a FULL
+ * stop that long charges past 95% and is blank. The map drew that as an L: a
+ * blank top right, and a column of repeats up the left. Under fixed charging
+ * range, legs too long for one charge to 95% are blank at every speed.
+ */
+export function usefulStopCount(totals) {
+    const stops = totals[0]?.length ?? 0;
+    const same = (a, b) => (a == null && b == null) || (a != null && b != null && Math.abs(a - b) < 1e-6);
+    let keep = stops;
+    while (keep > 1) {
+        const ti = keep - 1;
+        const adds = totals.some(row => row[ti] != null && !same(row[ti], row[ti - 1]));
+        if (adds) break;
+        keep--;
+    }
+    return keep;
+}
+
 /** The fastest cell of a grid, or null if no cell finished. */
 export function bestOf(totals) {
     let best = null;

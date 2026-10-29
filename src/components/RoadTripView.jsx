@@ -44,7 +44,7 @@ import SpeedBadge from './charts/SpeedBadge';
 import { spreadTestsFor, sweepSpread, timelineSpread } from '../utils/roadTripSpread';
 import {
     OPT_SPEED_MPH, stopAxisFor, bestOf, envelopeBySpeed, envelopeByStop, nearBest, chargeWindow,
-    nearestIndex, NEAR_BEST_PCT, DEFAULT_SPEED_RANGE, speedIndexRange, withinSpeeds,
+    nearestIndex, NEAR_BEST_PCT, DEFAULT_SPEED_RANGE, speedIndexRange, withinSpeeds, usefulStopCount,
 } from '../utils/tripOptimizer';
 import { tripMapCells } from './charts/tripMapCells';
 import { ratioOf } from '../utils/contrast';
@@ -1286,7 +1286,7 @@ export default function RoadTripView({
     } = roadTripConfig;
     const optimizerSearch = useMemo(() => {
         if (!optimizer) return null;
-        const { values: stops, param } = stopAxisFor(gMode);
+        const { values: allStops, param } = stopAxisFor(gMode);
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id];
             if (!chargingData?.length) return null;
@@ -1307,11 +1307,18 @@ export default function RoadTripView({
                 [param]:           stop,
             });
             const priced = OPT_SPEED_MPH.map(mph => entry.priceAt(mph));
-            const totals = OPT_SPEED_MPH.map((mph, si) => stops.map(stop => {
+            const full = OPT_SPEED_MPH.map((mph, si) => allStops.map(stop => {
                 const sim = simAt(mph, priced[si], stop);
                 return isSimUnrealistic(sim) ? null : sim.totalTimeMin;
             }));
-            return { totals, stops, simCell: (si, ti) => simAt(OPT_SPEED_MPH[si], priced[si], stops[ti]) };
+            // The stop plans past the longest a full stop can use before 95%
+            // are blank or repeats: cut, so the map's axis ends where the
+            // choice does (usefulStopCount). `trimmed` tells the table the top
+            // row is that limit, not the edge of the search.
+            const keep = usefulStopCount(full);
+            const totals = full.map(row => row.slice(0, keep));
+            const stops = allStops.slice(0, keep);
+            return { totals, stops, trimmed: keep < allStops.length, simCell: (si, ti) => simAt(OPT_SPEED_MPH[si], priced[si], stops[ti]) };
         });
     }, [optimizer, validEntries, runDataCache, gStartSoc, gMinSoc, gDestSoc, gLeg, gChargeTime, gTotal,
         gMode, gOverhead, gTowing, gTowEff, gTowRef, gPerRun]);
@@ -1327,11 +1334,11 @@ export default function RoadTripView({
     );
     const optimizerGrids = useMemo(() => optimizerSearch?.map(search => {
         if (!search) return null;
-        const { totals, stops, simCell } = search;
+        const { totals, stops, trimmed, simCell } = search;
         const allowed = withinSpeeds(totals, speedRange);
         const best = bestOf(allowed);
         return {
-            totals, stops, best,
+            totals, stops, trimmed, best,
             fastest: bestOf(totals),
             range: speedRange,
             // The table's span keeps to the range: it is advice.
@@ -1606,7 +1613,9 @@ export default function RoadTripView({
                     readout: false, _noHalo: true,
                 },
                 {
-                    label: 'Your plan', _tag: `${fmtSpeed(speed, units)}, ${Math.round(ys[yourTi])} ${stopUnit}`,
+                    // Drawn at the nearest row — the top one, for a plan past
+                    // the cut — but tagged with what you entered.
+                    label: 'Your plan', _tag: `${fmtSpeed(speed, units)}, ${Math.round(mode === 'time' ? stopSetting : convDistance(stopSetting, units))} ${stopUnit}`,
                     data: [{ x: units === 'metric' ? speed * MI_TO_KM : speed, y: ys[yourTi] }],
                     showLine: false, pointStyle: 'circle', pointRadius: 7, pointBorderWidth: 2.5,
                     borderColor: ink, backgroundColor: 'transparent', readout: false,
