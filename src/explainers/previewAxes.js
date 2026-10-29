@@ -14,7 +14,6 @@ export const PREVIEW_AXES = {
     time:        { label: 'Time',            unit: 'min', field: 'time' },
     range:       { label: 'Range (tested)',  unit: 'mi',  field: 'range' },
     deltaRange:  { label: 'Range added',     unit: 'mi',  field: 'range',       delta: true },
-    temperature: { label: 'Temperature',     unit: '°F',  field: 'temperature' },
 };
 
 export const DEFAULT_AXES = { x: 'soc', y: 'chargeRate' };

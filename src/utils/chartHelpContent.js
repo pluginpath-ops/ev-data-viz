@@ -60,13 +60,15 @@ export const CHART_HELP_DEFAULTS = {
             'SoC (State of Charge) — how full the battery is, 0–100%.\n' +
             'Charge Rate (kW) — power flowing into the battery right now.\n' +
             'C-rate — charge power ÷ battery size (kW ÷ kWh); ~1C ≈ adding a full pack in an hour, regardless of car size.\n' +
-            'Range Rate — miles of range gained per minute.\n' +
+            'Range Rate — miles of range gained per minute (or per hour).\n' +
+            'SoC Rate — percent of the battery added per minute.\n' +
             'SoC Added / Range Added — change since the start of the plotted window. A composite curve is rebuilt from the tests that reach its start — race mode’s start SoC, or otherwise as far back as two of its tests reach. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
             'Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the range actually logged in the test.',
         math_approach:
             'Mostly the raw measured points drawn as-is — no smoothing or curve-fitting. ' +
             'The computed fields are simple arithmetic: C-rate = charge kW ÷ battery kWh; ' +
-            'range rate = (rated miles ÷ battery kWh) × charge kW ÷ 60; EPA range = ' +
+            'range rate = (rated miles ÷ battery kWh) × charge kW ÷ 60 per minute, or without ' +
+            'the ÷ 60 per hour; SoC rate = charge kW ÷ battery kWh × 100 ÷ 60; EPA range = ' +
             '(SoC ÷ 100) × the car’s rated miles; the “added” fields subtract the first ' +
             'reading in view. The optional range backfill matches each SoC to the range ' +
             'from the vehicle’s range test by linear interpolation.',

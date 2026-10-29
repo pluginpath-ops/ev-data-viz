@@ -22,7 +22,9 @@ import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
  */
 const AXIS_FIGURES = {
     cRate:         ['capacity'],
+    socRate:       ['capacity'],
     rangeRate:     ['capacity', 'range'],
+    rangeRateHr:   ['capacity', 'range'],
     rangeEpa:      ['range'],
     deltaRangeEpa: ['range'],
 };
@@ -37,7 +39,11 @@ import SeriesPaletteSelect from './SeriesPaletteSelect';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useRunSelection } from '../hooks/useRunSelection';
-import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
+import { convDistance } from '../utils/unitConversions';
+import { chargingAxisOptions } from '../utils/chargingAxes';
+import AxisPicker from './AxisPicker';
+import SectionBand from './SectionBand';
+import { useRememberedOpen } from '../hooks/useRememberedOpen';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun, isCompositeRun, defaultChargingRun } from '../utils/runUtils';
 import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
@@ -63,9 +69,9 @@ import { pointsKnownEmpty, loadRunPoints, runsByIdString, rangeAtFrom } from '..
 const RUN_ATOMS = [{ key: 'test', of: s => s.run?.name }];
 
 /** The Y axes a composite's test spread can be drawn on: charge rate, and the
- *  two axes that are charge rate scaled by a vehicle figure. On any other Y the
+ *  axes that are charge rate scaled by a vehicle figure. On any other Y the
  *  spread in kW has no meaning. */
-const SPREAD_AXES = new Set(['chargeRate', 'cRate', 'rangeRate']);
+const SPREAD_AXES = new Set(['chargeRate', 'cRate', 'socRate', 'rangeRate', 'rangeRateHr']);
 
 /** The axes measured from where a curve starts: plotting one measures every
  *  composite from the start SoC (#408). */
@@ -330,36 +336,22 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         fetchMissingData();
     }, [missingRunIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const dl = distanceLabel(units);
     // Memoised because the frame's title derives from it: a fresh array every
     // render made that memo churn, which the lint spotted before anyone noticed
     // the work. Only the unit system moves it.
-    const axisOptions = useMemo(() => [
-        { value: 'soc',           label: 'State of Charge (%)' },
-        { value: 'deltaSoc',      label: 'SoC Added (%)' },
-        { value: 'chargeRate',    label: 'Charge Rate (kW)' },
-        { value: 'time',          label: 'Time (min)' },
-        { value: 'range',         label: `Range - Tested (${dl})` },
-        { value: 'deltaRange',    label: `Range Added - Tested (${dl})` },
-        { value: 'rangeEpa',      label: `Range - EPA (${dl})` },
-        { value: 'deltaRangeEpa', label: `Range Added - EPA (${dl})` },
-        { value: 'temperature',   label: `Temperature (${tempLabel(units)})` },
-        { value: 'cRate',         label: 'C-Rate  (~kW ÷ battery)' },
-        { value: 'rangeRate',     label: `Range Rate (${dl}/min)` },
-        { value: 'frame',         label: 'Frame' },
-    ], [dl, units]);
+    const axisOptions = useMemo(() => chargingAxisOptions(units), [units]);
+    const [axesOpen, setAxesOpen] = useRememberedOpen('charging-axes', true);
 
     // Convert a stored (imperial) field value to the current unit system for display.
-    const DISTANCE_AXES = new Set(['range', 'deltaRange', 'rangeEpa', 'deltaRangeEpa', 'rangeRate']);
+    const DISTANCE_AXES = new Set(['range', 'deltaRange', 'rangeEpa', 'deltaRangeEpa', 'rangeRate', 'rangeRateHr']);
     const convertAxisValue = (value, fieldKey) => {
         if (value == null) return null;
         if (DISTANCE_AXES.has(fieldKey)) return convDistance(value, units);
-        if (fieldKey === 'temperature')  return convTemp(value, units);
         return value;
     };
 
     /**
-     * Get the value for a field key, computing virtual fields (cRate, rangeRate)
+     * Get the value for a field key, computing virtual fields (cRate, socRate, rangeRate, rangeRateHr)
      * on-the-fly from stored chargeRate + vehicle metadata.
      * vehicleBattery = kWh, vehicleRange = rated miles
      */
@@ -415,6 +407,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // miles per minute: (rated_range / battery_kWh) × charge_kW ÷ 60
             return (point.chargeRate != null && vehicleRange && vehicleBattery)
                 ? Math.round((vehicleRange / vehicleBattery) * point.chargeRate / 60 * 1000) / 1000
+                : null;
+        }
+        if (fieldKey === 'rangeRateHr') {
+            // miles per hour: (rated_range / battery_kWh) × charge_kW
+            return (point.chargeRate != null && vehicleRange && vehicleBattery)
+                ? Math.round((vehicleRange / vehicleBattery) * point.chargeRate * 10) / 10
+                : null;
+        }
+        if (fieldKey === 'socRate') {
+            // percent of the battery per minute: charge_kW ÷ battery_kWh × 100 ÷ 60
+            return (point.chargeRate != null && vehicleBattery)
+                ? Math.round((point.chargeRate / vehicleBattery) * 100 / 60 * 1000) / 1000
                 : null;
         }
         return point[fieldKey] ?? null;
@@ -1098,47 +1102,26 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     explained, not a quieter version of the same puzzle. */}
 
                 {/* ── AXES ── */}
+                {/* A band that closes, because the picker is a list rather than
+                    three dropdowns and costs a few hundred pixels of the sidebar.
+                    Its note says what is plotted, open or closed. */}
                 <div className="chart-rail-group">
-                    <span className="text-micro">Axes</span>
-                    <div className="axis-rows">
-                        <label className="axis-row">
-                            <span className="axis-row-key">X</span>
-                            <select
-                                value={chartConfig.xAxis}
-                                onChange={(e) => setChartConfig({ ...chartConfig, xAxis: e.target.value })}
-                                className="form-input"
-                            >
-                                {axisOptions.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="axis-row">
-                            <span className="axis-row-key">Y</span>
-                            <select
-                                value={chartConfig.yAxis}
-                                onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
-                                className="form-input"
-                            >
-                                {axisOptions.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="axis-row">
-                            <span className="axis-row-key">Y2</span>
-                            <select
-                                value={chartConfig.y2Axis ?? ''}
-                                onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
-                                className="form-input"
-                            >
-                                <option value="">— None —</option>
-                                {axisOptions.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                    </div>
+                    <SectionBand
+                        open={axesOpen}
+                        onToggle={setAxesOpen}
+                        label="Axes"
+                        note={[chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis]
+                            .filter(Boolean)
+                            .map(k => stripUnits(axisOptions.find(o => o.value === k)?.label ?? k))
+                            .join(' · ')}
+                    />
+                    {axesOpen && (
+                        <AxisPicker
+                            options={axisOptions}
+                            axes={{ x: chartConfig.xAxis, y: chartConfig.yAxis, y2: chartConfig.y2Axis ?? null }}
+                            onChange={({ x, y, y2 }) => setChartConfig({ ...chartConfig, xAxis: x, yAxis: y, y2Axis: y2 })}
+                        />
+                    )}
                 </div>
 
                 {/* Alignment is a property of the time axis, so it belongs with

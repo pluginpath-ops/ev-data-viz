@@ -6240,6 +6240,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* A picker row selects; it does not drag, unlike the column picker's. */
 .field-picker-row { cursor: default; }
+/* A list short enough to show whole (the axis picker's twelve). */
+.field-picker-list.is-whole { max-height: none; overflow-y: visible; }
 .field-picker-row.is-selected { background-color: var(--color-primary-surface); }
 .field-picker-choice {
     display: flex;
