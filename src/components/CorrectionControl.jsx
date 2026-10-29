@@ -20,8 +20,11 @@ import { DEFAULT_READER_MODE } from '../utils/correctionSettings';
  *
  * Lives in chartConfig, so it rides the pop-out sync and is set once for
  * every chart and the vehicle table.
+ *
+ * `fields` passes through to CorrectionTargetFields: Road Trip leaves out the
+ * speed, because a trip is corrected to the speed it is driven.
  */
-export default function CorrectionControl({ mode = DEFAULT_READER_MODE, target, setChartConfig }) {
+export default function CorrectionControl({ mode = DEFAULT_READER_MODE, target, setChartConfig, fields = null }) {
     return (
         <>
             <label className="rail-select-row" title="Re-price measured range and efficiency to a common basis. Temperature covers air density and an assumed heating or cooling load; battery conditioning, cold tyres and regen limits are not modelled.">
@@ -43,6 +46,7 @@ export default function CorrectionControl({ mode = DEFAULT_READER_MODE, target, 
             {mode !== 'none' && (
                 <CorrectionTargetFields
                     target={target}
+                    fields={fields}
                     onChange={t => setChartConfig(prev => ({ ...prev, correctionTarget: t }))}
                 />
             )}
