@@ -42,6 +42,8 @@ import { useRunSelection } from '../hooks/useRunSelection';
 import { convDistance } from '../utils/unitConversions';
 import { chargingAxisOptions } from '../utils/chargingAxes';
 import AxisPicker from './AxisPicker';
+import ZoomHint from './ZoomHint';
+import { useChartZoom } from '../hooks/useChartZoom';
 import SectionBand from './SectionBand';
 import { useRememberedOpen } from '../hooks/useRememberedOpen';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun, isCompositeRun, defaultChargingRun } from '../utils/runUtils';
@@ -97,6 +99,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const readout = useChartReadout();
+    const { zoomed, resetZoom, zoomOptions, plugin: zoomStatePlugin } = useChartZoom(chartInstance);
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -941,7 +944,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
             data: { datasets },
-            plugins: [readout.plugin(readoutConfig)],
+            plugins: [readout.plugin(readoutConfig), zoomStatePlugin],
             options: {
                 animation: false,
                 responsive: true,
@@ -967,6 +970,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         zoom: {
                             drag: { enabled: true, threshold: CLICK_SLOP, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
                             mode: 'xy',
+                            ...zoomOptions,
                         },
                     },
                 },
@@ -1405,13 +1409,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     <>
                         <FeatureChartButton />
                         <button
-                            onClick={() => chartInstance.current?.resetZoom()}
-                            className="chart-copy-btn"
-                            title="Reset zoom to full view"
-                        >
-                            Reset zoom
-                        </button>
-                        <button
                             onClick={() => {
                                 navigator.clipboard.writeText(window.location.href).then(() => {
                                     setCopied(true);
@@ -1434,7 +1431,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             </PlotFrame>
 
             {!presentationMode && (
-                <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset zoom to restore</p>
+                <ZoomHint onReset={resetZoom} />
             )}
 
             {/* ── Controls below chart: scale inputs + line toggle + race mode — hidden in presentation mode ── */}
@@ -1446,6 +1443,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     y2Min={limits.y2Min} y2Max={limits.y2Max}
                     onChange={setLimit}
                     showY2={!!chartConfig.y2Axis}
+                    zoomed={zoomed} onResetZoom={resetZoom}
                     card={false}
                 />
 
