@@ -31,14 +31,42 @@ export const OPT_LEG_MI = range(60, 260, 10);
 /** Minutes per stop searched under the fixed-charge-time sim. */
 export const OPT_CHARGE_MIN = range(10, 60, 2.5);
 
-/** How far from the best a plan may be and still count as "as good", minutes. */
-export const NEAR_BEST_MIN = 5;
+/**
+ * How far from the best a plan may be and still count as "as good", percent of
+ * the best trip time. A share rather than fixed minutes so it means the same on
+ * a 300 mi trip as on a 1,000 mi one: 2% of a 700 mi trip is about a quarter
+ * of an hour, which no driver would trade a comfortable speed for.
+ */
+export const NEAR_BEST_PCT = 2;
 
 /** The per-stop values searched for a sim mode, and the simulation field they set. */
 export function stopAxisFor(mode) {
     return mode === 'time'
         ? { values: OPT_CHARGE_MIN, param: 'chargeTimeMinutes' }
         : { values: OPT_LEG_MI, param: 'legDistanceMi' };
+}
+
+/** Default speed range the best plan may use, mph: legal, holdable cruising. */
+export const DEFAULT_SPEED_RANGE = [55, 80];
+
+/**
+ * The speed indices a range allows: the first speed at or above `min` to the
+ * last at or below `max`, either way round. The grid outside them is not
+ * dropped — the chart still draws the fastest plan, labelled as such — only
+ * the BEST plan is held to what a driver would actually do.
+ */
+export function speedIndexRange(min, max) {
+    const lo = Math.min(min, max), hi = Math.max(min, max);
+    let a = OPT_SPEED_MPH.findIndex(v => v >= lo);
+    let b = OPT_SPEED_MPH.findLastIndex(v => v <= hi);
+    if (a === -1) a = OPT_SPEED_MPH.length - 1;
+    if (b === -1) b = 0;
+    return a <= b ? [a, b] : [b, a];
+}
+
+/** A grid with every speed outside [lo, hi] (indices) blanked. */
+export function withinSpeeds(totals, [lo, hi]) {
+    return totals.map((row, si) => (si >= lo && si <= hi ? row : row.map(() => null)));
 }
 
 /** The fastest cell of a grid, or null if no cell finished. */
@@ -79,13 +107,19 @@ export function envelopeByStop(totals) {
 }
 
 /**
- * Every cell within `tolMin` of the best: the mask, how many cells, and the
- * index span of speeds and of stop plans it covers. The spans bound the
- * region, which need not be a rectangle — the map draws the mask itself.
+ * Every cell no more than `pct` percent slower than `best`: the mask, how many
+ * cells, the index span of speeds and of stop plans it covers, and the
+ * tolerance in minutes (`tolMin`, for labels). The spans bound the region,
+ * which need not be a rectangle — the map draws the mask itself.
+ *
+ * `best` defaults to the grid's own fastest cell. The map passes the best plan
+ * within the speed range instead, over the WHOLE grid: then the region also
+ * takes in every faster plan, at any speed — it has no upper bound, only "no
+ * more than 2% slower than the best you would actually drive".
  */
-export function nearBest(totals, tolMin = NEAR_BEST_MIN) {
-    const best = bestOf(totals);
+export function nearBest(totals, pct = NEAR_BEST_PCT, best = bestOf(totals)) {
     if (!best) return null;
+    const tolMin = best.total * pct / 100;
     const limit = best.total + tolMin;
     let count = 0;
     let siLo = Infinity, siHi = -Infinity, tiLo = Infinity, tiHi = -Infinity;
@@ -98,7 +132,7 @@ export function nearBest(totals, tolMin = NEAR_BEST_MIN) {
         }
         return near;
     }));
-    return { mask, count, speeds: [siLo, siHi], stops: [tiLo, tiHi], limit };
+    return { mask, count, speeds: [siLo, siHi], stops: [tiLo, tiHi], limit, tolMin };
 }
 
 /**

@@ -225,21 +225,28 @@ export const CHART_HELP_DEFAULTS = {
             'for several stops: on a short trip the answer is mostly where one stop lands.',
         how_to_read:
             'Travel speed and Charge per stop plot trip time against one setting. With ' +
-            '“Best plan at each point” on, each point uses the best value of the other setting, so the ' +
-            'lowest point of a line is that car’s best trip; off, the other setting is ' +
-            'held at what you entered. The table below names each car’s best speed and ' +
-            'stop plan, the charge window that implies (arrive at, leave with), and every ' +
-            'plan within 5 minutes of it — the optimum is usually broad, and the range is ' +
-            'the useful answer.',
+            '“Optimize the other setting” on, each point uses the best value of the other ' +
+            'one, so the lowest point of a line is that car’s best trip; off, the other ' +
+            'setting is held at what you entered. On a fast charger the fastest plan is ' +
+            'often a speed nobody should drive, so the fastest legal plan keeps to the legal range ' +
+            'you set under Your plan (55–80 mph to start) and the fastest is shown apart, labelled as such. ' +
+            'The table names each car’s fastest legal plan, the charge window it implies (arrive ' +
+            'at, leave with), what it saves over your own plan, and every plan within 2% ' +
+            'of its trip time — the optimum is usually broad, and the span is the useful ' +
+            'answer. The Map shows one car’s whole grid: more saturated is faster, speeds outside ' +
+            'your legal range are dimmed, ★ is the fastest plan, ◆ the fastest within your legal range ' +
+            '(Fastest legal), the outline every plan no more than 2% slower than ◆ at any speed, ' +
+            'and ○ yours; each carries its figure beside it.',
         key_terms:
-            'Best plan — the fastest combination of speed and stop plan found on the grid.\n' +
+            'Fastest — the quickest plan on the whole grid, whatever the speed.\n' +
+            'Fastest legal — the quickest plan within your legal range.\n' +
             'Charge window — the average SoC the car arrives at a stop with, and leaves with.\n' +
-            'Within 5 min — every plan whose trip is no more than 5 minutes slower than the best.\n' +
+            'Within 2% — every plan whose trip is no more than 2% slower than the fastest legal plan: about 14 minutes on a 700 mi trip.\n' +
             'Average speed — trip distance ÷ total time, stops included.',
         math_approach:
             'Each cell is one full trip simulation (see Road Trip). Speeds step by 1 mph, ' +
             'stop distances by 10 mi and stop times by 2.5 minutes; a plan that would charge ' +
-            'past 95% or cannot finish is left blank. The best plan is the fastest cell — ' +
+            'past 95% or cannot finish is left blank. The fastest legal plan is the fastest cell in your legal range — ' +
             'within the grid’s steps, so read it to the nearest step, not exactly.',
     },
 

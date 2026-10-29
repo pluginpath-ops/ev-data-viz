@@ -1,13 +1,13 @@
 import { useAppContext } from '../context/AppContext';
 import { formatTime } from '../utils/roadTripSimulation';
-import { OPT_SPEED_MPH, NEAR_BEST_MIN } from '../utils/tripOptimizer';
+import { OPT_SPEED_MPH, NEAR_BEST_PCT } from '../utils/tripOptimizer';
 import { convDistance, distanceLabel, fmtSpeed, speedLabel } from '../utils/unitConversions';
 
 /**
  * Trip Optimizer's answer, one row per plotted trip: the best travel speed and
  * stop plan the grid found, what that means at a charger (arrive at, leave
  * with), how much it saves over the plan in the sidebar, and every plan within
- * NEAR_BEST_MIN of it.
+ * NEAR_BEST_PCT of its trip time.
  *
  * The last column is the one to read. The optimum is nearly always broad, and
  * a span of speeds a driver can hold is better advice than one exact figure —
@@ -30,20 +30,23 @@ export default function BestPlanTable({ rows, mode, speed, stopSetting, totalDis
     const span = (lo, hi, fmt) => (lo === hi ? fmt(lo) : `${fmt(lo)}–${fmt(hi)}`);
     const speedNum = mph => Math.round(convDistance(mph, units));
     const avgSpeed = totalMin => (convDistance(totalDistance, units) / (totalMin / 60)).toFixed(1);
+    // Every row shares the reader's range.
+    const range = rows.find(r => r.grid)?.grid.range;
+    const rangeText = range ? `${speedNum(OPT_SPEED_MPH[range[0]])}–${speedNum(OPT_SPEED_MPH[range[1]])} ${sl}` : '';
 
     return (
         <div className="card">
-            <h3 className="section-title">Best plan</h3>
+            <h3 className="section-title">Fastest legal</h3>
             <div className="best-plan-table-container">
                 <table className="best-plan-table">
                     <thead>
                         <tr>
                             <th>Vehicle / Run</th>
-                            <th>Best speed · stop plan</th>
+                            <th>Fastest legal, {rangeText}</th>
                             <th>Charge window</th>
                             <th>Trip time</th>
                             <th>vs your plan</th>
-                            <th>Within {NEAR_BEST_MIN} min</th>
+                            <th>Within {NEAR_BEST_PCT}%</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -53,11 +56,11 @@ export default function BestPlanTable({ rows, mode, speed, stopSetting, totalDis
                                 return (
                                     <tr key={entry.key}>
                                         <td><RowName entry={entry} name={name} /></td>
-                                        <td colSpan={5} className="text-meta">No plan on the grid finishes this trip without charging past 95%.</td>
+                                        <td colSpan={5} className="text-meta">No plan within {rangeText} finishes this trip without charging past 95%.</td>
                                     </tr>
                                 );
                             }
-                            const { best, near, stops, window: w } = grid;
+                            const { best, fastest, near, stops, window: w } = grid;
                             const bestMph = OPT_SPEED_MPH[best.si];
                             const yoursDone = yours && yours.completed !== false;
                             const saves = yoursDone ? Math.round(yours.totalTimeMin - best.total) : null;
@@ -69,6 +72,10 @@ export default function BestPlanTable({ rows, mode, speed, stopSetting, totalDis
                                 best.ti === stops.length - 1 && 'the longest stop searched',
                                 best.ti === 0 && 'the shortest stop searched',
                             ].filter(Boolean);
+                            // When the range is what binds: the fastest plan sits
+                            // outside it, and what the range costs is worth saying.
+                            const capCost = fastest && (fastest.si !== best.si || fastest.ti !== best.ti)
+                                ? Math.round(best.total - fastest.total) : 0;
                             return (
                                 <tr key={entry.key}>
                                     <td><RowName entry={entry} name={name} /></td>
@@ -89,6 +96,11 @@ export default function BestPlanTable({ rows, mode, speed, stopSetting, totalDis
                                     <td>
                                         <div className="best-plan-figure">{formatTime(best.total)}</div>
                                         <div className="text-meta">avg {avgSpeed(best.total)} {sl}</div>
+                                        {capCost > 0 && (
+                                            <div className="text-meta">
+                                                fastest: {formatTime(fastest.total)} at {fmtSpeed(OPT_SPEED_MPH[fastest.si], units)}, {formatTime(capCost)} quicker
+                                            </div>
+                                        )}
                                     </td>
                                     <td>
                                         {saves == null ? (
@@ -105,7 +117,7 @@ export default function BestPlanTable({ rows, mode, speed, stopSetting, totalDis
                                             {span(OPT_SPEED_MPH[near.speeds[0]], OPT_SPEED_MPH[near.speeds[1]], speedNum)} {sl}
                                         </div>
                                         <div className="text-meta">
-                                            {span(stops[near.stops[0]], stops[near.stops[1]], stopText)} per stop · {near.count} plans
+                                            {span(stops[near.stops[0]], stops[near.stops[1]], stopText)} per stop · {near.count} plans, ≤ {Math.round(near.tolMin)} min slower
                                         </div>
                                     </td>
                                 </tr>
@@ -116,9 +128,9 @@ export default function BestPlanTable({ rows, mode, speed, stopSetting, totalDis
             </div>
             <p className="text-note">
                 Searched every {fmtSpeed(1, units)} from {fmtSpeed(45, units)} to {fmtSpeed(100, units)}, against
-                every {mode === 'time' ? '2.5 minutes' : stopText(10)} of charge per stop, so read the best plan
+                every {mode === 'time' ? '2.5 minutes' : stopText(10)} of charge per stop, so read the fastest legal plan
                 to the nearest step.
-                The span is every plan within {NEAR_BEST_MIN} minutes of the best: not always a rectangle,
+                The span is every plan in your legal range within {NEAR_BEST_PCT}% of its trip time: not always a rectangle,
                 so not every pair inside it qualifies.
             </p>
         </div>
