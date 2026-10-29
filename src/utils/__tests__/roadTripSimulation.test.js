@@ -295,3 +295,31 @@ describe('destination SoC requirement (road trip)', () => {
         expect(topUp.endSoc - topUp.startSoc).toBeGreaterThan(cap);
     });
 });
+
+describe('a last stop a few miles short (fixed charge time)', () => {
+    // 90 mi to the first stop, a 30-minute stop adds 30 mi, and the second
+    // stop is half a mile short. Charging just enough to finish is +1% there;
+    // the "too slow for a meaningful charge" check used to read that as a
+    // failed stop and abandon the trip — isolated blank cells on the maps.
+    it('finishes rather than calling the charger too slow', () => {
+        const result = simulateRoadTrip({
+            ...baseParams,
+            startSoc: 100, minSoc: 10, destinationMinSoc: 10,
+            totalDistanceMi: 120.5, mode: 'time', chargeTimeMinutes: 30,
+        });
+        expect(result.completed).toBe(true);
+        expect(result.warnings).not.toContain('Charger too slow for meaningful charge');
+        expect(result.chargeStops).toBe(2);
+    });
+
+    it('still calls a full-duration stop that adds under 1% too slow', () => {
+        const flat = [{ soc: 0, time: 0 }, { soc: 10, time: 10 }, { soc: 10.5, time: 1000 }];
+        const result = simulateRoadTrip({
+            ...baseParams, chargingData: flat,
+            startSoc: 100, minSoc: 10, destinationMinSoc: 10,
+            totalDistanceMi: 300, mode: 'time', chargeTimeMinutes: 30,
+        });
+        expect(result.completed).toBe(false);
+        expect(result.warnings).toContain('Charger too slow for meaningful charge');
+    });
+});

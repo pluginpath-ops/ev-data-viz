@@ -246,11 +246,18 @@ export function simulateRoadTrip({
                     targetSoc = endSoc != null ? Math.min(endSoc, 100) : Math.min(currentSoc + chargeTimeMinutes * 2, 100);
                 }
                 chargeTime = chargeTimeMinutes;
-            }
 
-            if (targetSoc <= currentSoc + 1) {
-                warnings.push('Charger too slow for meaningful charge');
-                break;
+                // Only a FULL-duration stop can be "too slow": the branch
+                // above charges just enough to finish, and when the car
+                // arrives a few miles short that is legitimately +1% — which
+                // this check, when it sat after both branches, read as a
+                // failed stop and abandoned the trip. Which few miles short
+                // depends on where the last leg lands, so the sweep maps
+                // showed it as isolated blank cells amid finished ones.
+                if (targetSoc <= currentSoc + 1) {
+                    warnings.push('Charger too slow for meaningful charge');
+                    break;
+                }
             }
         }
 
