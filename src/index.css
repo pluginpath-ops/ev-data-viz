@@ -3256,7 +3256,9 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    or three digits it will ever hold instead of stretching. */
 .scenario-row {
     display: grid;
-    grid-template-columns: 42px 62px minmax(0, 1fr);
+    /* 72px: three digits beside a number spinner, which Firefox draws inside
+       the box and cannot be told not to without losing it everywhere. */
+    grid-template-columns: 42px 72px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
 }
@@ -3271,6 +3273,26 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     font-family: var(--font-mono);
     font-weight: 600;
 }
+/* Two numbers for one setting — Trip Optimizer's legal range — with "to"
+   between them, set as the unit beside it is. */
+/* Two fields where one usually sits, each as wide as the others so the
+   spinner keeps its room; the gaps tighten instead, to fit the sidebar. */
+.scenario-row.is-range {
+    grid-template-columns: 42px 72px auto 72px minmax(0, 1fr);
+    gap: 6px;
+}
+/* Above a plot: which of the plotted series a one-series chart (Trip
+   Optimizer's map) is drawing, and the control to change it. In the frame,
+   where the reader is looking, rather than in the sidebar. */
+.plot-series-picker {
+    @apply flex items-center gap-2 mb-2;
+}
+.plot-series-picker .form-input {
+    width: auto;
+    max-width: 100%;
+    min-width: 0;
+}
+
 /* Parameters that OVERRIDE measured data rather than describing the trip.
  *
  * ONE box around the set, not chrome on each field. Coloring every key and
@@ -3283,7 +3305,13 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * are looking at" signal, the same one race mode carries. Not a warning: the
  * override is the point, it just must not be invisible.
  */
-.override-panel {
+/*
+ * Trip Optimizer's "Your plan" box: the speed and stop plan the map's ○ marks.
+ * The override panel's orange for the same reason — the active setting the
+ * chart is drawn around — with a title, since a plan is not an override.
+ */
+.override-panel,
+.your-plan-panel {
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -3292,7 +3320,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     border-radius: var(--radius-control);
     background-color: var(--color-accent-orange-surface);
 }
-.override-panel .scenario-key { color: var(--color-accent-orange); }
+.override-panel .scenario-key,
+.your-plan-panel .scenario-key { color: var(--color-accent-orange); }
+/* Paired with .text-micro, the sidebar's group label, which it recolors. */
+.your-plan-title { color: var(--color-accent-orange); }
 .override-panel .text-note { margin: 0; }
 
 .scenario-unit {

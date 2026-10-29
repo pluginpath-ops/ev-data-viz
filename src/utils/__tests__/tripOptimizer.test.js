@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     bestOf, envelopeBySpeed, envelopeByStop, nearBest, chargeWindow, nearestIndex, stopAxisFor,
+    speedIndexRange, withinSpeeds, usefulStopCount,
     OPT_LEG_MI, OPT_CHARGE_MIN, OPT_SPEED_MPH,
 } from '../tripOptimizer';
 
@@ -28,12 +29,18 @@ describe('tripOptimizer', () => {
     });
 
     it('marks every cell within the tolerance and spans them', () => {
-        const near = nearBest(GRID, 5);
+        // 672 × 1% = 6.72 minutes: 672, 676 and 674, not 680.
+        const near = nearBest(GRID, 1);
+        expect(near.tolMin).toBeCloseTo(6.72);
         expect(near.count).toBe(3);   // 672, 676, 674
         expect(near.speeds).toEqual([1, 2]);
         expect(near.stops).toEqual([1, 2]);
         expect(near.mask[0]).toEqual([false, false, false]);
         expect(nearBest([[null]])).toBeNull();
+        // Against a slower reference, every faster cell is in too: no upper bound.
+        const open = nearBest(GRID, 1, { si: 2, ti: 1, total: 690 });
+        expect(open.mask[0]).toEqual([false, true, false]);  // 700 > 696.9
+        expect(open.count).toBe(6);                          // all but 700 and 701
     });
 
     it('describes the en-route stops, not the destination top-up', () => {
@@ -55,8 +62,33 @@ describe('tripOptimizer', () => {
         expect(OPT_SPEED_MPH[nearestIndex(OPT_SPEED_MPH, 200)]).toBe(100);
     });
 
+    it('holds the best plan to a speed range, in either order', () => {
+        const [lo, hi] = speedIndexRange(55, 80);
+        expect([OPT_SPEED_MPH[lo], OPT_SPEED_MPH[hi]]).toEqual([55, 80]);
+        expect(speedIndexRange(80, 55)).toEqual([lo, hi]);
+        expect(speedIndexRange(55.5, 79.5).map(i => OPT_SPEED_MPH[i])).toEqual([56, 79]);
+        // The fastest cell (row 1) is outside; the best within row 2 is 674.
+        expect(bestOf(withinSpeeds(GRID, [2, 2]))).toEqual({ si: 2, ti: 1, total: 674 });
+        expect(withinSpeeds(GRID, [2, 2])[1]).toEqual([null, null, null]);
+    });
+
     it('searches the setting the sim holds fixed', () => {
         expect(stopAxisFor('time')).toEqual({ values: OPT_CHARGE_MIN, param: 'chargeTimeMinutes' });
         expect(stopAxisFor('distance').param).toBe('legDistanceMi');
+    });
+
+    it('cuts top stop plans that are blank or repeat the row below', () => {
+        // The fixed-time L: a one-stop speed repeats up the column, the rest go blank.
+        expect(usefulStopCount([
+            [600, 590, 590, 590],
+            [550, 540, null, null],
+        ])).toBe(2);
+        // A row that changes anything, anywhere, is kept — and so is all below it.
+        expect(usefulStopCount([
+            [600, 590, 590, 580],
+            [550, 540, null, null],
+        ])).toBe(4);
+        expect(usefulStopCount([[null, null]])).toBe(1);
+        expect(usefulStopCount(GRID)).toBe(3);
     });
 });

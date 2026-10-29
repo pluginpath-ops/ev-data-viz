@@ -91,8 +91,15 @@ export function defaultRoadTripConfig() {
         // Trip Optimizer's own. A trip long enough for several stops, or the
         // optimum is mostly an artifact of where the one or two stops land.
         optimizerDistance: 700,
-        optimizerChart: 'speed',  // 'speed' | 'tripDist' (charge per stop) | 'map'
+        // The map first: it answers both settings at once, which is what the
+        // tab is for; the sweeps are its slices, a click away.
+        optimizerChart: 'map',    // 'map' | 'speed' | 'tripDist' (charge per stop)
         bestPlan: true,           // each sweep point takes the best of the other setting
+        // The speeds the BEST plan may use. The fastest is still drawn, and
+        // labelled as such: 95 mph wins on a fast charger, and nobody should
+        // be told to drive it.
+        optimizerSpeedMin: 55,
+        optimizerSpeedMax: 80,
         towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
         towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
         towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured

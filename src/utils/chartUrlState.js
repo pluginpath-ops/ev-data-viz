@@ -26,8 +26,8 @@
  *   compare       cmp_soc cmp_mins cmp_mi  cmp_o (orientation)  cmp_sel (the
  *                 plotted pairs)
  *   roadtrip      rt_*
- *   optimizer     rt_* and rt_otd rt_oc rt_bp (its own distance, chart and
- *                 best-plan switch). A roadtrip link whose rt_xa is a sweep
+ *   optimizer     rt_* and rt_otd rt_oc rt_bp rt_osn rt_osx (its own distance,
+ *                 chart, best-plan switch and the speeds the best plan may use). A roadtrip link whose rt_xa is a sweep
  *                 (written before the optimizer had its own tab) opens here.
  *   specs         sf (the field charted)
  *   specscatter   scx scy
@@ -157,6 +157,8 @@ export function parseChartUrl(search) {
         ...(n('rt_otd') != null && { optimizerDistance: n('rt_otd')         }),
         ...(OPTIMIZER_CHARTS.includes(p.get('rt_oc')) && { optimizerChart: p.get('rt_oc') }),
         ...(p.get('rt_bp') === '0' && { bestPlan: false                     }),
+        ...(n('rt_osn') != null && { optimizerSpeedMin: n('rt_osn')         }),
+        ...(n('rt_osx') != null && { optimizerSpeedMax: n('rt_osx')         }),
         ...(p.get('rt_sya') && { sweepYAxis:         p.get('rt_sya')         }),
         ...(p.get('rt_tw') === '1' && { towingMode: true                    }),
         ...(n('rt_te') != null && { towingEfficiency:   n('rt_te')          }),
@@ -351,6 +353,8 @@ export function buildChartParams({
             p.set('rt_otd', rt.optimizerDistance);
             p.set('rt_oc',  rt.optimizerChart);
             if (rt.bestPlan === false)        p.set('rt_bp', '0');
+            if (rt.optimizerSpeedMin != null) p.set('rt_osn', rt.optimizerSpeedMin);
+            if (rt.optimizerSpeedMax != null) p.set('rt_osx', rt.optimizerSpeedMax);
         }
         if (rt.towingMode) {
             p.set('rt_te', rt.towingEfficiency);

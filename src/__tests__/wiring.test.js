@@ -3037,10 +3037,12 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
     it('the charts that must deviate keep a tooltip, and say why', () => {
         // Range & Efficiency draws bars from the same Chart: bars keep theirs.
         expect(read('src/components/RangeChartView.jsx')).toMatch(/enabled: built\.kind !== 'line'[\s\S]{0,80}filter: suppressBarTooltip/);
-        // Road Trip: all three of its charts read through the one readout, the
-        // timeline with its own describe (it says what each vehicle is DOING).
+        // Road Trip: all four of its charts read through the one readout, the
+        // timeline with its own describe (it says what each vehicle is DOING),
+        // and Trip Optimizer's map with its own (its lines are the ridge of
+        // best stop plans and the reader's own stop plan).
         const trip = read('src/components/RoadTripView.jsx');
-        expect(trip.match(/readout\.plugin\(/g)).toHaveLength(3);
+        expect(trip.match(/readout\.plugin\(/g)).toHaveLength(4);
         expect(trip).toMatch(/tooltip: \{ enabled: false \}/);
         expect(trip).not.toMatch(/displayColors: true/);
         // The spec scatter plots one point per vehicle; there is no shared X.
@@ -3102,7 +3104,11 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
         for (const file of ['src/components/ChargingView.jsx', 'src/components/RoadTripView.jsx']) {
             const src = read(file);
             const drags = src.match(/drag: \{\s*enabled: true,\s*threshold: CLICK_SLOP/g) ?? [];
-            expect(drags.length, file).toBe(src.match(/drag: \{/g).length);
+            expect(drags.length, file).toBe(src.match(/drag: \{/g)?.length ?? 0);
+            // Or one shared drag, named once with the threshold and used by name.
+            if (/drag: ZOOM_DRAG/.test(src)) {
+                expect(src, file).toMatch(/const ZOOM_DRAG = \{\s*enabled: true, threshold: CLICK_SLOP/);
+            }
             expect(src).toMatch(/import \{ useChartReadout, CLICK_SLOP \}/);
         }
     });
