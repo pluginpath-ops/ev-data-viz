@@ -25,6 +25,8 @@ import { sessionFor } from '../utils/testSessions';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
+import ZoomHint from './ZoomHint';
+import { useChartZoom } from '../hooks/useChartZoom';
 import {
     simulateRoadTrip, segmentsToChartPoints, segmentsToChartPointsChargeTime,
     segmentsToChartPointsByTest,
@@ -838,6 +840,7 @@ export default function RoadTripView({
     const canvasRef = useRef(null);
     const readout   = useChartReadout();
     const chartRef  = useRef(null);
+    const { zoomed, resetZoom, zoomOptions, plugin: zoomStatePlugin } = useChartZoom(chartRef);
 
     const [runDataCache, setRunDataCache] = useState({});
     const [loading, setLoading] = useState(false);
@@ -1671,7 +1674,7 @@ export default function RoadTripView({
             chartRef.current = new Chart(canvasRef.current, {
                 type: 'line',
                 data: { datasets: mapDatasets },
-                plugins: [cellsPlugin, readout.plugin(mapReadout)],
+                plugins: [cellsPlugin, readout.plugin(mapReadout), zoomStatePlugin],
                 options: {
                     animation: false,
                     responsive: true,
@@ -1721,6 +1724,7 @@ export default function RoadTripView({
                             zoom: {
                                 drag: ZOOM_DRAG,
                                 mode: 'xy',
+                                ...zoomOptions,
                             },
                         },
                     },
@@ -1791,7 +1795,7 @@ export default function RoadTripView({
             chartRef.current = new Chart(canvasRef.current, {
                 type: 'line',
                 data: { datasets: speedDatasets },
-                plugins: [readout.plugin({ ...speedReadout, describe: (row, o) => speedReadout.describe(row, o, speedDatasets) })],
+                plugins: [readout.plugin({ ...speedReadout, describe: (row, o) => speedReadout.describe(row, o, speedDatasets) }), zoomStatePlugin],
                 options: {
                     animation: false,
                     responsive: true,
@@ -1823,6 +1827,7 @@ export default function RoadTripView({
                             zoom: {
                                 drag: ZOOM_DRAG,
                                 mode: 'xy',
+                                ...zoomOptions,
                             },
                         },
                     },
@@ -1907,7 +1912,7 @@ export default function RoadTripView({
             chartRef.current = new Chart(canvasRef.current, {
                 type: 'line',
                 data: { datasets: distDatasets },
-                plugins: [readout.plugin({ ...distReadout, describe: (row, o) => distReadout.describe(row, o, distDatasets) })],
+                plugins: [readout.plugin({ ...distReadout, describe: (row, o) => distReadout.describe(row, o, distDatasets) }), zoomStatePlugin],
                 options: {
                     animation: false,
                     responsive: true,
@@ -1938,6 +1943,7 @@ export default function RoadTripView({
                             zoom: {
                                 drag: ZOOM_DRAG,
                                 mode: 'xy',
+                                ...zoomOptions,
                             },
                         },
                     },
@@ -2230,11 +2236,12 @@ export default function RoadTripView({
                         zoom: {
                             drag: ZOOM_DRAG,
                             mode: 'xy',
+                            ...zoomOptions,
                         },
                     },
                 },
             },
-            plugins: [readout.plugin(timelineReadout), makeRoadTripPlugin(simResults.map((s, i) => {
+            plugins: [zoomStatePlugin, readout.plugin(timelineReadout), makeRoadTripPlugin(simResults.map((s, i) => {
                 return datasets.find(d => d._simIndex === i) ? s : null;
             }).filter(Boolean), units, yAxis, iceTime,
                 isByTestMode ? { laneIndex: iceLane, gasStops: iceGasStopSegs, totalTimeMin: iceTime } : null,
@@ -2797,13 +2804,6 @@ export default function RoadTripView({
                         <>
                             <FeatureChartButton />
                             <button
-                                onClick={() => chartRef.current?.resetZoom()}
-                                className="chart-copy-btn"
-                                title="Reset zoom to full view"
-                            >
-                                Reset zoom
-                            </button>
-                            <button
                                 onClick={() => {
                                     const p = new URLSearchParams(window.location.search);
                                     if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(','));
@@ -2877,7 +2877,7 @@ export default function RoadTripView({
             )}
 
             {!presentationMode && !loading && validEntries.length > 0 && (
-                <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset zoom to restore</p>
+                <ZoomHint onReset={resetZoom} />
             )}
 
             {/* ── Axis Scale Controls (card provided by AxisScaleControls) ─ */}
@@ -2888,6 +2888,7 @@ export default function RoadTripView({
                     onChange={onAxisChange}
                     showX={true}
                     showY2={false}
+                    zoomed={zoomed} onResetZoom={resetZoom}
                     xAxisLabel={isSpeedMode || isMapMode ? `X-Axis Scale (${sl})`
                         : isTripDistMode ? `X-Axis Scale (${mode === 'time' ? 'min' : dl})`
                             : 'X-Axis Scale (hrs)'}

@@ -3150,6 +3150,18 @@ describe('the spec chart plots the vehicle table’s columns (#450)', () => {
         expect(read('src/utils/chartUrlState.js')).toMatch(/chartMode === 'specs' \|\| chartMode === 'specscatter'\)[\s\S]{0,120}encodeAssumptionParams\(chartConfig\.assumptions\)/);
     });
 
+    it('every chart with box-zoom resets it from the Axis Scale controls and the zoom hint', () => {
+        for (const file of ['ChargingView', 'RoadTripView']) {
+            const view = read(`src/components/${file}.jsx`);
+            expect(view, `${file} tracks the zoom`).toMatch(/useChartZoom\(/);
+            expect(view, `${file} hands the zoom state to the controls`).toMatch(/zoomed=\{zoomed\} onResetZoom=\{resetZoom\}/);
+            expect(view, `${file} links the hint`).toMatch(/<ZoomHint onReset=\{resetZoom\}/);
+            expect(view, `${file} no longer keeps Reset zoom in the toolbar`).not.toMatch(/>\s*Reset zoom\s*</);
+            expect(view, `${file} clears the state when a chart is rebuilt`).toMatch(/zoomStatePlugin/);
+        }
+        expect(read('src/components/AxisScaleControls.jsx')).toMatch(/zoomed && onResetZoom/);
+    });
+
     it('Charging Curves chooses its axes through the axis picker, from the one axis list', () => {
         const view = read('src/components/ChargingView.jsx');
         expect(view).toMatch(/<AxisPicker/);
