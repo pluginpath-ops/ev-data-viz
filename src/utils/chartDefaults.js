@@ -86,8 +86,13 @@ export function defaultRoadTripConfig() {
         totalDistance: 500, speed: 70,
         overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
         yAxis: 'chargeTime',      // 'distance' | 'chargeTime' | 'byTest'
-        xAxis: 'totalTime',       // 'totalTime' | 'driveTime' | 'speed' | 'tripDist'
-        sweepYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' (sweep modes only)
+        xAxis: 'totalTime',       // 'totalTime' | 'driveTime' — Road Trip's timeline
+        sweepYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' | 'avgSpeed' (Trip Optimizer)
+        // Trip Optimizer's own. A trip long enough for several stops, or the
+        // optimum is mostly an artifact of where the one or two stops land.
+        optimizerDistance: 700,
+        optimizerChart: 'speed',  // 'speed' | 'tripDist' (charge per stop) | 'map'
+        bestPlan: true,           // each sweep point takes the best of the other setting
         towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
         towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
         towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured

@@ -2068,7 +2068,8 @@ describe('every chart\'s axis limits go through one door (#478)', () => {
     const CHARTS = {
         'src/components/ChargingView.jsx':                  'charging',
         'src/components/RangeChartView.jsx':                'range',
-        'src/components/RoadTripView.jsx':                  'roadtrip',
+        // Road Trip's view is also Trip Optimizer's, and asks for both.
+        'src/components/RoadTripView.jsx':                  ['roadtrip', 'optimizer'],
         'src/components/PerformanceCurveView.jsx':          'perfcurve',
         'src/components/EpaCurvesView.jsx':                 'epacurves',
         'src/components/epa/curves/EpaCurveExplorer.jsx':   'epaexplorer',
@@ -2077,16 +2078,18 @@ describe('every chart\'s axis limits go through one door (#478)', () => {
     it('every view that draws Axis Scale controls reads and writes through useAxisLimits', () => {
         const withControls = ALL.filter(x => /<AxisScaleControls\b/.test(x.text) && !x.file.endsWith('AxisScaleControls.jsx')).map(x => x.file);
         expect(withControls.sort(), 'a chart view with Axis Scale controls that is not in CHARTS above').toEqual(Object.keys(CHARTS).sort());
-        for (const [file, key] of Object.entries(CHARTS)) {
+        for (const [file, keys] of Object.entries(CHARTS)) {
             const text = read(file);
-            expect(text, `${file} must ask for the '${key}' limits`).toMatch(new RegExp(`useAxisLimits\\('${key}'\\)`));
+            for (const key of [keys].flat()) {
+                expect(text, `${file} must ask for the '${key}' limits`).toMatch(new RegExp(`useAxisLimits\\('${key}'\\)`));
+            }
             expect(text, `${file} must hand the controls the hook's setter`).toMatch(/<AxisScaleControls[\s\S]*?onChange=\{(setLimit|setScaleLimit|onAxisChange)\}/);
             expect(text, `${file} must not hold its own limits`).not.toMatch(/useState\(\s*\{\s*xMin|useSyncedScale|NO_SCALE|setXMin|setScale\b/);
         }
     });
 
     it('every key the views ask for is registered, and every registered key has a view', () => {
-        expect(Object.values(CHARTS).sort()).toEqual(Object.keys(AXIS_LIMIT_CHARTS).sort());
+        expect(Object.values(CHARTS).flat().sort()).toEqual(Object.keys(AXIS_LIMIT_CHARTS).sort());
     });
 
     it('nothing outside the hook keeps limits in chartConfig or epaConfig by field name', () => {
