@@ -180,7 +180,13 @@ export function simulateRoadTrip({
         // this branch agrees with the one below it (the higher floor reaches
         // less far, so it can only ever fire when minSoc would have finished
         // the trip too) and any shortfall is the top-up's job after the loop.
-        const canFinishAtDestFloor = rangeFrom(currentSoc, destFloor) >= remainingTrip - 0.01;
+        //
+        // Short by less than MIN_DRIVE_MI counts as finishing: a driver covers
+        // the last hundred feet on what the gauge rounds to the floor. Held to
+        // 0.01 mi, a leg that ended a few hundredths short stopped to charge
+        // 1% (overhead and all) and then failed the MIN_DRIVE_MI check below
+        // for the sliver left — a blank cell amid finished trips on the maps.
+        const canFinishAtDestFloor = rangeFrom(currentSoc, destFloor) >= remainingTrip - MIN_DRIVE_MI;
         const driveDist = canFinishAtDestFloor
             ? remainingTrip
             : Math.max(0, Math.min(rangeFrom(currentSoc, minSoc), remainingTrip));
@@ -246,11 +252,18 @@ export function simulateRoadTrip({
                     targetSoc = endSoc != null ? Math.min(endSoc, 100) : Math.min(currentSoc + chargeTimeMinutes * 2, 100);
                 }
                 chargeTime = chargeTimeMinutes;
-            }
 
-            if (targetSoc <= currentSoc + 1) {
-                warnings.push('Charger too slow for meaningful charge');
-                break;
+                // Only a FULL-duration stop can be "too slow": the branch
+                // above charges just enough to finish, and when the car
+                // arrives a few miles short that is legitimately +1% — which
+                // this check, when it sat after both branches, read as a
+                // failed stop and abandoned the trip. Which few miles short
+                // depends on where the last leg lands, so the sweep maps
+                // showed it as isolated blank cells amid finished ones.
+                if (targetSoc <= currentSoc + 1) {
+                    warnings.push('Charger too slow for meaningful charge');
+                    break;
+                }
             }
         }
 
@@ -286,7 +299,10 @@ export function simulateRoadTrip({
     // guarantees arrival at or above minSoc on its own, and destFloor is
     // clamped to never sit below it (see its definition above) — so a
     // separate minSoc check here could only ever agree with this one.
-    if (completed && currentSoc < destFloor - 0.01) {
+    //
+    // Below destFloor by no more than the MIN_DRIVE_MI of slack the drive step
+    // allows is arriving at it, not a reason to stop.
+    if (completed && currentSoc < destFloor - socForMiles(MIN_DRIVE_MI) - 0.01) {
         const targetSoc = Math.min(100, destFloor);
         if (targetSoc > currentSoc + 0.01) {
             const tStart = timeAtSoc(currentSoc);
