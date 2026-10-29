@@ -217,22 +217,30 @@ export const CHART_HELP_DEFAULTS = {
     optimizer: {
         title: 'About the Trip Optimizer',
         data_source:
-            'The Road Trip simulation, run once per value of one setting instead of once: ' +
-            'the travel speed, or the stop plan — the distance each stop adds (Fixed ' +
-            'charging range) or the minutes it lasts (Fixed charge time). ' +
+            'The Road Trip simulation, run over a grid of plans instead of one: every ' +
+            'travel speed from 45 to 100 mph against every stop plan — the distance each ' +
+            'stop adds (Fixed charging range) or the minutes it lasts (Fixed charge time). ' +
             'Each car uses its real measured charging curve and the efficiency from its ' +
             'range data, re-priced for each speed. The trip defaults to 700 mi, long enough ' +
             'for several stops: on a short trip the answer is mostly where one stop lands.',
         how_to_read:
-            'Travel speed and Charge per stop plot trip time against one setting, with ' +
-            'the other held at what you entered: the lowest point of a line is that car’s ' +
-            'best trip for that setting. Moving the other setting moves the whole line, so ' +
-            'the two trade against each other — a faster speed wants a different stop plan.',
+            'Travel speed and Charge per stop plot trip time against one setting. With ' +
+            '“Best plan at each point” on, each point uses the best value of the other setting, so the ' +
+            'lowest point of a line is that car’s best trip; off, the other setting is ' +
+            'held at what you entered. The table below names each car’s best speed and ' +
+            'stop plan, the charge window that implies (arrive at, leave with), and every ' +
+            'plan within 5 minutes of it — the optimum is usually broad, and the range is ' +
+            'the useful answer.',
         key_terms:
-            'Charge per stop — the distance each stop adds (Fixed charging range) or the minutes it lasts (Fixed charge time).',
+            'Best plan — the fastest combination of speed and stop plan found on the grid.\n' +
+            'Charge window — the average SoC the car arrives at a stop with, and leaves with.\n' +
+            'Within 5 min — every plan whose trip is no more than 5 minutes slower than the best.\n' +
+            'Average speed — trip distance ÷ total time, stops included.',
         math_approach:
-            'Each point is one full trip simulation (see Road Trip); a plan that would ' +
-            'charge past 95% or cannot finish is left out of the line.',
+            'Each cell is one full trip simulation (see Road Trip). Speeds step by 1 mph, ' +
+            'stop distances by 10 mi and stop times by 2.5 minutes; a plan that would charge ' +
+            'past 95% or cannot finish is left blank. The best plan is the fastest cell — ' +
+            'within the grid’s steps, so read it to the nearest step, not exactly.',
     },
 
     perfcompare: {

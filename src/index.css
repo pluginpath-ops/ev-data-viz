@@ -6258,6 +6258,42 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply text-amber-700 text-xs font-medium;
 }
 
+/* ── Trip Optimizer: the best-plan table ─────────────────────────────────────
+   One row per plotted trip: its best speed and stop plan, the charge window,
+   the saving over the sidebar's plan, and the span within a few minutes. */
+.best-plan-table-container {
+    @apply overflow-x-auto mt-3 mb-2;
+}
+.best-plan-table {
+    @apply w-full text-sm;
+}
+.best-plan-table th {
+    @apply text-left font-medium py-2 pr-6 border-b whitespace-nowrap;
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+}
+.best-plan-table td {
+    @apply py-2 pr-6 align-top border-b;
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+.best-plan-name {
+    @apply flex items-start gap-2;
+}
+.best-plan-name .series-swatch {
+    margin-top: 0.35em;
+}
+/* The row's figures; the line under each is .text-meta. */
+.best-plan-figure {
+    @apply font-medium tabular-nums;
+    color: var(--color-text-primary);
+}
+/* Time the best plan saves over the reader's own: good news, in the success role. */
+.best-plan-saving {
+    @apply font-medium tabular-nums;
+    color: var(--color-success-text);
+}
+
 /* A picker row that is derived from several tests rather than measured — a
    composite curve. Italic, so it never reads as a test someone ran. */
 .run-name-derived { font-style: italic; }
