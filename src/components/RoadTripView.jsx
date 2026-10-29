@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { correctionSummary } from '../utils/correctionSettings';
+import { normalizeCorrectionTarget, tempText, altitudeText, accessoryText } from '../utils/correctionSettings';
 import SectionBand from './SectionBand';
 import SidebarDisplaySection from './SidebarDisplaySection';
 import { useAxisLimits } from '../hooks/useAxisLimits';
@@ -82,6 +82,27 @@ const LEG_SWEEP_MI   = Array.from(
     { length: Math.floor((LEG_SWEEP_MAX - LEG_SWEEP_MIN) / LEG_SWEEP_STEP) + 1 },
     (_, i) => LEG_SWEEP_MIN + i * LEG_SWEEP_STEP,
 ); // [60, 80, 100, ..., 200]
+
+// ── Charge-time sweep constants (minutes per stop) ───────────────────────────
+const CHARGE_SWEEP_MIN  = 10;  // minutes per stop
+const CHARGE_SWEEP_MAX  = 60;  // minutes per stop
+const CHARGE_SWEEP_STEP = 5;   // minutes
+const CHARGE_SWEEP_MIN_PER_STOP = Array.from(
+    { length: Math.floor((CHARGE_SWEEP_MAX - CHARGE_SWEEP_MIN) / CHARGE_SWEEP_STEP) + 1 },
+    (_, i) => CHARGE_SWEEP_MIN + i * CHARGE_SWEEP_STEP,
+); // [10, 15, 20, ..., 60]
+
+/**
+ * What the per-stop sweep varies follows the sim: a fixed charge amount sweeps
+ * the distance each stop adds, a fixed charge time sweeps how long each stop
+ * lasts. It used to sweep the distance under both, and the time sim never reads
+ * it — every step ran the same trip and each vehicle drew a flat line.
+ */
+function stopSweepFor(mode) {
+    return mode === 'time'
+        ? { xs: CHARGE_SWEEP_MIN_PER_STOP, param: 'chargeTimeMinutes' }
+        : { xs: LEG_SWEEP_MI, param: 'legDistanceMi' };
+}
 
 // ── Unrealistic simulation check ─────────────────────────────────────────────
 const CHARGE_CEIL_SOC = 95; // % — charging above this marks a sim as unrealistic
@@ -245,10 +266,24 @@ const DEST_SOC_NOTE = 'What to arrive with. Independent of the en-route minimum,
     + 'Higher means arriving with a reserve, topped up at the destination if the trip '
     + 'would not otherwise get there.';
 
+/**
+ * The correction target fields Road Trip offers: no speed, because a trip is
+ * corrected to the speed it is driven (see tripTarget in the view).
+ */
+const TRIP_CORRECTION_FIELDS = ['temperatureF', 'altitudeFt', 'accessoryW'];
+
+/** correctionSummary's words, with the trip's speed named for what it is. */
+function tripCorrectionSummary(mode, target, units) {
+    if (!mode || mode === 'none') return 'no correction';
+    const parts = ['trip speed', tempText(target.temperatureF, units), altitudeText(target.altitudeFt, units)];
+    if (target.accessoryW != null) parts.push(accessoryText(target.accessoryW));
+    return `to ${parts.join(' · ')}`;
+}
+
 const SIM_MODES = [
-    { value: 'distance',     mode: 'distance', towing: false, label: 'Fixed charge amount' },
+    { value: 'distance',     mode: 'distance', towing: false, label: 'Fixed charging range' },
     { value: 'time',         mode: 'time',     towing: false, label: 'Fixed charge time' },
-    { value: 'distance-tow', mode: 'distance', towing: true,  label: 'Fixed charge amount — towing' },
+    { value: 'distance-tow', mode: 'distance', towing: true,  label: 'Fixed charging range — towing' },
     { value: 'time-tow',     mode: 'time',     towing: true,  label: 'Fixed charge time — towing' },
 ];
 
@@ -256,7 +291,9 @@ const X_AXES = [
     { value: 'totalTime', label: 'Total time' },
     { value: 'driveTime', label: 'Drive time' },
     { value: 'speed',     label: 'Travel speed (sweep)' },
-    { value: 'tripDist',  label: 'Trip distance (sweep)' },
+    // 'tripDist' is kept as the value so saved URLs still resolve; the sweep is
+    // of the charge per stop, never the trip's distance (see stopSweepFor).
+    { value: 'tripDist',  label: 'Charge per stop (sweep)' },
 ];
 
 /** Y over a speed or trip-distance sweep: every option is a duration. */
@@ -769,6 +806,18 @@ export default function RoadTripView({
     // (below), and selection is derived from this same structure, so building
     // it before resolving colors is the only order that isn't circular. See
     // "Resolve chart colors" below for the pass that attaches `.color`.
+    // A trip is priced at the speed it is driven, so the correction's speed is
+    // the trip's, never the reader's target speed. Correcting to the target
+    // and letting the simulation re-price from there did not cancel out: the
+    // correction prices the accessory load and air density at its speed, the
+    // simulation's speedCorrectionFactor knows neither, so the target speed
+    // leaked into every trip. Road Trip offers no speed slider for that reason.
+    const tripSpeed = roadTripConfig.speed;
+    const tripTarget = useMemo(
+        () => ({ ...normalizeCorrectionTarget(correctionTarget), speedMph: tripSpeed }),
+        [correctionTarget, tripSpeed],
+    );
+
     const pairStructure = useMemo(() => {
         const map = new Map();
         for (const vehicle of selectedVehicles) {
@@ -791,13 +840,15 @@ export default function RoadTripView({
                     // The range side is explicit — it is the row — so the resolver
                     // enters at rank 1 and its fallbacks only matter when the chosen
                     // test carries no usable data.
-                    const src = resolveRangeSource(chargingRun, {
+                    const resolveAt = speedMph => resolveRangeSource(chargingRun, {
                         vehicle,
                         batteryKwh: vehicle.socWindowKwh,
                         explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
-                        correction: { mode: correctionMode, target: correctionTarget },
+                        correction: { mode: correctionMode, target: { ...tripTarget, speedMph } },
                         session: sessionFor(testSessions, rangeRun),
                     });
+                    const src = resolveAt(tripSpeed);
+                    const ownSpeedMph = rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null;
 
                     const key = pairKey(rangeRun.id, partnerId);
                     map.set(key, {
@@ -819,7 +870,14 @@ export default function RoadTripView({
                         // re-prices from: the test's own, or the standard speed
                         // once correction has already moved it there. Assume
                         // 70 mph if neither the range test nor its source says.
-                        testSpeedMph:   pricedAtSpeedMph(src, rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null),
+                        testSpeedMph:   pricedAtSpeedMph(src, ownSpeedMph),
+                        // The speed sweep drives at every speed, so it prices
+                        // each one there rather than from the trip speed.
+                        priceAt: speedMph => {
+                            if (correctionMode === 'none') return { miPerKwh: src.miPerKwh, testSpeedMph: pricedAtSpeedMph(src, ownSpeedMph) };
+                            const at = resolveAt(speedMph);
+                            return { miPerKwh: at.miPerKwh, testSpeedMph: pricedAtSpeedMph(at, ownSpeedMph) };
+                        },
                         batteryKwh:     vehicle.socWindowKwh,
                         efficiencyNote: src.note,
                     });
@@ -827,7 +885,7 @@ export default function RoadTripView({
             }
         }
         return map;
-    }, [selectedVehicles, pairings, correctionMode, correctionTarget, testSessions]);
+    }, [selectedVehicles, pairings, correctionMode, tripTarget, tripSpeed, testSessions]);
 
     // Selection lives in the shared hook (hooks/useRunSelection.js), the same one
     // Charge Compare uses. Previously this view had its own copy, whose bootstrap
@@ -1080,10 +1138,12 @@ export default function RoadTripView({
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id] ?? [];
             const ov = perRun[entry.key] || {};
-            return SPEED_SWEEP_MPH.map(speedMph => simulateRoadTrip({
+            return SPEED_SWEEP_MPH.map(speedMph => {
+              const priced = entry.priceAt(speedMph);
+              return simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
-                miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
-                testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
+                miPerKwh:          towingMode ? towingEfficiency : priced.miPerKwh,
+                testSpeedMph:      towingMode ? towingRefSpeedMph : (priced.testSpeedMph || 70),
                 chargingData,
                 startSoc, minSoc: ov.minSoc ?? minSoc, destinationMinSoc,
                 legDistanceMi:     ov.legDistance ?? legDistance,
@@ -1093,35 +1153,38 @@ export default function RoadTripView({
                 overheadMinutes:   overhead,
                 mode,
                 towingMode,
-            }));
+              });
+            });
         });
     }, [validEntries, runDataCache, roadTripConfig]);
 
-    // ── Leg-distance sweep: run simulation at every leg distance in LEG_SWEEP_MI ─
-    const distSweepResults = useMemo(() => {
+    // ── Per-stop sweep: the leg or the charge time, whichever the sim holds ──
+    const stopSweepResults = useMemo(() => {
         if (roadTripConfig.xAxis !== 'tripDist') return null;
         const {
-            startSoc, minSoc, destinationMinSoc, chargeTime, totalDistance, speed, mode, overhead,
+            startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance, speed, mode, overhead,
             towingMode, towingEfficiency, towingRefSpeedMph,
         } = roadTripConfig;
+        const { xs, param } = stopSweepFor(mode);
         const perRun = roadTripConfig.perRun || {};
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id] ?? [];
             const ov = perRun[entry.key] || {};
-            // Leg distance is the swept axis here, so a per-run leg override doesn't apply.
-            return LEG_SWEEP_MI.map(legMi => simulateRoadTrip({
+            // The swept field comes last, so a per-run override of it doesn't apply.
+            return xs.map(x => simulateRoadTrip({
                 batteryKwh:        entry.batteryKwh,
                 miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
                 testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
                 chargingData,
                 startSoc, minSoc: ov.minSoc ?? minSoc, destinationMinSoc,
-                legDistanceMi:     legMi,
+                legDistanceMi:     ov.legDistance ?? legDistance,
                 totalDistanceMi:   totalDistance,
                 speedMph:          speed,
                 chargeTimeMinutes: ov.chargeTime ?? chargeTime,
                 overheadMinutes:   overhead,
                 mode,
                 towingMode,
+                [param]:           x,
             }));
         });
     }, [validEntries, runDataCache, roadTripConfig]);
@@ -1134,10 +1197,10 @@ export default function RoadTripView({
         if (!showTestSpread || roadTripConfig.towingMode) return null;
         return validEntries.map(entry => spreadTestsFor(entry.vehicle, {
             correctionMode,
-            correctionTarget,
+            correctionTarget: tripTarget,
             sessionOf: r => sessionFor(testSessions, r),
         }));
-    }, [showTestSpread, roadTripConfig.towingMode, validEntries, correctionMode, correctionTarget, testSessions]);
+    }, [showTestSpread, roadTripConfig.towingMode, validEntries, correctionMode, tripTarget, testSessions]);
 
     const spreadSweep = useMemo(() => {
         const {
@@ -1146,7 +1209,8 @@ export default function RoadTripView({
         } = roadTripConfig;
         if (!spreadInputs || (xAxis !== 'speed' && xAxis !== 'tripDist')) return null;
         const isSpeed = xAxis === 'speed';
-        const xs = isSpeed ? SPEED_SWEEP_MPH : LEG_SWEEP_MI;
+        const stopSweep = stopSweepFor(mode);
+        const xs = isSpeed ? SPEED_SWEEP_MPH : stopSweep.xs;
         const perRun = roadTripConfig.perRun || {};
         return validEntries.map((entry, i) => {
             const chargingData = runDataCache[entry.run.id];
@@ -1154,20 +1218,31 @@ export default function RoadTripView({
             const tests = spreadInputs[i];
             if (tests.length < 2) return { tests: tests.length, steps: null };
             const ov = perRun[entry.key] || {};
-            const perTest = tests.map(t => xs.map(x => {
+            // On the speed sweep each test is priced at each speed, as the
+            // main line is (tripTarget); spreadTestsFor keeps the tests' order.
+            const testsAt = isSpeed
+                ? xs.map(x => spreadTestsFor(entry.vehicle, {
+                    correctionMode,
+                    correctionTarget: { ...tripTarget, speedMph: x },
+                    sessionOf: r => sessionFor(testSessions, r),
+                }))
+                : null;
+            const perTest = tests.map((t0, ti) => xs.map((x, xi) => {
                 const mph = isSpeed ? x : speed;
+                const t = testsAt?.[xi][ti] ?? t0;
                 const sim = simulateRoadTrip({
                     batteryKwh:        entry.batteryKwh,
                     miPerKwh:          t.miPerKwh,
                     testSpeedMph:      t.testSpeedMph,
                     chargingData,
                     startSoc, minSoc: ov.minSoc ?? minSoc, destinationMinSoc,
-                    legDistanceMi:     isSpeed ? (ov.legDistance ?? legDistance) : x,
+                    legDistanceMi:     ov.legDistance ?? legDistance,
                     totalDistanceMi:   totalDistance,
                     speedMph:          mph,
                     chargeTimeMinutes: ov.chargeTime ?? chargeTime,
                     overheadMinutes:   overhead,
                     mode,
+                    ...(isSpeed ? {} : { [stopSweep.param]: x }),
                 });
                 return isSimUnrealistic(sim) ? null : Math.round(getSweepY(sim, mph, totalDistance, sweepYAxis));
             }));
@@ -1178,7 +1253,7 @@ export default function RoadTripView({
                 steps: sweepSpread(perTest),
             };
         });
-    }, [spreadInputs, validEntries, runDataCache, roadTripConfig]);
+    }, [spreadInputs, validEntries, runDataCache, roadTripConfig, correctionMode, tripTarget, testSessions]);
 
     // The timeline: each test's whole trip under the current scenario, and the
     // area between the furthest-along and the least at every minute. In the
@@ -1234,7 +1309,7 @@ export default function RoadTripView({
     // ── Build & render chart ──────────────────────────────────────────────────
     useEffect(() => {
         if (!canvasRef.current) return;
-        const { totalDistance, yAxis, xAxis, sweepYAxis, overhead, speed } = roadTripConfig;
+        const { totalDistance, yAxis, xAxis, sweepYAxis, overhead, speed, mode } = roadTripConfig;
         const isSpeedMode      = xAxis === 'speed';
         const isTripDistMode   = xAxis === 'tripDist';
         const isSweepMode      = isSpeedMode || isTripDistMode;
@@ -1245,7 +1320,7 @@ export default function RoadTripView({
         if (isSpeedMode) {
             if (!speedSweepResults || speedSweepResults.length === 0) return;
         } else if (isTripDistMode) {
-            if (!distSweepResults || distSweepResults.length === 0) return;
+            if (!stopSweepResults || stopSweepResults.length === 0) return;
         } else {
             if (!simResults.some(Boolean)) return;
         }
@@ -1373,18 +1448,23 @@ export default function RoadTripView({
             return () => { chartRef.current?.destroy(); chartRef.current = null; };
         }
 
-        // ── Trip distance sweep chart ────────────────────────────────────────
+        // ── Per-stop sweep chart ─────────────────────────────────────────────
         if (isTripDistMode) {
             const sweepLabel = { totalTime: 'Total Trip Time', driveTime: 'Driving Time', chargeTime: 'Charge + Stop Time' }[sweepYAxis] ?? 'Total Trip Time';
-            const legMinDisplay  = units === 'metric' ? Math.round(LEG_SWEEP_MIN  * MI_TO_KM) : LEG_SWEEP_MIN;
-            const legMaxDisplay  = units === 'metric' ? Math.round(LEG_SWEEP_MAX  * MI_TO_KM) : LEG_SWEEP_MAX;
-            const legStepDisplay = units === 'metric' ? Math.round(LEG_SWEEP_STEP * MI_TO_KM) : LEG_SWEEP_STEP;
+            // Minutes are minutes in either unit system; a distance converts.
+            const isChargeTimeSweep = mode === 'time';
+            const stopXs = stopSweepFor(mode).xs;
+            const toDisplay = v => (isChargeTimeSweep || units !== 'metric' ? v : Math.round(v * MI_TO_KM));
+            const stopMinDisplay  = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_MIN  : LEG_SWEEP_MIN);
+            const stopMaxDisplay  = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_MAX  : LEG_SWEEP_MAX);
+            const stopStepDisplay = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_STEP : LEG_SWEEP_STEP);
+            const stopXTitle = isChargeTimeSweep ? 'Charge Minutes per Stop' : `${dl} Between Charges`;
 
             const distDatasets = validEntries.map((entry, i) => {
-                const sweepSims = distSweepResults[i];
+                const sweepSims = stopSweepResults[i];
                 if (!sweepSims) return null;
-                const data = LEG_SWEEP_MI.map((legMi, di) => ({
-                    x: units === 'metric' ? Math.round(legMi * MI_TO_KM) : legMi,
+                const data = stopXs.map((x, di) => ({
+                    x: toDisplay(x),
                     y: isSimUnrealistic(sweepSims[di]) ? null : Math.round(getSweepY(sweepSims[di], speed, totalDistance, sweepYAxis)),
                 }));
                 return {
@@ -1402,17 +1482,16 @@ export default function RoadTripView({
                     fill: false,
                 };
             }).filter(Boolean);
-            distDatasets.push(...spreadDatasets(validEntries, spreadSweep,
-                LEG_SWEEP_MI.map(legMi => (units === 'metric' ? Math.round(legMi * MI_TO_KM) : legMi))));
+            distDatasets.push(...spreadDatasets(validEntries, spreadSweep, stopXs.map(toDisplay)));
 
-            // ICE reference line — ICE stops every 3 hrs regardless of leg distance setting
-            const iceDistData = LEG_SWEEP_MI.map(legMi => {
+            // ICE reference line — ICE stops every 3 hrs whatever the EV's stops are
+            const iceDistData = stopXs.map(x => {
                 const iceTotalMin = calcIceTotalTimeAtSpeed(speed, totalDistance, overhead);
                 const driveMin    = (totalDistance / speed) * 60;
                 const yVal = sweepYAxis === 'driveTime'  ? driveMin
                            : sweepYAxis === 'chargeTime' ? iceTotalMin - driveMin
                            : iceTotalMin;
-                return { x: units === 'metric' ? Math.round(legMi * MI_TO_KM) : legMi, y: Math.round(yVal) };
+                return { x: toDisplay(x), y: Math.round(yVal) };
             });
             const iceDistYMin = Math.floor((Math.min(...iceDistData.map(d => d.y)) - 30) / 60) * 60;
             distDatasets.unshift({
@@ -1428,7 +1507,10 @@ export default function RoadTripView({
                 _isIce: true,
             });
 
-            const distReadout = sweepReadout({ xTitle: `Distance between charges (${dl})`, yTitle: sweepLabel });
+            const distReadout = sweepReadout({
+                xTitle: isChargeTimeSweep ? 'Charge time per stop (min)' : `Distance between charges (${dl})`,
+                yTitle: sweepLabel,
+            });
             chartRef.current = new Chart(canvasRef.current, {
                 type: 'line',
                 data: { datasets: distDatasets },
@@ -1441,10 +1523,10 @@ export default function RoadTripView({
                     scales: {
                         x: {
                             type: 'linear',
-                            min: axisLimits.xMin ?? legMinDisplay,
-                            max: axisLimits.xMax ?? legMaxDisplay,
-                            title: { display: true, text: `${dl} Between Charges`, font: { size: fonts.axis }, color: legendColor },
-                            ticks: { stepSize: legStepDisplay, color: tickColor },
+                            min: axisLimits.xMin ?? stopMinDisplay,
+                            max: axisLimits.xMax ?? stopMaxDisplay,
+                            title: { display: true, text: stopXTitle, font: { size: fonts.axis }, color: legendColor },
+                            ticks: { stepSize: stopStepDisplay, color: tickColor },
                             grid: { color: gridColor },
                         },
                         y: {
@@ -1776,7 +1858,7 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, speedSweepResults, distSweepResults, spreadSweep, spreadTimeline, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, axisLimits, isDark]);
+    }, [simResults, speedSweepResults, stopSweepResults, spreadSweep, spreadTimeline, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, roadTripConfig.mode, axisLimits, isDark]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
@@ -1812,7 +1894,7 @@ export default function RoadTripView({
     const isSweepMode    = isSpeedMode || isTripDistMode;
 
     // Did any sweep sim get cut off due to unrealistic charging?
-    const activeSweepResults = isSpeedMode ? speedSweepResults : isTripDistMode ? distSweepResults : null;
+    const activeSweepResults = isSpeedMode ? speedSweepResults : isTripDistMode ? stopSweepResults : null;
     const hasUnrealisticPoints = activeSweepResults?.some(
         entryResults => entryResults?.some(sim => isSimUnrealistic(sim))
     ) ?? false;
@@ -1857,23 +1939,25 @@ export default function RoadTripView({
     // "Road Trip — 500 mi at 70 mph" and the PNG said nothing.
     const plotTitle = useMemo(() => (
         isSpeedMode ? 'Trip time vs travel speed'
-            : isTripDistMode ? 'Trip time vs leg distance'
+            : isTripDistMode
+                ? (mode === 'time' ? 'Trip time vs charge time per stop' : 'Trip time vs leg distance')
                 : 'Road trip'
-    ), [isSpeedMode, isTripDistMode]);
+    ), [isSpeedMode, isTripDistMode, mode]);
 
     const plotSubtitle = useMemo(() => {
         const runs = validEntries.length;
         const parts = countParts(verboseLabels, [[runs, 'run']]);
         if (!isSpeedMode) parts.push(`${Math.round(convDistance(totalDistance, units))} ${dl}`);
         if (!isSpeedMode) parts.push(`${Math.round(convDistance(speed, units))} ${sl}`);
-        parts.push(mode === 'distance'
+        // The swept quantity is the x-axis, not a setting, as speed is above.
+        if (!isTripDistMode) parts.push(mode === 'distance'
             ? `${Math.round(convDistance(legDistance, units))} ${dl} per charge`
             : `${chargeTime} min per stop`);
         parts.push(`${startSoc}→${minSoc}% SoC`);
         if (towingMode) parts.push('towing');
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [validEntries, isSpeedMode, totalDistance, speed, mode, legDistance, chargeTime,
+    }, [validEntries, isSpeedMode, isTripDistMode, totalDistance, speed, mode, legDistance, chargeTime,
         startSoc, minSoc, towingMode, units, dl, sl, verboseLabels]);
 
     // Source line: each trip prices a charging test against a range test, or
@@ -2003,7 +2087,10 @@ export default function RoadTripView({
                                     onChange={v => setField('destinationMinSoc', v)} />
                                 <span className="scenario-unit">% SoC</span>
                             </label>
-                            {mode === 'distance' ? (
+                            {/* Hidden on the per-stop sweep, as Speed is on the
+                                speed sweep: the chart sweeps this field, so a
+                                value typed here would change nothing. */}
+                            {isTripDistMode ? null : mode === 'distance' ? (
                                 <label className="scenario-row">
                                     <span className="scenario-key">Leg</span>
                                     <NumberInput className="form-input" min={1}
@@ -2082,7 +2169,7 @@ export default function RoadTripView({
                       * accent-filled button in a "Mode" group of one: it is a
                       * thing that is either on or off, which is what every
                       * other control in this region already is. */}
-                    <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={correctionSummary(correctionMode, correctionTarget, units)}>
+                    <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={tripCorrectionSummary(correctionMode, tripTarget, units)}>
                         <div className="display-grid">
                             {setChartConfig && (
                                 <>
@@ -2097,7 +2184,8 @@ export default function RoadTripView({
                             </label>
                         </div>
                         {setChartConfig && (
-                            <CorrectionControl mode={correctionMode} target={correctionTarget} setChartConfig={setChartConfig} />
+                            <CorrectionControl mode={correctionMode} target={correctionTarget} setChartConfig={setChartConfig}
+                                fields={TRIP_CORRECTION_FIELDS} />
                         )}
                     </SidebarDisplaySection>
 
@@ -2305,7 +2393,7 @@ export default function RoadTripView({
             )}
 
             {/* ── Axis Scale Controls (card provided by AxisScaleControls) ─ */}
-            {!loading && (simResults.some(Boolean) || speedSweepResults?.length > 0 || distSweepResults?.length > 0) && !presentationMode && (
+            {!loading && (simResults.some(Boolean) || speedSweepResults?.length > 0 || stopSweepResults?.length > 0) && !presentationMode && (
                 <AxisScaleControls
                     xMin={axisLimits.xMin} xMax={axisLimits.xMax}
                     yMin={axisLimits.yMin} yMax={axisLimits.yMax}
