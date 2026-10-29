@@ -192,8 +192,8 @@ export const CHART_HELP_DEFAULTS = {
             'Read it as a race against the clock (and against gas). The default view plots ' +
             'distance covered vs elapsed time; flat steps are charging stops, and each ' +
             'car’s total trip time — and how it compares to ICE — is labelled at the ' +
-            'finish. You can also chart cumulative charge time, per-car SoC “lanes”, or ' +
-            'sweep travel speed / distance-between-stops to find the sweet spot. Because ' +
+            'finish. You can also chart cumulative charge time or per-car SoC “lanes”; the ' +
+            'Trip Optimizer tab searches travel speed and stop plan for the sweet spot. Because ' +
             'charging follows each car’s actual curve, a faster-charging car can win a long ' +
             'trip even with less range. Cars that can’t finish (battery depleted, or a stop ' +
             'would need >95% charge) are dropped.',
@@ -212,6 +212,27 @@ export const CHART_HELP_DEFAULTS = {
             'efficient). Trip time = driving time + charging time + per-stop overhead. The ' +
             'ICE line drives fixed 3-hour legs with the same overhead. It’s a model — real ' +
             'charger availability, weather and traffic will vary.',
+    },
+
+    optimizer: {
+        title: 'About the Trip Optimizer',
+        data_source:
+            'The Road Trip simulation, run once per value of one setting instead of once: ' +
+            'the travel speed, or the stop plan — the distance each stop adds (Fixed ' +
+            'charging range) or the minutes it lasts (Fixed charge time). ' +
+            'Each car uses its real measured charging curve and the efficiency from its ' +
+            'range data, re-priced for each speed. The trip defaults to 700 mi, long enough ' +
+            'for several stops: on a short trip the answer is mostly where one stop lands.',
+        how_to_read:
+            'Travel speed and Charge per stop plot trip time against one setting, with ' +
+            'the other held at what you entered: the lowest point of a line is that car’s ' +
+            'best trip for that setting. Moving the other setting moves the whole line, so ' +
+            'the two trade against each other — a faster speed wants a different stop plan.',
+        key_terms:
+            'Charge per stop — the distance each stop adds (Fixed charging range) or the minutes it lasts (Fixed charge time).',
+        math_approach:
+            'Each point is one full trip simulation (see Road Trip); a plan that would ' +
+            'charge past 95% or cannot finish is left out of the line.',
     },
 
     perfcompare: {

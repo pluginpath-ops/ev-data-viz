@@ -67,9 +67,11 @@ export default function PresentedChart({
             />
         )}
 
-        {selectedVehicles.length > 0 && chartMode === 'roadtrip' && roadTripConfig && (
+        {selectedVehicles.length > 0 && (chartMode === 'roadtrip' || chartMode === 'optimizer') && roadTripConfig && (
             <RoadTripView
                 vehicles={vehicles}
+                key={chartMode}
+                optimizer={chartMode === 'optimizer'}
                 selectedVehicleIds={selectedVehicles}
                 roadTripConfig={roadTripConfig}
                 pairings={pairings}

@@ -26,6 +26,9 @@
  *   compare       cmp_soc cmp_mins cmp_mi  cmp_o (orientation)  cmp_sel (the
  *                 plotted pairs)
  *   roadtrip      rt_*
+ *   optimizer     rt_* and rt_otd rt_oc rt_bp (its own distance, chart and
+ *                 best-plan switch). A roadtrip link whose rt_xa is a sweep
+ *                 (written before the optimizer had its own tab) opens here.
  *   specs         sf (the field charted)
  *   specscatter   scx scy
  *   epacurves     epa_ya epa_m epa_ov
@@ -39,6 +42,12 @@ import {
 } from './axisLimits';
 import { encodeVehicleFilters } from './vehicleFilters';
 import { VEHICLE_TABLE_PARAM_PREFIX, encodeAssumptionParams } from './vehicleTable';
+
+/** Road Trip X axes that are sweeps: Trip Optimizer's charts since it got its own tab. */
+const ROAD_TRIP_SWEEPS = ['speed', 'tripDist'];
+
+/** Trip Optimizer's charts. */
+export const OPTIMIZER_CHARTS = ['speed', 'tripDist', 'map'];
 
 /** The Range & Efficiency chart types, in the order the view lists them. */
 export const RANGE_CHART_TYPES = [
@@ -78,7 +87,11 @@ export function parseChartUrl(search) {
     const effUnit = p.get('eff');
     // A stale or hand-edited ?m= would otherwise fall through to the charging
     // chart with no indication why.
-    const chartMode = ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE;
+    const linkedMode = ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE;
+    // The sweeps were Road Trip X axes until Trip Optimizer took them; a link
+    // to one opens the optimizer on that chart, with the trip it named.
+    const sweepLink = linkedMode === 'roadtrip' && ROAD_TRIP_SWEEPS.includes(p.get('rt_xa'));
+    const chartMode = sweepLink ? 'optimizer' : linkedMode;
 
     const chart = {
         vehicleIds:    idList(p.get('v')),
@@ -138,7 +151,12 @@ export function parseChartUrl(search) {
         ...(n('rt_sp') != null && { speed:         n('rt_sp')               }),
         ...(n('rt_oh') != null && { overhead:      n('rt_oh')               }),
         ...(p.get('rt_ya') && { yAxis:              p.get('rt_ya')          }),
-        ...(p.get('rt_xa') && { xAxis:              p.get('rt_xa')          }),
+        ...(p.get('rt_xa') && !sweepLink && { xAxis: p.get('rt_xa')         }),
+        ...(sweepLink && { optimizerChart: p.get('rt_xa'), bestPlan: false,
+            ...(n('rt_td') != null && { optimizerDistance: n('rt_td') }) }),
+        ...(n('rt_otd') != null && { optimizerDistance: n('rt_otd')         }),
+        ...(OPTIMIZER_CHARTS.includes(p.get('rt_oc')) && { optimizerChart: p.get('rt_oc') }),
+        ...(p.get('rt_bp') === '0' && { bestPlan: false                     }),
         ...(p.get('rt_sya') && { sweepYAxis:         p.get('rt_sya')         }),
         ...(p.get('rt_tw') === '1' && { towingMode: true                    }),
         ...(n('rt_te') != null && { towingEfficiency:   n('rt_te')          }),
@@ -315,7 +333,7 @@ export function buildChartParams({
     if (pairsEncoded) p.set('pairs', pairsEncoded);
 
     // Road Trip
-    if (chartMode === 'roadtrip') {
+    if (chartMode === 'roadtrip' || chartMode === 'optimizer') {
         const rt = roadTripConfig;
         p.set('rt_m',  rt.mode);
         p.set('rt_ss', rt.startSoc);
@@ -329,6 +347,11 @@ export function buildChartParams({
         p.set('rt_xa',  rt.xAxis);
         if (rt.sweepYAxis !== 'totalTime')     p.set('rt_sya', rt.sweepYAxis);
         if (rt.towingMode)                    p.set('rt_tw', '1');
+        if (chartMode === 'optimizer') {
+            p.set('rt_otd', rt.optimizerDistance);
+            p.set('rt_oc',  rt.optimizerChart);
+            if (rt.bestPlan === false)        p.set('rt_bp', '0');
+        }
         if (rt.towingMode) {
             p.set('rt_te', rt.towingEfficiency);
             p.set('rt_tr', rt.towingRefSpeedMph);

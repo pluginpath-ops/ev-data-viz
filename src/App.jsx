@@ -1203,7 +1203,7 @@ export default function App() {
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
                         <ChargingView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -1214,9 +1214,13 @@ export default function App() {
                             setPairings={setPairings}
                         />
                     )}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'roadtrip' && (
+                    {/* Trip Optimizer is Road Trip's view as its optimizer
+                        variant; keyed so switching between them starts clean. */}
+                    {activeChartCategory && selectedVehicles.length > 0 && (chartMode === 'roadtrip' || chartMode === 'optimizer') && (
                         <RoadTripView
                             vehicles={chartVehicles}
+                            key={chartMode}
+                            optimizer={chartMode === 'optimizer'}
                             selectedVehicleIds={selectedVehicles}
                             roadTripConfig={roadTripConfig}
                             setRoadTripConfig={setRoadTripConfig}

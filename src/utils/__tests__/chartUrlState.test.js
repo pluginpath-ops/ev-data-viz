@@ -174,6 +174,31 @@ describe('the settings that already travelled still do', () => {
     });
 });
 
+describe('Trip Optimizer links', () => {
+    const rt = { mode: 'distance', startSoc: 90, minSoc: 10, legDistance: 150, chargeTime: 30, totalDistance: 500, speed: 70, overhead: 5, yAxis: 'chargeTime', xAxis: 'totalTime', sweepYAxis: 'totalTime', towingMode: false };
+
+    it('round-trips its own distance, chart and best-plan switch, leaving Road Trip\'s alone', () => {
+        const q = build({ chartMode: 'optimizer', roadTripConfig: { ...rt, optimizerDistance: 900, optimizerChart: 'tripDist', bestPlan: false } });
+        const parsed = parseChartUrl(q);
+        expect(parsed.chart.chartMode).toBe('optimizer');
+        expect(parsed.roadTrip).toMatchObject({ totalDistance: 500, xAxis: 'totalTime', optimizerDistance: 900, optimizerChart: 'tripDist', bestPlan: false });
+    });
+
+    it('does not write its keys on a Road Trip link', () => {
+        const keys = [...new URLSearchParams(build({ chartMode: 'roadtrip', roadTripConfig: { ...rt, optimizerDistance: 700, optimizerChart: 'speed', bestPlan: true } })).keys()];
+        for (const k of ['rt_otd', 'rt_oc', 'rt_bp']) expect(keys).not.toContain(k);
+    });
+
+    it('opens a Road Trip sweep link from before the tab existed as the same chart', () => {
+        const parsed = parseChartUrl('m=roadtrip&rt_xa=speed&rt_td=640');
+        expect(parsed.chart.chartMode).toBe('optimizer');
+        // Best plan off: the old chart held the stop plan at what the link set.
+        expect(parsed.roadTrip).toMatchObject({ optimizerChart: 'speed', optimizerDistance: 640, bestPlan: false });
+        expect(parsed.roadTrip.xAxis).toBeUndefined();
+        expect(parseChartUrl('m=roadtrip&rt_xa=driveTime').chart.chartMode).toBe('roadtrip');
+    });
+});
+
 // ── Axis limits (#478) ───────────────────────────────────────────────────────
 // Every chart that has Axis Scale controls keeps its limits in
 // chartConfig.axisLimits and the link writes them as one `ax` parameter.

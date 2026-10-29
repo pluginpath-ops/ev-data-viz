@@ -287,14 +287,51 @@ const SIM_MODES = [
     { value: 'time-tow',     mode: 'time',     towing: true,  label: 'Fixed charge time — towing' },
 ];
 
+/** Road Trip's X: the trip as it unfolds. */
 const X_AXES = [
     { value: 'totalTime', label: 'Total time' },
     { value: 'driveTime', label: 'Drive time' },
-    { value: 'speed',     label: 'Travel speed (sweep)' },
-    // 'tripDist' is kept as the value so saved URLs still resolve; the sweep is
-    // of the charge per stop, never the trip's distance (see stopSweepFor).
-    { value: 'tripDist',  label: 'Charge per stop (sweep)' },
 ];
+
+/**
+ * Trip Optimizer's charts, held as its X. 'tripDist' is the stored value of the
+ * per-stop sweep, kept so old links resolve; it sweeps the charge per stop,
+ * never the trip's distance (see stopSweepFor).
+ */
+const OPTIMIZER_X_AXES = [
+    { value: 'speed',     label: 'Travel speed' },
+    { value: 'tripDist',  label: 'Charge per stop' },
+];
+
+/**
+ * Trip Optimizer is this view with its own trip distance and chart, held in
+ * roadTripConfig beside Road Trip's so a link, the pop-out and a Home panel
+ * carry them with no plumbing of their own. Every other setting is shared: a
+ * driver's start and minimum SoC, stop overhead and sim mode do not change
+ * because they are asking a different question of the same trip.
+ *
+ * The view reads `totalDistance` and `xAxis` throughout, so the variant swaps
+ * its own in on the way in (`asOptimizer`) and back out on the way out
+ * (`fromOptimizer`), and nothing below needs to know which tab it is on.
+ */
+function asOptimizer(stored) {
+    return {
+        ...stored,
+        totalDistance: stored.optimizerDistance ?? 700,
+        xAxis: OPTIMIZER_X_AXES.some(o => o.value === stored.optimizerChart) ? stored.optimizerChart : 'speed',
+    };
+}
+function fromOptimizer(next, prev) {
+    return {
+        ...next,
+        totalDistance: prev.totalDistance, xAxis: prev.xAxis,
+        optimizerDistance: next.totalDistance, optimizerChart: next.xAxis,
+    };
+}
+/** Road Trip as stored, with a sweep X from before the optimizer had a tab put back on the timeline. */
+function asRoadTrip(stored) {
+    return X_AXES.some(o => o.value === stored.xAxis) ? stored : { ...stored, xAxis: 'totalTime' };
+}
 
 /** Y over a speed or trip-distance sweep: every option is a duration. */
 const SWEEP_Y_AXES = [
@@ -739,8 +776,10 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
 export default function RoadTripView({
     vehicles,
     selectedVehicleIds,
-    roadTripConfig,
-    setRoadTripConfig,
+    roadTripConfig: storedConfig,
+    setRoadTripConfig: setStoredConfig,
+    // Drawn as Trip Optimizer: the sweeps, on its own trip distance.
+    optimizer = false,
     // Global chart-session pairings (utils/pairings.js). Read-only here: this
     // view consumes a pairing chosen in Charge Compare but does not set one,
     // because it is charging-primary and the pairing is keyed by range test.
@@ -756,6 +795,16 @@ export default function RoadTripView({
 }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
+
+    const roadTripConfig = useMemo(
+        () => (optimizer ? asOptimizer(storedConfig) : asRoadTrip(storedConfig)),
+        [optimizer, storedConfig],
+    );
+    const setRoadTripConfig = useCallback(update => setStoredConfig(prev => {
+        const view = optimizer ? asOptimizer(prev) : prev;
+        const next = typeof update === 'function' ? update(view) : update;
+        return optimizer ? fromOptimizer(next, prev) : next;
+    }), [optimizer, setStoredConfig]);
     const canvasRef = useRef(null);
     const readout   = useChartReadout();
     const chartRef  = useRef(null);
@@ -774,7 +823,10 @@ export default function RoadTripView({
     // hoursToMinutes where they are drawn). One set for the chart whatever its
     // axes: changing an axis keeps the limits, as it always did here — Reset is
     // the reader's.
-    const { limits: axisLimits, setLimit: onAxisChange } = useAxisLimits('roadtrip');
+    // Trip Optimizer keeps its own: its axes are speed and stop plan, not time.
+    const roadTripLimits  = useAxisLimits('roadtrip');
+    const optimizerLimits = useAxisLimits('optimizer');
+    const { limits: axisLimits, setLimit: onAxisChange } = optimizer ? optimizerLimits : roadTripLimits;
     const [copiedUrl, setCopiedUrl] = useState(false);
     // PROTOTYPE, local to this view: not in chartConfig, not in the URL.
     const [showTestSpread, setShowTestSpread] = useState(false);
@@ -2012,7 +2064,7 @@ export default function RoadTripView({
                                     value={xAxis}
                                     onChange={e => setField('xAxis', e.target.value)}
                                 >
-                                    {X_AXES.map(o => (
+                                    {(optimizer ? OPTIMIZER_X_AXES : X_AXES).map(o => (
                                         <option key={o.value} value={o.value}>{o.label}</option>
                                     ))}
                                 </select>
@@ -2400,7 +2452,9 @@ export default function RoadTripView({
                     onChange={onAxisChange}
                     showX={true}
                     showY2={false}
-                    xAxisLabel={isSpeedMode ? `X-Axis Scale (${sl})` : isTripDistMode ? `X-Axis Scale (${dl})` : 'X-Axis Scale (hrs)'}
+                    xAxisLabel={isSpeedMode ? `X-Axis Scale (${sl})`
+                        : isTripDistMode ? `X-Axis Scale (${mode === 'time' ? 'min' : dl})`
+                            : 'X-Axis Scale (hrs)'}
                     yAxisLabel={isSweepMode ? 'Y-Axis Scale (hrs)' : 'Left Axis Scale'}
                 />
             )}
