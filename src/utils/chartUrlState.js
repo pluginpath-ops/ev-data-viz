@@ -37,6 +37,7 @@
 import { ALL_CHART_MODES, DEFAULT_CHART_MODE } from '../constants/chartNav';
 import { decodeCorrection, encodeCorrection } from './correctionSettings';
 import { encodePairings, decodePairings } from './pairings';
+import { isChargingAxis } from './chargingAxes';
 import {
     AXIS_LIMITS_PARAM, axisLimitsOf, axisLimitsOfLink, encodeAxisLimits, hasAxisLimits, withAxisLimits,
 } from './axisLimits';
@@ -206,9 +207,11 @@ export function chartConfigFromParsed(chart, base) {
     const s = chart;
     return {
         ...base,
-        ...(s.xAxis         && { xAxis: s.xAxis }),
-        ...(s.yAxis         && { yAxis: s.yAxis }),
-        ...(s.y2Axis        && { y2Axis: s.y2Axis }),
+        // An axis the chart no longer offers (Temperature, Frame) is left at
+        // what `base` has, so an old link or saved comparison still opens.
+        ...(isChargingAxis(s.xAxis)  && { xAxis: s.xAxis }),
+        ...(isChargingAxis(s.yAxis)  && { yAxis: s.yAxis }),
+        ...(isChargingAxis(s.y2Axis) && { y2Axis: s.y2Axis }),
         ...(s.runIds.length > 0 && (s.chartMode === 'charging' || s.chartMode === 'range') && { selectedRuns: s.runIds }),
         alignRaw:      s.alignRaw,
         raceThreshold: s.raceThreshold,

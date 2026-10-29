@@ -4423,6 +4423,15 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-radius: 50%;
     background-color: var(--color-accent-orange);
 }
+/* The label over its note. Zero flex-basis, not the content's width: the
+   sidebar wraps its bands (above), and a note too long for the row measured
+   as wider than it and wrapped the whole column under the caret. Now the
+   column takes what is left and the note truncates inside it. */
+.section-band-text {
+    @apply flex flex-col gap-0.5;
+    flex: 1 1 0;
+    min-width: 0;
+}
 /* A summary while closed, a hint while open. Truncates rather than wrapping
    onto a further line. */
 .section-band-note {
@@ -6240,6 +6249,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* A picker row selects; it does not drag, unlike the column picker's. */
 .field-picker-row { cursor: default; }
+/* A list short enough to show whole (the axis picker's twelve). */
+.field-picker-list.is-whole { max-height: none; overflow-y: visible; }
 .field-picker-row.is-selected { background-color: var(--color-primary-surface); }
 .field-picker-choice {
     display: flex;

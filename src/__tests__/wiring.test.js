@@ -3150,6 +3150,13 @@ describe('the spec chart plots the vehicle table’s columns (#450)', () => {
         expect(read('src/utils/chartUrlState.js')).toMatch(/chartMode === 'specs' \|\| chartMode === 'specscatter'\)[\s\S]{0,120}encodeAssumptionParams\(chartConfig\.assumptions\)/);
     });
 
+    it('Charging Curves chooses its axes through the axis picker, from the one axis list', () => {
+        const view = read('src/components/ChargingView.jsx');
+        expect(view).toMatch(/<AxisPicker/);
+        expect(view).toMatch(/chargingAxisOptions\(units\)/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/isChargingAxis\(s\.xAxis\)/);
+    });
+
     it('lists its columns through the field picker, a variant of the column picker’s matching', () => {
         expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<FieldPicker mode="dual"/);
         expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<FieldPicker mode="single"/);
