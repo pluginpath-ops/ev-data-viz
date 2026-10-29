@@ -3268,6 +3268,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     font-weight: 600;
     color: var(--color-text-meta);
 }
+/* A setting something else is holding (Trip Optimizer's sweeps set both of
+   Your plan's): the whole row recedes, key and unit with the field. */
+.scenario-row:has(.form-input:disabled) { opacity: 0.5; }
+.scenario-row .form-input:disabled { cursor: not-allowed; }
 .scenario-row .form-input {
     text-align: center;
     font-family: var(--font-mono);
@@ -3276,10 +3280,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* Two numbers for one setting — Trip Optimizer's legal range — with "to"
    between them, set as the unit beside it is. */
 /* Two fields where one usually sits, each as wide as the others so the
-   spinner keeps its room; the gaps tighten instead, to fit the sidebar. */
+   spinner keeps its room. The gaps stay the rows' 8px — tightened, the first
+   field sat 2px left of every field above it — and the unit takes the squeeze. */
 .scenario-row.is-range {
     grid-template-columns: 42px 72px auto 72px minmax(0, 1fr);
-    gap: 6px;
 }
 /* Above a plot: which of the plotted series a one-series chart (Trip
    Optimizer's map) is drawing, and the control to change it. In the frame,
@@ -4315,6 +4319,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     outline-offset: -1px;
     border-color: var(--color-primary);
 }
+
+/* An option of the axis row above it (Trip Optimizer's "Optimize speed"):
+   indented to start under that row's select — the 22px key and its 8px gap —
+   so it reads as part of the X choice rather than a fourth setting. The
+   checkbox and its text stay the standard .toggle-label. */
+.axis-row-option { padding-left: 30px; }
 
 /* Alignment sits UNDER the three axis pickers, indented, because it modifies the
    X axis rather than standing beside it as a fourth axis. */

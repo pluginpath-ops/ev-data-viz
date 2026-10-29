@@ -28,7 +28,7 @@ import AxisScaleControls from './AxisScaleControls';
 import {
     simulateRoadTrip, segmentsToChartPoints, segmentsToChartPointsChargeTime,
     segmentsToChartPointsByTest,
-    formatTime, speedCorrectionFactor,
+    formatTime, speedCorrectionFactor, untimedSpans,
 } from '../utils/roadTripSimulation';
 import { useRunSelection } from '../hooks/useRunSelection';
 import ChartLoading from './charts/ChartLoading';
@@ -1172,6 +1172,22 @@ export default function RoadTripView({
         fetchMissing();
     }, [neededRunIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Charging curves with SoC the simulation cannot time (untimedSpans), in
+    // the part a stop charges through: Min SoC to the 95% ceiling. Once per
+    // curve, since several range pairings can share one.
+    const untimedCurves = useMemo(() => {
+        const seen = new Map();
+        const within = [roadTripConfig.minSoc ?? 0, CHARGE_CEIL_SOC];
+        for (const e of validEntries) {
+            const id = e.run.id;
+            if (seen.has(id) || !runDataCache[id]?.length) continue;
+            const spans = untimedSpans(runDataCache[id], { within });
+            const timed = runDataCache[id].some(p => p.time != null);
+            if (spans.length) seen.set(id, { entry: e, spans, timed });
+        }
+        return [...seen.values()];
+    }, [validEntries, runDataCache, roadTripConfig.minSoc]);
+
     // ── Run simulation for each entry ─────────────────────────────────────────
     const simResults = useMemo(() => {
         const {
@@ -1860,11 +1876,16 @@ export default function RoadTripView({
             }).filter(Boolean);
             distDatasets.push(...spreadDatasets(validEntries, spreadSweep, stopXs.map(toDisplay)));
 
-            // ICE reference line — ICE stops every 3 hrs whatever the EV's stops are
-            // At the trip speed: a best-plan line's own speeds vary, but the
-            // ICE car has no stop plan to optimize, so it holds the one speed.
+            // ICE reference line — ICE stops every 3 hrs whatever the EV's stops are.
+            // Held to the same speeds as the EVs: with best plan on, each EV
+            // point may drive anywhere in the legal range, so the ICE car drives
+            // the top of it — its stops do not lengthen with speed, so that is
+            // its best plan. At the trip speed instead it lost to an iX3 doing
+            // 80 while it did 70. Best plan off, everyone holds the trip speed.
+            const iceRange = bestPlanOn ? optimizerGrids?.find(Boolean)?.range : null;
+            const iceMph = iceRange ? OPT_SPEED_MPH[iceRange[1]] : speed;
             const iceDistData = stopXs.map(x => (
-                { x: toDisplay(x), y: yOf(calcIceTotalTimeAtSpeed(speed, totalDistance, overhead), speed) }));
+                { x: toDisplay(x), y: yOf(calcIceTotalTimeAtSpeed(iceMph, totalDistance, overhead), iceMph) }));
             const iceDistYMin = yFloor(iceDistData);
             distDatasets.unshift({
                 label: 'ICE Reference',
@@ -2366,27 +2387,40 @@ export default function RoadTripView({
     // Speed and the stop plan: shown on every chart, the swept one included.
     // On Trip Optimizer they are YOUR plan — the ○ on the map, and what the
     // best-plan table measures itself against — so they render last there, boxed.
+    //
+    // On a sweep with "Optimize speed" (or leg distance, charge time), the simulation sets BOTH:
+    // one is the X axis, the other is optimized at each point. Neither field
+    // can move a line then, so both are disabled rather than left to look live.
+    // The legal range stays: it bounds what the optimizer may choose.
+    const planSetBySim = bestPlan && isSweepMode;
+    // The setting a sweep optimizes: whichever of Your plan's two it does not sweep.
+    const optimizedSetting = isSpeedMode
+        ? (mode === 'time' ? 'charge time' : 'leg distance')
+        : 'speed';
+    const setBySimTitle = planSetBySim
+        ? `Set by the simulation: the chart sweeps one setting and optimizes the other. Turn off “Optimize ${optimizedSetting}” to hold it yourself.`
+        : undefined;
     const planRows = (
         <>
-            <label className="scenario-row">
+            <label className="scenario-row" title={setBySimTitle}>
                 <span className="scenario-key">Speed</span>
-                <NumberInput className="form-input" min={1}
+                <NumberInput className="form-input" min={1} disabled={planSetBySim}
                     value={dispSpeed}
                     onChange={val => setField('speed', units === 'metric' ? Math.round(val / MI_TO_KM) : val)} />
                 <span className="scenario-unit">{sl}</span>
             </label>
             {mode === 'distance' ? (
-                <label className="scenario-row">
+                <label className="scenario-row" title={setBySimTitle}>
                     <span className="scenario-key">Leg</span>
-                    <NumberInput className="form-input" min={1}
+                    <NumberInput className="form-input" min={1} disabled={planSetBySim}
                         value={dispLeg}
                         onChange={val => setField('legDistance', units === 'metric' ? Math.round(val / MI_TO_KM) : val)} />
                     <span className="scenario-unit">{dl}/charge</span>
                 </label>
             ) : (
-                <label className="scenario-row">
+                <label className="scenario-row" title={setBySimTitle}>
                     <span className="scenario-key">Charge</span>
-                    <NumberInput className="form-input" min={1}
+                    <NumberInput className="form-input" min={1} disabled={planSetBySim}
                         value={chargeTime}
                         onChange={v => setField('chargeTime', v)} />
                     <span className="scenario-unit">min/stop</span>
@@ -2426,6 +2460,17 @@ export default function RoadTripView({
                                     ))}
                                 </select>
                             </label>
+                            {/* Under X, indented to its select: it qualifies the sweep X
+                                names, so it reads as part of that choice, not a
+                                setting of its own. Named for what it optimizes. */}
+                            {optimizer && !isMapMode && (
+                                <label className="toggle-label axis-row-option"
+                                    title={`Each point takes the best ${optimizedSetting}: on Travel speed, the fastest stop plan at that speed; on Charge per stop, the fastest speed within your legal range. Off, it is held at what you entered under Your plan.`}>
+                                    <input type="checkbox" className="w-4 h-4" checked={bestPlan}
+                                        onChange={e => setField('bestPlan', e.target.checked)} />
+                                    <span className="text-sm font-medium">Optimize {optimizedSetting}</span>
+                                </label>
+                            )}
                             {/* The map has no Y to choose: its Y is the stop plan, its color the time. */}
                             {!isMapMode && (
                                 <label className="axis-row">
@@ -2462,14 +2507,6 @@ export default function RoadTripView({
                                     ))}
                                 </select>
                             </label>
-                            {optimizer && !isMapMode && (
-                                <label className="toggle-label"
-                                    title="Each point takes the best value of the other setting: on Travel speed, the fastest stop plan at that speed; on Charge per stop, the fastest speed within your legal range. Off, the other setting is held at what you entered under Your plan.">
-                                    <input type="checkbox" className="w-4 h-4" checked={bestPlan}
-                                        onChange={e => setField('bestPlan', e.target.checked)} />
-                                    <span className="text-sm font-medium">Optimize the other setting</span>
-                                </label>
-                            )}
                         </div>
                     </div>
 
@@ -2705,7 +2742,7 @@ export default function RoadTripView({
                     )}
 
                     {/* Warnings for vehicles/runs that can't be simulated */}
-                    {(vehiclesWithNoChargingRuns.length > 0 || skippedEntries.length > 0) && (
+                    {(vehiclesWithNoChargingRuns.length > 0 || skippedEntries.length > 0 || untimedCurves.length > 0) && (
                         <div className="roadtrip-warning mt-3">
                             {vehiclesWithNoChargingRuns.map(v => (
                                 <p key={v.id}>⚠ {nameOf(v)}: No charging test data</p>
@@ -2713,6 +2750,15 @@ export default function RoadTripView({
                             {skippedEntries.map(e => (
                                 <p key={e.key}>
                                     ⚠ {nameOf(e.vehicle)} – {e.label}: {!e.miPerKwh ? 'No range data for efficiency' : 'No battery capacity'}
+                                </p>
+                            ))}
+                            {/* Not skipped — the trip still runs — but across these
+                                spans its charge times are estimated, not measured. */}
+                            {untimedCurves.map(({ entry: e, spans, timed }) => (
+                                <p key={`untimed-${e.run.id}`}>
+                                    ⚠ {nameOf(e.vehicle)} – {e.run.name}: {timed
+                                        ? `no charge times for ${spans.map(([a, b]) => (a === b ? `${a}%` : `${a}–${b}%`)).join(', ')} SoC; charging there is estimated`
+                                        : 'no charge times at all; its charging is a rough estimate'}
                                 </p>
                             ))}
                         </div>

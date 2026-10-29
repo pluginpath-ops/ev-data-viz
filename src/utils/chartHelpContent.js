@@ -225,8 +225,9 @@ export const CHART_HELP_DEFAULTS = {
             'for several stops: on a short trip the answer is mostly where one stop lands.',
         how_to_read:
             'Travel speed and Charge per stop plot trip time against one setting. With ' +
-            '“Optimize the other setting” on, each point uses the best value of the other ' +
-            'one, so the lowest point of a line is that car’s best trip; off, the other ' +
+            'the checkbox under X on (“Optimize leg distance” on Travel speed, “Optimize ' +
+            'speed” on Charge per stop), each point uses the best value of the other ' +
+            'setting, so the lowest point of a line is that car’s best trip; off, the other ' +
             'setting is held at what you entered. On a fast charger the fastest plan is ' +
             'often a speed nobody should drive, so the fastest legal plan keeps to the legal range ' +
             'you set under Your plan (55–80 mph to start) and the fastest is shown apart, labelled as such. ' +
