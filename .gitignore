@@ -9,3 +9,6 @@ LocalDev/
 
 # Supabase CLI local state
 supabase/.temp/
+
+# ESLint cache (CI persists it with actions/cache; `npm run lint -- --cache` locally)
+.eslintcache
