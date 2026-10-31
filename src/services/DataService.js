@@ -4516,6 +4516,9 @@ export function feGuidePayload(r, sourceFile = null) {
     unadj_city_mpge: r.unadjCityMpge,
     unadj_hwy_mpge:  r.unadjHwyMpge,
     unadj_comb_mpge: r.unadjCombMpge,
+    // The kWh/100mi twin's, usually the more precise copy (migration 094).
+    unadj_city_kwh_100mi: r.unadjCityKwh100mi ?? null,
+    unadj_hwy_kwh_100mi:  r.unadjHwyKwh100mi ?? null,
     adj_city_mpge:   r.adjCityMpge,
     adj_hwy_mpge:    r.adjHwyMpge,
     adj_comb_mpge:   r.adjCombMpge,

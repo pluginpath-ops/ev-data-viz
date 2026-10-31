@@ -312,3 +312,24 @@ describe('parseFeGuide — surviving a rename (#214)', () => {
         expect(out.suggestions).toEqual([]);
     });
 });
+
+describe('parseFeGuide — the kWh/100mi twin\'s figures', () => {
+    const { rows } = parseFeGuide(CSV);
+
+    it('keeps them on the MPGe row, at the precision printed', () => {
+        // The MPGe line prints 154.2; its twin prints 21.8565 — the copy a
+        // test vehicle's 100 × AC ÷ CD range can be matched against.
+        const r = byCarline(rows, 'R2 Performance AWD (20in AT)');
+        expect(r.unadjCityKwh100mi).toBe(21.8565);
+        expect(r.unadjHwyKwh100mi).toBe(26.6998);
+        expect(r.unadjCityMpge).toBe(154.2);
+    });
+
+    it('pairs each twin with its own configuration', () => {
+        expect(byCarline(rows, 'R2 Performance AWD (21in)').unadjCityKwh100mi).toBe(21.6463);
+    });
+
+    it('is null for a row whose twin is missing', () => {
+        expect(byCarline(rows, 'ZDX AWD').unadjCityKwh100mi).toBeNull();
+    });
+});
