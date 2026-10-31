@@ -33,6 +33,7 @@ import { extractPdfText } from '../utils/extractPdfText';
 import { parseEpaCsiText } from '../utils/parseEpaCsiPdf';
 import { integrityWarnings } from '../utils/epaIntegrity';
 import { importProgressLabel } from '../utils/importProgress';
+import { resolveTestVehicleIds } from '../utils/epaTestVehicleIdentity';
 
 export default function EpaPdfImportModal({ targetVehicle = null, onImport, getExistingIds, onClose }) {
     const [step, setStep]       = useState('upload'); // upload | review | done
@@ -50,7 +51,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
     const [result, setResult]   = useState(null);
     const [certifications, setCertifications] = useState([]);  // one per file: { certification, members }
     const [heldCerts, setHeldCerts] = useState({});           // test_vehicle_id → [{ test_group, model_year }]
-    const { getEpaCertificationsFor } = useAppContext();
+    const { getEpaCertificationsFor, getEpaTestVehicleIdentity } = useAppContext();
 
     /**
      * Read a list of PDFs, then review them together.
@@ -74,6 +75,9 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
         const statuses = [];
         const seen = new Map();   // test_vehicle_id → the file that claimed it
 
+        // Read every file first, so the keys can be settled across all of them
+        // before anything is compared by key.
+        const parsed = [];
         for (const [i, file] of list.entries()) {
             setProgress({ done: i, total: list.length, name: file.name });
             try {
@@ -83,7 +87,27 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                     statuses.push({ name: file.name, configs: 0, error: w[0] || 'No EPA configurations found.' });
                     continue;
                 }
+                parsed.push({ name: file.name, testVehicles: g, certification, warnings: w });
+            } catch (e) {
+                statuses.push({ name: file.name, configs: 0, error: e.message || 'Failed to read PDF.' });
+            }
+        }
 
+        // The parser's key depends on how many configurations a file lists, so
+        // the MY2025 and MY2026 files of one Blazer EV key the same test
+        // differently. A test vehicle whose test is already held IS that record
+        // (utils/epaTestVehicleIdentity). Without the lookup — offline, or it
+        // failed — the batch is still resolved against itself.
+        let stored = {};
+        try { stored = await getEpaTestVehicleIdentity(parsed.flatMap(f => f.testVehicles)); } catch { /* non-fatal */ }
+        const identity = resolveTestVehicleIds(parsed, stored);
+        for (const r of identity.renamed) {
+            if (r.why !== 'reused Vehicle ID') allWarnings.push(`${r.file}: ${r.from} is the stored ${r.to} (${r.why}).`);
+        }
+        allWarnings.push(...identity.warnings);
+
+        for (const { name, testVehicles: g, certification, warnings: w } of identity.files) {
+            try {
                 const kept = [];
                 for (const grp of g) {
                     // The same configuration in two files is a real situation —
@@ -92,22 +116,22 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                     // last silently win is not, because which file is "last"
                     // depends on the order the picker happened to hand them over.
                     if (seen.has(grp.test_vehicle_id)) {
-                        allWarnings.push(`${file.name}: ${grp.test_vehicle_id} also appears in ${seen.get(grp.test_vehicle_id)} — its lab results come from the first file; both certifications are recorded.`);
+                        allWarnings.push(`${name}: ${grp.test_vehicle_id} also appears in ${seen.get(grp.test_vehicle_id)} — its lab results come from the first file; both certifications are recorded.`);
                         continue;
                     }
-                    seen.set(grp.test_vehicle_id, file.name);
+                    seen.set(grp.test_vehicle_id, name);
                     // Provenance, which nothing was setting before: the column
                     // exists and importEpaTestVehicleFull writes it, but the modal
                     // never supplied a name, so every imported test vehicle recorded
                     // null for the file it came from.
-                    kept.push({ ...grp, source_file: file.name });
+                    kept.push({ ...grp, source_file: name });
                 }
                 allTestVehicles.push(...kept);
                 // Every test vehicle the file names, including one a previous
                 // file already supplied: the certification is this file's.
                 if (certification) {
                     allCertifications.push({
-                        certification: { ...certification, source_file: file.name },
+                        certification: { ...certification, source_file: name },
                         members: g.map(t => ({
                             test_vehicle_id:      t.test_vehicle_id,
                             carryover_test_group: t.carryover_test_group ?? null,
@@ -115,7 +139,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                         })),
                     });
                 }
-                allWarnings.push(...w.map(x => list.length > 1 ? `${file.name}: ${x}` : x));
+                allWarnings.push(...w.map(x => list.length > 1 ? `${name}: ${x}` : x));
                 // Is what we just read internally possible? A bulk load of every
                 // MY2026 certification wrote 2-5 kWh packs and 1% charging
                 // efficiencies, and none of it surfaced — a nonsensical figure
@@ -124,11 +148,11 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                 // curator can still choose not to import it.
                 for (const grp of kept) {
                     allWarnings.push(...integrityWarnings(grp)
-                        .map(x => list.length > 1 ? `${file.name}: ${x}` : x));
+                        .map(x => list.length > 1 ? `${name}: ${x}` : x));
                 }
-                statuses.push({ name: file.name, configs: kept.length, error: null });
+                statuses.push({ name: name, configs: kept.length, error: null });
             } catch (e) {
-                statuses.push({ name: file.name, configs: 0, error: e.message || 'Failed to read PDF.' });
+                statuses.push({ name: name, configs: 0, error: e.message || 'Failed to read PDF.' });
             }
         }
 

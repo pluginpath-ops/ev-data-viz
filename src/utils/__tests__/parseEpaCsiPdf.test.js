@@ -439,3 +439,25 @@ describe('a Vehicle ID shared by several configurations', () => {
         expect(warnings.some(w => w.includes('share the key'))).toBe(false);
     });
 });
+
+describe('the manufacturer\'s note on each test', () => {
+    // GM files the DC energy it did not put in the table here — "MCT UBE
+    // ENERGY = 89050.7 WH" on the MY2024 Blazer EV — split across items.
+    const withNote = (...note) => [...cdItems({ dc: 78.9, miles: 300, ac: 92.4 }),
+        'Manufacturer Test Comments', ...note,
+        'Certification', 'Region'];
+
+    it('reads the whole note, not just its first item', () => {
+        expect(testOf(withNote('MCT TEST.', 'MCT UBE ENERGY =', '89050.7 WH')).mfr_test_comments)
+            .toBe('MCT TEST. MCT UBE ENERGY = 89050.7 WH');
+    });
+
+    it('stops at the results table', () => {
+        expect(testOf(withNote('ok')).mfr_test_comments).toBe('ok');
+    });
+
+    it('is null for EPA\'s "--" and for no label at all', () => {
+        expect(testOf(withNote('--')).mfr_test_comments).toBeNull();
+        expect(testOf(cdItems({ dc: 78.9, miles: 300, ac: 92.4 })).mfr_test_comments).toBeNull();
+    });
+});
