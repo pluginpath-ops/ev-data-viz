@@ -23,6 +23,7 @@
  */
 import { couldStandBehind, guidePoint, testVehiclePoint } from './guideTestedVia';
 import { configurationsFromTestedVia, namesTestVehicle } from './vehicleGuideLinks';
+import { isNoLabelSkip } from './epaBehindNoLabel';
 
 const ORDER = ['exact', 'near', 'blend', 'alternative', 'possible', 'other-label', 'no-match', 'no-lab-data'];
 
@@ -33,7 +34,7 @@ const ORDER = ['exact', 'near', 'blend', 'alternative', 'possible', 'other-label
  * @param {Set<string>} [linked]  test vehicles the vehicle links
  * @returns {Array<{
  *   test_vehicle_id, carline, match, nearest: boolean, otherRowId: number|null,
- *   delta: { city: number, hwy: number } | null, linked: boolean,
+ *   delta: { city: number, hwy: number } | null, linked: boolean, behindNoLabel: boolean,
  * }>}  best match first; delta is the test vehicle's kWh/100mi against the
  *      row's, as a share (+0.03 uses 3% more)
  */
@@ -58,6 +59,7 @@ export function guideRowMatches({ guide, via, pool = [] } = {}, others = [], lin
             otherRowId: match === 'other-label' ? sibling.rowId : null,
             delta: g && p ? { city: p.city / g.city - 1, hwy: p.hwy / g.hwy - 1 } : null,
             linked: linked.has(tv.test_vehicle_id),
+            behindNoLabel: isNoLabelSkip(tv),
         };
     });
     const size = (d) => (d ? Math.hypot(d.city, d.hwy) : Infinity);

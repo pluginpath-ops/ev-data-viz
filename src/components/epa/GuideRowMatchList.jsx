@@ -70,6 +70,7 @@ export default function GuideRowMatchList({ row, others = [], mappings = new Map
                             <span className="font-mono">{m.test_vehicle_id}</span>
                             {m.carline && <span className="text-meta"> · {m.carline}</span>}
                             {why && <span className="text-meta block truncate">behind {why}</span>}
+                            {m.behindNoLabel && <span className="text-meta block">marked behind no EPA Label</span>}
                         </span>
                         <span className="guide-match-delta" title="Its unadjusted kWh/100mi against the row’s">
                             {m.delta ? `city ${pct(m.delta.city)} · hwy ${pct(m.delta.hwy)}` : '—'}

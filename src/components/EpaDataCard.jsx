@@ -13,6 +13,7 @@
  */
 import { useState, useEffect } from 'react';
 import { certifiedYears, formatYears } from '../utils/epaCertifications';
+import { isNoLabelSkip } from '../utils/epaBehindNoLabel';
 
 const CONFIDENCE_COLORS = {
     verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
@@ -25,6 +26,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
     const [testVehicles,         setTestVehicles]         = useState([]);
     const [loading,        setLoading]        = useState(true);
     const [query,          setQuery]          = useState('');
+    const [showNoLabel,    setShowNoLabel]    = useState(false);
     const [deleting,       setDeleting]       = useState(new Set());
     const [draftNames,     setDraftNames]     = useState({});   // keyed by test_vehicle_id
     const [savingName,     setSavingName]     = useState(new Set());
@@ -92,9 +94,15 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
 
     // ── Client-side filter ────────────────────────────────────────────────────
 
+    // Behind no EPA Label (layer 4): retests and unsold variants, hidden
+    // unless asked for. Marked by Admin → Data Checks, never deleted.
+    const noLabel = (g) => (g.certifications ?? []).some(isNoLabelSkip);
+    const noLabelCount = testVehicles.filter(noLabel).length;
+    const listed = showNoLabel ? testVehicles : testVehicles.filter(g => !noLabel(g));
+
     const q = query.trim().toLowerCase();
     const filtered = q
-        ? testVehicles.filter(g =>
+        ? listed.filter(g =>
             g.make?.toLowerCase().includes(q) ||
             g.epa_carline_name?.toLowerCase().includes(q) ||
             g.display_name?.toLowerCase().includes(q) ||
@@ -102,7 +110,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
             g.test_group?.toLowerCase().includes(q) ||
             (g.epa_vehicle_mappings || []).some(m => m.vehicles?.name?.toLowerCase().includes(q))
           )
-        : testVehicles;
+        : listed;
 
     const linkedCount = testVehicles.filter(g => g.epa_vehicle_mappings?.length > 0).length;
 
@@ -117,6 +125,12 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
                     <h3 className="font-semibold text-sm">EPA Test Groups</h3>
                     <p className="text-xs text-secondary mt-0.5">
                         {loading ? 'Loading…' : `${testVehicles.length} imported · ${linkedCount} linked to vehicles`}
+                        {!loading && noLabelCount > 0 && (
+                            <label className="inline-flex items-center gap-1 ml-2">
+                                <input type="checkbox" checked={showNoLabel} onChange={e => setShowNoLabel(e.target.checked)} />
+                                Show {noLabelCount} behind no EPA Label
+                            </label>
+                        )}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -300,7 +314,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
             )}
 
             {/* Footer: row count when filter is active */}
-            {!loading && testVehicles.length > 0 && q && filtered.length !== testVehicles.length && (
+            {!loading && testVehicles.length > 0 && filtered.length !== testVehicles.length && (
                 <div className="px-4 py-2 border-t text-xs text-meta">
                     Showing {filtered.length} of {testVehicles.length} test vehicles
                 </div>

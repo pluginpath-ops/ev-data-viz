@@ -1,7 +1,7 @@
 # EPA test vehicle identity, and what stands behind a Guide row
 
-Investigation, 2026-10-31; layers 1 and 2 built the same night, layer 3 the
-next day after the owner's answers (see **Status** at the end). Measured on the full CSI corpus
+Investigation, 2026-10-31; layers 1 and 2 built the same night, layers 3 and 4
+the next day after the owner's answers (see **Status** at the end). Measured on the full CSI corpus
 (`LocalDev/epa-csi/`, 2021–2027, 718 files, 1,360 EPA test vehicles), the
 Fuel Economy Guide CSVs MY22–MY27 (1,303 EV rows) and the 2026-10-27 backup.
 Scripts and a per-row result table: `LocalDev/epa-csi/identity/` (see the end).
@@ -416,6 +416,31 @@ well as -1 and -2).
 Not built: the manufacturer comments beside an untested row (Part C). The
 comments are stored; showing them is a small follow-up.
 
+**Layer 4 — test vehicles behind no EPA Label (built; owner, 2026-10-31:
+"hide/remove all the extraneous retests and variants that don't tie to the
+published info").** A test vehicle is behind no EPA Label when every Guide row
+of its certification is explained by Tested via (exact, near or blend) and it
+could stand behind none of them — not within reach of a row, not as one end of
+a blend pair, not as a corner of a three-way blend
+(`couldStandBehind` in `guideTestedVia.js`). A row nobody reproduces, a
+certification with no Guide row imported, or a test vehicle with no lab
+figures leaves it unjudged. Marked, never deleted: the Guide link sweep's own
+skip with `NO_LABEL_NOTE`, so every reader that honors a skip honors it;
+its Guide links are cleared (each paired one car's lab data with another's
+label) and its vehicle links removed. A curator's own skip is never
+overwritten, and only this mark is lifted when a later Guide adds a row it
+stands behind. Admin → Data Checks → Behind no EPA Label previews and applies;
+Admin → EPA Data hides them behind a "Show N behind no EPA Label" toggle.
+
+On the mirror (applied in the app, then restored): 68 of 910 behind no EPA
+Label, 492 behind a row, 350 unjudged. Applying cleared 24 Guide links,
+skipped 94 memberships and removed 17 vehicle links; a second run is empty.
+**Three vehicles lose their only configuration** — EQE 320+ and EQE SUV 320+
+(`X294PSM245r-Z2695`) and Model 3 LR (`3D221-731644`) — and the IONIQ 9 AWD
+keeps two with no primary, as it had none before. Removed anyway (owner,
+2026-11-01: "if it's bad, remove it"); those vehicles want an EPA Label
+linked (layer 3).
+
 **Applying to production, in order:**
 1. Migration 093, then in the SQL editor, after reading the list:
    `SELECT keep_id, drop_id, via, conflicts FROM epa_test_vehicle_duplicates;`
@@ -426,6 +451,10 @@ comments are stored; showing them is a small follow-up.
 3. Merge layers 1–2 (the import writes 093's and 094's columns).
 4. Migration 095, merge layer 3, then Admin → Data Checks → EPA Label links:
    preview, read, apply.
+5. Merge layer 4 (no migration), then Admin → Data Checks → Behind no EPA
+   Label: preview, read the vehicle links it removes, apply. After layer 3's
+   move, so a configuration that move keeps is judged against the links it
+   made.
 
 ## Running the analysis again
 

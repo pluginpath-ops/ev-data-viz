@@ -1569,6 +1569,15 @@ export function AppProvider({ children }) {
         return result;
     };
 
+    // Layer 4: test vehicles behind no EPA Label of their certification —
+    // marked with the Guide link sweep's skip, never deleted.
+    const planBehindNoLabel = () => dataService.planBehindNoLabel();
+    const applyBehindNoLabel = async (plan) => {
+        const result = await dataService.applyBehindNoLabel(plan);
+        if (result.unlinked) setVehicles(await dataService.getVehicles());
+        return result;
+    };
+
     /**
      * Import parsed CSI-PDF test vehicles (clean-replace each), optionally linking one
      * to a vehicle, then refresh. Used by the PDF import modal from both Admin
@@ -2323,6 +2332,8 @@ export function AppProvider({ children }) {
         linkVehicleGuideRow,
         unlinkVehicleGuideRow,
         applyVehicleGuideLinkPlan,
+        planBehindNoLabel,
+        applyBehindNoLabel,
         updateEpaMapping,
         setPrimaryEpaMapping,
         unlinkEpaTestVehicle,

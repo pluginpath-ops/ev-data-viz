@@ -285,8 +285,9 @@ export function testedVia(guideRow, testVehicles = []) {
  * a blend's reach, or be one end of a two-way blend with any other test
  * vehicle of the pool, or (when the row itself needed three) one corner of a
  * three-way blend? Looser than `testedVia`, which names only the best
- * explanation: this answers "is it definitely NOT behind the row". Two 2023
- * Taycans that no row named still pass it.
+ * explanation: this answers "is it definitely NOT behind the row", the test
+ * for hiding a test vehicle (epaBehindNoLabel): two 2023 Taycans that no row
+ * named still pass it, and so stay.
  *
  * @param {Object} guideRow
  * @param {Object} testVehicle  with tests
