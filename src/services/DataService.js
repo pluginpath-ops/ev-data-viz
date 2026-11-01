@@ -20,6 +20,8 @@ import { toChargerClass } from '../utils/runChargerClass';
 import { toChargerCurrent } from '../utils/chargerCurrentClass';
 import { rangePerSocLookup } from '../utils/runPoints';
 import { testFingerprint } from '../utils/epaTestVehicleIdentity';
+import { testedVia, guideTestedViaPool } from '../utils/guideTestedVia';
+import { configurationsFromTestedVia, planVehicleGuideLinks } from '../utils/vehicleGuideLinks';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -297,6 +299,28 @@ function buildInheritedRuns(vehicle, runById, runToVehicle, lineage = []) {
  * curves group by. One list, so every reader of a certification's Guide row
  * reads the same row.
  */
+ /** A certification membership as guideTestedViaPool reads it (EPA Label, 095; layer 4). */
+const TESTED_VIA_MEMBER = `id, test_vehicle_id, carryover_test_group, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note,
+  certification:epa_certifications!inner(test_group),
+  test_vehicle:epa_test_vehicles(epa_carline_name,
+    epa_tests(test_number, procedure_code, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc),
+    epa_covered_models(carline_name))`;
+
+function testedViaMember(r) {
+  return {
+    membershipId: r.id,
+    test_group: r.certification?.test_group ?? null,
+    test_vehicle_id: r.test_vehicle_id,
+    carryover_test_group: r.carryover_test_group,
+    fe_guide_row_id: r.fe_guide_row_id ?? null,
+    fe_guide_skipped_at: r.fe_guide_skipped_at ?? null,
+    fe_guide_skip_note: r.fe_guide_skip_note ?? null,
+    epa_carline_name: r.test_vehicle?.epa_carline_name ?? null,
+    tests: r.test_vehicle?.epa_tests ?? [],
+    covered_models: (r.test_vehicle?.epa_covered_models ?? []).map(c => c.carline_name),
+  };
+}
+
 const GUIDE_VIEW_FIELDS = 'id, model_year, smog_test_group, division, carline, carline_class, drive_desc, label_comb_range_mi, label_city_range_mi, label_hwy_range_mi, label_comb_mpge, label_city_mpge, label_hwy_mpge, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, calc_approach, total_voltage_v, batt_specific_energy_wh_kg, nominal_pack_kwh, adjustment_signature';
 
 /**
@@ -2748,6 +2772,278 @@ class DataService {
       }
     }
     return out;
+  }
+
+  // ── A vehicle's EPA Label (migration 095) ────────────────────────────────────
+  //
+  // A vehicle links to the Guide rows that are the car; its EPA test vehicles
+  // come through each row's Tested via (utils/vehicleGuideLinks.js).
+
+  /**
+   * Every certification membership in these Test Groups' families, in the
+   * shape guideTestedViaPool reads: the row's Test Group, its carryover
+   * origins, and any membership whose carryover names one of them.
+   */
+  async getTestedViaMembers(testGroups) {
+    const groups = [...new Set((testGroups ?? []).filter(Boolean))];
+    if (!this.useSupabase || !groups.length) return [];
+    const fetch = async (filter) => {
+      const { data, error } = await filter(getSupabase().from('epa_certification_test_vehicles').select(TESTED_VIA_MEMBER));
+      if (error) throw error;
+      return data || [];
+    };
+    const byGroup = (gs) => fetch(q => q.in('certification.test_group', gs));
+    const byCarryover = (gs) => fetch(q => q.in('carryover_test_group', gs));
+
+    const first = [...await byGroup(groups), ...await byCarryover(groups)];
+    const origins = [...new Set(first.map(r => r.carryover_test_group).filter(g => g && !groups.includes(g)))];
+    const rows = origins.length ? [...first, ...await byGroup(origins), ...await byCarryover(origins)] : first;
+
+    const seen = new Set();
+    return rows.flatMap(r => {
+      const key = `${r.certification?.test_group}|${r.test_vehicle_id}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [testedViaMember(r)];
+    });
+  }
+
+  /**
+   * Tested via for each Guide row, with the ids of the pool it was judged
+   * against (configurationStanding needs both).
+   * @returns {Object<number, { via, poolIds: Set<string> }>}
+   */
+  async getGuideRowsTestedVia(guideRows) {
+    const rows = (guideRows ?? []).filter(Boolean);
+    const members = await this.getTestedViaMembers(rows.map(r => r.smog_test_group));
+    return Object.fromEntries(rows.map(r => {
+      const pool = guideTestedViaPool(r.smog_test_group, members);
+      return [r.id, { via: testedVia(r, pool), pool, poolIds: new Set(pool.map(m => m.test_vehicle_id)) }];
+    }));
+  }
+
+  /**
+   * Every Guide row of these certifications (by smog Test Group), with the
+   * same fields as a linked row — what "behind another EPA Label" is judged
+   * against (configurationStanding's `others`).
+   */
+  async getGuideRowsOfTestGroups(testGroups) {
+    const groups = [...new Set((testGroups ?? []).filter(Boolean))];
+    const out = [];
+    for (let i = 0; i < groups.length; i += 100) {
+      const { data, error } = await getSupabase().from('epa_fe_guide')
+        .select(`${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`)
+        .in('smog_test_group', groups.slice(i, i + 100));
+      if (error) throw error;
+      out.push(...(data || []));
+    }
+    return out;
+  }
+
+  /**
+   * A vehicle's Guide rows, each with its Tested via, and `others`: the
+   * other rows of the same certifications with theirs. Null when migration
+   * 095 is not applied, so the section can say so instead of showing nothing.
+   *
+   * @returns {{ rows: Array<{ linkId, rowId, guide, via, poolIds }>, others: Array<{ rowId, guide, via }> } | null}
+   */
+  async getVehicleGuideRows(vehicleId) {
+    if (!this.useSupabase || vehicleId == null) return [];
+    const { data, error } = await getSupabase()
+      .from('vehicle_guide_rows')
+      .select(`id, fe_guide_row_id, guide:epa_fe_guide(${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi)`)
+      .eq('vehicle_id', vehicleId)
+      .order('id', { ascending: true });
+    if (error) {
+      if (isMissingRelation(error) || error.code === 'PGRST205') return null;
+      throw error;
+    }
+    const links = (data || []).filter(l => l.guide);
+    if (!links.length) return { rows: [], others: [] };
+    const linkedIds = new Set(links.map(l => l.fe_guide_row_id));
+    const siblings = (await this.getGuideRowsOfTestGroups(links.map(l => l.guide.smog_test_group)))
+      .filter(g => !linkedIds.has(g.id));
+    const judged = await this.getGuideRowsTestedVia([...links.map(l => l.guide), ...siblings]);
+    return {
+      rows: links.map(l => ({ linkId: l.id, rowId: l.fe_guide_row_id, guide: l.guide, ...judged[l.fe_guide_row_id] })),
+      others: siblings.map(g => ({ rowId: g.id, guide: g, via: judged[g.id]?.via })),
+    };
+  }
+
+  /** Guide rows ranked for a vehicle, as the test vehicle picker ranks them. */
+  async getVehicleGuideCandidates(vehicle) {
+    if (!this.useSupabase || !vehicle) return [];
+    const rows = await fetchAllRows(() => getSupabase()
+      .from('epa_fe_guide')
+      .select(`${GUIDE_VIEW_FIELDS}, motor_count, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`)
+      .order('id', { ascending: true }));
+    return rankFeCandidates({
+      make: vehicle.make,
+      model_year: String(vehicle.year ?? '').match(/\d{4}/)?.[0] ?? null,
+      epa_carline_name: [vehicle.model, vehicle.trim].filter(Boolean).join(' ') || vehicle.name,
+    }, rows);
+  }
+
+  /**
+   * Link a vehicle to a Guide row, and the test vehicles its Tested via names.
+   *
+   * A configuration the vehicle already links is left as it is. The row's
+   * primary member (a blend's nearest) becomes the vehicle's primary only when
+   * the vehicle has none — 067's trigger makes a first link primary, so it is
+   * inserted first.
+   *
+   * @returns {{ linked: string[], kept: string[] }}
+   */
+  async linkVehicleGuideRow(vehicleId, guideRow, via) {
+    if (!this.useSupabase) return { linked: [], kept: [] };
+    const sb = getSupabase();
+    const { error } = await sb.from('vehicle_guide_rows')
+      .upsert({ vehicle_id: vehicleId, fe_guide_row_id: guideRow.id }, { onConflict: 'vehicle_id,fe_guide_row_id', ignoreDuplicates: true });
+    if (error) throw error;
+
+    const { data: existing, error: readErr } = await sb.from('epa_vehicle_mappings')
+      .select('id, test_vehicle_id, is_primary').eq('vehicle_id', vehicleId);
+    if (readErr) throw readErr;
+    const have = new Set((existing || []).map(m => m.test_vehicle_id));
+    const hasPrimary = (existing || []).some(m => m.is_primary);
+
+    const out = { linked: [], kept: [] };
+    for (const c of configurationsFromTestedVia(via)) {
+      if (have.has(c.test_vehicle_id)) { out.kept.push(c.test_vehicle_id); continue; }
+      const { error: insErr } = await sb.from('epa_vehicle_mappings').insert({
+        vehicle_id: vehicleId, test_vehicle_id: c.test_vehicle_id, confidence: c.confidence,
+        via_guide_row_id: guideRow.id, is_primary: c.primary && !hasPrimary,
+      });
+      if (insErr) throw insErr;
+      out.linked.push(c.test_vehicle_id);
+    }
+    return out;
+  }
+
+  /**
+   * Unlink a vehicle's Guide row and the configurations it brought; one linked
+   * by hand stays. Admin, like unlinking a configuration.
+   */
+  async unlinkVehicleGuideRow(vehicleId, guideRowId) {
+    if (!this.useSupabase) return;
+    const sb = getSupabase();
+    const { error: mapErr } = await sb.from('epa_vehicle_mappings')
+      .delete().eq('vehicle_id', vehicleId).eq('via_guide_row_id', guideRowId);
+    if (mapErr) throw mapErr;
+    const { error } = await sb.from('vehicle_guide_rows')
+      .delete().eq('vehicle_id', vehicleId).eq('fe_guide_row_id', guideRowId);
+    if (error) throw error;
+  }
+
+  /**
+   * The one-time move to vehicle → Guide row links, for every vehicle with a
+   * configuration (Admin → Data Checks). Reads only; applyVehicleGuideLinkPlan
+   * writes.
+   *
+   * @returns {Array<{ vehicle: { id, name, year }, plan, rows: Object }>} one
+   *   entry per vehicle whose plan changes something or leaves a
+   *   configuration unconfirmed
+   */
+  async planVehicleGuideLinks() {
+    if (!this.useSupabase) return [];
+    const sb = getSupabase();
+    const mappings = await fetchAllRows(() => sb.from('epa_vehicle_mappings')
+      .select(`id, vehicle_id, test_vehicle_id, is_primary, vehicles(id, name, year),
+        test_vehicle:epa_test_vehicles(test_vehicle_id, epa_tests(test_number, procedure_code, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc))`)
+      .order('id', { ascending: true }));
+    const ids = [...new Set(mappings.map(m => m.test_vehicle_id))];
+    const certLinks = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await sb.from('epa_certification_test_vehicles')
+        .select('test_vehicle_id, fe_guide_row_id').in('test_vehicle_id', ids.slice(i, i + 100)).not('fe_guide_row_id', 'is', null);
+      if (error) throw error;
+      certLinks.push(...(data || []));
+    }
+    const guideRowsOf = {};
+    for (const l of certLinks) (guideRowsOf[l.test_vehicle_id] ??= []).push(l.fe_guide_row_id);
+
+    // The rows the certifications point at, and every other row of the same
+    // certifications — what a configuration not named by its vehicle's rows
+    // may stand behind instead ("elsewhere").
+    const rowIds = [...new Set(certLinks.map(l => l.fe_guide_row_id))];
+    const pointed = [];
+    for (let i = 0; i < rowIds.length; i += 100) {
+      const { data, error } = await sb.from('epa_fe_guide')
+        .select('id, smog_test_group').in('id', rowIds.slice(i, i + 100));
+      if (error) throw error;
+      pointed.push(...(data || []));
+    }
+    const guideRows = await this.getGuideRowsOfTestGroups(pointed.map(g => g.smog_test_group));
+    const missing = rowIds.filter(id => !guideRows.some(g => g.id === id));
+    for (let i = 0; i < missing.length; i += 100) {
+      const { data, error } = await sb.from('epa_fe_guide')
+        .select(`${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`).in('id', missing.slice(i, i + 100));
+      if (error) throw error;
+      guideRows.push(...(data || []));
+    }
+    const judged = await this.getGuideRowsTestedVia(guideRows);
+    const guideById = Object.fromEntries(guideRows.map(g => [g.id, g]));
+    const rows = Object.fromEntries(Object.entries(judged).map(([id, j]) => [id, { ...j, guide: guideById[id] }]));
+    const others = Object.entries(rows).map(([id, r]) => ({ rowId: Number(id), via: r.via }));
+
+    const linked = await fetchAllRows(() => sb.from('vehicle_guide_rows').select('vehicle_id, fe_guide_row_id').order('id', { ascending: true }));
+    const byVehicle = new Map();
+    for (const m of mappings) {
+      if (!byVehicle.has(m.vehicle_id)) byVehicle.set(m.vehicle_id, { vehicle: m.vehicles, mappings: [] });
+      byVehicle.get(m.vehicle_id).mappings.push({ ...m, testVehicle: m.test_vehicle });
+    }
+    return [...byVehicle.entries()].map(([vehicleId, { vehicle, mappings: ms }]) => ({
+      vehicle,
+      plan: planVehicleGuideLinks({
+        mappings: ms, guideRowsOf, rows, others,
+        linkedRowIds: linked.filter(l => l.vehicle_id === vehicleId).map(l => l.fe_guide_row_id),
+      }),
+      rows,
+    }));
+  }
+
+  /**
+   * Write what planVehicleGuideLinks proposed. One vehicle at a time and never
+   * throwing for one: a failure is reported with everything that worked, as
+   * linkFeGuideRows does.
+   */
+  async applyVehicleGuideLinkPlan(entries) {
+    const result = { rows: 0, dropped: 0, added: 0, primaries: 0, failures: [] };
+    if (!this.useSupabase) return result;
+    const sb = getSupabase();
+    for (const { vehicle, plan } of entries) {
+      try {
+        if (plan.linkRows.length) {
+          const { error } = await sb.from('vehicle_guide_rows').upsert(
+            plan.linkRows.map(id => ({ vehicle_id: vehicle.id, fe_guide_row_id: Number(id) })),
+            { onConflict: 'vehicle_id,fe_guide_row_id', ignoreDuplicates: true });
+          if (error) throw error;
+          result.rows += plan.linkRows.length;
+        }
+        if (plan.drop.length) {
+          const { error } = await sb.from('epa_vehicle_mappings').delete().in('id', plan.drop.map(d => d.mappingId));
+          if (error) throw error;
+          result.dropped += plan.drop.length;
+        }
+        for (const a of plan.add) {
+          const { error } = await sb.from('epa_vehicle_mappings').insert({
+            vehicle_id: vehicle.id, test_vehicle_id: a.test_vehicle_id, confidence: a.confidence,
+            via_guide_row_id: Number(a.rowId),
+          });
+          if (error) throw error;
+          result.added += 1;
+        }
+        if (plan.primary) {
+          const { error } = await sb.from('epa_vehicle_mappings').update({ is_primary: true })
+            .eq('vehicle_id', vehicle.id).eq('test_vehicle_id', plan.primary);
+          if (error) throw error;
+          result.primaries += 1;
+        }
+      } catch (error) {
+        result.failures.push({ vehicle: vehicle.name, message: error.message });
+      }
+    }
+    return result;
   }
 
   // ── EPA Certifications (#374, migration 082) ─────────────────────────────────

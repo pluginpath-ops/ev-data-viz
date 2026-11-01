@@ -1531,6 +1531,44 @@ export function AppProvider({ children }) {
     const getEpaCertificationsFor = (ids) => dataService.getEpaCertificationsFor(ids);
     const getEpaTestVehicleIdentity = (testVehicles) => dataService.getEpaTestVehicleIdentity(testVehicles);
 
+    // A vehicle's EPA Label (migration 095): its Guide rows, and the
+    // configurations their Tested via links.
+    const getVehicleGuideRows = (vehicleId) => dataService.getVehicleGuideRows(vehicleId);
+    const getVehicleGuideCandidates = (vehicle) => dataService.getVehicleGuideCandidates(vehicle);
+    const getGuideRowsTestedVia = (rows) => dataService.getGuideRowsTestedVia(rows);
+    const planVehicleGuideLinks = () => dataService.planVehicleGuideLinks();
+
+    const linkVehicleGuideRow = async (vehicleId, guideRow, via) => {
+        try {
+            const res = await dataService.linkVehicleGuideRow(vehicleId, guideRow, via);
+            setVehicles(await dataService.getVehicles());
+            showSuccess(res.linked.length
+                ? `EPA Label linked, with ${res.linked.length} configuration${res.linked.length === 1 ? '' : 's'}.`
+                : 'EPA Label linked.');
+            return res;
+        } catch (error) {
+            showError('Error linking EPA Label: ' + error.message);
+            throw error;
+        }
+    };
+
+    const unlinkVehicleGuideRow = async (vehicleId, guideRowId) => {
+        try {
+            await dataService.unlinkVehicleGuideRow(vehicleId, guideRowId);
+            setVehicles(await dataService.getVehicles());
+            showSuccess('EPA Label unlinked.');
+        } catch (error) {
+            showError('Error unlinking EPA Label: ' + error.message);
+            throw error;
+        }
+    };
+
+    const applyVehicleGuideLinkPlan = async (entries) => {
+        const result = await dataService.applyVehicleGuideLinkPlan(entries);
+        setVehicles(await dataService.getVehicles());
+        return result;
+    };
+
     /**
      * Import parsed CSI-PDF test vehicles (clean-replace each), optionally linking one
      * to a vehicle, then refresh. Used by the PDF import modal from both Admin
@@ -2278,6 +2316,13 @@ export function AppProvider({ children }) {
         getExistingEpaTestVehicleIds,
         getEpaCertificationsFor,
         getEpaTestVehicleIdentity,
+        getVehicleGuideRows,
+        getVehicleGuideCandidates,
+        getGuideRowsTestedVia,
+        planVehicleGuideLinks,
+        linkVehicleGuideRow,
+        unlinkVehicleGuideRow,
+        applyVehicleGuideLinkPlan,
         updateEpaMapping,
         setPrimaryEpaMapping,
         unlinkEpaTestVehicle,
