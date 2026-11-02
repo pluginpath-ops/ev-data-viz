@@ -441,20 +441,45 @@ keeps two with no primary, as it had none before. Removed anyway (owner,
 2026-11-01: "if it's bad, remove it"); those vehicles want an EPA Label
 linked (layer 3).
 
-**Applying to production, in order:**
+**Applying to production, in order** (corrected 2026-11-02: the re-imports
+come after the code that writes them is deployed — main's Guide parser drops
+the kWh/100mi figures and main's PDF import writes no manufacturer comments and
+keys test vehicles the old way):
 1. Migration 093, then in the SQL editor, after reading the list:
    `SELECT keep_id, drop_id, via, conflicts FROM epa_test_vehicle_duplicates;`
-   and merge the conflict-free ones. Then
-   `LocalDev/curation/epa-identity/split-reused-ids.sql` and re-import its
-   four PDFs.
-2. Migration 094, then re-import each year's Guide CSV.
-3. Merge layers 1–2 (the import writes 093's and 094's columns).
-4. Migration 095, merge layer 3, then Admin → Data Checks → EPA Label links:
+   and merge the conflict-free ones. The one Tesla pair held back
+   (`STSLV00.0L2Y` / `YD224-061538`, two Guide rows) is a curator's call:
+   merge with `force => true` or leave it. Then run
+   `LocalDev/curation/epa-identity/split-reused-ids.sql`.
+2. Migration 094.
+3. Merge layers 1–2 and let them deploy.
+4. Re-import each year's Guide CSV (fills 094's kWh/100mi columns; Tested via
+   reads them, so before step 6).
+5. Re-import every CSI PDF, the split script's four included. Each existing
+   test gets its manufacturer comments (093's column, empty until then); the
+   import routes every test vehicle to its stored record by test number, and
+   writes no Guide link, skip, mapping or primary. Dry run on the 2026-11-02
+   backup: 0 new duplicates (the parser's raw keys would have made 55).
+6. Migration 095, merge layer 3, then Admin → Data Checks → EPA Label links:
    preview, read, apply.
-5. Merge layer 4 (no migration), then Admin → Data Checks → Behind no EPA
-   Label: preview, read the vehicle links it removes, apply. After layer 3's
-   move, so a configuration that move keeps is judged against the links it
-   made.
+7. Merge layer 4 (no migration), then Admin → Data Checks → Behind no EPA
+   Label: preview, read the vehicle links it removes and the vehicles it
+   leaves with no configuration, apply. After layer 3's move, so a
+   configuration that move keeps is judged against the links it made.
+8. Link an EPA Label to each vehicle step 7 left with no configuration, and
+   to the top vehicles the 2026-11-02 audit found clear-cut
+   (`LocalDev/curation/epa-label-top100/apply.sql`, one comment per vehicle —
+   do it with the app's Link/Unlink, not the SQL).
+
+**Measured on the 2026-11-02 backup (local mirror).** EPA Label links: 164
+rows linked, 10 configurations removed, 7 added, 10 primaries set. Behind no
+EPA Label: 68 of 910 marked, 24 Guide links cleared, 11 vehicle links
+removed; EQE 320+, EQE SUV 320+ and Model 3 LR left with none. A second run
+of each is empty. Audit of the top 100 vehicles by the Vehicles tab's order:
+13 right, 18 with a wrong row or configuration, 61 missing a row, 8 with no
+row in the imported Guide; the wrong ones came from earlier hand links (an
+EX90 test vehicle on a Polestar 3, an Air Sapphire as an Air Dream's primary)
+that the move promoted, not from the move's rules.
 
 ## Running the analysis again
 

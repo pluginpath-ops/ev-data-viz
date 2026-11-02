@@ -122,7 +122,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b">
                 <div>
-                    <h3 className="font-semibold text-sm">EPA Test Groups</h3>
+                    <h3 className="font-semibold text-sm">EPA test vehicles</h3>
                     <p className="text-xs text-secondary mt-0.5">
                         {loading ? 'Loading…' : `${testVehicles.length} imported · ${linkedCount} linked to vehicles`}
                         {!loading && noLabelCount > 0 && (
@@ -196,6 +196,11 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
                                         {/* Vehicle ID, and the years it is certified for (#374) */}
                                         <td className="px-3 py-2 font-mono whitespace-nowrap">
                                             <div className="text-secondary">{g.test_vehicle_id}</div>
+                                            {noLabel(g) && (
+                                                <span className="badge-micro is-warning mt-0.5" title="Marked by Admin → Data Checks: every Guide row of its certification is reproduced by other test vehicles">
+                                                    behind no EPA Label
+                                                </span>
+                                            )}
                                             {certifiedYears(g).length > 1 && (
                                                 <div className="text-caption mt-0.5">{formatYears(certifiedYears(g))}</div>
                                             )}

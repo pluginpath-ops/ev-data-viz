@@ -17,18 +17,28 @@ import { useAppContext } from '../../context/AppContext';
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-function MarkLine({ entry, name }) {
+/** A vehicle as the preview names it: two can share a name, so with its year. */
+const vehicleName = (v) => [v?.name ?? `vehicle ${v?.id}`, v?.year && `(${v.year})`].filter(Boolean).join(' ');
+
+function MarkLine({ entry, name, leftBare }) {
     const { test_vehicle_id, clearLinks, skip, unlink } = entry;
     const changes = [
         clearLinks.length > 0 && `clear ${plural(clearLinks.length, 'Guide link')}`,
         skip && 'skip in the Guide link sweep',
-        unlink.length > 0 && `unlink from ${unlink.map(u => u.vehicle?.name ?? `vehicle ${u.vehicle?.id}`).join(', ')}`,
+        unlink.length > 0 && `unlink from ${unlink.map(u => vehicleName(u.vehicle)).join(', ')}`,
     ].filter(Boolean);
+    // What a curator has to follow up: a vehicle left with no configuration,
+    // or one that loses its primary.
+    const warnings = unlink.flatMap(u => [
+        leftBare.has(u.vehicle?.id) && `${vehicleName(u.vehicle)} is left with no configuration — link its EPA Label`,
+        !leftBare.has(u.vehicle?.id) && u.isPrimary && `${vehicleName(u.vehicle)} loses its primary configuration`,
+    ].filter(Boolean));
     return (
         <li className="data-check-finding">
             <span className="font-mono">{test_vehicle_id}</span>
             {name && <span className="text-meta"> · {name}</span>}
             <div className="text-note">{changes.join('; ')}</div>
+            {warnings.map(w => <div key={w} className="text-note data-check-warning">{w}</div>)}
         </li>
     );
 }
@@ -41,6 +51,7 @@ export default function BehindNoLabelMaintenance() {
     const [error, setError] = useState(null);
 
     const plan = state?.plan;
+    const leftBare = new Set(state?.leftBare ?? []);
     const pending = plan ? plan.mark.length + plan.unmark.length : 0;
     const unlinking = plan ? plan.mark.reduce((n, m) => n + m.unlink.length, 0) : 0;
 
@@ -52,7 +63,8 @@ export default function BehindNoLabelMaintenance() {
     }
 
     async function apply() {
-        const also = unlinking ? ` ${plural(unlinking, 'vehicle link')} will be removed.` : '';
+        const bare = leftBare.size ? ` ${plural(leftBare.size, 'vehicle')} will be left with no configuration.` : '';
+        const also = unlinking ? ` ${plural(unlinking, 'vehicle link')} will be removed.${bare}` : '';
         if (!window.confirm(`Mark ${plural(plan.mark.length, 'test vehicle')} behind no EPA Label?${also}`)) return;
         setBusy('apply'); setError(null);
         try {
@@ -100,7 +112,7 @@ export default function BehindNoLabelMaintenance() {
             {error && <p className="note-panel is-danger">{error}</p>}
             {plan?.mark.length > 0 && (
                 <ul className="flex flex-col gap-1">
-                    {plan.mark.map(m => <MarkLine key={m.test_vehicle_id} entry={m} name={state.names[m.test_vehicle_id]} />)}
+                    {plan.mark.map(m => <MarkLine key={m.test_vehicle_id} entry={m} name={state.names[m.test_vehicle_id]} leftBare={leftBare} />)}
                 </ul>
             )}
             {plan?.unmark.length > 0 && (
