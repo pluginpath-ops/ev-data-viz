@@ -284,7 +284,7 @@ function EpaTestVehicleCard({ mapping, vehicle, standing, canEdit, onUnlink, onD
                     ) : (
                         <ConfidenceBadge confidence={mapping.confidence} />
                     )}
-                    {canEdit && (
+                    {canEdit && onUnlink && (
                         <button
                             type="button"
                             disabled={unlinking || deleting}
@@ -435,7 +435,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
     const [showDropdown, setShowDropdown] = useState(false);
     const [linking, setLinking]           = useState(false);
     const [showPdfModal, setShowPdfModal] = useState(false);
-    const { importEpaCsiTestVehicles, getExistingEpaTestVehicleIds, deleteEpaTestVehicle, vehicles, getEpaSuggestionCandidates } = useAppContext();
+    const { importEpaCsiTestVehicles, getExistingEpaTestVehicleIds, deleteEpaTestVehicle, vehicles, getEpaSuggestionCandidates, isAdmin } = useAppContext();
     const [showCreate, setShowCreate]     = useState(false);
     const [createDraft, setCreateDraft]   = useState({ test_vehicle_id: '', model_year: '', make: '', epa_carline_name: '' });
     const [creating, setCreating]         = useState(false);
@@ -703,6 +703,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                 vehicle={vehicle}
                 guideRows={guideRows}
                 canEdit={canEdit}
+                canUnlink={isAdmin}
                 onLinkTestVehicle={(testVehicleId) => onLink(vehicle.id, testVehicleId, 'likely', null)}
                 onUnlinkMapping={(mapping) => onUnlink(mapping.id)}
             />
@@ -747,7 +748,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                         standing={standings[m.id]}
                         canEdit={canEdit}
                         onTestVehicleChanged={onTestVehicleChanged}
-                        onUnlink={onUnlink}
+                        onUnlink={isAdmin ? onUnlink : undefined}
                         onDelete={deleteEpaTestVehicle}
                         onUpdateConfidence={onUpdateConfidence}
                         onUpdateDisplayName={onUpdateDisplayName}

@@ -26,12 +26,10 @@ import { configurationsFromTestedVia, namesTestVehicle } from './vehicleGuideLin
 
 const ORDER = ['exact', 'near', 'blend', 'alternative', 'possible', 'other-label', 'no-match', 'no-lab-data'];
 
-/** Named by the row itself: one of its members, by id or by the same lab point. */
-const isMember = (via, tv) => namesTestVehicle({ ...via, alternatives: [] }, tv);
-
 /**
  * @param {Object} row  { guide, via, pool }
- * @param {Array<{ rowId, via }>} [others]  the other rows of its certification
+ * @param {Array<{ rowId, via }>} [others]  the other rows of its certification,
+ *        the vehicle's own linked ones included
  * @param {Set<string>} [linked]  test vehicles the vehicle links
  * @returns {Array<{
  *   test_vehicle_id, carline, match, nearest: boolean, otherRowId: number|null,
@@ -46,7 +44,7 @@ export function guideRowMatches({ guide, via, pool = [] } = {}, others = [], lin
         const p = testVehiclePoint(tv);
         const sibling = others.find(o => namesTestVehicle(o.via, tv));
         let match;
-        if (isMember(via, tv)) match = via.verdict;
+        if (namesTestVehicle(via, tv)) match = via.verdict;
         else if (!p) match = 'no-lab-data';
         else if (sibling) match = 'other-label';
         else if ((via?.alternatives ?? []).includes(tv.test_vehicle_id)) match = 'alternative';

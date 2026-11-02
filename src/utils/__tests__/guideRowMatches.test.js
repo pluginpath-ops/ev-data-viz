@@ -40,6 +40,13 @@ describe('guideRowMatches', () => {
         expect(out.map(m => [m.test_vehicle_id, m.match])).toEqual([['A', 'exact'], ['B', 'alternative']]);
     });
 
+    it('is not other label where a sibling row only lists it as an alternative — the Equinox under the Blazer', () => {
+        const pool = [tv('A', 20, 25), tv('E', 30, 40)];
+        const others = [{ rowId: 9, via: { ...exact('S', 24, 30), ambiguous: true, alternatives: ['E'] } }];
+        const out = guideRowMatches({ guide: row(1, 20, 25), via: exact('A', 20, 25), pool }, others);
+        expect(out.find(m => m.test_vehicle_id === 'E').match).toBe('no-match');
+    });
+
     it('says when a test vehicle has no lab data', () => {
         const pool = [{ test_vehicle_id: 'Z', tests: [] }, tv('X', 30, 40)];
         const out = guideRowMatches({ guide: row(1, 20, 25), via: exact('A', 20, 25), pool });

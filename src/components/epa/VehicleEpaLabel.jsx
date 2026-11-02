@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import TestedViaSummary from './TestedViaSummary';
 import GuideRowMatchList from './GuideRowMatchList';
+import { configurationsFromTestedVia } from '../../utils/vehicleGuideLinks';
 
 /**
  * The vehicle's EPA Label: the Fuel Economy Guide rows that are this car, and
@@ -51,7 +52,7 @@ function GuideRowLine({ guide, via, action, children }) {
 }
 
 /** A candidate's test vehicles, folded: each one needs reading, and the list is long. */
-function CandidateMatches({ row, others }) {
+function CandidateMatches({ row, others, mappings }) {
     const [open, setOpen] = useState(false);
     if (!row?.pool?.length) return null;
     return (
@@ -59,12 +60,12 @@ function CandidateMatches({ row, others }) {
             <button type="button" className="fe-picker-link-btn mt-1" onClick={() => setOpen(o => !o)}>
                 {open ? '▾' : '▸'} {row.pool.length} test vehicle{row.pool.length === 1 ? '' : 's'} in its certification
             </button>
-            {open && <GuideRowMatchList row={row} others={others} />}
+            {open && <GuideRowMatchList row={row} others={others} mappings={mappings} />}
         </>
     );
 }
 
-function CandidatePicker({ vehicle, linkedIds, onLinked }) {
+function CandidatePicker({ vehicle, linkedIds, mappings, onLinked }) {
     const { getVehicleGuideCandidates, getGuideRowsTestedVia, linkVehicleGuideRow } = useAppContext();
     const [open, setOpen] = useState(false);
     const [candidates, setCandidates] = useState(null);
@@ -166,6 +167,7 @@ function CandidatePicker({ vehicle, linkedIds, onLinked }) {
                         <CandidateMatches
                             row={vias[c.row.id] && { guide: c.row, ...vias[c.row.id] }}
                             others={siblingsOf(c.row)}
+                            mappings={mappings}
                         />
                     </GuideRowLine>
                 ))}
@@ -174,7 +176,12 @@ function CandidatePicker({ vehicle, linkedIds, onLinked }) {
     );
 }
 
-export default function VehicleEpaLabel({ vehicle, guideRows, canEdit, onLinkTestVehicle, onUnlinkMapping }) {
+/**
+ * @param {Object} props
+ * @param {boolean} props.canEdit  link a label or a configuration
+ * @param {boolean} [props.canUnlink]  unlink either: admins only, as RLS has it
+ */
+export default function VehicleEpaLabel({ vehicle, guideRows, canEdit, canUnlink = false, onLinkTestVehicle, onUnlinkMapping }) {
     const { unlinkVehicleGuideRow } = useAppContext();
     const { data, loading, error, reload } = guideRows;
     const rows = data ? data.rows : null;
@@ -188,10 +195,23 @@ export default function VehicleEpaLabel({ vehicle, guideRows, canEdit, onLinkTes
     // Migration 095 not applied: nothing to show, and nothing a curator can do.
     if (!loading && !error && data === null) return null;
 
+    // A row's siblings for its match list: the other rows of its
+    // certification, and the vehicle's own other rows — a configuration one of
+    // them names reads "other label" here, not "no match".
+    const siblingsOf = (r) => [...others, ...(rows ?? []).filter(o => o.rowId !== r.rowId)];
+
     const unlink = async (rowId) => {
-        if (!window.confirm('Unlink this EPA Label? The configurations it linked go with it; ones linked by hand stay.')) return;
+        if (!window.confirm('Unlink this EPA Label? The configurations it linked go with it, unless another linked label names them; ones linked by hand stay.')) return;
+        // A configuration this row brought that another linked row also names
+        // stays, and is the other row's from now on.
+        const keepFor = {};
+        for (const o of rows ?? []) {
+            if (o.rowId === rowId) continue;
+            for (const c of configurationsFromTestedVia(o.via)) keepFor[c.test_vehicle_id] ??= o.rowId;
+        }
         setBusy(rowId);
-        try { await unlinkVehicleGuideRow(vehicle.id, rowId); reload(); }
+        try { await unlinkVehicleGuideRow(vehicle.id, rowId, keepFor); reload(); }
+        catch { /* reported by the context */ }
         finally { setBusy(null); }
     };
 
@@ -212,7 +232,7 @@ export default function VehicleEpaLabel({ vehicle, guideRows, canEdit, onLinkTes
                             key={r.rowId}
                             guide={r.guide}
                             via={r.via}
-                            action={canEdit && (
+                            action={canEdit && canUnlink && (
                                 <button
                                     type="button"
                                     className="btn btn-secondary text-xs py-0.5 px-2 shrink-0 disabled:opacity-40"
@@ -226,17 +246,17 @@ export default function VehicleEpaLabel({ vehicle, guideRows, canEdit, onLinkTes
                         >
                             <GuideRowMatchList
                                 row={r}
-                                others={others}
+                                others={siblingsOf(r)}
                                 mappings={mappings}
                                 canEdit={canEdit}
                                 onLink={onLinkTestVehicle}
-                                onUnlink={onUnlinkMapping}
+                                onUnlink={canUnlink ? onUnlinkMapping : undefined}
                             />
                         </GuideRowLine>
                     ))}
                 </ul>
             )}
-            {canEdit && <CandidatePicker vehicle={vehicle} linkedIds={linkedIds} onLinked={reload} />}
+            {canEdit && <CandidatePicker vehicle={vehicle} linkedIds={linkedIds} mappings={mappings} onLinked={reload} />}
         </div>
     );
 }

@@ -52,16 +52,27 @@ export function configurationsFromTestedVia(via) {
 }
 
 /**
- * Does a row's Tested via name this test vehicle? By id, an ambiguous
- * alternative, or the same lab point — a test vehicle stored twice is one car,
- * and testedVia keeps only one copy.
+ * Does a row's Tested via name this test vehicle? By id, or by the same lab
+ * point — a test vehicle stored twice is one car, and testedVia keeps only one
+ * copy.
+ *
+ * Not an ambiguous row's alternatives: an alternative explains the row only as
+ * well as the test vehicles it named, and may be another car altogether — the
+ * Blazer EV AWD row lists an Equinox EV test vehicle among its alternatives.
+ * isAlternative says that apart, so a linked alternative is neither confirmed
+ * nor contradicted.
  */
 export function namesTestVehicle(via, testVehicle) {
     if (!via || !TESTED.has(via.verdict)) return false;
     const id = testVehicle?.test_vehicle_id;
-    if (via.members.some(m => m.test_vehicle_id === id) || (via.alternatives ?? []).includes(id)) return true;
+    if (via.members.some(m => m.test_vehicle_id === id)) return true;
     const key = pointKey(testVehiclePoint(testVehicle));
     return key != null && via.members.some(m => pointKey(m) === key);
+}
+
+/** One of an ambiguous row's alternatives, which the row does not name. */
+export function isAlternative(via, testVehicle) {
+    return TESTED.has(via?.verdict) && (via.alternatives ?? []).includes(testVehicle?.test_vehicle_id);
 }
 
 /**
@@ -76,7 +87,8 @@ export function namesTestVehicle(via, testVehicle) {
  *                 other test vehicles, and no row of
  *                 the certification names it          { status, rowId }
  *   unconfirmed   no row says either way: untested,
- *                 no lab data, or it is in no linked
+ *                 no lab data, an ambiguous row's
+ *                 alternative, or it is in no linked
  *                 row's pool                          { status, rowId: null }
  *
  * "Elsewhere" is kept apart from "contradicted" because of the data
@@ -93,6 +105,7 @@ export function configurationStanding(testVehicle, rows = [], others = []) {
     const id = testVehicle?.test_vehicle_id;
     const named = rows.find(r => namesTestVehicle(r.via, testVehicle));
     if (named) return { status: 'confirmed', rowId: named.rowId };
+    if (rows.some(r => isAlternative(r.via, testVehicle))) return { status: 'unconfirmed', rowId: null };
     const against = rows.find(r => r.poolIds?.has(id) && TESTED.has(r.via?.verdict));
     if (against) {
         const sibling = others.find(r => namesTestVehicle(r.via, testVehicle));

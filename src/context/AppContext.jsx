@@ -1552,9 +1552,9 @@ export function AppProvider({ children }) {
         }
     };
 
-    const unlinkVehicleGuideRow = async (vehicleId, guideRowId) => {
+    const unlinkVehicleGuideRow = async (vehicleId, guideRowId, keepFor) => {
         try {
-            await dataService.unlinkVehicleGuideRow(vehicleId, guideRowId);
+            await dataService.unlinkVehicleGuideRow(vehicleId, guideRowId, keepFor);
             setVehicles(await dataService.getVehicles());
             showSuccess('EPA Label unlinked.');
         } catch (error) {

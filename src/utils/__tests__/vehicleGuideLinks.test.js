@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    configurationsFromTestedVia, namesTestVehicle, configurationStanding, planVehicleGuideLinks,
+    configurationsFromTestedVia, namesTestVehicle, isAlternative, configurationStanding, planVehicleGuideLinks,
 } from '../vehicleGuideLinks';
 
 const member = (test_vehicle_id, city, hwy) => ({ test_vehicle_id, city, hwy, via: ['T'] });
@@ -34,10 +34,11 @@ describe('configurationsFromTestedVia', () => {
 });
 
 describe('namesTestVehicle', () => {
-    it('by id, or as an ambiguous alternative', () => {
+    it('by id, and never as an ambiguous alternative', () => {
         const v = via('exact', [member('A', 20, 25)], { alternatives: ['B'] });
         expect(namesTestVehicle(v, { test_vehicle_id: 'A' })).toBe(true);
-        expect(namesTestVehicle(v, { test_vehicle_id: 'B' })).toBe(true);
+        expect(namesTestVehicle(v, { test_vehicle_id: 'B' })).toBe(false);
+        expect(isAlternative(v, { test_vehicle_id: 'B' })).toBe(true);
         expect(namesTestVehicle(v, { test_vehicle_id: 'C' })).toBe(false);
     });
 
@@ -68,6 +69,11 @@ describe('configurationStanding', () => {
     it('is elsewhere when a sibling row of the certification names it — the Gravity GT on other wheels', () => {
         const others = [{ rowId: 3, via: via('exact', [member('B', 21, 26)]) }];
         expect(configurationStanding({ test_vehicle_id: 'B' }, rows, others)).toEqual({ status: 'elsewhere', rowId: 3 });
+    });
+
+    it('is unconfirmed, not confirmed or contradicted, as an ambiguous row\'s alternative — the Equinox under the Blazer row', () => {
+        const ambiguous = [{ rowId: 1, via: via('blend', [member('A', 20, 25)], { alternatives: ['E'] }), poolIds: new Set(['A', 'E']) }];
+        expect(configurationStanding({ test_vehicle_id: 'E' }, ambiguous)).toEqual({ status: 'unconfirmed', rowId: null });
     });
 
     it('is unconfirmed when its row is untested, or it is in no linked row\'s pool', () => {

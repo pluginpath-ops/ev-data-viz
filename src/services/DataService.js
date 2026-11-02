@@ -41,6 +41,9 @@ const roundField = roundTo;
  */
 const PAGE_SIZE = 1000;
 
+// RLS turns a delete by anyone but an admin into one that removes nothing.
+const ONLY_ADMINS_UNLINK = 'Nothing was unlinked — only an admin can unlink.';
+
 /** Test ids per data_points request: ~7 characters each, so a request stays far under any URL limit. */
 const POINTS_IDS_PER_REQUEST = 100;
 
@@ -2575,11 +2578,13 @@ class DataService {
    */
   async unlinkEpaTestVehicle(mappingId) {
     if (!this.useSupabase) return;
-    const { error } = await getSupabase()
+    const { data, error } = await getSupabase()
       .from('epa_vehicle_mappings')
       .delete()
-      .eq('id', mappingId);
+      .eq('id', mappingId)
+      .select('id');
     if (error) throw error;
+    if (!data?.length) throw new Error(ONLY_ADMINS_UNLINK);
   }
 
   /**
@@ -2787,11 +2792,10 @@ class DataService {
   async getTestedViaMembers(testGroups) {
     const groups = [...new Set((testGroups ?? []).filter(Boolean))];
     if (!this.useSupabase || !groups.length) return [];
-    const fetch = async (filter) => {
-      const { data, error } = await filter(getSupabase().from('epa_certification_test_vehicles').select(TESTED_VIA_MEMBER));
-      if (error) throw error;
-      return data || [];
-    };
+    // Paged: the move reads every vehicle's families at once, and a capped
+    // read would judge a row against part of its pool.
+    const fetch = (filter) => fetchAllRows(() =>
+      filter(getSupabase().from('epa_certification_test_vehicles').select(TESTED_VIA_MEMBER)).order('id', { ascending: true }));
     const byGroup = (gs) => fetch(q => q.in('certification.test_group', gs));
     const byCarryover = (gs) => fetch(q => q.in('carryover_test_group', gs));
 
@@ -2922,17 +2926,36 @@ class DataService {
 
   /**
    * Unlink a vehicle's Guide row and the configurations it brought; one linked
-   * by hand stays. Admin, like unlinking a configuration.
+   * by hand stays, and so does one another linked row names (`keepFor`: test
+   * vehicle id → that row), which is that row's from then on. Admin, like
+   * unlinking a configuration: RLS turns anyone else's delete into a no-op,
+   * which is reported rather than passed off as done.
+   *
+   * @param {Object<string, number>} [keepFor]
    */
-  async unlinkVehicleGuideRow(vehicleId, guideRowId) {
+  async unlinkVehicleGuideRow(vehicleId, guideRowId, keepFor = {}) {
     if (!this.useSupabase) return;
     const sb = getSupabase();
-    const { error: mapErr } = await sb.from('epa_vehicle_mappings')
-      .delete().eq('vehicle_id', vehicleId).eq('via_guide_row_id', guideRowId);
-    if (mapErr) throw mapErr;
-    const { error } = await sb.from('vehicle_guide_rows')
-      .delete().eq('vehicle_id', vehicleId).eq('fe_guide_row_id', guideRowId);
+    const { data: brought, error: readErr } = await sb.from('epa_vehicle_mappings')
+      .select('id, test_vehicle_id')
+      .eq('vehicle_id', vehicleId).eq('via_guide_row_id', guideRowId);
+    if (readErr) throw readErr;
+    const drop = [];
+    for (const m of brought || []) {
+      const other = keepFor[m.test_vehicle_id];
+      if (other == null) { drop.push(m.id); continue; }
+      const { error } = await sb.from('epa_vehicle_mappings').update({ via_guide_row_id: other }).eq('id', m.id);
+      if (error) throw error;
+    }
+    if (drop.length) {
+      const { data, error } = await sb.from('epa_vehicle_mappings').delete().in('id', drop).select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error(ONLY_ADMINS_UNLINK);
+    }
+    const { data, error } = await sb.from('vehicle_guide_rows')
+      .delete().eq('vehicle_id', vehicleId).eq('fe_guide_row_id', guideRowId).select('id');
     if (error) throw error;
+    if (!data?.length) throw new Error(ONLY_ADMINS_UNLINK);
   }
 
   /**
