@@ -7470,6 +7470,42 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .fe-candidate-list {
     @apply flex flex-col max-h-56 overflow-y-auto;
 }
+
+/* A vehicle's EPA Label (migration 095): the Guide rows that are the car, each
+   with what stands behind it (Tested via). One rule between rows, as a list. */
+.epa-label-rows > li + li { border-top: 1px solid var(--color-border); }
+.epa-label-error {
+    @apply text-xs mt-1;
+    color: var(--color-danger-text);
+}
+
+/* Under an EPA Label row: every test vehicle of its certification and how it
+   matches the row (GuideRowMatchList). Badge, test vehicle, its kWh/100mi
+   against the row's, and whether the vehicle links it. Wraps to two lines on
+   a phone rather than scrolling. */
+.guide-match-list {
+    @apply mt-2 ml-3 pl-3 flex flex-col text-xs;
+    border-left: 2px solid var(--color-border);
+}
+.guide-match-row {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr) auto auto;
+    align-items: baseline;
+    column-gap: 0.75rem;
+    @apply py-1;
+}
+.guide-match-row + .guide-match-row { border-top: 1px solid var(--color-border); }
+.guide-match-fit { @apply inline-flex flex-wrap gap-1; }
+.guide-match-delta {
+    @apply whitespace-nowrap tabular-nums;
+    color: var(--color-text-meta);
+}
+.guide-match-action { @apply inline-flex items-center justify-end gap-2; }
+@media (max-width: 640px) {
+    .guide-match-row { grid-template-columns: 6.5rem minmax(0, 1fr); row-gap: 0.25rem; }
+    .guide-match-delta { grid-column: 2; }
+    .guide-match-action { grid-column: 2; justify-content: flex-start; }
+}
 .fe-candidate-list > .fe-candidate:nth-child(odd) {
     background-color: var(--color-card);
 }

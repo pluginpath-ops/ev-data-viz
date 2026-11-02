@@ -1,5 +1,6 @@
 import ChargeSummaryMaintenance from './ChargeSummaryMaintenance';
 import CompositeMaintenance from './CompositeMaintenance';
+import EpaLabelLinkMaintenance from './EpaLabelLinkMaintenance';
 import TestAttributionCheck from './TestAttributionCheck';
 import { useState, useMemo, useCallback } from 'react';
 import { useAppContext } from '../../context/AppContext';
@@ -581,6 +582,9 @@ export default function DataChecksPanel() {
             <ChargeSummaryMaintenance />
             <h4 className="subsection-title mt-6">Composite curves</h4>
             <CompositeMaintenance />
+
+            <h4 className="subsection-title mt-6">EPA Label links</h4>
+            <EpaLabelLinkMaintenance />
 
             <h4 className="subsection-title mt-6">Limits</h4>
             <p className="text-note mb-2">

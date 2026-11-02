@@ -7,10 +7,12 @@ import { guideConflicts } from '../../utils/feGuidePromotion';
 /**
  * Attach a staged Fuel Economy Guide row to this EPA test vehicle (#206, phase 3).
  *
- * This is where the curation happens. No key joins the two — the guide's smog
- * Test Group matches 1 of our 89 linked test vehicles and is not unique per
- * configuration — so a human decides, and this exists to make that decision a
- * confirmation rather than a search.
+ * This is where the curation happens. The guide's smog Test Group is the
+ * certification's Test Group (1,192 of 1,211 EV rows, 2026-10-31), but it is
+ * not unique per configuration — one certification lists every wheel and trim
+ * — so a human decides, and this exists to make that decision a confirmation
+ * rather than a search. Which test vehicle stands behind a row is worked out
+ * from the lab data instead (guideTestedVia; the vehicle's EPA Label, 095).
  *
  * Filtering by make still leaves ~19 candidates per year on the real data, which
  * is too many to read. Ranked by carline similarity the correct row came first

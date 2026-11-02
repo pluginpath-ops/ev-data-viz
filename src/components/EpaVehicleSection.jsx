@@ -18,6 +18,9 @@ import EpaDerivationChecks from './epa/EpaDerivationChecks';
 import EpaCuratorEditor from './epa/EpaCuratorEditor';
 import FeGuidePicker from './epa/FeGuidePicker';
 import EpaCertificationList from './epa/EpaCertificationList';
+import VehicleEpaLabel from './epa/VehicleEpaLabel';
+import { useVehicleGuideRows } from '../hooks/useVehicleGuideRows';
+import { configurationStanding } from '../utils/vehicleGuideLinks';
 import { certificationsOf, certifiedYears, formatYears, sinceYear, testVehicleView } from '../utils/epaCertifications';
 import { epaRecordFromTestVehicle } from '../utils/epaRecordFromTestVehicle';
 import { buildMethodologyModel } from '../utils/epaMethodology';
@@ -83,8 +86,20 @@ function DataRow({ label, value, muted, always = false }) {
     );
 }
 
+/**
+ * How a configuration stands against the vehicle's EPA Label (095): named by a
+ * Guide row's Tested via, contradicted by one (the row is another test
+ * vehicle's), or neither. Shown only once the vehicle has a Guide row.
+ */
+const STANDING = {
+    confirmed:    { label: 'TESTED VIA LABEL', intent: 'is-good',    title: "Its EPA Label's Tested via names this test vehicle" },
+    elsewhere:    { label: 'OTHER LABEL',      intent: 'is-warning', title: "Behind another EPA Label of the same certification, which this vehicle does not link" },
+    contradicted: { label: 'NOT BEHIND LABEL', intent: 'is-danger',  title: "Its EPA Label's Tested via names other test vehicles, and no Guide row of the certification names this one" },
+    unconfirmed:  { label: 'UNCONFIRMED',      intent: 'is-warning', title: "None of the vehicle's EPA Label rows says whether this test vehicle is behind it" },
+};
+
 /** Card displaying the data for one EPA test vehicle mapping. */
-function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName, onTestVehicleChanged }) {
+function EpaTestVehicleCard({ mapping, vehicle, standing, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName, onTestVehicleChanged }) {
     const [unlinking,    setUnlinking]    = useState(false);
     const [deleting,     setDeleting]     = useState(false);
     const [updatingConf, setUpdatingConf] = useState(false);
@@ -92,6 +107,7 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
     const [savingName,   setSavingName]   = useState(false);
     const [curating,     setCurating]     = useState(false);
     const [curatorDirty, setCuratorDirty] = useState(false);
+    const [showCertifications, setShowCertifications] = useState(false);
     const g = mapping.epaTestVehicle;
 
     // Which certification the Guide picker links (#374): the one this
@@ -236,6 +252,13 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                         {mapping.isPrimary && vehicle?.epa_mappings?.length > 1 && (
                             <span className="badge-micro is-accent ml-2" title="The configuration that stands for this vehicle">PRIMARY</span>
                         )}
+                        {standing && (
+                            <span className={`badge-micro ${STANDING[standing.status].intent} ml-2`}
+                                title={standing.rowTitle ? `${STANDING[standing.status].title}: ${standing.rowTitle}` : STANDING[standing.status].title}>
+                                {STANDING[standing.status].label}
+                            </span>
+                        )}
+                        {standing?.rowTitle && <span className="text-meta"> {standing.rowTitle}</span>}
                     </div>
                     {/* The test vehicle, anchored on its first certified year, and
                         every year it is certified for (#374). Its Test Groups
@@ -261,7 +284,7 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                     ) : (
                         <ConfidenceBadge confidence={mapping.confidence} />
                     )}
-                    {canEdit && (
+                    {canEdit && onUnlink && (
                         <button
                             type="button"
                             disabled={unlinking || deleting}
@@ -285,13 +308,6 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                     )}
                 </div>
             </div>
-
-            <EpaCertificationList
-                testVehicle={g}
-                canEdit={canEdit}
-                targetLinkId={targetLinkId}
-                onTarget={setPickerLinkId}
-            />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1 text-xs">
 
@@ -343,9 +359,6 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                 gate as the curator form below, because the writes behind it are
                 contributor-only at the RLS layer anyway — showing the controls
                 to anyone else offers buttons that would be refused. */}
-            {canEdit && (
-                <FeGuidePicker key={targetLinkId ?? 'none'} testVehicle={pickerTestVehicle} canEdit={canEdit} onChanged={onTestVehicleChanged} />
-            )}
 
             {/* Does this record reconcile? Below the data it judges, so a phase
                 can be corrected in the same view it is questioned in — and the
@@ -357,13 +370,41 @@ function EpaTestVehicleCard({ mapping, vehicle, canEdit, onUnlink, onDelete, onU
                 <p className="mt-2 text-xs text-secondary italic border-t pt-2">{mapping.notes}</p>
             )}
 
+            {/* Each year's certification and the Guide row its label figures
+                come from — the per-year link behind Label Efficiency and Label
+                Range. Folded, and curators only: the vehicle's EPA Label above
+                is where a reader sees which row this car is (owner, 2026-11-01:
+                the list "doesn't have enough info" to judge on its own). */}
+            {canEdit && (
+                <>
+                    <button
+                        type="button"
+                        onClick={() => setShowCertifications(o => !o)}
+                        className="mt-3 mr-4 fe-picker-link-btn"
+                    >
+                        {showCertifications ? '▾' : '▸'} Label figures by year ({certificationsOf(g).length})
+                    </button>
+                    {showCertifications && (
+                        <>
+                            <EpaCertificationList
+                                testVehicle={g}
+                                canEdit={canEdit}
+                                targetLinkId={targetLinkId}
+                                onTarget={setPickerLinkId}
+                            />
+                            <FeGuidePicker key={targetLinkId ?? 'none'} testVehicle={pickerTestVehicle} canEdit={canEdit} onChanged={onTestVehicleChanged} />
+                        </>
+                    )}
+                </>
+            )}
+
             {/* Curator form — contributor/admin only */}
             {canEdit && (
                 <>
                     <button
                         type="button"
                         onClick={toggleCurate}
-                        className="mt-3 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                        className="mt-3 fe-picker-link-btn"
                     >
                         {curating ? '▾ Hide curator fields' : '▸ Curate fields & test data'}
                         {curating && curatorDirty && <span className="ml-1 text-amber-500" title="Unsaved edits">●</span>}
@@ -394,7 +435,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
     const [showDropdown, setShowDropdown] = useState(false);
     const [linking, setLinking]           = useState(false);
     const [showPdfModal, setShowPdfModal] = useState(false);
-    const { importEpaCsiTestVehicles, getExistingEpaTestVehicleIds, deleteEpaTestVehicle, vehicles, getEpaSuggestionCandidates } = useAppContext();
+    const { importEpaCsiTestVehicles, getExistingEpaTestVehicleIds, deleteEpaTestVehicle, vehicles, getEpaSuggestionCandidates, isAdmin } = useAppContext();
     const [showCreate, setShowCreate]     = useState(false);
     const [createDraft, setCreateDraft]   = useState({ test_vehicle_id: '', model_year: '', make: '', epa_carline_name: '' });
     const [creating, setCreating]         = useState(false);
@@ -402,6 +443,19 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
     const debounceRef = useRef(null);
 
     const mappings = vehicle?.epa_mappings ?? [];
+    const guideRows = useVehicleGuideRows(vehicle);
+    const standings = useMemo(() => {
+        const { rows, others } = guideRows.data ?? {};
+        if (!rows?.length) return {};
+        const titleOf = (rowId) => {
+            const g = [...rows, ...others].find(r => r.rowId === rowId)?.guide;
+            return g ? `${g.model_year} ${g.carline}` : null;
+        };
+        return Object.fromEntries((vehicle?.epa_mappings ?? []).map(m => {
+            const s = configurationStanding(m.epaTestVehicle, rows, others);
+            return [m.id, { ...s, rowTitle: titleOf(s.rowId) }];
+        }));
+    }, [guideRows.data, vehicle?.epa_mappings]);
     // Where to look (#341): a variant's source, or the vehicle's own make and
     // model when there is no source to go on. Kept after a link, for the next
     // one. Curators only — a viewer sees links, never suggestions.
@@ -641,6 +695,19 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                 </div>
             )}
 
+            {/* What the vehicle is, as EPA labels it — and, through each row's
+                Tested via, which configurations below stand behind it. Above
+                them, so a link here (which adds cards) never moves what is
+                being clicked. */}
+            <VehicleEpaLabel
+                vehicle={vehicle}
+                guideRows={guideRows}
+                canEdit={canEdit}
+                canUnlink={isAdmin}
+                onLinkTestVehicle={(testVehicleId) => onLink(vehicle.id, testVehicleId, 'likely', null)}
+                onUnlinkMapping={(mapping) => onUnlink(mapping.id)}
+            />
+
             {/* Above the linked configurations, so a link — which adds a card —
                 never moves the rows being clicked. Folded when the tab opens on
                 a vehicle already linked, where what is linked is what a reader
@@ -658,7 +725,8 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                 />
             )}
 
-            {/* Existing mappings */}
+            {/* The test data behind the label: one card per configuration. */}
+            <h4 className="subsection-title mt-4 mb-2">Test data</h4>
             {mappings.length === 0 ? (
                 <p className="text-sm text-secondary mb-3">
                     No EPA test vehicle linked yet.
@@ -677,9 +745,10 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                         key={m.id}
                         mapping={m}
                         vehicle={vehicle}
+                        standing={standings[m.id]}
                         canEdit={canEdit}
                         onTestVehicleChanged={onTestVehicleChanged}
-                        onUnlink={onUnlink}
+                        onUnlink={isAdmin ? onUnlink : undefined}
                         onDelete={deleteEpaTestVehicle}
                         onUpdateConfidence={onUpdateConfidence}
                         onUpdateDisplayName={onUpdateDisplayName}

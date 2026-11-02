@@ -281,6 +281,41 @@ export function testedVia(guideRow, testVehicles = []) {
 }
 
 /**
+ * Could this test vehicle stand behind this row at all — reproduce it within
+ * a blend's reach, or be one end of a two-way blend with any other test
+ * vehicle of the pool, or (when the row itself needed three) one corner of a
+ * three-way blend? Looser than `testedVia`, which names only the best
+ * explanation: this answers "is it definitely NOT behind the row". Two 2023
+ * Taycans that no row named still pass it.
+ *
+ * @param {Object} guideRow
+ * @param {Object} testVehicle  with tests
+ * @param {Array} pool  the row's pool (guideTestedViaPool)
+ * @param {Object} [via]  the row's testedVia result, for the three-way case
+ */
+export function couldStandBehind(guideRow, testVehicle, pool = [], via = null) {
+    const g = guidePoint(guideRow);
+    const p = testVehiclePoint(testVehicle);
+    if (!g || !p) return false;
+    if (dist(g, p) <= g.tol * BLEND_REACH) return true;
+    const others = pool
+        .filter(o => o.test_vehicle_id !== testVehicle.test_vehicle_id)
+        .map(testVehiclePoint).filter(Boolean);
+    for (const q of others) {
+        const s = onSegment(g, p, q);
+        if (s && s.t >= BLEND_EDGE && s.t <= 1 - BLEND_EDGE && s.d <= g.tol * BLEND_REACH) return true;
+    }
+    if (via?.verdict === 'blend' && via.members?.length === 3) {
+        for (let i = 0; i < others.length; i++) {
+            for (let j = i + 1; j < others.length; j++) {
+                if (inTriangle(g, p, others[i], others[j])) return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * The pool for a Guide row: every test vehicle that was certified under the
  * row's Test Group, wherever the file that says so is.
  *

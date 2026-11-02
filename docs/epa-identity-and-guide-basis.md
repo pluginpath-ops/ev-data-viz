@@ -1,7 +1,7 @@
 # EPA test vehicle identity, and what stands behind a Guide row
 
-Investigation, 2026-10-31; layers 1 and 2 built the same night, layer 3 is a
-design awaiting the owner (see **Status** at the end). Measured on the full CSI corpus
+Investigation, 2026-10-31; layers 1 and 2 built the same night, layer 3 the
+next day after the owner's answers (see **Status** at the end). Measured on the full CSI corpus
 (`LocalDev/epa-csi/`, 2021–2027, 718 files, 1,360 EPA test vehicles), the
 Fuel Economy Guide CSVs MY22–MY27 (1,303 EV rows) and the 2026-10-27 backup.
 Scripts and a per-row result table: `LocalDev/epa-csi/identity/` (see the end).
@@ -361,34 +361,71 @@ record each (retests).
   (the parser's raw keys would have made 32). Against an empty database the
   resolver splits exactly `NNGAA078` and `Mullen THREE`.
 
-**Layer 2 — Tested via (built, uncommitted).** `utils/guideTestedVia.js`
+**Layer 2 — Tested via (built).** `utils/guideTestedVia.js`
 (`testedVia`, `guideTestedViaPool`), migration 094 + `parseFeGuide` for the
 kWh/100mi figures. Pure; nothing in the app calls it yet.
 
-**Layer 3 — the curator's link (design, not built).** Needs the owner before
-code, because it changes what a curator does and what a vehicle reads:
+**Layer 3 — the vehicle's EPA Label (built; owner answers 2026-10-31).**
 
-* A table `vehicle_guide_rows (vehicle_id, fe_guide_row_id, is_primary, note,
-  created_by)` — or reuse `epa_certification_test_vehicles.fe_guide_row_id`
-  and derive the vehicle's rows through its configurations? A table of its own
-  is what "vehicle → Guide row" means; the existing column is the reverse
-  direction and stays as the computed link's cache.
-* The vehicle's EPA section: "EPA Label" picker of Guide rows (make + year
-  filtered, as today), each candidate showing its Tested via; linking a row
-  links its exact/near test vehicle as the primary configuration, or a blend's
-  members as configurations with none primary until a curator picks.
-* Where checks fail or the verdict is untested, the members' manufacturer
-  comments (vehicle and test) are shown beside the row — the cheap thing to
-  read before the PDF (Part C).
+Answers: a blend's nearest member stands for the vehicle; keep an existing
+configuration unless a Guide row contradicts it ("only contradicted ones");
+build and test it all locally, apply in the order given below.
 
-Questions for the owner before layer 3:
-1. For a **blend**, which member supplies the vehicle's coefficients and test
-   weight — none until a curator picks, or the one nearest the row?
-2. Existing vehicle → test vehicle links (`epa_vehicle_mappings`): keep as
-   they are and show where they disagree with the Guide row's Tested via, or
-   migrate each vehicle to the Guide rows its configurations point at?
-3. Apply 093 + 094 to production and re-import the Guide CSVs before layer 3,
-   so the merge and the kWh figures are there to build on?
+* Migration 095: `vehicle_guide_rows` (vehicle → Guide row) and
+  `epa_vehicle_mappings.via_guide_row_id` (the row a configuration came in
+  through). Same RLS as the mappings.
+* `utils/vehicleGuideLinks.js`: what a row's Tested via links
+  (`configurationsFromTestedVia`), a configuration's standing
+  (`configurationStanding`: tested via label / other label / not behind
+  label / unconfirmed), and the one-time move (`planVehicleGuideLinks`).
+* The vehicle's EPA section leads with its EPA Label (owner, 2026-11-01: key
+  it on the Guide row, with the test configurations behind it). Each row shows
+  its Tested via, then every test vehicle of its certification with a **match**
+  badge (`utils/guideRowMatches.js`: exact / near / blend + nearest /
+  alternative / possible / other label / no match / no lab data), its
+  kWh/100mi against the row's, whether the vehicle links it, and Link/Unlink.
+  The ranked picker shows the same list for each candidate before it is
+  linked. Test data follows; each card keeps a standing badge, and its
+  per-year certification table and Guide picker are folded under "Label
+  figures by year" for curators, since read alone they did not say whether a
+  link was good.
+* Admin → Data Checks → EPA Label links: preview, then apply, the move.
+
+Two rules the data changed, both on the mirror:
+
+1. **Which rows a vehicle gets.** From the certification links alone, the
+   Ioniq 5 XRT's AWD test vehicles pointed at the "Ioniq 5 RWD" row — old
+   mistakes carried over. From Tested via alone, one Taycan test vehicle is a
+   blend member of a dozen Taycan rows and the R1S's stand behind the R1T's.
+   So a row is linked only where both agree: a configuration's certification
+   points at it AND its Tested via names that configuration. 163 rows.
+2. **What "contradicted" means.** Of 17 configurations the vehicle's own rows
+   did not name, 7 stood behind a sibling row of the same certification (the
+   Gravity GT on 21/22in wheels where the vehicle linked the 20/21in row). They
+   are the right car, so they are kept and marked "other label". Removed: the
+   10 that no Guide row of their certification names (iX3 ×2, IONIQ 9 ×3, EQE
+   SUV ×2, CLA 250+, Model Y Performance, Ioniq 5 RWD).
+
+The move on the mirror: 163 rows linked, 10 configurations removed, 7 added (a
+blend's other members), 10 primaries set (only where the old primary went,
+or there was none), 96 left unconfirmed; a second run is empty. Not done: an
+existing primary is not moved to a blend's nearest member when it is itself
+a member (the Blazer EV RS AWD keeps `1SMV5028`, which explains the row as
+well as -1 and -2).
+
+Not built: the manufacturer comments beside an untested row (Part C). The
+comments are stored; showing them is a small follow-up.
+
+**Applying to production, in order:**
+1. Migration 093, then in the SQL editor, after reading the list:
+   `SELECT keep_id, drop_id, via, conflicts FROM epa_test_vehicle_duplicates;`
+   and merge the conflict-free ones. Then
+   `LocalDev/curation/epa-identity/split-reused-ids.sql` and re-import its
+   four PDFs.
+2. Migration 094, then re-import each year's Guide CSV.
+3. Merge layers 1–2 (the import writes 093's and 094's columns).
+4. Migration 095, merge layer 3, then Admin → Data Checks → EPA Label links:
+   preview, read, apply.
 
 ## Running the analysis again
 
