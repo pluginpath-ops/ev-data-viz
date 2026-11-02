@@ -1693,7 +1693,7 @@ export function AppProvider({ children }) {
             showSuccess(`Imported ${testVehicles.length} EPA config(s) from PDF.`
                 + (keptCount ? ` Kept ${keptCount} hand-edited value(s) that differ from the PDF.` : '')
                 + (guardedCount ? ` ${guardedCount} config(s) already held a newer model year's certification, so its year, Test Group, covered models and every value it already had were kept; the older file only filled blanks.` : '')
-                + (sparedCount ? ` Kept ${sparedCount} test(s), phase(s) or coefficient set(s) another certification's file supplied.` : '')
+                + (sparedCount ? ` Kept ${sparedCount} stored test(s), phase(s) or coefficient set(s) this file does not list: an import never removes them, as another certification's file may list them.` : '')
                 + (certAdded ? ` ${certAdded} new certification(s).` : '')
                 + (recertified ? ` ${recertified} recertified.` : ''));
             return { count: testVehicles.length, kept: keptCount, guarded: guardedCount, spared: sparedCount, certifications: certAdded, recertified };
