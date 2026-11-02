@@ -42,7 +42,8 @@ export function guideRowMatches({ guide, via, pool = [] } = {}, others = [], lin
     const g = guidePoint(guide);
     const nearestId = configurationsFromTestedVia(via).find(c => c.primary)?.test_vehicle_id ?? null;
     const out = pool.map(tv => {
-        const p = testVehiclePoint(tv);
+        // Its test nearest the row: a test vehicle tested twice is judged on the run the row is.
+        const p = testVehiclePoint(tv, g);
         const sibling = others.find(o => namesTestVehicle(o.via, tv));
         let match;
         if (namesTestVehicle(via, tv)) match = via.verdict;
