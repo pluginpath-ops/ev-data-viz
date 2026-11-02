@@ -19,6 +19,7 @@ import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
 import { toChargerCurrent } from '../utils/chargerCurrentClass';
 import { rangePerSocLookup } from '../utils/runPoints';
+import { testFingerprint } from '../utils/epaTestVehicleIdentity';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -316,7 +317,7 @@ const CERTIFICATIONS_EMBED = `certifications:epa_certification_test_vehicles(id,
  * Guide candidate check derive from. Shared with the link sweep, so a
  * suggestion is checked against exactly what the EPA tab will read.
  */
-const EPA_LAB_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
+const EPA_LAB_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, mfr_test_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
 
 const EPA_TEST_VEHICLE_FIELDS = `${EPA_LAB_FIELDS}, ${CERTIFICATIONS_EMBED}`;
 
@@ -2571,6 +2572,23 @@ class DataService {
   async bulkUpsertEpaTestVehicles(rows) {
     if (!this.useSupabase || !rows.length) return;
 
+    // 0. A Vehicle ID the CSI import already stored suffixed, as
+    //    `<ID>-<config>` because its PDF listed several configurations, is
+    //    that record: writing the bare ID made a second one with no tests
+    //    (21 pairs, merged by migration 093).
+    const twinOf = (r) => (r.vehicle_config_number != null ? `${r.test_vehicle_id}-${r.vehicle_config_number}` : null);
+    const probe = [...new Set(rows.flatMap(r => [r.test_vehicle_id, twinOf(r)]).filter(Boolean))];
+    const stored = new Set();
+    for (let i = 0; i < probe.length; i += 100) {
+      const { data, error } = await getSupabase().from('epa_test_vehicles')
+        .select('test_vehicle_id').in('test_vehicle_id', probe.slice(i, i + 100));
+      if (error) throw error;
+      for (const r of data || []) stored.add(r.test_vehicle_id);
+    }
+    rows = rows.map(r => (!stored.has(r.test_vehicle_id) && stored.has(twinOf(r))
+      ? { ...r, test_vehicle_id: twinOf(r) }
+      : r));
+
     // 1. Test vehicle rows — strip private helpers.
     const testVehicleRows = rows.map(({ _coefficientSet, _hasCoeffs, _hasMpge, ...g }) => g);
     const { error } = await getSupabase()
@@ -2678,6 +2696,58 @@ class DataService {
       found.push(...(data || []).map(r => r.test_vehicle_id));
     }
     return found;
+  }
+
+  /**
+   * What the database already holds for these parsed test vehicles, in the
+   * shape resolveTestVehicleIds (utils/epaTestVehicleIdentity) reads: which
+   * record each of their test numbers is stored under, which record each test's
+   * fingerprint is stored under (a renumbered test), and the carline and test
+   * weight of any record their keys already name.
+   *
+   * Fingerprints are fetched by test date — a date narrows a corpus of ~1,600
+   * tests to a handful — and compared here, so the rule lives in one place.
+   */
+  async getEpaTestVehicleIdentity(testVehicles) {
+    const out = { byTestNumber: {}, byFingerprint: {}, records: {} };
+    if (!this.useSupabase || !testVehicles?.length) return out;
+    const tests = testVehicles.flatMap(tv => tv.tests ?? []);
+    const numbers = [...new Set(tests.map(t => t.test_number).filter(Boolean))];
+    const dates = [...new Set(tests.filter(t => testFingerprint(t)).map(t => t.test_date))];
+    // The bare Vehicle ID of a suffixed key too: the Test Car List record
+    // of that configuration (testCarListTwin).
+    const keys = [...new Set(testVehicles.flatMap(tv => [tv.test_vehicle_id, /^(.+)[-/]\d+$/.exec(tv.test_vehicle_id)?.[1]]).filter(Boolean))];
+    const chunks = (xs) => Array.from({ length: Math.ceil(xs.length / 100) }, (_, i) => xs.slice(i * 100, i * 100 + 100));
+    const TEST_COLS = 'test_vehicle_id, test_number, procedure_code, test_date, cd_range_combined_calc, ac_recharge_kwh';
+
+    for (const c of chunks(numbers)) {
+      const { data, error } = await getSupabase().from('epa_tests').select(TEST_COLS).in('test_number', c);
+      if (error) throw error;
+      for (const r of data || []) out.byTestNumber[r.test_number] ??= r.test_vehicle_id;
+    }
+    for (const c of chunks(dates)) {
+      const { data, error } = await getSupabase().from('epa_tests').select(TEST_COLS).in('test_date', c);
+      if (error) throw error;
+      for (const r of data || []) {
+        const fp = testFingerprint(r);
+        if (fp) out.byFingerprint[fp] ??= r.test_vehicle_id;
+      }
+    }
+    for (const c of chunks(keys)) {
+      const { data, error } = await getSupabase().from('epa_test_vehicles')
+        .select('test_vehicle_id, epa_carline_name, vehicle_config_number, epa_coefficient_sets(equiv_test_weight_lbs), epa_tests(count)')
+        .in('test_vehicle_id', c);
+      if (error) throw error;
+      for (const r of data || []) {
+        out.records[r.test_vehicle_id] = {
+          epa_carline_name: r.epa_carline_name,
+          equiv_test_weight_lbs: (r.epa_coefficient_sets ?? []).find(cs => cs.equiv_test_weight_lbs != null)?.equiv_test_weight_lbs ?? null,
+          vehicle_config_number: r.vehicle_config_number,
+          has_tests: (r.epa_tests?.[0]?.count ?? 0) > 0,
+        };
+      }
+    }
+    return out;
   }
 
   // ── EPA Certifications (#374, migration 082) ─────────────────────────────────
@@ -2958,10 +3028,11 @@ class DataService {
     }
 
     // 3. Tests + phases.
-    //    `mfr_test_vehicle_comments` arrives in migration 059. Retry without it
-    //    rather than failing a whole import over a field that is a curator's
-    //    reading aid — the numbers matter more than the note.
-    const withoutNote = ({ mfr_test_vehicle_comments: _dropped, ...rest }) => rest;
+    //    `mfr_test_vehicle_comments` arrives in migration 059 and
+    //    `mfr_test_comments` in 093. Retry without them rather than failing a
+    //    whole import over fields that are a curator's reading aid — the
+    //    numbers matter more than the notes.
+    const withoutNote = ({ mfr_test_vehicle_comments: _v, mfr_test_comments: _t, ...rest }) => rest;
     const writeTest = async (write, row) => {
       let res = await write(row);
       if (res.error && isMissingColumn(res.error)) res = await write(withoutNote(row));

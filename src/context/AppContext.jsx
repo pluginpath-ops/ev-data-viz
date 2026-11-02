@@ -1529,6 +1529,7 @@ export function AppProvider({ children }) {
     const getExistingEpaTestVehicleIds = (ids) => dataService.getExistingEpaTestVehicleIds(ids);
     /** Which certifications these test vehicles are already in, for the import review (#374). */
     const getEpaCertificationsFor = (ids) => dataService.getEpaCertificationsFor(ids);
+    const getEpaTestVehicleIdentity = (testVehicles) => dataService.getEpaTestVehicleIdentity(testVehicles);
 
     /**
      * Import parsed CSI-PDF test vehicles (clean-replace each), optionally linking one
@@ -2276,6 +2277,7 @@ export function AppProvider({ children }) {
         acceptFeGuideValues,
         getExistingEpaTestVehicleIds,
         getEpaCertificationsFor,
+        getEpaTestVehicleIdentity,
         updateEpaMapping,
         setPrimaryEpaMapping,
         unlinkEpaTestVehicle,
