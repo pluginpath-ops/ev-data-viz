@@ -42,8 +42,12 @@ describe('resolveTestVehicleIds', () => {
             { byTestNumber: { SGMX10086618: '1SMV5028-0' } },
         );
         expect(ids(res)).toEqual(['1SMV5028-0']);
-        expect(res.files[0].testVehicles[0].renamedFrom).toBe('1SMV5028');
-        expect(res.renamed[0].why).toBe('shares a test number');
+        expect(res.renamed[0]).toMatchObject({ from: '1SMV5028', to: '1SMV5028-0', why: 'shares a test number' });
+        // Written to epa_test_vehicles as it stands: only the key changes,
+        // nothing the table has no column for (the 2022 import failed on
+        // "renamedFrom").
+        const parsed = tv('1SMV5028', [epaTest('SGMX10086618')]);
+        expect(Object.keys(res.files[0].testVehicles[0]).sort()).toEqual(Object.keys(parsed).sort());
     });
 
     it('follows a renumbered test by its fingerprint — Polestar VVX → PAB', () => {
