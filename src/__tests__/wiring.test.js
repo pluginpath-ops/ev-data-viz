@@ -49,7 +49,7 @@ describe('utilities built for the UI are reached by the UI', () => {
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
                      'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromTestVehicle.js',
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
-                     'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
+                     'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
@@ -140,12 +140,6 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The candidate filter, consumed inside the module by rankFeCandidates. Exported so "same manufacturer" is testable without ranking.',
         'feGuideMatch.carlineScore':
             'The similarity metric, consumed inside the module by rankFeCandidates. Exported so a score can be pinned against real carline pairs.',
-        'epaLinkSweep.hasDerivableEnergy':
-            'Consumed inside the module by tierOf. Exported so the procedure-code rule — 77 and 84 only, never 86 — is asserted on its own.',
-        'epaLinkSweep.hasCoefficients':
-            'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
-        'epaLinkSweep.tierOf':
-            'Consumed inside the module by classifyTestVehicle. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
         'epaCurveSubjects.curveSubject':
             'Consumed inside the module by curveSubjects, which the explorer calls. Exported so one record\'s tier and energy source are assertable without building a whole list.',
         'epaCurveSubjects.resolveCurveEnergy':
@@ -180,16 +174,6 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The import-time form of checkRecordIntegrity, called by EpaPdfImportModal. Listed because the checks it wraps are also read directly by the curator card, and only this spelling reaches the import path.',
         'epaCertStats.NOT_MEASURED_SOURCES':
             'The source names that mean "not derived", consumed inside the module and asserted BY NAME against what epaDerivations actually returns — deriveDrivetrainEta says "estimated" where deriveChargerEfficiency says "assumed", and a single check for one of them published DEFAULT_ETA as a fleet measurement.',
-        'epaLinkSweep.wheelMentions':
-            'Called by the sweep view to distil a manufacturer note, and inside the module by coveredWheelSizes. Exported so the four real notations — inch, in, doubled quote, and Lucid\'s 20F21R pair — are pinned by name.',
-        'epaLinkSweep.coveredModelMatches':
-            'Consumed inside the module by classifyTestVehicle. Exported so the certificate-covers-this-carline match, and its refusal when a certificate covers several candidates, are asserted directly.',
-        'epaLinkSweep.exactTestGroupMatches':
-            'Consumed inside the module by classifyTestVehicle. Exported so the identifier match — and its refusal to fire when several rows share the id — is asserted directly.',
-        'epaLinkSweep.sharedCertification':
-            'Consumed inside the module by classifyTestVehicle. Exported so the one-certification-several-wheels case is pinned against the real Lucid data on its own.',
-        'epaLinkSweep.classifyTestVehicle':
-            'Consumed inside the module by buildSweep, which the sweep view calls. Exported so one test vehicle\'s proposal and decline reason can be asserted without building a whole sweep.',
     };
 
     for (const mod of WATCHED) {
@@ -483,14 +467,15 @@ describe('the seams that broke before', () => {
         // ran the app's largest query 98 times, so the sweep appeared to hang
         // and only the last of 98 toasts survived. The batch path refreshes
         // once. Nothing about that is visible from either file alone.
-        const sweep = read('src/components/admin/FeGuideLinkSweep.jsx');
-        const batchFn = sweep.slice(sweep.indexOf('const linkBatch'));
-        const body = batchFn.slice(0, batchFn.indexOf('\n    };'));
+        // The Guide-row sweep submits its whole queue the same way.
+        const sweep = read('src/components/admin/GuideRowLinkSweep.jsx');
+        const submitFn = sweep.slice(sweep.indexOf('const submit'));
+        const body = submitFn.slice(0, submitFn.indexOf('\n    };'));
 
-        expect(body, 'linkBatch must call linkFeGuideRows, the batch path')
+        expect(body, 'submit must call linkFeGuideRows, the batch path')
             .toMatch(/linkFeGuideRows\(/);
-        expect(body, 'linkBatch must not loop the single-link call')
-            .not.toMatch(/await\s+linkFeGuideRow\(/);
+        expect(body, 'submit must not loop the single-link call')
+            .not.toMatch(/linkFeGuideRow\(/);
 
         // And the batch path must refresh once rather than per link.
         const ctx = read('src/context/AppContext.jsx');
@@ -592,7 +577,10 @@ describe('the seams that broke before', () => {
         // alone. A picker never mounted, or a choice the checks never read,
         // would store a primary that changes nothing anyone can see.
         const section = read('src/components/EpaVehicleSection.jsx');
-        expect(section, 'the EPA section must mount the picker').toMatch(/<PrimaryConfigurationPicker[\s\S]*?onChoose=\{onSetPrimary\}/);
+        // The vehicle's EPA section marks a primary from its EPA Label
+        // (or a card no label reaches); Data Checks keeps the picker.
+        expect(section, 'the EPA Label must be handed the write').toMatch(/<VehicleEpaLabel[\s\S]*?onSetPrimary=\{\(mapping\) => onSetPrimary\(vehicle\.id, mapping\.id\)\}/);
+        expect(read('src/components/epa/GuideRowMatchList.jsx'), 'the label must offer it').toMatch(/Mark as primary/);
         expect(read('src/components/RunsView.jsx'), 'RunsView must hand the write to the section')
             .toMatch(/onSetPrimary=\{setPrimaryEpaMapping\}/);
         expect(read('src/context/AppContext.jsx')).toMatch(/dataService\.setPrimaryEpaMapping\(/);

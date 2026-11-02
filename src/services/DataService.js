@@ -2848,6 +2848,28 @@ class DataService {
   }
 
   /**
+   * Everything the Guide-row link sweep judges (utils/guideRowSweep.js):
+   * every Guide row with its kWh/100mi lines, and every certification
+   * membership with its tests. Both paged — the sweep judges each row against
+   * its whole pool, and a capped read would judge it against part of one.
+   */
+  async getGuideRowSweep() {
+    if (!this.useSupabase) return { rows: [], members: [] };
+    const [rows, members] = await Promise.all([
+      fetchAllRows(() => getSupabase().from('epa_fe_guide')
+        .select(`${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`)
+        .order('id', { ascending: true })),
+      fetchAllRows(() => getSupabase().from('epa_certification_test_vehicles')
+        .select(TESTED_VIA_MEMBER.replace('epa_certifications!inner(test_group)', 'epa_certifications!inner(test_group, model_year)'))
+        .order('id', { ascending: true })),
+    ]);
+    return {
+      rows,
+      members: members.map(r => ({ ...testedViaMember(r), model_year: r.certification?.model_year ?? null })),
+    };
+  }
+
+  /**
    * A vehicle's Guide rows, each with its Tested via, and `others`: the
    * other rows of the same certifications with theirs. Null when migration
    * 095 is not applied, so the section can say so instead of showing nothing.
@@ -3681,59 +3703,6 @@ class DataService {
     // hand-set value keeps.
     const { applied, held } = guideOverlay(testVehicle, feRow);
     return { applied, held, selection };
-  }
-
-  /**
-   * Every test vehicle still awaiting a guide link (#238).
-   *
-   * Includes what each one would unlock, so the sweep can prioritise: the
-   * procedure codes and DC energy that decide whether a link adds a charger
-   * efficiency, and the coefficient targets that decide whether it adds a
-   * road-load figure. Both are read here rather than counted server-side
-   * because the sweep needs the values anyway.
-   *
-   * Skipped test vehicles are excluded by default. "We looked and there is nothing" is
-   * a decision, and a sweep that keeps re-asking it never finishes — but the
-   * caller can ask for them, because that is different from having no opinion.
-   */
-  async getTestVehiclesAwaitingFeLink({ includeSkipped = false } = {}) {
-    if (!this.useSupabase) return [];
-    // One item per test vehicle PER CERTIFICATION (#374): the Guide is
-    // published by year, so a test vehicle certified in three years has three
-    // links to make. Each item is shaped as the test vehicle in that year — its
-    // year and Test Group are the certification's, its covered models the
-    // certificate's — so the matching reads it as it read a record before.
-    const rows = await fetchAllRows(() => {
-      let q = getSupabase()
-        .from('epa_certification_test_vehicles')
-        .select(`
-          id, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note,
-          carryover_test_group, carryover_model_year,
-          certification:epa_certifications(id, test_group, model_year, basis,
-            epa_covered_models(carline_number, carline_name, certification_region, drive_system)),
-          test_vehicle:epa_test_vehicles(${EPA_LAB_FIELDS}, epa_vehicle_mappings(vehicles(id, name, year)))
-        `)
-        .is('fe_guide_row_id', null)
-        .order('id', { ascending: true });
-      if (!includeSkipped) q = q.is('fe_guide_skipped_at', null);
-      return q;
-    });
-    return rows
-      .filter(r => r.test_vehicle && r.certification)
-      .map(r => ({
-        ...r.test_vehicle,
-        model_year:           r.certification.model_year,
-        test_group:           r.certification.test_group,
-        carryover_test_group: r.carryover_test_group,
-        carryover_model_year: r.carryover_model_year,
-        fe_guide_row_id:      null,
-        fe_guide_skipped_at:  r.fe_guide_skipped_at,
-        fe_guide_skip_note:   r.fe_guide_skip_note,
-        epa_covered_models:   r.certification.epa_covered_models ?? [],
-        _linkRowId:           r.id,
-        _certificationBasis:  r.certification.basis,
-      }))
-      .sort((a, b) => String(a.test_vehicle_id).localeCompare(String(b.test_vehicle_id)) || a.model_year - b.model_year);
   }
 
   /** How far the sweep has got: linked, skipped, still awaiting a decision. */

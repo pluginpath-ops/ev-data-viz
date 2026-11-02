@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { guideRowMatches } from '../../utils/guideRowMatches';
+import { guideRowMatches, formatShare } from '../../utils/guideRowMatches';
+import GuideMatchBadge from './GuideMatchBadge';
 
 /**
  * Every test vehicle of a Guide row's certification, badged by how it matches
@@ -11,24 +12,12 @@ import { guideRowMatches } from '../../utils/guideRowMatches';
  * a danger on one the vehicle links — that is the configuration to look at.
  */
 
-const MATCH = {
-    exact:         { label: 'exact',       title: 'Reproduces the row’s unadjusted kWh/100mi within the precision the Guide printed' },
-    near:          { label: 'near',        title: 'Reproduces the row, just past rounding' },
-    blend:         { label: 'blend',       title: 'One of the test vehicles the row lies between' },
-    alternative:   { label: 'alternative', title: 'Explains the row as well as the test vehicles Tested via named — the row is ambiguous' },
-    possible:      { label: 'possible',    title: 'No row names it, but it could be one end of a blend behind this row' },
-    'other-label': { label: 'other label', title: 'Another Guide row of the certification names it' },
-    'no-match':    { label: 'no match',    title: 'It could not stand behind this row' },
-    'no-lab-data': { label: 'no lab data', title: 'Its tests cannot give both city and highway kWh/100mi' },
-};
 
 function intentOf(m) {
     if (['exact', 'near', 'blend'].includes(m.match)) return 'is-good';
     if (!m.linked) return ['possible', 'alternative'].includes(m.match) ? 'is-warning' : '';
     return m.match === 'no-match' ? 'is-danger' : 'is-warning';
 }
-
-const pct = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(1)}%`;
 
 /**
  * @param {Object} props
@@ -38,8 +27,10 @@ const pct = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(1)}%`;
  * @param {boolean} props.canEdit
  * @param {(testVehicleId: string) => Promise} [props.onLink]
  * @param {(mapping: Object) => Promise} [props.onUnlink]
+ * @param {(mapping: Object) => Promise} [props.onSetPrimary]  makes a linked
+ *        configuration the one that stands for the vehicle
  */
-export default function GuideRowMatchList({ row, others = [], mappings = new Map(), canEdit = false, onLink, onUnlink }) {
+export default function GuideRowMatchList({ row, others = [], mappings = new Map(), canEdit = false, onLink, onUnlink, onSetPrimary }) {
     const [busy, setBusy] = useState(null);
     const matches = guideRowMatches(row, others, new Set(mappings.keys()));
     if (!matches.length) return <p className="text-caption mt-1">No test vehicle of its certification is imported.</p>;
@@ -61,9 +52,7 @@ export default function GuideRowMatchList({ row, others = [], mappings = new Map
                 return (
                     <li key={m.test_vehicle_id} className="guide-match-row">
                         <span className="guide-match-fit">
-                            <span className={`badge-micro ${intentOf(m)}`} title={MATCH[m.match].title}>
-                                {MATCH[m.match].label}
-                            </span>
+                            <GuideMatchBadge match={m.match} intent={intentOf(m)} />
                             {m.nearest && <span className="badge-micro is-good" title="The blend member nearest the row: it stands for the vehicle">nearest</span>}
                         </span>
                         <span className="min-w-0">
@@ -73,13 +62,20 @@ export default function GuideRowMatchList({ row, others = [], mappings = new Map
                             {m.behindNoLabel && <span className="text-meta block">marked behind no EPA Label</span>}
                         </span>
                         <span className="guide-match-delta" title="Its unadjusted kWh/100mi against the row’s">
-                            {m.delta ? `city ${pct(m.delta.city)} · hwy ${pct(m.delta.hwy)}` : '—'}
+                            {m.delta ? `city ${formatShare(m.delta.city)} · hwy ${formatShare(m.delta.hwy)}` : '—'}
                         </span>
                         <span className="guide-match-action">
                             {mapping && (
                                 <span className="badge-micro is-accent" title="A configuration of this vehicle">
                                     {mapping.isPrimary ? 'primary' : 'linked'}
                                 </span>
+                            )}
+                            {canEdit && mapping && !mapping.isPrimary && onSetPrimary && (
+                                <button type="button" className="btn btn-secondary text-xs py-0.5 px-2 disabled:opacity-40"
+                                    disabled={busy != null} onClick={() => act(m.test_vehicle_id, () => onSetPrimary(mapping))}
+                                    title="Make this the configuration that stands for the vehicle — what Data Checks judges it against">
+                                    {busy === m.test_vehicle_id ? '…' : 'Mark as primary'}
+                                </button>
                             )}
                             {canEdit && mapping && onUnlink && (
                                 <button type="button" className="btn btn-secondary text-xs py-0.5 px-2 disabled:opacity-40"
