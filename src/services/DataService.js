@@ -2967,7 +2967,7 @@ class DataService {
    * @param {Object} testVehicle  Output element of parseEpaCsiText().testVehicles
    * @returns {Promise<{kept: Array, guarded: Array, spared: number}>} curator-held values the PDF
    *   disagreed with, identity fields an older certification was stopped from
-   *   overwriting (#374), and rows another file supplied that this one does not list
+   *   overwriting (#374), and how many stored rows this file does not list (all kept)
    */
   async importEpaTestVehicleFull(testVehicle) {
     if (!this.useSupabase) return { kept: [], guarded: [], spared: 0 };
@@ -2998,10 +2998,11 @@ class DataService {
       .upsert({ test_vehicle_id: tgid, ...plan.testVehicle.payload, overrides: plan.testVehicle.overrides },
               { onConflict: 'test_vehicle_id', ignoreDuplicates: false }));
 
-    // 2. Coefficient sets — remove, then update in place, then insert (the
-    //    one-primary-per-test-vehicle index is checked per statement).
+    // 2. Coefficient sets — update in place, then insert (the
+    //    one-primary-per-test-vehicle index is checked per statement). Nothing
+    //    is removed here or below: another certification's file may list what
+    //    this one does not (see planTestVehicleImport).
     const cp = plan.coefficients;
-    if (cp.remove.length) check(await supabase.from('epa_coefficient_sets').delete().in('id', cp.remove));
     for (const u of cp.update) {
       check(await supabase.from('epa_coefficient_sets')
         .update({ ...u.payload, overrides: u.overrides }).eq('id', u.id));
@@ -3040,7 +3041,6 @@ class DataService {
       return res.data;
     };
     const applyPhases = async (testId, pp) => {
-      if (pp.remove.length) check(await supabase.from('epa_test_phases').delete().in('id', pp.remove));
       for (const u of pp.update) {
         check(await supabase.from('epa_test_phases')
           .update({ ...u.payload, overrides: u.overrides }).eq('id', u.id));
@@ -3052,7 +3052,6 @@ class DataService {
     };
 
     const tp = plan.tests;
-    if (tp.remove.length) check(await supabase.from('epa_tests').delete().in('id', tp.remove));
     for (const u of tp.update) {
       await writeTest(
         (row) => supabase.from('epa_tests').update({ ...row, overrides: u.overrides }).eq('id', u.id).select('id').single(),
