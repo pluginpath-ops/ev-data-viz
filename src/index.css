@@ -7049,6 +7049,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .data-check-finding.is-disagrees { border-left-color: var(--color-danger); }
 .data-check-finding.is-gap       { border-left-color: var(--color-border-strong); }
+/* A follow-up a finding leaves a curator: a vehicle left with no configuration. */
+.data-check-warning { color: var(--color-warning-text); }
 /* Shown only under "Show skipped", and quieter than an open finding: a decision
    already made, kept findable rather than hidden. */
 .data-check-finding.is-skipped   { @apply opacity-60; }

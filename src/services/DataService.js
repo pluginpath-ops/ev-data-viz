@@ -22,6 +22,7 @@ import { rangePerSocLookup } from '../utils/runPoints';
 import { testFingerprint } from '../utils/epaTestVehicleIdentity';
 import { testedVia, guideTestedViaPool } from '../utils/guideTestedVia';
 import { configurationsFromTestedVia, planVehicleGuideLinks } from '../utils/vehicleGuideLinks';
+import { planBehindNoLabel, NO_LABEL_NOTE, isNoLabelSkip } from '../utils/epaBehindNoLabel';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -2465,7 +2466,7 @@ class DataService {
     if (error) throw error;
   }
 
-  // ── EPA Test Groups ───────────────────────────────────────────────────────
+  // ── EPA test vehicles ───────────────────────────────────────────────────────
 
   /**
    * Search epa_test_vehicles for the vehicle-linking combobox.
@@ -2526,6 +2527,8 @@ class DataService {
     return (data || [])
       .filter(t => certifiedYears(t).some(y => years.includes(y))
         || (!t.certifications?.length && years.includes(Number(t.model_year))))
+      // Behind no EPA Label (layer 4): no car anyone bought, so never a suggestion.
+      .filter(t => !(t.certifications ?? []).some(isNoLabelSkip))
       .map(t => viewForVehicle(span, t));
   }
 
@@ -3065,6 +3068,109 @@ class DataService {
       } catch (error) {
         result.failures.push({ vehicle: vehicle.name, message: error.message });
       }
+    }
+    return result;
+  }
+
+  // ── EPA test vehicles behind no EPA Label (layer 4) ──────────────────────────
+
+  /**
+   * Which test vehicles stand behind no Guide row of a certification whose
+   * rows are all reproduced by others (utils/epaBehindNoLabel.js), and what
+   * marking them changes. Reads everything: every membership with its tests,
+   * every Guide row with figures. Admin → Data Checks only.
+   *
+   * @returns {{ plan, names: Object<string, string> }}  names: test_vehicle_id → its carline
+   */
+  async planBehindNoLabel() {
+    if (!this.useSupabase) return { plan: planBehindNoLabel([]), names: {} };
+    const sb = getSupabase();
+    const members = (await fetchAllRows(() => sb.from('epa_certification_test_vehicles')
+      .select(TESTED_VIA_MEMBER).order('id', { ascending: true }))).map(testedViaMember);
+    const guide = (await fetchAllRows(() => sb.from('epa_fe_guide')
+      .select(`${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`)
+      .order('id', { ascending: true })))
+      .filter(g => g.smog_test_group && (g.unadj_city_kwh_100mi != null || g.unadj_city_mpge != null));
+
+    const rowsByTv = new Map();
+    for (const g of guide) {
+      const pool = guideTestedViaPool(g.smog_test_group, members);
+      if (!pool.length) continue;
+      const entry = { guide: g, via: testedVia(g, pool), pool };
+      for (const m of pool) {
+        if (!rowsByTv.has(m.test_vehicle_id)) rowsByTv.set(m.test_vehicle_id, []);
+        rowsByTv.get(m.test_vehicle_id).push(entry);
+      }
+    }
+
+    const byTv = new Map();
+    for (const m of members) {
+      if (!byTv.has(m.test_vehicle_id)) byTv.set(m.test_vehicle_id, { test_vehicle_id: m.test_vehicle_id, tests: m.tests, carline: m.epa_carline_name, memberships: [], mappings: [] });
+      byTv.get(m.test_vehicle_id).memberships.push({
+        id: m.membershipId, test_group: m.test_group, fe_guide_row_id: m.fe_guide_row_id,
+        fe_guide_skipped_at: m.fe_guide_skipped_at, fe_guide_skip_note: m.fe_guide_skip_note,
+      });
+    }
+    const mappings = await fetchAllRows(() => sb.from('epa_vehicle_mappings')
+      .select('id, test_vehicle_id, is_primary, vehicles(id, name, year)').order('id', { ascending: true }));
+    for (const m of mappings) byTv.get(m.test_vehicle_id)?.mappings.push({ id: m.id, vehicle: m.vehicles, isPrimary: m.is_primary });
+
+    const tvs = [...byTv.values()];
+    const names = Object.fromEntries(tvs.map(t => [t.test_vehicle_id, t.carline ?? '']));
+    const plan = planBehindNoLabel(tvs, id => rowsByTv.get(id) ?? []);
+
+    // Vehicles the pass leaves with no configuration at all, for the preview
+    // to say so: the owner's rule is to remove a bad one even when it is the
+    // last (2026-11-01), but a curator should see which before applying.
+    const removed = new Set(plan.mark.flatMap(m => m.unlink.map(u => u.id)));
+    const left = new Map();
+    for (const m of mappings) {
+      if (!removed.has(m.id)) left.set(m.vehicles?.id, (left.get(m.vehicles?.id) ?? 0) + 1);
+    }
+    const leftBare = [...new Set(plan.mark.flatMap(m => m.unlink.map(u => u.vehicle?.id)))]
+      .filter(id => id != null && !left.has(id));
+    return { plan, names, leftBare };
+  }
+
+  /**
+   * Write what planBehindNoLabel proposed: clear each wrong Guide link (as
+   * unlinkFeGuideRow does, so what the link promoted is demoted), skip the
+   * memberships with NO_LABEL_NOTE, remove the vehicle links, and lift this
+   * mark where a row now names the test vehicle. Never a curator's own skip.
+   */
+  async applyBehindNoLabel(plan) {
+    const result = { cleared: 0, skipped: 0, unlinked: 0, unmarked: 0, failures: [] };
+    if (!this.useSupabase) return result;
+    const sb = getSupabase();
+    for (const m of plan.mark) {
+      try {
+        for (const linkRowId of m.clearLinks) {
+          await this.unlinkFeGuideRow(m.test_vehicle_id, { linkRowId });
+          result.cleared += 1;
+        }
+        if (m.skip) {
+          const { data, error } = await sb.from('epa_certification_test_vehicles')
+            .update({ fe_guide_skipped_at: new Date().toISOString(), fe_guide_skip_note: NO_LABEL_NOTE })
+            .eq('test_vehicle_id', m.test_vehicle_id).is('fe_guide_row_id', null).is('fe_guide_skipped_at', null)
+            .select('id');
+          if (error) throw error;
+          if (data?.length) result.skipped += 1;
+        }
+        if (m.unlink.length) {
+          const { error } = await sb.from('epa_vehicle_mappings').delete().in('id', m.unlink.map(u => u.id));
+          if (error) throw error;
+          result.unlinked += m.unlink.length;
+        }
+      } catch (error) {
+        result.failures.push({ test_vehicle_id: m.test_vehicle_id, message: error.message });
+      }
+    }
+    for (const id of plan.unmark) {
+      const { error } = await sb.from('epa_certification_test_vehicles')
+        .update({ fe_guide_skipped_at: null, fe_guide_skip_note: null })
+        .eq('test_vehicle_id', id).eq('fe_guide_skip_note', NO_LABEL_NOTE);
+      if (error) result.failures.push({ test_vehicle_id: id, message: error.message });
+      else result.unmarked += 1;
     }
     return result;
   }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { guideRowMatches } from '../guideRowMatches';
+import { NO_LABEL_NOTE } from '../epaBehindNoLabel';
 
 // MCT tests: city = 100·ac/c, highway = 100·ac/h.
 const tv = (id, city, hwy, extra = {}) => ({
@@ -47,10 +48,11 @@ describe('guideRowMatches', () => {
         expect(out.find(m => m.test_vehicle_id === 'E').match).toBe('no-match');
     });
 
-    it('says when a test vehicle has no lab data', () => {
-        const pool = [{ test_vehicle_id: 'Z', tests: [] }, tv('X', 30, 40)];
+    it('says when a test vehicle has no lab data, and when it is marked behind no EPA Label', () => {
+        const pool = [{ test_vehicle_id: 'Z', tests: [] }, tv('X', 30, 40, { fe_guide_skipped_at: '2026-10-31', fe_guide_skip_note: NO_LABEL_NOTE })];
         const out = guideRowMatches({ guide: row(1, 20, 25), via: exact('A', 20, 25), pool });
         expect(out.map(m => m.match)).toEqual(['no-match', 'no-lab-data']);
+        expect(out[0].behindNoLabel).toBe(true);
         expect(out[1].delta).toBeNull();
     });
 });
