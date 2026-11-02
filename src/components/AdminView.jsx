@@ -8,7 +8,7 @@ import ConstantsKnobs from './admin/ConstantsKnobs';
 import InterfaceSettings from './admin/InterfaceSettings';
 import Playground from './playground/Playground';
 import FeGuideImport from './admin/FeGuideImport';
-import FeGuideLinkSweep from './admin/FeGuideLinkSweep';
+import GuideRowLinkSweep from './admin/GuideRowLinkSweep';
 import EpaAuditSweep from './admin/EpaAuditSweep';
 import BrandRegistry from './admin/BrandRegistry';
 import TagRegistry from './admin/TagRegistry';
@@ -217,7 +217,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
             {subtab === 'feguide' && (
                 <div className="flex flex-col gap-6">
                     <FeGuideImport />
-                    <FeGuideLinkSweep />
+                    <GuideRowLinkSweep />
                 </div>
             )}
 

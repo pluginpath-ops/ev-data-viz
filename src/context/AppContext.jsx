@@ -1668,8 +1668,8 @@ export function AppProvider({ children }) {
     const getFeGuideRow = (id) => dataService.getFeGuideRow(id);
     const getTestVehiclesForCertStats = () => dataService.getTestVehiclesForCertStats();
     const getTestVehiclesForCurves = () => dataService.getTestVehiclesForCurves();
-    // The linking sweep (#238).
-    const getTestVehiclesAwaitingFeLink = (opts) => dataService.getTestVehiclesAwaitingFeLink(opts);
+    // The linking sweep (#238), Guide row first (utils/guideRowSweep.js).
+    const getGuideRowSweep = () => dataService.getGuideRowSweep();
     const getFeLinkProgress = () => dataService.getFeLinkProgress();
     const setFeLinkSkipped = (id, skipped, note, opts) => dataService.setFeLinkSkipped(id, skipped, note, opts);
     // Data Checks skips (#321, migration 066).
@@ -2306,7 +2306,7 @@ export function AppProvider({ children }) {
         getTestVehiclesForCertStats,
         getTestVehiclesForCurves,
         linkFeGuideRows,
-        getTestVehiclesAwaitingFeLink,
+        getGuideRowSweep,
         getFeLinkProgress,
         setFeLinkSkipped,
         getDataCheckSkips,

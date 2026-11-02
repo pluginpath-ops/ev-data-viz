@@ -68,3 +68,6 @@ export function guideRowMatches({ guide, via, pool = [] } = {}, others = [], lin
         || Number(b.nearest) - Number(a.nearest)
         || size(a.delta) - size(b.delta));
 }
+
+/** A delta share as the match lists print it: "+3.4%", "−0.2%". */
+export const formatShare = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(1)}%`;

@@ -181,7 +181,7 @@ function CandidatePicker({ vehicle, linkedIds, mappings, onLinked }) {
  * @param {boolean} props.canEdit  link a label or a configuration
  * @param {boolean} [props.canUnlink]  unlink either: admins only, as RLS has it
  */
-export default function VehicleEpaLabel({ vehicle, guideRows, canEdit, canUnlink = false, onLinkTestVehicle, onUnlinkMapping }) {
+export default function VehicleEpaLabel({ vehicle, guideRows, canEdit, canUnlink = false, onLinkTestVehicle, onUnlinkMapping, onSetPrimary }) {
     const { unlinkVehicleGuideRow } = useAppContext();
     const { data, loading, error, reload } = guideRows;
     const rows = data ? data.rows : null;
@@ -251,6 +251,7 @@ export default function VehicleEpaLabel({ vehicle, guideRows, canEdit, canUnlink
                                 canEdit={canEdit}
                                 onLink={onLinkTestVehicle}
                                 onUnlink={canUnlink ? onUnlinkMapping : undefined}
+                                onSetPrimary={onSetPrimary}
                             />
                         </GuideRowLine>
                     ))}

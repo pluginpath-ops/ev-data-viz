@@ -11,7 +11,6 @@ import InfoIcon from './InfoIcon';
 import SectionHeader, { SectionAction } from './SectionHeader';
 import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import DerivedValues from './epa/DerivedValues';
-import PrimaryConfigurationPicker from './epa/PrimaryConfigurationPicker';
 import VariantEpaSuggestions from './epa/VariantEpaSuggestions';
 import { suggestionSource, packLabels } from '../utils/variantEpaSuggestions';
 import EpaDerivationChecks from './epa/EpaDerivationChecks';
@@ -99,7 +98,7 @@ const STANDING = {
 };
 
 /** Card displaying the data for one EPA test vehicle mapping. */
-function EpaTestVehicleCard({ mapping, vehicle, standing, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName, onTestVehicleChanged }) {
+function EpaTestVehicleCard({ mapping, vehicle, standing, canEdit, onUnlink, onDelete, onUpdateConfidence, onUpdateDisplayName, onTestVehicleChanged, onSetPrimary }) {
     const [unlinking,    setUnlinking]    = useState(false);
     const [deleting,     setDeleting]     = useState(false);
     const [updatingConf, setUpdatingConf] = useState(false);
@@ -284,6 +283,17 @@ function EpaTestVehicleCard({ mapping, vehicle, standing, canEdit, onUnlink, onD
                     ) : (
                         <ConfidenceBadge confidence={mapping.confidence} />
                     )}
+                    {canEdit && onSetPrimary && (
+                        <button
+                            type="button"
+                            disabled={unlinking || deleting}
+                            onClick={onSetPrimary}
+                            className="btn btn-secondary text-xs py-0.5 px-2 disabled:opacity-40"
+                            title="Make this the configuration that stands for the vehicle — what Data Checks judges it against"
+                        >
+                            Mark as primary
+                        </button>
+                    )}
                     {canEdit && onUnlink && (
                         <button
                             type="button"
@@ -456,6 +466,10 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
             return [m.id, { ...s, rowTitle: titleOf(s.rowId) }];
         }));
     }, [guideRows.data, vehicle?.epa_mappings]);
+    // Configurations an EPA Label lists, where "Mark as primary" lives; a card
+    // offers it only for one no label reaches, so every configuration has
+    // exactly one place to be made primary.
+    const inLabel = useMemo(() => new Set((guideRows.data?.rows ?? []).flatMap(r => [...(r.poolIds ?? [])])), [guideRows.data]);
     // Where to look (#341): a variant's source, or the vehicle's own make and
     // model when there is no source to go on. Kept after a link, for the next
     // one. Curators only — a viewer sees links, never suggestions.
@@ -706,6 +720,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                 canUnlink={isAdmin}
                 onLinkTestVehicle={(testVehicleId) => onLink(vehicle.id, testVehicleId, 'likely', null)}
                 onUnlinkMapping={(mapping) => onUnlink(mapping.id)}
+                onSetPrimary={(mapping) => onSetPrimary(vehicle.id, mapping.id)}
             />
 
             {/* Above the linked configurations, so a link — which adds a card —
@@ -734,12 +749,6 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                 </p>
             ) : (
                 <>
-                <PrimaryConfigurationPicker
-                    vehicle={vehicle}
-                    mappings={mappings}
-                    canEdit={canEdit}
-                    onChoose={onSetPrimary}
-                />
                 {mappings.map(m => (
                     <EpaTestVehicleCard
                         key={m.id}
@@ -752,6 +761,8 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                         onDelete={deleteEpaTestVehicle}
                         onUpdateConfidence={onUpdateConfidence}
                         onUpdateDisplayName={onUpdateDisplayName}
+                        onSetPrimary={!m.isPrimary && mappings.length > 1 && !inLabel.has(m.epaTestVehicle?.test_vehicle_id)
+                            ? () => onSetPrimary(vehicle.id, m.id) : undefined}
                     />
                 ))}
                 </>
