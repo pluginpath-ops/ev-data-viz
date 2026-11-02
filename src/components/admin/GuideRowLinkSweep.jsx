@@ -101,7 +101,10 @@ function SweepMatch({ match: m, rowId, titleOf, queued, onToggle }) {
 }
 
 function SweepGuideRow({ item, titleOf, queue, onToggle, onQueueNamed }) {
-    const { row, via, matches } = item;
+    const { row, via } = item;
+    // A test vehicle another row has already claimed is noise here, unless it
+    // reproduces this row exactly — then it is the choice to see.
+    const matches = item.matches.filter(m => m.state !== 'elsewhere' || m.match === 'exact');
     const named = matches.filter(m => m.state === 'awaiting' && ['exact', 'near', 'blend'].includes(m.match));
     const allQueued = named.length > 0 && named.every(m => queue.get(m.membership.membershipId)?.rowId === row.id);
     return (
@@ -151,6 +154,7 @@ export default function GuideRowLinkSweep() {
     const [status, setStatus] = useState('ready');
     const [make, setMake] = useState('');
     const [year, setYear] = useState('');
+    const [hideLinked, setHideLinked] = useState(false);
     const [shown, setShown] = useState(PAGE);
     const [showOrphans, setShowOrphans] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -178,7 +182,11 @@ export default function GuideRowLinkSweep() {
             || String(a.row.division).localeCompare(String(b.row.division))
             || String(a.row.carline).localeCompare(String(b.row.carline))), [items, make, year]);
     const counts = useMemo(() => Object.fromEntries(STATUS.map(s => [s.key, filtered.filter(i => i.status === s.key).length])), [filtered]);
-    const visible = filtered.filter(i => (frozen?.get(i.row.id) ?? i.status) === status);
+    const hasLink = (i) => i.matches.some(m => m.state === 'here');
+    const visible = filtered.filter(i => {
+        const was = frozen?.get(i.row.id);
+        return (was?.status ?? i.status) === status && !(hideLinked && (was?.linked ?? hasLink(i)));
+    });
     const refilter = (fn) => (e) => { fn(e); setFrozen(null); setShown(PAGE); };
     // Bulk queuing reaches only the rows on screen, a page at a time: a
     // curator looks over what a button is about to queue before Submit, and
@@ -215,7 +223,7 @@ export default function GuideRowLinkSweep() {
         const links = entries.filter(e => !e.skip);
         const skips = entries.filter(e => e.skip);
         setBusy(true); setNote(null);
-        setFrozen(f => f ?? new Map(items.map(i => [i.row.id, i.status])));
+        setFrozen(f => f ?? new Map(items.map(i => [i.row.id, { status: i.status, linked: hasLink(i) }])));
         const done = [];
         const failed = [];
         try {
@@ -328,6 +336,10 @@ export default function GuideRowLinkSweep() {
                     <option value="">Every year</option>
                     {years.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
+                <label className="text-note flex items-center gap-1.5" title="Hide every Guide row that already has a test vehicle linked to it">
+                    <input type="checkbox" checked={hideLinked} onChange={refilter(e => setHideLinked(e.target.checked))} />
+                    Hide rows already linked
+                </label>
             </div>
 
             <div className="brand-list">
