@@ -35,7 +35,10 @@
  *
  * Of the 1,211 Guide EV rows on the local mirror: 601 one test vehicle
  * exactly, 70 within rounding of one, 150 a blend, 368 untested, 22 with no
- * lab data. See docs/epa-identity-and-guide-basis.md.
+ * lab data. Reading every test rather than each test vehicle's first
+ * (2026-11-03, the 11-02 backup): 608 exact, 70 near, 157 blend, 354
+ * untested — 20 rows moved, every one to an explanation as good or simpler.
+ * See docs/epa-identity-and-guide-basis.md.
  *
  * Pure: the caller supplies the Guide row and the pool of test vehicles —
  * every test vehicle certified under the row's Test Group (guideTestedViaPool).
@@ -62,29 +65,49 @@ const decimals = (v) => (String(v).split('.')[1] ?? '').length;
 const halfUnit = (a, b) => 0.5 * 10 ** -Math.max(decimals(a), decimals(b));
 
 /**
- * A test vehicle's unadjusted kWh/100mi, city and highway, or null when its
- * tests cannot give both.
+ * Every unadjusted kWh/100mi point, city and highway, a test vehicle's tests
+ * can give: one per multi-cycle test, then one per UDDS and highway pair.
+ *
+ * Every one, not the first. A test vehicle tested twice has two points, and
+ * the Guide can print either: Rivian's R1S Quad Max (22in UHP) was run in
+ * February and again in May, and its EPA Label is the mean of the two drive
+ * modes' MAY runs. Reading only the first test missed that and explained the
+ * row with three test vehicles of other wheel sizes instead.
  */
-export function testVehiclePoint(tv) {
+export function testVehiclePoints(tv) {
     const tests = tv?.tests ?? tv?.epa_tests ?? [];
     const of = (code) => tests.filter(t => num(t.procedure_code) === code && num(t.ac_recharge_kwh) > 0);
     const per = (ac, mi) => (num(mi) > 0 ? 100 * num(ac) / num(mi) : null);
 
+    const out = [];
     for (const t of of(PROC_MCT)) {
         const city = per(t.ac_recharge_kwh, t.cd_range_combined_calc);
         const hwy  = per(t.ac_recharge_kwh, t.cd_range_hwy_calc);
-        if (city && hwy) return { city, hwy, via: [t.test_number] };
+        if (city && hwy) out.push({ city, hwy, via: [t.test_number] });
     }
-    const udds = of(PROC_CD_UDDS).find(t => num(t.cd_range_combined_calc) > 0);
-    const hwyT = of(PROC_CD_HWY).find(t => num(t.cd_range_combined_calc) > 0);
-    if (udds && hwyT) {
-        return {
-            city: per(udds.ac_recharge_kwh, udds.cd_range_combined_calc),
-            hwy:  per(hwyT.ac_recharge_kwh, hwyT.cd_range_combined_calc),
-            via:  [udds.test_number, hwyT.test_number],
-        };
+    const udds = of(PROC_CD_UDDS).filter(t => num(t.cd_range_combined_calc) > 0);
+    const hwys = of(PROC_CD_HWY).filter(t => num(t.cd_range_combined_calc) > 0);
+    for (const u of udds) {
+        for (const h of hwys) {
+            out.push({
+                city: per(u.ac_recharge_kwh, u.cd_range_combined_calc),
+                hwy:  per(h.ac_recharge_kwh, h.cd_range_combined_calc),
+                via:  [u.test_number, h.test_number],
+            });
+        }
     }
-    return null;
+    return out;
+}
+
+/**
+ * A test vehicle's unadjusted kWh/100mi, city and highway — the point nearest
+ * `near` when one is given (a Guide row's guidePoint), else its first — or
+ * null when its tests cannot give both.
+ */
+export function testVehiclePoint(tv, near = null) {
+    const pts = testVehiclePoints(tv);
+    if (!pts.length) return null;
+    return near ? pts.reduce((a, b) => (dist(near, b) < dist(near, a) ? b : a)) : pts[0];
 }
 
 /**
@@ -129,7 +152,7 @@ export function coversCarline(guideCarline, tv) {
         .some(c => sameCarline(guideCarline, c));
 }
 
-const dist = (p, q) => Math.hypot(p.city - q.city, p.hwy - q.hwy);
+function dist(p, q) { return Math.hypot(p.city - q.city, p.hwy - q.hwy); }
 
 /** Where `p` falls on segment a→b: { t, d } with t the share of the way. */
 function onSegment(p, a, b) {
@@ -153,7 +176,10 @@ const spanOf = (members) => ({
     hwy:  [Math.min(...members.map(m => m.hwy)),  Math.max(...members.map(m => m.hwy))],
 });
 
-/** Explain `g` from `pts` alone: exact, near, blend or null. */
+/** One point per test vehicle, the first of each kept. */
+const distinctCars = (pts) => pts.filter((p, i) => pts.findIndex(q => q.test_vehicle_id === p.test_vehicle_id) === i);
+
+/** Explain `g` from `pts` alone: exact, near, blend or null. Every point is one test; a blend's members are different test vehicles. */
 function explain(g, pts) {
     if (!pts.length) return null;
     const ranked = [...pts].sort((a, b) => dist(g, a) - dist(g, b));
@@ -161,13 +187,15 @@ function explain(g, pts) {
     if (dist(g, best) <= g.tol) {
         // Two test vehicles both inside the printed precision cannot be told
         // apart by this row; say so rather than pick one.
-        const tied = ranked.filter(p => dist(g, p) <= g.tol);
+        // Another test of the same test vehicle is not another explanation.
+        const tied = distinctCars(ranked.filter(p => dist(g, p) <= g.tol));
         return { verdict: 'exact', members: [best], ambiguous: tied.length > 1, alternatives: tied.slice(1) };
     }
 
     const pairs = [];
     for (let i = 0; i < pts.length; i++) {
         for (let j = i + 1; j < pts.length; j++) {
+            if (pts[i].test_vehicle_id === pts[j].test_vehicle_id) continue;
             const s = onSegment(g, pts[i], pts[j]);
             if (s && s.t >= 0 && s.t <= 1 && s.d <= g.tol * BLEND_REACH) pairs.push({ ...s, a: pts[i], b: pts[j] });
         }
@@ -176,7 +204,11 @@ function explain(g, pts) {
     const blendPairs = pairs.filter(x => x.t >= BLEND_EDGE && x.t <= 1 - BLEND_EDGE);
     if (blendPairs.length) {
         const { a, b } = blendPairs[0];
-        return { verdict: 'blend', members: [a, b], ambiguous: blendPairs.length > 1, alternatives: blendPairs.slice(1).flatMap(x => [x.a, x.b]) };
+        // Other pairs count as other explanations only when they are other
+        // cars; the same two test vehicles through different tests are not.
+        const same = (x) => new Set([x.a.test_vehicle_id, x.b.test_vehicle_id, a.test_vehicle_id, b.test_vehicle_id]).size === 2;
+        const others = blendPairs.slice(1).filter(x => !same(x));
+        return { verdict: 'blend', members: [a, b], ambiguous: others.length > 0, alternatives: distinctCars(others.flatMap(x => [x.a, x.b])) };
     }
     if (pairs.length) {
         const { t, a, b } = pairs[0];
@@ -189,11 +221,12 @@ function explain(g, pts) {
         for (let j = i + 1; j < pts.length; j++) {
             for (let k = j + 1; k < pts.length; k++) {
                 const [a, b, c] = [pts[i], pts[j], pts[k]];
+                if (new Set([a.test_vehicle_id, b.test_vehicle_id, c.test_vehicle_id]).size < 3) continue;
                 if (inTriangle(g, a, b, c) && (!tri || area(a, b, c) < tri.area)) tri = { area: area(a, b, c), members: [a, b, c] };
             }
         }
     }
-    if (tri) return { verdict: 'blend', members: tri.members, ambiguous: pts.length > 3, alternatives: [] };
+    if (tri) return { verdict: 'blend', members: tri.members, ambiguous: new Set(pts.map(p => p.test_vehicle_id)).size > 3, alternatives: [] };
     return null;
 }
 
@@ -237,11 +270,12 @@ export function testedVia(guideRow, testVehicles = []) {
     // filed under this row's carline is the one kept.
     const byRun = new Map();
     for (const tv of testVehicles) {
-        const p = testVehiclePoint(tv);
-        if (!p) continue;
-        const key = `${p.city.toFixed(4)}|${p.hwy.toFixed(4)}`;
-        const pt = { test_vehicle_id: tv.test_vehicle_id, city: p.city, hwy: p.hwy, own: coversCarline(guideRow.carline, tv), via: p.via };
-        if (!byRun.has(key) || (pt.own && !byRun.get(key).own)) byRun.set(key, pt);
+        const own = coversCarline(guideRow.carline, tv);
+        for (const p of testVehiclePoints(tv)) {
+            const key = `${p.city.toFixed(4)}|${p.hwy.toFixed(4)}`;
+            const pt = { test_vehicle_id: tv.test_vehicle_id, city: p.city, hwy: p.hwy, own, via: p.via };
+            if (!byRun.has(key) || (pt.own && !byRun.get(key).own)) byRun.set(key, pt);
+        }
     }
     const pts = [...byRun.values()];
     if (!pts.length) return { ...empty, verdict: 'no-lab-data' };
@@ -296,20 +330,21 @@ export function testedVia(guideRow, testVehicles = []) {
  */
 export function couldStandBehind(guideRow, testVehicle, pool = [], via = null) {
     const g = guidePoint(guideRow);
-    const p = testVehiclePoint(testVehicle);
-    if (!g || !p) return false;
-    if (dist(g, p) <= g.tol * BLEND_REACH) return true;
-    const others = pool
-        .filter(o => o.test_vehicle_id !== testVehicle.test_vehicle_id)
-        .map(testVehiclePoint).filter(Boolean);
-    for (const q of others) {
-        const s = onSegment(g, p, q);
-        if (s && s.t >= BLEND_EDGE && s.t <= 1 - BLEND_EDGE && s.d <= g.tol * BLEND_REACH) return true;
-    }
-    if (via?.verdict === 'blend' && via.members?.length === 3) {
-        for (let i = 0; i < others.length; i++) {
-            for (let j = i + 1; j < others.length; j++) {
-                if (inTriangle(g, p, others[i], others[j])) return true;
+    const mine = testVehiclePoints(testVehicle);
+    if (!g || !mine.length) return false;
+    const others = pool.filter(o => o.test_vehicle_id !== testVehicle.test_vehicle_id)
+        .flatMap(o => testVehiclePoints(o).map(q => ({ ...q, id: o.test_vehicle_id })));
+    for (const p of mine) {
+        if (dist(g, p) <= g.tol * BLEND_REACH) return true;
+        for (const q of others) {
+            const s = onSegment(g, p, q);
+            if (s && s.t >= BLEND_EDGE && s.t <= 1 - BLEND_EDGE && s.d <= g.tol * BLEND_REACH) return true;
+        }
+        if (via?.verdict === 'blend' && via.members?.length === 3) {
+            for (let i = 0; i < others.length; i++) {
+                for (let j = i + 1; j < others.length; j++) {
+                    if (others[i].id !== others[j].id && inTriangle(g, p, others[i], others[j])) return true;
+                }
             }
         }
     }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { testVehiclePoint, guidePoint, sameCarline, coversCarline, testedVia, guideTestedViaPool } from '../guideTestedVia';
+import { testVehiclePoint, testVehiclePoints, guidePoint, sameCarline, coversCarline, testedVia, guideTestedViaPool } from '../guideTestedVia';
 
 // A test vehicle whose multi-cycle test reads `city` and `hwy` kWh/100mi on
 // 100 kWh of AC recharge.
@@ -8,6 +8,7 @@ const tv = (id, city, hwy, extra = {}) => ({
     tests: [{ test_number: `${id}-T`, procedure_code: 77, ac_recharge_kwh: 100, cd_range_combined_calc: 10000 / city, cd_range_hwy_calc: 10000 / hwy }],
     ...extra,
 });
+const mct = (n, city, hwy) => ({ test_number: n, procedure_code: 77, ac_recharge_kwh: 100, cd_range_combined_calc: 10000 / city, cd_range_hwy_calc: 10000 / hwy });
 const row = (city, hwy, extra = {}) => ({ carline: 'BLAZER EV AWD', unadj_city_kwh_100mi: city, unadj_hwy_kwh_100mi: hwy, ...extra });
 
 describe('testVehiclePoint', () => {
@@ -23,6 +24,13 @@ describe('testVehiclePoint', () => {
             { test_number: 'H', procedure_code: 84, ac_recharge_kwh: 90, cd_range_combined_calc: 250 },
         ] });
         expect(p).toEqual({ city: 30, hwy: 36, via: ['U', 'H'] });
+    });
+
+    it('is the test nearest a point when asked — a test vehicle tested twice', () => {
+        const twice = { tests: [mct('FEB', 30.22, 33.71), mct('MAY', 29.65, 33.08)] };
+        expect(testVehiclePoint(twice).via).toEqual(['FEB']);
+        expect(testVehiclePoint(twice, { city: 29.6, hwy: 33 }).via).toEqual(['MAY']);
+        expect(testVehiclePoints(twice).map(p => p.via[0])).toEqual(['FEB', 'MAY']);
     });
 
     it('is null without AC energy — a placeholder test', () => {
@@ -108,6 +116,25 @@ describe('testedVia', () => {
         const r = testedVia(row(22.51, 26.512), [tv('A', 22.5, 26.5), tv('B', 23.0, 27.1)]);
         expect(r.verdict).toBe('near');
         expect(r.members.map(m => m.test_vehicle_id)).toEqual(['A']);
+    });
+
+    it('reads every test of a test vehicle — the R1S Quad (22in UHP) is the mean of the two modes\' May runs', () => {
+        // Conserve and All Purpose, each run in February and again in May;
+        // the row is 50/50 of the May runs. The plain 22in pair sits nearby.
+        const pool = [
+            { test_vehicle_id: 'UHP-0', epa_carline_name: 'BLAZER EV AWD', tests: [mct('UHP-0-FEB', 30.22, 33.71), mct('UHP-0-MAY', 29.65, 33.08)] },
+            { test_vehicle_id: 'UHP-1', epa_carline_name: 'BLAZER EV AWD', tests: [mct('UHP-1-FEB', 34.73, 40.02), mct('UHP-1-MAY', 33.92, 38.96)] },
+            tv('R22-0', 27.52, 30.98), tv('R22-1', 33.54, 37.88),
+        ];
+        const v = testedVia(row('31.7832', '36.0232'), pool);
+        expect(v.verdict).toBe('blend');
+        expect(v.members.map(m => [m.test_vehicle_id, m.via[0]])).toEqual([['UHP-0', 'UHP-0-MAY'], ['UHP-1', 'UHP-1-MAY']]);
+        expect(v.ambiguous).toBe(false);
+    });
+
+    it('never blends a test vehicle with itself', () => {
+        const one = { test_vehicle_id: 'A', epa_carline_name: 'BLAZER EV AWD', tests: [mct('A1', 20, 25), mct('A2', 22, 27)] };
+        expect(testedVia(row('21.0000', '26.0000'), [one]).verdict).toBe('untested');
     });
 
     it('blend of three: inside the triangle they make', () => {

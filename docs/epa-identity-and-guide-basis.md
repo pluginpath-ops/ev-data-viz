@@ -244,6 +244,23 @@ sibling configurations apart. Migration 094 stores the kWh/100mi figures.
 | no lab data | 22 | — |
 | **Guide EV rows** | **1,211** | |
 
+**Every test, not the first (2026-11-03, the 11-02 backup).** Tested via
+read one point per test vehicle, from its first multi-cycle test. A test
+vehicle tested twice has two, and the Guide can print the later one: the R1S
+Quad Max (22in UHP) was run in February and May in both drive modes, and its
+EPA Label is the 50/50 mean of the May runs. Reading the first test missed
+that and called the row a three-way blend of other wheel sizes. Now every
+test is a point, and a blend's members must be different test vehicles. On
+the mirror: exact 602 → 608, blend 150 → 157, untested 366 → 354, near and no
+lab data unchanged. The 20 rows that moved:
+
+| Change | Rows | Examples |
+|---|---|---|
+| untested → blend | 11 | R1S/R1T All-Terrain Tri Max (20in), R1S/R1T Performance (20in AT), ID.4 Pro S (2022); SQ8 / SQ8 Sportback (20in) MY2024–25 as an ambiguous three-way of `RAZS-ES-290-2/3/4` |
+| untested → exact | 1 | A6 e-tron quattro ultra (2027) |
+| blend → exact | 4 | RS e-tron GT Performance MY2025–27, VF 9 Plus (2024) |
+| ambiguous blend → blend | 4 | R1S/R1T Quad (22in UHP) MY2026–27: the UHP pair, not three of other wheels |
+
 Spot checks across makes (LocalDev/epa-csi/identity/testedvia.json):
 Ioniq 5 AWD MY25/26 by wheel size, EV9 GT-Line/RWD/Standard, Taycan 4S
 Performance Battery, R1S Dual Large/Max, EX30 all four: **exact**. EV9 Long

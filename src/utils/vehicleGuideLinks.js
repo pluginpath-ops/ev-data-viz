@@ -20,7 +20,7 @@
  *
  * Pure: the caller supplies the rows' Tested via and pools.
  */
-import { testVehiclePoint } from './guideTestedVia';
+import { testVehiclePoints } from './guideTestedVia';
 
 /** Verdicts that name the test vehicles behind a row. */
 export const TESTED = new Set(['exact', 'near', 'blend']);
@@ -66,8 +66,8 @@ export function namesTestVehicle(via, testVehicle) {
     if (!via || !TESTED.has(via.verdict)) return false;
     const id = testVehicle?.test_vehicle_id;
     if (via.members.some(m => m.test_vehicle_id === id)) return true;
-    const key = pointKey(testVehiclePoint(testVehicle));
-    return key != null && via.members.some(m => pointKey(m) === key);
+    const keys = new Set(testVehiclePoints(testVehicle).map(pointKey));
+    return via.members.some(m => keys.has(pointKey(m)));
 }
 
 /** One of an ambiguous row's alternatives, which the row does not name. */
