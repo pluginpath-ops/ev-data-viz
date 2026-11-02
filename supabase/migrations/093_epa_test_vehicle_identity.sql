@@ -115,15 +115,25 @@ $$;
 -- history, Guide links), then the one with more tests, then the bare ID — the
 -- shorter key, which is EPA's own Vehicle ID rather than one we suffixed.
 CREATE OR REPLACE VIEW public.epa_test_vehicle_duplicates AS
-WITH shared AS (
+WITH fingerprinted AS (
+    SELECT t.test_vehicle_id, t.test_number, public.epa_test_fingerprint(t) AS fp
+      FROM public.epa_tests t
+),
+-- Two equality joins, not one join on "same number OR same fingerprint": an OR
+-- leaves Postgres a nested loop that fingerprints every pair of tests (~2.5M
+-- calls, past the SQL editor's timeout on production). Each half hashes.
+shared AS (
     SELECT DISTINCT LEAST(a.test_vehicle_id, b.test_vehicle_id)    AS a_id,
                     GREATEST(a.test_vehicle_id, b.test_vehicle_id) AS b_id,
                     CASE WHEN a.test_number = b.test_number THEN 'test number' ELSE 'renumbered test' END AS via
-      FROM public.epa_tests a
-      JOIN public.epa_tests b
-        ON a.test_vehicle_id <> b.test_vehicle_id
-       AND (a.test_number = b.test_number
-            OR public.epa_test_fingerprint(a) = public.epa_test_fingerprint(b))
+      FROM fingerprinted a
+      JOIN fingerprinted b ON a.test_vehicle_id <> b.test_vehicle_id AND a.test_number = b.test_number
+    UNION
+    SELECT LEAST(a.test_vehicle_id, b.test_vehicle_id),
+           GREATEST(a.test_vehicle_id, b.test_vehicle_id),
+           CASE WHEN a.test_number = b.test_number THEN 'test number' ELSE 'renumbered test' END
+      FROM fingerprinted a
+      JOIN fingerprinted b ON a.test_vehicle_id <> b.test_vehicle_id AND a.fp = b.fp
 ),
 -- The Test Car List writes a configuration under its bare Vehicle ID, with no
 -- tests; a CSI file listing several configurations wrote the same car as
