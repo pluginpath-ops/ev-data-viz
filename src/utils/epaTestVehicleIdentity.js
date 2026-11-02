@@ -94,8 +94,10 @@ export function testCarListTwin(key, tv, records) {
  * @param {Object<string,Object>} stored.records        test_vehicle_id → { epa_carline_name, equiv_test_weight_lbs,
  *        vehicle_config_number, has_tests }, for the parsed keys and their bare Vehicle IDs
  * @returns {{ files: Array, renamed: Array<{ file, from, to, why }>, warnings: string[] }}
- *   files    the same files with each test vehicle's `test_vehicle_id` resolved
- *            and `renamedFrom` set where it changed
+ *   files    the same files with each test vehicle's `test_vehicle_id` resolved,
+ *            and nothing else added: each test vehicle is written to
+ *            epa_test_vehicles as it stands, so a key the table has no column
+ *            for fails the import ("renamedFrom" did, on the 2022 corpus)
  *   renamed  every change, for the review
  *   warnings what a curator should read: refused adoptions, reused IDs
  */
@@ -153,7 +155,7 @@ export function resolveTestVehicleIds(files, stored = {}) {
 
             claimed.add(id);
             if (id !== key) renamed.push({ file: file.name, from: key, to: id, why });
-            return id === key ? tv : { ...tv, test_vehicle_id: id, renamedFrom: key };
+            return id === key ? tv : { ...tv, test_vehicle_id: id };
         });
 
         // Known from here on, for the files after this one.
