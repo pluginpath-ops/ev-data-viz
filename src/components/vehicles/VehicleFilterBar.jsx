@@ -43,6 +43,7 @@ export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, sho
                             hint={f.hint}
                             format={f.format}
                             unit="vehicle"
+                            order={f.order}
                             values={counts[f.key].values}
                             selected={st.in}
                             excluded={st.out}
