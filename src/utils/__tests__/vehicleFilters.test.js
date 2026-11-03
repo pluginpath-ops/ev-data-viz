@@ -43,6 +43,14 @@ describe('matching', () => {
         expect(ids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'data', 'charging'))).toEqual([3, 4]);
     });
 
+    it('matches a year inside a span, and lists single years only', () => {
+        expect(ids(toggleInclude(EMPTY_VEHICLE_FILTERS, 'year', '2025'))).toEqual([1, 3]);
+        expect(ids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'year', '2024'))).toEqual([1, 2]);
+        const counts = vehicleFacetCounts(fleet, EMPTY_VEHICLE_FILTERS, ctx);
+        expect(counts.year.values.sort()).toEqual(['2024', '2025', '2026']);
+        expect(counts.year.counts.get('2026')).toBe(2);
+    });
+
     it('including a value clears its exclusion, and the other way round', () => {
         const out = toggleExclude(EMPTY_VEHICLE_FILTERS, 'make', 'Ford');
         const back = toggleInclude(out, 'make', 'Ford');
