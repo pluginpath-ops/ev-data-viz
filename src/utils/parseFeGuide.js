@@ -202,7 +202,13 @@ function mapRow(row, original = row) {
         modelTypeIndex: str(row, 'Index (Model Type Index)'),
 
         // Label figures — what the window sticker says
-        labelCombRangeMi: num(row, 'Comb Range as shown on FE Label (miles)'),
+        // EPA's MY2023 Guide leaves the label's combined range blank on 112 of
+        // its 144 EV rows and gives it only as the model type's driving range
+        // (Range1). Where both are filled — 708 rows across MY2022–2026 — they
+        // agree to the mile but once (Model 3 RWD, 273 vs 272), so Range1 stands
+        // in. Without it those rows were dropped as unusable: 32 of 144 imported.
+        labelCombRangeMi: num(row, 'Comb Range as shown on FE Label (miles)')
+            ?? num(row, 'Range1 - Model Type Driving Range - Conventional Fuel'),
         labelCityRangeMi: num(row, 'City Range (miles)'),
         labelHwyRangeMi:  num(row, 'Hwy Range (miles)'),
         labelCombMpge:    num(row, 'Comb FE (Guide) - Conventional Fuel'),
