@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import {
+    repairUnitLines,
     parseFeGuide, parseMotorPowerKw, adjustmentSignature,
     REQUIRED_COLUMNS, OPTIONAL_COLUMNS,
 } from '../parseFeGuide';
@@ -345,5 +346,36 @@ describe('parseFeGuide — the kWh/100mi twin\'s figures', () => {
 
     it('is null for a row whose twin is missing', () => {
         expect(byCarline(rows, 'ZDX AWD').unadjCityKwh100mi).toBeNull();
+    });
+});
+
+describe('repairUnitLines — figures EPA printed on the wrong line', () => {
+    const line = (city, hwy, adjCity, adjHwy) => ({
+        'City Unadj FE - Conventional Fuel': String(city), 'Hwy Unadj FE - Conventional Fuel': String(hwy),
+        'City Unrd Adj FE - Conventional Fuel': String(adjCity), 'Hwy Unrd Adj FE - Conventional Fuel': String(adjHwy),
+    });
+
+    it('swaps the lines when the MPGe one adjusts upward — the MY2023 Q4 e-tron', () => {
+        const { mpgeLine, kwhLine, repair } = repairUnitLines(line(21.0971, 25.0759, 30.1314, 35.8259), line(159.8, 134.4, 111.86, 94.08));
+        expect(repair).toBe('units-swapped');
+        expect(mpgeLine['City Unadj FE - Conventional Fuel']).toBe('159.8');
+        expect(kwhLine['City Unadj FE - Conventional Fuel']).toBe('21.0971');
+    });
+
+    it('leaves a low-MPGe vehicle alone — a Hummer adjusts down like any MPGe line', () => {
+        const hummer = line(67.4, 66.6, 47.2, 46.6);
+        expect(repairUnitLines(hummer, line(50.0, 50.6, 71.4, 72.3)).repair).toBeNull();
+    });
+
+    it('converts a cycle the MPGe line repeated from the kWh line — the MY2024 Plaid 21in', () => {
+        const { mpgeLine, repair } = repairUnitLines(line(118.1, 27.5479, 82.7, 85.6), line(28.5398, 27.5479, 40.77, 39.35));
+        expect(repair).toBe('mpge-from-kwh');
+        expect(mpgeLine['Hwy Unadj FE - Conventional Fuel']).toBe('122.3505');
+        expect(mpgeLine['City Unadj FE - Conventional Fuel']).toBe('118.1');
+    });
+
+    it('does nothing without a twin, or when the lines agree', () => {
+        expect(repairUnitLines(line(118.1, 122.4, 82.7, 85.6), undefined).repair).toBeNull();
+        expect(repairUnitLines(line(118.1, 122.4, 82.7, 85.6), line(28.5398, 27.5371, 40.77, 39.34)).repair).toBeNull();
     });
 });

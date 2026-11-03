@@ -52,6 +52,7 @@
 import Papa from 'papaparse';
 import { rangePlausibility } from './feGuidePlausibility';
 import { resolveColumns, suggestColumns } from './feGuideColumns';
+import { MPG_E_CONVERSION } from '../constants/units';
 
 /** Columns without which a row cannot be interpreted at all — a hard failure. */
 export const REQUIRED_COLUMNS = [
@@ -177,6 +178,60 @@ export function adjustmentSignature(cityRatio, hwyRatio) {
     const isFixed = Math.abs(cityRatio - 0.7) < 1e-6 && Math.abs(hwyRatio - 0.7) < 1e-6;
     if (isFixed) return 'fixed';
     return Math.abs(cityRatio - hwyRatio) < 1e-4 ? 'per-vehicle' : 'per-cycle';
+}
+
+// ── Figures on the wrong line ───────────────────────────────────────────────
+//
+// EPA's files print each configuration twice, once per unit, and a few rows
+// put a figure on the wrong line. Size alone cannot tell the units apart — a
+// Hummer's adjusted 48 MPGe sits below its 71 kWh/100mi — but direction can:
+// adjusting LOWERS an MPGe figure and RAISES a kWh/100mi one.
+//
+//   swapped    every figure of the MPGe line is the kWh/100mi one and the
+//              other way round: the MY2023 Q4 e-tron and MY2024 Q4 40 e-tron
+//              (21.1 "MPGe" city, 159.8 "kWh/100mi"), the MY2022 Taycan
+//              Performance Battery Plus.
+//   duplicated one cycle of the MPGe line repeats the kWh/100mi figure: the
+//              MY2024 Model S Plaid 21in's highway and combined (27.5479 on
+//              both lines). Its MPGe is that figure converted, which is how
+//              EPA defines it.
+
+const FE_COLUMNS = ['City', 'Hwy', 'Comb'].flatMap(c => [
+    `${c} FE (Guide) - Conventional Fuel`,
+    `${c} Unadj FE - Conventional Fuel`,
+    `${c} Unrd Adj FE - Conventional Fuel`,
+]);
+const UNADJ = (c) => `${c} Unadj FE - Conventional Fuel`;
+
+/** Whether adjusting raised this line's figures — a kWh/100mi line's behavior. */
+function adjustingRaises(line) {
+    for (const c of ['City', 'Hwy']) {
+        const unadj = num(line, UNADJ(c));
+        const adj = num(line, `${c} Unrd Adj FE - Conventional Fuel`) ?? num(line, `${c} FE (Guide) - Conventional Fuel`);
+        if (unadj > 0 && adj > 0 && adj !== unadj) return adj > unadj;
+    }
+    return null;
+}
+
+/**
+ * The MPGe line and kWh/100mi line as they should have been printed, and what
+ * was put right — null when nothing was.
+ */
+export function repairUnitLines(mpgeLine, kwhLine) {
+    if (!kwhLine) return { mpgeLine, kwhLine, repair: null };
+    if (adjustingRaises(mpgeLine) === true && adjustingRaises(kwhLine) === false) {
+        const pick = (line) => Object.fromEntries(FE_COLUMNS.map(k => [k, line[k]]));
+        return { mpgeLine: { ...mpgeLine, ...pick(kwhLine) }, kwhLine: { ...kwhLine, ...pick(mpgeLine) }, repair: 'units-swapped' };
+    }
+    const fixed = { ...mpgeLine };
+    for (const c of ['City', 'Hwy', 'Comb']) {
+        const m = num(mpgeLine, UNADJ(c));
+        const k = num(kwhLine, UNADJ(c));
+        if (m > 0 && m === k) fixed[UNADJ(c)] = String(Math.round(100 * MPG_E_CONVERSION / k * 1e4) / 1e4);
+    }
+    return FE_COLUMNS.some(k => fixed[k] !== mpgeLine[k])
+        ? { mpgeLine: fixed, kwhLine, repair: 'mpge-from-kwh' }
+        : { mpgeLine, kwhLine, repair: null };
 }
 
 /** One guide row, mapped and derived. */
@@ -350,8 +405,8 @@ export function parseFeGuide(csvText) {
 
         if (unitOf(canon) !== MPGE_UNIT) { skipped.duplicateUnit++; continue; }
 
-        const row = mapRow(canon, raw);
-        const twin = kwhTwin.get(twinKey(canon));
+        const { mpgeLine, kwhLine: twin, repair } = repairUnitLines(canon, kwhTwin.get(twinKey(canon)));
+        const row = mapRow(mpgeLine, raw);
         row.unadjCityKwh100mi = num(twin, 'City Unadj FE - Conventional Fuel');
         row.unadjHwyKwh100mi  = num(twin, 'Hwy Unadj FE - Conventional Fuel');
         // A row missing any part of the key, or its range, cannot be stored or
@@ -377,6 +432,9 @@ export function parseFeGuide(csvText) {
             hwyMi:  row.labelHwyRangeMi,
             combMi: row.labelCombRangeMi,
         });
+        // Put right, and said so: the curator should know EPA's file was
+        // read other than as printed.
+        if (repair) row.plausibilityFlags.push(repair);
         if (row.plausibilityFlags.length) {
             flagged.push({
                 modelYear: row.modelYear,
