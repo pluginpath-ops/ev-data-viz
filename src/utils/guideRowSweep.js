@@ -61,7 +61,10 @@ const NAMED = new Set(['exact', 'near', 'blend']);
  *   skipped   recorded as having no row
  *   awaiting  no decision yet
  *   none      the test vehicle is in the row's pool only through another
- *             year's certification, so there is nothing of this year to link
+ *             year's certification, so there is nothing of this year to link:
+ *             R1S0396R20-1 was tested for MY2024, which carries the MY2023
+ *             group over. Its link goes on a row of that year (`homeYears`);
+ *             this row's Tested via reads it either way.
  */
 function membershipState(m, rowId) {
     if (!m) return 'none';
@@ -94,7 +97,10 @@ export function buildGuideRowSweep(guideRows = [], members = []) {
         byGroup.get(r.smog_test_group).push(r);
     }
     const membersOf = new Map();
+    const yearsOf = new Map();
     for (const m of members) {
+        if (!yearsOf.has(m.test_vehicle_id)) yearsOf.set(m.test_vehicle_id, []);
+        yearsOf.get(m.test_vehicle_id).push(m);
         const key = `${m.test_group}|${m.test_vehicle_id}`;
         if (!membersOf.has(key)) membersOf.set(key, m);
     }
@@ -118,7 +124,9 @@ export function buildGuideRowSweep(guideRows = [], members = []) {
             const alsoNamedBy = NAMED.has(match.match)
                 ? others.filter(o => namesTestVehicle(o.via, match)).map(o => ({ rowId: o.rowId, carline: o.guide.carline }))
                 : [];
-            return { ...match, membership, alsoNamedBy, state: membershipState(membership, row.id) };
+            const homeYears = membership ? [] : [...new Set((yearsOf.get(match.test_vehicle_id) ?? [])
+                .map(m => m.model_year).filter(y => y != null))].sort();
+            return { ...match, membership, alsoNamedBy, homeYears, state: membershipState(membership, row.id) };
         });
         const awaiting = matches.filter(m => m.state === 'awaiting');
         const status = awaiting.some(m => NAMED.has(m.match)) ? 'ready'

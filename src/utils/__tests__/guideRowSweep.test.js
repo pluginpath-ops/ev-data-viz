@@ -36,6 +36,17 @@ describe('buildGuideRowSweep', () => {
         expect(items[0].status).toBe('judgement');
     });
 
+    it('names the year of a test vehicle carried in from another certification — R1S0396R20-1', () => {
+        const members = [
+            member('A', 'G23', 20, 25, { model_year: 2023 }),
+            member('B', 'G24', 20, 25, { model_year: 2024, carryover_test_group: 'G23' }),
+        ];
+        const { items } = buildGuideRowSweep([row(1, 'G23', 20, 25)], members);
+        expect(items[0].matches.map(m => [m.test_vehicle_id, m.state, m.homeYears])).toEqual([
+            ['A', 'awaiting', []], ['B', 'none', [2024]],
+        ]);
+    });
+
     it('lists awaiting memberships whose certification has no Guide row', () => {
         const { orphans } = buildGuideRowSweep([row(1, 'G1', 20, 25)], [member('A', 'G1', 20, 25), member('Z', 'G9', 20, 25)]);
         expect(orphans.map(o => o.test_vehicle_id)).toEqual(['Z']);

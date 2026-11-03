@@ -79,7 +79,10 @@ function SweepMatch({ match: m, rowId, titleOf, queued, onToggle }) {
                 )}
                 {m.state === 'skipped' && <span className="text-meta">skipped</span>}
                 {m.state === 'none' && (
-                    <span className="text-meta" title="It reaches this row's pool through another year's certification">other year</span>
+                    <span className="text-meta"
+                        title="Tested for another year’s certification, which carries this row’s test group over. This row’s Tested via reads it all the same; its link goes on a row of that year">
+                        {m.homeYears?.length ? `MY${m.homeYears.join('/')} — link it there` : 'other year'}
+                    </span>
                 )}
                 {m.state === 'awaiting' && (
                     <>
