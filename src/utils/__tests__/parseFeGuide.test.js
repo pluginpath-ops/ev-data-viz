@@ -221,6 +221,20 @@ describe('parseFeGuide — the natural key', () => {
         expect(skipped.unusable).toBeGreaterThan(0);
     });
 
+    it('reads the range from Range1 where the label range is blank — EPA\'s MY2023 Guide', () => {
+        // 112 of MY2023's 144 EV rows leave "Comb Range as shown on FE Label"
+        // blank and give the range only as the model type's driving range.
+        const [head, ...lines] = CSV.trim().split(/\r?\n/);
+        const cols = head.split(',');
+        const comb = cols.indexOf('Comb Range as shown on FE Label (miles)');
+        const blanked = [head + ',Range1 - Model Type Driving Range - Conventional Fuel',
+            ...lines.map(l => { const c = l.split(','); const r = c[comb]; c[comb] = ''; return [...c, r].join(','); })].join('\n');
+        const { rows: before } = parseFeGuide(CSV);
+        const { rows, skipped } = parseFeGuide(blanked);
+        expect(skipped.unusable).toBe(0);
+        expect(rows.map(r => r.labelCombRangeMi)).toEqual(before.map(r => r.labelCombRangeMi));
+    });
+
     it('makes every row in the sample uniquely keyed', () => {
         const keys = rows.map(r => `${r.modelYear}|${r.division}|${r.carline}|${r.modelTypeIndex}`);
         expect(new Set(keys).size).toBe(rows.length);
