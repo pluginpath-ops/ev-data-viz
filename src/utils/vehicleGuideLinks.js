@@ -21,6 +21,8 @@
  * Pure: the caller supplies the rows' Tested via and pools.
  */
 import { testVehiclePoints } from './guideTestedVia';
+import { carlineScore } from './feGuideMatch';
+import { yearSpan } from './vehicleImportPlan';
 
 /** Verdicts that name the test vehicles behind a row. */
 export const TESTED = new Set(['exact', 'near', 'blend']);
@@ -115,6 +117,44 @@ export function configurationStanding(testVehicle, rows = [], others = []) {
     return { status: 'unconfirmed', rowId: null };
 }
 
+const words = (value) => String(value ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? [];
+
+/**
+ * Could this Guide row be the vehicle's own EPA Label? A test for rows a
+ * configuration's certification points at — not rows a curator linked.
+ *
+ * EPA certifies sister cars together and carries a test vehicle over between
+ * years, so one test vehicle is named by the rows of several cars. Read
+ * against production after the 2026-11-03 sweep, following that trail
+ * proposed R1S rows for R1T vehicles, Blazer EV rows for an Equinox EV, the
+ * e-tron GT and RS e-tron GT each other's row, and rows from years the
+ * vehicle was never sold. A row passes only when:
+ *
+ *   • its model year is one of the vehicle's (a vehicle with no year passes);
+ *   • its carline holds every word of the vehicle's model (R1T is not R1S);
+ *   • no other row of that year, among those in play, is closer to the
+ *     vehicle's name — "RS e-tron GT" loses to "e-tron GT" for the e-tron GT,
+ *     "Q4 55 e-tron quattro" to "Q4 Sportback 55 e-tron quattro" for the
+ *     Sportback.
+ *
+ * @param {Object} vehicle  { name, year, model }
+ * @param {Object} guide    the row: { id, model_year, carline }
+ * @param {Array<Object>} peers  every Guide row in play (the row itself may be among them)
+ */
+export function couldBeVehiclesRow(vehicle, guide, peers = []) {
+    if (!vehicle || !guide) return false;
+    const span = yearSpan(vehicle.year);
+    const year = Number(guide.model_year);
+    if (span && !(year >= span[0] && year <= span[1])) return false;
+
+    const carline = new Set(words(guide.carline));
+    if (!words(vehicle.model ?? vehicle.name).every(w => carline.has(w))) return false;
+
+    const score = carlineScore(vehicle.name, guide.carline);
+    return !peers.some(p => p && p.id !== guide.id && Number(p.model_year) === year
+        && carlineScore(vehicle.name, p.carline) > score);
+}
+
 /**
  * The one-time move to the vehicle → Guide row model, for one vehicle.
  *
@@ -131,6 +171,8 @@ export function configurationStanding(testVehicle, rows = [], others = []) {
  * @param {Object<number, { via, poolIds: Set<string> }>} input.rows  Guide row id → Tested via + pool
  * @param {Array<{ rowId, via }>} [input.others]  every Guide row of the certifications involved, for "elsewhere"
  * @param {number[]} [input.linkedRowIds]  rows the vehicle already links (a second run)
+ * @param {Object} [input.vehicle]  { name, year, model }; with it, a row is
+ *        proposed only when couldBeVehiclesRow allows it (rows[id].guide)
  * @returns {{
  *   linkRows: number[],
  *   drop: Array<{ mappingId, test_vehicle_id, rowId }>,
@@ -142,7 +184,9 @@ export function configurationStanding(testVehicle, rows = [], others = []) {
  *   primary  the test vehicle to make primary, when the current primary is
  *            dropped (or there is none) and a row names one; null to leave it
  */
-export function planVehicleGuideLinks({ mappings = [], guideRowsOf = {}, rows = {}, others = [], linkedRowIds = [] }) {
+export function planVehicleGuideLinks({ mappings = [], guideRowsOf = {}, rows = {}, others = [], linkedRowIds = [], vehicle = null }) {
+    const peers = Object.values(rows).map(r => r.guide);
+    const ours = (id) => !vehicle || linkedRowIds.includes(id) || couldBeVehiclesRow(vehicle, rows[id]?.guide, peers);
     // A row a configuration's certification links to, AND whose Tested via
     // names that configuration. Either alone is not enough (2026-10-31, on
     // the mirror): certification links carry old mistakes — the Ioniq 5 XRT's
@@ -153,7 +197,7 @@ export function planVehicleGuideLinks({ mappings = [], guideRowsOf = {}, rows = 
         ...linkedRowIds,
         ...mappings.flatMap(m => (guideRowsOf[m.test_vehicle_id] ?? [])
             .filter(id => namesTestVehicle(rows[id]?.via, m.testVehicle ?? { test_vehicle_id: m.test_vehicle_id }))),
-    ])].filter(id => rows[id]);
+    ])].filter(id => rows[id] && ours(id));
     const judged = rowIds.map(rowId => ({ rowId, ...rows[rowId] }));
 
     const drop = [];
