@@ -5,6 +5,7 @@ import { buildGuideRowSweep, bulkLinks, applyDecisions } from '../../utils/guide
 import { formatShare } from '../../utils/guideRowMatches';
 import TestedViaSummary from '../epa/TestedViaSummary';
 import GuideMatchBadge from '../epa/GuideMatchBadge';
+import GuideModelTypeDesc from '../epa/GuideModelTypeDesc';
 
 /**
  * Link the Fuel Economy Guide to the certification records, one Guide row at
@@ -112,6 +113,7 @@ function SweepGuideRow({ item, titleOf, queue, onToggle, onQueueNamed }) {
             <div className="sweep-row-main">
                 <div className="min-w-0">
                     <div className="sweep-test-vehicle-name">{row.carline}</div>
+                    <GuideModelTypeDesc guide={row} />
                     <div className="text-meta">MY{row.model_year} {row.division} · {row.smog_test_group}</div>
                     <GuideRowFacts row={row} />
                 </div>

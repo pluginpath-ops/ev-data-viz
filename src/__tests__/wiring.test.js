@@ -506,7 +506,7 @@ describe('the seams that broke before', () => {
             // The select is GUIDE_VIEW_FIELDS plus what only the picker shows
             // (#374: candidates are checked against the lab data before linking).
             [
-                ...(svc.match(/const GUIDE_VIEW_FIELDS = '([^']*)'/)?.[1] ?? '').split(','),
+                ...(svc.match(/const GUIDE_VIEW_FIELDS = [`']([^`']*)[`']/)?.[1] ?? '').split(','),
                 ...(fn.match(/\.select\(`\$\{GUIDE_VIEW_FIELDS\}((?:, [a-z_]+)*)`\)/)?.[1] ?? '').split(','),
             ].map(s => s.trim()).filter(Boolean),
         );

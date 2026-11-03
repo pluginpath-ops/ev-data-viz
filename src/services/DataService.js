@@ -325,7 +325,12 @@ function testedViaMember(r) {
   };
 }
 
-const GUIDE_VIEW_FIELDS = 'id, model_year, smog_test_group, division, carline, carline_class, drive_desc, label_comb_range_mi, label_city_range_mi, label_hwy_range_mi, label_comb_mpge, label_city_mpge, label_hwy_mpge, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, calc_approach, total_voltage_v, batt_specific_energy_wh_kg, nominal_pack_kwh, adjustment_signature';
+// `model_type_desc` is the maker's own description of the model type, read
+// out of the stored CSV row. EPA's carline column can be the same for two
+// different cars — Audi's 2027 Q6 e-tron quattro and its Sportback both read
+// "Q6 e-tron quattro" — and only this says "Q6 e-tron SB quattro 20in".
+const GUIDE_MODEL_TYPE_DESC = 'model_type_desc:raw->>"Model Type Desc (MFR entered)"';
+const GUIDE_VIEW_FIELDS = `id, model_year, smog_test_group, division, carline, carline_class, drive_desc, label_comb_range_mi, label_city_range_mi, label_hwy_range_mi, label_comb_mpge, label_city_mpge, label_hwy_mpge, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, calc_approach, total_voltage_v, batt_specific_energy_wh_kg, nominal_pack_kwh, adjustment_signature, ${GUIDE_MODEL_TYPE_DESC}`;
 
 /**
  * A test vehicle's certifications (migration 082), each with its Guide row —
