@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import TestedViaSummary from './TestedViaSummary';
 import GuideRowMatchList from './GuideRowMatchList';
+import GuideModelTypeDesc from './GuideModelTypeDesc';
 import { configurationsFromTestedVia } from '../../utils/vehicleGuideLinks';
 
 /**
@@ -38,6 +39,7 @@ function GuideRowLine({ guide, via, action, children }) {
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 text-xs">
                     <div className="font-medium">{rowTitle(guide)}</div>
+                    <GuideModelTypeDesc guide={guide} />
                     <div className="text-meta">
                         {rowFigures(guide)}
                         {guide.smog_test_group && <> · Test Group <span className="font-mono">{guide.smog_test_group}</span></>}
