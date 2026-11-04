@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     configurationsFromTestedVia, namesTestVehicle, isAlternative, configurationStanding, planVehicleGuideLinks,
+    couldBeVehiclesRow,
 } from '../vehicleGuideLinks';
 
 const member = (test_vehicle_id, city, hwy) => ({ test_vehicle_id, city, hwy, via: ['T'] });
@@ -133,5 +134,49 @@ describe('planVehicleGuideLinks', () => {
         const first = planVehicleGuideLinks(input);
         expect(first).toMatchObject({ linkRows: [1], drop: [], add: [], elsewhere: [], primary: null });
         expect(planVehicleGuideLinks({ ...input, linkedRowIds: [1] }).linkRows).toEqual([]);
+    });
+});
+
+describe('couldBeVehiclesRow', () => {
+    const row = (id, model_year, carline) => ({ id, model_year, carline });
+
+    it('keeps to the vehicle\'s model years', () => {
+        const v = { name: 'Ioniq 6 LR RWD', model: 'Ioniq 6', year: '2025' };
+        expect(couldBeVehiclesRow(v, row(1, 2025, 'Ioniq 6 Long range RWD'))).toBe(true);
+        expect(couldBeVehiclesRow(v, row(2, 2023, 'Ioniq 6 Long range RWD'))).toBe(false);
+        expect(couldBeVehiclesRow({ ...v, year: '2023-2025' }, row(2, 2023, 'Ioniq 6 Long range RWD'))).toBe(true);
+    });
+
+    it('wants every word of the model in the carline — a shared test vehicle is not a shared car', () => {
+        expect(couldBeVehiclesRow({ name: 'R1T Dual Standard', model: 'R1T', year: '2025' }, row(1, 2025, 'R1S Dual Standard (22in)'))).toBe(false);
+        expect(couldBeVehiclesRow({ name: 'Equinox EV LT FWD', model: 'Equinox EV', year: '2026' }, row(2, 2026, 'BLAZER EV FWD 22IN TIRE'))).toBe(false);
+    });
+
+    it('loses to a closer row of the same year', () => {
+        const gt = row(795, 2024, 'e-tron GT');
+        const rs = row(796, 2024, 'RS e-tron GT');
+        const peers = [gt, rs];
+        expect(couldBeVehiclesRow({ name: 'e-tron GT', model: 'e-tron GT', year: '2024' }, rs, peers)).toBe(false);
+        expect(couldBeVehiclesRow({ name: 'e-tron GT', model: 'e-tron GT', year: '2024' }, gt, peers)).toBe(true);
+        expect(couldBeVehiclesRow({ name: 'RS e-tron GT', model: 'e-tron GT', year: '2024' }, gt, peers)).toBe(false);
+        // Another year's closer row does not count.
+        expect(couldBeVehiclesRow({ name: 'RS e-tron GT', model: 'e-tron GT', year: '2024-2025' }, row(9, 2025, 'e-tron GT'), [rs])).toBe(true);
+    });
+});
+
+describe('planVehicleGuideLinks with the vehicle', () => {
+    it('proposes no row of another carline, but keeps one already linked', () => {
+        const rows = {
+            1: { via: via('exact', [member('A', 20, 25)]), poolIds: new Set(['A']), guide: { id: 1, model_year: 2025, carline: 'R1S Quad (22in)' } },
+        };
+        const input = {
+            mappings: [{ id: 1, test_vehicle_id: 'A', is_primary: true }],
+            guideRowsOf: { A: [1] }, rows,
+            vehicle: { name: 'R1T Quad', model: 'R1T', year: '2025' },
+        };
+        expect(planVehicleGuideLinks(input).linkRows).toEqual([]);
+        expect(planVehicleGuideLinks({ ...input, vehicle: { ...input.vehicle, model: 'R1S', name: 'R1S Quad' } }).linkRows).toEqual([1]);
+        // A curator's link stands, and still judges the configurations.
+        expect(planVehicleGuideLinks({ ...input, linkedRowIds: [1] })).toMatchObject({ linkRows: [], drop: [] });
     });
 });

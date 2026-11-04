@@ -3001,7 +3001,7 @@ class DataService {
     if (!this.useSupabase) return [];
     const sb = getSupabase();
     const mappings = await fetchAllRows(() => sb.from('epa_vehicle_mappings')
-      .select(`id, vehicle_id, test_vehicle_id, is_primary, vehicles(id, name, year),
+      .select(`id, vehicle_id, test_vehicle_id, is_primary, vehicles(id, name, year, model),
         test_vehicle:epa_test_vehicles(test_vehicle_id, epa_tests(test_number, procedure_code, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc))`)
       .order('id', { ascending: true }));
     const ids = [...new Set(mappings.map(m => m.test_vehicle_id))];
@@ -3048,7 +3048,7 @@ class DataService {
     return [...byVehicle.entries()].map(([vehicleId, { vehicle, mappings: ms }]) => ({
       vehicle,
       plan: planVehicleGuideLinks({
-        mappings: ms, guideRowsOf, rows, others,
+        mappings: ms, guideRowsOf, rows, others, vehicle,
         linkedRowIds: linked.filter(l => l.vehicle_id === vehicleId).map(l => l.fe_guide_row_id),
       }),
       rows,
