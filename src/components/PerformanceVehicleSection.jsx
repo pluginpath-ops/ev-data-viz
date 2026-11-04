@@ -258,7 +258,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
             )}
 
             {canEdit && addingResult && (
-                <div className="border rounded-lg p-3 border-[var(--color-border)]">
+                <div className="border rounded-xs p-3 border-[var(--color-border)]">
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="text-xs">
                             <span className="text-secondary block mb-0.5">Source</span>

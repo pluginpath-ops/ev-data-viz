@@ -330,7 +330,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                 ))}
                             </div>
                         )}
-                        <div className="max-h-80 overflow-y-auto border rounded-lg">
+                        <div className="max-h-80 overflow-y-auto border rounded-xs">
                             <table className="w-full text-xs">
                                 <thead className="bg-[var(--color-surface-muted)] sticky top-0">
                                     <tr className="text-left text-secondary">

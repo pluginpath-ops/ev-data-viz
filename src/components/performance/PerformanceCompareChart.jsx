@@ -123,7 +123,7 @@ export default function PerformanceCompareChart({
                 datasets: [{
                     data: withData.map(r => r.value),
                     backgroundColor: withData.map(r => r.color),
-                    borderRadius: 4,
+                    borderRadius: 2,
                 }],
             },
             options: {

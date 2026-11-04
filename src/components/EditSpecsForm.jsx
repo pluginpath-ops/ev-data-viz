@@ -486,7 +486,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                     <button
                                                         type="button"
                                                         onClick={() => addCustomField(cat.key)}
-                                                        className="px-2 py-1 rounded text-xs bg-[var(--color-surface-sunken)] hover:bg-[var(--color-surface-muted)] text-secondary flex-shrink-0"
+                                                        className="px-2 py-1 rounded-xs text-xs bg-[var(--color-surface-sunken)] hover:bg-[var(--color-surface-muted)] text-secondary flex-shrink-0"
                                                     >
                                                         Add
                                                     </button>

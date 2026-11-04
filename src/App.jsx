@@ -1012,7 +1012,7 @@ export default function App() {
                                             <div key={vehicleId} className="flex items-center">
                                                 {/* Drop indicator before this pill */}
                                                 {dragOverIdx === idx && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded mr-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs mr-1 shrink-0" />
                                                 )}
                                                 <div
                                                     draggable
@@ -1059,7 +1059,7 @@ export default function App() {
                                                 </div>
                                                 {/* Drop indicator after the last pill */}
                                                 {idx === selectedVehicles.length - 1 && dragOverIdx === selectedVehicles.length && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded ml-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs ml-1 shrink-0" />
                                                 )}
                                             </div>
                                         );

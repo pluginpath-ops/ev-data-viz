@@ -37,7 +37,7 @@ const CONFIDENCE_COLORS = {
 
 function ConfidenceBadge({ confidence }) {
     return (
-        <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${CONFIDENCE_COLORS[confidence] ?? CONFIDENCE_COLORS.inferred}`}>
+        <span className={`text-xs px-1.5 py-0.5 rounded-xs border font-medium ${CONFIDENCE_COLORS[confidence] ?? CONFIDENCE_COLORS.inferred}`}>
             {confidence}
         </span>
     );
@@ -583,7 +583,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-meta">Linking…</span>
                         )}
                         {showDropdown && (results.length > 0 || searching || searchError) && (
-                            <ul className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
+                            <ul className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-xs border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
                                 {searching && (
                                     <li className="px-3 py-2 text-sm text-meta italic">Searching…</li>
                                 )}
@@ -641,7 +641,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                             + Create EPA test vehicle from scratch
                         </button>
                     ) : (
-                        <div className="mt-2 border rounded-lg p-3 border-[var(--color-border)]">
+                        <div className="mt-2 border rounded-xs p-3 border-[var(--color-border)]">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs font-semibold">New EPA test vehicle</span>
                                 <a href={EPA_SOURCE_URL} target="_blank" rel="noopener noreferrer"

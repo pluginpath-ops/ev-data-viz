@@ -176,6 +176,17 @@ for a container, `--radius-control` for something you click, `--radius-chip` for
 a pill, `--radius-mark` for a badge or a small tag, `--radius-track` for a bar,
 `--radius-popover` for a panel that floats.
 
+All six currently hold **2px** (owner decision, 2026-11-04): the site is
+hard-edged, and rounding is an accent rather than a default. In Tailwind that
+means `rounded-xs`, never bare `rounded` / `rounded-lg`. Two things stay round on
+purpose: things that are round by nature (dots, avatars, spinners, the race-mode
+toggle) and the pressable filter **chips** (`.guide-chip` and its group), which use `rounded-full`.
+
+A card's lit state is a 2px inner strip on the left (`.vehicle-card::after`, or
+an inset `box-shadow`), never a wider transparent `border-left` — that is what
+made the vehicle cards D-shaped: square on the left, round on the right. At rest
+the left edge is the same 1px border as the other three sides.
+
 ## See also
 
 - [`typography.md`](typography.md) — the type scale and the role classes

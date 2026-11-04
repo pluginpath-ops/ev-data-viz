@@ -337,7 +337,7 @@
    The handoff's six, named for what they wrap rather than by size, so a call
    site says `--radius-control` and cannot drift to a neighbouring value. There
    was no radius token before this: six literal `border-radius` declarations and
-   about a hundred `@apply rounded*`, which is how a 6px button came to sit
+   about a hundred `@apply rounded-xs*`, which is how a 6px button came to sit
    beside a 4px one.
 
    In `:root`, NOT in `@theme`, and that is deliberate. Tailwind tree-shakes
@@ -349,11 +349,18 @@
 
    Not theme-scoped: a corner is the same shape in light and dark. */
 :root {
-    --radius-card:    8px;   /* cards, the table frame, the plot frame */
-    --radius-popover: 7px;
-    --radius-control: 5px;   /* buttons, inputs, dropdown chips */
-    --radius-chip:    4px;
-    --radius-mark:    3px;   /* checkboxes, swatches, badges, bar fills */
+    /* One corner, 2px, for every container, control and mark (owner,
+       2026-11-04). The scale ran 8/7/5/4/3/2px, and a square selection edge
+       always fought one of them — an unselected card read as a D. Round is
+       now an accent with one meaning: a chip you picked or a tag on the car
+       (rounded-full), plus things that are round by nature — avatars, dots,
+       spinners. The names stay so each call site still says what it is, and
+       so a role can be split back out without touching the call sites. */
+    --radius-card:    2px;   /* cards, the table frame, the plot frame */
+    --radius-popover: 2px;
+    --radius-control: 2px;   /* buttons, inputs, dropdown chips */
+    --radius-chip:    2px;
+    --radius-mark:    2px;   /* checkboxes, swatches, badges, bar fills */
     --radius-track:   2px;   /* the track a bar fill sits in */
 }
 
@@ -1010,7 +1017,7 @@ body {
 /* A destructive icon button that is quiet until you approach it. Three of them
  * reached for `hover:bg-red-50`, a light tint with no dark counterpart. */
 .btn-icon-danger {
-    @apply rounded transition-colors leading-none;
+    @apply rounded-xs transition-colors leading-none;
     border: 1px solid transparent;
     color: var(--color-text-meta);
 }
@@ -1038,7 +1045,7 @@ body {
 /* Where a file is dropped. Two importers had the same rectangle, and both said
  * "active" with `bg-indigo-50/40` — a color the theme does not contain. */
 .drop-zone {
-    @apply rounded-lg p-10 text-center;
+    @apply rounded-xs p-10 text-center;
     border: 2px dashed var(--color-border);
     transition: border-color 0.12s, background-color 0.12s;
 }
@@ -1472,7 +1479,7 @@ body {
 
 /* ── Crop modal ─────────────────────────────────────────────────────────────── */
 .crop-modal-panel {
-    @apply rounded-xl shadow-2xl flex flex-col overflow-hidden;
+    @apply rounded-xs shadow-2xl flex flex-col overflow-hidden;
     background-color: var(--color-card);
     max-width: min(90vw, 900px);
     max-height: 90vh;
@@ -1507,14 +1514,14 @@ body {
     @apply text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 whitespace-nowrap;
 }
 .spec-link-add-form {
-    @apply border rounded-lg p-3;
+    @apply border rounded-xs p-3;
     background-color: var(--color-surface-muted);
     border-color: var(--color-border);
 }
 
 /* ── Copy-to-vehicle modal ──────────────────────────────────────────────────── */
 .copy-to-modal-panel {
-    @apply rounded-xl shadow-2xl flex flex-col overflow-hidden;
+    @apply rounded-xs shadow-2xl flex flex-col overflow-hidden;
     background-color: var(--color-card);
     width: min(90vw, 420px);
 }
@@ -1523,7 +1530,7 @@ body {
 
 /* Scrollable preview table of planned rows */
 .import-table-container {
-    @apply rounded-lg border overflow-auto;
+    @apply rounded-xs border overflow-auto;
     max-height: 22rem;
     border-color: var(--color-border);
 }
@@ -1639,7 +1646,7 @@ body {
    the light body text on a white cell and made whatever you were typing
    invisible. */
 .data-cell-input {
-    @apply w-full text-xs p-0.5 rounded outline-none;
+    @apply w-full text-xs p-0.5 rounded-xs outline-none;
     /* Number spinners suppressed — a column of them is unreadable at this size
        and the arrows sit where the next digit should be. */
     appearance: textfield;
@@ -1665,7 +1672,7 @@ body {
 
 /* CSV file upload drag-drop target */
 .csv-drop-zone {
-    @apply border-2 border-dashed rounded-lg p-6 text-center;
+    @apply border-2 border-dashed rounded-xs p-6 text-center;
     border-color: var(--color-border-strong);
     color: var(--color-text-muted);
 }
@@ -1827,7 +1834,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    site because it is the one everyone computes from. */
 .knob-source-local,
 .knob-source-site {
-    @apply text-[10px] font-semibold px-1.5 py-0.5 rounded border cursor-help;
+    @apply text-[10px] font-semibold px-1.5 py-0.5 rounded-xs border cursor-help;
 }
 .knob-source-local {
     color: var(--color-warning);
@@ -2133,14 +2140,32 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     cursor: pointer;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
-    /* Square on the color side — see .vehicle-run-group. */
-    border-radius: 0 var(--radius-card) var(--radius-card) 0;
-    /* Left edge reserved for the selection bar, so selecting a card does not
-       change its width and reflow the grid. */
-    border-left: 3px solid transparent;
-    /* Positioning context for the selection mark below. */
+    border-radius: var(--radius-card);
+    /* The selection bar is this 1px left border PLUS a 2px strip laid over the
+       inside of it (::after), so the edge is 3px when it is lit and 1px — the
+       same as the other three sides — when it is not. It used to reserve a
+       transparent 3px border with a square corner, which drew an unselected
+       card as a D: square and edgeless on the left, round on the right.
+       Nothing inside moves when the strip appears, so the grid does not
+       reflow on select. --edge is the strip's color, set by each state. */
+    --edge: transparent;
+    /* Positioning context for the selection mark and the strip. */
     position: relative;
     transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+/* The inner 2px of the bar. Above the photo band, which is flush to the edge
+   and would otherwise cover it; under the ✓ plate. */
+.vehicle-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2px;
+    z-index: 2;
+    pointer-events: none;
+    background-color: var(--edge);
+    transition: background-color 0.15s ease-in-out;
 }
 
 /* Hover leaves the LEFT border alone and previews the selection color on it.
@@ -2156,6 +2181,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     border-right-color: var(--color-border-strong);
     border-bottom-color: var(--color-border-strong);
     border-left-color: var(--color-accent-orange-muted);
+    --edge: var(--color-accent-orange-muted);
 }
 
 /* Broadsheet's treatment: a left orange bar and a tinted band, not a full-row
@@ -2168,6 +2194,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * strengthens it. */
 .vehicle-card.is-selected {
     border-left-color: var(--color-accent-orange);
+    --edge: var(--color-accent-orange);
     background-color: var(--color-cluster);
 }
 
@@ -2203,6 +2230,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .vehicle-card.is-pending {
     opacity: 0.6;
     border-left-color: var(--color-danger);
+    --edge: var(--color-danger);
 }
 
 /* The same object in a different shape, so it takes the same accent border
@@ -2224,15 +2252,15 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* A row's ⋯ menu opens below the row it belongs to, so the row must not clip
    it. The card's overflow: hidden is for its media band, which a row lacks. */
 .vehicle-row { overflow: visible; }
-/* The header lines up with rows that have a 3px accent border on the left
-   and a 1px border on the right, so its padding carries both. */
+/* The header lines up with rows that have a 1px border on each side (the
+   selection bar is drawn inside the left one), so its padding carries both. */
 .vehicle-list-head {
     position: sticky;
     top: var(--app-header-h, 0px);
     z-index: 3;
     padding-top: 6px;
     padding-bottom: 6px;
-    padding-left: 17px;
+    padding-left: 15px;
     padding-right: 15px;
     background-color: var(--color-background);
     border-bottom: 1px solid var(--color-border);
@@ -2328,7 +2356,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* A make's heading when the list is grouped by make. */
 .vehicle-list-group {
     margin: 10px 0 4px;
-    padding: 0 0 4px 17px;
+    padding: 0 0 4px 15px;
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -2493,9 +2521,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     margin-bottom: -1px;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
-    border-left: 3px solid transparent;
     border-bottom: 0;
-    border-radius: 0 var(--radius-card) 0 0;
+    /* A 1px left edge like the card below it; the selected bar adds 2px inside
+       it (box-shadow), so the two draw one continuous 3px bar. */
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
     font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-secondary);
     transition: border-color 0.15s ease-in-out, color 0.15s ease-in-out;
@@ -2508,6 +2537,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* Selected: the card's accent border and tint (.vehicle-card.is-selected). */
 .rolodex-card.is-selected {
     border-left-color: var(--color-accent-orange);
+    box-shadow: inset 2px 0 0 var(--color-accent-orange);
     background-color: var(--color-cluster);
 }
 /* A filtered-out stretch, or the sources past the cap: there, but not shown. */
@@ -4209,7 +4239,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Individual reorder direction button */
 .reorder-btn {
-    @apply w-6 h-6 flex items-center justify-center rounded text-[10px];
+    @apply w-6 h-6 flex items-center justify-center rounded-xs text-[10px];
     background-color: var(--color-surface-sunken);
     border: 1px solid var(--color-border);
     color: var(--color-text-muted);
@@ -4238,7 +4268,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Individual pagination navigation button */
 .pagination-btn {
-    @apply px-2 py-1 text-sm rounded disabled:opacity-40;
+    @apply px-2 py-1 text-sm rounded-xs disabled:opacity-40;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -4268,7 +4298,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    dropped — they steal half the box for an affordance the arrow keys already
    provide. */
 .soc-input {
-    @apply px-1 py-0 rounded text-sm w-10 text-center;
+    @apply px-1 py-0 rounded-xs text-sm w-10 text-center;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -4315,7 +4345,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Warning banner for a viewing condition that can't be applied (e.g. EPA
    Curves elevation adjustment missing a required weight for one vehicle) */
 .chart-warning-banner {
-    @apply text-sm border rounded px-3 py-2 mb-4;
+    @apply text-sm border rounded-xs px-3 py-2 mb-4;
     background-color: var(--color-warning-surface);
     border-color: var(--color-warning-border);
     color: var(--color-warning-text);
@@ -4544,14 +4574,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     gap: 4px;
     padding: 6px 7px;
     border: 1px solid var(--color-border);
-    border-left: 3px solid transparent;
-    border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+    border-radius: var(--radius-chip);
     background-color: var(--color-surface-muted);
 }
 /* A row carrying an override is doing something the trip settings above are
    not, so it says so on the same accent border every other state uses. */
 .routing-row.is-custom {
     border-left-color: var(--color-accent-orange);
+    box-shadow: inset 2px 0 0 var(--color-accent-orange);
     background-color: var(--color-accent-orange-surface);
 }
 
@@ -4856,7 +4886,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 .pair-add-btn,
 .pair-remove-btn {
-    @apply text-sm leading-none px-1 rounded transition;
+    @apply text-sm leading-none px-1 rounded-xs transition;
     color: var(--color-text-faint);
 }
 .pair-add-btn:hover:not(:disabled),
@@ -4870,7 +4900,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Copy chart as PNG / action button strip below charts */
 .chart-copy-btn {
-    @apply text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors;
+    @apply text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-xs border transition-colors;
     background-color: var(--color-surface-muted);
     border-color: var(--color-border);
     color: var(--color-text-secondary);
@@ -4938,7 +4968,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Efficiency unit toggle (mi/kWh ↔ Wh/mi) */
 .efficiency-unit-toggle {
-    @apply flex gap-1 p-1 rounded-lg;
+    @apply flex gap-1 p-1 rounded-xs;
     background-color: var(--color-surface-sunken);
 }
 
@@ -4948,7 +4978,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* "Adding data to: X" merge-mode banner */
 .merge-target-banner {
-    @apply mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between;
+    @apply mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xs flex items-center justify-between;
 }
 [data-theme="dark"] .merge-target-banner {
     background-color: rgba(59, 130, 246, 0.1);
@@ -4962,7 +4992,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Sub-section panel within a form (Charging Energy, Range Test Details) */
 .data-subpanel {
-    @apply border rounded-lg;
+    @apply border rounded-xs;
     background-color: var(--color-surface-muted);
     border-color: var(--color-border);
 }
@@ -4985,11 +5015,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * same two states on both panels and on the note panel above.
  */
 .estimation-panel {
-    @apply p-4 rounded-lg border flex items-start justify-between gap-4;
+    @apply p-4 rounded-xs border flex items-start justify-between gap-4;
     border-color: var(--color-border);
 }
 .join-key-panel {
-    @apply mt-5 p-4 rounded-lg border;
+    @apply mt-5 p-4 rounded-xs border;
     border-color: var(--color-border);
 }
 .estimation-panel.is-good,
@@ -5023,7 +5053,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* The same block, where nothing named it before. */
 .state-panel {
-    @apply mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3;
+    @apply mb-3 p-3 rounded-xs border flex flex-wrap items-center gap-3;
     border-color: var(--color-border);
 }
 
@@ -5131,7 +5161,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* OAuth provider button (GitHub, Google) */
 .auth-provider-btn {
-    @apply w-full flex items-center justify-center gap-3 font-medium py-3 px-4 rounded-lg transition;
+    @apply w-full flex items-center justify-center gap-3 font-medium py-3 px-4 rounded-xs transition;
     border: 2px solid var(--color-border-strong);
     background-color: var(--color-surface-muted);
     color: var(--color-text-primary);
@@ -5157,7 +5187,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Per-vehicle accordion panel */
 .import-vehicle-panel {
-    @apply border rounded-lg overflow-hidden transition;
+    @apply border rounded-xs overflow-hidden transition;
     border-color: var(--color-border);
 }
 
@@ -5183,7 +5213,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Numeric axis-bound input — hides browser spin buttons */
 .axis-input {
-    @apply px-2 py-1 rounded text-sm w-24;
+    @apply px-2 py-1 rounded-xs text-sm w-24;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -5246,7 +5276,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * both scroll axes, which is what makes the sticky header and the frozen label
  * column work. */
 .specs-table-container {
-    @apply rounded-lg overflow-auto;
+    @apply rounded-xs overflow-auto;
     max-height: var(--specs-max-h, calc(100vh - 14rem));
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
@@ -6303,7 +6333,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Subtle fixed watermark in bottom-right corner */
 .popout-watermark {
     @apply fixed bottom-3 right-4 z-50 text-xs font-medium
-           bg-black/10 px-2 py-1 rounded select-none pointer-events-none;
+           bg-black/10 px-2 py-1 rounded-xs select-none pointer-events-none;
     color: var(--color-text-faint);
 }
 
@@ -6327,7 +6357,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply flex flex-col gap-2;
 }
 .session-browser-row {
-    @apply flex items-center justify-between gap-4 rounded-lg px-3 py-2;
+    @apply flex items-center justify-between gap-4 rounded-xs px-3 py-2;
     background-color: var(--color-surface-sunken);
     border: 1px solid transparent;
 }
@@ -6335,7 +6365,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-color: var(--color-primary);
 }
 .session-vehicle-chip {
-    @apply text-xs px-1.5 py-0.5 rounded;
+    @apply text-xs px-1.5 py-0.5 rounded-xs;
     background-color: var(--color-card);
     color: var(--color-text-secondary);
     border: 1px solid var(--color-border);
@@ -6365,7 +6395,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     transform: rotate(90deg);
 }
 .session-group-edit {
-    @apply ml-auto text-xs px-2 py-0.5 rounded transition-colors;
+    @apply ml-auto text-xs px-2 py-0.5 rounded-xs transition-colors;
     color: var(--color-text-faint);
 }
 .session-group-edit:hover {
@@ -6725,14 +6755,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* ── Selective inheritance picker ───────────────────────────────────────────── */
 .spec-link-picker {
-    @apply mt-2 p-2 rounded-lg;
+    @apply mt-2 p-2 rounded-xs;
     background-color: var(--color-surface-sunken);
 }
 .spec-link-run-list {
     @apply flex flex-col gap-1 mt-2 max-h-52 overflow-y-auto pr-1;
 }
 .spec-link-kind-pill {
-    @apply text-xs px-1 rounded shrink-0;
+    @apply text-xs px-1 rounded-xs shrink-0;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -6770,7 +6800,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply ml-auto flex items-center gap-2;
 }
 .section-action {
-    @apply text-xs px-2 py-1 rounded whitespace-nowrap transition;
+    @apply text-xs px-2 py-1 rounded-xs whitespace-nowrap transition;
     @apply bg-indigo-50 text-indigo-700 hover:bg-indigo-100;
 }
 
@@ -6796,7 +6826,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 .epa-flow-box {
-    @apply w-full flex flex-col items-center gap-0.5 rounded-lg px-3 py-2 text-center border;
+    @apply w-full flex flex-col items-center gap-0.5 rounded-xs px-3 py-2 text-center border;
     border-color: var(--color-border);
     background-color: var(--color-card);
 }
@@ -6825,7 +6855,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    the leading edge in the status color so agreement and disagreement are
    distinguishable before any number is read. */
 .epa-check {
-    @apply flex flex-col gap-0.5 mt-3 p-2 rounded;
+    @apply flex flex-col gap-0.5 mt-3 p-2 rounded-xs;
     border-left: 3px solid var(--color-border);
     background: var(--color-surface-2, transparent);
 }
@@ -6834,7 +6864,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    distance from what EPA published — and a dropdown hides all of it until the
    moment it is closed again. */
 .epa-test-picker {
-    @apply rounded border border-[var(--color-border)] p-3 mb-3;
+    @apply rounded-xs border border-[var(--color-border)] p-3 mb-3;
     background: var(--color-surface-muted);
 }
 .epa-test-option {
@@ -6858,7 +6888,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    the figures the choice settles. Rows are .option-row, so hover and the
    selected state match every other one-of-a-list choice. */
 .primary-config-picker {
-    @apply mt-3 mb-3 rounded-lg border overflow-x-auto;
+    @apply mt-3 mb-3 rounded-xs border overflow-x-auto;
     border-color: var(--color-border);
 }
 .primary-config-option {
@@ -6886,7 +6916,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    Guide picker below is aimed at (a curator's "Link" button) is outlined, so
    the two never read as one. */
 .certification-list {
-    @apply mt-2 mb-3 rounded-lg border overflow-x-auto;
+    @apply mt-2 mb-3 rounded-xs border overflow-x-auto;
     border-color: var(--color-border);
 }
 .certification-row {
@@ -6953,7 +6983,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    a disagreement crossed a limit; a gap is something missing with no limit
    behind it, so it stays neutral rather than borrowing a status color. */
 .data-check-finding {
-    @apply flex flex-col gap-0.5 p-2 rounded;
+    @apply flex flex-col gap-0.5 p-2 rounded-xs;
     border-left: 3px solid var(--color-border);
     background: var(--color-surface-2, transparent);
 }
@@ -7040,7 +7070,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    same bracket inverted: a cap with its legs pointing down, reading as one
    value splitting into two rather than two combining into one. */
 .epa-flow-merge {
-    @apply mx-auto my-2 w-1/2 h-4 border-b border-x rounded-b-lg;
+    @apply mx-auto my-2 w-1/2 h-4 border-b border-x rounded-b-xs;
     border-color: var(--color-border);
 }
 
@@ -7051,7 +7081,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* The sentence the diagram exists to make unavoidable */
 .epa-methodology-callout {
-    @apply mt-5 rounded-lg px-3 py-2 text-sm border-l-4;
+    @apply mt-5 rounded-xs px-3 py-2 text-sm border-l-4;
     border-color: var(--color-primary);
     background-color: var(--color-surface-muted);
     color: var(--color-text-secondary);
@@ -7102,7 +7132,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 .cycle-bar {
-    @apply relative h-full rounded border;
+    @apply relative h-full rounded-xs border;
     min-width: 2px;
 }
 
@@ -7163,7 +7193,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .cycle-legend span { @apply inline-flex items-center gap-1.5; }
 
 .cycle-swatch {
-    @apply inline-block w-4 h-3 rounded-sm border not-italic;
+    @apply inline-block w-4 h-3 rounded-xs border not-italic;
 }
 .cycle-swatch-tick {
     @apply inline-block w-0.5 h-3.5 not-italic;
@@ -7201,7 +7231,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 .cert-cell {
-    @apply flex flex-col gap-1 rounded-lg border px-3 py-2 h-full;
+    @apply flex flex-col gap-1 rounded-xs border px-3 py-2 h-full;
     border-color: var(--color-border);
     background-color: var(--color-card);
     min-height: 5.5rem;
@@ -7298,7 +7328,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Advisory badge on a curator field — e.g. an EPA label range that disagrees
    with the vehicle's spec range (#206). Amber: worth a look, not an error. */
 .curator-field-flag {
-    @apply text-[9px] font-bold px-1 rounded cursor-help;
+    @apply text-[9px] font-bold px-1 rounded-xs cursor-help;
     color: var(--color-warning);
     background-color: rgba(245, 158, 11, 0.12);
 }
@@ -7306,7 +7336,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* ── Fuel Economy Guide import (#206) ───────────────────────────────────────── */
 
 .fe-dropzone {
-    @apply flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-8 px-4 cursor-pointer transition-colors text-center;
+    @apply flex flex-col items-center justify-center gap-1 rounded-xs border-2 border-dashed py-8 px-4 cursor-pointer transition-colors text-center;
     border-color: var(--color-border-strong);
     background-color: var(--color-surface-muted);
 }
@@ -7348,7 +7378,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* ── Fuel Economy Guide picker (#206) ───────────────────────────────────────── */
 
 .fe-picker {
-    @apply flex flex-col gap-1.5 rounded-lg border px-3 py-2 mb-4;
+    @apply flex flex-col gap-1.5 rounded-xs border px-3 py-2 mb-4;
     border-color: var(--color-border);
     background-color: var(--color-surface-muted);
 }
@@ -7369,7 +7399,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .fe-picker-link-btn:hover { color: var(--color-primary-hover); }
 
 .fe-candidate {
-    @apply flex items-center justify-between gap-3 rounded px-2 py-1.5;
+    @apply flex items-center justify-between gap-3 rounded-xs px-2 py-1.5;
 }
 
 /* The proposal. Distinguished because it is the one the curator confirms. */
@@ -7449,7 +7479,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* ── Filters ─────────────────────────────────────────────────────────────── */
 
 .guide-filter-bar {
-    @apply flex flex-wrap gap-x-6 gap-y-3 p-4 rounded-lg;
+    @apply flex flex-wrap gap-x-6 gap-y-3 p-4 rounded-xs;
     background-color: var(--color-surface-muted);
     border: 1px solid var(--color-border);
 }
@@ -7763,13 +7793,13 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply flex items-center gap-1.5;
 }
 .guide-range-input {
-    @apply w-16 px-2 py-1 rounded text-sm tabular-nums;
+    @apply w-16 px-2 py-1 rounded-xs text-sm tabular-nums;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
 }
 .guide-search-input {
-    @apply w-full px-3 py-1.5 rounded text-sm;
+    @apply w-full px-3 py-1.5 rounded-xs text-sm;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -7785,7 +7815,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Wide content scrolls inside its own container; the page never scrolls
    sideways. At 30 columns this is not optional. */
 .guide-table-container {
-    @apply overflow-x-auto rounded-lg;
+    @apply overflow-x-auto rounded-xs;
     border: 1px solid var(--color-border);
     max-height: 70vh;
     overflow-y: auto;
@@ -8339,7 +8369,7 @@ a.is-test-link:focus-visible {
 
 /* Badges ride on the configuration name rather than holding their own columns. */
 .guide-badge {
-    @apply inline-block px-1.5 py-0.5 rounded uppercase shrink-0;
+    @apply inline-block px-1.5 py-0.5 rounded-xs uppercase shrink-0;
     font-size: 0.5625rem;
     font-weight: 700;
     letter-spacing: 0.03em;
@@ -8360,13 +8390,13 @@ a.is-test-link:focus-visible {
 }
 
 .guide-warning {
-    @apply px-3 py-2 rounded text-sm;
+    @apply px-3 py-2 rounded-xs text-sm;
     background-color: rgba(245, 158, 11, 0.12);
     color: var(--color-text-primary);
     border: 1px solid var(--color-warning);
 }
 .guide-tested-note {
-    @apply px-3 py-2 rounded text-sm mb-3;
+    @apply px-3 py-2 rounded-xs text-sm mb-3;
     background-color: var(--color-primary-light);
     color: var(--color-primary-text);
 }
@@ -8378,7 +8408,7 @@ a.is-test-link:focus-visible {
 /* ── Compare panel ───────────────────────────────────────────────────────── */
 
 .guide-compare {
-    @apply flex flex-col gap-2 p-4 rounded-lg;
+    @apply flex flex-col gap-2 p-4 rounded-xs;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -8439,7 +8469,7 @@ a.is-test-link:focus-visible {
 /* ── Detail modal ────────────────────────────────────────────────────────── */
 
 .guide-detail-panel {
-    @apply flex flex-col rounded-lg mx-4;
+    @apply flex flex-col rounded-xs mx-4;
     max-width: 52rem;
     max-height: 88vh;
 }
@@ -8461,7 +8491,7 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-4;
 }
 .guide-certification-test-vehicle {
-    @apply flex flex-col gap-2 p-3 rounded;
+    @apply flex flex-col gap-2 p-3 rounded-xs;
     background-color: var(--color-surface-sunken);
 }
 /* Numbers in a certification table sit on their right edge, so a column of
@@ -8495,7 +8525,7 @@ a.is-test-link:focus-visible {
     color: var(--color-text-muted);
 }
 .guide-raw {
-    @apply mt-2 p-3 rounded max-h-64 overflow-y-auto flex flex-col gap-1;
+    @apply mt-2 p-3 rounded-xs max-h-64 overflow-y-auto flex flex-col gap-1;
     background-color: var(--color-surface-sunken);
 }
 .guide-raw-row {
@@ -8514,7 +8544,7 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-1.5;
 }
 .brand-row {
-    @apply flex flex-col gap-2 p-3 rounded-lg;
+    @apply flex flex-col gap-2 p-3 rounded-xs;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -8522,14 +8552,14 @@ a.is-test-link:focus-visible {
     @apply flex flex-wrap items-center gap-3;
 }
 .brand-input {
-    @apply px-2 py-1 rounded text-sm;
+    @apply px-2 py-1 rounded-xs text-sm;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
     min-width: 9rem;
 }
 .brand-select {
-    @apply px-2 py-1 rounded text-sm;
+    @apply px-2 py-1 rounded-xs text-sm;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -8548,7 +8578,7 @@ a.is-test-link:focus-visible {
 /* Merge deletes a brand, so the confirmation states what happens to the
    vehicles and aliases rather than asking "are you sure?". */
 .brand-merge-confirm {
-    @apply p-2 rounded;
+    @apply p-2 rounded-xs;
     background-color: rgba(245, 158, 11, 0.12);
     border: 1px solid var(--color-warning);
 }
@@ -8856,7 +8886,7 @@ a.is-test-link:focus-visible {
    would push them out of a 190px column to say something the muting has already
    said. */
 .stats-suppressed-flag {
-    @apply ml-2 px-1.5 py-0.5 rounded;
+    @apply ml-2 px-1.5 py-0.5 rounded-xs;
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 700;
     background-color: var(--color-surface-sunken);
@@ -8887,7 +8917,7 @@ a.is-test-link:focus-visible {
     background-color: var(--color-text-faint);
 }
 .stats-box-iqr {
-    @apply absolute rounded-sm;
+    @apply absolute rounded-xs;
     top: 50%;
     height: 8px;
     transform: translateY(-50%);
@@ -8919,7 +8949,7 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-4;
 }
 .stats-panel {
-    @apply flex flex-col gap-2 p-4 rounded-lg;
+    @apply flex flex-col gap-2 p-4 rounded-xs;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -8954,7 +8984,7 @@ a.is-test-link:focus-visible {
    flat fill reads as a solid mass and the shape has to be traced along the top
    edge; stepping it makes the peak legible peripherally. */
 .stats-histogram-bar {
-    @apply flex-1 rounded-t-sm;
+    @apply flex-1 rounded-t-xs;
     min-height: 1px;
     background-color: var(--bar-track);
 }
@@ -9022,7 +9052,7 @@ a.is-test-link:focus-visible {
    ══════════════════════════════════════════════════════════════════════════ */
 
 .sweep-row {
-    @apply flex flex-col gap-2 p-3 rounded-lg;
+    @apply flex flex-col gap-2 p-3 rounded-xs;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -9044,7 +9074,7 @@ a.is-test-link:focus-visible {
 /* The batch is the point of a sweep: everything unambiguous cleared at once,
    with the count stated so it is a decision rather than a leap. */
 .sweep-batch {
-    @apply flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg;
+    @apply flex flex-wrap items-center justify-between gap-3 p-3 rounded-xs;
     background-color: var(--color-primary-light);
     border: 1px solid var(--color-primary);
 }
@@ -9068,7 +9098,7 @@ a.is-test-link:focus-visible {
 /* The inline prompt that records a skip, with its optional note. Shared by the
    Fuel Economy Guide link sweep and Data Checks: the same act in both places. */
 .skip-ask {
-    @apply flex flex-wrap items-center gap-2 p-2 rounded;
+    @apply flex flex-wrap items-center gap-2 p-2 rounded-xs;
     background-color: rgba(245, 158, 11, 0.12);
     border: 1px solid var(--color-warning);
 }
@@ -9078,7 +9108,7 @@ a.is-test-link:focus-visible {
 /* Per-file outcome in the multi-PDF CSI import. A file that yielded nothing is
    a named failure here rather than configs that quietly never appeared. */
 .pdf-file-list {
-    @apply flex flex-col gap-0.5 mb-3 max-h-32 overflow-y-auto p-2 rounded text-xs;
+    @apply flex flex-col gap-0.5 mb-3 max-h-32 overflow-y-auto p-2 rounded-xs text-xs;
     background-color: var(--color-surface-muted);
 }
 .pdf-file-row {
@@ -9230,7 +9260,7 @@ a.is-test-link:focus-visible {
 }
 
 .pg-specimen {
-    @apply flex flex-col gap-1.5 rounded p-2;
+    @apply flex flex-col gap-1.5 rounded-xs p-2;
     background-color: var(--color-surface-muted);
     border: 1px solid var(--color-border);
 }
@@ -9250,7 +9280,7 @@ a.is-test-link:focus-visible {
 /* The measured ratio. Green and red here are a VERDICT on a number, not decor,
    which is why they are the only saturated colors on the page. */
 .pg-ratio {
-    @apply text-[10px] font-mono font-bold rounded px-1 py-0.5;
+    @apply text-[10px] font-mono font-bold rounded-xs px-1 py-0.5;
 }
 .pg-ratio.is-pass {
     background-color: var(--color-success-surface);
@@ -9265,7 +9295,7 @@ a.is-test-link:focus-visible {
    specimens inside are drawn by the real tokens rather than an imitation. */
 .pg-split { @apply grid gap-3; grid-template-columns: 1fr 1fr; }
 .pg-split-pane {
-    @apply rounded p-3;
+    @apply rounded-xs p-3;
     background-color: var(--color-background);
     border: 1px solid var(--color-border);
     /* The pane re-declares the palette, but a token is not a color until
@@ -9290,13 +9320,13 @@ a.is-test-link:focus-visible {
     grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
 }
 .pg-token-card {
-    @apply flex flex-col gap-2 rounded-lg p-3;
+    @apply flex flex-col gap-2 rounded-xs p-3;
     border: 1px solid;
 }
 .pg-token-name { @apply text-xs font-bold uppercase tracking-wide; }
 .pg-token-swatches { @apply flex gap-1.5; }
 .pg-token-swatch {
-    @apply w-7 h-7 rounded;
+    @apply w-7 h-7 rounded-xs;
     border: 1px solid var(--color-border);
 }
 .pg-token-sample { @apply text-sm; }
@@ -9306,7 +9336,7 @@ a.is-test-link:focus-visible {
    view shows it in the document's theme regardless of the pane. Amber because
    it is a caveat on the specimen, not a fault in it. */
 .pg-unscoped {
-    @apply text-[10px] font-mono rounded px-1 py-0.5;
+    @apply text-[10px] font-mono rounded-xs px-1 py-0.5;
     background-color: var(--color-warning-surface);
     color: var(--color-warning-text);
 }
@@ -9320,7 +9350,7 @@ a.is-test-link:focus-visible {
 
 /* The curators' row above the comparison: which one is shown, and Edit. */
 .home-curator {
-    @apply flex flex-wrap items-center gap-3 rounded-lg px-3 py-2;
+    @apply flex flex-wrap items-center gap-3 rounded-xs px-3 py-2;
     background-color: var(--color-surface-muted);
     border: 1px dashed var(--color-border-strong);
 }
@@ -9376,7 +9406,7 @@ a.is-test-link:focus-visible {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
 }
 .home-panel {
-    @apply flex flex-col gap-3 rounded-lg p-3;
+    @apply flex flex-col gap-3 rounded-xs p-3;
     /* The frame height every presented chart draws to (utils/presentedHeight.js).
        One height for every panel, Charge Stop's two stacked charts included, so a
        row of panels is one height and nothing is left with a gap under it. */

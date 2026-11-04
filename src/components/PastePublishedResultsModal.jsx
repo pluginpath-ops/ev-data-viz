@@ -124,7 +124,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                 />
 
                 {parsed && (
-                    <div className="mt-3 border rounded-lg p-3 border-[var(--color-border)]">
+                    <div className="mt-3 border rounded-xs p-3 border-[var(--color-border)]">
                         <div className="font-semibold text-sm mb-2">
                             {parsed.matched} line{parsed.matched === 1 ? '' : 's'} read
                             {parsed.unmatched.length > 0 && (
@@ -220,7 +220,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                     spelled out with the actual numbers, because "omit"/"include"
                     in a footnote is exactly the wording people read backwards. */}
                 {printedSixty != null && (
-                    <div className="mt-3 border rounded-lg p-3 border-[var(--color-border)]">
+                    <div className="mt-3 border rounded-xs p-3 border-[var(--color-border)]">
                         <div className="text-xs font-semibold mb-1">
                             Rollout basis — check before importing
                         </div>

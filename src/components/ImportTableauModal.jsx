@@ -220,7 +220,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                             </div>
 
                             {/* Global prefix */}
-                            <div className="flex items-center gap-3 p-3 bg-[var(--color-surface-muted)] rounded-lg border">
+                            <div className="flex items-center gap-3 p-3 bg-[var(--color-surface-muted)] rounded-xs border">
                                 <label className="text-sm font-medium text-secondary whitespace-nowrap">
                                     Run name prefix:
                                 </label>

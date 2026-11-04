@@ -227,7 +227,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 data:            plottableRuns.map(r => getY(r)),
                 backgroundColor: plottableRuns.map(r => colorMap[r.id] || DEFAULT_RUN_COLOR),
                 borderColor:     plottableRuns.map(r => colorMap[r.id] || DEFAULT_RUN_COLOR),
-                borderRadius:    4,
+                borderRadius: 2,
                 borderSkipped:   false,
             }];
             return {

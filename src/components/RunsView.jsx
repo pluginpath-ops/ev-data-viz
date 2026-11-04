@@ -227,7 +227,7 @@ const DeriveAxisPanel = ({
     const canPreview = !batteryMissing && ready && editData !== null && !editDataLoading;
 
     return (
-        <div className="mt-2 border rounded bg-[var(--color-surface-muted)] p-3 space-y-3">
+        <div className="mt-2 border rounded-xs bg-[var(--color-surface-muted)] p-3 space-y-3">
             {/* Mode selector */}
             <div className="flex items-center gap-1 flex-wrap">
                 <span className="text-xs text-secondary mr-1">Derive:</span>
@@ -236,7 +236,7 @@ const DeriveAxisPanel = ({
                         key={key}
                         type="button"
                         onClick={() => onChangeMode(key)}
-                        className={`text-xs px-2 py-1 rounded border ${mode === key
+                        className={`text-xs px-2 py-1 rounded-xs border ${mode === key
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'bg-[var(--color-surface)] text-secondary hover:text-[var(--color-text-primary)]'}`}
                         title={`from ${m.source}`}
@@ -394,7 +394,7 @@ const DeriveAxisPanel = ({
                                     {preview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
                                 </div>
                             )}
-                            <div className="max-h-64 overflow-y-auto border rounded">
+                            <div className="max-h-64 overflow-y-auto border rounded-xs">
                                 <table className="text-xs w-full">
                                     <thead className="bg-[var(--color-surface-sunken)] sticky top-0">
                                         <tr>
@@ -1738,7 +1738,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 setFieldMapping({});
                                                 setUploadStep('file');
                                             }}
-                                            className="rounded"
+                                            className="rounded-xs"
                                         />
                                         CSV has no header row (use column numbers)
                                     </label>
@@ -1790,7 +1790,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                             {/* In create mode, allow editing metadata here too */}
                             {uploadMode === 'create' && (
-                                <div className="mb-6 p-4 bg-[var(--color-surface-muted)] rounded">
+                                <div className="mb-6 p-4 bg-[var(--color-surface-muted)] rounded-xs">
                                     <h4 className="font-semibold mb-3">Test Metadata</h4>
                                     <div className="space-y-3">
                                         <input
@@ -2296,7 +2296,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 return (
                                                                     <button
                                                                         onClick={() => handleEstimateRangeInEdit(effectiveRangeFromTest)}
-                                                                        className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
+                                                                        className="text-xs px-3 py-1 rounded-xs border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
                                                                         title={tip}
                                                                     >
                                                                         Measured ({effectiveRangeFromTest} mi / 100%){!hasSocMeta && ' *'}
@@ -2306,7 +2306,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             {epaRange && (
                                                                 <button
                                                                     onClick={() => handleEstimateRangeInEdit(epaRange)}
-                                                                    className="text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
+                                                                    className="text-xs px-3 py-1 rounded-xs border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
                                                                     title={`Use the vehicle's ${epaName} range (${epaRange} mi) as the 100% SoC baseline`}
                                                                 >
                                                                     {epaName} ({epaRange} mi)
@@ -2360,7 +2360,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <p className="text-sm text-secondary py-4 text-center">Loading…</p>
                                             ) : (
                                                 <>
-                                                    <div className="overflow-auto rounded border" style={{ maxHeight: 360 }}>
+                                                    <div className="overflow-auto rounded-xs border" style={{ maxHeight: 360 }}>
                                                         <table className="w-full text-xs border-collapse">
                                                             <thead className="bg-[var(--color-surface-muted)] sticky top-0 z-10 border-b">
                                                                 <tr>

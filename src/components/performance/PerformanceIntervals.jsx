@@ -128,7 +128,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
             )}
 
             {draft && (
-                <div className="mt-2 border rounded-lg p-2 border-[var(--color-border)]">
+                <div className="mt-2 border rounded-xs p-2 border-[var(--color-border)]">
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="text-[11px]">
                             <span className="text-secondary block">Type</span>

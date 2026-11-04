@@ -86,7 +86,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                         <span className="font-semibold text-sm">
                             {formatTestedAt(session.tested_at) || 'Undated session'}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium capitalize text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-xs border font-medium capitalize text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]">
                             {session.test_type}
                         </span>
                         <span className="text-xs text-meta">{runs.length} runs</span>
@@ -98,7 +98,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                         shown until now — a session with no visible provenance is
                         just a number you have to take on trust. */}
                     <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-xs border font-medium text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]">
                             {shown('source_name') || 'Unattributed'}
                         </span>
                         {shown('source_url') && (
@@ -123,7 +123,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                     </div>
 
                     {editingSource && (
-                        <div className="mt-2 border rounded-lg p-2 border-[var(--color-border)] max-w-md">
+                        <div className="mt-2 border rounded-xs p-2 border-[var(--color-border)] max-w-md">
                             <CuratorField
                                 label="Source" value={shown('source_name')} canEdit
                                 overrideSource={'source_name' in edits ? 'pending' : undefined}

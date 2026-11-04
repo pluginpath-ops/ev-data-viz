@@ -25,7 +25,7 @@ function OriginBadge({ entry }) {
         : 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700';
     return (
         <span
-            className={`text-[9px] px-1 py-0.5 rounded border font-medium ${style}`}
+            className={`text-[9px] px-1 py-0.5 rounded-xs border font-medium ${style}`}
             title="Full run data held here — this figure is derived from it, not quoted."
         >
             full data

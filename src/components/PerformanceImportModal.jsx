@@ -129,7 +129,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                 {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
 
                 {match && (
-                    <div className="mt-3 border rounded-lg p-3 border-amber-500/40 bg-amber-500/5">
+                    <div className="mt-3 border rounded-xs p-3 border-amber-500/40 bg-amber-500/5">
                         <div className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-1">
                             These runs are already here
                         </div>
@@ -151,7 +151,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                 )}
 
                 {parsed && (
-                    <div className="mt-3 border rounded-lg p-3 border-[var(--color-border)]">
+                    <div className="mt-3 border rounded-xs p-3 border-[var(--color-border)]">
                         <div className="font-semibold text-sm mb-1">
                             {parsed.runs.length} run{parsed.runs.length === 1 ? '' : 's'} found
                             <span className="text-meta font-normal ml-2 text-xs">
