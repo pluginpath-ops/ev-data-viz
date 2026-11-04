@@ -115,7 +115,7 @@ export default function SessionControl({
                     <option value={current.id}>{sessionLabel(current)}</option>
                 )}
                 <option value="__new__">+ New session…</option>
-                <option value="__browse__">🔍 All sessions…</option>
+                <option value="__browse__">All sessions…</option>
             </select>
 
             {/* Editable wherever it is named: noticing a session is misdated

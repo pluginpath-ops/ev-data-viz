@@ -151,7 +151,7 @@ export default function HomeView({ slug, onSlugChange }) {
                         </button>
                         <button type="button" className="btn btn-secondary" onClick={copyUrl}
                             title="Copy a link to this featured comparison">
-                            {urlCopied ? '✓ Copied' : '🔗 URL'}
+                            {urlCopied ? '✓ Copied' : 'URL'}
                         </button>
                     </div>
                 </div>

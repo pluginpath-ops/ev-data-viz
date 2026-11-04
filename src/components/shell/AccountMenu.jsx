@@ -55,7 +55,7 @@ export default function AccountMenu({ user, userRole, units, onToggleUnits, onSi
                             <>
                                 <span className="account-email">{user.email}</span>
                                 {userRole && userRole !== 'user' && (
-                                    <span className="owner-badge">{userRole.toUpperCase()}</span>
+                                    <span className="badge-micro is-accent ml-2">{userRole.toUpperCase()}</span>
                                 )}
                             </>
                         ) : (

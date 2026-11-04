@@ -995,7 +995,7 @@ export default function EpaCurvesView({
                                 className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
                                 title="Copy link to this chart view"
                             >
-                                {urlCopied ? '✓ Copied' : '🔗 URL'}
+                                {urlCopied ? '✓ Copied' : 'URL'}
                             </button>
                             <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} disabled={!datasets.length} />
                         </>

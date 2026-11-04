@@ -62,7 +62,7 @@ export default function DeleteQueueBar({
                 )}
                 <div className="page-container py-3 flex items-center gap-4">
                     <span className="text-red-700 font-medium flex-1">
-                        🗑 {plural(pendingCount)} queued for deletion
+                        {plural(pendingCount)} queued for deletion
                     </span>
                     <button onClick={onClearQueue} className="btn btn-secondary text-sm">
                         Clear queue

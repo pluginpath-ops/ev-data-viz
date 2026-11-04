@@ -545,7 +545,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                 info={<InfoIcon text={EPA_EXPLAINERS.steadyStateCurve} className="ml-1" />}
                 actions={canEdit && (
                     <>
-                        <SectionAction onClick={() => setShowPdfModal(true)}>📑 Import from EPA lab PDF</SectionAction>
+                        <SectionAction onClick={() => setShowPdfModal(true)}>Import from EPA lab PDF</SectionAction>
                         <SectionAction onClick={() => { setShowCreate(true); setCreateError(null); }}>
                             + Create EPA test vehicle from scratch
                         </SectionAction>
@@ -618,7 +618,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                         onClick={() => setShowPdfModal(true)}
                         className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline mt-2 mr-4"
                     >
-                        📑 Import from EPA lab PDF
+                        Import from EPA lab PDF
                     </button>
                     {showPdfModal && (
                         <LazyBoundary>

@@ -238,7 +238,7 @@ export default function PerformanceCompareChart({
                         className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
                         title="Copy link to this chart view"
                     >
-                        {urlCopied ? '✓ Copied' : '🔗 URL'}
+                        {urlCopied ? '✓ Copied' : 'URL'}
                     </button>
                     <button
                         onClick={copyPng}

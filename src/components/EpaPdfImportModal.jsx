@@ -280,7 +280,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                     <button onClick={onClose} className="text-meta hover:text-secondary text-xl leading-none">×</button>
                 </div>
 
-                {error && <div className="note-panel is-danger mb-3">⚠️ {error}</div>}
+                {error && <div className="note-panel is-danger mb-3">⚠ {error}</div>}
 
                 {step === 'upload' && (
                     <div

@@ -246,7 +246,7 @@ export default function SpecsScatterView({ xPlot, yPlot, xCol, yCol, colorOf, un
                         className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
                         title="Copy link to this chart view"
                     >
-                        {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                        {copiedUrl ? '✓ Copied' : 'URL'}
                     </button>
                     <button
                         onClick={copyPng}

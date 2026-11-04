@@ -220,7 +220,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                     {!confirmDelete && (
                         <>
                             <button onClick={onClose} className="btn btn-secondary text-sm">Cancel</button>
-                            <button onClick={handleSave} disabled={saving} className="btn btn-primary text-sm">
+                            <button onClick={handleSave} disabled={saving} className="btn btn-commit text-sm">
                                 {saving ? 'Saving…' : 'Save'}
                             </button>
                         </>

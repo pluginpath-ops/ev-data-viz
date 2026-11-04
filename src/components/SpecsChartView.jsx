@@ -192,7 +192,7 @@ export default function SpecsChartView({ plot, col, colorOf, units, scope = 'sel
                         className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
                         title="Copy link to this chart view"
                     >
-                        {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                        {copiedUrl ? '✓ Copied' : 'URL'}
                     </button>
                     <button
                         onClick={copyPng}

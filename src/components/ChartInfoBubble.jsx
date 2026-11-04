@@ -5,7 +5,7 @@ import {
 } from '../utils/chartHelpContent';
 
 /**
- * ChartInfoBubble — a small, non-interactive "ℹ️ About this chart" disclosure
+ * ChartInfoBubble — a small, non-interactive "About this chart" disclosure
  * pinned near the bottom of each Charts sub-tab. Explains, in plain language,
  * what data a chart shows, why it's relevant, key terms/units, and the
  * high-level math.
@@ -13,7 +13,7 @@ import {
  * Copy is admin/contributor-editable and stored in the `chart_help` table
  * (loaded once into AppContext); it falls back to bundled defaults in
  * src/utils/chartHelpContent.js when a row is missing or in localStorage mode.
- * Contributors get an inline ✏️ edit form (the only interactivity beyond
+ * Contributors get an inline ✎ edit form (the only interactivity beyond
  * show/hide). Hidden entirely in presentation/pop-out mode.
  *
  * Props:
@@ -65,7 +65,7 @@ export default function ChartInfoBubble({ chartKey }) {
                         aria-hidden="true"
                         style={{ display: 'inline-block', transition: 'transform 0.2s', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}
                     >▶</span>
-                    <span>ℹ️ {title}</span>
+                    <span>{title}</span>
                 </button>
                 {isContributor && open && !editing && (
                     <button
@@ -74,7 +74,7 @@ export default function ChartInfoBubble({ chartKey }) {
                         className="btn btn-secondary ml-auto"
                         title="Edit this explanation"
                     >
-                        ✏️ Edit
+                        ✎ Edit
                     </button>
                 )}
             </div>

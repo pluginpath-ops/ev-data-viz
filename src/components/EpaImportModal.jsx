@@ -121,7 +121,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 onDragOver={handleDragOver}
                                 onDragLeave={handleDragLeave}
                             >
-                                <div className="text-4xl mb-3">📂</div>
+                                <div className="text-4xl mb-3">⇪</div>
                                 <p className="font-medium text-secondary">Drop the EPA testcar TSV here, or click to browse</p>
                                 <p className="text-sm text-meta mt-1">Accepts .csv (Excel) or .txt / .tsv (tab-separated) · Pre-filter to your vehicles of interest</p>
                                 <input ref={fileRef} type="file" accept=".txt,.tsv,.csv" className="hidden" onChange={handleFilePick} />
@@ -161,7 +161,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                             </div>
 
                             {error && (
-                                <div className="note-panel is-danger mb-4">⚠️ {error}</div>
+                                <div className="note-panel is-danger mb-4">⚠ {error}</div>
                             )}
 
                             {/* Table */}
@@ -265,7 +265,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                     {/* ── Step 3: Done ─────────────────────────────────────── */}
                     {step === 'done' && result && (
                         <div className="flex flex-col items-center py-8 text-center">
-                            <div className="text-5xl mb-4">✅</div>
+                            <div className="text-5xl mb-4">✓</div>
                             <p className="text-lg font-semibold mb-2">Import complete</p>
                             <p className="text-secondary">
                                 <strong>{result.testVehiclesCount}</strong> test vehicle{result.testVehiclesCount !== 1 ? 's' : ''} upserted

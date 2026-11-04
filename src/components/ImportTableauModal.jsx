@@ -161,7 +161,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                     {/* ── UPLOAD STEP ── */}
                     {step === 'upload' && (
                         <div className="flex flex-col items-center justify-center py-12 gap-4">
-                            <div className="text-5xl">📂</div>
+                            <div className="text-5xl">⇪</div>
                             <p className="text-secondary text-center max-w-sm">
                                 Export your Tableau workbook as <strong>CSV</strong> and upload it here.
                                 Columns should include <em>Date of charging test</em>, <em>Optimized</em>,
@@ -351,7 +351,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                     {/* ── DONE STEP ── */}
                     {step === 'done' && result && (
                         <div className="flex flex-col items-center justify-center py-12 gap-3">
-                            <div className="text-5xl">✅</div>
+                            <div className="text-5xl">✓</div>
                             <h3 className="text-lg font-bold">Import complete</h3>
                             <div className="flex flex-wrap gap-2 justify-center mt-1">
                                 {result.vehiclesCreated > 0 && (

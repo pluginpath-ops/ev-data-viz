@@ -266,7 +266,7 @@ export const LEDGER = [
     },
     {
         key: 'apply-palette',
-        count: 16,  // 17 → 16: .specs-chart-field-select's @apply focus:ring-blue-500 went with the select it styled (#450)
+        count: 11,  // 16 → 11: .badge-hidden, the vote buttons and .owner-badge moved onto the status tints (button and pill pass)
         scope: 'src/index.css',
         what: 'Semantic classes whose @apply line reaches for a palette color. These '
             + 'are the sharpest kind of drift: the class NAME says the right thing, so '

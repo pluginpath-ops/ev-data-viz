@@ -204,7 +204,7 @@ export default function FeaturedComparisonEditor({ request, comparisons, vehicle
                         <>
                             <span className="text-meta mr-auto self-center">{problems[0]}</span>
                             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
-                            <button type="button" onClick={save} disabled={saving || problems.length > 0 || slugTaken} className="btn btn-primary">
+                            <button type="button" onClick={save} disabled={saving || problems.length > 0 || slugTaken} className="btn btn-commit">
                                 {saving ? 'Saving…' : 'Save'}
                             </button>
                         </>

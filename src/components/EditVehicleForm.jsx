@@ -533,7 +533,7 @@ export default function EditVehicleForm({
                     <button type="button" onClick={onCancel} className="btn btn-secondary text-sm">
                         Cancel
                     </button>
-                    <button type="submit" className="btn btn-primary text-sm">
+                    <button type="submit" className="btn btn-commit text-sm">
                         {editingId ? 'Save Changes' : 'Add Vehicle'}
                     </button>
                 </div>

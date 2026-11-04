@@ -848,7 +848,7 @@ export default function VehiclesView({
                             className={`btn btn-toggle${editingOrder ? ' active' : ''} flex-shrink-0`}
                             style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
                         >
-                            ✏️ Edit Order
+                            ✎ Edit Order
                         </button>
                     )}
             </VehicleFilterBar>
@@ -982,7 +982,7 @@ export default function VehiclesView({
                         <button onClick={handleCancelOrder} disabled={savingOrder} className="btn btn-secondary text-sm">
                             Cancel
                         </button>
-                        <button onClick={handleSaveOrder} disabled={savingOrder} className="btn btn-primary text-sm flex items-center gap-2">
+                        <button onClick={handleSaveOrder} disabled={savingOrder} className="btn btn-commit text-sm flex items-center gap-2">
                             {savingOrder && (
                                 <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

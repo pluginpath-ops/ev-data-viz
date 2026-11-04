@@ -1418,7 +1418,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
                             title="Copy link to this chart view"
                         >
-                            {copied ? '✓ Copied' : '🔗 URL'}
+                            {copied ? '✓ Copied' : 'URL'}
                         </button>
                         <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                     </>

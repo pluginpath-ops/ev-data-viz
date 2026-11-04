@@ -240,7 +240,7 @@ export default function ImportVehiclesModal({ onClose }) {
                 </div>
 
                 {error && (
-                    <div className="note-panel is-danger mb-3">⚠️ {error}</div>
+                    <div className="note-panel is-danger mb-3">⚠ {error}</div>
                 )}
 
                 {step === 'upload' && (

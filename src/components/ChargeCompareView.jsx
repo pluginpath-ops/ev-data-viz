@@ -1111,7 +1111,7 @@ export default function ChargeCompareView({
                                     className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
                                     title="Copy link to this chart view"
                                 >
-                                    {copied ? '✓ Copied' : '🔗 URL'}
+                                    {copied ? '✓ Copied' : 'URL'}
                                 </button>
                                 <button
                                     onClick={png1.copyPng}

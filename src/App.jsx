@@ -1394,7 +1394,7 @@ export default function App() {
             {appNotification && (
                 <div className={`fixed-action-bar z-[60] ${appNotification.type === 'error' ? 'is-danger' : 'is-good'}`}>
                     <div className="page-container py-3 flex items-center gap-4">
-                        <span className="text-xl">{appNotification.type === 'error' ? '⚠️' : '✓'}</span>
+                        <span className="text-xl">{appNotification.type === 'error' ? '⚠' : '✓'}</span>
                         <p className={`flex-1 text-sm font-medium ${
                             appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
                         }`}>

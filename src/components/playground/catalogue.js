@@ -108,11 +108,10 @@ export const NOT_CATALOGUED = {
  * and cannot silently grow.
  */
 export const DARK_OVERRIDE_CLASSES = new Set([
-    'badge-hidden',
-    'brand-alias-chip', 'chart-copy-btn-active',
+    'chart-copy-btn-active',
     'guide-row', 'guide-tested-note',
     'merge-target-banner', 'stats-suppressed-flag',
-    'sweep-batch', 'vote-btn-vouch'
+    'sweep-batch'
 ]);
 
 /** Whether a specimen's class list contains one that cannot scope. */
@@ -140,7 +139,7 @@ export const SECTIONS = [
             { cls: 'note-panel', as: 'span', label: '⚠ Set the battery capacity to derive charging axes.',
               note: 'Warning is the default.' },
             { cls: 'note-panel is-danger', as: 'span', label: 'Could not read that file.' },
-            { cls: 'note-panel is-info', as: 'span', label: '📅 Timestamps detected — will be converted.',
+            { cls: 'note-panel is-info', as: 'span', label: 'Timestamps detected — will be converted.',
               note: 'The brand surface, not a status one: nothing is wrong.' },
             { cls: 'state-panel', as: 'span', label: 'Neutral — nothing to report yet.' },
             { cls: 'state-panel is-good', as: 'span', label: '✓ Range will be estimated from test data.' },
@@ -243,13 +242,14 @@ export const SECTIONS = [
     {
         id: 'buttons',
         title: 'Buttons',
-        blurb: 'Solid, rectangular actions. `.btn` is the base; add one intent class. '
+        blurb: 'Tinted, rectangular actions — a wash, a deep edge and a light label, one shape for every intent. `.btn` is the base; add one intent class. '
              + 'One size — the compact metrics that used to be `.btn-sm` are now the base, '
              + 'and the modifier is gone (#277).',
         specimens: [
-            { cls: 'btn btn-primary',   as: 'button', label: 'Primary',   note: 'Additive / available actions — Add, Save, View.' },
+            { cls: 'btn btn-commit',    as: 'button', label: 'Commit',    note: 'The one action a view exists to take — Save, Sign in. The only solid fill; at most one per view.' },
+            { cls: 'btn btn-primary',   as: 'button', label: 'Primary',   note: 'Additive / available actions — Add, Upload, View.' },
             { cls: 'btn btn-secondary', as: 'button', label: 'Secondary', note: 'Cancel, Back, and the unselected half of an exclusive pair.' },
-            { cls: 'btn btn-edit',      as: 'button', label: 'Edit',      note: 'Edit actions. Currently the same green as success.' },
+            { cls: 'btn btn-edit',      as: 'button', label: 'Edit',      note: 'Edit actions. The same neutral as Secondary — green is the success hue.' },
             { cls: 'btn btn-warning',   as: 'button', label: 'Warning',   note: 'Attention-drawing but not destructive.' },
             { cls: 'btn btn-danger',    as: 'button', label: 'Danger',    note: 'Destructive. Delete, Remove.' },
             { cls: 'btn-icon-danger',   as: 'button', label: 'Danger · icon',
@@ -279,9 +279,9 @@ export const SECTIONS = [
             { cls: 'guide-chip',        as: 'button', label: 'Filter chip',  note: 'The shared chip metrics — text-xs, px-2 py-0.5.' },
             { cls: 'guide-chip active', as: 'button', label: 'Filter chip · active' },
             { cls: 'tag-filter-btn tag-filter-na',  as: 'button', label: 'Tag filter · off',  note: 'Was text-sm/px-3 py-1; now matches the filter chip.' },
-            { cls: 'tag-filter-btn tag-filter-and', as: 'button', label: 'Tag filter · AND',  note: 'Raw bg-blue-500, outside the token system.' },
-            { cls: 'tag-filter-btn tag-filter-or',  as: 'button', label: 'Tag filter · OR',   note: 'Raw bg-green-500.' },
-            { cls: 'tag-filter-btn tag-filter-not', as: 'button', label: 'Tag filter · NOT',  note: 'Raw bg-red-500.' },
+            { cls: 'tag-filter-btn tag-filter-and', as: 'button', label: 'Tag filter · AND',  note: 'Primary tint.' },
+            { cls: 'tag-filter-btn tag-filter-or',  as: 'button', label: 'Tag filter · OR',   note: 'Success tint.' },
+            { cls: 'tag-filter-btn tag-filter-not', as: 'button', label: 'Tag filter · NOT',  note: 'Danger tint — the exclusion.' },
             { cls: 'selected-vehicle-chip', as: 'span', label: 'Selected vehicle', note: 'Persistent selection row. No border — "blue on blue".' },
             { cls: 'session-vehicle-chip',  as: 'span', label: 'Session vehicle' },
             { cls: 'tag-pill',        as: 'span', label: 'Tag' },
@@ -302,7 +302,6 @@ export const SECTIONS = [
               note: 'DEF. The one accent-colored marker, because it is the only one saying which row is privileged rather than what a row measured.' },
             { cls: 'badge-hidden',    as: 'span', label: 'Hidden' },
             { cls: 'badge-status',    as: 'span', label: 'Status' },
-            { cls: 'owner-badge',     as: 'span', label: 'Owner' },
             { cls: 'badge-micro is-qualified', as: 'span', label: 'Corrected' },
             { cls: 'guide-narrowed-chip', as: 'button', label: '2026 ✕',
               note: 'Removes its own value. The opposite of the chips it replaced, which selected one — hence the ✕ and the danger-colored hover.' },

@@ -1,7 +1,7 @@
 # Design tokens
 
 Every color and radius the app is allowed to use, defined in `src/index.css` in
-two blocks: `:root, [data-theme="light"]` and `[data-theme="dark"]`. All 65 are
+two blocks: `:root, [data-theme="light"]` and `[data-theme="dark"]`. All 68 are
 defined in both — there is no token with only one value.
 
 Specimens, live contrast ratios and a side-by-side of the two themes are on
@@ -47,10 +47,10 @@ issue for what is outstanding.
 | `accent-orange-surface` | `rgba(217, 119, 6, 0.10)` | `rgba(242, 139, 60, 0.10)` | 8 |
 | `accent-violet` | `rgb(124, 58, 237)` | `rgb(155, 140, 240)` | 5 |
 | `primary` | `rgb(59, 130, 246)` | `rgb(45, 127, 249)` | 129 |
-| `primary-border` | `rgb(147, 197, 253)` | `rgba(45, 127, 249, 0.35)` | 8 |
+| `primary-border` | `rgb(147, 197, 253)` | `rgba(45, 127, 249, 0.60)` | 8 |
 | `primary-hover` | `rgb(37, 99, 235)` | `rgb(26, 110, 232)` | 6 |
 | `primary-light` | `rgb(219, 234, 254)` | `rgba(45, 127, 249, 0.25)` | 17 |
-| `primary-surface` | `rgb(219, 234, 254)` | `rgba(45, 127, 249, 0.15)` | 13 |
+| `primary-surface` | `rgb(219, 234, 254)` | `rgba(45, 127, 249, 0.18)` | 13 |
 | `primary-text` | `rgb(30, 64, 175)` | `rgb(168, 203, 255)` | 21 |
 
 #### Surfaces
@@ -75,12 +75,12 @@ issue for what is outstanding.
 | `text-faint` | `rgb(156, 163, 175)` | `rgb(61, 74, 90)` | 34 |
 | `text-header-label` | `rgb(55, 65, 81)` | `rgb(195, 204, 216)` | 4 |
 | `text-link` | `rgb(29, 78, 216)` | `rgb(143, 186, 255)` | 5 |
-| `text-meta` | `rgb(107, 114, 128)` | `rgb(124, 135, 152)` | 46 |
-| `text-muted` | `rgb(107, 114, 128)` | `rgb(139, 149, 165)` | 30 |
+| `text-meta` | `rgb(107, 114, 128)` | `rgb(156, 166, 181)` | 46 |
+| `text-muted` | `rgb(107, 114, 128)` | `rgb(156, 166, 181)` | 30 |
 | `text-nav-meta` | `rgb(219, 234, 254)` | `rgb(143, 176, 224)` | 5 |
 | `text-on-nav` | `rgb(255, 255, 255)` | `rgb(255, 255, 255)` | 7 |
 | `text-primary` | `rgb(17, 24, 39)` | `rgb(242, 245, 249)` | 86 |
-| `text-secondary` | `rgb(75, 85, 99)` | `rgb(168, 178, 193)` | 63 |
+| `text-secondary` | `rgb(75, 85, 99)` | `rgb(192, 201, 214)` | 63 |
 | `text-value` | `rgb(17, 24, 39)` | `rgb(230, 235, 242)` | 9 |
 
 #### Lines
@@ -96,19 +96,19 @@ issue for what is outstanding.
 | token | light | dark | uses |
 |---|---|---|---:|
 | `danger` | `rgb(239, 68, 68)` | `rgb(220, 75, 66)` | 49 |
-| `danger-border` | `rgb(254, 202, 202)` | `rgba(232, 90, 80, 0.35)` | 10 |
+| `danger-border` | `rgb(254, 202, 202)` | `rgba(232, 90, 80, 0.60)` | 10 |
 | `danger-hover` | `rgb(220, 38, 38)` | `rgb(195, 61, 53)` | 3 |
-| `danger-surface` | `rgb(254, 242, 242)` | `rgba(232, 90, 80, 0.14)` | 11 |
+| `danger-surface` | `rgb(254, 242, 242)` | `rgba(232, 90, 80, 0.18)` | 11 |
 | `danger-text` | `rgb(153, 27, 27)` | `rgb(240, 146, 139)` | 13 |
 | `success` | `rgb(34, 197, 94)` | `rgb(35, 180, 126)` | 33 |
-| `success-border` | `rgb(187, 247, 208)` | `rgba(35, 180, 126, 0.35)` | 7 |
+| `success-border` | `rgb(187, 247, 208)` | `rgba(35, 180, 126, 0.60)` | 7 |
 | `success-hover` | `rgb(22, 163, 74)` | `rgb(28, 150, 104)` | 2 |
-| `success-surface` | `rgb(240, 253, 244)` | `rgba(35, 180, 126, 0.14)` | 9 |
+| `success-surface` | `rgb(240, 253, 244)` | `rgba(35, 180, 126, 0.18)` | 9 |
 | `success-text` | `rgb(22, 101, 52)` | `rgb(95, 214, 168)` | 9 |
 | `warning` | `rgb(245, 158, 11)` | `rgb(242, 139, 60)` | 66 |
-| `warning-border` | `rgb(253, 230, 138)` | `rgba(242, 139, 60, 0.35)` | 10 |
+| `warning-border` | `rgb(253, 230, 138)` | `rgba(242, 139, 60, 0.60)` | 10 |
 | `warning-hover` | `rgb(217, 119, 6)` | `rgb(224, 122, 43)` | 3 |
-| `warning-surface` | `rgb(255, 251, 235)` | `rgba(242, 139, 60, 0.12)` | 13 |
+| `warning-surface` | `rgb(255, 251, 235)` | `rgba(242, 139, 60, 0.18)` | 13 |
 | `warning-text` | `rgb(146, 64, 14)` | `rgb(245, 176, 119)` | 17 |
 
 #### Other
@@ -117,6 +117,9 @@ issue for what is outstanding.
 |---|---|---|---:|
 | `background` | `rgb(249, 250, 251)` | `rgb(13, 17, 23)` | 9 |
 | `chart-axis` | `rgb(156, 163, 175)` | `rgb(61, 74, 90)` | 4 |
+| `commit` | `rgb(37, 99, 235)` | `rgb(45, 127, 249)` | 3 |
+| `commit-hover` | `rgb(30, 64, 175)` | `rgb(92, 156, 251)` | 3 |
+| `commit-text` | `rgb(255, 255, 255)` | `rgb(13, 17, 23)` | 3 |
 | `chart-grid` | `rgb(229, 231, 235)` | `rgb(26, 33, 44)` | 3 |
 | `edit` | `rgb(34, 197, 94)` | `rgb(35, 180, 126)` | 7 |
 | `edit-hover` | `rgb(22, 163, 74)` | `rgb(28, 150, 104)` | 3 |
@@ -132,8 +135,21 @@ issue for what is outstanding.
 
 ## Notes on specific tokens
 
-**`text-meta` and `text-muted` are the same tier.** Identical in light
-(`rgb(107,114,128)`), a shade apart in dark. Two names for one idea, 46 and 30
+**One button and pill style: tinted.** Every `.btn-*` intent, the tag filter's
+AND/OR/NOT and the guide badges draw a wash (`-surface`), a deep edge
+(`-border`) and a light label (`-text`). The solid fills under white they
+replaced all measured below AA in dark (2.46–4.09:1). The dark washes went from
+0.12–0.15 to 0.18 and the edges from 0.35 to 0.60 at the same time, because what
+read as low contrast was the shape, not the text. `commit` / `-hover` / `-text`
+paint `.btn-commit`, the one solid button a view may carry, and in dark its
+label is the page color, not white.
+
+**`edit` and `edit-hover` no longer paint anything.** `.btn-edit` is the
+secondary neutral now, since green is the success hue. The tokens remain
+until something takes them or they are removed.
+
+**`text-meta` and `text-muted` are the same tier.** Identical in both themes
+since the button and pill pass (dark was a shade apart). Two names for one idea, 46 and 30
 uses — worth collapsing to one.
 
 **`primary-light` and `primary-surface` are identical in light**, and differ

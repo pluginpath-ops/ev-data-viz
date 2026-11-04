@@ -105,13 +105,13 @@ const TESTS_SECTION_HELP =
 // Counts are computed from data the view already has, so a tab can say how much
 // is behind it without fetching anything to find out.
 const SUBTABS = [
-    { id: 'tests',       label: '📏 Charging & Range', count: d => d.displayRuns.length },
-    { id: 'inherited',   label: '🔗 Inherited',     count: d => d.inheritedRuns.length },
-    { id: 'performance', label: '⚡ Performance',   count: d => {
+    { id: 'tests',       label: 'Charging & Range', count: d => d.displayRuns.length },
+    { id: 'inherited',   label: 'Inherited',     count: d => d.inheritedRuns.length },
+    { id: 'performance', label: 'Performance',   count: d => {
         const c = d.performanceCounts?.[d.vehicle.id];
         return c ? (c.accel ?? 0) + (c.braking ?? 0) : null;
     } },
-    { id: 'epa',         label: '🏛 EPA',           count: d => d.vehicle.epa_mappings?.length || null },
+    { id: 'epa',         label: 'EPA',           count: d => d.vehicle.epa_mappings?.length || null },
 ];
 
 /** Valid sub-tab ids, for App.jsx to validate the ?sub= URL param against. */
@@ -1371,7 +1371,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <div className="list-thumbnail">
                     {displayImageUrl(vehicle)
                         ? <img src={displayImageUrl(vehicle)} alt={vehicle.name} decoding="async" className="w-full h-full object-cover" />
-                        : <span>🚗</span>
+                        : null
                     }
                 </div>
                 <div className="flex-1 min-w-0">
@@ -1862,7 +1862,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 if (!tsMapped && !timeColTs) return null;
                                 return (
                                     <p className="note-panel is-info mt-3">
-                                        📅 Timestamps detected — will be converted to elapsed minutes from the first data point
+                                        Timestamps detected — will be converted to elapsed minutes from the first data point
                                         {tsMapped && !timeMapped && ' (Elapsed Time will be derived automatically)'}
                                     </p>
                                 );
@@ -1876,7 +1876,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div className={`estimation-panel ${estimations.range === 'measured' ? 'is-good' : 'is-warning'}`}>
                                             <div className="flex-1 min-w-0">
                                                 <p className="state-panel-title">
-                                                    {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : '📏 Estimate from measured range test'}
+                                                    {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : 'Estimate from measured range test'}
                                                 </p>
                                                 {rangeTestRuns.length > 1 && (
                                                     <select
@@ -2334,7 +2334,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 return (
                                                     <div className={`state-panel ${tone}`}>
                                                         <span className="text-xs text-secondary">
-                                                            {editCalcKwh != null && <>⚡ <strong>Data points → {editCalcKwh} kWh</strong> · </>}
+                                                            {editCalcKwh != null && <><strong>Data points → {editCalcKwh} kWh</strong> · </>}
                                                             {packE != null
                                                                 ? <>pack ≈ {packE} kWh <span className="text-secondary">({dSoC}% × {cap} kWh)</span></>
                                                                 : <span className="text-secondary">add SoC data + battery capacity to validate energy</span>}
@@ -2347,7 +2347,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         )}
                                                         {excess != null && !good && (
                                                             <span className="badge-status is-warning">
-                                                                ⚠️ {excess >= 0 ? '+' : ''}{excess.toFixed(1)}% vs pack {excess < 0 ? '(below SoC-implied)' : '(>10% of capacity)'}
+                                                                ⚠ {excess >= 0 ? '+' : ''}{excess.toFixed(1)}% vs pack {excess < 0 ? '(below SoC-implied)' : '(>10% of capacity)'}
                                                             </span>
                                                         )}
                                                         {packE != null && !hasManual && (
@@ -2875,7 +2875,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             className="w-4 h-4 shrink-0"
                                                         />
                                                         <span className={`spec-link-kind-pill is-${runKindFrom(r)}`}>
-                                                            {runKindFrom(r) === 'charging' ? '⚡' : '📏'}
+                                                            {runKindFrom(r) === 'charging' ? '↯' : '↔'}
                                                         </span>
                                                         <span className="truncate">{r.name}</span>
                                                         {r.date && <span className="text-xs text-meta shrink-0">{r.date}</span>}

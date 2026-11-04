@@ -1,7 +1,7 @@
 /**
  * Chart help / "About this chart" copy.
  *
- * Layman-friendly explanations shown in the collapsible ℹ️ bubble at the bottom
+ * Layman-friendly explanations shown in the collapsible ⓘ bubble at the bottom
  * of each Charts sub-tab. The authoritative copy lives in the `chart_help` table
  * (admin/contributor-editable, seeded by migration 031); these objects are the
  * BUNDLED FALLBACK used when a row is missing or in localStorage-only mode.

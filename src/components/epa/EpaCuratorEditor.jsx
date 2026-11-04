@@ -325,7 +325,7 @@ export default function EpaCuratorEditor({ testVehicleId, canEdit, onDirtyChange
                         <button onClick={resetEdits} disabled={saving} className="btn btn-secondary text-sm disabled:opacity-40">
                             Discard
                         </button>
-                        <button onClick={handleSave} disabled={saving} className="btn btn-primary text-sm disabled:opacity-40">
+                        <button onClick={handleSave} disabled={saving} className="btn btn-commit text-sm disabled:opacity-40">
                             {saving ? 'Saving…' : 'Save changes'}
                         </button>
                     </div>
