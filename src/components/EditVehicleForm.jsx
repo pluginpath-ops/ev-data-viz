@@ -259,7 +259,7 @@ export default function EditVehicleForm({
                                     type="button"
                                     onClick={handleCreateManufacturer}
                                     disabled={!newMfgName.trim() || mfgSaving}
-                                    className="btn btn-primary text-sm disabled:opacity-40"
+                                    className="btn btn-secondary text-sm disabled:opacity-40"
                                 >
                                     {mfgSaving ? 'Saving…' : 'Create'}
                                 </button>
@@ -438,7 +438,7 @@ export default function EditVehicleForm({
                                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); adoptInheritedTags(); onCreateTag(); } }}
                                 className="form-input form-input flex-1"
                             />
-                            <button type="button" onClick={() => { adoptInheritedTags(); onCreateTag(); }} className="btn btn-primary text-sm">
+                            <button type="button" onClick={() => { adoptInheritedTags(); onCreateTag(); }} className="btn btn-secondary text-sm">
                                 Create tag
                             </button>
                         </div>
@@ -505,7 +505,7 @@ export default function EditVehicleForm({
                             </div>
                         )}
                         <label className="image-upload-label">
-                            <span className="btn btn-primary text-sm">
+                            <span className="btn btn-secondary text-sm">
                                 {imageUploading ? 'Uploading…' : ownValues(editingVehicle ?? {}).image_url ? 'Replace image' : 'Upload image'}
                             </span>
                             <input
@@ -602,7 +602,7 @@ export default function EditVehicleForm({
                                 type="button"
                                 onClick={handleCropConfirm}
                                 disabled={!completedCrop?.width}
-                                className="btn btn-primary text-sm"
+                                className="btn btn-secondary text-sm"
                             >
                                 Use this crop
                             </button>

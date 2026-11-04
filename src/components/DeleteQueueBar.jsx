@@ -43,7 +43,7 @@ export default function DeleteQueueBar({
                     <span className="text-gray-400 text-sm tabular-nums w-6 text-right">
                         {secondsLeft}s
                     </span>
-                    <button onClick={onUndo} className="btn btn-primary text-sm">
+                    <button onClick={onUndo} className="btn btn-secondary text-sm">
                         ↩ Undo
                     </button>
                 </div>
@@ -68,7 +68,7 @@ export default function DeleteQueueBar({
                         Clear queue
                     </button>
                     <button onClick={onCommit} className="btn btn-danger text-sm">
-                        Delete {plural(pendingCount)} →
+                        Delete {plural(pendingCount)}
                     </button>
                 </div>
             </div>

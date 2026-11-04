@@ -72,7 +72,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
 
     return (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="modal-panel rounded-xl p-5 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+            <div className="modal-panel p-5 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
                 <h3 className="section-title mb-1">Import performance testing data</h3>
                 <p className="text-xs text-secondary mb-3">
                     For <span className="font-semibold">{vehicle?.name}</span>. Expects a GPS
@@ -222,7 +222,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                 <div className="flex gap-2 mt-4">
                     <button
                         type="button" onClick={handleImport} disabled={!parsed || busy}
-                        className="btn btn-primary text-sm disabled:opacity-50"
+                        className="btn btn-commit text-sm disabled:opacity-50"
                     >
                         {busy ? 'Working…'
                             : match ? `Add splits to ${match.matched} existing run${match.matched === 1 ? '' : 's'}`

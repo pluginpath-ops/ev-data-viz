@@ -197,7 +197,6 @@ describe('previewAxes', () => {
     });
 
     it('measures an added axis from the run’s first reading', () => {
-        expect(axisPoints(pts, 'time', 'deltaSoc')).toEqual([[0, 0], [10, 40], [20, 70]]);
         expect(axisPoints(pts, 'time', 'deltaRange')).toEqual([[0, 0], [10, 120], [20, 210]]);
     });
 

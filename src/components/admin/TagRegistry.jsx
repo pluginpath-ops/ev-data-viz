@@ -65,7 +65,7 @@ export default function TagRegistry() {
                                 </div>
                                 <div className="brand-row-actions">
                                     {draft !== tag.name && (
-                                        <button className="btn btn-primary" disabled={busy || !draft.trim()}
+                                        <button className="btn btn-commit" disabled={busy || !draft.trim()}
                                             onClick={() => run(() => updateTag(tag.id, draft.trim()))}>
                                             Save
                                         </button>

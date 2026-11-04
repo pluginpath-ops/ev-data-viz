@@ -47,7 +47,7 @@ import RunCard from './runs/RunCard';
 import CompositeRunCard from './runs/CompositeRunCard';
 import LineageChargingNote from './runs/LineageChargingNote';
 import VehicleCombobox from './VehicleCombobox';
-import { DATA_FLAGS, RunKindPill, FIELD_META, inferRunFlags } from './runs/runDisplay';
+import { DATA_FLAGS, RunKindBadge, FIELD_META, inferRunFlags } from './runs/runDisplay';
 
 
 
@@ -80,7 +80,7 @@ const EFFICIENCY_HELP =
 // On a charging test efficiency is not inert, but it is nearly so: the only
 // distance such a run carries is the range readout on its data points. Saying
 // so is the difference between "this knob does nothing" and "this knob does
-// one specific thing" — the question the missing kind pill left open.
+// one specific thing" — the question the missing kind badge left open.
 const EFFICIENCY_ON_CHARGING =
     'On a charging test the only distance to scale is the range readout on ' +
     'its data points — kWh and kW are capacity\'s job.';
@@ -373,7 +373,7 @@ const DeriveAxisPanel = ({
                             type="button"
                             onClick={onApply}
                             disabled={!preview || applying}
-                            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+                            className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                         >{applying ? 'Applying…' : 'Apply'}</button>
                         {!batteryMissing && usingAnchors && validAnchors.length < cfg.calibMinAnchors && (
                             <span className="text-xs text-meta">Need ≥{cfg.calibMinAnchors} anchors to preview</span>
@@ -1442,7 +1442,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <button
                             onClick={async () => { setDuplicatingVehicle(true); await onDuplicateVehicle(vehicle.id); setDuplicatingVehicle(false); }}
                             disabled={duplicatingVehicle}
-                            className="btn btn-primary disabled:opacity-50"
+                            className="btn btn-secondary disabled:opacity-50"
                         >
                             {duplicatingVehicle ? <><span className="spinner-inline"/>Copying…</> : '⧉ Copy'}
                         </button>
@@ -1532,7 +1532,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div>
                                             <p className="text-xs text-secondary mb-1">Data type</p>
                                             <div className="data-type-flags">
-                                                {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
+                                                {DATA_FLAGS.map(({ key, label, desc }) => {
                                                     const active = runMetadata.dataFlags.includes(key);
                                                     return (
                                                         <button
@@ -1540,7 +1540,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             type="button"
                                                             title={desc}
                                                             onClick={() => setRunMetadata(m => ({ ...m, dataFlags: [key] }))}
-                                                            className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-meta border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
+                                                            className={`guide-chip${active ? ' active' : ''}`}
                                                         >
                                                             {label}
                                                         </button>
@@ -1770,7 +1770,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <button
                                             onClick={handleSaveRecord}
                                             disabled={!runMetadata.name}
-                                            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="btn btn-commit disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save record
                                         </button>
@@ -1953,7 +1953,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 {uploadMode === 'create' ? (
                                     <button
                                         onClick={handleImport}
-                                        className="btn btn-primary"
+                                        className="btn btn-commit"
                                     >
                                         Import Run
                                     </button>
@@ -1961,7 +1961,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         onClick={handleMerge}
                                         disabled={merging || missingJoinKey}
-                                        className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
                                         {merging ? 'Merging…' : 'Merge into Run'}
                                     </button>
@@ -2015,7 +2015,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <div>
                                         <p className="text-xs text-secondary mb-1">Data type</p>
                                         <div className="data-type-flags">
-                                            {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
+                                            {DATA_FLAGS.map(({ key, label, desc }) => {
                                                 const active = (editFormData.dataFlags || ['charging']).includes(key);
                                                 return (
                                                     <button
@@ -2023,7 +2023,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         type="button"
                                                         title={desc}
                                                         onClick={() => setEditFormData(f => ({ ...f, dataFlags: [key] }))}
-                                                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-meta border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
+                                                        className={`guide-chip${active ? ' active' : ''}`}
                                                     >
                                                         {label}
                                                     </button>
@@ -2206,7 +2206,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         onClick={() => handleSaveEdit(run.id)}
                                         disabled={savingData}
-                                        className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
                                         {savingData ? 'Saving…' : 'Save Changes'}
                                     </button>
@@ -2626,7 +2626,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div className="run-card-header">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <RunKindPill run={run} />
+                                                    <RunKindBadge run={run} />
                                                     <h3 className="section-title">
                                                         {run.name}
                                                         <RunSourceLinks run={run} className="text-sm font-normal" />
@@ -2847,7 +2847,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     key={opt.key}
                                                     type="button"
                                                     onClick={() => { setNewLinkKind(opt.key); setNewLinkRunIds(null); }}
-                                                    className={`btn text-xs ${newLinkKind === opt.key ? 'btn-primary' : 'btn-secondary'}`}
+                                                    className={`btn btn-toggle text-xs${newLinkKind === opt.key ? ' active' : ''}`}
                                                 >
                                                     {opt.label}
                                                 </button>
@@ -2945,7 +2945,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         type="button"
                                         onClick={handleAdd}
                                         disabled={!newLinkSourceId || runsToLink.length === 0 || linkSaving}
-                                        className="btn btn-primary text-sm disabled:opacity-40"
+                                        className="btn btn-commit text-sm disabled:opacity-40"
                                     >
                                         {linkSaving ? 'Linking…' : `Link ${runsToLink.length > 0 ? runsToLink.length + ' ' : ''}Test${runsToLink.length !== 1 ? 's' : ''}`}
                                     </button>
@@ -2994,7 +2994,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {/* Edit vehicle modal */}
             {showEditVehicle && (
                 <div className="modal-overlay" onClick={closeEditVehicle}>
-                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    <div className="modal-panel max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <LazyBoundary>
                             <EditVehicleForm
                                 formData={vehicleFormData}
@@ -3061,7 +3061,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 type="button"
                                 onClick={handleCopyToConfirm}
                                 disabled={!copyingToVehicleId}
-                                className="btn btn-primary text-sm disabled:opacity-40"
+                                className="btn btn-commit text-sm disabled:opacity-40"
                             >
                                 Copy test
                             </button>

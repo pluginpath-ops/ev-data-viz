@@ -31,7 +31,7 @@ export default function AuthModal({ onClose, onAuthSuccess }) {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-panel rounded-lg p-8 max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-panel p-8 max-w-md" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header mb-6">
                     <h2 className="text-2xl font-bold">Sign In</h2>
                     <button onClick={onClose} className="text-secondary hover:text-secondary text-2xl">&times;</button>

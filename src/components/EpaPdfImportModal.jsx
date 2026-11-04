@@ -270,7 +270,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
 
     return (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="modal-panel rounded-xl p-5"
+            <div className="modal-panel p-5"
                  style={{ maxWidth: '760px', width: '96vw', maxHeight: '90vh', overflowY: 'auto' }}
                  onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-4">
@@ -432,7 +432,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                                 </button>
                             )}
                             <button onClick={() => setStep('upload')} className="btn btn-secondary text-sm" disabled={busy}>Back</button>
-                            <button onClick={handleImport} className="btn btn-primary text-sm" disabled={busy || !selected.size}>
+                            <button onClick={handleImport} className="btn btn-commit text-sm" disabled={busy || !selected.size}>
                                 {busy
                                     ? (importProgress ? `Importing ${Math.min(importProgress.done + 1, importProgress.total)} of ${importProgress.total}…` : 'Importing…')
                                     : `Import ${selected.size} config(s)`}
@@ -448,7 +448,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                             Imported {result?.count ?? selected.size} configuration(s)
                             {files.length > 1 && ` from ${files.filter(f => f.configs > 0).length} of ${files.length} files`}.
                         </p>
-                        <button onClick={onClose} className="btn btn-primary text-sm mt-4">Done</button>
+                        <button onClick={onClose} className="btn btn-secondary text-sm mt-4">Done</button>
                     </div>
                 )}
             </div>

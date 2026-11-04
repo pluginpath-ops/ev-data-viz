@@ -315,7 +315,7 @@ export default function GuideRowLinkSweep() {
                     {queued.length > 0 && (
                         <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setQueue(new Map())}>Clear</button>
                     )}
-                    <button type="button" className="btn btn-primary" disabled={busy || !queued.length} onClick={submit}>
+                    <button type="button" className="btn btn-commit" disabled={busy || !queued.length} onClick={submit}>
                         {busy ? 'Submitting…' : `Submit ${queued.length || ''}`.trim()}
                     </button>
                 </div>

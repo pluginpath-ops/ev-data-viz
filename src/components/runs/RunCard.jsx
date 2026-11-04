@@ -6,7 +6,7 @@ import RunListingBadges from './RunListingBadges';
 import RunCurationToggle from './RunCurationToggle';
 import { isUnlisted, isExcluded, hasQualityOverride } from '../../utils/runListing';
 import { sessionFor } from '../../utils/testSessions';
-import { RunKindPill, FIELD_META, inferRunFlags } from './runDisplay';
+import { RunKindBadge, FIELD_META, inferRunFlags } from './runDisplay';
 import { filterChargingRuns, defaultChargingRun, runKindFrom } from '../../utils/runUtils';
 
 /**
@@ -110,7 +110,7 @@ export default function RunCard({
                 at its right end, so the action column below starts level with
                 the bands rather than with the title (.run-card-body). */}
             <div className="flex items-center gap-2 flex-wrap">
-                <RunKindPill run={run} />
+                <RunKindBadge run={run} />
                 <h3 className="section-title">
                     {run.name}
                     <RunSourceLinks run={run} className="text-sm font-normal" />

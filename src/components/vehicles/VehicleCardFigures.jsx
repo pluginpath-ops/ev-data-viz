@@ -47,9 +47,12 @@ export function epaRangeTitle(vehicle) {
 // ── Test-count row ────────────────────────────────────────────────────────────
 
 /**
- * Renders a "Tests: Charging (n) Range (n) EPA (n)" line that matches the
- * styling of Battery/Range rows. "Tests:" inherits the parent's text-sm color;
- * the type names are 1pt smaller and colored. Zero-count categories omitted.
+ * The card's test counts: "TESTS  ↯ 1  ↔ 2  EPA 1", a label and a row of
+ * neutral count badges, set like the Platform line above it. They were
+ * "Charging (1) Range (2) EPA (1)" in green, amber and blue — a hue per kind
+ * that meant nothing a word did not already say, and green and amber already
+ * mean success and caution. The full name is each badge's tooltip.
+ * Zero-count categories omitted.
  */
 export function TestCountPills({ vehicle, performanceCounts = {}, onOpenSubtab }) {
     const counts = vehicleDataCategories(vehicle, performanceCounts);
@@ -57,18 +60,18 @@ export function TestCountPills({ vehicle, performanceCounts = {}, onOpenSubtab }
     const shown = DATA_CATEGORIES.filter(c => counts[c.key] > 0 || pooled[c.key] > 0);
     if (shown.length === 0) return null;
 
-    // "Charging (4/2)": listed tests, then in grey the unlisted ones that still
-    // count in the statistics (#394, the pool).
+    // "↯ 4/2": listed tests, then in grey the unlisted ones that still count
+    // in the statistics (#394, the pool).
     return (
-        <p className="flex flex-wrap items-baseline gap-x-1.5">
-            <span>Tests:</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-micro">Tests</span>
             {shown.map(c => (
-                <TestCountLink key={c.key} className={`card-test-count ${c.colorClass}`} category={c} vehicle={vehicle}
+                <TestCountLink key={c.key} className="badge-micro card-test-count" category={c} vehicle={vehicle}
                     count={counts[c.key]} pooled={pooled[c.key]} onOpenSubtab={onOpenSubtab}>
-                    {c.label} ({counts[c.key]}{pooled[c.key] > 0 && <span className="test-count-pool">/{pooled[c.key]}</span>})
+                    {c.glyph ?? c.short ?? c.label} {counts[c.key]}{pooled[c.key] > 0 && <span className="test-count-pool">/{pooled[c.key]}</span>}
                 </TestCountLink>
             ))}
-        </p>
+        </div>
     );
 }
 

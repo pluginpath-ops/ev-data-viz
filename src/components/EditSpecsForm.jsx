@@ -332,7 +332,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div
-                className="modal-panel rounded-xl shadow-2xl w-full mx-4"
+                className="modal-panel w-full mx-4"
                 style={{ maxWidth: '640px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
                 onClick={e => e.stopPropagation()}
             >
@@ -540,7 +540,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                 type="button"
                                 onClick={handleSave}
                                 disabled={saving}
-                                className="btn btn-primary text-sm"
+                                className="btn btn-commit text-sm"
                             >
                                 {saving ? 'Saving…' : 'Save Specs'}
                             </button>

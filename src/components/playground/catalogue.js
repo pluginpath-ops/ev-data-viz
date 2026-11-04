@@ -246,8 +246,8 @@ export const SECTIONS = [
              + 'One size — the compact metrics that used to be `.btn-sm` are now the base, '
              + 'and the modifier is gone (#277).',
         specimens: [
-            { cls: 'btn btn-commit',    as: 'button', label: 'Commit',    note: 'The one action a view exists to take — Save, Sign in. The only solid fill; at most one per view.' },
-            { cls: 'btn btn-primary',   as: 'button', label: 'Primary',   note: 'Additive / available actions — Add, Upload, View.' },
+            { cls: 'btn btn-commit',    as: 'button', label: 'Commit',    note: 'The one action a view or modal exists to take — Save, Import N. Orange, the "now" hue; the only solid fill.' },
+            { cls: 'btn btn-primary',   as: 'button', label: 'Go ↘',      note: 'Takes you somewhere — Tests & Data ↘, Open chart ↘. Blue is location and selection.' },
             { cls: 'btn btn-secondary', as: 'button', label: 'Secondary', note: 'Cancel, Back, and the unselected half of an exclusive pair.' },
             { cls: 'btn btn-edit',      as: 'button', label: 'Edit',      note: 'Edit actions. The same neutral as Secondary — green is the success hue.' },
             { cls: 'btn btn-warning',   as: 'button', label: 'Warning',   note: 'Attention-drawing but not destructive.' },

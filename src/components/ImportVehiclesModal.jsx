@@ -230,7 +230,7 @@ export default function ImportVehiclesModal({ onClose }) {
     return (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
             <div
-                className="modal-panel rounded-xl p-5"
+                className="modal-panel p-5"
                 style={{ maxWidth: '900px', width: '96vw', maxHeight: '90vh', overflowY: 'auto' }}
                 onClick={e => e.stopPropagation()}
             >
@@ -435,7 +435,7 @@ export default function ImportVehiclesModal({ onClose }) {
                             <button onClick={() => { setStep('upload'); setPlan(null); setError(null); }} className="btn btn-secondary text-sm" disabled={busy}>
                                 Back
                             </button>
-                            <button onClick={handleApply} className="btn btn-primary text-sm" disabled={busy || !canApply}>
+                            <button onClick={handleApply} className="btn btn-commit text-sm" disabled={busy || !canApply}>
                                 {busy ? 'Importing…' : `Import ${summary.creates + summary.updates} vehicle(s)`}
                             </button>
                         </div>
@@ -460,7 +460,7 @@ export default function ImportVehiclesModal({ onClose }) {
                             >
                                 Import another file
                             </button>
-                            <button onClick={onClose} className="btn btn-primary text-sm">Done</button>
+                            <button onClick={onClose} className="btn btn-secondary text-sm">Done</button>
                         </div>
                     </div>
                 )}

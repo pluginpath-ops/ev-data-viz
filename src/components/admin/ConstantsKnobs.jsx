@@ -173,7 +173,7 @@ export default function ConstantsKnobs() {
                         Saved — reload to apply the change to the calculations here. Anyone else
                         picks up a published value on their next load.
                     </span>
-                    <button onClick={() => window.location.reload()} className="btn btn-primary text-sm whitespace-nowrap">
+                    <button onClick={() => window.location.reload()} className="btn btn-secondary text-sm whitespace-nowrap">
                         ↻ Reload now
                     </button>
                 </div>

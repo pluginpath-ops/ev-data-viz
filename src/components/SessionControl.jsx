@@ -90,7 +90,7 @@ export default function SessionControl({
                     placeholder="e.g. OoS 4-car loop"
                     className="form-input form-input flex-1 min-w-40"
                 />
-                <button onClick={handleCreate} disabled={saving} className="btn btn-primary text-sm py-0.5">
+                <button onClick={handleCreate} disabled={saving} className="btn btn-secondary text-sm py-0.5">
                     {saving ? 'Creating…' : 'Create'}
                 </button>
                 <button onClick={() => setCreating(false)} className="btn btn-secondary text-sm py-0.5">Cancel</button>

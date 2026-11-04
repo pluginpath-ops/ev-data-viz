@@ -249,7 +249,7 @@ export default function ResultsBatchImport({ sources, sourcesAvailable, existing
                         </span>
                         <button
                             type="button"
-                            className="btn btn-primary text-sm"
+                            className="btn btn-commit text-sm"
                             disabled={busy || !toWrite.length || !sourcesAvailable}
                             onClick={importRows}
                         >

@@ -205,7 +205,7 @@ export default function FeGuideImport() {
                     <button
                         onClick={handleImport}
                         disabled={importing}
-                        className="btn btn-primary mt-3 disabled:opacity-60"
+                        className="btn btn-commit mt-3 disabled:opacity-60"
                     >
                         {importing ? 'Importing…' : `Import ${parsed.rows.length} configurations`}
                     </button>

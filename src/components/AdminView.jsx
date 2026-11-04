@@ -135,7 +135,7 @@ export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId
                         ↓ Export Data
                     </button>
                     <div className="relative">
-                        <button className="btn btn-primary text-sm" onClick={() => setShowImportMenu(m => !m)}>
+                        <button className="btn btn-secondary text-sm" onClick={() => setShowImportMenu(m => !m)}>
                             Import ▾
                         </button>
                         {showImportMenu && (

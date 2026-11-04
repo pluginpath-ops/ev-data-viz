@@ -9,7 +9,6 @@
  */
 export const PREVIEW_AXES = {
     soc:         { label: 'State of charge', unit: '%',   field: 'soc',         fixed: [0, 100] },
-    deltaSoc:    { label: 'SoC added',       unit: '%',   field: 'soc',         delta: true },
     chargeRate:  { label: 'Charge rate',     unit: 'kW',  field: 'chargeRate' },
     time:        { label: 'Time',            unit: 'min', field: 'time' },
     range:       { label: 'Range (tested)',  unit: 'mi',  field: 'range' },

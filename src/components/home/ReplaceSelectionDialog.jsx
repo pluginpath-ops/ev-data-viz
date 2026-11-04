@@ -20,7 +20,7 @@ export default function ReplaceSelectionDialog({ count, incoming, action, onConf
     return (
         <div className="modal-overlay" onClick={onCancel}>
             <div
-                className="modal-panel rounded-xl shadow-2xl mx-4 flex flex-col"
+                className="modal-panel mx-4 flex flex-col"
                 style={{ maxWidth: 'min(92vw, 460px)' }}
                 role="alertdialog"
                 aria-labelledby="replace-selection-title"
@@ -38,7 +38,7 @@ export default function ReplaceSelectionDialog({ count, incoming, action, onConf
                 </div>
                 <div className="modal-footer">
                     <button type="button" onClick={onCancel} className="btn btn-secondary">Cancel</button>
-                    <button type="button" onClick={onConfirm} className="btn btn-primary" autoFocus>Replace my selection</button>
+                    <button type="button" onClick={onConfirm} className="btn btn-commit" autoFocus>Replace my selection</button>
                 </div>
             </div>
         </div>

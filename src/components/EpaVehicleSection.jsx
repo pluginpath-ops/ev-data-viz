@@ -696,7 +696,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                             </p>
                             <div className="flex gap-2 mt-2">
                                 <button type="button" onClick={handleCreate} disabled={creating}
-                                    className="btn btn-primary text-xs py-1 px-3 disabled:opacity-50">
+                                    className="btn btn-secondary text-xs py-1 px-3 disabled:opacity-50">
                                     {creating ? 'Creating…' : 'Create & link'}
                                 </button>
                                 <button type="button" onClick={() => setShowCreate(false)} disabled={creating}

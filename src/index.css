@@ -45,36 +45,24 @@
    That is what lets the playground show both themes side by side — and it costs
    one selector rather than a duplicated palette. */
 :root, [data-theme="light"] {
-    /* Primary color (main actions: Add, Save, View) */
+    /* Primary: location and selection — the nav, links, selected chips, and
+       .btn-primary, a button that takes you somewhere. */
     --color-primary: rgb(59, 130, 246);
     --color-primary-hover: rgb(37, 99, 235);
     --color-primary-light: rgb(219, 234, 254);
     --color-primary-text: rgb(30, 64, 175);
-    /* The one solid button a view may carry (.btn-commit). Its own triple
-       because white on --color-primary is 3.68:1 — the fill steps a shade
-       darker here, and in dark the text flips to the page color instead. */
-    --color-commit:       rgb(37, 99, 235);     /* provisional — light pass */
-    --color-commit-hover: rgb(30, 64, 175);     /* provisional — light pass */
-    --color-commit-text:  rgb(255, 255, 255);
+    /* The one solid button a view may carry (.btn-commit): the orange of
+       "active / now", because committing is the one action that makes
+       something happen now. Dark text, because white on this orange is 3.2:1. */
+    --color-commit:       rgb(217, 119, 6);     /* provisional — light pass */
+    --color-commit-hover: rgb(245, 158, 11);    /* provisional — light pass */
+    --color-commit-text:  rgb(17, 24, 39);
 
-    /* Success/Edit color (Edit buttons) */
+    /* Status hues as solid marks — a dot, a tick, a bar. Buttons no longer
+       fill with them; see the button guide. */
     --color-success: rgb(34, 197, 94);
-    --color-success-hover: rgb(22, 163, 74);
-
-    /* Danger color (Delete buttons) */
     --color-danger: rgb(239, 68, 68);
-    --color-danger-hover: rgb(220, 38, 38);
-
-    /* Secondary color (Cancel, Back buttons) */
-    --color-secondary: rgb(107, 114, 128);
-    --color-secondary-hover: rgb(75, 85, 99);
-
-    /* Edit button specific (defaults to success color) */
-    --color-edit: rgb(34, 197, 94);
-    --color-edit-hover: rgb(22, 163, 74);
-
     --color-warning: rgb(245, 158, 11);
-    --color-warning-hover: rgb(217, 119, 6);
 
     /* Every token below is documented in docs/design-tokens.md, with its light
        and dark value and how many places use it. */
@@ -195,9 +183,11 @@
  */
 [data-theme="dark"] {
     /* ── Accents ────────────────────────────────────────────────────────────
-       Blue leads the chrome. Orange is the single "active / now" signal and
-       NOTHING else on the page may use it — that is what makes "where am I"
-       answerable from across the room. Green stays a data and status color,
+       Blue leads the chrome: where you are and what you have selected.
+       Orange is the "active / now" signal — the live sub-tab, the median
+       tick — and, solid, the one commit button a view may carry. Nothing else
+       on the page may use it; that is what makes "where am I" answerable from
+       across the room. Green stays a data and status color,
        never chrome. Violet and grey are series colors only. */
     --color-accent-blue:   rgb(45, 127, 249);   /* #2d7ff9 */
     --color-accent-orange: rgb(242, 139, 60);   /* #f28b3c */
@@ -210,29 +200,18 @@
        only what it resolves to. */
     --color-primary:        rgb(45, 127, 249);
     --color-primary-hover:  rgb(26, 110, 232);
-    /* White on this blue is 3.81:1; the page color on it is 4.97:1. The solid
-       button reads as a lit key rather than a sticker, and it passes. */
-    --color-commit:         rgb(45, 127, 249);
-    --color-commit-hover:   rgb(92, 156, 251);
+    /* The accent orange as a solid key, the page color on it: 7.7:1. */
+    --color-commit:         rgb(242, 139, 60);
+    --color-commit-hover:   rgb(247, 166, 104);
     --color-commit-text:    rgb(13, 17, 23);
     --color-success:        rgb(35, 180, 126);
-    --color-success-hover:  rgb(28, 150, 104);
-    --color-edit:           rgb(35, 180, 126);
-    --color-edit-hover:     rgb(28, 150, 104);
     /* The handoff pins no solid red — its only red is the rgba(232,90,80) tint
        behind a NOT chip. Taken at face value that tint measures 3.49:1 under
        white, which is WORSE than the red-500 it replaces (3.76:1). Two steps
-       darker keeps the family and moves the number the right way. */
+       darker keeps the family. (Nothing writes white on it any more — the
+       buttons are tinted — but a solid red mark still wants the darker red.) */
     --color-danger:         rgb(220, 75, 66);
-    --color-danger-hover:   rgb(195, 61, 53);
     --color-warning:        rgb(242, 139, 60);
-    --color-warning-hover:  rgb(224, 122, 43);
-    /* Darker than --color-accent-grey (#6b7a8f), and deliberately so. The accent
-       grey is a BAR FILL — nothing is written on it. This is a button fill with
-       white text, and at the accent value that pairing measures 4.38:1, which
-       is under AA. The handoff's hue, two steps down. */
-    --color-secondary:      rgb(97, 111, 130);
-    --color-secondary-hover: rgb(80, 92, 108);
 
     /* ── Surface layers ── */
     --color-background:     rgb(13, 17, 23);    /* #0d1117 page, chip-line row */
@@ -410,19 +389,21 @@
  * 2.46) beside the tinted badges and toggles that had replaced them elsewhere.
  * Hue is what the button means; the shape is the same for all of them.
  *
- * btn-commit   (solid)  — The ONE action a view exists to take: Save, Sign in.
- *                         At most one per view; it is the only solid fill left,
- *                         and it only works while it stays rare.
+ * btn-commit   (orange, solid) — The ONE action a view or modal exists to
+ *                         take: Save, Save changes, Import N, Submit. The only
+ *                         solid fill left, and it only works while it stays rare.
  *
- * btn-primary  (blue)   — Additive / available actions.
- *                         Rule: "I can create, add, or move forward here."
- *                         Examples: Add Vehicle, Upload Image, Create tag,
- *                                   Import, View Charts
+ * btn-primary  (blue)   — Takes you somewhere: another page or view.
+ *                         Blue is location and selection, so a blue button is
+ *                         a way to a place. Its label ends ↘ (on-site); a link
+ *                         that leaves the site ends ↗.
+ *                         Examples: View Tests & Data ↘, Open chart ↘,
+ *                                   Open in new window
  *
- * btn-secondary (grey)  — Neutral / non-data-changing actions, and editing.
- *                         Rule: "This cancels, goes back, exports, or opens an
- *                         editor without mutating state on its own."
- *                         Examples: Cancel, Back, Sign Out, Export Data, Edit
+ * btn-secondary (grey)  — Every other action: add, create, select, upload,
+ *                         cancel, export, edit.
+ *                         Examples: + Add Vehicle, Select All Visible, Create
+ *                                   tag, Upload image, Cancel, Edit
  *
  * btn-edit             — The same neutral as btn-secondary. It was green, the
  *                         success hue, so a row of controls said "this went
@@ -1000,7 +981,8 @@ body {
     @apply list-disc ml-5;
 }
 
-/* A run's kind, as the pill that opens its title line.
+/* A run's kind, as the badge that opens its title line — a .badge-micro, a
+ * size up. A badge rather than a pill: a label you read, not a control.
  *
  * Charging and range are the one place in this app where two hues genuinely
  * encode a category rather than decorating one — the kind decides how every
@@ -1009,8 +991,10 @@ body {
  * light colors with no dark counterpart, so on a dark theme they were two pale
  * slabs at the top of every card. */
 .run-kind {
-    @apply text-xs px-2 py-0.5 rounded-full font-medium shrink-0;
-    border: 1px solid transparent;
+    /* Two steps up from the micro badge (the meta size, ~12px): it heads a
+       test card, and the ↯ and ↔ have to read at a glance. */
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    padding: 1px 7px;
 }
 .run-kind.is-charging {
     border-color: color-mix(in srgb, var(--color-accent-blue) 45%, transparent);
@@ -1446,6 +1430,13 @@ body {
 .modal-panel {
     @apply w-full;
     background-color: var(--color-card);
+    /* One modal shape, owned here. Thirteen call sites each added
+       `rounded-xl shadow-2xl` — a 12px corner nothing else on the site has,
+       under Tailwind's deepest shadow. A modal is a card that floats: the
+       card's corner and edge, the popover's shadow. */
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-popover);
 }
 .modal-header {
     @apply flex items-center justify-between;
@@ -1511,48 +1502,7 @@ body {
     border-top: 1px solid var(--color-border);
 }
 
-/* ── Trims section (inside EditVehicleForm) ─────────────────────────────────── */
-.trim-list {
-    @apply border rounded-lg overflow-hidden text-sm;
-    border-color: var(--color-border);
-}
-.trim-list-header {
-    @apply grid px-3 py-1.5 text-xs font-medium;
-    grid-template-columns: 1fr 1fr 1fr auto;
-    gap: 0.5rem;
-    background-color: var(--color-surface-muted);
-    color: var(--color-text-muted);
-    border-bottom: 1px solid var(--color-border);
-}
-.trim-list-row {
-    @apply grid items-center px-3 py-2;
-    grid-template-columns: 1fr 1fr 1fr auto;
-    gap: 0.5rem;
-    border-bottom: 1px solid var(--color-border);
-}
-.trim-list-row:last-child {
-    border-bottom: none;
-}
-.trim-add-row {
-    @apply flex gap-2 mt-2 items-center;
-}
-.trim-add-row .form-input {
-    @apply flex-1 min-w-0;
-}
 
-/* ── Spec link section (inside EditVehicleForm) ─────────────────────────────── */
-.spec-link-list {
-    @apply border rounded-lg overflow-hidden text-sm;
-    border-color: var(--color-border);
-}
-.spec-link-row {
-    @apply flex items-center gap-2 px-3 py-2;
-    background-color: var(--color-card);
-    border-bottom: 1px solid var(--color-border);
-}
-.spec-link-row:last-child {
-    border-bottom: none;
-}
 .spec-link-type-badge {
     @apply text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 whitespace-nowrap;
 }
@@ -1762,7 +1712,8 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* Base pill — full-radius small badge; color classes added inline */
 /* Call sites usually paint this from the tag's own color; the fallback is here
    so one that does not is still a pill rather than floating text. */
-.tag-pill {
+.tag-pill,
+.vehicle-tag {
     @apply px-2 py-0.5 rounded-full text-xs font-medium;
     /* The filter chip's neutral exactly — a pill and a chip side by side
        should differ in whether they press, not in how they are drawn. */
@@ -1809,14 +1760,14 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: var(--color-text-secondary);
 }
 
-/* "DEF" — the vehicle's default test for this kind. The one accent-colored
-   marker, because it is the only one that says which row is privileged rather
-   than what a row measured. */
+/* "DEF" — the vehicle's default test for this kind — and the account's role.
+   Marked by a bright edge rather than a hue: it says which row is privileged,
+   and blue is kept for location and selection. */
 .badge-micro.is-accent,
 .badge-default {
-    background-color: var(--color-primary-surface);
-    border-color: var(--color-primary-border);
-    color: var(--color-primary-text);
+    background-color: transparent;
+    border-color: var(--color-text-secondary);
+    color: var(--color-text-primary);
     letter-spacing: 0.06em;
 }
 
@@ -2403,11 +2354,11 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     font-family: var(--font-mono);
     color: var(--color-text-meta);
 }
-/* One kind's count on a vehicle card, "Charging (4/2)": a step under the
-   card's body text, weighted like a label. Its hue comes from the kind. */
+/* One kind's count on a vehicle card, "↯ 4/2": a micro badge one size up, so
+   the glyph reads at a glance. Neutral — a count is not a status. */
 .card-test-count {
-    font-size: calc(var(--fs-body) * 0.9286);
-    font-weight: 500;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    padding: 1px 6px;
 }
 /* A count that opens its tests (card and List): the text it replaces, as a
    button. Preflight already strips a button's chrome and inherits its type;
@@ -2909,12 +2860,6 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     margin-bottom: 0;
 }
 
-.chart-rail .axis-align-row {
-    flex-direction: column;
-    align-items: flex-start;
-    padding-left: 0;
-    margin: 0;
-}
 
 /* Range & Efficiency's measure picker: six choices, each a phrase ("Efficiency
    by Temperature"), so they stack. Wrapping them would give a ragged two-column
@@ -4238,12 +4183,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* One of a vehicle's tags. It was an inline cluster in two places (the card and
    the edit form) painting the same primary tint. */
-.vehicle-tag {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
-    border: 1px solid transparent;
-    background-color: var(--color-primary-light);
-    color: var(--color-primary-text);
-}
+/* The vehicle's tags take .tag-pill's neutral (grouped with it above): a tag
+   describes the car, it is not a place or a selection, which is what blue
+   means. Only the layout differs — it holds a remove button. */
+.vehicle-tag { @apply inline-flex items-center gap-1; }
 /* In the edit form, a size up: these are targets with a remove button. */
 .vehicle-tag.is-editable { @apply px-3 py-1 text-sm; }
 /* A tag that came from the vehicle's source (it has none of its own): outlined,
@@ -4319,17 +4262,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply block text-sm font-medium mb-1;
     color: var(--color-text-secondary);
 }
-.axis-select {
-    @apply px-2 py-0.5 rounded text-sm w-full;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-primary);
-}
-.axis-select:focus {
-    outline: 2px solid var(--color-primary);
-    outline-offset: -1px;
-    border-color: var(--color-primary);
-}
 
 /* The alignment threshold: a percentage, so one or two digits and never more.
    Sized to the number rather than to the form, and the browser's spin buttons
@@ -4358,12 +4290,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    so it reads as part of the X choice rather than a fourth setting. The
    checkbox and its text stay the standard .toggle-label. */
 .axis-row-option { padding-left: 30px; }
-
-/* Alignment sits UNDER the three axis pickers, indented, because it modifies the
-   X axis rather than standing beside it as a fourth axis. */
-.axis-align-row {
-    @apply flex flex-wrap items-center gap-x-3 gap-y-2 pl-6 -mt-3 mb-6;
-}
 
 /* Chart type / preset button row; mb added inline */
 .chart-type-buttons {
@@ -4395,31 +4321,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-warning-text);
 }
 
-/* An inline panel of settings that only apply in one mode — currently the
-   towing efficiency inputs, which appear when Road Trip is switched to towing.
-   Amber because it is a qualifier on everything below it, not a warning.
-
-   Every color is a token or has a dark override. It was `bg-amber-50` with no
-   dark rule, so in dark mode the light body text sat on a cream panel and both
-   the field labels and the values were unreadable. */
-.mode-settings-panel {
-    @apply mb-4 p-3 rounded-lg border;
-    background-color: var(--color-warning-surface);
-    border-color: var(--color-warning-border);
-    color: var(--color-text-primary);
-}
-.mode-settings-title {
-    @apply text-xs font-semibold mb-2 uppercase tracking-wide;
-    color: var(--color-warning-text);
-}
-.mode-settings-note {
-    /* Same color as the title. It was amber-600, which at text-xs on the pale
-       panel read 3.07:1 — under the 4.5:1 small-text minimum — so hierarchy is
-       carried by weight and caps instead, which this could afford and the
-       contrast could not. */
-    @apply text-xs max-w-xs;
-    color: var(--color-warning-text);
-}
 
 /* The section band (SectionBand.jsx): the labelled divider that opens a
    section of the sidebar — the run selector, routing overrides, the
@@ -5034,12 +4935,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-surface-muted);
 }
 
-/* Race mode configuration panel */
-.race-mode-panel {
-    @apply mt-4 p-3 rounded-lg;
-    border: 1px solid var(--color-border);
-    background-color: var(--color-surface-muted);
-}
 
 /* Efficiency unit toggle (mi/kWh ↔ Wh/mi) */
 .efficiency-unit-toggle {
@@ -5050,10 +4945,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* ── Runs View ──────────────────────────────────────────────────────────────── */
 
-/* Top header bar of the runs view (title + action buttons) */
-.runs-view-header {
-    @apply flex justify-between items-center mb-6;
-}
 
 /* "Adding data to: X" merge-mode banner */
 .merge-target-banner {
@@ -5694,10 +5585,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply flex items-center gap-1;
 }
 
-/* Flagged field indicator wrapper */
-.spec-field-flag-indicator {
-    @apply inline-flex items-center;
-}
 
 /* ── InfoIcon — peek, then pin ───────────────────────────────────────────────
  *
@@ -6914,18 +6801,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-card);
 }
 
-/* The adjusted figures and the computed combined — what the argument rests on */
-.epa-flow-box-strong {
-    border-color: var(--color-primary);
-    background-color: var(--color-primary-light);
-}
 
-/* The number on the window sticker: the end of the chain, styled as the answer */
-.epa-flow-box-label {
-    border-color: var(--color-primary);
-    border-width: 2px;
-    background-color: var(--color-card);
-}
 
 .epa-flow-value {
     @apply text-lg font-semibold tabular-nums;
@@ -7897,9 +7773,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
-}
-.guide-reset {
-    @apply self-end;
 }
 /* Column picker sits in the filter bar beside the facets, so every control
    that changes what you see is in one place. */
@@ -9337,13 +9210,6 @@ a.is-test-link:focus-visible {
    un-scopable override deleted, and a tier added later inherits the system
    instead of needing a fifth rule. */
 
-.curve-canvas-wrap {
-    @apply p-3 rounded-lg;
-    height: 26rem;
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
-}
-
 /* ── Playground ──────────────────────────────────────────────────────────────
    The catalogue page. Its own chrome is deliberately plain — anything eye-
    catching here competes with the specimens, which are the content. */
@@ -9651,6 +9517,31 @@ a.is-test-link:focus-visible {
     animation: scroll-more-bob 2.2s ease-in-out infinite;
 }
 .scroll-more:hover { filter: brightness(1.1); }
+/* The first screen anyone sees. The bolt is the one emoji the public side
+   keeps, on the owner's call: a full-color mark that pulses gently while the
+   data loads, rather than a spinner. */
+.app-loading {
+    @apply min-h-screen flex flex-col items-center justify-center gap-4;
+    background-color: var(--color-background);
+}
+.app-loading-glyph {
+    font-size: calc(var(--fs-body) * 4);
+    line-height: 1;
+    animation: app-loading-pulse 1.6s ease-in-out infinite;
+}
+.app-loading-label {
+    font-size: calc(var(--fs-body) * 1.25);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+@keyframes app-loading-pulse {
+    0%, 100% { transform: scale(1);    opacity: 1; }
+    50%      { transform: scale(1.08); opacity: 0.7; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .app-loading-glyph { animation: none; }
+}
+
 @keyframes scroll-more-bob {
     0%, 100% { transform: translateX(-50%) translateY(0); }
     50%      { transform: translateX(-50%) translateY(-3px); }

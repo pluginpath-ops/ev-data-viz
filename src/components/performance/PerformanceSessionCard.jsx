@@ -138,7 +138,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                             />
                             <div className="flex gap-2 mt-2">
                                 <button type="button" onClick={saveSource} disabled={saving || !dirty}
-                                    className="btn btn-primary text-[11px] py-0.5 px-2 disabled:opacity-50">
+                                    className="btn btn-commit text-[11px] py-0.5 px-2 disabled:opacity-50">
                                     {saving ? 'Saving…' : 'Save'}
                                 </button>
                                 <button type="button" disabled={saving}

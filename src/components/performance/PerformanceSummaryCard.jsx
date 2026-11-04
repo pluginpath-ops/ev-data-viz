@@ -159,7 +159,7 @@ export default function PerformanceSummaryCard({
                 <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[var(--color-border)]">
                     <button
                         type="button" onClick={handleSave} disabled={saving}
-                        className="btn btn-primary text-xs py-1 px-3 disabled:opacity-50"
+                        className="btn btn-commit text-xs py-1 px-3 disabled:opacity-50"
                     >
                         {saving ? 'Saving…' : `Save ${changeCount} change${changeCount === 1 ? '' : 's'}`}
                     </button>

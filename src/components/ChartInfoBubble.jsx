@@ -110,7 +110,7 @@ export default function ChartInfoBubble({ chartKey }) {
                             type="button"
                             onClick={handleSave}
                             disabled={saving}
-                            className="btn btn-primary disabled:opacity-50"
+                            className="btn btn-commit disabled:opacity-50"
                         >
                             {saving ? 'Saving…' : 'Save'}
                         </button>

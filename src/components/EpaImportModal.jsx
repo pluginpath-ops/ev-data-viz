@@ -309,13 +309,13 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 type="button"
                                 onClick={handleImport}
                                 disabled={importing || selectedCount === 0}
-                                className="btn btn-primary text-sm disabled:opacity-40"
+                                className="btn btn-commit text-sm disabled:opacity-40"
                             >
                                 {importing ? 'Importing…' : `Import ${selectedCount} test vehicle${selectedCount !== 1 ? 's' : ''}${linkedCount > 0 ? ` + ${linkedCount} link${linkedCount !== 1 ? 's' : ''}` : ''}`}
                             </button>
                         )}
                         {step === 'done' && (
-                            <button type="button" onClick={onClose} className="btn btn-primary text-sm">Done</button>
+                            <button type="button" onClick={onClose} className="btn btn-secondary text-sm">Done</button>
                         )}
                     </div>
                 </div>

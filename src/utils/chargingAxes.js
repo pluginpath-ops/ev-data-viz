@@ -12,7 +12,8 @@ import { distanceLabel } from './unitConversions';
  * supplies the noun.
  *
  * `value` is the key chartConfig holds and the link writes (`x`, `y`, `y2`).
- * Temperature and Frame were axes until the picker was grouped; they are not
+ * Temperature and Frame were axes until the picker was grouped, and SoC Added
+ * sat under Range added until the owner dropped it; they are not
  * offered now, and `chargingAxisOr` is what keeps a link that names one opening.
  */
 export function chargingAxisOptions(units) {
@@ -27,7 +28,6 @@ export function chargingAxisOptions(units) {
         { group: 'Range',          value: 'soc',          name: 'SoC',         unit: '%',       label: 'State of Charge (%)' },
         { group: 'Range',          value: 'range',        name: 'Tested',      unit: dl,        label: `Range - Tested (${dl})` },
         { group: 'Range',          value: 'rangeEpa',     name: 'EPA',         unit: dl,        label: `Range - EPA (${dl})` },
-        { group: 'Range added',    value: 'deltaSoc',     name: 'SoC',         unit: '%',       label: 'SoC Added (%)' },
         { group: 'Range added',    value: 'deltaRange',   name: 'Tested',      unit: dl,        label: `Range Added - Tested (${dl})` },
         { group: 'Range added',    value: 'deltaRangeEpa', name: 'EPA',        unit: dl,        label: `Range Added - EPA (${dl})` },
     ];

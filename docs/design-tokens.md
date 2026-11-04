@@ -1,7 +1,7 @@
 # Design tokens
 
 Every color and radius the app is allowed to use, defined in `src/index.css` in
-two blocks: `:root, [data-theme="light"]` and `[data-theme="dark"]`. All 68 are
+two blocks: `:root, [data-theme="light"]` and `[data-theme="dark"]`. All 61 are
 defined in both — there is no token with only one value.
 
 Specimens, live contrast ratios and a side-by-side of the two themes are on
@@ -97,17 +97,14 @@ issue for what is outstanding.
 |---|---|---|---:|
 | `danger` | `rgb(239, 68, 68)` | `rgb(220, 75, 66)` | 49 |
 | `danger-border` | `rgb(254, 202, 202)` | `rgba(232, 90, 80, 0.60)` | 10 |
-| `danger-hover` | `rgb(220, 38, 38)` | `rgb(195, 61, 53)` | 3 |
 | `danger-surface` | `rgb(254, 242, 242)` | `rgba(232, 90, 80, 0.18)` | 11 |
 | `danger-text` | `rgb(153, 27, 27)` | `rgb(240, 146, 139)` | 13 |
 | `success` | `rgb(34, 197, 94)` | `rgb(35, 180, 126)` | 33 |
 | `success-border` | `rgb(187, 247, 208)` | `rgba(35, 180, 126, 0.60)` | 7 |
-| `success-hover` | `rgb(22, 163, 74)` | `rgb(28, 150, 104)` | 2 |
 | `success-surface` | `rgb(240, 253, 244)` | `rgba(35, 180, 126, 0.18)` | 9 |
 | `success-text` | `rgb(22, 101, 52)` | `rgb(95, 214, 168)` | 9 |
 | `warning` | `rgb(245, 158, 11)` | `rgb(242, 139, 60)` | 66 |
 | `warning-border` | `rgb(253, 230, 138)` | `rgba(242, 139, 60, 0.60)` | 10 |
-| `warning-hover` | `rgb(217, 119, 6)` | `rgb(224, 122, 43)` | 3 |
 | `warning-surface` | `rgb(255, 251, 235)` | `rgba(242, 139, 60, 0.18)` | 13 |
 | `warning-text` | `rgb(146, 64, 14)` | `rgb(245, 176, 119)` | 17 |
 
@@ -117,15 +114,11 @@ issue for what is outstanding.
 |---|---|---|---:|
 | `background` | `rgb(249, 250, 251)` | `rgb(13, 17, 23)` | 9 |
 | `chart-axis` | `rgb(156, 163, 175)` | `rgb(61, 74, 90)` | 4 |
-| `commit` | `rgb(37, 99, 235)` | `rgb(45, 127, 249)` | 3 |
-| `commit-hover` | `rgb(30, 64, 175)` | `rgb(92, 156, 251)` | 3 |
-| `commit-text` | `rgb(255, 255, 255)` | `rgb(13, 17, 23)` | 3 |
+| `commit` | `rgb(217, 119, 6)` | `rgb(242, 139, 60)` | 3 |
+| `commit-hover` | `rgb(245, 158, 11)` | `rgb(247, 166, 104)` | 3 |
+| `commit-text` | `rgb(17, 24, 39)` | `rgb(13, 17, 23)` | 3 |
 | `chart-grid` | `rgb(229, 231, 235)` | `rgb(26, 33, 44)` | 3 |
-| `edit` | `rgb(34, 197, 94)` | `rgb(35, 180, 126)` | 7 |
-| `edit-hover` | `rgb(22, 163, 74)` | `rgb(28, 150, 104)` | 3 |
 | `nav-active` | `rgb(29, 78, 216)` | `rgb(23, 50, 87)` | 8 |
-| `secondary` | `rgb(107, 114, 128)` | `rgb(97, 111, 130)` | 8 |
-| `secondary-hover` | `rgb(75, 85, 99)` | `rgb(80, 92, 108)` | 3 |
 | `--radius-card` | `` | `` | 7 |
 | `--radius-chip` | `` | `` | 9 |
 | `--radius-control` | `` | `` | 20 |
@@ -141,12 +134,12 @@ AND/OR/NOT and the guide badges draw a wash (`-surface`), a deep edge
 replaced all measured below AA in dark (2.46–4.09:1). The dark washes went from
 0.12–0.15 to 0.18 and the edges from 0.35 to 0.60 at the same time, because what
 read as low contrast was the shape, not the text. `commit` / `-hover` / `-text`
-paint `.btn-commit`, the one solid button a view may carry, and in dark its
-label is the page color, not white.
+paint `.btn-commit`, the one solid button a view may carry: the accent orange
+with a dark label (7.7:1 in dark).
 
-**`edit` and `edit-hover` no longer paint anything.** `.btn-edit` is the
-secondary neutral now, since green is the success hue. The tokens remain
-until something takes them or they are removed.
+**Removed with the solid buttons:** `edit`, `edit-hover`, `secondary`,
+`secondary-hover` and the `danger`/`success`/`warning` `-hover` steps. Each was a
+button fill or its hover, and no button fills with them now.
 
 **`text-meta` and `text-muted` are the same tier.** Identical in both themes
 since the button and pill pass (dark was a shade apart). Two names for one idea, 46 and 30
@@ -157,13 +150,19 @@ only in dark (0.25 vs 0.15 alpha). `-light` is the older spelling; prefer
 `-surface`, and prefer `-border` over a full-strength `--color-primary` on a
 pale fill.
 
-**`accent-green`, `border-subtle` and `success-hover` are unused** — 2 uses each,
-which is their own two definitions. Either something should use them or they
-should go.
+**`accent-green` is used once and `border-subtle` rarely.** Kept: both are
+part of a set (the accents, the line weights) rather than leftovers.
 
-**`accent-orange` is the "active / now" signal and nothing else may use it.**
-That is the only reason it answers "where am I" from across the room. 41 uses:
-the wordmark, the selected sub-tab, the median tick, the live charging pair.
+**`accent-orange` is the "active / now" signal, and the commit button.**
+That is the only reason it answers "where am I" from across the room. Uses:
+the wordmark, the selected sub-tab, the median tick, the live charging pair, and
+(as `commit`) the one solid Save/Import button a view may carry. Nothing else.
+
+**Hue roles.** Blue is location and selection: the nav, links, selected chips,
+the AND filter, and `.btn-primary`, which is now only a button that takes you
+somewhere. Actions are neutral (`.btn-secondary`). Green, amber and red are
+success, caution and destructive. Violet and grey are data series, plus the
+explainer hub edges.
 
 **Status is a triad, not a color.** Each of warning / danger / success carries
 `-surface`, `-border` and `-text`, and they are used together. A component

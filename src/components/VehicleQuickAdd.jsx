@@ -40,7 +40,7 @@ export default function VehicleQuickAdd({ vehicles, selectedIds, onToggle }) {
             width="20rem"
             className="vehicle-quick-add"
             trigger={(props) => (
-                <button {...props} type="button" className="btn btn-primary" title="Add vehicles to the selection">
+                <button {...props} type="button" className="btn btn-secondary" title="Add vehicles to the selection">
                     ＋ Add
                 </button>
             )}

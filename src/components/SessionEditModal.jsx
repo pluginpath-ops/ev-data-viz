@@ -115,7 +115,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div
-                className="modal-panel rounded-xl shadow-2xl mx-4 flex flex-col"
+                className="modal-panel mx-4 flex flex-col"
                 style={{ maxWidth: 'min(92vw, 640px)', maxHeight: '85vh' }}
                 onClick={e => e.stopPropagation()}
             >

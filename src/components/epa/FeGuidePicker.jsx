@@ -289,7 +289,7 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
                             type="button"
                             onClick={() => handleLink(best.row.id)}
                             disabled={busy}
-                            className="btn btn-primary disabled:opacity-60"
+                            className="btn btn-secondary disabled:opacity-60"
                         >
                             {busy ? '…' : 'Link'}
                         </button>

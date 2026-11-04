@@ -875,11 +875,9 @@ export default function App() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-background)' }}>
-                <div className="text-center">
-                    <div className="text-6xl mb-4">&#9889;</div>
-                    <div className="text-2xl font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Loading EV Data...</div>
-                </div>
+            <div className="app-loading" role="status">
+                <div className="app-loading-glyph" aria-hidden="true">⚡</div>
+                <div className="app-loading-label">Loading EV data…</div>
             </div>
         );
     }

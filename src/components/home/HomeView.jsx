@@ -133,7 +133,7 @@ export default function HomeView({ slug, onSlugChange }) {
     return (
         <div className="home-view">
             <HomeIntro />
-            <h2 className="home-section-head text-micro">Featured comparison</h2>
+            <h2 className="home-section-head text-meta">Featured comparison</h2>
             {curatorBar}
             <header className="home-header">
                 {/* Title and reset share a row; the blurb and the vehicles run
@@ -178,7 +178,7 @@ export default function HomeView({ slug, onSlugChange }) {
 
             {others.length > 0 && (
                 <>
-                    <h2 className="home-section-head text-micro">Other comparisons</h2>
+                    <h2 className="home-section-head text-meta">Other comparisons</h2>
                     <label className="home-others">
                         <span className="text-label">Past comparisons</span>
                         <select className="form-input home-select" value="" onChange={e => showOther(e.target.value)}>

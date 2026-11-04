@@ -139,7 +139,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
 
     return (
         <div className="modal-overlay p-4">
-            <div className="modal-panel rounded-xl shadow-2xl max-w-5xl max-h-[90vh] flex flex-col">
+            <div className="modal-panel max-w-5xl max-h-[90vh] flex flex-col">
 
                 {/* Header */}
                 <div className="modal-header px-6 py-4 border-b flex-shrink-0">
@@ -167,7 +167,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                 Columns should include <em>Date of charging test</em>, <em>Optimized</em>,
                                 <em>Vehicle</em>, and numeric SoC columns (0–100).
                             </p>
-                            <label className="btn btn-primary cursor-pointer">
+                            <label className="btn btn-secondary cursor-pointer">
                                 Choose CSV file
                                 <input type="file" accept=".csv" className="hidden" onChange={handleFile} />
                             </label>
@@ -386,14 +386,14 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                             <button
                                 onClick={handleImport}
                                 disabled={activeSessions.length === 0}
-                                className="btn btn-primary disabled:opacity-50"
+                                className="btn btn-commit disabled:opacity-50"
                             >
                                 Import {activeSessions.length} session{activeSessions.length !== 1 ? 's' : ''}
                             </button>
                         </>
                     )}
                     {step === 'done' && (
-                        <button onClick={onClose} className="btn btn-primary">Done</button>
+                        <button onClick={onClose} className="btn btn-secondary">Done</button>
                     )}
                 </div>
             </div>

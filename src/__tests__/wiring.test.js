@@ -2622,7 +2622,7 @@ describe('Home draws a featured comparison and curators can make one (#448 layer
     });
 
     it('the featured comparison sits under its own section header', () => {
-        expect(home).toMatch(/<h2 className="home-section-head text-micro">Featured comparison<\/h2>/);
+        expect(home).toMatch(/<h2 className="home-section-head text-meta">Featured comparison<\/h2>/);
     });
 
     it('a panel draws through PresentedChart, the view the pop-out uses, from its own state', () => {
@@ -2938,7 +2938,7 @@ describe('Home offers the other featured comparisons and a link to this one (#44
     });
 
     it('a section header, with its rule, separates the other comparisons from the charts above', () => {
-        expect(home).toMatch(/<h2 className="home-section-head text-micro">Other comparisons<\/h2>/);
+        expect(home).toMatch(/<h2 className="home-section-head text-meta">Other comparisons<\/h2>/);
         // The header is not part of the dropdown's own block.
         expect(home).not.toMatch(/<label className="home-others">\s*<h2/);
         expect(home).toMatch(/Past comparisons/);

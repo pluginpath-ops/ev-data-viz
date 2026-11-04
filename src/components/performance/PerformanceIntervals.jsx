@@ -218,7 +218,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
 
                     <div className="flex gap-2 mt-2">
                         <button type="button" onClick={submit} disabled={saving}
-                            className="btn btn-primary text-[11px] py-0.5 px-2 disabled:opacity-50">
+                            className="btn btn-secondary text-[11px] py-0.5 px-2 disabled:opacity-50">
                             {saving ? 'Saving…' : 'Add'}
                         </button>
                         <button type="button" onClick={() => setDraft(null)} disabled={saving}

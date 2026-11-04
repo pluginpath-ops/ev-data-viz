@@ -280,7 +280,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                     </p>
                     <div className="flex gap-2 mt-2">
                         <button type="button" onClick={handleAddResult} disabled={creating}
-                            className="btn btn-primary text-xs py-1 px-3 disabled:opacity-50">
+                            className="btn btn-secondary text-xs py-1 px-3 disabled:opacity-50">
                             {creating ? 'Adding…' : 'Add'}
                         </button>
                         <button type="button" onClick={() => setAddingResult(false)} disabled={creating}
