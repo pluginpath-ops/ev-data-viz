@@ -89,7 +89,7 @@ export default function FeaturedComparisonEditor({ request, comparisons, vehicle
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div
-                className="modal-panel rounded-xl shadow-2xl mx-4 flex flex-col"
+                className="modal-panel mx-4 flex flex-col"
                 style={{ maxWidth: 'min(92vw, 640px)', maxHeight: '85vh' }}
                 role="dialog"
                 aria-labelledby="featured-editor-title"
@@ -204,7 +204,7 @@ export default function FeaturedComparisonEditor({ request, comparisons, vehicle
                         <>
                             <span className="text-meta mr-auto self-center">{problems[0]}</span>
                             <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
-                            <button type="button" onClick={save} disabled={saving || problems.length > 0 || slugTaken} className="btn btn-primary">
+                            <button type="button" onClick={save} disabled={saving || problems.length > 0 || slugTaken} className="btn btn-commit">
                                 {saving ? 'Saving…' : 'Save'}
                             </button>
                         </>

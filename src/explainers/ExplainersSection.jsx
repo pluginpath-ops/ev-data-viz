@@ -103,7 +103,7 @@ function WhereThisFits({ slug, readable }) {
             <div className="explainer-hub-head">
                 <HubGlyph glyph={hub.glyph} />
                 <div>
-                    <h3 id="explainer-fits" className="text-micro">Where this fits</h3>
+                    <h3 id="explainer-fits" className="subsection-title">Where this fits</h3>
                     <p className="subsection-title">{hub.title}</p>
                 </div>
             </div>

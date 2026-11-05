@@ -568,7 +568,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                                 className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
                                 title="Copy link to this chart view"
                             >
-                                {urlCopied ? '✓ Copied' : '🔗 URL'}
+                                {urlCopied ? '✓ Copied' : 'URL'}
                             </button>
                             <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={copied} copiedBeside={copiedBeside} />
                         </>

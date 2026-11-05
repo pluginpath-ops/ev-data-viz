@@ -114,21 +114,21 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                     {step === 'upload' && (
                         <div className="flex flex-col items-center">
                             <div
-                                className={`w-full border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition
+                                className={`w-full border-2 border-dashed rounded-xs p-12 text-center cursor-pointer transition
                                     ${dragOver ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-[var(--color-border)] hover:border-indigo-400'}`}
                                 onClick={() => fileRef.current?.click()}
                                 onDrop={handleDrop}
                                 onDragOver={handleDragOver}
                                 onDragLeave={handleDragLeave}
                             >
-                                <div className="text-4xl mb-3">📂</div>
+                                <div className="text-4xl mb-3">⇪</div>
                                 <p className="font-medium text-secondary">Drop the EPA testcar TSV here, or click to browse</p>
                                 <p className="text-sm text-meta mt-1">Accepts .csv (Excel) or .txt / .tsv (tab-separated) · Pre-filter to your vehicles of interest</p>
                                 <input ref={fileRef} type="file" accept=".txt,.tsv,.csv" className="hidden" onChange={handleFilePick} />
                             </div>
                             {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-                            <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-sm text-amber-800 dark:text-amber-300 max-w-lg">
+                            <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xs text-sm text-amber-800 dark:text-amber-300 max-w-lg">
                                 <p className="font-semibold mb-1">How to prepare the file</p>
                                 <ol className="list-decimal list-inside space-y-1 text-xs">
                                     <li>Download the EPA Test Car List (testcar_yymmdd.txt) from <span className="font-mono">epa.gov</span></li>
@@ -144,7 +144,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                     {step === 'map' && summary && (
                         <>
                             {/* Summary banner */}
-                            <div className="flex flex-wrap gap-4 mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-lg text-sm">
+                            <div className="flex flex-wrap gap-4 mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-xs text-sm">
                                 <span><strong>{summary.total}</strong> test vehicle{summary.total !== 1 ? 's' : ''} found</span>
                                 {summary.yearMin && <span>MY {summary.yearMin}{summary.yearMax !== summary.yearMin ? `–${summary.yearMax}` : ''}</span>}
                                 <span>{summary.makes.join(', ')}</span>
@@ -161,7 +161,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                             </div>
 
                             {error && (
-                                <div className="note-panel is-danger mb-4">⚠️ {error}</div>
+                                <div className="note-panel is-danger mb-4">⚠ {error}</div>
                             )}
 
                             {/* Table */}
@@ -265,7 +265,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                     {/* ── Step 3: Done ─────────────────────────────────────── */}
                     {step === 'done' && result && (
                         <div className="flex flex-col items-center py-8 text-center">
-                            <div className="text-5xl mb-4">✅</div>
+                            <div className="text-5xl mb-4">✓</div>
                             <p className="text-lg font-semibold mb-2">Import complete</p>
                             <p className="text-secondary">
                                 <strong>{result.testVehiclesCount}</strong> test vehicle{result.testVehiclesCount !== 1 ? 's' : ''} upserted
@@ -309,13 +309,13 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 type="button"
                                 onClick={handleImport}
                                 disabled={importing || selectedCount === 0}
-                                className="btn btn-primary text-sm disabled:opacity-40"
+                                className="btn btn-commit text-sm disabled:opacity-40"
                             >
                                 {importing ? 'Importing…' : `Import ${selectedCount} test vehicle${selectedCount !== 1 ? 's' : ''}${linkedCount > 0 ? ` + ${linkedCount} link${linkedCount !== 1 ? 's' : ''}` : ''}`}
                             </button>
                         )}
                         {step === 'done' && (
-                            <button type="button" onClick={onClose} className="btn btn-primary text-sm">Done</button>
+                            <button type="button" onClick={onClose} className="btn btn-secondary text-sm">Done</button>
                         )}
                     </div>
                 </div>

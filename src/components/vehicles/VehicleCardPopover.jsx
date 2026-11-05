@@ -91,7 +91,7 @@ export default function VehicleCardPopover({
                                     <div className="flex items-center gap-1.5">
                                         {onViewRuns && (
                                             <button type="button" className="btn btn-primary flex-1" onClick={() => { close(); onViewRuns(vehicle); }}>
-                                                View Tests &amp; Data →
+                                                View Tests &amp; Data ↘
                                             </button>
                                         )}
                                         <button type="button" className="btn btn-secondary" onClick={() => { close(); onViewSpecs(vehicle); }}>

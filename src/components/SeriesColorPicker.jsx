@@ -550,7 +550,7 @@ function PickerPanel({
                 <button type="button" className="btn btn-secondary" onClick={close}>Cancel</button>
                 <button
                     type="button"
-                    className={armed ? 'btn btn-warning' : 'btn btn-primary'}
+                    className={armed ? 'btn btn-warning' : 'btn btn-secondary'}
                     onClick={commit}
                 >
                     {armed ? `Overwrite ${targets.length}` : 'Apply'}

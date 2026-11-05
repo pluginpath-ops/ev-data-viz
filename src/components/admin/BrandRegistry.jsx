@@ -135,7 +135,7 @@ function BrandRow({ brand, brands, usage, aliases, parents, onSave, onMerge, onD
                 </div>
                 <div className="brand-row-actions">
                     {dirty && (
-                        <button className="btn btn-primary" disabled={busy || !name.trim()}
+                        <button className="btn btn-commit" disabled={busy || !name.trim()}
                             onClick={() => onSave(brand.id, { name: name.trim(), parent_name: parent.trim() || null })}>
                             Save
                         </button>
@@ -349,7 +349,7 @@ function NewBrandFromDivision({ division, onCreate, onCancel, busy }) {
         <div className="brand-merge">
             <input className="form-input brand-input" value={name} onChange={e => setName(e.target.value)}
                 aria-label="New brand name" />
-            <button className="btn btn-primary" disabled={busy || !name.trim()}
+            <button className="btn btn-secondary" disabled={busy || !name.trim()}
                 onClick={() => onCreate(name.trim())}>Create</button>
             <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>
         </div>

@@ -36,7 +36,7 @@ describe('the picker groups', () => {
     it('keeps every axis, grouped in the list own order', () => {
         const groups = groupAxes(chargingAxisOptions('imperial'));
         expect(groups.map(g => g.group)).toEqual(['Time', 'Charging speed', 'Range', 'Range added']);
-        expect(groups.flatMap(g => g.options)).toHaveLength(12);
+        expect(groups.flatMap(g => g.options)).toHaveLength(11);
     });
 });
 
@@ -54,5 +54,12 @@ describe('a link that names an axis the chart dropped', () => {
         expect(config.xAxis).toBe('soc');
         expect(config.yAxis).toBe('rangeRateHr');
         expect(config.y2Axis).toBe(null);
+    });
+});
+
+describe('SoC Added', () => {
+    it('is no longer offered, and a link that names it falls back', () => {
+        expect(isChargingAxis('deltaSoc')).toBe(false);
+        expect(chargingAxisOr('deltaSoc', 'time')).toBe('time');
     });
 });

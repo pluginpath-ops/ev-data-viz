@@ -190,7 +190,7 @@ export const COMPOSITES = {
             <div className="account-panel" style={{ position: 'static' }}>
                 <div className="account-identity">
                     <span className="account-email">greg@evbench.io</span>
-                    <span className="owner-badge">ADMIN</span>
+                    <span className="badge-micro is-accent ml-2">ADMIN</span>
                 </div>
                 <div className="account-row">
                     <span className="text-nano">Units</span>

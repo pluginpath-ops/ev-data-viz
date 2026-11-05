@@ -45,30 +45,24 @@
    That is what lets the playground show both themes side by side — and it costs
    one selector rather than a duplicated palette. */
 :root, [data-theme="light"] {
-    /* Primary color (main actions: Add, Save, View) */
+    /* Primary: location and selection — the nav, links, selected chips, and
+       .btn-primary, a button that takes you somewhere. */
     --color-primary: rgb(59, 130, 246);
     --color-primary-hover: rgb(37, 99, 235);
     --color-primary-light: rgb(219, 234, 254);
     --color-primary-text: rgb(30, 64, 175);
+    /* The one solid button a view may carry (.btn-commit): the orange of
+       "active / now", because committing is the one action that makes
+       something happen now. Dark text, because white on this orange is 3.2:1. */
+    --color-commit:       rgb(217, 119, 6);     /* provisional — light pass */
+    --color-commit-hover: rgb(245, 158, 11);    /* provisional — light pass */
+    --color-commit-text:  rgb(17, 24, 39);
 
-    /* Success/Edit color (Edit buttons) */
+    /* Status hues as solid marks — a dot, a tick, a bar. Buttons no longer
+       fill with them; see the button guide. */
     --color-success: rgb(34, 197, 94);
-    --color-success-hover: rgb(22, 163, 74);
-
-    /* Danger color (Delete buttons) */
     --color-danger: rgb(239, 68, 68);
-    --color-danger-hover: rgb(220, 38, 38);
-
-    /* Secondary color (Cancel, Back buttons) */
-    --color-secondary: rgb(107, 114, 128);
-    --color-secondary-hover: rgb(75, 85, 99);
-
-    /* Edit button specific (defaults to success color) */
-    --color-edit: rgb(34, 197, 94);
-    --color-edit-hover: rgb(22, 163, 74);
-
     --color-warning: rgb(245, 158, 11);
-    --color-warning-hover: rgb(217, 119, 6);
 
     /* Every token below is documented in docs/design-tokens.md, with its light
        and dark value and how many places use it. */
@@ -189,9 +183,11 @@
  */
 [data-theme="dark"] {
     /* ── Accents ────────────────────────────────────────────────────────────
-       Blue leads the chrome. Orange is the single "active / now" signal and
-       NOTHING else on the page may use it — that is what makes "where am I"
-       answerable from across the room. Green stays a data and status color,
+       Blue leads the chrome: where you are and what you have selected.
+       Orange is the "active / now" signal — the live sub-tab, the median
+       tick — and, solid, the one commit button a view may carry. Nothing else
+       on the page may use it; that is what makes "where am I" answerable from
+       across the room. Green stays a data and status color,
        never chrome. Violet and grey are series colors only. */
     --color-accent-blue:   rgb(45, 127, 249);   /* #2d7ff9 */
     --color-accent-orange: rgb(242, 139, 60);   /* #f28b3c */
@@ -204,24 +200,18 @@
        only what it resolves to. */
     --color-primary:        rgb(45, 127, 249);
     --color-primary-hover:  rgb(26, 110, 232);
+    /* The accent orange as a solid key, the page color on it: 7.7:1. */
+    --color-commit:         rgb(242, 139, 60);
+    --color-commit-hover:   rgb(247, 166, 104);
+    --color-commit-text:    rgb(13, 17, 23);
     --color-success:        rgb(35, 180, 126);
-    --color-success-hover:  rgb(28, 150, 104);
-    --color-edit:           rgb(35, 180, 126);
-    --color-edit-hover:     rgb(28, 150, 104);
     /* The handoff pins no solid red — its only red is the rgba(232,90,80) tint
        behind a NOT chip. Taken at face value that tint measures 3.49:1 under
        white, which is WORSE than the red-500 it replaces (3.76:1). Two steps
-       darker keeps the family and moves the number the right way. */
+       darker keeps the family. (Nothing writes white on it any more — the
+       buttons are tinted — but a solid red mark still wants the darker red.) */
     --color-danger:         rgb(220, 75, 66);
-    --color-danger-hover:   rgb(195, 61, 53);
     --color-warning:        rgb(242, 139, 60);
-    --color-warning-hover:  rgb(224, 122, 43);
-    /* Darker than --color-accent-grey (#6b7a8f), and deliberately so. The accent
-       grey is a BAR FILL — nothing is written on it. This is a button fill with
-       white text, and at the accent value that pairing measures 4.38:1, which
-       is under AA. The handoff's hue, two steps down. */
-    --color-secondary:      rgb(97, 111, 130);
-    --color-secondary-hover: rgb(80, 92, 108);
 
     /* ── Surface layers ── */
     --color-background:     rgb(13, 17, 23);    /* #0d1117 page, chip-line row */
@@ -247,9 +237,14 @@
     --color-text-primary:      rgb(242, 245, 249); /* #f2f5f9 */
     --color-text-value:        rgb(230, 235, 242); /* #e6ebf2 measured figures */
     --color-text-header-label: rgb(195, 204, 216); /* #c3ccd8 column headers */
-    --color-text-secondary:    rgb(168, 178, 193); /* #a8b2c1 */
-    --color-text-muted:        rgb(139, 149, 165); /* #8b95a5 */
-    --color-text-meta:         rgb(124, 135, 152); /* #7c8798 meta AND micro-labels */
+    /* Raised a step in the button and pill pass: secondary 8.6 → 11.4:1 and
+       meta 6.1/5.1 → 7.7:1 on the page. The quiet tiers read as faded rather
+       than as quieter, and micro/nano at 10px sat closest to the floor.
+       `-muted` and `-meta` are ONE tier now — .text-meta read one, .text-micro
+       the other, a shade apart, which no reader could tell was a distinction. */
+    --color-text-secondary:    rgb(192, 201, 214); /* #c0c9d6 */
+    --color-text-muted:        rgb(156, 166, 181); /* #9ca6b5 — same as meta */
+    --color-text-meta:         rgb(156, 166, 181); /* #9ca6b5 meta AND micro-labels */
     --color-text-faint:        rgb(61, 74, 90);    /* #3d4a5a disabled; also the chart axis */
 
     --color-text-link:     rgb(143, 186, 255); /* #8fbaff */
@@ -293,19 +288,23 @@
        bug this shape exists to prevent. */
     --color-primary-light:   rgba(45, 127, 249, 0.25);
     --color-primary-text:    rgb(168, 203, 255);
-    --color-primary-surface: rgba(45, 127, 249, 0.15);
-    --color-primary-border:  rgba(45, 127, 249, 0.35);
+    /* The wash and the edge were 0.12–0.15 and 0.35, and a tinted control read
+       as low contrast beside a solid one — not its text, which cleared AA
+       easily, but its SHAPE, which barely separated from the page. 0.18 and
+       0.60 give it the deep outline the solid buttons are being retired for. */
+    --color-primary-surface: rgba(45, 127, 249, 0.18);
+    --color-primary-border:  rgba(45, 127, 249, 0.60);
 
-    --color-warning-surface: rgba(242, 139, 60, 0.12);
-    --color-warning-border:  rgba(242, 139, 60, 0.35);
+    --color-warning-surface: rgba(242, 139, 60, 0.18);
+    --color-warning-border:  rgba(242, 139, 60, 0.60);
     --color-warning-text:    rgb(245, 176, 119);
 
-    --color-danger-surface:  rgba(232, 90, 80, 0.14);
-    --color-danger-border:   rgba(232, 90, 80, 0.35);
+    --color-danger-surface:  rgba(232, 90, 80, 0.18);
+    --color-danger-border:   rgba(232, 90, 80, 0.60);
     --color-danger-text:     rgb(240, 146, 139);
 
-    --color-success-surface: rgba(35, 180, 126, 0.14);
-    --color-success-border:  rgba(35, 180, 126, 0.35);
+    --color-success-surface: rgba(35, 180, 126, 0.18);
+    --color-success-border:  rgba(35, 180, 126, 0.60);
     --color-success-text:    rgb(95, 214, 168);
 }
 
@@ -338,7 +337,7 @@
    The handoff's six, named for what they wrap rather than by size, so a call
    site says `--radius-control` and cannot drift to a neighbouring value. There
    was no radius token before this: six literal `border-radius` declarations and
-   about a hundred `@apply rounded*`, which is how a 6px button came to sit
+   about a hundred `@apply rounded-xs*`, which is how a 6px button came to sit
    beside a 4px one.
 
    In `:root`, NOT in `@theme`, and that is deliberate. Tailwind tree-shakes
@@ -350,11 +349,18 @@
 
    Not theme-scoped: a corner is the same shape in light and dark. */
 :root {
-    --radius-card:    8px;   /* cards, the table frame, the plot frame */
-    --radius-popover: 7px;
-    --radius-control: 5px;   /* buttons, inputs, dropdown chips */
-    --radius-chip:    4px;
-    --radius-mark:    3px;   /* checkboxes, swatches, badges, bar fills */
+    /* One corner, 2px, for every container, control and mark (owner,
+       2026-11-04). The scale ran 8/7/5/4/3/2px, and a square selection edge
+       always fought one of them — an unselected card read as a D. Round is
+       now an accent with one meaning: a chip you picked or a tag on the car
+       (rounded-full), plus things that are round by nature — avatars, dots,
+       spinners. The names stay so each call site still says what it is, and
+       so a role can be split back out without touching the call sites. */
+    --radius-card:    2px;   /* cards, the table frame, the plot frame */
+    --radius-popover: 2px;
+    --radius-control: 2px;   /* buttons, inputs, dropdown chips */
+    --radius-chip:    2px;
+    --radius-mark:    2px;   /* checkboxes, swatches, badges, bar fills */
     --radius-track:   2px;   /* the track a bar fill sits in */
 }
 
@@ -368,13 +374,15 @@
        modifier, and the compact one is what the site wanted almost everywhere —
        so it became the base and the modifier went away (#277). `.btn-tab` keeps
        its own larger metrics: top-level navigation is not the same control. */
-    padding: 0.25rem 0.75rem;
+    /* 1px less than the 0.25rem/0.75rem box on every side, because every
+       button now draws a 1px edge and the outside size should not move. */
+    padding: calc(0.25rem - 1px) calc(0.75rem - 1px);
     font-size: 0.75rem;
     border-radius: var(--radius-control);
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease-in-out;
-    border: none;
+    border: 1px solid transparent;
     display: inline-block;
     text-align: center;
 }
@@ -382,72 +390,79 @@
 /*
  * BUTTON SEMANTIC GUIDE
  * ─────────────────────────────────────────────────────────────────
- * btn-primary  (blue)  — Additive / available actions.
- *                        Rule: "I can create, add, or move forward here."
- *                        Examples: Add Vehicle, Save Changes, Upload Image,
- *                                  Create tag, Import, View Charts, Sign In
+ * ONE style: a tinted wash, a deep edge of the same hue, and a light tint of
+ * it for the label. The site used to carry two — solid fills under white text
+ * (every one of them below AA: primary 3.81, danger 4.09, edit 2.66, warning
+ * 2.46) beside the tinted badges and toggles that had replaced them elsewhere.
+ * Hue is what the button means; the shape is the same for all of them.
  *
- * btn-edit     (green) — Modify-in-place actions.
- *                        Rule: "I'm editing something that already exists."
- *                        Examples: Edit (run)
+ * btn-commit   (orange, solid) — The ONE action a view or modal exists to
+ *                         take: Save, Save changes, Import N, Submit. The only
+ *                         solid fill left, and it only works while it stays rare.
  *
- * btn-danger   (red)   — Destructive / irreversible actions.
- *                        Rule: "This permanently removes data."
- *                        Examples: Delete (vehicle, run)
+ * btn-primary  (blue)   — Takes you somewhere: another page or view.
+ *                         Blue is location and selection, so a blue button is
+ *                         a way to a place. Its label ends ↘ (on-site); a link
+ *                         that leaves the site ends ↗.
+ *                         Examples: View Tests & Data ↘, Open chart ↘,
+ *                                   Open in new window
  *
- * btn-secondary (grey)  — Neutral / non-data-changing actions.
- *                         Rule: "This cancels, goes back, or exports without mutating state."
- *                         Examples: Cancel, Back, Sign Out, Export Data, Set as Default
+ * btn-secondary (grey)  — Every other action: add, create, select, upload,
+ *                         cancel, export, edit.
+ *                         Examples: + Add Vehicle, Select All Visible, Create
+ *                                   tag, Upload image, Cancel, Edit
  *
- * btn-warning  (amber)  — Alert / attention-drawing but non-destructive actions.
+ * btn-edit             — The same neutral as btn-secondary. It was green, the
+ *                         success hue, so a row of controls said "this went
+ *                         well" about a button that had not been pressed.
+ *                         Kept as a name so the call sites say what they are.
+ *
+ * btn-danger   (red)    — Destructive / irreversible actions.
+ *                         Rule: "This permanently removes data."
+ *                         Examples: Delete (vehicle, run)
+ *
+ * btn-warning  (amber)  — Attention-drawing but non-destructive actions.
  *                         Rule: "This resets or clears state in a reversible but notable way."
  *                         Examples: Clear all selections
  * ─────────────────────────────────────────────────────────────────
  */
 
-/* Primary / Additive Action Button */
-.btn-primary {
-    background-color: var(--color-primary);
-    color: white;
-}
-.btn-primary:hover {
-    background-color: var(--color-primary-hover);
-}
+/* Each intent sets three values; one rule paints them all, so the five
+   cannot drift apart again. Hover deepens the wash toward the edge. */
+.btn-primary   { --btn-wash: var(--color-primary-surface); --btn-edge: var(--color-primary-border); --btn-ink: var(--color-primary-text); }
+.btn-danger    { --btn-wash: var(--color-danger-surface);  --btn-edge: var(--color-danger-border);  --btn-ink: var(--color-danger-text); }
+.btn-warning   { --btn-wash: var(--color-warning-surface); --btn-edge: var(--color-warning-border); --btn-ink: var(--color-warning-text); }
+.btn-secondary,
+.btn-edit      { --btn-wash: var(--color-surface-sunken);  --btn-edge: color-mix(in srgb, var(--color-text-meta) 55%, transparent); --btn-ink: var(--color-text-primary); }
 
-/* Edit / Modify Button */
+.btn-primary,
+.btn-danger,
+.btn-warning,
+.btn-secondary,
 .btn-edit {
-    background-color: var(--color-edit);
-    color: white;
+    background-color: var(--btn-wash);
+    border-color: var(--btn-edge);
+    color: var(--btn-ink);
 }
-.btn-edit:hover {
-    background-color: var(--color-edit-hover);
-}
-
-/* Danger / Destructive Button */
-.btn-danger {
-    background-color: var(--color-danger);
-    color: white;
-}
-.btn-danger:hover {
-    background-color: var(--color-danger-hover);
+.btn-primary:hover:not(:disabled),
+.btn-danger:hover:not(:disabled),
+.btn-warning:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled),
+.btn-edit:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--btn-edge) 50%, var(--btn-wash));
 }
 
-/* Secondary / Neutral Button */
-.btn-secondary {
-    background-color: var(--color-secondary);
-    color: white;
+/* The commit action — see the guide above. Solid, on its own token triple
+   because white on the primary blue is the 3.81:1 this pass exists to end. */
+.btn-commit {
+    background-color: var(--color-commit);
+    border-color: var(--color-commit);
+    color: var(--color-commit-text);
+    font-weight: 600;
 }
-.btn-secondary:hover {
-    background-color: var(--color-secondary-hover);
-}
-
-/* Warning / Alert Button (amber) — attention-drawing but not destructive */
-.btn-warning {
-    background-color: var(--color-warning);
-    color: white;
-}
-.btn-warning:hover {
-    background-color: var(--color-warning-hover);
+.btn-commit:hover:not(:disabled) {
+    background-color: var(--color-commit-hover);
+    border-color: var(--color-commit-hover);
 }
 
 /* A button that shows an on/off state — currently "Set Default" on a test.
@@ -491,7 +506,7 @@
     border: 1px solid var(--color-warning-border);
     color: var(--color-warning-text);
 }
-.btn-restore:hover { background-color: var(--color-warning-border); }
+.btn-restore:hover { background-color: color-mix(in srgb, var(--color-warning-border) 50%, var(--color-warning-surface)); }
 
 /* Sub-tab — second-level navigation, inside a section.
    A smaller .btn-tab and nothing else: same shape, same states, one step down.
@@ -973,7 +988,8 @@ body {
     @apply list-disc ml-5;
 }
 
-/* A run's kind, as the pill that opens its title line.
+/* A run's kind, as the badge that opens its title line — a .badge-micro, a
+ * size up. A badge rather than a pill: a label you read, not a control.
  *
  * Charging and range are the one place in this app where two hues genuinely
  * encode a category rather than decorating one — the kind decides how every
@@ -982,8 +998,10 @@ body {
  * light colors with no dark counterpart, so on a dark theme they were two pale
  * slabs at the top of every card. */
 .run-kind {
-    @apply text-xs px-2 py-0.5 rounded-full font-medium shrink-0;
-    border: 1px solid transparent;
+    /* Two steps up from the micro badge (the meta size, ~12px): it heads a
+       test card, and the ↯ and ↔ have to read at a glance. */
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    padding: 1px 7px;
 }
 .run-kind.is-charging {
     border-color: color-mix(in srgb, var(--color-accent-blue) 45%, transparent);
@@ -999,7 +1017,7 @@ body {
 /* A destructive icon button that is quiet until you approach it. Three of them
  * reached for `hover:bg-red-50`, a light tint with no dark counterpart. */
 .btn-icon-danger {
-    @apply rounded transition-colors leading-none;
+    @apply rounded-xs transition-colors leading-none;
     border: 1px solid transparent;
     color: var(--color-text-meta);
 }
@@ -1027,7 +1045,7 @@ body {
 /* Where a file is dropped. Two importers had the same rectangle, and both said
  * "active" with `bg-indigo-50/40` — a color the theme does not contain. */
 .drop-zone {
-    @apply rounded-lg p-10 text-center;
+    @apply rounded-xs p-10 text-center;
     border: 2px dashed var(--color-border);
     transition: border-color 0.12s, background-color 0.12s;
 }
@@ -1356,9 +1374,9 @@ body {
 /* Signed in reads differently from signed out at a glance, which is the whole
    job of an avatar: filled and lettered vs. outlined and generic. */
 .account-btn.signed-in {
-    background-color: var(--color-primary);
-    border-color: var(--color-primary);
-    color: var(--color-primary-text, #fff);
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
+    color: var(--color-primary-text);
 }
 
 .account-panel {
@@ -1419,6 +1437,13 @@ body {
 .modal-panel {
     @apply w-full;
     background-color: var(--color-card);
+    /* One modal shape, owned here. Thirteen call sites each added
+       `rounded-xl shadow-2xl` — a 12px corner nothing else on the site has,
+       under Tailwind's deepest shadow. A modal is a card that floats: the
+       card's corner and edge, the popover's shadow. */
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-popover);
 }
 .modal-header {
     @apply flex items-center justify-between;
@@ -1454,7 +1479,7 @@ body {
 
 /* ── Crop modal ─────────────────────────────────────────────────────────────── */
 .crop-modal-panel {
-    @apply rounded-xl shadow-2xl flex flex-col overflow-hidden;
+    @apply rounded-xs shadow-2xl flex flex-col overflow-hidden;
     background-color: var(--color-card);
     max-width: min(90vw, 900px);
     max-height: 90vh;
@@ -1484,60 +1509,19 @@ body {
     border-top: 1px solid var(--color-border);
 }
 
-/* ── Trims section (inside EditVehicleForm) ─────────────────────────────────── */
-.trim-list {
-    @apply border rounded-lg overflow-hidden text-sm;
-    border-color: var(--color-border);
-}
-.trim-list-header {
-    @apply grid px-3 py-1.5 text-xs font-medium;
-    grid-template-columns: 1fr 1fr 1fr auto;
-    gap: 0.5rem;
-    background-color: var(--color-surface-muted);
-    color: var(--color-text-muted);
-    border-bottom: 1px solid var(--color-border);
-}
-.trim-list-row {
-    @apply grid items-center px-3 py-2;
-    grid-template-columns: 1fr 1fr 1fr auto;
-    gap: 0.5rem;
-    border-bottom: 1px solid var(--color-border);
-}
-.trim-list-row:last-child {
-    border-bottom: none;
-}
-.trim-add-row {
-    @apply flex gap-2 mt-2 items-center;
-}
-.trim-add-row .form-input {
-    @apply flex-1 min-w-0;
-}
 
-/* ── Spec link section (inside EditVehicleForm) ─────────────────────────────── */
-.spec-link-list {
-    @apply border rounded-lg overflow-hidden text-sm;
-    border-color: var(--color-border);
-}
-.spec-link-row {
-    @apply flex items-center gap-2 px-3 py-2;
-    background-color: var(--color-card);
-    border-bottom: 1px solid var(--color-border);
-}
-.spec-link-row:last-child {
-    border-bottom: none;
-}
 .spec-link-type-badge {
     @apply text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 whitespace-nowrap;
 }
 .spec-link-add-form {
-    @apply border rounded-lg p-3;
+    @apply border rounded-xs p-3;
     background-color: var(--color-surface-muted);
     border-color: var(--color-border);
 }
 
 /* ── Copy-to-vehicle modal ──────────────────────────────────────────────────── */
 .copy-to-modal-panel {
-    @apply rounded-xl shadow-2xl flex flex-col overflow-hidden;
+    @apply rounded-xs shadow-2xl flex flex-col overflow-hidden;
     background-color: var(--color-card);
     width: min(90vw, 420px);
 }
@@ -1546,7 +1530,7 @@ body {
 
 /* Scrollable preview table of planned rows */
 .import-table-container {
-    @apply rounded-lg border overflow-auto;
+    @apply rounded-xs border overflow-auto;
     max-height: 22rem;
     border-color: var(--color-border);
 }
@@ -1662,7 +1646,7 @@ body {
    the light body text on a white cell and made whatever you were typing
    invisible. */
 .data-cell-input {
-    @apply w-full text-xs p-0.5 rounded outline-none;
+    @apply w-full text-xs p-0.5 rounded-xs outline-none;
     /* Number spinners suppressed — a column of them is unreadable at this size
        and the arrows sit where the next digit should be. */
     appearance: textfield;
@@ -1688,7 +1672,7 @@ body {
 
 /* CSV file upload drag-drop target */
 .csv-drop-zone {
-    @apply border-2 border-dashed rounded-lg p-6 text-center;
+    @apply border-2 border-dashed rounded-xs p-6 text-center;
     border-color: var(--color-border-strong);
     color: var(--color-text-muted);
 }
@@ -1735,11 +1719,14 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* Base pill — full-radius small badge; color classes added inline */
 /* Call sites usually paint this from the tag's own color; the fallback is here
    so one that does not is still a pill rather than floating text. */
-.tag-pill {
+.tag-pill,
+.vehicle-tag {
     @apply px-2 py-0.5 rounded-full text-xs font-medium;
-    border: 1px solid transparent;
+    /* The filter chip's neutral exactly — a pill and a chip side by side
+       should differ in whether they press, not in how they are drawn. */
+    border: 1px solid var(--color-border);
     background-color: var(--color-surface-sunken);
-    color: var(--color-text-secondary);
+    color: var(--color-text-primary);
 }
 /* Summary counts at the head of a result — a row of them, read at a glance,
    so they carry more air than a pill inside a row of data. */
@@ -1775,17 +1762,19 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     font-weight: 600;
     letter-spacing: 0.04em;
     background-color: var(--color-surface-sunken);
-    color: var(--color-text-meta);
+    /* Secondary, not meta: meta on the sunken fill was 4.39:1, under AA at
+       the smallest size the site sets. */
+    color: var(--color-text-secondary);
 }
 
-/* "DEF" — the vehicle's default test for this kind. The one accent-colored
-   marker, because it is the only one that says which row is privileged rather
-   than what a row measured. */
+/* "DEF" — the vehicle's default test for this kind — and the account's role.
+   Marked by a bright edge rather than a hue: it says which row is privileged,
+   and blue is kept for location and selection. */
 .badge-micro.is-accent,
 .badge-default {
-    background-color: var(--color-primary-surface);
-    border-color: var(--color-primary-border);
-    color: var(--color-primary-text);
+    background-color: transparent;
+    border-color: var(--color-text-secondary);
+    color: var(--color-text-primary);
     letter-spacing: 0.06em;
 }
 
@@ -1812,7 +1801,8 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 
 .badge-micro.is-warning,
 .badge-status.is-warning,
-.tag-pill.is-warning {
+.tag-pill.is-warning,
+.badge-hidden {
     background-color: var(--color-warning-surface);
     border-color: var(--color-warning-border);
     color: var(--color-warning-text);
@@ -1827,11 +1817,9 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 
 /* Marks a run hidden from regular viewers (admin/contributor-only visibility) */
 .badge-hidden {
-    @apply text-xs font-normal bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded align-middle;
-}
-[data-theme="dark"] .badge-hidden {
-    background-color: rgba(249, 115, 22, 0.2);
-    color: rgb(253, 186, 116);
+    @apply text-xs font-normal px-1.5 py-0.5 align-middle;
+    border-radius: var(--radius-mark);
+    border: 1px solid var(--color-warning-border);
 }
 
 /* Border-style status badge (full-radius); color classes added inline */
@@ -1846,7 +1834,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
    site because it is the one everyone computes from. */
 .knob-source-local,
 .knob-source-site {
-    @apply text-[10px] font-semibold px-1.5 py-0.5 rounded border cursor-help;
+    @apply text-[10px] font-semibold px-1.5 py-0.5 rounded-xs border cursor-help;
 }
 .knob-source-local {
     color: var(--color-warning);
@@ -1915,9 +1903,6 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .selected-vehicle-chip-name:hover { @apply underline decoration-dotted; }
 
 /* OWNER role badge next to user email */
-.owner-badge {
-    @apply ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-bold;
-}
 
 /* Import ▾ dropdown panel */
 /* The "More ▾" overflow menu. It was --color-card on a rounded-lg with
@@ -2155,14 +2140,32 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     cursor: pointer;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
-    /* Square on the color side — see .vehicle-run-group. */
-    border-radius: 0 var(--radius-card) var(--radius-card) 0;
-    /* Left edge reserved for the selection bar, so selecting a card does not
-       change its width and reflow the grid. */
-    border-left: 3px solid transparent;
-    /* Positioning context for the selection mark below. */
+    border-radius: var(--radius-card);
+    /* The selection bar is this 1px left border PLUS a 2px strip laid over the
+       inside of it (::after), so the edge is 3px when it is lit and 1px — the
+       same as the other three sides — when it is not. It used to reserve a
+       transparent 3px border with a square corner, which drew an unselected
+       card as a D: square and edgeless on the left, round on the right.
+       Nothing inside moves when the strip appears, so the grid does not
+       reflow on select. --edge is the strip's color, set by each state. */
+    --edge: transparent;
+    /* Positioning context for the selection mark and the strip. */
     position: relative;
     transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+/* The inner 2px of the bar. Above the photo band, which is flush to the edge
+   and would otherwise cover it; under the ✓ plate. */
+.vehicle-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 2px;
+    z-index: 2;
+    pointer-events: none;
+    background-color: var(--edge);
+    transition: background-color 0.15s ease-in-out;
 }
 
 /* Hover leaves the LEFT border alone and previews the selection color on it.
@@ -2178,6 +2181,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     border-right-color: var(--color-border-strong);
     border-bottom-color: var(--color-border-strong);
     border-left-color: var(--color-accent-orange-muted);
+    --edge: var(--color-accent-orange-muted);
 }
 
 /* Broadsheet's treatment: a left orange bar and a tinted band, not a full-row
@@ -2190,6 +2194,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * strengthens it. */
 .vehicle-card.is-selected {
     border-left-color: var(--color-accent-orange);
+    --edge: var(--color-accent-orange);
     background-color: var(--color-cluster);
 }
 
@@ -2225,6 +2230,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .vehicle-card.is-pending {
     opacity: 0.6;
     border-left-color: var(--color-danger);
+    --edge: var(--color-danger);
 }
 
 /* The same object in a different shape, so it takes the same accent border
@@ -2246,15 +2252,15 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* A row's ⋯ menu opens below the row it belongs to, so the row must not clip
    it. The card's overflow: hidden is for its media band, which a row lacks. */
 .vehicle-row { overflow: visible; }
-/* The header lines up with rows that have a 3px accent border on the left
-   and a 1px border on the right, so its padding carries both. */
+/* The header lines up with rows that have a 1px border on each side (the
+   selection bar is drawn inside the left one), so its padding carries both. */
 .vehicle-list-head {
     position: sticky;
     top: var(--app-header-h, 0px);
     z-index: 3;
     padding-top: 6px;
     padding-bottom: 6px;
-    padding-left: 17px;
+    padding-left: 15px;
     padding-right: 15px;
     background-color: var(--color-background);
     border-bottom: 1px solid var(--color-border);
@@ -2350,7 +2356,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* A make's heading when the list is grouped by make. */
 .vehicle-list-group {
     margin: 10px 0 4px;
-    padding: 0 0 4px 17px;
+    padding: 0 0 4px 15px;
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -2376,11 +2382,11 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     font-family: var(--font-mono);
     color: var(--color-text-meta);
 }
-/* One kind's count on a vehicle card, "Charging (4/2)": a step under the
-   card's body text, weighted like a label. Its hue comes from the kind. */
+/* One kind's count on a vehicle card, "↯ 4/2": a micro badge one size up, so
+   the glyph reads at a glance. Neutral — a count is not a status. */
 .card-test-count {
-    font-size: calc(var(--fs-body) * 0.9286);
-    font-weight: 500;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    padding: 1px 6px;
 }
 /* A count that opens its tests (card and List): the text it replaces, as a
    button. Preflight already strips a button's chrome and inherits its type;
@@ -2515,9 +2521,10 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     margin-bottom: -1px;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
-    border-left: 3px solid transparent;
     border-bottom: 0;
-    border-radius: 0 var(--radius-card) 0 0;
+    /* A 1px left edge like the card below it; the selected bar adds 2px inside
+       it (box-shadow), so the two draw one continuous 3px bar. */
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
     font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
     color: var(--color-text-secondary);
     transition: border-color 0.15s ease-in-out, color 0.15s ease-in-out;
@@ -2530,6 +2537,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* Selected: the card's accent border and tint (.vehicle-card.is-selected). */
 .rolodex-card.is-selected {
     border-left-color: var(--color-accent-orange);
+    box-shadow: inset 2px 0 0 var(--color-accent-orange);
     background-color: var(--color-cluster);
 }
 /* A filtered-out stretch, or the sources past the cap: there, but not shown. */
@@ -2882,12 +2890,6 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     margin-bottom: 0;
 }
 
-.chart-rail .axis-align-row {
-    flex-direction: column;
-    align-items: flex-start;
-    padding-left: 0;
-    margin: 0;
-}
 
 /* Range & Efficiency's measure picker: six choices, each a phrase ("Efficiency
    by Temperature"), so they stack. Wrapping them would give a ragged two-column
@@ -3789,7 +3791,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     font-size: calc(var(--fs-body) * 1.5714);
     font-weight: 700;
     letter-spacing: 0.06em;
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 /* The scrim would grey out the fallback panel for no reason — there is no
    photograph under it to darken. */
@@ -4183,20 +4185,26 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  *
  * The mapping is the one the issue asked for. NOT takes danger because it is
  * the exclusion — the state that removes rows — and danger is what this app
- * already uses to say so. White text on all three, because each is a solid
- * fill of a saturated token; that is the one place a literal white is the
- * right answer rather than a missing one. */
-.tag-filter-and { background-color: var(--color-primary); border-color: var(--color-primary); color: #fff; }
-.tag-filter-and:hover { background-color: var(--color-primary-hover); border-color: var(--color-primary-hover); }
-.tag-filter-or  { background-color: var(--color-success); border-color: var(--color-success); color: #fff; }
-.tag-filter-or:hover  { background-color: var(--color-success-hover); border-color: var(--color-success-hover); }
-.tag-filter-not { background-color: var(--color-danger);  border-color: var(--color-danger);  color: #fff; }
-.tag-filter-not:hover { background-color: var(--color-danger-hover);  border-color: var(--color-danger-hover); }
+ * already uses to say so. Tinted, like every other control since the button
+ * pass: the solid fills under white measured 3.81, 2.66 and 4.09:1. */
+.tag-filter-and { --chip-wash: var(--color-primary-surface); --chip-edge: var(--color-primary-border); --chip-ink: var(--color-primary-text); }
+.tag-filter-or  { --chip-wash: var(--color-success-surface); --chip-edge: var(--color-success-border); --chip-ink: var(--color-success-text); }
+.tag-filter-not { --chip-wash: var(--color-danger-surface);  --chip-edge: var(--color-danger-border);  --chip-ink: var(--color-danger-text); }
+.tag-filter-and,
+.tag-filter-or,
+.tag-filter-not {
+    background-color: var(--chip-wash);
+    border-color: var(--chip-edge);
+    color: var(--chip-ink);
+}
+.tag-filter-and:hover,
+.tag-filter-or:hover,
+.tag-filter-not:hover { background-color: color-mix(in srgb, var(--chip-edge) 50%, var(--chip-wash)); }
 
 /* Small legend explaining OR/AND/NOT color states */
 .tag-filter-legend {
     @apply ml-auto flex items-center gap-2 whitespace-nowrap select-none text-xs;
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 
 /* Vehicle tag chip cluster on a card or list row */
@@ -4205,12 +4213,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* One of a vehicle's tags. It was an inline cluster in two places (the card and
    the edit form) painting the same primary tint. */
-.vehicle-tag {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
-    border: 1px solid transparent;
-    background-color: var(--color-primary-light);
-    color: var(--color-primary-text);
-}
+/* The vehicle's tags take .tag-pill's neutral (grouped with it above): a tag
+   describes the car, it is not a place or a selection, which is what blue
+   means. Only the layout differs — it holds a remove button. */
+.vehicle-tag { @apply inline-flex items-center gap-1; }
 /* In the edit form, a size up: these are targets with a remove button. */
 .vehicle-tag.is-editable { @apply px-3 py-1 text-sm; }
 /* A tag that came from the vehicle's source (it has none of its own): outlined,
@@ -4233,7 +4239,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Individual reorder direction button */
 .reorder-btn {
-    @apply w-6 h-6 flex items-center justify-center rounded text-[10px];
+    @apply w-6 h-6 flex items-center justify-center rounded-xs text-[10px];
     background-color: var(--color-surface-sunken);
     border: 1px solid var(--color-border);
     color: var(--color-text-muted);
@@ -4262,7 +4268,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Individual pagination navigation button */
 .pagination-btn {
-    @apply px-2 py-1 text-sm rounded disabled:opacity-40;
+    @apply px-2 py-1 text-sm rounded-xs disabled:opacity-40;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -4286,24 +4292,13 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply block text-sm font-medium mb-1;
     color: var(--color-text-secondary);
 }
-.axis-select {
-    @apply px-2 py-0.5 rounded text-sm w-full;
-    background-color: var(--color-surface-input);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-primary);
-}
-.axis-select:focus {
-    outline: 2px solid var(--color-primary);
-    outline-offset: -1px;
-    border-color: var(--color-primary);
-}
 
 /* The alignment threshold: a percentage, so one or two digits and never more.
    Sized to the number rather than to the form, and the browser's spin buttons
    dropped — they steal half the box for an affordance the arrow keys already
    provide. */
 .soc-input {
-    @apply px-1 py-0 rounded text-sm w-10 text-center;
+    @apply px-1 py-0 rounded-xs text-sm w-10 text-center;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -4325,12 +4320,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    so it reads as part of the X choice rather than a fourth setting. The
    checkbox and its text stay the standard .toggle-label. */
 .axis-row-option { padding-left: 30px; }
-
-/* Alignment sits UNDER the three axis pickers, indented, because it modifies the
-   X axis rather than standing beside it as a fourth axis. */
-.axis-align-row {
-    @apply flex flex-wrap items-center gap-x-3 gap-y-2 pl-6 -mt-3 mb-6;
-}
 
 /* Chart type / preset button row; mb added inline */
 .chart-type-buttons {
@@ -4356,37 +4345,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Warning banner for a viewing condition that can't be applied (e.g. EPA
    Curves elevation adjustment missing a required weight for one vehicle) */
 .chart-warning-banner {
-    @apply text-sm border rounded px-3 py-2 mb-4;
+    @apply text-sm border rounded-xs px-3 py-2 mb-4;
     background-color: var(--color-warning-surface);
     border-color: var(--color-warning-border);
     color: var(--color-warning-text);
 }
 
-/* An inline panel of settings that only apply in one mode — currently the
-   towing efficiency inputs, which appear when Road Trip is switched to towing.
-   Amber because it is a qualifier on everything below it, not a warning.
-
-   Every color is a token or has a dark override. It was `bg-amber-50` with no
-   dark rule, so in dark mode the light body text sat on a cream panel and both
-   the field labels and the values were unreadable. */
-.mode-settings-panel {
-    @apply mb-4 p-3 rounded-lg border;
-    background-color: var(--color-warning-surface);
-    border-color: var(--color-warning-border);
-    color: var(--color-text-primary);
-}
-.mode-settings-title {
-    @apply text-xs font-semibold mb-2 uppercase tracking-wide;
-    color: var(--color-warning-text);
-}
-.mode-settings-note {
-    /* Same color as the title. It was amber-600, which at text-xs on the pale
-       panel read 3.07:1 — under the 4.5:1 small-text minimum — so hierarchy is
-       carried by weight and caps instead, which this could afford and the
-       contrast could not. */
-    @apply text-xs max-w-xs;
-    color: var(--color-warning-text);
-}
 
 /* The section band (SectionBand.jsx): the labelled divider that opens a
    section of the sidebar — the run selector, routing overrides, the
@@ -4610,14 +4574,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     gap: 4px;
     padding: 6px 7px;
     border: 1px solid var(--color-border);
-    border-left: 3px solid transparent;
-    border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+    border-radius: var(--radius-chip);
     background-color: var(--color-surface-muted);
 }
 /* A row carrying an override is doing something the trip settings above are
    not, so it says so on the same accent border every other state uses. */
 .routing-row.is-custom {
     border-left-color: var(--color-accent-orange);
+    box-shadow: inset 2px 0 0 var(--color-accent-orange);
     background-color: var(--color-accent-orange-surface);
 }
 
@@ -4794,7 +4758,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Per-vehicle "all / none" bulk selection links in the run selector */
 .run-bulk-link {
     @apply text-xs underline transition;
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 .run-bulk-link:hover {
     color: var(--color-primary);
@@ -4922,7 +4886,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 .pair-add-btn,
 .pair-remove-btn {
-    @apply text-sm leading-none px-1 rounded transition;
+    @apply text-sm leading-none px-1 rounded-xs transition;
     color: var(--color-text-faint);
 }
 .pair-add-btn:hover:not(:disabled),
@@ -4936,7 +4900,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Copy chart as PNG / action button strip below charts */
 .chart-copy-btn {
-    @apply text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors;
+    @apply text-sm flex items-center gap-1.5 px-3 py-1.5 rounded-xs border transition-colors;
     background-color: var(--color-surface-muted);
     border-color: var(--color-border);
     color: var(--color-text-secondary);
@@ -5001,30 +4965,20 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-color: var(--color-surface-muted);
 }
 
-/* Race mode configuration panel */
-.race-mode-panel {
-    @apply mt-4 p-3 rounded-lg;
-    border: 1px solid var(--color-border);
-    background-color: var(--color-surface-muted);
-}
 
 /* Efficiency unit toggle (mi/kWh ↔ Wh/mi) */
 .efficiency-unit-toggle {
-    @apply flex gap-1 p-1 rounded-lg;
+    @apply flex gap-1 p-1 rounded-xs;
     background-color: var(--color-surface-sunken);
 }
 
 
 /* ── Runs View ──────────────────────────────────────────────────────────────── */
 
-/* Top header bar of the runs view (title + action buttons) */
-.runs-view-header {
-    @apply flex justify-between items-center mb-6;
-}
 
 /* "Adding data to: X" merge-mode banner */
 .merge-target-banner {
-    @apply mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between;
+    @apply mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xs flex items-center justify-between;
 }
 [data-theme="dark"] .merge-target-banner {
     background-color: rgba(59, 130, 246, 0.1);
@@ -5038,7 +4992,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Sub-section panel within a form (Charging Energy, Range Test Details) */
 .data-subpanel {
-    @apply border rounded-lg;
+    @apply border rounded-xs;
     background-color: var(--color-surface-muted);
     border-color: var(--color-border);
 }
@@ -5061,11 +5015,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * same two states on both panels and on the note panel above.
  */
 .estimation-panel {
-    @apply p-4 rounded-lg border flex items-start justify-between gap-4;
+    @apply p-4 rounded-xs border flex items-start justify-between gap-4;
     border-color: var(--color-border);
 }
 .join-key-panel {
-    @apply mt-5 p-4 rounded-lg border;
+    @apply mt-5 p-4 rounded-xs border;
     border-color: var(--color-border);
 }
 .estimation-panel.is-good,
@@ -5099,7 +5053,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* The same block, where nothing named it before. */
 .state-panel {
-    @apply mb-3 p-3 rounded-lg border flex flex-wrap items-center gap-3;
+    @apply mb-3 p-3 rounded-xs border flex flex-wrap items-center gap-3;
     border-color: var(--color-border);
 }
 
@@ -5207,7 +5161,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* OAuth provider button (GitHub, Google) */
 .auth-provider-btn {
-    @apply w-full flex items-center justify-center gap-3 font-medium py-3 px-4 rounded-lg transition;
+    @apply w-full flex items-center justify-center gap-3 font-medium py-3 px-4 rounded-xs transition;
     border: 2px solid var(--color-border-strong);
     background-color: var(--color-surface-muted);
     color: var(--color-text-primary);
@@ -5233,7 +5187,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Per-vehicle accordion panel */
 .import-vehicle-panel {
-    @apply border rounded-lg overflow-hidden transition;
+    @apply border rounded-xs overflow-hidden transition;
     border-color: var(--color-border);
 }
 
@@ -5259,7 +5213,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Numeric axis-bound input — hides browser spin buttons */
 .axis-input {
-    @apply px-2 py-1 rounded text-sm w-24;
+    @apply px-2 py-1 rounded-xs text-sm w-24;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -5322,7 +5276,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * both scroll axes, which is what makes the sticky header and the frozen label
  * column work. */
 .specs-table-container {
-    @apply rounded-lg overflow-auto;
+    @apply rounded-xs overflow-auto;
     max-height: var(--specs-max-h, calc(100vh - 14rem));
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
@@ -5625,7 +5579,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-colors cursor-pointer;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 .vote-btn:hover {
     border-color: var(--color-border-strong);
@@ -5634,25 +5588,26 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* Vouch variant — active state turns green */
 .vote-btn-vouch.vote-btn-active {
-    @apply border-green-400 text-green-600 bg-green-50 hover:border-green-500 hover:text-green-700;
-}
-[data-theme="dark"] .vote-btn-vouch.vote-btn-active {
-    background-color: rgba(34, 197, 94, 0.15);
-    border-color: rgba(34, 197, 94, 0.5);
-    color: rgb(134, 239, 172);
+    background-color: var(--color-success-surface);
+    border-color: var(--color-success-border);
+    color: var(--color-success-text);
 }
 
-/* Flag variant — compact width, active state turns muted grey */
+/* Flag variant — compact width, active state takes the danger tint. It was a
+   solid red-600 under white, the last solid fill among the run's controls. */
 .vote-btn-flag {
     @apply px-1;
 }
 .vote-btn-flag.vote-btn-active {
-    @apply border-red-600 text-white bg-red-600 hover:bg-red-700 hover:border-red-700;
+    background-color: var(--color-danger-surface);
+    border-color: var(--color-danger-border);
+    color: var(--color-danger-text);
 }
 
 /* Read-only vouch count (shown in edit form footer) */
 .vote-readonly {
-    @apply text-xs text-green-600 flex items-center gap-1;
+    @apply text-xs flex items-center gap-1;
+    color: var(--color-success-text);
 }
 
 /* Run card vote button group */
@@ -5660,10 +5615,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply flex items-center gap-1;
 }
 
-/* Flagged field indicator wrapper */
-.spec-field-flag-indicator {
-    @apply inline-flex items-center;
-}
 
 /* ── InfoIcon — peek, then pin ───────────────────────────────────────────────
  *
@@ -6382,14 +6333,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Subtle fixed watermark in bottom-right corner */
 .popout-watermark {
     @apply fixed bottom-3 right-4 z-50 text-xs font-medium
-           bg-black/10 px-2 py-1 rounded select-none pointer-events-none;
+           bg-black/10 px-2 py-1 rounded-xs select-none pointer-events-none;
     color: var(--color-text-faint);
 }
 
 /* Shown when pop-out is open but no vehicles are selected in the main tab */
 .popout-waiting {
     @apply flex items-center justify-center min-h-screen text-lg;
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 
 /* Run-selector header row: the disclosure on the left, chart-session toggles
@@ -6406,7 +6357,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply flex flex-col gap-2;
 }
 .session-browser-row {
-    @apply flex items-center justify-between gap-4 rounded-lg px-3 py-2;
+    @apply flex items-center justify-between gap-4 rounded-xs px-3 py-2;
     background-color: var(--color-surface-sunken);
     border: 1px solid transparent;
 }
@@ -6414,7 +6365,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border-color: var(--color-primary);
 }
 .session-vehicle-chip {
-    @apply text-xs px-1.5 py-0.5 rounded;
+    @apply text-xs px-1.5 py-0.5 rounded-xs;
     background-color: var(--color-card);
     color: var(--color-text-secondary);
     border: 1px solid var(--color-border);
@@ -6444,7 +6395,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     transform: rotate(90deg);
 }
 .session-group-edit {
-    @apply ml-auto text-xs px-2 py-0.5 rounded transition-colors;
+    @apply ml-auto text-xs px-2 py-0.5 rounded-xs transition-colors;
     color: var(--color-text-faint);
 }
 .session-group-edit:hover {
@@ -6804,14 +6755,14 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* ── Selective inheritance picker ───────────────────────────────────────────── */
 .spec-link-picker {
-    @apply mt-2 p-2 rounded-lg;
+    @apply mt-2 p-2 rounded-xs;
     background-color: var(--color-surface-sunken);
 }
 .spec-link-run-list {
     @apply flex flex-col gap-1 mt-2 max-h-52 overflow-y-auto pr-1;
 }
 .spec-link-kind-pill {
-    @apply text-xs px-1 rounded shrink-0;
+    @apply text-xs px-1 rounded-xs shrink-0;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -6829,7 +6780,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .site-footer p + p {
     @apply mt-1 text-xs;
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 
 /* ── Sub-tab section headers ────────────────────────────────────────────────── */
@@ -6849,7 +6800,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply ml-auto flex items-center gap-2;
 }
 .section-action {
-    @apply text-xs px-2 py-1 rounded whitespace-nowrap transition;
+    @apply text-xs px-2 py-1 rounded-xs whitespace-nowrap transition;
     @apply bg-indigo-50 text-indigo-700 hover:bg-indigo-100;
 }
 
@@ -6875,23 +6826,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 .epa-flow-box {
-    @apply w-full flex flex-col items-center gap-0.5 rounded-lg px-3 py-2 text-center border;
+    @apply w-full flex flex-col items-center gap-0.5 rounded-xs px-3 py-2 text-center border;
     border-color: var(--color-border);
     background-color: var(--color-card);
 }
 
-/* The adjusted figures and the computed combined — what the argument rests on */
-.epa-flow-box-strong {
-    border-color: var(--color-primary);
-    background-color: var(--color-primary-light);
-}
 
-/* The number on the window sticker: the end of the chain, styled as the answer */
-.epa-flow-box-label {
-    border-color: var(--color-primary);
-    border-width: 2px;
-    background-color: var(--color-card);
-}
 
 .epa-flow-value {
     @apply text-lg font-semibold tabular-nums;
@@ -6915,7 +6855,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    the leading edge in the status color so agreement and disagreement are
    distinguishable before any number is read. */
 .epa-check {
-    @apply flex flex-col gap-0.5 mt-3 p-2 rounded;
+    @apply flex flex-col gap-0.5 mt-3 p-2 rounded-xs;
     border-left: 3px solid var(--color-border);
     background: var(--color-surface-2, transparent);
 }
@@ -6924,7 +6864,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    distance from what EPA published — and a dropdown hides all of it until the
    moment it is closed again. */
 .epa-test-picker {
-    @apply rounded border border-[var(--color-border)] p-3 mb-3;
+    @apply rounded-xs border border-[var(--color-border)] p-3 mb-3;
     background: var(--color-surface-muted);
 }
 .epa-test-option {
@@ -6948,7 +6888,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    the figures the choice settles. Rows are .option-row, so hover and the
    selected state match every other one-of-a-list choice. */
 .primary-config-picker {
-    @apply mt-3 mb-3 rounded-lg border overflow-x-auto;
+    @apply mt-3 mb-3 rounded-xs border overflow-x-auto;
     border-color: var(--color-border);
 }
 .primary-config-option {
@@ -6976,7 +6916,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    Guide picker below is aimed at (a curator's "Link" button) is outlined, so
    the two never read as one. */
 .certification-list {
-    @apply mt-2 mb-3 rounded-lg border overflow-x-auto;
+    @apply mt-2 mb-3 rounded-xs border overflow-x-auto;
     border-color: var(--color-border);
 }
 .certification-row {
@@ -7043,7 +6983,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    a disagreement crossed a limit; a gap is something missing with no limit
    behind it, so it stays neutral rather than borrowing a status color. */
 .data-check-finding {
-    @apply flex flex-col gap-0.5 p-2 rounded;
+    @apply flex flex-col gap-0.5 p-2 rounded-xs;
     border-left: 3px solid var(--color-border);
     background: var(--color-surface-2, transparent);
 }
@@ -7130,7 +7070,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    same bracket inverted: a cap with its legs pointing down, reading as one
    value splitting into two rather than two combining into one. */
 .epa-flow-merge {
-    @apply mx-auto my-2 w-1/2 h-4 border-b border-x rounded-b-lg;
+    @apply mx-auto my-2 w-1/2 h-4 border-b border-x rounded-b-xs;
     border-color: var(--color-border);
 }
 
@@ -7141,7 +7081,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* The sentence the diagram exists to make unavoidable */
 .epa-methodology-callout {
-    @apply mt-5 rounded-lg px-3 py-2 text-sm border-l-4;
+    @apply mt-5 rounded-xs px-3 py-2 text-sm border-l-4;
     border-color: var(--color-primary);
     background-color: var(--color-surface-muted);
     color: var(--color-text-secondary);
@@ -7192,7 +7132,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 .cycle-bar {
-    @apply relative h-full rounded border;
+    @apply relative h-full rounded-xs border;
     min-width: 2px;
 }
 
@@ -7253,7 +7193,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .cycle-legend span { @apply inline-flex items-center gap-1.5; }
 
 .cycle-swatch {
-    @apply inline-block w-4 h-3 rounded-sm border not-italic;
+    @apply inline-block w-4 h-3 rounded-xs border not-italic;
 }
 .cycle-swatch-tick {
     @apply inline-block w-0.5 h-3.5 not-italic;
@@ -7291,7 +7231,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 .cert-cell {
-    @apply flex flex-col gap-1 rounded-lg border px-3 py-2 h-full;
+    @apply flex flex-col gap-1 rounded-xs border px-3 py-2 h-full;
     border-color: var(--color-border);
     background-color: var(--color-card);
     min-height: 5.5rem;
@@ -7362,7 +7302,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 .collapsible-subtitle {
     @apply text-xs;
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 
 .collapsible-body {
@@ -7388,7 +7328,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Advisory badge on a curator field — e.g. an EPA label range that disagrees
    with the vehicle's spec range (#206). Amber: worth a look, not an error. */
 .curator-field-flag {
-    @apply text-[9px] font-bold px-1 rounded cursor-help;
+    @apply text-[9px] font-bold px-1 rounded-xs cursor-help;
     color: var(--color-warning);
     background-color: rgba(245, 158, 11, 0.12);
 }
@@ -7396,7 +7336,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* ── Fuel Economy Guide import (#206) ───────────────────────────────────────── */
 
 .fe-dropzone {
-    @apply flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed py-8 px-4 cursor-pointer transition-colors text-center;
+    @apply flex flex-col items-center justify-center gap-1 rounded-xs border-2 border-dashed py-8 px-4 cursor-pointer transition-colors text-center;
     border-color: var(--color-border-strong);
     background-color: var(--color-surface-muted);
 }
@@ -7438,7 +7378,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* ── Fuel Economy Guide picker (#206) ───────────────────────────────────────── */
 
 .fe-picker {
-    @apply flex flex-col gap-1.5 rounded-lg border px-3 py-2 mb-4;
+    @apply flex flex-col gap-1.5 rounded-xs border px-3 py-2 mb-4;
     border-color: var(--color-border);
     background-color: var(--color-surface-muted);
 }
@@ -7459,7 +7399,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .fe-picker-link-btn:hover { color: var(--color-primary-hover); }
 
 .fe-candidate {
-    @apply flex items-center justify-between gap-3 rounded px-2 py-1.5;
+    @apply flex items-center justify-between gap-3 rounded-xs px-2 py-1.5;
 }
 
 /* The proposal. Distinguished because it is the one the curator confirms. */
@@ -7539,7 +7479,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* ── Filters ─────────────────────────────────────────────────────────────── */
 
 .guide-filter-bar {
-    @apply flex flex-wrap gap-x-6 gap-y-3 p-4 rounded-lg;
+    @apply flex flex-wrap gap-x-6 gap-y-3 p-4 rounded-xs;
     background-color: var(--color-surface-muted);
     border: 1px solid var(--color-border);
 }
@@ -7832,11 +7772,12 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* Hovering something already selected darkens it rather than reverting it. */
 .guide-chip.active:hover:not(:disabled) {
-    background-color: var(--color-primary-hover);
+    background-color: color-mix(in srgb, var(--color-primary-border) 50%, var(--color-primary-surface));
 }
 .guide-chip.active {
-    background-color: var(--color-primary);
-    color: rgb(255, 255, 255);
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
+    color: var(--color-primary-text);
 }
 /* Disabled means "selecting this leaves nothing", which is an answer. It stays
    visible for that reason — a make disappearing from the list reads as a bug. */
@@ -7852,19 +7793,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply flex items-center gap-1.5;
 }
 .guide-range-input {
-    @apply w-16 px-2 py-1 rounded text-sm tabular-nums;
+    @apply w-16 px-2 py-1 rounded-xs text-sm tabular-nums;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
 }
 .guide-search-input {
-    @apply w-full px-3 py-1.5 rounded text-sm;
+    @apply w-full px-3 py-1.5 rounded-xs text-sm;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
-}
-.guide-reset {
-    @apply self-end;
 }
 /* Column picker sits in the filter bar beside the facets, so every control
    that changes what you see is in one place. */
@@ -7877,7 +7815,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Wide content scrolls inside its own container; the page never scrolls
    sideways. At 30 columns this is not optional. */
 .guide-table-container {
-    @apply overflow-x-auto rounded-lg;
+    @apply overflow-x-auto rounded-xs;
     border: 1px solid var(--color-border);
     max-height: 70vh;
     overflow-y: auto;
@@ -8431,27 +8369,34 @@ a.is-test-link:focus-visible {
 
 /* Badges ride on the configuration name rather than holding their own columns. */
 .guide-badge {
-    @apply inline-block px-1.5 py-0.5 rounded uppercase shrink-0;
+    @apply inline-block px-1.5 py-0.5 rounded-xs uppercase shrink-0;
     font-size: 0.5625rem;
     font-weight: 700;
     letter-spacing: 0.03em;
-    color: rgb(255, 255, 255);
+    border: 1px solid transparent;
 }
-.guide-badge-tested { background-color: var(--color-primary); }
-.guide-badge-multi  { background-color: var(--color-warning); }
+/* Tinted like every other marker — white on the solid fills was 3.81 and 2.46:1. */
+.guide-badge-tested { --badge-wash: var(--color-primary-surface); --badge-edge: var(--color-primary-border); --badge-ink: var(--color-primary-text); }
+.guide-badge-multi  { --badge-wash: var(--color-warning-surface); --badge-edge: var(--color-warning-border); --badge-ink: var(--color-warning-text); }
+.guide-badge-tested,
+.guide-badge-multi {
+    background-color: var(--badge-wash);
+    border-color: var(--badge-edge);
+    color: var(--badge-ink);
+}
 
 .guide-pager {
     @apply flex items-center justify-center gap-3;
 }
 
 .guide-warning {
-    @apply px-3 py-2 rounded text-sm;
+    @apply px-3 py-2 rounded-xs text-sm;
     background-color: rgba(245, 158, 11, 0.12);
     color: var(--color-text-primary);
     border: 1px solid var(--color-warning);
 }
 .guide-tested-note {
-    @apply px-3 py-2 rounded text-sm mb-3;
+    @apply px-3 py-2 rounded-xs text-sm mb-3;
     background-color: var(--color-primary-light);
     color: var(--color-primary-text);
 }
@@ -8463,7 +8408,7 @@ a.is-test-link:focus-visible {
 /* ── Compare panel ───────────────────────────────────────────────────────── */
 
 .guide-compare {
-    @apply flex flex-col gap-2 p-4 rounded-lg;
+    @apply flex flex-col gap-2 p-4 rounded-xs;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -8524,7 +8469,7 @@ a.is-test-link:focus-visible {
 /* ── Detail modal ────────────────────────────────────────────────────────── */
 
 .guide-detail-panel {
-    @apply flex flex-col rounded-lg mx-4;
+    @apply flex flex-col rounded-xs mx-4;
     max-width: 52rem;
     max-height: 88vh;
 }
@@ -8546,7 +8491,7 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-4;
 }
 .guide-certification-test-vehicle {
-    @apply flex flex-col gap-2 p-3 rounded;
+    @apply flex flex-col gap-2 p-3 rounded-xs;
     background-color: var(--color-surface-sunken);
 }
 /* Numbers in a certification table sit on their right edge, so a column of
@@ -8580,7 +8525,7 @@ a.is-test-link:focus-visible {
     color: var(--color-text-muted);
 }
 .guide-raw {
-    @apply mt-2 p-3 rounded max-h-64 overflow-y-auto flex flex-col gap-1;
+    @apply mt-2 p-3 rounded-xs max-h-64 overflow-y-auto flex flex-col gap-1;
     background-color: var(--color-surface-sunken);
 }
 .guide-raw-row {
@@ -8599,7 +8544,7 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-1.5;
 }
 .brand-row {
-    @apply flex flex-col gap-2 p-3 rounded-lg;
+    @apply flex flex-col gap-2 p-3 rounded-xs;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -8607,14 +8552,14 @@ a.is-test-link:focus-visible {
     @apply flex flex-wrap items-center gap-3;
 }
 .brand-input {
-    @apply px-2 py-1 rounded text-sm;
+    @apply px-2 py-1 rounded-xs text-sm;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
     min-width: 9rem;
 }
 .brand-select {
-    @apply px-2 py-1 rounded text-sm;
+    @apply px-2 py-1 rounded-xs text-sm;
     background-color: var(--color-surface-input);
     border: 1px solid var(--color-border);
     color: var(--color-text-primary);
@@ -8633,7 +8578,7 @@ a.is-test-link:focus-visible {
 /* Merge deletes a brand, so the confirmation states what happens to the
    vehicles and aliases rather than asking "are you sure?". */
 .brand-merge-confirm {
-    @apply p-2 rounded;
+    @apply p-2 rounded-xs;
     background-color: rgba(245, 158, 11, 0.12);
     border: 1px solid var(--color-warning);
 }
@@ -8641,15 +8586,6 @@ a.is-test-link:focus-visible {
 .brand-aliases {
     @apply flex flex-wrap items-center gap-1.5 pt-2;
     border-top: 1px solid var(--color-border);
-}
-.brand-alias-chip {
-    background-color: var(--color-surface-sunken);
-    color: var(--color-text-secondary);
-    border: 1px solid var(--color-border);
-}
-[data-theme="dark"] .brand-alias-chip {
-    background-color: rgba(255, 255, 255, 0.08);
-    color: rgb(241, 245, 249);
 }
 .brand-alias-chip button {
     @apply leading-none px-0.5;
@@ -8841,18 +8777,16 @@ a.is-test-link:focus-visible {
     font-weight: 700;
     color: var(--color-text-primary);
 }
-.stats-headline-scope {
-    margin-left: 10px;
-    font-family: var(--font-mono);
-    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
-    color: var(--color-text-meta);
-}
-/* The unit's own question — the reason to care which unit is selected at all.
-   Quoted because it is a question a reader asks, not a label for a control. */
+.stats-headline-scope { margin-left: 10px; }
+/* The scope, and the unit's own question — the reason to care which unit is
+   selected at all. Quoted because it is a question a reader asks, not a label
+   for a control. One voice: the question was a tier fainter (text-faint,
+   2.1:1) until the contrast pass, and was otherwise this rule already. */
+.stats-headline-scope,
 .stats-headline-question {
     font-family: var(--font-mono);
     font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 
 /* ── Summary table ───────────────────────────────────────────────────────── */
@@ -8928,12 +8862,6 @@ a.is-test-link:focus-visible {
     letter-spacing: 0.08em;
     color: var(--color-text-meta);
 }
-.stats-dist-unit {
-    @apply block;
-    font-family: var(--font-mono);
-    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
-    color: var(--color-text-faint);
-}
 
 .stats-row { border-bottom: 1px solid var(--color-border); }
 /* The corpus row leads. It is the frame every row below is read against — it
@@ -8958,7 +8886,7 @@ a.is-test-link:focus-visible {
    would push them out of a 190px column to say something the muting has already
    said. */
 .stats-suppressed-flag {
-    @apply ml-2 px-1.5 py-0.5 rounded;
+    @apply ml-2 px-1.5 py-0.5 rounded-xs;
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 700;
     background-color: var(--color-surface-sunken);
@@ -8989,7 +8917,7 @@ a.is-test-link:focus-visible {
     background-color: var(--color-text-faint);
 }
 .stats-box-iqr {
-    @apply absolute rounded-sm;
+    @apply absolute rounded-xs;
     top: 50%;
     height: 8px;
     transform: translateY(-50%);
@@ -9021,7 +8949,7 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-4;
 }
 .stats-panel {
-    @apply flex flex-col gap-2 p-4 rounded-lg;
+    @apply flex flex-col gap-2 p-4 rounded-xs;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -9056,7 +8984,7 @@ a.is-test-link:focus-visible {
    flat fill reads as a solid mass and the shape has to be traced along the top
    edge; stepping it makes the peak legible peripherally. */
 .stats-histogram-bar {
-    @apply flex-1 rounded-t-sm;
+    @apply flex-1 rounded-t-xs;
     min-height: 1px;
     background-color: var(--bar-track);
 }
@@ -9124,7 +9052,7 @@ a.is-test-link:focus-visible {
    ══════════════════════════════════════════════════════════════════════════ */
 
 .sweep-row {
-    @apply flex flex-col gap-2 p-3 rounded-lg;
+    @apply flex flex-col gap-2 p-3 rounded-xs;
     background-color: var(--color-card);
     border: 1px solid var(--color-border);
 }
@@ -9146,7 +9074,7 @@ a.is-test-link:focus-visible {
 /* The batch is the point of a sweep: everything unambiguous cleared at once,
    with the count stated so it is a decision rather than a leap. */
 .sweep-batch {
-    @apply flex flex-wrap items-center justify-between gap-3 p-3 rounded-lg;
+    @apply flex flex-wrap items-center justify-between gap-3 p-3 rounded-xs;
     background-color: var(--color-primary-light);
     border: 1px solid var(--color-primary);
 }
@@ -9170,7 +9098,7 @@ a.is-test-link:focus-visible {
 /* The inline prompt that records a skip, with its optional note. Shared by the
    Fuel Economy Guide link sweep and Data Checks: the same act in both places. */
 .skip-ask {
-    @apply flex flex-wrap items-center gap-2 p-2 rounded;
+    @apply flex flex-wrap items-center gap-2 p-2 rounded-xs;
     background-color: rgba(245, 158, 11, 0.12);
     border: 1px solid var(--color-warning);
 }
@@ -9180,7 +9108,7 @@ a.is-test-link:focus-visible {
 /* Per-file outcome in the multi-PDF CSI import. A file that yielded nothing is
    a named failure here rather than configs that quietly never appeared. */
 .pdf-file-list {
-    @apply flex flex-col gap-0.5 mb-3 max-h-32 overflow-y-auto p-2 rounded text-xs;
+    @apply flex flex-col gap-0.5 mb-3 max-h-32 overflow-y-auto p-2 rounded-xs text-xs;
     background-color: var(--color-surface-muted);
 }
 .pdf-file-row {
@@ -9250,7 +9178,7 @@ a.is-test-link:focus-visible {
 .curve-picker-group + .curve-picker-row { margin-top: 2px; }
 .curve-picker-group-count {
     font-family: var(--font-mono);
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 
 /* Two lines, because one line had to hold a name, a year, a make and a badge
@@ -9312,13 +9240,6 @@ a.is-test-link:focus-visible {
    un-scopable override deleted, and a tier added later inherits the system
    instead of needing a fifth rule. */
 
-.curve-canvas-wrap {
-    @apply p-3 rounded-lg;
-    height: 26rem;
-    background-color: var(--color-card);
-    border: 1px solid var(--color-border);
-}
-
 /* ── Playground ──────────────────────────────────────────────────────────────
    The catalogue page. Its own chrome is deliberately plain — anything eye-
    catching here competes with the specimens, which are the content. */
@@ -9339,7 +9260,7 @@ a.is-test-link:focus-visible {
 }
 
 .pg-specimen {
-    @apply flex flex-col gap-1.5 rounded p-2;
+    @apply flex flex-col gap-1.5 rounded-xs p-2;
     background-color: var(--color-surface-muted);
     border: 1px solid var(--color-border);
 }
@@ -9353,13 +9274,13 @@ a.is-test-link:focus-visible {
 }
 .pg-specimen-note {
     @apply text-[11px] basis-full;
-    color: var(--color-text-faint);
+    color: var(--color-text-meta);
 }
 
 /* The measured ratio. Green and red here are a VERDICT on a number, not decor,
    which is why they are the only saturated colors on the page. */
 .pg-ratio {
-    @apply text-[10px] font-mono font-bold rounded px-1 py-0.5;
+    @apply text-[10px] font-mono font-bold rounded-xs px-1 py-0.5;
 }
 .pg-ratio.is-pass {
     background-color: var(--color-success-surface);
@@ -9374,7 +9295,7 @@ a.is-test-link:focus-visible {
    specimens inside are drawn by the real tokens rather than an imitation. */
 .pg-split { @apply grid gap-3; grid-template-columns: 1fr 1fr; }
 .pg-split-pane {
-    @apply rounded p-3;
+    @apply rounded-xs p-3;
     background-color: var(--color-background);
     border: 1px solid var(--color-border);
     /* The pane re-declares the palette, but a token is not a color until
@@ -9399,13 +9320,13 @@ a.is-test-link:focus-visible {
     grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
 }
 .pg-token-card {
-    @apply flex flex-col gap-2 rounded-lg p-3;
+    @apply flex flex-col gap-2 rounded-xs p-3;
     border: 1px solid;
 }
 .pg-token-name { @apply text-xs font-bold uppercase tracking-wide; }
 .pg-token-swatches { @apply flex gap-1.5; }
 .pg-token-swatch {
-    @apply w-7 h-7 rounded;
+    @apply w-7 h-7 rounded-xs;
     border: 1px solid var(--color-border);
 }
 .pg-token-sample { @apply text-sm; }
@@ -9415,7 +9336,7 @@ a.is-test-link:focus-visible {
    view shows it in the document's theme regardless of the pane. Amber because
    it is a caveat on the specimen, not a fault in it. */
 .pg-unscoped {
-    @apply text-[10px] font-mono rounded px-1 py-0.5;
+    @apply text-[10px] font-mono rounded-xs px-1 py-0.5;
     background-color: var(--color-warning-surface);
     color: var(--color-warning-text);
 }
@@ -9429,7 +9350,7 @@ a.is-test-link:focus-visible {
 
 /* The curators' row above the comparison: which one is shown, and Edit. */
 .home-curator {
-    @apply flex flex-wrap items-center gap-3 rounded-lg px-3 py-2;
+    @apply flex flex-wrap items-center gap-3 rounded-xs px-3 py-2;
     background-color: var(--color-surface-muted);
     border: 1px dashed var(--color-border-strong);
 }
@@ -9485,7 +9406,7 @@ a.is-test-link:focus-visible {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
 }
 .home-panel {
-    @apply flex flex-col gap-3 rounded-lg p-3;
+    @apply flex flex-col gap-3 rounded-xs p-3;
     /* The frame height every presented chart draws to (utils/presentedHeight.js).
        One height for every panel, Charge Stop's two stacked charts included, so a
        row of panels is one height and nothing is left with a gap under it. */
@@ -9610,19 +9531,47 @@ a.is-test-link:focus-visible {
     bottom: 1.25rem;
     transform: translateX(-50%);
     z-index: var(--z-header);
-    padding: 0.45rem 1rem;
-    border: 0;
+    padding: calc(0.45rem - 1px) calc(1rem - 1px);
     border-radius: 9999px;
     font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
     font-weight: 600;
     letter-spacing: 0.09em;
-    background-color: var(--color-primary);
-    color: white;
+    /* Opaque popover ground under the tint: it floats over content, and a
+       translucent wash alone would let the chart beneath show through. */
+    background-color: var(--color-popover);
+    background-image: linear-gradient(var(--color-primary-surface), var(--color-primary-surface));
+    border: 1px solid var(--color-primary-border);
+    color: var(--color-primary-text);
     box-shadow: var(--shadow-popover);
     cursor: pointer;
     animation: scroll-more-bob 2.2s ease-in-out infinite;
 }
 .scroll-more:hover { filter: brightness(1.1); }
+/* The first screen anyone sees. The bolt is the one emoji the public side
+   keeps, on the owner's call: a full-color mark that pulses gently while the
+   data loads, rather than a spinner. */
+.app-loading {
+    @apply min-h-screen flex flex-col items-center justify-center gap-4;
+    background-color: var(--color-background);
+}
+.app-loading-glyph {
+    font-size: calc(var(--fs-body) * 4);
+    line-height: 1;
+    animation: app-loading-pulse 1.6s ease-in-out infinite;
+}
+.app-loading-label {
+    font-size: calc(var(--fs-body) * 1.25);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+@keyframes app-loading-pulse {
+    0%, 100% { transform: scale(1);    opacity: 1; }
+    50%      { transform: scale(1.08); opacity: 0.7; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .app-loading-glyph { animation: none; }
+}
+
 @keyframes scroll-more-bob {
     0%, 100% { transform: translateX(-50%) translateY(0); }
     50%      { transform: translateX(-50%) translateY(-3px); }

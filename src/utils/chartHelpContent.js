@@ -1,7 +1,7 @@
 /**
  * Chart help / "About this chart" copy.
  *
- * Layman-friendly explanations shown in the collapsible ℹ️ bubble at the bottom
+ * Layman-friendly explanations shown in the collapsible ⓘ bubble at the bottom
  * of each Charts sub-tab. The authoritative copy lives in the `chart_help` table
  * (admin/contributor-editable, seeded by migration 031); these objects are the
  * BUNDLED FALLBACK used when a row is missing or in localStorage-only mode.
@@ -62,7 +62,7 @@ export const CHART_HELP_DEFAULTS = {
             'C-rate — charge power ÷ battery size (kW ÷ kWh); ~1C ≈ adding a full pack in an hour, regardless of car size.\n' +
             'Range Rate — miles of range gained per minute (or per hour).\n' +
             'SoC Rate — percent of the battery added per minute.\n' +
-            'SoC Added / Range Added — change since the start of the plotted window. A composite curve is rebuilt from the tests that reach its start — race mode’s start SoC, or otherwise as far back as two of its tests reach. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
+            'Range Added — change since the start of the plotted window. A composite curve is rebuilt from the tests that reach its start — race mode’s start SoC, or otherwise as far back as two of its tests reach. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
             'Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the range actually logged in the test.',
         math_approach:
             'Mostly the raw measured points drawn as-is — no smoothing or curve-fitting. ' +

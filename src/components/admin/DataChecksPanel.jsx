@@ -679,7 +679,7 @@ export default function DataChecksPanel() {
                         <button type="button" className="btn btn-secondary text-sm" onClick={() => setOnly('no-400v-support')}>
                             Show them
                         </button>
-                        <button type="button" className="btn btn-primary text-sm" disabled={filling} onClick={fillAllNative}>
+                        <button type="button" className="btn btn-secondary text-sm" disabled={filling} onClick={fillAllNative}>
                             {filling ? 'Filling…' : `Fill all ${fillPlan.length}`}
                         </button>
                     </span>

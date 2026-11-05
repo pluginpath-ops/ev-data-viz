@@ -155,7 +155,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
             {/* Error */}
             {error && (
                 <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 text-xs">
-                    ⚠️ {error}
+                    ⚠ {error}
                 </div>
             )}
 
@@ -289,7 +289,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
                                                     {mappings.map(m => (
                                                         <span
                                                             key={m.id}
-                                                            className={`px-1.5 py-0.5 rounded border font-medium ${CONFIDENCE_COLORS[m.confidence] ?? CONFIDENCE_COLORS.inferred}`}
+                                                            className={`px-1.5 py-0.5 rounded-xs border font-medium ${CONFIDENCE_COLORS[m.confidence] ?? CONFIDENCE_COLORS.inferred}`}
                                                         >
                                                             {m.vehicles?.name || '?'}
                                                             {m.vehicles?.year ? ` (${m.vehicles.year})` : ''}

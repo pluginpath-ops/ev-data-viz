@@ -549,7 +549,7 @@ export default function EpaCurveExplorer({
                                             className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
                                             title="Copy link to this chart view"
                                         >
-                                            {urlCopied ? '✓ Copied' : '🔗 URL'}
+                                            {urlCopied ? '✓ Copied' : 'URL'}
                                         </button>
                                         <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={pngCopied} copiedBeside={copiedBeside} />
                                     </>

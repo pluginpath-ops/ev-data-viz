@@ -875,11 +875,9 @@ export default function App() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-background)' }}>
-                <div className="text-center">
-                    <div className="text-6xl mb-4">&#9889;</div>
-                    <div className="text-2xl font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Loading EV Data...</div>
-                </div>
+            <div className="app-loading" role="status">
+                <div className="app-loading-glyph" aria-hidden="true">⚡</div>
+                <div className="app-loading-label">Loading EV data…</div>
             </div>
         );
     }
@@ -1014,7 +1012,7 @@ export default function App() {
                                             <div key={vehicleId} className="flex items-center">
                                                 {/* Drop indicator before this pill */}
                                                 {dragOverIdx === idx && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded mr-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs mr-1 shrink-0" />
                                                 )}
                                                 <div
                                                     draggable
@@ -1061,7 +1059,7 @@ export default function App() {
                                                 </div>
                                                 {/* Drop indicator after the last pill */}
                                                 {idx === selectedVehicles.length - 1 && dragOverIdx === selectedVehicles.length && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded ml-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs ml-1 shrink-0" />
                                                 )}
                                             </div>
                                         );
@@ -1394,7 +1392,7 @@ export default function App() {
             {appNotification && (
                 <div className={`fixed-action-bar z-[60] ${appNotification.type === 'error' ? 'is-danger' : 'is-good'}`}>
                     <div className="page-container py-3 flex items-center gap-4">
-                        <span className="text-xl">{appNotification.type === 'error' ? '⚠️' : '✓'}</span>
+                        <span className="text-xl">{appNotification.type === 'error' ? '⚠' : '✓'}</span>
                         <p className={`flex-1 text-sm font-medium ${
                             appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
                         }`}>

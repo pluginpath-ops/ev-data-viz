@@ -45,10 +45,10 @@ export default function FeaturedChartPanel({ comparison, index, onOpen }) {
             <header className="home-panel-head">
                 <div className="home-panel-heading">
                     <h3 className="section-title">{chart.title}</h3>
-                    <span className="text-micro">{defaultChartTitle(seed.chartMode)}</span>
+                    <span className="text-meta">{defaultChartTitle(seed.chartMode)}</span>
                 </div>
-                <button type="button" className="btn btn-secondary home-panel-open" onClick={onOpen}>
-                    Open chart →
+                <button type="button" className="btn btn-primary home-panel-open" onClick={onOpen}>
+                    Open chart ↘
                 </button>
             </header>
             <MarkdownText text={chart.caption} />

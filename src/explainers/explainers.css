@@ -342,7 +342,9 @@
     border: 1px solid var(--color-border);
     color: var(--color-text-meta);
 }
-.explainer-tag.is-draft { border-color: var(--color-warning-border); color: var(--color-warning-text); background-color: var(--color-warning-surface); }
+/* Draft is a state of the writing, not a warning about it: neutral, a step
+   brighter than Planned so a readable page still stands out from a stub. */
+.explainer-tag.is-draft { border-color: var(--color-border-strong); color: var(--color-text-secondary); background-color: var(--color-surface-sunken); }
 .explainer-tag.is-lab { border-color: var(--color-primary-border); color: var(--color-primary-text); background-color: var(--color-primary-surface); }
 
 /* ── The Split Pack Lab ─────────────────────────────────────────────────── */

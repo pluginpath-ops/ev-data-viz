@@ -2817,7 +2817,7 @@ export default function RoadTripView({
                                 className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
                                 title="Copy link to this Road Trip chart"
                             >
-                                {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                                {copiedUrl ? '✓ Copied' : 'URL'}
                             </button>
                             <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                         </>

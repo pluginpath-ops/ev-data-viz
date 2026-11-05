@@ -139,7 +139,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
 
     return (
         <div className="modal-overlay p-4">
-            <div className="modal-panel rounded-xl shadow-2xl max-w-5xl max-h-[90vh] flex flex-col">
+            <div className="modal-panel max-w-5xl max-h-[90vh] flex flex-col">
 
                 {/* Header */}
                 <div className="modal-header px-6 py-4 border-b flex-shrink-0">
@@ -161,13 +161,13 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                     {/* ── UPLOAD STEP ── */}
                     {step === 'upload' && (
                         <div className="flex flex-col items-center justify-center py-12 gap-4">
-                            <div className="text-5xl">📂</div>
+                            <div className="text-5xl">⇪</div>
                             <p className="text-secondary text-center max-w-sm">
                                 Export your Tableau workbook as <strong>CSV</strong> and upload it here.
                                 Columns should include <em>Date of charging test</em>, <em>Optimized</em>,
                                 <em>Vehicle</em>, and numeric SoC columns (0–100).
                             </p>
-                            <label className="btn btn-primary cursor-pointer">
+                            <label className="btn btn-secondary cursor-pointer">
                                 Choose CSV file
                                 <input type="file" accept=".csv" className="hidden" onChange={handleFile} />
                             </label>
@@ -220,7 +220,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                             </div>
 
                             {/* Global prefix */}
-                            <div className="flex items-center gap-3 p-3 bg-[var(--color-surface-muted)] rounded-lg border">
+                            <div className="flex items-center gap-3 p-3 bg-[var(--color-surface-muted)] rounded-xs border">
                                 <label className="text-sm font-medium text-secondary whitespace-nowrap">
                                     Run name prefix:
                                 </label>
@@ -351,7 +351,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                     {/* ── DONE STEP ── */}
                     {step === 'done' && result && (
                         <div className="flex flex-col items-center justify-center py-12 gap-3">
-                            <div className="text-5xl">✅</div>
+                            <div className="text-5xl">✓</div>
                             <h3 className="text-lg font-bold">Import complete</h3>
                             <div className="flex flex-wrap gap-2 justify-center mt-1">
                                 {result.vehiclesCreated > 0 && (
@@ -386,14 +386,14 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                             <button
                                 onClick={handleImport}
                                 disabled={activeSessions.length === 0}
-                                className="btn btn-primary disabled:opacity-50"
+                                className="btn btn-commit disabled:opacity-50"
                             >
                                 Import {activeSessions.length} session{activeSessions.length !== 1 ? 's' : ''}
                             </button>
                         </>
                     )}
                     {step === 'done' && (
-                        <button onClick={onClose} className="btn btn-primary">Done</button>
+                        <button onClick={onClose} className="btn btn-secondary">Done</button>
                     )}
                 </div>
             </div>

@@ -66,6 +66,7 @@ export const CONSTRUCTED = {
     'nav-menu-main': 'NavMenu builds `nav-menu-${level}`.',
     'nav-menu-sub':  'NavMenu builds `nav-menu-${level}`.',
     'is-prose':      'RunSpecRows builds `is-${cell.tone}`.',
+    'is-charging':   'RunKindBadge builds `run-kind is-${flag.key}` — a test is charging or range.',
     'is-gap':        'DataChecksPanel builds `data-check-finding is-${f.kind}` — a finding is `disagrees` or `gap`.',
     'is-hue':        'SeriesColorPicker builds `color-slider-input is-${track}`.',
     'is-lightness':  'SeriesColorPicker builds `color-slider-input is-${track}`.',
@@ -222,7 +223,7 @@ export const LEDGER = [
     },
     {
         key: 'near-identical',
-        count: 43,
+        count: 36,  // 43 → 36: the 18 unreferenced classes went, and seven pairs with them (button and pill pass)
         what: `pairs of classes at least ${NEAR_THRESHOLD * 100}% identical by declaration. `
             + 'Two names for one idea is how a 639-class stylesheet stops being holdable.',
         fix: 'one class, and a modifier for whatever genuinely differs.',
@@ -233,7 +234,7 @@ export const LEDGER = [
     },
     {
         key: 'unreferenced',
-        count: 18,
+        count: 0,   // 18 → 0: all deleted in the button and pill pass
         what: 'classes the stylesheet defines that no source file names. Dead rules are '
             + 'invisible to the compiler, the linter and the tests alike.',
         fix: 'delete it, or add it to CONSTRUCTED with the template that builds it.',

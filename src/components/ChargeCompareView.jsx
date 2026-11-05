@@ -845,7 +845,7 @@ export default function ChargeCompareView({
             data:            flatRuns.map(r => r._yValue),
             backgroundColor: flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.35)' : r.color),
             borderColor:     flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.6)'  : r.color),
-            borderRadius:    4,
+            borderRadius: 2,
             borderSkipped:   false,
         }];
 
@@ -1111,7 +1111,7 @@ export default function ChargeCompareView({
                                     className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
                                     title="Copy link to this chart view"
                                 >
-                                    {copied ? '✓ Copied' : '🔗 URL'}
+                                    {copied ? '✓ Copied' : 'URL'}
                                 </button>
                                 <button
                                     onClick={png1.copyPng}

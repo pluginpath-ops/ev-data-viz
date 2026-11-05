@@ -45,12 +45,12 @@ import CopyPngButton from './charts/CopyPngButton';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
-    { key: 'range-vehicle-bar',  label: '📊 Range by Vehicle',       kind: 'bar',  desc: 'Projected full range per run, grouped by vehicle' },
-    { key: 'eff-vehicle-bar',    label: '📊 Efficiency by Vehicle',   kind: 'bar',  desc: 'Efficiency per run, grouped by vehicle' },
-    { key: 'range-speed-line',   label: '📈 Range by Speed',          kind: 'line', desc: 'Projected range at each tested speed; one line per vehicle' },
-    { key: 'eff-speed-line',     label: '📈 Efficiency by Speed',     kind: 'line', desc: 'Efficiency at each tested speed; one line per vehicle' },
-    { key: 'range-temp-line',    label: '📈 Range by Temperature',    kind: 'line', desc: 'Projected range vs ambient temperature; one line per vehicle' },
-    { key: 'eff-temp-line',      label: '📈 Efficiency by Temp',      kind: 'line', desc: 'Efficiency vs ambient temperature; one line per vehicle' },
+    { key: 'range-vehicle-bar',  label: 'Range by Vehicle',       kind: 'bar',  desc: 'Projected full range per run, grouped by vehicle' },
+    { key: 'eff-vehicle-bar',    label: 'Efficiency by Vehicle',   kind: 'bar',  desc: 'Efficiency per run, grouped by vehicle' },
+    { key: 'range-speed-line',   label: 'Range by Speed',          kind: 'line', desc: 'Projected range at each tested speed; one line per vehicle' },
+    { key: 'eff-speed-line',     label: 'Efficiency by Speed',     kind: 'line', desc: 'Efficiency at each tested speed; one line per vehicle' },
+    { key: 'range-temp-line',    label: 'Range by Temperature',    kind: 'line', desc: 'Projected range vs ambient temperature; one line per vehicle' },
+    { key: 'eff-temp-line',      label: 'Efficiency by Temp',      kind: 'line', desc: 'Efficiency vs ambient temperature; one line per vehicle' },
 ];
 
 // ── Range helper ──────────────────────────────────────────────────────────────
@@ -227,7 +227,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 data:            plottableRuns.map(r => getY(r)),
                 backgroundColor: plottableRuns.map(r => colorMap[r.id] || DEFAULT_RUN_COLOR),
                 borderColor:     plottableRuns.map(r => colorMap[r.id] || DEFAULT_RUN_COLOR),
-                borderRadius:    4,
+                borderRadius: 2,
                 borderSkipped:   false,
             }];
             return {
@@ -374,7 +374,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                     if (run.temperature_f != null) badges.push({ text: fmtTemp(run.temperature_f, units) });
                     if (run.avg_wind_speed_mph != null) {
                         const dir = run.wind_direction_deg != null ? ` @ ${run.wind_direction_deg}°` : '';
-                        badges.push({ text: `💨 ${fmtSpeed(run.avg_wind_speed_mph, units)}${dir}` });
+                        badges.push({ text: `wind ${fmtSpeed(run.avg_wind_speed_mph, units)}${dir}` });
                     }
                     if (badges.length === 0) return;
 
@@ -833,7 +833,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                             className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
                             title="Copy link to this chart view"
                         >
-                            {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                            {copiedUrl ? '✓ Copied' : 'URL'}
                         </button>
                         <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={copied} copiedBeside={copiedBeside} disabled={plottableRuns.length === 0} />
                     </>

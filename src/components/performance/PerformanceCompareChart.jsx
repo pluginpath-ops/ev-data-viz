@@ -123,7 +123,7 @@ export default function PerformanceCompareChart({
                 datasets: [{
                     data: withData.map(r => r.value),
                     backgroundColor: withData.map(r => r.color),
-                    borderRadius: 4,
+                    borderRadius: 2,
                 }],
             },
             options: {
@@ -238,7 +238,7 @@ export default function PerformanceCompareChart({
                         className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
                         title="Copy link to this chart view"
                     >
-                        {urlCopied ? '✓ Copied' : '🔗 URL'}
+                        {urlCopied ? '✓ Copied' : 'URL'}
                     </button>
                     <button
                         onClick={copyPng}

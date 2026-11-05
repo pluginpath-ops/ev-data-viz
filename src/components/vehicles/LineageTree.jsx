@@ -74,8 +74,8 @@ function LineageRow({ vehicle, depth, trail, hasVariants, role, units, selected,
                 {range != null && <>{range}<span className="stat-cell-unit"> {distanceUnit(units)}</span></>}
             </span>
             <span role="cell" onClick={e => e.stopPropagation()}>
-                <button type="button" className="btn btn-secondary" onClick={() => onViewRuns(vehicle)}>
-                    Tests &amp; Data →
+                <button type="button" className="btn btn-primary" onClick={() => onViewRuns(vehicle)}>
+                    Tests &amp; Data ↘
                 </button>
             </span>
         </div>

@@ -23,7 +23,7 @@ import paths by depth.
   components named in the rule's allow-list. Theme tokens are CSS
   variables, so they need no import. Anything else fails lint, so widen the list in the
   rule, with a reason, rather than working around it.
-- **EVBench may import only `ExplainerLink`** (the "Learn more →" link for spec
+- **EVBench may import only `ExplainerLink`** (the "Learn more ↘" link for spec
   hints and platform pages) **and `ExplainersSection`** (the mount point under
   Reference). App.jsx owns only the URL (`&topic=<slug>`) and `openExplainer`.
 
