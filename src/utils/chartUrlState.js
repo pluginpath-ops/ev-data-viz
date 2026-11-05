@@ -30,6 +30,17 @@
  *   specscatter   scx scy
  *   epacurves     epa_ya epa_m epa_ov
  *   specstable    vt_* (carried over, written by the table itself) and filters
+ *
+ * ── Three forms of one link (#476) ───────────────────────────────────────────
+ *   the address bar   every setting only where it differs from a fresh page's
+ *                     — `chartQueryString(buildChartParams(...))`. Before #476
+ *                     x y, cmp_soc cmp_mins cmp_mi and ten rt_* were written
+ *                     every time; links that carry them still read the same.
+ *   written out       the defaults put back (`withDefaultsWrittenOut`), for
+ *                     what must not change when a default does: a featured
+ *                     comparison's saved chart, and the input to …
+ *   the short link    `?k=1.…`, the toolbar's URL button (`chartShortLink`,
+ *                     utils/shortLink.js) — the written-out form, packed.
  */
 import { ALL_CHART_MODES, DEFAULT_CHART_MODE } from '../constants/chartNav';
 import { decodeCorrection, encodeCorrection } from './correctionSettings';
@@ -39,6 +50,15 @@ import {
 } from './axisLimits';
 import { encodeVehicleFilters } from './vehicleFilters';
 import { VEHICLE_TABLE_PARAM_PREFIX, encodeAssumptionParams } from './vehicleTable';
+import {
+    DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION,
+    defaultCompareConfig, defaultRoadTripConfig,
+} from './chartDefaults';
+import { encodeShortLink } from './shortLink';
+
+// The defaults live with the rest of a fresh page's settings (chartDefaults.js);
+// re-exported because the views have always found them here.
+export { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION };
 
 /** The Range & Efficiency chart types, in the order the view lists them. */
 export const RANGE_CHART_TYPES = [
@@ -46,15 +66,48 @@ export const RANGE_CHART_TYPES = [
     'range-speed-line', 'eff-speed-line',
     'range-temp-line', 'eff-temp-line',
 ];
-export const DEFAULT_RANGE_CHART_TYPE = 'range-vehicle-bar';
 
 /** Efficiency as mi/kWh or Wh/mi. */
 export const EFFICIENCY_UNITS = ['mi_kwh', 'wh_mi'];
-export const DEFAULT_EFFICIENCY_UNIT = 'mi_kwh';
 
-/** Charge Stop's bars lie down by default. */
 export const COMPARE_ORIENTATIONS = ['horizontal', 'vertical'];
-export const DEFAULT_COMPARE_ORIENTATION = 'horizontal';
+
+/*
+ * Charge Stop's and Road Trip's settings, as [parameter, config key, number?].
+ * Written only when they differ from a fresh page's (chartDefaults.js), and read
+ * whenever present — links written before #476 carried every one of them. One
+ * table for the read, the write and `withDefaultsWrittenOut`, so the three
+ * cannot disagree about which parameters there are.
+ */
+const COMPARE_PARAMS = [
+    ['cmp_soc', 'startSoc', true], ['cmp_mins', 'xMinutes', true], ['cmp_mi', 'mMiles', true],
+];
+const ROAD_TRIP_PARAMS = [
+    ['rt_m', 'mode'], ['rt_ss', 'startSoc', true], ['rt_ms', 'minSoc', true],
+    ['rt_ld', 'legDistance', true], ['rt_ct', 'chargeTime', true], ['rt_td', 'totalDistance', true],
+    ['rt_sp', 'speed', true], ['rt_oh', 'overhead', true],
+    ['rt_ya', 'yAxis'], ['rt_xa', 'xAxis'], ['rt_sya', 'sweepYAxis'],
+];
+// Written only on a towing link: they mean nothing without rt_tw=1.
+const TOWING_PARAMS = [['rt_te', 'towingEfficiency', true], ['rt_tr', 'towingRefSpeedMph', true]];
+
+/** The settings of `table` that `p` names, as a config fragment. */
+function readParams(p, table) {
+    const out = {};
+    for (const [param, key, numeric] of table) {
+        const raw = p.get(param);
+        if (numeric ? raw != null : raw) out[key] = numeric ? Number(raw) : raw;
+    }
+    return out;
+}
+
+/** Writes each setting of `table` that differs from `defaults`. */
+function writeParams(p, table, config, defaults) {
+    for (const [param, key] of table) {
+        const value = config?.[key];
+        if (value != null && String(value) !== String(defaults[key])) p.set(param, String(value));
+    }
+}
 
 // Ids are numeric on the wire but a uuid-keyed row would not be, so keep a
 // non-number as it came rather than turning it into NaN.
@@ -109,15 +162,10 @@ export function parseChartUrl(search) {
     };
 
     // Charge Stop
-    const cmpSoc  = p.get('cmp_soc');
-    const cmpMins = p.get('cmp_mins');
-    const cmpMi   = p.get('cmp_mi');
     const cmpO    = p.get('cmp_o');
     const cmpSel  = p.get('cmp_sel');
     const compare = {
-        ...(cmpSoc  != null && { startSoc: Number(cmpSoc)  }),
-        ...(cmpMins != null && { xMinutes: Number(cmpMins) }),
-        ...(cmpMi   != null && { mMiles:   Number(cmpMi)   }),
+        ...readParams(p, COMPARE_PARAMS),
         ...(COMPARE_ORIENTATIONS.includes(cmpO) && { orientation: cmpO }),
         // Pair keys, not ids ('70::12'), so they stay strings.
         ...(cmpSel  && { selected: cmpSel.split(',').filter(Boolean) }),
@@ -127,22 +175,10 @@ export function parseChartUrl(search) {
     const pairsParam = p.get('pairs');
 
     // Road Trip
-    const n = (key) => { const v = p.get(key); return v != null ? Number(v) : null; };
     const roadTrip = {
-        ...(p.get('rt_m')  && { mode:             p.get('rt_m')           }),
-        ...(n('rt_ss') != null && { startSoc:     n('rt_ss')               }),
-        ...(n('rt_ms') != null && { minSoc:        n('rt_ms')               }),
-        ...(n('rt_ld') != null && { legDistance:   n('rt_ld')               }),
-        ...(n('rt_ct') != null && { chargeTime:    n('rt_ct')               }),
-        ...(n('rt_td') != null && { totalDistance: n('rt_td')               }),
-        ...(n('rt_sp') != null && { speed:         n('rt_sp')               }),
-        ...(n('rt_oh') != null && { overhead:      n('rt_oh')               }),
-        ...(p.get('rt_ya') && { yAxis:              p.get('rt_ya')          }),
-        ...(p.get('rt_xa') && { xAxis:              p.get('rt_xa')          }),
-        ...(p.get('rt_sya') && { sweepYAxis:         p.get('rt_sya')         }),
-        ...(p.get('rt_tw') === '1' && { towingMode: true                    }),
-        ...(n('rt_te') != null && { towingEfficiency:   n('rt_te')          }),
-        ...(n('rt_tr') != null && { towingRefSpeedMph:  n('rt_tr')          }),
+        ...readParams(p, ROAD_TRIP_PARAMS),
+        ...(p.get('rt_tw') === '1' && { towingMode: true }),
+        ...readParams(p, TOWING_PARAMS),
     };
 
     // Modeled Efficiency · selected vehicles
@@ -301,9 +337,7 @@ export function buildChartParams({
 
     // Charge Stop
     if (chartMode === 'compare') {
-        p.set('cmp_soc',  compareConfig.startSoc);
-        p.set('cmp_mins', compareConfig.xMinutes);
-        p.set('cmp_mi',   compareConfig.mMiles);
+        writeParams(p, COMPARE_PARAMS, compareConfig, defaultCompareConfig());
         if (compareConfig.orientation && compareConfig.orientation !== DEFAULT_COMPARE_ORIENTATION) p.set('cmp_o', compareConfig.orientation);
         if (compareConfig.selected?.length) p.set('cmp_sel', compareConfig.selected.join(','));
     }
@@ -316,22 +350,11 @@ export function buildChartParams({
 
     // Road Trip
     if (chartMode === 'roadtrip') {
-        const rt = roadTripConfig;
-        p.set('rt_m',  rt.mode);
-        p.set('rt_ss', rt.startSoc);
-        p.set('rt_ms', rt.minSoc);
-        p.set('rt_ld', rt.legDistance);
-        p.set('rt_ct', rt.chargeTime);
-        p.set('rt_td', rt.totalDistance);
-        p.set('rt_sp', rt.speed);
-        p.set('rt_oh', rt.overhead);
-        p.set('rt_ya',  rt.yAxis);
-        p.set('rt_xa',  rt.xAxis);
-        if (rt.sweepYAxis !== 'totalTime')     p.set('rt_sya', rt.sweepYAxis);
-        if (rt.towingMode)                    p.set('rt_tw', '1');
-        if (rt.towingMode) {
-            p.set('rt_te', rt.towingEfficiency);
-            p.set('rt_tr', rt.towingRefSpeedMph);
+        const defaults = defaultRoadTripConfig();
+        writeParams(p, ROAD_TRIP_PARAMS, roadTripConfig, defaults);
+        if (roadTripConfig.towingMode) {
+            p.set('rt_tw', '1');
+            writeParams(p, TOWING_PARAMS, roadTripConfig, defaults);
         }
     }
 
@@ -376,3 +399,45 @@ export function buildChartParams({
 
     return p;
 }
+
+/**
+ * A chart link's query with the defaults this module leaves out put back, for
+ * a link that has to mean the same thing after a default changes. The address
+ * bar leaves out the Charge Stop and Road Trip settings a fresh page would
+ * have; a saved chart that did so would follow the default rather than the
+ * curator. The others it leaves out (the correction, the display toggles,
+ * axis limits) already read absent as one fixed value.
+ *
+ * @param {string} search  a query string, with or without the leading `?`
+ * @returns {string}
+ */
+export function withDefaultsWrittenOut(search) {
+    const p = new URLSearchParams(search ?? '');
+    const fill = (table, defaults) => {
+        for (const [param, key] of table) if (!p.has(param)) p.set(param, String(defaults[key]));
+    };
+    const mode = p.get('m');
+    if (mode === 'compare') fill(COMPARE_PARAMS, defaultCompareConfig());
+    if (mode === 'roadtrip') {
+        const defaults = defaultRoadTripConfig();
+        fill(ROAD_TRIP_PARAMS, defaults);
+        if (p.get('rt_tw') === '1') fill(TOWING_PARAMS, defaults);
+    }
+    return p.toString();
+}
+
+/**
+ * The query as the address bar shows it. URLSearchParams escapes `,` and `:`,
+ * three characters each, and a list of tests is mostly commas; both are legal
+ * in a query and read back the same, so they are written plain.
+ */
+export const chartQueryString = (p) => p.toString().replace(/%2C/gi, ',').replace(/%3A/gi, ':');
+
+/**
+ * The short link for a chart's query: its defaults written out, then packed
+ * (utils/shortLink.js). What the toolbar's URL button copies.
+ *
+ * @param {string} search  a query string, with or without the leading `?`
+ * @returns {string} the key, `1.…`
+ */
+export const chartShortLink = (search) => encodeShortLink(withDefaultsWrittenOut(search));

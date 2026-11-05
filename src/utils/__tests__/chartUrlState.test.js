@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import {
-    parseChartUrl, buildChartParams, chartConfigFromParsed,
+    parseChartUrl, buildChartParams, chartConfigFromParsed, chartQueryString, withDefaultsWrittenOut,
     RANGE_CHART_TYPES, DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION,
 } from '../chartUrlState';
 import { DEFAULT_READER_MODE, DEFAULT_CORRECTION_TARGET } from '../correctionSettings';
-import { defaultChartConfig } from '../chartDefaults';
+import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig } from '../chartDefaults';
 import { AXIS_LIMIT_CHARTS, axisLimitsOf } from '../axisLimits';
 
 const baseConfig = () => ({
@@ -164,11 +164,11 @@ describe('the settings that already travelled still do', () => {
     it('round-trips pairings, Road Trip and the Modeled Efficiency selection', () => {
         const q = build({
             chartMode: 'roadtrip', pairings: { 12: ['5', '7'] },
-            roadTripConfig: { mode: 'distance', startSoc: 90, minSoc: 10, legDistance: 150, chargeTime: 30, totalDistance: 500, speed: 70, overhead: 5, yAxis: 'chargeTime', xAxis: 'totalTime', sweepYAxis: 'totalTime', towingMode: false },
+            roadTripConfig: { ...defaultRoadTripConfig(), mode: 'time', startSoc: 80, legDistance: 120, speed: 75 },
         });
         const parsed = parseChartUrl(q);
         expect(parsed.pairings).toEqual({ 12: ['5', '7'] });
-        expect(parsed.roadTrip).toMatchObject({ mode: 'distance', startSoc: 90, legDistance: 150, speed: 70 });
+        expect(parsed.roadTrip).toEqual({ mode: 'time', startSoc: 80, legDistance: 120, speed: 75 });
         const epa = parseChartUrl(build({ chartMode: 'epacurves', epaConfig: { yAxis: 'whmi', selectedMappings: [4, 9], overlay: 'corrected' } })).epa;
         expect(epa).toEqual({ yAxis: 'whmi', selectedMappings: [4, 9], overlay: 'corrected' });
     });
@@ -259,5 +259,42 @@ describe('links written before #478 still open as they did', () => {
     it('ignores what it cannot read rather than losing the chart', () => {
         expect(parseChartUrl('ax=xx40_bogus_yxNaN_y2n').chart.axisLimits).toMatchObject({ xMax: 40, yMax: null });
         expect(parseChartUrl('xn=abc').chart.axisLimits).toMatchObject({ xMin: null });
+    });
+});
+
+// ── The slim address bar (#476) ──────────────────────────────────────────────
+describe('the address bar leaves out what a fresh page would show (#476)', () => {
+    it('an untouched Road Trip writes only where it is', () => {
+        const q = new URLSearchParams(build({ chartMode: 'roadtrip', selectedVehicles: [3], roadTripConfig: defaultRoadTripConfig() }));
+        expect([...q.keys()].sort()).toEqual(['m', 'tab', 'v']);
+    });
+
+    it('an untouched Charge Stop writes none of cmp_soc, cmp_mins, cmp_mi', () => {
+        const q = new URLSearchParams(build({ chartMode: 'compare', compareConfig: defaultCompareConfig() }));
+        for (const k of ['cmp_soc', 'cmp_mins', 'cmp_mi']) expect(q.has(k)).toBe(false);
+        const moved = new URLSearchParams(build({ chartMode: 'compare', compareConfig: { ...defaultCompareConfig(), xMinutes: 20 } }));
+        expect(moved.get('cmp_mins')).toBe('20');
+        expect(moved.has('cmp_soc')).toBe(false);
+    });
+
+    it('towing writes only the towing settings that moved', () => {
+        const q = new URLSearchParams(build({ chartMode: 'roadtrip', roadTripConfig: { ...defaultRoadTripConfig(), towingMode: true, towingEfficiency: 1.2 } }));
+        expect(q.get('rt_tw')).toBe('1');
+        expect(q.get('rt_te')).toBe('1.2');
+        expect(q.has('rt_tr')).toBe(false);
+    });
+
+    it('writes commas and colons plain', () => {
+        const p = new URLSearchParams({ r: '1,2,3', cmp_sel: '4::5' });
+        expect(chartQueryString(p)).toBe('r=1,2,3&cmp_sel=4::5');
+        expect(parseChartUrl(chartQueryString(p)).chart.runIds).toEqual([1, 2, 3]);
+    });
+
+    it('writes the defaults back out for what must not follow them', () => {
+        const out = new URLSearchParams(withDefaultsWrittenOut('tab=efficiency&m=roadtrip&rt_ct=15'));
+        expect(out.get('rt_ct')).toBe('15');
+        expect(out.get('rt_ya')).toBe(defaultRoadTripConfig().yAxis);
+        expect(out.has('rt_te')).toBe(false);
+        expect(withDefaultsWrittenOut('tab=efficiency&m=range&r=5')).toBe('tab=efficiency&m=range&r=5');
     });
 });

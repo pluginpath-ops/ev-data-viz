@@ -48,6 +48,7 @@ import { countParts } from '../utils/plotCaption';
 import NumberInput from './NumberInput';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyPngButton from './charts/CopyPngButton';
+import CopyLinkButton from './charts/CopyLinkButton';
 
 Chart.register(ZoomPlugin);
 
@@ -737,7 +738,6 @@ export default function RoadTripView({
     // axes: changing an axis keeps the limits, as it always did here — Reset is
     // the reader's.
     const { limits: axisLimits, setLimit: onAxisChange } = useAxisLimits('roadtrip');
-    const [copiedUrl, setCopiedUrl] = useState(false);
     // PROTOTYPE, local to this view: not in chartConfig, not in the URL.
     const [showTestSpread, setShowTestSpread] = useState(false);
     const [sortCol, setSortCol] = useState(null);   // column key or null
@@ -2261,22 +2261,8 @@ export default function RoadTripView({
                             >
                                 Reset zoom
                             </button>
-                            <button
-                                onClick={() => {
-                                    const p = new URLSearchParams(window.location.search);
-                                    if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(','));
-                                    else p.delete('rt_r');
-                                    const url = `${window.location.origin}${window.location.pathname}?${p.toString()}`;
-                                    navigator.clipboard.writeText(url).then(() => {
-                                        setCopiedUrl(true);
-                                        setTimeout(() => setCopiedUrl(false), 2000);
-                                    });
-                                }}
-                                className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
-                                title="Copy link to this Road Trip chart"
-                            >
-                                {copiedUrl ? '✓ Copied' : '🔗 URL'}
-                            </button>
+                            <CopyLinkButton withExtra={p => { if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(',')); else p.delete('rt_r'); }}
+                                title="Copy a short link to this Road Trip chart" />
                             <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                         </>
                     )}

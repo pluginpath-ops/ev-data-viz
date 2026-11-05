@@ -7,12 +7,13 @@
  * once, and a single chart behind a dropdown made that a sequence of clicks and
  * a memory test.
  */
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import PlotFrame from '../charts/PlotFrame';
 import { useChartPng } from '../../hooks/useChartPng';
 import { useSourceLine } from '../../hooks/useSourceLine';
+import CopyLinkButton from '../charts/CopyLinkButton';
 
 export default function PerformanceCompareChart({
     title,
@@ -53,7 +54,6 @@ export default function PerformanceCompareChart({
         return parts.join(' · ');
     }, [valueModes, valueMode, axisLabel]);
 
-    const [urlCopied, setUrlCopied] = useState(false);
     // The deriver's placeholder for a result with no source is not a source.
     const sourceRuns = useMemo(
         () => withData.map(r => ({ id: r.id, source: r.sourceName === 'Unattributed' ? '' : r.sourceName })),
@@ -223,23 +223,7 @@ export default function PerformanceCompareChart({
                 onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (
                     <>
-                    <button
-                        onClick={() => {
-                            const p = new URLSearchParams(window.location.search);
-                            p.set('tab', 'performance');
-                            p.set('m', 'perfcompare');
-                            navigator.clipboard.writeText(
-                                `${window.location.origin}${window.location.pathname}?${p}`
-                            ).then(() => {
-                                setUrlCopied(true);
-                                setTimeout(() => setUrlCopied(false), 2000);
-                            });
-                        }}
-                        className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy link to this chart view"
-                    >
-                        {urlCopied ? '✓ Copied' : '🔗 URL'}
-                    </button>
+                    <CopyLinkButton withExtra={p => { p.set('tab', 'performance'); p.set('m', 'perfcompare'); }} />
                     <button
                         onClick={copyPng}
                         className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}

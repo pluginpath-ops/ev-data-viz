@@ -42,6 +42,7 @@ import { countParts, legendWorthShowing } from '../utils/plotCaption';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyPngButton from './charts/CopyPngButton';
+import CopyLinkButton from './charts/CopyLinkButton';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -89,7 +90,6 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // and the pop-out carry them; this view only asks for a change.
     const setChartType = rangeChartType => setChartConfig(prev => ({ ...prev, rangeChartType }));
     const setEffUnit   = unit => setChartConfig(prev => ({ ...prev, effUnit: unit }));
-    const [copiedUrl,    setCopiedUrl]    = useState(false);
 
     // ── Axis limits — yMin defaults to 0, rest auto ──────────────────────────
     // In chartConfig (#478), so a chart link, a Home panel and the pop-out all
@@ -823,18 +823,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 exportControls={!presentationMode && (
                     <>
                         <FeatureChartButton />
-                        <button
-                            onClick={() => {
-                                navigator.clipboard.writeText(window.location.href).then(() => {
-                                    setCopiedUrl(true);
-                                    setTimeout(() => setCopiedUrl(false), 2000);
-                                });
-                            }}
-                            className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
-                            title="Copy link to this chart view"
-                        >
-                            {copiedUrl ? '✓ Copied' : '🔗 URL'}
-                        </button>
+                        <CopyLinkButton />
                         <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={copied} copiedBeside={copiedBeside} disabled={plottableRuns.length === 0} />
                     </>
                 )}

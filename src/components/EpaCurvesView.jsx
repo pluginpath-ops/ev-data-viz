@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useCallback } from 'react';
 import Chart from 'chart.js/auto';
 import { useChartReadout } from '../hooks/useChartReadout';
 import { readoutNumber, withUnit } from '../utils/readoutAtX';
@@ -43,6 +43,7 @@ import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import { useAxisLimits } from '../hooks/useAxisLimits';
 import CopyPngButton from './charts/CopyPngButton';
+import CopyLinkButton from './charts/CopyLinkButton';
 
 const NO_RUNS = [];
 const EPA_TESTS = { tests: true };
@@ -260,7 +261,6 @@ export default function EpaCurvesView({
     const chartRef  = useRef(null);
 
     // ── UI state ──────────────────────────────────────────────────────────────
-    const [urlCopied,        setUrlCopied]        = useState(false);
     // The curve is drawn under the SHARED correction target — altitude,
     // temperature and accessory load, the same sliders every chart and the
     // vehicle table read — and under two extras of its own, wind and elevation
@@ -744,13 +744,6 @@ export default function EpaCurvesView({
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(datasets.length) });
 
-    const handleCopyUrl = () => {
-        navigator.clipboard.writeText(window.location.href).then(() => {
-            setUrlCopied(true);
-            setTimeout(() => setUrlCopied(false), 2000);
-        });
-    };
-
     // ── Total visible mapping count (for selector badge) ──────────────────────
     /**
      * The methodology diagram, per visible EPA configuration of the selected
@@ -990,13 +983,7 @@ export default function EpaCurvesView({
                     exportControls={!presentationMode && (
                         <>
                             <FeatureChartButton />
-                            <button
-                                onClick={handleCopyUrl}
-                                className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
-                                title="Copy link to this chart view"
-                            >
-                                {urlCopied ? '✓ Copied' : '🔗 URL'}
-                            </button>
+                            <CopyLinkButton />
                             <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} disabled={!datasets.length} />
                         </>
                     )}
