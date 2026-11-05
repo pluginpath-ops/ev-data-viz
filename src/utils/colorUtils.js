@@ -682,6 +682,14 @@ export const SERIES_PALETTES = [
  */
 export const VEHICLE_PALETTE = 'vehicle';
 
+/**
+ * What a chart opens on: the house palette. The site's own colors read as one
+ * system with the rest of the page, and a first look at a comparison is about
+ * telling the series apart. Vehicle color is one choice away, and the run
+ * selector says so while a palette is in force (ColorSourceNote).
+ */
+export const DEFAULT_SERIES_PALETTE = 'evbench';
+
 /** The colors a palette id names, or null for the vehicle-color mode. */
 export function paletteColorsById(id) {
     return SERIES_PALETTES.find(p => p.id === id)?.colors ?? null;

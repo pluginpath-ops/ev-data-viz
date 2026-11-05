@@ -36,6 +36,7 @@ import { sessionFor } from '../utils/testSessions';
 import { correctionFactor, runConditions } from '../utils/conditionCorrection';
 import { correctionCaption, correctionSummary, DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
+import ColorSourceNote from './ColorSourceNote';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useRunSelection } from '../hooks/useRunSelection';
@@ -53,7 +54,7 @@ import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE, withAlpha } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE, withAlpha } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import { compositeConditions, compositeExplainer, compositeFrom, earliestStart, clockedStart, spreadAlong, THIN_SUPPORT, COMPOSITE_MIN_TESTS } from '../utils/compositeCurve';
@@ -197,10 +198,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         [selectedVehicles, selectedRuns]
     );
     const handSet = chartConfig.handSet ?? false;
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf, clearHandSet } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
-        palette: chartConfig.seriesPalette ?? VEHICLE_PALETTE,
+        palette: chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
     });
@@ -1071,7 +1072,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 presentationMode={presentationMode}
                 chartType={chartConfig.rangeChartType}
                 effUnit={chartConfig.effUnit}
-                palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                 // Without this the Range sub-tab could never return to Hand-set:
                 // selecting it wrote chartConfig.handSet, the prop defaulted to
                 // false on the way back down, and the field snapped to the
@@ -1226,9 +1227,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
-                    colorControl={<SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
+                    colorControl={<ColorSourceNote palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} onClearHandSet={clearHandSet} />}
                     handSetColorOf={handSetColorOf}
-                    chartPalette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                    chartPalette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                     onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
@@ -1407,6 +1408,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 loadingMessage="Loading run data…"
                 exportControls={!presentationMode && (
                     <>
+                        <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                         <FeatureChartButton />
                         <button
                             onClick={() => {

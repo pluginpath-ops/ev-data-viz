@@ -3288,3 +3288,28 @@ describe('the shared points cache is read by the chart views and cleared by ever
         expect(body('rebuildComposites')).toMatch(/getPointsForRuns\(/);
     });
 });
+
+/**
+ * ── The Colors field is in the toolbar; the run picker keeps one line ─────────
+ *
+ * The palette is a property of the plot, so its field sits in the chart's
+ * toolbar beside URL and PNG. The run picker keeps ColorSourceNote, which hints
+ * at vehicle colors and says when picks override the field. A view that put the
+ * select back into `colorControl` would show it twice or not at all.
+ */
+describe('the Colors field lives in the toolbar', () => {
+    const VIEWS = ['ChargingView', 'RangeChartView', 'ChargeCompareView', 'RoadTripView', 'EpaCurvesView'];
+
+    it.each(VIEWS)('%s draws SeriesPaletteSelect in exportControls and ColorSourceNote in the run picker', (f) => {
+        const text = read(`src/components/${f}.jsx`);
+        const toolbar = text.slice(text.indexOf('exportControls='));
+        expect(toolbar.indexOf('<SeriesPaletteSelect'), 'no Colors field in the toolbar').toBeGreaterThan(-1);
+        expect(toolbar.indexOf('<SeriesPaletteSelect')).toBeLessThan(toolbar.indexOf('<FeatureChartButton'));
+        expect(text).toMatch(/colorControl=\{<ColorSourceNote /);
+    });
+
+    it('charts open on the house palette', () => {
+        expect(read('src/utils/chartDefaults.js')).toMatch(/seriesPalette: DEFAULT_SERIES_PALETTE/);
+        expect(read('src/utils/colorUtils.js')).toMatch(/DEFAULT_SERIES_PALETTE = 'evbench'/);
+    });
+});

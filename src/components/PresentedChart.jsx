@@ -1,5 +1,5 @@
 import ChargingView from './ChargingView';
-import { VEHICLE_PALETTE } from '../utils/colorUtils';
+import { DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import ChargeCompareView from './ChargeCompareView';
 import RoadTripView from './RoadTripView';
 import SpecChart from './SpecChart';
@@ -80,7 +80,7 @@ export default function PresentedChart({
                 correctionTarget={chartConfig?.correctionTarget}
                 handSet={chartConfig?.handSet ?? false}
                 verboseLabels={chartConfig?.verboseLabels ?? false}
-                palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
+                palette={chartConfig?.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                 presentationMode
             />
         )}
@@ -112,7 +112,7 @@ export default function PresentedChart({
                 onSelectedChange={setCompareConfig ? keys => setCompareConfig(p => ({ ...p, selected: keys })) : undefined}
                 pairings={pairings}
                 verboseLabels={chartConfig?.verboseLabels ?? false}
-                palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
+                palette={chartConfig?.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                 testSpread={chartConfig?.testSpread ?? true}
                 correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
                 correctionTarget={chartConfig?.correctionTarget}
@@ -127,7 +127,7 @@ export default function PresentedChart({
                 selectedVehicleIds={selectedVehicles}
                 epaConfig={epaConfig || { yAxis: 'kwh100mi' }}
                 setEpaConfig={setEpaConfig ?? (() => {})}
-                palette={chartConfig?.seriesPalette ?? VEHICLE_PALETTE}
+                palette={chartConfig?.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                 correctionTarget={chartConfig?.correctionTarget}
                 presentationMode
             />

@@ -17,6 +17,7 @@ import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
+import ColorSourceNote from './ColorSourceNote';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import TestSpreadToggle from './TestSpreadToggle';
 import { correctionCaption, correctionSummary } from '../utils/correctionSettings';
@@ -24,7 +25,7 @@ import { spreadOf, rangeBasesFor, drawTestSpread, testSpreadHoverPlugin, testPoi
 import { useRunSelection } from '../hooks/useRunSelection';
 import { DEFAULT_COMPARE_ORIENTATION } from '../utils/chartUrlState';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -380,7 +381,7 @@ export default function ChargeCompareView({
     verboseLabels = false,
     correctionMode = 'none',
     correctionTarget = undefined,
-    palette = VEHICLE_PALETTE,
+    palette = DEFAULT_SERIES_PALETTE,
     handSet = false,
     testSpread = true,
     setChartConfig = null,
@@ -566,7 +567,7 @@ export default function ChargeCompareView({
         () => selectedRuns.map(k => parsePairKey(k).rangeRunId),
         [selectedRuns]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf, clearHandSet } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
@@ -1029,7 +1030,7 @@ export default function ChargeCompareView({
                 </SidebarDisplaySection>
 
                 <RunSelector
-                    colorControl={setChartConfig ? <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} /> : null}
+                    colorControl={<ColorSourceNote palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} onClearHandSet={clearHandSet} />}
                         handSetColorOf={handSetColorOf}
                         chartPalette={palette}
                         onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
@@ -1105,6 +1106,7 @@ export default function ChargeCompareView({
                         loadingMessage="Loading charging data…"
                         exportControls={!presentationMode && (
                             <>
+                                {setChartConfig && <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
                                 <FeatureChartButton />
                                 <button
                                     onClick={handleCopyUrl}

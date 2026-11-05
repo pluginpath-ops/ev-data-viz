@@ -88,9 +88,10 @@ function plottedColorOf(run, colorMap, vehicle) {
  *   onSetPartner    — (primaryRunId, oldPartnerId, newPartnerId) => void
  *   onAddPartner    — (primaryRunId, partnerId) => void
  *   onRemovePartner — (primaryRunId, partnerId) => void
- *   colorControl    — optional node: the chart's color source (SeriesPaletteSelect),
- *                     shown first when open, directly above the swatches it
- *                     colors. It used to sit in Display, a section away from them.
+ *   colorControl    — optional node: the run picker's line about where the
+ *                     series colors come from (ColorSourceNote), shown first
+ *                     when open, directly above the swatches. The Colors field
+ *                     itself is in the chart's toolbar (SeriesPaletteSelect).
  */
 export default function RunSelector({
     vehicles,

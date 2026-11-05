@@ -26,7 +26,7 @@ export default function PlotFrame({ title, subtitle, sourceLine, exportControls,
         <>
             {exportControls && (
                 <div className="chart-export-strip">
-                    <span className="text-micro">PNG / URL export captures the frame below</span>
+                    <span className="text-micro truncate min-w-0" title="PNG / URL export captures the frame below">PNG / URL export captures the frame below</span>
                     <span className="chart-export-rule" />
                     {exportControls}
                 </div>

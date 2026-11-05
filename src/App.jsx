@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { VEHICLE_PALETTE } from './utils/colorUtils';
+import { DEFAULT_SERIES_PALETTE } from './utils/colorUtils';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
 import { AxisLimitsProvider } from './hooks/useAxisLimits';
@@ -1224,7 +1224,7 @@ export default function App() {
                             setRoadTripConfig={setRoadTripConfig}
                             pairings={pairings}
                             setPairings={setPairings}
-                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
@@ -1251,7 +1251,7 @@ export default function App() {
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
                             correctionTarget={chartConfig.correctionTarget}
-                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             testSpread={chartConfig.testSpread ?? true}
                             setChartConfig={setChartConfig}
@@ -1277,7 +1277,7 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             epaConfig={epaConfig}
                             setEpaConfig={setEpaConfig}
-                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
