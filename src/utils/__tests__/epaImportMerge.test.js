@@ -56,22 +56,14 @@ describe('planChildren', () => {
         expect(p.update).toHaveLength(1);
         expect(p.update[0].id).toBe(7);
         expect(p.insert).toEqual([]);
-        expect(p.remove).toEqual([]);
+        expect(p.unlisted).toEqual([]);
     });
 
-    it('inserts what is new and removes what the PDF no longer has', () => {
+    it('inserts what is new and names what the PDF does not list', () => {
         const p = planChildren([{ id: 1, k: 'old', overrides: {} }], [{ k: 'new' }], key);
         expect(p.insert).toEqual([{ k: 'new' }]);
-        expect(p.remove).toEqual([1]);
-    });
-
-    it('never removes a row a curator added or edited', () => {
-        const p = planChildren([
-            { id: 1, k: 'added-by-hand', source: 'manual', overrides: {} },
-            { id: 2, k: 'edited', overrides: { v: manual } },
-            { id: 3, k: 'plain', overrides: { v: { source: 'pdf' } } },
-        ], [], key);
-        expect(p.remove).toEqual([3]);
+        expect(p.unlisted).toEqual([1]);
+        expect('remove' in p).toBe(false);
     });
 });
 
@@ -100,8 +92,7 @@ describe('planTestVehicleImport', () => {
         expect('total_dc_energy_kwh' in t.payload).toBe(false);   // hand-entered, PDF had none
         expect(t.phases.update[0]).toMatchObject({ id: 30, payload: { distance_mi: 7.5 } });
         expect('dc_energy_kwh' in t.phases.update[0].payload).toBe(false);
-        expect(plan.coefficients.remove).toEqual([]);
-        expect(plan.tests.remove).toEqual([]);
+        expect(plan.spared).toBe(0);
     });
 
     it('reports where the PDF disagreed with a held value', () => {
@@ -111,11 +102,12 @@ describe('planTestVehicleImport', () => {
         expect(plan.kept).toEqual([{ where: 'test T1', field: 'total_dc_energy_kwh', kept: 99, pdf: 101.2 }]);
     });
 
-    describe('only the record\'s own file removes rows', () => {
-        // Stored from the MY2026 file: two tests, the second with two phases,
-        // and a second coefficient set. The MY2024 file lists less of it.
+    describe('no file removes a row, whatever order the files arrive in', () => {
+        // A carryover test vehicle stored from its MY2026 file (the record's
+        // source_file): test A is listed only in the MY2024 file, test B in both,
+        // with phase 2 and the Alt set only in the MY2024 file's listing.
         const pdfTag = { source: 'pdf' };
-        const fromFile = (file) => ({
+        const storedFrom = (file) => ({
             testVehicle: { test_vehicle_id: 'K', model_year: 2026, source_file: file, overrides: {} },
             coefficient_sets: [
                 { id: 1, category: 'City/Highway', target_a: 30, overrides: { target_a: pdfTag } },
@@ -128,34 +120,46 @@ describe('planTestVehicleImport', () => {
                 ] },
             ],
         });
-        const file = (name) => ({
-            testVehicle: { test_vehicle_id: 'K', model_year: 2024, source_file: name },
+        const file = (name, model_year) => ({
+            testVehicle: { test_vehicle_id: 'K', model_year, source_file: name },
             coefficient_sets: [{ category: 'City/Highway', target_a: 30 }],
             tests: [{ test_number: 'B', phases: [{ phase_index: 1 }] }, { test_number: 'C', phases: [] }],
         });
+        const noRemoval = (plan) => {
+            expect('remove' in plan.tests).toBe(false);
+            expect('remove' in plan.coefficients).toBe(false);
+            plan.tests.update.forEach(u => expect('remove' in u.phases).toBe(false));
+        };
 
-        it('a different file adds and updates, and removes nothing', () => {
-            const plan = planTestVehicleImport(fromFile('2026.pdf'), file('2024.pdf'));
-            expect(plan.tests.insert.map(t => t.row.test_number)).toEqual(['C']);
+        it('re-importing the newest file keeps an older test only the older file lists', () => {
+            // The carryover case: oldest-first, the MY2026 file is imported
+            // after the MY2024 one, onto a record that already names it.
+            const plan = planTestVehicleImport(storedFrom('2026.pdf'), file('2026.pdf', 2026));
+            noRemoval(plan);
             expect(plan.tests.update.map(u => u.id)).toEqual([310]);
-            expect(plan.tests.remove).toEqual([]);
-            expect(plan.tests.update[0].phases.remove).toEqual([]);
-            expect(plan.coefficients.remove).toEqual([]);
+            expect(plan.tests.insert.map(t => t.row.test_number)).toEqual(['C']);
             expect(plan.spared).toBe(3);   // test A, phase 2, the Alt set
         });
 
-        it('the same file, re-imported, still removes what it no longer lists', () => {
-            const plan = planTestVehicleImport(fromFile('2024.pdf'), file('2024.pdf'));
-            expect(plan.tests.remove).toEqual([309]);
-            expect(plan.tests.update[0].phases.remove).toEqual([42]);
-            expect(plan.coefficients.remove).toEqual([2]);
-            expect(plan.spared).toBe(0);
+        it('an older file adds and updates, and removes nothing', () => {
+            const plan = planTestVehicleImport(storedFrom('2026.pdf'), file('2024.pdf', 2024));
+            noRemoval(plan);
+            expect(plan.tests.insert.map(t => t.row.test_number)).toEqual(['C']);
+            expect(plan.spared).toBe(3);
         });
 
-        it('a record with no file on it behaves as before', () => {
-            const plan = planTestVehicleImport(fromFile(null), file('2024.pdf'));
-            expect(plan.tests.remove).toEqual([309]);
-            expect(plan.spared).toBe(0);
+        it('a record with no file on it keeps its rows too', () => {
+            const plan = planTestVehicleImport(storedFrom(null), file('2024.pdf', 2024));
+            noRemoval(plan);
+            expect(plan.spared).toBe(3);
+        });
+
+        it('keeps a row a curator added or edited, as it always did', () => {
+            const stored = storedFrom('2026.pdf');
+            stored.tests.push({ id: 311, test_number: 'M', source: 'manual', overrides: {}, epa_test_phases: [] });
+            const plan = planTestVehicleImport(stored, file('2026.pdf', 2026));
+            noRemoval(plan);
+            expect(plan.spared).toBe(4);
         });
     });
 

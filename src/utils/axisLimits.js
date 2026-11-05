@@ -65,6 +65,7 @@ export const AXIS_LIMIT_CHARTS = {
     charging:    { yMin: 0 },
     range:       { yMin: 0 },
     roadtrip:    {},
+    optimizer:   {},
     perfcurve:   {},
     epacurves:   {},
     epaexplorer: {},

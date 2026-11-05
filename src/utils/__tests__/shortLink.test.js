@@ -56,7 +56,12 @@ const OLD_ADDRESSES = [
     'tab=efficiency&r=480%2C1070&m=range&corr=none&rc=eff-speed-line&eff=wh_mi&ax=yn50',
     'tab=efficiency&v=48%2C107&m=compare&cmp_soc=10&cmp_mins=15&cmp_mi=150&cmp_o=vertical&cmp_sel=480%3A%3A900%2Cinherited_v96_304%3A%3A',
     'tab=efficiency&v=48%2C107&m=roadtrip&rt_m=distance&rt_ss=90&rt_ms=10&rt_ld=150&rt_ct=30&rt_td=500&rt_sp=70&rt_oh=5&rt_ya=chargeTime&rt_xa=totalTime',
-    'tab=efficiency&v=48%2C107%2C66&m=roadtrip&pairs=480%3A481%3B1070%3A1071&rt_m=time&rt_ss=90&rt_ms=10&rt_ld=150&rt_ct=15&rt_td=500&rt_sp=70&rt_oh=5&rt_ya=chargeTime&rt_xa=speed&rt_sya=driveTime&rt_tw=1&rt_te=1.5&rt_tr=70',
+    'tab=efficiency&v=48%2C107%2C66&m=roadtrip&pairs=480%3A481%3B1070%3A1071&rt_m=time&rt_ss=90&rt_ms=10&rt_ld=150&rt_ct=15&rt_td=500&rt_sp=70&rt_oh=5&rt_ya=chargeTime&rt_xa=driveTime&rt_sya=driveTime&rt_tw=1&rt_te=1.5&rt_tr=70',
+    // A Road Trip sweep from before Trip Optimizer had its own tab: opens the optimizer.
+    'tab=efficiency&v=48%2C107&m=roadtrip&rt_m=distance&rt_ss=90&rt_ms=10&rt_ld=150&rt_ct=30&rt_td=640&rt_sp=70&rt_oh=5&rt_ya=chargeTime&rt_xa=speed&rt_sya=avgSpeed',
+    // Trip Optimizer as the address bar wrote it before #476.
+    'tab=efficiency&v=48%2C107&m=optimizer&rt_m=distance&rt_ss=90&rt_ms=10&rt_ld=150&rt_ct=30&rt_td=500&rt_sp=70&rt_oh=5&rt_ya=chargeTime&rt_xa=totalTime&rt_otd=700&rt_oc=map&rt_osn=55&rt_osx=80',
+    'tab=efficiency&v=48&m=optimizer&rt_m=time&rt_ss=90&rt_ms=10&rt_ld=150&rt_ct=30&rt_td=500&rt_sp=70&rt_oh=5&rt_ya=chargeTime&rt_xa=totalTime&rt_otd=900&rt_oc=tripDist&rt_bp=0&rt_osn=50&rt_osx=75',
     'tab=efficiency&v=48%2C107&m=epacurves&epa_m=1201%2C1202&epa_ov=corrected&epa_ya=mpge&c_alt=5000&c_acc=1500',
     'tab=specifications&v=4%2C9&m=specs&sf=calc.efficiency&vt_win=10-70&ss=all&q=Model+3',
     'tab=specifications&v=4%2C9&m=specscatter&scx=figures.epaRangeMi&scy=pricing.base_price_usd',
@@ -88,7 +93,7 @@ describe('old links open as they always did (#476)', () => {
     it('reads every Road Trip and Charge Stop setting an old link wrote', () => {
         expect(parseChartUrl(OLD_ADDRESSES[5]).roadTrip).toEqual({
             mode: 'time', startSoc: 90, minSoc: 10, legDistance: 150, chargeTime: 15, totalDistance: 500,
-            speed: 70, overhead: 5, yAxis: 'chargeTime', xAxis: 'speed', sweepYAxis: 'driveTime',
+            speed: 70, overhead: 5, yAxis: 'chargeTime', xAxis: 'driveTime', sweepYAxis: 'driveTime',
             towingMode: true, towingEfficiency: 1.5, towingRefSpeedMph: 70,
         });
         expect(parseChartUrl(OLD_ADDRESSES[3]).compare).toEqual({
@@ -133,6 +138,9 @@ describe('the short link opens the chart it was copied from', () => {
         // The two the issue was about: an untouched Road Trip, and its towing case.
         expect(chartShortLink(OLD_ADDRESSES[4]).length).toBeLessThan(25);
         expect(chartShortLink(OLD_ADDRESSES[5]).length).toBeLessThan(65);
+        // An untouched Trip Optimizer: every setting at version 1's defaults.
+        const optimizer = OLD_ADDRESSES.find(q => q.includes('m=optimizer&rt_m=distance'));
+        expect(chartShortLink(optimizer).length).toBeLessThan(25);
     });
 });
 

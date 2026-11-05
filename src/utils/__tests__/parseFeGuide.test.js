@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import {
+    repairUnitLines,
     parseFeGuide, parseMotorPowerKw, adjustmentSignature,
     REQUIRED_COLUMNS, OPTIONAL_COLUMNS,
 } from '../parseFeGuide';
@@ -221,6 +222,20 @@ describe('parseFeGuide — the natural key', () => {
         expect(skipped.unusable).toBeGreaterThan(0);
     });
 
+    it('reads the range from Range1 where the label range is blank — EPA\'s MY2023 Guide', () => {
+        // 112 of MY2023's 144 EV rows leave "Comb Range as shown on FE Label"
+        // blank and give the range only as the model type's driving range.
+        const [head, ...lines] = CSV.trim().split(/\r?\n/);
+        const cols = head.split(',');
+        const comb = cols.indexOf('Comb Range as shown on FE Label (miles)');
+        const blanked = [head + ',Range1 - Model Type Driving Range - Conventional Fuel',
+            ...lines.map(l => { const c = l.split(','); const r = c[comb]; c[comb] = ''; return [...c, r].join(','); })].join('\n');
+        const { rows: before } = parseFeGuide(CSV);
+        const { rows, skipped } = parseFeGuide(blanked);
+        expect(skipped.unusable).toBe(0);
+        expect(rows.map(r => r.labelCombRangeMi)).toEqual(before.map(r => r.labelCombRangeMi));
+    });
+
     it('makes every row in the sample uniquely keyed', () => {
         const keys = rows.map(r => `${r.modelYear}|${r.division}|${r.carline}|${r.modelTypeIndex}`);
         expect(new Set(keys).size).toBe(rows.length);
@@ -310,5 +325,57 @@ describe('parseFeGuide — surviving a rename (#214)', () => {
         const out = parseFeGuide(CSV);
         expect(out.renamed).toEqual([]);
         expect(out.suggestions).toEqual([]);
+    });
+});
+
+describe('parseFeGuide — the kWh/100mi twin\'s figures', () => {
+    const { rows } = parseFeGuide(CSV);
+
+    it('keeps them on the MPGe row, at the precision printed', () => {
+        // The MPGe line prints 154.2; its twin prints 21.8565 — the copy a
+        // test vehicle's 100 × AC ÷ CD range can be matched against.
+        const r = byCarline(rows, 'R2 Performance AWD (20in AT)');
+        expect(r.unadjCityKwh100mi).toBe(21.8565);
+        expect(r.unadjHwyKwh100mi).toBe(26.6998);
+        expect(r.unadjCityMpge).toBe(154.2);
+    });
+
+    it('pairs each twin with its own configuration', () => {
+        expect(byCarline(rows, 'R2 Performance AWD (21in)').unadjCityKwh100mi).toBe(21.6463);
+    });
+
+    it('is null for a row whose twin is missing', () => {
+        expect(byCarline(rows, 'ZDX AWD').unadjCityKwh100mi).toBeNull();
+    });
+});
+
+describe('repairUnitLines — figures EPA printed on the wrong line', () => {
+    const line = (city, hwy, adjCity, adjHwy) => ({
+        'City Unadj FE - Conventional Fuel': String(city), 'Hwy Unadj FE - Conventional Fuel': String(hwy),
+        'City Unrd Adj FE - Conventional Fuel': String(adjCity), 'Hwy Unrd Adj FE - Conventional Fuel': String(adjHwy),
+    });
+
+    it('swaps the lines when the MPGe one adjusts upward — the MY2023 Q4 e-tron', () => {
+        const { mpgeLine, kwhLine, repair } = repairUnitLines(line(21.0971, 25.0759, 30.1314, 35.8259), line(159.8, 134.4, 111.86, 94.08));
+        expect(repair).toBe('units-swapped');
+        expect(mpgeLine['City Unadj FE - Conventional Fuel']).toBe('159.8');
+        expect(kwhLine['City Unadj FE - Conventional Fuel']).toBe('21.0971');
+    });
+
+    it('leaves a low-MPGe vehicle alone — a Hummer adjusts down like any MPGe line', () => {
+        const hummer = line(67.4, 66.6, 47.2, 46.6);
+        expect(repairUnitLines(hummer, line(50.0, 50.6, 71.4, 72.3)).repair).toBeNull();
+    });
+
+    it('converts a cycle the MPGe line repeated from the kWh line — the MY2024 Plaid 21in', () => {
+        const { mpgeLine, repair } = repairUnitLines(line(118.1, 27.5479, 82.7, 85.6), line(28.5398, 27.5479, 40.77, 39.35));
+        expect(repair).toBe('mpge-from-kwh');
+        expect(mpgeLine['Hwy Unadj FE - Conventional Fuel']).toBe('122.3505');
+        expect(mpgeLine['City Unadj FE - Conventional Fuel']).toBe('118.1');
+    });
+
+    it('does nothing without a twin, or when the lines agree', () => {
+        expect(repairUnitLines(line(118.1, 122.4, 82.7, 85.6), undefined).repair).toBeNull();
+        expect(repairUnitLines(line(118.1, 122.4, 82.7, 85.6), line(28.5398, 27.5371, 40.77, 39.34)).repair).toBeNull();
     });
 });

@@ -119,7 +119,7 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel, 
                                     drawing IS, and in what unit. */}
                                 <span className="stats-dist-legend">Distribution</span>
                                 {(m?.unit || m?.axisLabel) && (
-                                    <span className="stats-dist-unit">{m.unit || m.axisLabel}</span>
+                                    <span className="text-caption block">{m.unit || m.axisLabel}</span>
                                 )}
                             </th>
                         )}

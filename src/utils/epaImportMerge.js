@@ -122,15 +122,12 @@ export function mergeRow(existing, incoming, { neverNull = [], fillOnly = false 
     return { payload, overrides, kept, older };
 }
 
-/** A row a curator has put something into by hand — never deleted by an import. */
-const isCuratorRow = (row) =>
-    row.source === 'manual' || Object.keys(row.overrides || {}).some(f => isHeld(row.overrides, f));
-
 /**
  * Diff stored child rows against incoming ones, by natural key.
  *
- * @returns {{ update: Array<{id, existing, incoming}>, insert: Array, remove: Array<id> }}
- *   `remove` never includes a row a curator has edited or added by hand.
+ * @returns {{ update: Array<{id, existing, incoming}>, insert: Array, unlisted: Array<id> }}
+ *   `unlisted` is every stored row the incoming list does not name. An import
+ *   keeps them all (see planTestVehicleImport); they are only counted.
  */
 export function planChildren(existingRows, incomingRows, keyOf) {
     const byKey = new Map();
@@ -149,10 +146,10 @@ export function planChildren(existingRows, incomingRows, keyOf) {
             insert.push(incoming);
         }
     });
-    const remove = (existingRows || [])
-        .filter((row, i) => !matched.has(keyOf(row, i)) && !isCuratorRow(row))
+    const unlisted = (existingRows || [])
+        .filter((row, i) => !matched.has(keyOf(row, i)))
         .map(row => row.id);
-    return { update, insert, remove };
+    return { update, insert, unlisted };
 }
 
 export const coefficientKey = (row) => row.category;
@@ -172,16 +169,33 @@ export const phaseKey = (row) => row.phase_index;
  *   held value the PDF disagreed with; `guarded` the identity fields, and the
  *   stored values, an older certification was stopped from overwriting; `holdIdentity` tells the executor
  *   to leave the certificate-wide covered-models list alone too; `spared` counts
- *   the stored rows this file does not list but did not supply, and so keeps.
+ *   the stored tests, phases and coefficient sets this file does not list, all
+ *   of which are kept.
  *
- * Only the file a record came from removes its rows. A test vehicle can be in
- * several certifications' files, and each lists the tests behind its own
- * certification: the MY2024 Kia file lacks two tests the MY2026 one added, and
- * re-importing it removed them. The rows carry no file of their own, so the
- * record's `source_file` stands in: a different file adds and updates, and
- * removes nothing. On the 2021–2025 corpus against the 2026-10-10 backup that
- * keeps 6 tests and 7 phases, every removal the re-import would have made.
- * The cost: a recertified filing that drops a test leaves the old one standing.
+ * An import never removes a test, a phase or a coefficient set; it only adds
+ * and updates. A test vehicle can be in several certifications' files, and
+ * each lists only the tests behind its own certification: a carryover's older
+ * tests are listed in the older years' files and nowhere else. The rows carry
+ * no file of their own, so no file can tell its own rows from another's.
+ *
+ * The rule before this one let the record's own file (`source_file`, the
+ * newest certification's) remove what it did not list. That held only while
+ * the newest file was imported last: re-importing the corpus oldest year first
+ * made each newer file delete the older years' tests — 73 tests on the
+ * 2026-11-02 backup, among them a 2025 file removing two 2021 tests.
+ *
+ * The cost: a refiled certification that drops a test leaves the old one
+ * standing, for a curator to remove by hand. The 2021–2027 corpus never asks
+ * for that — every stored test, phase and coefficient set on a record from one
+ * of its files is listed by at least one file — and phase lists do differ
+ * between files (101 tests have phases in a newer file and none in an older
+ * one), so not even phases are safe for one file to prune.
+ *
+ * The other cost shows only oldest-first: where a Vehicle ID was reused, an
+ * older file can put a test on the record a newer file later splits off
+ * (FE-Y1ASCUV-25's SPRX10086180, before the MY2027 file names
+ * FE-Y1ASCUV-25-1). The old rule deleted the stray copy by luck; now it
+ * stays, and epa_test_vehicle_duplicates lists the pair for a curator.
  */
 export function planTestVehicleImport(stored, incoming) {
     const kept = [];
@@ -216,8 +230,8 @@ export function planTestVehicleImport(stored, incoming) {
     const testVehicleMerge = merge('test-vehicle', stored.testVehicle, incomingTestVehicle, { neverNull: NEVER_NULLED });
 
     const coefPlan = planChildren(stored.coefficient_sets, incoming.coefficient_sets, coefficientKey);
+    let spared = coefPlan.unlisted.length;
     const coefficients = {
-        remove: coefPlan.remove,
         update: coefPlan.update.map(u => {
             const m = merge(`coefficients ${u.existing.category}`, u.existing, u.incoming);
             return { id: u.id, payload: m.payload, overrides: m.overrides };
@@ -229,16 +243,16 @@ export function planTestVehicleImport(stored, incoming) {
     };
 
     const testPlan = planChildren(stored.tests, incoming.tests, testKey);
+    spared += testPlan.unlisted.length;
     const tests = {
-        remove: testPlan.remove,
         update: testPlan.update.map(u => {
             const { phases = [], ...row } = u.incoming;
             const m = merge(`test ${u.existing.test_number ?? u.id}`, u.existing, row);
             const phasePlan = planChildren(u.existing.epa_test_phases, phases, phaseKey);
+            spared += phasePlan.unlisted.length;
             return {
                 id: u.id, payload: m.payload, overrides: m.overrides,
                 phases: {
-                    remove: phasePlan.remove,
                     update: phasePlan.update.map(pu => {
                         const pm = merge(`test ${u.existing.test_number ?? u.id} phase ${pu.existing.phase_index}`, pu.existing, pu.incoming);
                         return { id: pu.id, payload: pm.payload, overrides: pm.overrides };
@@ -262,18 +276,6 @@ export function planTestVehicleImport(stored, incoming) {
             };
         }),
     };
-
-    // Only the record's own file removes rows (see above). No file on record
-    // (a Test Car List row, or one made by hand) is the old behavior.
-    const storedFile = stored.testVehicle?.source_file ?? null;
-    let spared = 0;
-    if (storedFile && storedFile !== (incoming.testVehicle?.source_file ?? null)) {
-        spared = coefficients.remove.length + tests.remove.length
-            + tests.update.reduce((n, u) => n + u.phases.remove.length, 0);
-        coefficients.remove = [];
-        tests.remove = [];
-        tests.update.forEach(u => { u.phases.remove = []; });
-    }
 
     return {
         testVehicle: { payload: testVehicleMerge.payload, overrides: testVehicleMerge.overrides },

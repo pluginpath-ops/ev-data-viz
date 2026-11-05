@@ -50,7 +50,7 @@ export default function ViewSpecsModal({ vehicle, onClose }) {
     return (
         <div className="modal-overlay" onClick={handleClose}>
             <div
-                className="modal-panel rounded-xl shadow-2xl w-full mx-4"
+                className="modal-panel w-full mx-4"
                 style={{ maxWidth: '560px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
                 onClick={e => e.stopPropagation()}
             >

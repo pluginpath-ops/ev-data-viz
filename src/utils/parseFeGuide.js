@@ -13,10 +13,18 @@
  *
  * 1. EVERY CONFIGURATION APPEARS TWICE, once with fuel economy in MPGe and once
  *    in kWh/100mi, sharing a `Index (Model Type Index)`. The two are the same
- *    number expressed differently — 76 MPGe is 44 kWh/100mi — so importing both
- *    writes 44 into an MPGe column at an entirely plausible magnitude. Rows are
- *    filtered to the MPGe unit and the kWh figures derived at read time if ever
- *    wanted, because two stored copies of one measurement can disagree.
+ *    measurement expressed differently — 76 MPGe is 44 kWh/100mi — so importing
+ *    both as rows writes 44 into an MPGe column at an entirely plausible
+ *    magnitude. One row is kept per configuration, the MPGe one.
+ *
+ *    The kWh/100mi twin's unadjusted figures ARE kept, on that row, because
+ *    they are usually the more precise copy: across MY2022–2027, 1,723 of 2,576
+ *    figures print MPGe to 1 decimal and kWh/100mi to 4 (GM's Blazer EV AWD:
+ *    145.9 MPGe, 23.1078 kWh/100mi). kWh/100mi is the unit a test reproduces —
+ *    100 × AC recharge ÷ CD range — and at 1 decimal of MPGe two sibling
+ *    configurations can be indistinguishable (guideTestedVia). They are not
+ *    always exactly 33.705 apart (135 figures differ past rounding, by under
+ *    0.01), so neither is derived from the other.
  *
  * 2. THE FILE COVERS EVERY FUEL. Only `Fuel Usage Desc = Electricity` rows are
  *    kept, matching the issue's BEV-only scope.
@@ -31,15 +39,20 @@
  * ── What the identifiers do and do not give you ──────────────────────────────
  *
  * `#1 Smog Rating Test Group` is the only Test-Group-shaped identifier in the
- * file, and it is NOT a usable join key: it matches 1 of our 87 linked test vehicles,
- * and it is not unique per configuration — both 2027 R2 rows share
- * `VRIVT00.0232` while reading 307 and 330 miles. It is carried for the cases
- * where it does match; the natural key is (model year, division, carline).
+ * file. It is not a key to a TEST VEHICLE: a test vehicle's own test_group is
+ * the year it was first certified, so a carryover row never matches one, and
+ * one Test Group covers several configurations — both 2027 R2 rows share
+ * `VRIVT00.0232` while reading 307 and 330 miles. It IS the certification's
+ * Test Group: 1,192 of 1,211 Guide EV rows find their stored certification by
+ * it (2026-10-31), which is how guideTestedVia finds the test vehicles that can
+ * stand behind a row. The row's own natural key is (model year, division,
+ * carline, model type index).
  */
 
 import Papa from 'papaparse';
 import { rangePlausibility } from './feGuidePlausibility';
 import { resolveColumns, suggestColumns } from './feGuideColumns';
+import { MPG_E_CONVERSION } from '../constants/units';
 
 /** Columns without which a row cannot be interpreted at all — a hard failure. */
 export const REQUIRED_COLUMNS = [
@@ -91,6 +104,7 @@ export const OPTIONAL_COLUMNS = [
 
 const EV_FUEL   = 'electricity';
 const MPGE_UNIT = 'miles per gallon';
+const KWH_UNIT  = 'kilowatt-hour per 100 miles';
 
 const str = (row, key) => {
     const v = row?.[key];
@@ -166,6 +180,60 @@ export function adjustmentSignature(cityRatio, hwyRatio) {
     return Math.abs(cityRatio - hwyRatio) < 1e-4 ? 'per-vehicle' : 'per-cycle';
 }
 
+// ── Figures on the wrong line ───────────────────────────────────────────────
+//
+// EPA's files print each configuration twice, once per unit, and a few rows
+// put a figure on the wrong line. Size alone cannot tell the units apart — a
+// Hummer's adjusted 48 MPGe sits below its 71 kWh/100mi — but direction can:
+// adjusting LOWERS an MPGe figure and RAISES a kWh/100mi one.
+//
+//   swapped    every figure of the MPGe line is the kWh/100mi one and the
+//              other way round: the MY2023 Q4 e-tron and MY2024 Q4 40 e-tron
+//              (21.1 "MPGe" city, 159.8 "kWh/100mi"), the MY2022 Taycan
+//              Performance Battery Plus.
+//   duplicated one cycle of the MPGe line repeats the kWh/100mi figure: the
+//              MY2024 Model S Plaid 21in's highway and combined (27.5479 on
+//              both lines). Its MPGe is that figure converted, which is how
+//              EPA defines it.
+
+const FE_COLUMNS = ['City', 'Hwy', 'Comb'].flatMap(c => [
+    `${c} FE (Guide) - Conventional Fuel`,
+    `${c} Unadj FE - Conventional Fuel`,
+    `${c} Unrd Adj FE - Conventional Fuel`,
+]);
+const UNADJ = (c) => `${c} Unadj FE - Conventional Fuel`;
+
+/** Whether adjusting raised this line's figures — a kWh/100mi line's behavior. */
+function adjustingRaises(line) {
+    for (const c of ['City', 'Hwy']) {
+        const unadj = num(line, UNADJ(c));
+        const adj = num(line, `${c} Unrd Adj FE - Conventional Fuel`) ?? num(line, `${c} FE (Guide) - Conventional Fuel`);
+        if (unadj > 0 && adj > 0 && adj !== unadj) return adj > unadj;
+    }
+    return null;
+}
+
+/**
+ * The MPGe line and kWh/100mi line as they should have been printed, and what
+ * was put right — null when nothing was.
+ */
+export function repairUnitLines(mpgeLine, kwhLine) {
+    if (!kwhLine) return { mpgeLine, kwhLine, repair: null };
+    if (adjustingRaises(mpgeLine) === true && adjustingRaises(kwhLine) === false) {
+        const pick = (line) => Object.fromEntries(FE_COLUMNS.map(k => [k, line[k]]));
+        return { mpgeLine: { ...mpgeLine, ...pick(kwhLine) }, kwhLine: { ...kwhLine, ...pick(mpgeLine) }, repair: 'units-swapped' };
+    }
+    const fixed = { ...mpgeLine };
+    for (const c of ['City', 'Hwy', 'Comb']) {
+        const m = num(mpgeLine, UNADJ(c));
+        const k = num(kwhLine, UNADJ(c));
+        if (m > 0 && m === k) fixed[UNADJ(c)] = String(Math.round(100 * MPG_E_CONVERSION / k * 1e4) / 1e4);
+    }
+    return FE_COLUMNS.some(k => fixed[k] !== mpgeLine[k])
+        ? { mpgeLine: fixed, kwhLine, repair: 'mpge-from-kwh' }
+        : { mpgeLine, kwhLine, repair: null };
+}
+
 /** One guide row, mapped and derived. */
 function mapRow(row, original = row) {
     const unadjCity = num(row, 'City Unadj FE - Conventional Fuel');
@@ -189,7 +257,13 @@ function mapRow(row, original = row) {
         modelTypeIndex: str(row, 'Index (Model Type Index)'),
 
         // Label figures — what the window sticker says
-        labelCombRangeMi: num(row, 'Comb Range as shown on FE Label (miles)'),
+        // EPA's MY2023 Guide leaves the label's combined range blank on 112 of
+        // its 144 EV rows and gives it only as the model type's driving range
+        // (Range1). Where both are filled — 708 rows across MY2022–2026 — they
+        // agree to the mile but once (Model 3 RWD, 273 vs 272), so Range1 stands
+        // in. Without it those rows were dropped as unusable: 32 of 144 imported.
+        labelCombRangeMi: num(row, 'Comb Range as shown on FE Label (miles)')
+            ?? num(row, 'Range1 - Model Type Driving Range - Conventional Fuel'),
         labelCityRangeMi: num(row, 'City Range (miles)'),
         labelHwyRangeMi:  num(row, 'Hwy Range (miles)'),
         labelCombMpge:    num(row, 'Comb FE (Guide) - Conventional Fuel'),
@@ -310,18 +384,31 @@ export function parseFeGuide(csvText) {
     // Rows that import but look wrong -- see feGuidePlausibility.
     const flagged = [];
 
+    // The row under the names this parser reads; `raw` keeps EPA's own.
+    const canonOf = (raw) => renamed.length
+        ? { ...raw, ...Object.fromEntries(renamed.map(r => [r.column, raw[r.header]])) }
+        : raw;
+    const unitOf = (canon) => (str(canon, 'Fuel Unit Desc - Conventional Fuel') ?? '').toLowerCase();
+    const twinKey = (canon) => ['Model Year', 'Division', 'Carline', 'Index (Model Type Index)']
+        .map(k => str(canon, k)).join('|');
+    // Each configuration's kWh/100mi twin, for its unadjusted figures.
+    const kwhTwin = new Map();
     for (const raw of parsed.data) {
-        // The row under the names this parser reads; `raw` keeps EPA's own.
-        const canon = renamed.length
-            ? { ...raw, ...Object.fromEntries(renamed.map(r => [r.column, raw[r.header]])) }
-            : raw;
+        const canon = canonOf(raw);
+        if (unitOf(canon) === KWH_UNIT) kwhTwin.set(twinKey(canon), canon);
+    }
+
+    for (const raw of parsed.data) {
+        const canon = canonOf(raw);
         const fuel = (str(canon, 'Fuel Usage Desc - Conventional Fuel') ?? '').toLowerCase();
         if (fuel !== EV_FUEL) { skipped.nonEv++; continue; }
 
-        const unit = (str(canon, 'Fuel Unit Desc - Conventional Fuel') ?? '').toLowerCase();
-        if (unit !== MPGE_UNIT) { skipped.duplicateUnit++; continue; }
+        if (unitOf(canon) !== MPGE_UNIT) { skipped.duplicateUnit++; continue; }
 
-        const row = mapRow(canon, raw);
+        const { mpgeLine, kwhLine: twin, repair } = repairUnitLines(canon, kwhTwin.get(twinKey(canon)));
+        const row = mapRow(mpgeLine, raw);
+        row.unadjCityKwh100mi = num(twin, 'City Unadj FE - Conventional Fuel');
+        row.unadjHwyKwh100mi  = num(twin, 'Hwy Unadj FE - Conventional Fuel');
         // A row missing any part of the key, or its range, cannot be stored or
         // linked. modelTypeIndex counts: without it two Audi configurations at
         // different ranges collapse into one.
@@ -345,6 +432,9 @@ export function parseFeGuide(csvText) {
             hwyMi:  row.labelHwyRangeMi,
             combMi: row.labelCombRangeMi,
         });
+        // Put right, and said so: the curator should know EPA's file was
+        // read other than as printed.
+        if (repair) row.plausibilityFlags.push(repair);
         if (row.plausibilityFlags.length) {
             flagged.push({
                 modelYear: row.modelYear,

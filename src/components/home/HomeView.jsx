@@ -5,7 +5,7 @@ import { useFeaturedComparisonsContext } from '../../context/FeaturedComparisons
 import { comparisonToShow, liveVehicleIds, replacesSelection, vehiclesInOrder } from '../../utils/featuredComparisons';
 import { buildVehicleLabels } from '../../utils/seriesLabel';
 import HomeIntro from './HomeIntro';
-import ScrollMoreHint from './ScrollMoreHint';
+import ScrollMoreHint from '../ScrollMoreHint';
 import MarkdownText from '../MarkdownText';
 import FeaturedChartPanel from './FeaturedChartPanel';
 import ReplaceSelectionDialog from './ReplaceSelectionDialog';
@@ -133,7 +133,7 @@ export default function HomeView({ slug, onSlugChange }) {
     return (
         <div className="home-view">
             <HomeIntro />
-            <h2 className="home-section-head text-micro">Featured comparison</h2>
+            <h2 className="home-section-head text-meta">Featured comparison</h2>
             {curatorBar}
             <header className="home-header">
                 {/* Title and reset share a row; the blurb and the vehicles run
@@ -151,7 +151,7 @@ export default function HomeView({ slug, onSlugChange }) {
                         </button>
                         <button type="button" className="btn btn-secondary" onClick={copyUrl}
                             title="Copy a link to this featured comparison">
-                            {urlCopied ? '✓ Copied' : '🔗 URL'}
+                            {urlCopied ? '✓ Copied' : 'URL'}
                         </button>
                     </div>
                 </div>
@@ -178,7 +178,7 @@ export default function HomeView({ slug, onSlugChange }) {
 
             {others.length > 0 && (
                 <>
-                    <h2 className="home-section-head text-micro">Other comparisons</h2>
+                    <h2 className="home-section-head text-meta">Other comparisons</h2>
                     <label className="home-others">
                         <span className="text-label">Past comparisons</span>
                         <select className="form-input home-select" value="" onChange={e => showOther(e.target.value)}>
@@ -189,7 +189,7 @@ export default function HomeView({ slug, onSlugChange }) {
                 </>
             )}
 
-            <ScrollMoreHint />
+            <ScrollMoreHint target=".home-panel" label="Scroll to the next chart" />
 
             {pending && (
                 <ReplaceSelectionDialog

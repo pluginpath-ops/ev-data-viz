@@ -121,7 +121,7 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
     });
 
     return (
-        <div className="border rounded-lg p-3 mb-2 border-[var(--color-border)]">
+        <div className="border rounded-xs p-3 mb-2 border-[var(--color-border)]">
             <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
                     {canEdit ? (

@@ -20,6 +20,8 @@ import NumberInput from './NumberInput';
  *   xAxisLabel                     – label for the X-axis section (default "X-Axis Scale").
  *                                    Pass e.g. "X-Axis Scale (hrs)" to hint at expected units.
  *   yAxisLabel                     – label for the left Y-axis section (default "Left Axis Scale").
+ *   zoomed, onResetZoom            – a chart with box-zoom passes both (useChartZoom). Reset zoom
+ *                                    is drawn in the corner while `zoomed`, and not at all otherwise.
  *
  * Card wrapping (design pattern):
  *   By default this component renders itself inside a `card mb-6` container so that
@@ -35,6 +37,7 @@ export default function AxisScaleControls({
     xAxisLabel = 'X-Axis Scale',
     yAxisLabel = 'Left Axis Scale',
     card = true,
+    zoomed = false, onResetZoom = null,
 }) {
     const colCount = 1 + (showX ? 1 : 0) + (showY2 ? 1 : 0);
     const gridClass = colCount === 3 ? 'grid-cols-3'
@@ -42,6 +45,12 @@ export default function AxisScaleControls({
                     : 'grid-cols-1 max-w-xs';
 
     const content = (
+      <div className="axis-scale-controls">
+        {zoomed && onResetZoom && (
+            <button type="button" className="zoom-reset" onClick={onResetZoom} title="Reset zoom to full view">
+                Reset zoom
+            </button>
+        )}
         <div className={`grid gap-8 ${gridClass}`}>
 
             {/* ── Y-Axis Scale ─────────────────────────────────────────────── */}
@@ -157,6 +166,7 @@ export default function AxisScaleControls({
                 </div>
             )}
         </div>
+      </div>
     );
 
     return card ? <div className="card mb-6">{content}</div> : content;

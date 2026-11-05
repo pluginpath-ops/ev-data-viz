@@ -41,7 +41,7 @@ export default function SectionBand({ open, onToggle, label, count = null, activ
             <span aria-hidden="true" className="collapsible-caret" style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
             {/* The note sits under the label, not under the caret, so it reads
                 as part of the section it summarises. */}
-            <span className="flex flex-col gap-0.5 min-w-0">
+            <span className="section-band-text">
                 <span className="flex items-center gap-2">
                     <span className="text-micro">{label}</span>
                     {active && <span className="section-band-dot" role="img" aria-label={activeLabel ?? 'Applied'} title={activeLabel ?? undefined} />}

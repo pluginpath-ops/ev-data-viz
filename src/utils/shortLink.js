@@ -61,7 +61,7 @@ const NAMES_V1 = [
     'rt_tw', 'rt_te', 'rt_tr', 'rt_r',
     'sf', 'ss', 'scx', 'scy', 'epa_ya', 'epa_m', 'epa_ov',
     'vt_preset', 'vt_cols', 'vt_sort', 'vt_dir', 'vt_win', 'vt_add', 'vt_home', 'vt_fast', 'vt_basis',
-    'q',
+    'q', 'rt_otd', 'rt_oc', 'rt_bp', 'rt_osn', 'rt_osx',
 ];
 
 // Values that recur: tabs, modes, axes, chart types, units, presets, and the
@@ -119,6 +119,7 @@ const WORDS_V1 = [
     'interior.screen_size_in', 'interior.hud', 'interior.front_heated_seats',
     'interior.front_ventilated_seats', 'interior.rear_heated_seats', 'interior.heated_steering_wheel',
     'interior.sound_system_speakers', 'interior.sound_system_watts',
+    'optimizer', 'map', 'avgSpeed',
 ];
 
 /**
@@ -134,14 +135,18 @@ const IMPLIED_V1 = {
         rt_m: 'distance', rt_ss: '90', rt_ms: '10', rt_ld: '150', rt_ct: '30', rt_td: '500',
         rt_sp: '70', rt_oh: '5', rt_ya: 'chargeTime', rt_xa: 'totalTime', rt_sya: 'totalTime',
     },
+    // Trip Optimizer is drawn by Road Trip's view and carries its settings too.
+    optimizer: { rt_otd: '700', rt_oc: 'map', rt_bp: '1', rt_osn: '55', rt_osx: '80' },
     towing:   { rt_te: '1.5', rt_tr: '70' },
 };
 
 function impliedOf(p) {
     const mode = p.get('m') ?? 'charging';
+    const trip = mode === 'roadtrip' || mode === 'optimizer';
     return {
-        ...IMPLIED_V1[mode],
-        ...(mode === 'roadtrip' && p.get('rt_tw') === '1' && IMPLIED_V1.towing),
+        ...(trip ? IMPLIED_V1.roadtrip : IMPLIED_V1[mode]),
+        ...(mode === 'optimizer' && IMPLIED_V1.optimizer),
+        ...(trip && p.get('rt_tw') === '1' && IMPLIED_V1.towing),
     };
 }
 

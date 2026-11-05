@@ -35,11 +35,11 @@ export default function InterfaceSettings() {
 
                 {headerImageUrl ? (
                     <div
-                        className="w-full h-32 rounded-lg border border-[var(--color-border)] mb-3"
+                        className="w-full h-32 rounded-xs border border-[var(--color-border)] mb-3"
                         style={{ backgroundImage: `url(${headerImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                     />
                 ) : (
-                    <div className="w-full h-32 rounded-lg border border-dashed border-[var(--color-border-strong)] flex items-center justify-center text-sm text-meta mb-3">
+                    <div className="w-full h-32 rounded-xs border border-dashed border-[var(--color-border-strong)] flex items-center justify-center text-sm text-meta mb-3">
                         No header image set
                     </div>
                 )}

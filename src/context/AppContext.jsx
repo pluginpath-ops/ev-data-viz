@@ -22,6 +22,7 @@ import { toSessionRow, sessionFor } from '../utils/testSessions';
 import { isListed, poolOf } from '../utils/runListing';
 import { createWriteGuard } from '../utils/writeGuard';
 import { passDown } from '../utils/vehicleDeletion';
+import { withPointCount } from '../utils/runPoints';
 import { chargingLineage, lineageInheritors } from '../utils/lineageCharging';
 
 const AppContext = createContext(null);
@@ -733,6 +734,9 @@ export function AppProvider({ children }) {
                         : r) }
                     : v
             ));
+            // The run's copies elsewhere (inherited tests) hold the old count
+            // too, and a chart skips the points request for a test counted at 0.
+            setVehicles(prev => withPointCount(prev, runId, result.rowCount));
             if (feedsComposites(vehicleId, runId)) await refreshCompositesAround(vehicleId, runId);
             return result;
         } catch (error) {
@@ -759,6 +763,9 @@ export function AppProvider({ children }) {
                         : v
                 ));
             }
+            // A merge can take a run from no points to some: the new count goes
+            // to the run and its copies, or a chart would keep skipping it.
+            if (result?.rowCount != null) setVehicles(prev => withPointCount(prev, runId, result.rowCount));
             if (feedsComposites(vehicleId, runId)) await refreshCompositesAround(vehicleId, runId);
             return result;
         } catch (error) {
@@ -1522,6 +1529,54 @@ export function AppProvider({ children }) {
     const getExistingEpaTestVehicleIds = (ids) => dataService.getExistingEpaTestVehicleIds(ids);
     /** Which certifications these test vehicles are already in, for the import review (#374). */
     const getEpaCertificationsFor = (ids) => dataService.getEpaCertificationsFor(ids);
+    const getEpaTestVehicleIdentity = (testVehicles) => dataService.getEpaTestVehicleIdentity(testVehicles);
+
+    // A vehicle's EPA Label (migration 095): its Guide rows, and the
+    // configurations their Tested via links.
+    const getVehicleGuideRows = (vehicleId) => dataService.getVehicleGuideRows(vehicleId);
+    const getVehicleGuideCandidates = (vehicle) => dataService.getVehicleGuideCandidates(vehicle);
+    const getGuideRowsTestedVia = (rows) => dataService.getGuideRowsTestedVia(rows);
+    const planVehicleGuideLinks = () => dataService.planVehicleGuideLinks();
+
+    const linkVehicleGuideRow = async (vehicleId, guideRow, via) => {
+        try {
+            const res = await dataService.linkVehicleGuideRow(vehicleId, guideRow, via);
+            setVehicles(await dataService.getVehicles());
+            showSuccess(res.linked.length
+                ? `EPA Label linked, with ${res.linked.length} configuration${res.linked.length === 1 ? '' : 's'}.`
+                : 'EPA Label linked.');
+            return res;
+        } catch (error) {
+            showError('Error linking EPA Label: ' + error.message);
+            throw error;
+        }
+    };
+
+    const unlinkVehicleGuideRow = async (vehicleId, guideRowId, keepFor) => {
+        try {
+            await dataService.unlinkVehicleGuideRow(vehicleId, guideRowId, keepFor);
+            setVehicles(await dataService.getVehicles());
+            showSuccess('EPA Label unlinked.');
+        } catch (error) {
+            showError('Error unlinking EPA Label: ' + error.message);
+            throw error;
+        }
+    };
+
+    const applyVehicleGuideLinkPlan = async (entries) => {
+        const result = await dataService.applyVehicleGuideLinkPlan(entries);
+        setVehicles(await dataService.getVehicles());
+        return result;
+    };
+
+    // Layer 4: test vehicles behind no EPA Label of their certification —
+    // marked with the Guide link sweep's skip, never deleted.
+    const planBehindNoLabel = () => dataService.planBehindNoLabel();
+    const applyBehindNoLabel = async (plan) => {
+        const result = await dataService.applyBehindNoLabel(plan);
+        if (result.unlinked) setVehicles(await dataService.getVehicles());
+        return result;
+    };
 
     /**
      * Import parsed CSI-PDF test vehicles (clean-replace each), optionally linking one
@@ -1613,8 +1668,8 @@ export function AppProvider({ children }) {
     const getFeGuideRow = (id) => dataService.getFeGuideRow(id);
     const getTestVehiclesForCertStats = () => dataService.getTestVehiclesForCertStats();
     const getTestVehiclesForCurves = () => dataService.getTestVehiclesForCurves();
-    // The linking sweep (#238).
-    const getTestVehiclesAwaitingFeLink = (opts) => dataService.getTestVehiclesAwaitingFeLink(opts);
+    // The linking sweep (#238), Guide row first (utils/guideRowSweep.js).
+    const getGuideRowSweep = () => dataService.getGuideRowSweep();
     const getFeLinkProgress = () => dataService.getFeLinkProgress();
     const setFeLinkSkipped = (id, skipped, note, opts) => dataService.setFeLinkSkipped(id, skipped, note, opts);
     // Data Checks skips (#321, migration 066).
@@ -1685,7 +1740,7 @@ export function AppProvider({ children }) {
             showSuccess(`Imported ${testVehicles.length} EPA config(s) from PDF.`
                 + (keptCount ? ` Kept ${keptCount} hand-edited value(s) that differ from the PDF.` : '')
                 + (guardedCount ? ` ${guardedCount} config(s) already held a newer model year's certification, so its year, Test Group, covered models and every value it already had were kept; the older file only filled blanks.` : '')
-                + (sparedCount ? ` Kept ${sparedCount} test(s), phase(s) or coefficient set(s) another certification's file supplied.` : '')
+                + (sparedCount ? ` Kept ${sparedCount} stored test(s), phase(s) or coefficient set(s) this file does not list: an import never removes them, as another certification's file may list them.` : '')
                 + (certAdded ? ` ${certAdded} new certification(s).` : '')
                 + (recertified ? ` ${recertified} recertified.` : ''));
             return { count: testVehicles.length, kept: keptCount, guarded: guardedCount, spared: sparedCount, certifications: certAdded, recertified };
@@ -2252,7 +2307,7 @@ export function AppProvider({ children }) {
         getTestVehiclesForCertStats,
         getTestVehiclesForCurves,
         linkFeGuideRows,
-        getTestVehiclesAwaitingFeLink,
+        getGuideRowSweep,
         getFeLinkProgress,
         setFeLinkSkipped,
         getDataCheckSkips,
@@ -2270,6 +2325,16 @@ export function AppProvider({ children }) {
         acceptFeGuideValues,
         getExistingEpaTestVehicleIds,
         getEpaCertificationsFor,
+        getEpaTestVehicleIdentity,
+        getVehicleGuideRows,
+        getVehicleGuideCandidates,
+        getGuideRowsTestedVia,
+        planVehicleGuideLinks,
+        linkVehicleGuideRow,
+        unlinkVehicleGuideRow,
+        applyVehicleGuideLinkPlan,
+        planBehindNoLabel,
+        applyBehindNoLabel,
         updateEpaMapping,
         setPrimaryEpaMapping,
         unlinkEpaTestVehicle,

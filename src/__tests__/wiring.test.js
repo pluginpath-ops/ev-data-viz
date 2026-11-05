@@ -49,7 +49,7 @@ describe('utilities built for the UI are reached by the UI', () => {
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
                      'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromTestVehicle.js',
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
-                     'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
+                     'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
@@ -140,12 +140,6 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The candidate filter, consumed inside the module by rankFeCandidates. Exported so "same manufacturer" is testable without ranking.',
         'feGuideMatch.carlineScore':
             'The similarity metric, consumed inside the module by rankFeCandidates. Exported so a score can be pinned against real carline pairs.',
-        'epaLinkSweep.hasDerivableEnergy':
-            'Consumed inside the module by tierOf. Exported so the procedure-code rule — 77 and 84 only, never 86 — is asserted on its own.',
-        'epaLinkSweep.hasCoefficients':
-            'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
-        'epaLinkSweep.tierOf':
-            'Consumed inside the module by classifyTestVehicle. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
         'epaCurveSubjects.curveSubject':
             'Consumed inside the module by curveSubjects, which the explorer calls. Exported so one record\'s tier and energy source are assertable without building a whole list.',
         'epaCurveSubjects.resolveCurveEnergy':
@@ -180,16 +174,6 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The import-time form of checkRecordIntegrity, called by EpaPdfImportModal. Listed because the checks it wraps are also read directly by the curator card, and only this spelling reaches the import path.',
         'epaCertStats.NOT_MEASURED_SOURCES':
             'The source names that mean "not derived", consumed inside the module and asserted BY NAME against what epaDerivations actually returns — deriveDrivetrainEta says "estimated" where deriveChargerEfficiency says "assumed", and a single check for one of them published DEFAULT_ETA as a fleet measurement.',
-        'epaLinkSweep.wheelMentions':
-            'Called by the sweep view to distil a manufacturer note, and inside the module by coveredWheelSizes. Exported so the four real notations — inch, in, doubled quote, and Lucid\'s 20F21R pair — are pinned by name.',
-        'epaLinkSweep.coveredModelMatches':
-            'Consumed inside the module by classifyTestVehicle. Exported so the certificate-covers-this-carline match, and its refusal when a certificate covers several candidates, are asserted directly.',
-        'epaLinkSweep.exactTestGroupMatches':
-            'Consumed inside the module by classifyTestVehicle. Exported so the identifier match — and its refusal to fire when several rows share the id — is asserted directly.',
-        'epaLinkSweep.sharedCertification':
-            'Consumed inside the module by classifyTestVehicle. Exported so the one-certification-several-wheels case is pinned against the real Lucid data on its own.',
-        'epaLinkSweep.classifyTestVehicle':
-            'Consumed inside the module by buildSweep, which the sweep view calls. Exported so one test vehicle\'s proposal and decline reason can be asserted without building a whole sweep.',
     };
 
     for (const mod of WATCHED) {
@@ -483,14 +467,15 @@ describe('the seams that broke before', () => {
         // ran the app's largest query 98 times, so the sweep appeared to hang
         // and only the last of 98 toasts survived. The batch path refreshes
         // once. Nothing about that is visible from either file alone.
-        const sweep = read('src/components/admin/FeGuideLinkSweep.jsx');
-        const batchFn = sweep.slice(sweep.indexOf('const linkBatch'));
-        const body = batchFn.slice(0, batchFn.indexOf('\n    };'));
+        // The Guide-row sweep submits its whole queue the same way.
+        const sweep = read('src/components/admin/GuideRowLinkSweep.jsx');
+        const submitFn = sweep.slice(sweep.indexOf('const submit'));
+        const body = submitFn.slice(0, submitFn.indexOf('\n    };'));
 
-        expect(body, 'linkBatch must call linkFeGuideRows, the batch path')
+        expect(body, 'submit must call linkFeGuideRows, the batch path')
             .toMatch(/linkFeGuideRows\(/);
-        expect(body, 'linkBatch must not loop the single-link call')
-            .not.toMatch(/await\s+linkFeGuideRow\(/);
+        expect(body, 'submit must not loop the single-link call')
+            .not.toMatch(/linkFeGuideRow\(/);
 
         // And the batch path must refresh once rather than per link.
         const ctx = read('src/context/AppContext.jsx');
@@ -521,7 +506,7 @@ describe('the seams that broke before', () => {
             // The select is GUIDE_VIEW_FIELDS plus what only the picker shows
             // (#374: candidates are checked against the lab data before linking).
             [
-                ...(svc.match(/const GUIDE_VIEW_FIELDS = '([^']*)'/)?.[1] ?? '').split(','),
+                ...(svc.match(/const GUIDE_VIEW_FIELDS = [`']([^`']*)[`']/)?.[1] ?? '').split(','),
                 ...(fn.match(/\.select\(`\$\{GUIDE_VIEW_FIELDS\}((?:, [a-z_]+)*)`\)/)?.[1] ?? '').split(','),
             ].map(s => s.trim()).filter(Boolean),
         );
@@ -592,7 +577,10 @@ describe('the seams that broke before', () => {
         // alone. A picker never mounted, or a choice the checks never read,
         // would store a primary that changes nothing anyone can see.
         const section = read('src/components/EpaVehicleSection.jsx');
-        expect(section, 'the EPA section must mount the picker').toMatch(/<PrimaryConfigurationPicker[\s\S]*?onChoose=\{onSetPrimary\}/);
+        // The vehicle's EPA section marks a primary from its EPA Label
+        // (or a card no label reaches); Data Checks keeps the picker.
+        expect(section, 'the EPA Label must be handed the write').toMatch(/<VehicleEpaLabel[\s\S]*?onSetPrimary=\{\(mapping\) => onSetPrimary\(vehicle\.id, mapping\.id\)\}/);
+        expect(read('src/components/epa/GuideRowMatchList.jsx'), 'the label must offer it').toMatch(/Mark as primary/);
         expect(read('src/components/RunsView.jsx'), 'RunsView must hand the write to the section')
             .toMatch(/onSetPrimary=\{setPrimaryEpaMapping\}/);
         expect(read('src/context/AppContext.jsx')).toMatch(/dataService\.setPrimaryEpaMapping\(/);
@@ -1083,7 +1071,7 @@ describe('the seams that broke before', () => {
         expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
         expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
         expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
-        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\)\}/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\) \?\? explainerNoteLink\(row\.links\?\.\[col\.key\], openExplainer\)\}/);
         expect(read('src/components/tables/TableCell.jsx'), 'without borrowing the test peek').toMatch(/const noteLink = test \?\? link/);
     });
 
@@ -1657,6 +1645,33 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         }
     });
 
+    it('offers the DC fast charging loss as a knob, and prices the fast cost on it, not on the wall figure (#506)', () => {
+        const knobs = read('src/constants/knobs.js');
+        const epa = read('src/constants/epa.js');
+        expect(knobs, 'the loss is tunable but absent from the Admin knobs').toContain("key: 'DC_FAST_LOSS'");
+        expect(epa, 'and is not resolved through the override layers').toMatch(/resolve\('DC_FAST_LOSS'/);
+        const table = read('src/utils/vehicleTable.js');
+        const fast = table.slice(table.indexOf('const costPer100Fast'), table.indexOf('const CALCULATED_COLUMNS'));
+        expect(fast, 'the fast cost must be grossed up by the knob').toMatch(/1 - DC_FAST_LOSS/);
+        // The fast column must not go back to the AC wall basis: a DC session
+        // bypasses the onboard charger the home cost pays for.
+        expect(fast, 'the fast cost must not read wallEfficiency').not.toMatch(/wallEfficiency/);
+        expect(table, 'the fast column must read the cost it is built on').toMatch(/costPer100Fast\(inputs, fastPrice, chargerEff\)/);
+        // And the home figure stays on the wall basis.
+        expect(table, 'the home cost stays on wall-side efficiency').toMatch(/costPer100\(homePrice\)\(inputs\)/);
+        const figures = read('src/utils/vehicleFigures.js');
+        expect(figures, 'the cert\'s own charging efficiency must reach the table').toMatch(/chargerEfficiency: measuredChargerEfficiency/);
+        expect(table, 'and be read from the resolved range').toMatch(/vehicle\.epaRange\?\.chargerEfficiency/);
+        // The estimate note on every fast cell must reach the explainer, with its tooltip.
+        expect(table, 'the fast column must carry its note link').toMatch(/noteLink: fastCostNoteLink/);
+        expect(table, 'and the table must hand it to the cell').toMatch(/links\[col\.key\] = col\.noteLink\(\)/);
+        expect(read('src/components/tables/TableCell.jsx'), 'and the cell must show the tooltip').toMatch(/title=\{noteLink\.title\}/);
+        // The default and the evidence behind it must say the same number.
+        const ledger = JSON.parse(read('src/explainers/facts.json')).facts.find(f => f.id === 'dc-fast-round-trip-pairs');
+        expect(epa, 'the default must be the ledger\'s').toContain(`DC_FAST_LOSS: ${ledger.value.evbench_default},`);
+        expect(read('src/explainers/content/dc-fast-charging-loss.md'), 'and the explainer must cite the round trip').toContain('[[fact:dc-fast-round-trip-pairs]]');
+    });
+
     it('offers the accessory load on the correction target, and writes it to the link only when set (#449)', () => {
         const fields = read('src/components/CorrectionTargetFields.jsx');
         expect(fields, 'the row must resolve auto through the temperature').toMatch(/effectiveAccessoryW\(/);
@@ -1678,6 +1693,19 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         }
         expect(read('src/hooks/useViewingConditions.js'), 'the extras are only wind and elevation change')
             .not.toMatch(/setElevationFt|setTempF|setAccessoryOverrideW/);
+    });
+
+    it('offers Road Trip no correction speed slider, and states the trip speed instead', () => {
+        // Trip -> Speed is the only speed on that chart: a trip is corrected to
+        // the speed it is driven (tripTarget), so the shared target's speed is
+        // redundant there.
+        const src = read('src/components/RoadTripView.jsx');
+        const fields = src.match(/const TRIP_CORRECTION_FIELDS = (\[[^\]]*\])/)?.[1];
+        expect(fields, 'Road Trip must name the conditions it offers').toBeTruthy();
+        expect(fields, 'no correction speed slider on Road Trip').not.toMatch(/speedMph/);
+        expect(src, 'the control must be given that list').toMatch(/<CorrectionControl[^>]*fields=\{TRIP_CORRECTION_FIELDS\}/);
+        expect(src, 'the collapsed summary must not state the hidden speed').toMatch(/summary=\{tripCorrectionSummary\(/);
+        expect(read('src/components/CorrectionControl.jsx'), 'the control must pass fields on').toMatch(/<CorrectionTargetFields[^>]*fields=\{fields\}/s);
     });
 
     it('carries the target, and the extras, to both pop-outs (#449)', () => {
@@ -2041,7 +2069,8 @@ describe('every chart\'s axis limits go through one door (#478)', () => {
     const CHARTS = {
         'src/components/ChargingView.jsx':                  'charging',
         'src/components/RangeChartView.jsx':                'range',
-        'src/components/RoadTripView.jsx':                  'roadtrip',
+        // Road Trip's view is also Trip Optimizer's, and asks for both.
+        'src/components/RoadTripView.jsx':                  ['roadtrip', 'optimizer'],
         'src/components/PerformanceCurveView.jsx':          'perfcurve',
         'src/components/EpaCurvesView.jsx':                 'epacurves',
         'src/components/epa/curves/EpaCurveExplorer.jsx':   'epaexplorer',
@@ -2050,16 +2079,18 @@ describe('every chart\'s axis limits go through one door (#478)', () => {
     it('every view that draws Axis Scale controls reads and writes through useAxisLimits', () => {
         const withControls = ALL.filter(x => /<AxisScaleControls\b/.test(x.text) && !x.file.endsWith('AxisScaleControls.jsx')).map(x => x.file);
         expect(withControls.sort(), 'a chart view with Axis Scale controls that is not in CHARTS above').toEqual(Object.keys(CHARTS).sort());
-        for (const [file, key] of Object.entries(CHARTS)) {
+        for (const [file, keys] of Object.entries(CHARTS)) {
             const text = read(file);
-            expect(text, `${file} must ask for the '${key}' limits`).toMatch(new RegExp(`useAxisLimits\\('${key}'\\)`));
+            for (const key of [keys].flat()) {
+                expect(text, `${file} must ask for the '${key}' limits`).toMatch(new RegExp(`useAxisLimits\\('${key}'\\)`));
+            }
             expect(text, `${file} must hand the controls the hook's setter`).toMatch(/<AxisScaleControls[\s\S]*?onChange=\{(setLimit|setScaleLimit|onAxisChange)\}/);
             expect(text, `${file} must not hold its own limits`).not.toMatch(/useState\(\s*\{\s*xMin|useSyncedScale|NO_SCALE|setXMin|setScale\b/);
         }
     });
 
     it('every key the views ask for is registered, and every registered key has a view', () => {
-        expect(Object.values(CHARTS).sort()).toEqual(Object.keys(AXIS_LIMIT_CHARTS).sort());
+        expect(Object.values(CHARTS).flat().sort()).toEqual(Object.keys(AXIS_LIMIT_CHARTS).sort());
     });
 
     it('nothing outside the hook keeps limits in chartConfig or epaConfig by field name', () => {
@@ -2477,12 +2508,16 @@ describe('a chart link is read and written in one module (#448 layer 1)', () => 
         // Charge Stop's and Road Trip's settings are tables (#476): one list
         // that readParams and writeParams both walk, so a row is read and
         // written or neither. Each table must be on both sides.
-        for (const table of ['COMPARE_PARAMS', 'ROAD_TRIP_PARAMS', 'TOWING_PARAMS']) {
+        for (const table of ['COMPARE_PARAMS', 'ROAD_TRIP_PARAMS', 'OPTIMIZER_PARAMS', 'TOWING_PARAMS']) {
             expect(parseSrc, `${table} is read`).toMatch(new RegExp(`readParams\\(p, ${table}\\)`));
             expect(buildSrc, `${table} is written`).toMatch(new RegExp(`writeParams\\(p, ${table}`));
         }
         const tabled = [...parseSrc.matchAll(/\['((?:cmp|rt)_[a-z]+)', '/g)].map(m => m[1]);
-        expect(tabled.length).toBe(16);
+        expect(tabled.length).toBe(20);
+        // Trip Optimizer's chart is a table row for the write and read apart
+        // (an unknown chart is dropped).
+        expect(buildSrc).toMatch(/writeParams\(p, OPTIMIZER_CHART_PARAM/);
+        expect(parseSrc).toMatch(/p\.get\('rt_oc'\)/);
         // `tab` is read by App itself before the parse, `m` and `v` through
         // their own names — the check is on the quoted key appearing at all.
         const unread = written.filter(k => k !== 'tab' && !parseSrc.includes(`'${k}'`));
@@ -2600,7 +2635,7 @@ describe('Home draws a featured comparison and curators can make one (#448 layer
     });
 
     it('the featured comparison sits under its own section header', () => {
-        expect(home).toMatch(/<h2 className="home-section-head text-micro">Featured comparison<\/h2>/);
+        expect(home).toMatch(/<h2 className="home-section-head text-meta">Featured comparison<\/h2>/);
     });
 
     it('a panel draws through PresentedChart, the view the pop-out uses, from its own state', () => {
@@ -2878,11 +2913,15 @@ describe('a featured comparison keeps its vehicles in the order the curator set 
     });
 });
 
-describe('Home says when there is more below the window (#448)', () => {
-    const hint = read('src/components/home/ScrollMoreHint.jsx');
+describe('Home and the Explainers landing say when there is more below the window (#448)', () => {
+    const hint = read('src/components/ScrollMoreHint.jsx');
 
-    it('Home shows the "More" pill', () => {
-        expect(read('src/components/home/HomeView.jsx')).toMatch(/<ScrollMoreHint \/>/);
+    it('Home shows the "More" pill over its panels', () => {
+        expect(read('src/components/home/HomeView.jsx')).toMatch(/<ScrollMoreHint target="\.home-panel"/);
+    });
+
+    it('the Explainers landing shows it over its subjects', () => {
+        expect(read('src/explainers/ExplainersSection.jsx')).toMatch(/<ScrollMoreHint target="\.explainer-hub"/);
     });
 
     it('it watches the panels as they scroll, resize and grow, and is gone when none is below', () => {
@@ -2912,7 +2951,7 @@ describe('Home offers the other featured comparisons and a link to this one (#44
     });
 
     it('a section header, with its rule, separates the other comparisons from the charts above', () => {
-        expect(home).toMatch(/<h2 className="home-section-head text-micro">Other comparisons<\/h2>/);
+        expect(home).toMatch(/<h2 className="home-section-head text-meta">Other comparisons<\/h2>/);
         // The header is not part of the dropdown's own block.
         expect(home).not.toMatch(/<label className="home-others">\s*<h2/);
         expect(home).toMatch(/Past comparisons/);
@@ -3012,10 +3051,12 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
     it('the charts that must deviate keep a tooltip, and say why', () => {
         // Range & Efficiency draws bars from the same Chart: bars keep theirs.
         expect(read('src/components/RangeChartView.jsx')).toMatch(/enabled: built\.kind !== 'line'[\s\S]{0,80}filter: suppressBarTooltip/);
-        // Road Trip: all three of its charts read through the one readout, the
-        // timeline with its own describe (it says what each vehicle is DOING).
+        // Road Trip: all four of its charts read through the one readout, the
+        // timeline with its own describe (it says what each vehicle is DOING),
+        // and Trip Optimizer's map with its own (its lines are the ridge of
+        // best stop plans and the reader's own stop plan).
         const trip = read('src/components/RoadTripView.jsx');
-        expect(trip.match(/readout\.plugin\(/g)).toHaveLength(3);
+        expect(trip.match(/readout\.plugin\(/g)).toHaveLength(4);
         expect(trip).toMatch(/tooltip: \{ enabled: false \}/);
         expect(trip).not.toMatch(/displayColors: true/);
         // The spec scatter plots one point per vehicle; there is no shared X.
@@ -3077,7 +3118,11 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
         for (const file of ['src/components/ChargingView.jsx', 'src/components/RoadTripView.jsx']) {
             const src = read(file);
             const drags = src.match(/drag: \{\s*enabled: true,\s*threshold: CLICK_SLOP/g) ?? [];
-            expect(drags.length, file).toBe(src.match(/drag: \{/g).length);
+            expect(drags.length, file).toBe(src.match(/drag: \{/g)?.length ?? 0);
+            // Or one shared drag, named once with the threshold and used by name.
+            if (/drag: ZOOM_DRAG/.test(src)) {
+                expect(src, file).toMatch(/const ZOOM_DRAG = \{\s*enabled: true, threshold: CLICK_SLOP/);
+            }
             expect(src).toMatch(/import \{ useChartReadout, CLICK_SLOP \}/);
         }
     });
@@ -3117,6 +3162,25 @@ describe('the spec chart plots the vehicle table’s columns (#450)', () => {
         expect(read('src/components/VehicleTableAssumptions.jsx')).toMatch(/<VehicleAssumptionFields/);
         expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<VehicleAssumptionFields/);
         expect(read('src/utils/chartUrlState.js')).toMatch(/chartMode === 'specs' \|\| chartMode === 'specscatter'\)[\s\S]{0,120}encodeAssumptionParams\(chartConfig\.assumptions\)/);
+    });
+
+    it('every chart with box-zoom resets it from the Axis Scale controls and the zoom hint', () => {
+        for (const file of ['ChargingView', 'RoadTripView']) {
+            const view = read(`src/components/${file}.jsx`);
+            expect(view, `${file} tracks the zoom`).toMatch(/useChartZoom\(/);
+            expect(view, `${file} hands the zoom state to the controls`).toMatch(/zoomed=\{zoomed\} onResetZoom=\{resetZoom\}/);
+            expect(view, `${file} links the hint`).toMatch(/<ZoomHint onReset=\{resetZoom\}/);
+            expect(view, `${file} no longer keeps Reset zoom in the toolbar`).not.toMatch(/>\s*Reset zoom\s*</);
+            expect(view, `${file} clears the state when a chart is rebuilt`).toMatch(/zoomStatePlugin/);
+        }
+        expect(read('src/components/AxisScaleControls.jsx')).toMatch(/zoomed && onResetZoom/);
+    });
+
+    it('Charging Curves chooses its axes through the axis picker, from the one axis list', () => {
+        const view = read('src/components/ChargingView.jsx');
+        expect(view).toMatch(/<AxisPicker/);
+        expect(view).toMatch(/chargingAxisOptions\(units\)/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/isChargingAxis\(s\.xAxis\)/);
     });
 
     it('lists its columns through the field picker, a variant of the column picker’s matching', () => {
@@ -3199,5 +3263,114 @@ describe('the short link is copied, opened and reported (#476)', () => {
 
     it('shortLink.js stays a leaf, since main.jsx imports it before the constants are seeded', () => {
         expect(read('src/utils/shortLink.js')).not.toMatch(/^import /m);
+    });
+});
+
+describe('point requests are skipped for a test counted at zero (#497)', () => {
+    it('Charging Curves asks pointsKnownEmpty before it looks up a range test\'s points', () => {
+        expect(read('src/components/ChargingView.jsx')).toMatch(/pointsKnownEmpty\(/);
+    });
+
+    it('the shared loader (every view\'s point read) asks it before fetching', () => {
+        expect(read('src/utils/runPoints.js')).toMatch(/if \(pointsKnownEmpty\(run\)\)/);
+    });
+
+    it('Charging Curves skips the range-per-SoC lookup for a source with no points', () => {
+        expect(read('src/components/ChargingView.jsx')).toMatch(/!pointsKnownEmpty\(src\.sourceRun\)/);
+    });
+
+    it('a write that changes a run\'s points puts the new count back in state, on its copies too', () => {
+        const ctx = read('src/context/AppContext.jsx');
+        expect(ctx.match(/withPointCount\(/g)?.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('a run read without the count embed is "unknown" (null), not "none" (0)', () => {
+        expect(read('src/services/DataService.js')).toMatch(/\?\s*\(r\.data_points\[0\]\?\.count \?\? 0\) : null/);
+    });
+});
+
+describe('the three chart views load points in one batch, not one test at a time (#496)', () => {
+    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s reads through loadRunPoints and never awaits getRunData itself', (name) => {
+        const text = read(`src/components/${name}.jsx`);
+        expect(text).toMatch(/loadRunPoints\(dataService,/);
+        expect(text).not.toMatch(/dataService\.getRunData\(/);
+        expect(text).not.toMatch(/dataService\.buildRangePerSocLookup\(/);
+    });
+
+    it('the batch is getPointsForRuns (through the shared cache), which chunks its id list', () => {
+        expect(read('src/utils/runPoints.js')).toMatch(/dataService\.getPointsForRuns(Cached)?\(/);
+        expect(read('src/services/DataService.js')).toMatch(/POINTS_IDS_PER_REQUEST/);
+    });
+});
+
+describe('the shared points cache is read by the chart views and cleared by every write (#498)', () => {
+    const service = read('src/services/DataService.js');
+    // The text of one method, from its signature to the next method at the same indent.
+    const body = (name) => {
+        const start = service.search(new RegExp(`\\n  (async )?${name}\\(`));
+        expect(start, `${name} exists`).toBeGreaterThan(-1);
+        const rest = service.slice(start + 1);
+        const next = rest.slice(1).search(/\n {2}(async |get |#|static )?[A-Za-z#_]+\([^)]*\) \{/);
+        return rest.slice(0, next === -1 ? undefined : next + 1);
+    };
+
+    it('the shared loader reads through the cached methods only', () => {
+        const text = read('src/utils/runPoints.js');
+        expect(text).toMatch(/getPointsForRunsCached\(/);
+        expect(text).toMatch(/getRunDataCached\(/);
+        expect(text).not.toMatch(/dataService\.getRunData\(|dataService\.getPointsForRuns\(/);
+    });
+
+    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s loads through the shared loader — and Home\'s panels render these views', (name) => {
+        expect(read(`src/components/${name}.jsx`)).toMatch(/loadRunPoints\(/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(new RegExp(`<${name}\\b`));
+    });
+
+    it.each(['addRun', 'replaceRunData', 'mergeRunData', 'writeCompositePoints', 'deleteRun', 'deleteVehicle', 'importTableauSessions', 'signOut', 'initialize'])(
+        '%s invalidates cached points', (name) => {
+            expect(body(name)).toMatch(/invalidateRunPoints\(/);
+        });
+
+    it('the writers that race a read invalidate on both sides of the write', () => {
+        for (const name of ['replaceRunData', 'mergeRunData', 'writeCompositePoints']) {
+            expect(body(name).match(/invalidateRunPoints\(/g)?.length, name).toBeGreaterThanOrEqual(2);
+        }
+    });
+
+    it('a fresh vehicle read reconciles the cache against the new counts', () => {
+        expect(body('getVehicles')).toMatch(/reconcileRunPoints\(/);
+    });
+
+    it('the callers that must see the table as it is NOW stay uncached', () => {
+        for (const name of ['duplicateRun', 'copyRunToVehicle', 'refreshChargeSummary', 'backfillChargeSummaries']) {
+            expect(body(name), name).not.toMatch(/Cached\(/);
+        }
+        expect(read('src/components/RunsView.jsx')).not.toMatch(/Cached\(/);
+        expect(body('rebuildComposites')).toMatch(/getPointsForRuns\(/);
+    });
+});
+
+/**
+ * ── The Colors field is in the toolbar; the run picker keeps one line ─────────
+ *
+ * The palette is a property of the plot, so its field sits in the chart's
+ * toolbar beside URL and PNG. The run picker keeps ColorSourceNote, which hints
+ * at vehicle colors and says when picks override the field. A view that put the
+ * select back into `colorControl` would show it twice or not at all.
+ */
+describe('the Colors field lives in the toolbar', () => {
+    const VIEWS = ['ChargingView', 'RangeChartView', 'ChargeCompareView', 'RoadTripView', 'EpaCurvesView'];
+
+    it.each(VIEWS)('%s draws SeriesPaletteSelect in exportControls and ColorSourceNote in the run picker', (f) => {
+        const text = read(`src/components/${f}.jsx`);
+        const toolbar = text.slice(text.indexOf('exportControls='));
+        expect(toolbar.indexOf('<SeriesPaletteSelect'), 'no Colors field in the toolbar').toBeGreaterThan(-1);
+        expect(toolbar.indexOf('<SeriesPaletteSelect')).toBeLessThan(toolbar.indexOf('<FeatureChartButton'));
+        expect(text).toMatch(/colorControl=\{<ColorSourceNote /);
+    });
+
+    it('charts open on the house palette', () => {
+        expect(read('src/utils/chartDefaults.js')).toMatch(/seriesPalette: DEFAULT_SERIES_PALETTE/);
+        expect(read('src/utils/colorUtils.js')).toMatch(/DEFAULT_SERIES_PALETTE = 'evbench'/);
     });
 });

@@ -106,7 +106,7 @@ export default function SplitPackLab() {
                     <>
                         {' '}
                         <a className="explainer-link" href={chargingTestsHref({ runIds: pack.runs })}>
-                            See its {pack.runs.length === 1 ? 'charging test' : `${pack.runs.length} charging tests`} →
+                            See its {pack.runs.length === 1 ? 'charging test' : `${pack.runs.length} charging tests`} ↘
                         </a>
                         {pack.runsNote && <> ({pack.runsNote})</>}
                     </>

@@ -1,5 +1,7 @@
 import ChargeSummaryMaintenance from './ChargeSummaryMaintenance';
 import CompositeMaintenance from './CompositeMaintenance';
+import EpaLabelLinkMaintenance from './EpaLabelLinkMaintenance';
+import BehindNoLabelMaintenance from './BehindNoLabelMaintenance';
 import TestAttributionCheck from './TestAttributionCheck';
 import { useState, useMemo, useCallback } from 'react';
 import { useAppContext } from '../../context/AppContext';
@@ -582,6 +584,12 @@ export default function DataChecksPanel() {
             <h4 className="subsection-title mt-6">Composite curves</h4>
             <CompositeMaintenance />
 
+            <h4 className="subsection-title mt-6">EPA Label links</h4>
+            <EpaLabelLinkMaintenance />
+
+            <h4 className="subsection-title mt-6">Behind no EPA Label</h4>
+            <BehindNoLabelMaintenance />
+
             <h4 className="subsection-title mt-6">Limits</h4>
             <p className="text-note mb-2">
                 Change a limit and every count below updates at once. Nothing is saved until you
@@ -671,7 +679,7 @@ export default function DataChecksPanel() {
                         <button type="button" className="btn btn-secondary text-sm" onClick={() => setOnly('no-400v-support')}>
                             Show them
                         </button>
-                        <button type="button" className="btn btn-primary text-sm" disabled={filling} onClick={fillAllNative}>
+                        <button type="button" className="btn btn-secondary text-sm" disabled={filling} onClick={fillAllNative}>
                             {filling ? 'Filling…' : `Fill all ${fillPlan.length}`}
                         </button>
                     </span>

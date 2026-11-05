@@ -10,8 +10,10 @@
  *   - dropdowns with counts, one filter bar above every view, each active
  *     filter a removable chip beneath (VehicleFilterBar);
  *   - any value can be excluded as well as included;
- *   - tags and test data have an any / all switch; make, model, year and
- *     drive are one value per vehicle, so "all" would mean nothing there;
+ *   - tags and test data have an any / all switch; make, model and drive are
+ *     one value per vehicle, so "all" would mean nothing there. Year is one
+ *     value per model year: a "2024-2026" vehicle is in 2024, 2025 and 2026,
+ *     so the menu lists single years and a span is never a value of its own;
  *   - the filters travel in the URL, tidily.
  *
  * ── Shape ───────────────────────────────────────────────────────────────────
@@ -39,6 +41,7 @@
 import { resolveEffectiveSpecs } from './specHelpers';
 import { DATA_CATEGORIES, hasDataCategory } from './vehicleDataCategories';
 import { ownValues } from './vehicleInheritance';
+import { yearSpan } from './vehicleImportPlan';
 
 /**
  * What a curator audits a vehicle for: one yes/no question per entry, each
@@ -78,15 +81,24 @@ export const CURATION_CHECKS = [
  *
  * `values(vehicle, ctx)` gives a vehicle's values for the facet — several for
  * tags and test data. `format(value)`, where given, is how a value reads on
- * screen; otherwise the value is its own text.
+ * screen; otherwise the value is its own text. `order` is the menu's order
+ * (GuideFacetMenu): by count unless the value is what a reader scans for —
+ * years newest first, makes and models A–Z (owner, 2026-11-03).
  */
 export const VEHICLE_FACETS = [
-    { key: 'make',  label: 'Make',  param: 'mk', legacy: 'vt_mk',
+    { key: 'make',  label: 'Make',  param: 'mk', legacy: 'vt_mk', order: 'alpha',
       values: (v) => [v.make || v.manufacturer?.name].filter(Boolean) },
-    { key: 'model', label: 'Model', param: 'md',
+    { key: 'model', label: 'Model', param: 'md', order: 'alpha',
       values: (v) => [v.model].filter(Boolean) },
-    { key: 'year',  label: 'Year',  param: 'yr', legacy: 'vt_y',
-      values: (v) => (v.year != null && v.year !== '' ? [String(v.year)] : []) },
+    { key: 'year',  label: 'Year',  param: 'yr', legacy: 'vt_y', order: 'year',
+      // Every model year of the span: "2024-2026" is in 2024, 2025 and 2026.
+      // As spans the menu listed "2024", "2024-2025", "2024-2026"… as
+      // unrelated values, and choosing 2024 missed every vehicle in a span.
+      values: (v) => {
+          const span = yearSpan(v.year);
+          if (!span) return [];
+          return Array.from({ length: span[1] - span[0] + 1 }, (_, i) => String(span[0] + i));
+      } },
     { key: 'drive', label: 'Drive', param: 'dr', legacy: 'vt_dr',
       // Through inheritance and the platform, as the table shows it.
       values: (v, ctx) => [ctx.specsOf(v)?.powertrain?.drive_type].filter(Boolean) },

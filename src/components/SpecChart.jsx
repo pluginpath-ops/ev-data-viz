@@ -9,7 +9,7 @@ import SelectionEmptyState from './SelectionEmptyState';
 import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { EMPTY_VEHICLE_FILTERS } from '../utils/vehicleFilters';
 import SpecChartSidebar from './specchart/SpecChartSidebar';
-import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { resolveChartColors, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import { readMemory } from '../utils/vehicleTableStorage';
 import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import {
@@ -103,7 +103,7 @@ export default function SpecChart({
 
     // A vehicle's color is the same here as on every chart: its own (curated,
     // or the base set from its chip), the palette only filling the gaps.
-    const palette = chartConfig.seriesPalette ?? VEHICLE_PALETTE;
+    const palette = chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE;
     const colorMap = useMemo(() => resolveChartColors(
         plotted.map(v => ({ id: v.id, created_at: v.created_at })),
         {}, palette, plotted.map(v => ({ ...v, runs: [{ id: v.id }] })),

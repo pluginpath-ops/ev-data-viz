@@ -22,7 +22,9 @@ import { readoutNumber, unitOf, nameOf, withUnit } from '../utils/readoutAtX';
  */
 const AXIS_FIGURES = {
     cRate:         ['capacity'],
+    socRate:       ['capacity'],
     rangeRate:     ['capacity', 'range'],
+    rangeRateHr:   ['capacity', 'range'],
     rangeEpa:      ['range'],
     deltaRangeEpa: ['range'],
 };
@@ -34,10 +36,17 @@ import { sessionFor } from '../utils/testSessions';
 import { correctionFactor, runConditions } from '../utils/conditionCorrection';
 import { correctionCaption, correctionSummary, DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
+import ColorSourceNote from './ColorSourceNote';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useRunSelection } from '../hooks/useRunSelection';
-import { convDistance, convTemp, distanceLabel, tempLabel } from '../utils/unitConversions';
+import { convDistance } from '../utils/unitConversions';
+import { chargingAxisOptions } from '../utils/chargingAxes';
+import AxisPicker from './AxisPicker';
+import ZoomHint from './ZoomHint';
+import { useChartZoom } from '../hooks/useChartZoom';
+import SectionBand from './SectionBand';
+import { useRememberedOpen } from '../hooks/useRememberedOpen';
 import { filterChargingRuns, filterRangeRuns, isChargingRun, isRangeRun, isCompositeRun, defaultChargingRun } from '../utils/runUtils';
 import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
@@ -45,7 +54,7 @@ import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE, withAlpha } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE, withAlpha } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import { compositeConditions, compositeExplainer, compositeFrom, earliestStart, clockedStart, spreadAlong, THIN_SUPPORT, COMPOSITE_MIN_TESTS } from '../utils/compositeCurve';
@@ -57,15 +66,16 @@ import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyPngButton from './charts/CopyPngButton';
 import CopyLinkButton from './charts/CopyLinkButton';
+import { pointsKnownEmpty, loadRunPoints, runsByIdString, rangeAtFrom } from '../utils/runPoints';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
 // series here is a single run rather than a pairing of two.
 const RUN_ATOMS = [{ key: 'test', of: s => s.run?.name }];
 
 /** The Y axes a composite's test spread can be drawn on: charge rate, and the
- *  two axes that are charge rate scaled by a vehicle figure. On any other Y the
+ *  axes that are charge rate scaled by a vehicle figure. On any other Y the
  *  spread in kW has no meaning. */
-const SPREAD_AXES = new Set(['chargeRate', 'cRate', 'rangeRate']);
+const SPREAD_AXES = new Set(['chargeRate', 'cRate', 'socRate', 'rangeRate', 'rangeRateHr']);
 
 /** The axes measured from where a curve starts: plotting one measures every
  *  composite from the start SoC (#408). */
@@ -91,6 +101,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
     const readout = useChartReadout();
+    const { zoomed, resetZoom, zoomOptions, plugin: zoomStatePlugin } = useChartZoom(chartInstance);
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
 
@@ -187,10 +198,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         [selectedVehicles, selectedRuns]
     );
     const handSet = chartConfig.handSet ?? false;
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf, clearHandSet } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
-        palette: chartConfig.seriesPalette ?? VEHICLE_PALETTE,
+        palette: chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE,
         resetKey: selectedVehicleIds.join(','),
         vehicles: selectedVehicles,
     });
@@ -243,30 +254,25 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // authority than a figure derived from a measured range test, and treating
     // them as more authoritative was the anomaly.
     //
-    // Returns (soc) => miles, or null when no range test won ('recorded' and
-    // 'none' leave the run's own column alone). Deliberately UNCORRECTED:
-    // correction is a single multiplier applied at render time (rangeFactorFor),
-    // so the dropdown takes effect without refetching.
-    const rangeAtFor = async (runId, run) => {
+    // Returns the resolved source when a range test won ('recorded' and 'none'
+    // leave the run's own column alone), else null. Resolving is synchronous,
+    // so the loader can learn every run's source BEFORE it fetches, and fetch
+    // the points of all the tests and all their range lookups together.
+    const rangeSourceFor = (runId, run) => {
         const parentVehicle = parentOf(runId);
         const src = resolveRangeSource(run ?? { id: runId }, {
             vehicle: parentVehicle,
             explicitPairing: pairedRangeOf(parentVehicle, runId),
         });
-        if (src.miPerSoc == null) return null;
-        // A range test WITH its own SoC/range time series gives the real,
-        // non-linear shape; prefer it. Most range tests are scalar (distance +
-        // SoC bounds), so the linear miPerSoc model is the usual path.
-        let lookup = null;
-        if (src.sourceRun?.id && !isEpaPartnerId(src.sourceRun.id)) {
-            try {
-                lookup = await dataService.buildRangePerSocLookup(src.sourceRun.id);
-            } catch (_) { /* fall through to linear */ }
-        }
-        return lookup
-            ? (soc) => lookup(soc)
-            : (soc) => Math.round(soc * src.miPerSoc * 10) / 10;
+        return src.miPerSoc == null ? null : src;
     };
+
+    // The range test whose own SoC/range time series might give the real,
+    // non-linear shape — only a stored test counted as having points (#497;
+    // most range tests are scalar: distance + SoC bounds).
+    const lookupRunOf = (src) =>
+        src?.sourceRun?.id && !isEpaPartnerId(src.sourceRun.id) && !pointsKnownEmpty(src.sourceRun)
+            ? src.sourceRun : null;
 
     // Lazy-load data_points for newly selected runs — a composite's included:
     // it is a stored run with points like any test.
@@ -283,50 +289,49 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             if (missingIds.length === 0) return;
             setLoadingData(true);
             const updates = {};
-            // Build a flat lookup of all runs across all selected vehicles
-            const allRuns = vehicles.flatMap(v => v.runs || []);
-            for (const runId of missingIds) {
-                try {
-                    let runData;
-                    if (dataService.useSupabase) {
-                        const run = allRuns.find(r => String(r.id) === String(runId));
-                        if (run?._inherited) {
-                            runData = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
-                        } else {
-                            runData = await dataService.getRunData(runId);
+            if (dataService.useSupabase) {
+                // Every missing test's points in one go, and — alongside — the
+                // points of the range tests whose own curve could replace the
+                // linear model (#496). Range lookups are read unscaled, by the
+                // id the source run has, as buildRangePerSocLookup always did,
+                // so they go in with no run to scale them by.
+                const runsById = runsByIdString(vehicles);
+                const sourceOf = new Map();
+                for (const runId of missingIds) {
+                    const run = runsById.get(String(runId));
+                    const src = pointsKnownEmpty(run) ? null : rangeSourceFor(runId, run);
+                    if (src) sourceOf.set(runId, src);
+                }
+                const lookupIds = [...new Set([...sourceOf.values()].map(src => lookupRunOf(src)?.id).filter(Boolean))];
+                const [loaded, lookups] = await Promise.all([
+                    loadRunPoints(dataService, missingIds, runsById),
+                    lookupIds.length ? loadRunPoints(dataService, lookupIds, new Map()) : {},
+                ]);
+                for (const runId of missingIds) {
+                    try {
+                        let runData = loaded[runId] ?? [];
+                        const src = sourceOf.get(runId);
+                        if (runData.length > 0 && src) {
+                            const rangeAt = rangeAtFrom(src, lookups[lookupRunOf(src)?.id]);
+                            runData = runData.map(p => ({
+                                ...p,
+                                range: p.soc != null ? rangeAt(p.soc) : null,
+                            }));
                         }
-
-                        // Range axis, resolved on the same ranking as every other
-                        // chart (utils/rangeSource.js):
-                        //
-                        //   pairing → default range test → recorded range column
-                        //
-                        // A range test now outranks the recorded column outright,
-                        // not just when one was explicitly paired. The recorded
-                        // values are themselves mostly estimates — usually the car's
-                        // guess-o-meter — so they carry no more authority than a
-                        // figure derived from a measured range test, and treating
-                        // them as more authoritative was the anomaly.
-                        if (runData.length > 0) {
-                            const rangeAt = await rangeAtFor(runId, run);
-                            if (rangeAt) {
-                                runData = runData.map(p => ({
-                                    ...p,
-                                    range: p.soc != null ? rangeAt(p.soc) : null,
-                                }));
-                            }
-                        }
-                    } else {
-                        // localStorage: find run.data inline
-                        for (const v of vehicles) {
-                            const run = v.runs?.find(r => r.id === runId);
-                            if (run) { runData = run.data || []; break; }
-                        }
+                        updates[runId] = runData;
+                    } catch (err) {
+                        console.error(`Failed to load data for run ${runId}:`, err);
+                        updates[runId] = [];
                     }
-                    updates[runId] = runData ?? [];
-                } catch (err) {
-                    console.error(`Failed to load data for run ${runId}:`, err);
-                    updates[runId] = [];
+                }
+            } else {
+                // localStorage: find run.data inline
+                for (const runId of missingIds) {
+                    for (const v of vehicles) {
+                        const run = v.runs?.find(r => r.id === runId);
+                        if (run) { updates[runId] = run.data || []; break; }
+                    }
+                    updates[runId] ??= [];
                 }
             }
             setRunDataCache(prev => ({ ...prev, ...updates }));
@@ -335,36 +340,22 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         fetchMissingData();
     }, [missingRunIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const dl = distanceLabel(units);
     // Memoised because the frame's title derives from it: a fresh array every
     // render made that memo churn, which the lint spotted before anyone noticed
     // the work. Only the unit system moves it.
-    const axisOptions = useMemo(() => [
-        { value: 'soc',           label: 'State of Charge (%)' },
-        { value: 'deltaSoc',      label: 'SoC Added (%)' },
-        { value: 'chargeRate',    label: 'Charge Rate (kW)' },
-        { value: 'time',          label: 'Time (min)' },
-        { value: 'range',         label: `Range - Tested (${dl})` },
-        { value: 'deltaRange',    label: `Range Added - Tested (${dl})` },
-        { value: 'rangeEpa',      label: `Range - EPA (${dl})` },
-        { value: 'deltaRangeEpa', label: `Range Added - EPA (${dl})` },
-        { value: 'temperature',   label: `Temperature (${tempLabel(units)})` },
-        { value: 'cRate',         label: 'C-Rate  (~kW ÷ battery)' },
-        { value: 'rangeRate',     label: `Range Rate (${dl}/min)` },
-        { value: 'frame',         label: 'Frame' },
-    ], [dl, units]);
+    const axisOptions = useMemo(() => chargingAxisOptions(units), [units]);
+    const [axesOpen, setAxesOpen] = useRememberedOpen('charging-axes', true);
 
     // Convert a stored (imperial) field value to the current unit system for display.
-    const DISTANCE_AXES = new Set(['range', 'deltaRange', 'rangeEpa', 'deltaRangeEpa', 'rangeRate']);
+    const DISTANCE_AXES = new Set(['range', 'deltaRange', 'rangeEpa', 'deltaRangeEpa', 'rangeRate', 'rangeRateHr']);
     const convertAxisValue = (value, fieldKey) => {
         if (value == null) return null;
         if (DISTANCE_AXES.has(fieldKey)) return convDistance(value, units);
-        if (fieldKey === 'temperature')  return convTemp(value, units);
         return value;
     };
 
     /**
-     * Get the value for a field key, computing virtual fields (cRate, rangeRate)
+     * Get the value for a field key, computing virtual fields (cRate, socRate, rangeRate, rangeRateHr)
      * on-the-fly from stored chargeRate + vehicle metadata.
      * vehicleBattery = kWh, vehicleRange = rated miles
      */
@@ -420,6 +411,18 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // miles per minute: (rated_range / battery_kWh) × charge_kW ÷ 60
             return (point.chargeRate != null && vehicleRange && vehicleBattery)
                 ? Math.round((vehicleRange / vehicleBattery) * point.chargeRate / 60 * 1000) / 1000
+                : null;
+        }
+        if (fieldKey === 'rangeRateHr') {
+            // miles per hour: (rated_range / battery_kWh) × charge_kW
+            return (point.chargeRate != null && vehicleRange && vehicleBattery)
+                ? Math.round((vehicleRange / vehicleBattery) * point.chargeRate * 10) / 10
+                : null;
+        }
+        if (fieldKey === 'socRate') {
+            // percent of the battery per minute: charge_kW ÷ battery_kWh × 100 ÷ 60
+            return (point.chargeRate != null && vehicleBattery)
+                ? Math.round((point.chargeRate / vehicleBattery) * 100 / 60 * 1000) / 1000
                 : null;
         }
         return point[fieldKey] ?? null;
@@ -942,7 +945,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
             data: { datasets },
-            plugins: [readout.plugin(readoutConfig)],
+            plugins: [readout.plugin(readoutConfig), zoomStatePlugin],
             options: {
                 animation: false,
                 responsive: true,
@@ -968,6 +971,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         zoom: {
                             drag: { enabled: true, threshold: CLICK_SLOP, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 },
                             mode: 'xy',
+                            ...zoomOptions,
                         },
                     },
                 },
@@ -1068,7 +1072,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 presentationMode={presentationMode}
                 chartType={chartConfig.rangeChartType}
                 effUnit={chartConfig.effUnit}
-                palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                 // Without this the Range sub-tab could never return to Hand-set:
                 // selecting it wrote chartConfig.handSet, the prop defaulted to
                 // false on the way back down, and the field snapped to the
@@ -1103,47 +1107,26 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     explained, not a quieter version of the same puzzle. */}
 
                 {/* ── AXES ── */}
+                {/* A band that closes, because the picker is a list rather than
+                    three dropdowns and costs a few hundred pixels of the sidebar.
+                    Its note says what is plotted, open or closed. */}
                 <div className="chart-rail-group">
-                    <span className="text-micro">Axes</span>
-                    <div className="axis-rows">
-                        <label className="axis-row">
-                            <span className="axis-row-key">X</span>
-                            <select
-                                value={chartConfig.xAxis}
-                                onChange={(e) => setChartConfig({ ...chartConfig, xAxis: e.target.value })}
-                                className="form-input"
-                            >
-                                {axisOptions.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="axis-row">
-                            <span className="axis-row-key">Y</span>
-                            <select
-                                value={chartConfig.yAxis}
-                                onChange={(e) => setChartConfig({ ...chartConfig, yAxis: e.target.value })}
-                                className="form-input"
-                            >
-                                {axisOptions.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                        <label className="axis-row">
-                            <span className="axis-row-key">Y2</span>
-                            <select
-                                value={chartConfig.y2Axis ?? ''}
-                                onChange={(e) => setChartConfig({ ...chartConfig, y2Axis: e.target.value || null })}
-                                className="form-input"
-                            >
-                                <option value="">— None —</option>
-                                {axisOptions.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                    </div>
+                    <SectionBand
+                        open={axesOpen}
+                        onToggle={setAxesOpen}
+                        label="Axes"
+                        note={[chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis]
+                            .filter(Boolean)
+                            .map(k => stripUnits(axisOptions.find(o => o.value === k)?.label ?? k))
+                            .join(' · ')}
+                    />
+                    {axesOpen && (
+                        <AxisPicker
+                            options={axisOptions}
+                            axes={{ x: chartConfig.xAxis, y: chartConfig.yAxis, y2: chartConfig.y2Axis ?? null }}
+                            onChange={({ x, y, y2 }) => setChartConfig({ ...chartConfig, xAxis: x, yAxis: y, y2Axis: y2 })}
+                        />
+                    )}
                 </div>
 
                 {/* Alignment is a property of the time axis, so it belongs with
@@ -1244,9 +1227,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
                 {/* ── Collapsible run selector ── */}
                 <RunSelector
-                    colorControl={<SeriesPaletteSelect palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
+                    colorControl={<ColorSourceNote palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} onClearHandSet={clearHandSet} />}
                     handSetColorOf={handSetColorOf}
-                    chartPalette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                    chartPalette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                     onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
                     vehicles={selectedVehicles}
                     selectedRunIds={selectedRuns}
@@ -1425,14 +1408,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 loadingMessage="Loading run data…"
                 exportControls={!presentationMode && (
                     <>
+                        <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                         <FeatureChartButton />
-                        <button
-                            onClick={() => chartInstance.current?.resetZoom()}
-                            className="chart-copy-btn"
-                            title="Reset zoom to full view"
-                        >
-                            Reset zoom
-                        </button>
                         <CopyLinkButton />
                         <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                     </>
@@ -1445,7 +1422,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             </PlotFrame>
 
             {!presentationMode && (
-                <p className="text-xs text-meta mt-1">Drag to box-zoom · Reset zoom to restore</p>
+                <ZoomHint onReset={resetZoom} />
             )}
 
             {/* ── Controls below chart: scale inputs + line toggle + race mode — hidden in presentation mode ── */}
@@ -1457,6 +1434,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     y2Min={limits.y2Min} y2Max={limits.y2Max}
                     onChange={setLimit}
                     showY2={!!chartConfig.y2Axis}
+                    zoomed={zoomed} onResetZoom={resetZoom}
                     card={false}
                 />
 

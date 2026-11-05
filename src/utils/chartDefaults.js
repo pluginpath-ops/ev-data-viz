@@ -10,7 +10,7 @@
  * Each function returns a FRESH object, since the configs hold arrays and maps
  * that a caller must be free to replace without touching the defaults.
  */
-import { VEHICLE_PALETTE } from './colorUtils';
+import { DEFAULT_SERIES_PALETTE } from './colorUtils';
 import { NO_VEHICLE_BASES } from './vehicleBase';
 import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from './correctionSettings';
 import { DEFAULT_ASSUMPTIONS } from './vehicleTable';
@@ -43,9 +43,9 @@ export function defaultChartConfig() {
         axisLimits: {},
         showLine:   true,
         showPoints: false,
-        // Where series colors come from: each vehicle's curated color by
-        // default, or a SERIES_PALETTES id to assign from that set instead.
-        seriesPalette: VEHICLE_PALETTE,
+        // Where series colors come from: a SERIES_PALETTES id (the house
+        // palette by default), or VEHICLE_PALETTE for each vehicle's own color.
+        seriesPalette: DEFAULT_SERIES_PALETTE,
         // Whether hand-set colors are in force over that base. Choosing a
         // palette parks them; selecting Hand-set brings them back.
         handSet: false,
@@ -92,8 +92,20 @@ export function defaultRoadTripConfig() {
         totalDistance: 500, speed: 70,
         overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
         yAxis: 'chargeTime',      // 'distance' | 'chargeTime' | 'byTest'
-        xAxis: 'totalTime',       // 'totalTime' | 'driveTime' | 'speed' | 'tripDist'
-        sweepYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' (sweep modes only)
+        xAxis: 'totalTime',       // 'totalTime' | 'driveTime' — Road Trip's timeline
+        sweepYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' | 'avgSpeed' (Trip Optimizer)
+        // Trip Optimizer's own. A trip long enough for several stops, or the
+        // optimum is mostly an artifact of where the one or two stops land.
+        optimizerDistance: 700,
+        // The map first: it answers both settings at once, which is what the
+        // tab is for; the sweeps are its slices, a click away.
+        optimizerChart: 'map',    // 'map' | 'speed' | 'tripDist' (charge per stop)
+        bestPlan: true,           // each sweep point takes the best of the other setting
+        // The speeds the BEST plan may use. The fastest is still drawn, and
+        // labelled as such: 95 mph wins on a fast charger, and nobody should
+        // be told to drive it.
+        optimizerSpeedMin: 55,
+        optimizerSpeedMax: 80,
         towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
         towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
         towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured

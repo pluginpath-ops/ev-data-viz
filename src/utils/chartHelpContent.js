@@ -1,7 +1,7 @@
 /**
  * Chart help / "About this chart" copy.
  *
- * Layman-friendly explanations shown in the collapsible ℹ️ bubble at the bottom
+ * Layman-friendly explanations shown in the collapsible ⓘ bubble at the bottom
  * of each Charts sub-tab. The authoritative copy lives in the `chart_help` table
  * (admin/contributor-editable, seeded by migration 031); these objects are the
  * BUNDLED FALLBACK used when a row is missing or in localStorage-only mode.
@@ -60,13 +60,15 @@ export const CHART_HELP_DEFAULTS = {
             'SoC (State of Charge) — how full the battery is, 0–100%.\n' +
             'Charge Rate (kW) — power flowing into the battery right now.\n' +
             'C-rate — charge power ÷ battery size (kW ÷ kWh); ~1C ≈ adding a full pack in an hour, regardless of car size.\n' +
-            'Range Rate — miles of range gained per minute.\n' +
-            'SoC Added / Range Added — change since the start of the plotted window. A composite curve is rebuilt from the tests that reach its start — race mode’s start SoC, or otherwise as far back as two of its tests reach. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
+            'Range Rate — miles of range gained per minute (or per hour).\n' +
+            'SoC Rate — percent of the battery added per minute.\n' +
+            'Range Added — change since the start of the plotted window. A composite curve is rebuilt from the tests that reach its start — race mode’s start SoC, or otherwise as far back as two of its tests reach. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
             'Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the range actually logged in the test.',
         math_approach:
             'Mostly the raw measured points drawn as-is — no smoothing or curve-fitting. ' +
             'The computed fields are simple arithmetic: C-rate = charge kW ÷ battery kWh; ' +
-            'range rate = (rated miles ÷ battery kWh) × charge kW ÷ 60; EPA range = ' +
+            'range rate = (rated miles ÷ battery kWh) × charge kW ÷ 60 per minute, or without ' +
+            'the ÷ 60 per hour; SoC rate = charge kW ÷ battery kWh × 100 ÷ 60; EPA range = ' +
             '(SoC ÷ 100) × the car’s rated miles; the “added” fields subtract the first ' +
             'reading in view. The optional range backfill matches each SoC to the range ' +
             'from the vehicle’s range test by linear interpolation.',
@@ -192,8 +194,8 @@ export const CHART_HELP_DEFAULTS = {
             'Read it as a race against the clock (and against gas). The default view plots ' +
             'distance covered vs elapsed time; flat steps are charging stops, and each ' +
             'car’s total trip time — and how it compares to ICE — is labelled at the ' +
-            'finish. You can also chart cumulative charge time, per-car SoC “lanes”, or ' +
-            'sweep travel speed / distance-between-stops to find the sweet spot. Because ' +
+            'finish. You can also chart cumulative charge time or per-car SoC “lanes”; the ' +
+            'Trip Optimizer tab searches travel speed and stop plan for the sweet spot. Because ' +
             'charging follows each car’s actual curve, a faster-charging car can win a long ' +
             'trip even with less range. Cars that can’t finish (battery depleted, or a stop ' +
             'would need >95% charge) are dropped.',
@@ -212,6 +214,45 @@ export const CHART_HELP_DEFAULTS = {
             'efficient). Trip time = driving time + charging time + per-stop overhead. The ' +
             'ICE line drives fixed 3-hour legs with the same overhead. It’s a model — real ' +
             'charger availability, weather and traffic will vary.',
+    },
+
+    optimizer: {
+        title: 'About the Trip Optimizer',
+        data_source:
+            'The Road Trip simulation, run over a grid of plans instead of one: every ' +
+            'travel speed from 45 to 100 mph against every stop plan — the distance each ' +
+            'stop adds (Fixed charging range) or the minutes it lasts (Fixed charge time). ' +
+            'Each car uses its real measured charging curve and the efficiency from its ' +
+            'range data, re-priced for each speed. The trip defaults to 700 mi, long enough ' +
+            'for several stops: on a short trip the answer is mostly where one stop lands.',
+        how_to_read:
+            'Travel speed and Charge per stop plot trip time against one setting. With ' +
+            'the checkbox under X on (“Optimize leg distance” on Travel speed, “Optimize ' +
+            'speed” on Charge per stop), each point uses the best value of the other ' +
+            'setting, so the lowest point of a line is that car’s best trip; off, the other ' +
+            'setting is held at what you entered. On a fast charger the fastest plan is ' +
+            'often a speed nobody should drive, so the fastest legal plan keeps to the legal range ' +
+            'you set under Your plan (55–80 mph to start) and the fastest is shown apart, labelled as such. ' +
+            'The table names each car’s fastest legal plan, the charge window it implies (arrive ' +
+            'at, leave with), what it saves over your own plan, and every plan within 2% ' +
+            'of its trip time — the optimum is usually broad, and the span is the useful ' +
+            'answer. The Map shows one car’s whole grid: more saturated is faster, speeds outside ' +
+            'your legal range are dimmed, ★ is the fastest plan, ◆ the fastest within your legal range ' +
+            '(Fastest legal), the outline every plan no more than 2% slower than ◆ at any speed, ' +
+            'and ○ yours; each carries its figure beside it.',
+        key_terms:
+            'Fastest — the quickest plan on the whole grid, whatever the speed.\n' +
+            'Fastest legal — the quickest plan within your legal range.\n' +
+            'Charge window — the average SoC the car arrives at a stop with, and leaves with.\n' +
+            'Within 2% — every plan whose trip is no more than 2% slower than the fastest legal plan: about 14 minutes on a 700 mi trip.\n' +
+            'Average speed — trip distance ÷ total time, stops included.',
+        math_approach:
+            'Each cell is one full trip simulation (see Road Trip). Speeds step by 1 mph, ' +
+            'stop distances by 10 mi and stop times by 2.5 minutes; a plan that would charge ' +
+            'past 95% or cannot finish is left blank. The fastest legal plan is the fastest cell in your legal range — ' +
+            'within the grid’s steps, so read it to the nearest step, not exactly. The ' +
+            'charge-per-stop axis ends at the longest stop a full charge from your Min SoC ' +
+            'to 95% can use: past it every plan is blank or the same trip as the row below.',
     },
 
     perfcompare: {

@@ -67,7 +67,7 @@ export default function VehicleCombobox({
                 </button>
             )}
             {open && (
-                <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
+                <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-xs border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
                     <li
                         className="px-3 py-2 text-sm cursor-pointer text-meta hover:bg-[var(--color-surface-sunken)]"
                         onMouseDown={() => choose('')}

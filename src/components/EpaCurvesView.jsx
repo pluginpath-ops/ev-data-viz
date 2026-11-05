@@ -8,7 +8,7 @@ import { convSpeed, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../util
 import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
 import { buildVehicleLabels } from '../utils/seriesLabel';
 import { PALETTE } from '../utils/specHelpers';
-import { resolveChartColors, seriesRowsOf, applyColorOverrides, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { resolveChartColors, seriesRowsOf, applyColorOverrides, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
@@ -34,6 +34,7 @@ import { epaRecordFromTestVehicle, NO_RECORD_REASONS } from '../utils/epaRecordF
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
+import ColorSourceNote from './ColorSourceNote';
 import { useRunSelection } from '../hooks/useRunSelection';
 import WindAndElevationFields from './epa/WindAndElevationFields';
 import CorrectionTargetFields from './CorrectionTargetFields';
@@ -250,7 +251,7 @@ export default function EpaCurvesView({
     epaConfig,
     setEpaConfig,
     presentationMode = false,
-    palette = VEHICLE_PALETTE,
+    palette = DEFAULT_SERIES_PALETTE,
     setChartConfig = null,
     correctionTarget = undefined,
 }) {
@@ -933,7 +934,7 @@ export default function EpaCurvesView({
                                 <InfoIcon text={EPA_EXPLAINERS.curveEta} />
                             </span>
                             <RunSelector
-                                colorControl={setChartConfig ? <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} /> : null}
+                                colorControl={<ColorSourceNote palette={palette} setChartConfig={setChartConfig} />}
                                 vehicles={selectorVehicles}
                                 selectedRunIds={selectedMappings}
                                 onToggleRun={toggleMapping}
@@ -982,6 +983,7 @@ export default function EpaCurvesView({
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
                         <>
+                            {setChartConfig && <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />}
                             <FeatureChartButton />
                             <CopyLinkButton />
                             <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} disabled={!datasets.length} />

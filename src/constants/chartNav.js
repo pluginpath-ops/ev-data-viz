@@ -68,6 +68,10 @@ export const CHART_CATEGORIES = [
             // A charging stop's worth: range added in X minutes, time to add M miles.
             { key: 'compare',   label: 'Charge Stop' },
             { key: 'roadtrip',  label: 'Road Trip' },
+            // The speed and stop-plan sweeps, moved out of Road Trip's X menu
+            // where nobody found them, and searched together rather than one
+            // at a time. Road Trip's own view, drawn as its optimizer variant.
+            { key: 'optimizer', label: 'Trip Optimizer' },
         ],
     },
     {

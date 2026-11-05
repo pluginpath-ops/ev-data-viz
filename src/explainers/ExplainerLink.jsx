@@ -4,7 +4,7 @@ import { useNavigation } from '../context/NavigationContext';
 export const explainerHref = (slug) => `?tab=reference&sub=explainers&topic=${encodeURIComponent(slug)}`;
 
 /**
- * "Learn more →" to an explainer, by slug. One of the two things EVBench may
+ * "Learn more ↘" to an explainer, by slug. One of the two things EVBench may
  * import from src/explainers (eslint.config.js). A real href, so a new tab
  * works; a plain click navigates in place, like PlatformLink.
  */
@@ -22,7 +22,7 @@ export default function ExplainerLink({ topic, className = 'explainer-link', chi
                 openExplainer(topic);
             }}
         >
-            {children ?? 'Learn more →'}
+            {children ?? 'Learn more ↘'}
         </a>
     );
 }

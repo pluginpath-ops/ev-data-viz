@@ -51,6 +51,7 @@ import { statisticalRuns } from './runListing';
 import { resolveEffectiveSpecs } from './specHelpers';
 import { epaConfigurationFigures, primaryEpaMapping } from './epaConfiguration';
 import { TESTED_CAPACITY_TOLERANCE_PCT } from '../constants/epa';
+import { deriveChargerEfficiency } from './epaDerivations';
 import { distanceValue, distanceUnit } from './unitConversions';
 import { bestChargeWindows } from './chargeWindows';
 
@@ -130,12 +131,28 @@ export function resolveSocWindow(vehicle, vehicles = [], { tolerancePct = TESTED
 }
 
 /**
+ * The AC charging efficiency the cert measured or a curator pinned, or null.
+ *
+ * Null rather than the assumed fallback, so a reader can tell a measurement
+ * from a default and choose its own: an out-of-band ratio (a short cycle
+ * against a full recharge) is a bad read, not a charger. The cert's DC ÷ AC is
+ * an AC figure: it is what turns the label's wall efficiency back into the
+ * battery-side one, and says nothing about a DC fast session (#506).
+ */
+function measuredChargerEfficiency(testVehicle) {
+    const { value, source, flags } = deriveChargerEfficiency(testVehicle);
+    return source === 'manual' || (source === 'measured' && !flags.length) ? value : null;
+}
+
+/**
  * The vehicle's EPA range, and where it came from.
  *
  * @returns {{
  *   mi: number|null, basis: string|null,
  *   cityMi: number|null, hwyMi: number|null,   only with an EPA label
  *   combinedMpge: number|null,                 likewise
+ *   chargerEfficiency: number|null,            likewise: the cert's own DC ÷ AC,
+ *                                              where measured or pinned
  *   spanMi: [number, number]|null,             several labels, none primary
  *   expectedSource: string|null,               the Expected EPA Range's basis
  * }}
@@ -143,10 +160,11 @@ export function resolveSocWindow(vehicle, vehicles = [], { tolerancePct = TESTED
 export function resolveEpaRange(vehicle, vehicles = []) {
     const links = (vehicle?.epa_mappings ?? []).filter(m => m.epaTestVehicle);
     const pick = primaryEpaMapping(links);
-    const none = { mi: null, basis: null, cityMi: null, hwyMi: null, combinedMpge: null, spanMi: null, expectedSource: null, fromYear: null, certification: null };
+    const none = { mi: null, basis: null, cityMi: null, hwyMi: null, combinedMpge: null, chargerEfficiency: null, spanMi: null, expectedSource: null, fromYear: null, certification: null };
 
     const fromLabel = (testVehicle) => ({
         ...none,
+        chargerEfficiency: measuredChargerEfficiency(testVehicle),
         mi: positive(testVehicle.label_range_published),
         basis: 'epa-label',
         cityMi: positive(testVehicle.label_city_range_mi),

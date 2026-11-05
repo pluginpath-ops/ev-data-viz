@@ -106,7 +106,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
 
     return (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-            <div className="modal-panel rounded-xl p-5 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+            <div className="modal-panel p-5 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
                 <h3 className="section-title mb-1">Paste published results</h3>
                 <p className="text-xs text-secondary mb-3">
                     For <span className="font-semibold">{vehicle?.name}</span>. Paste a result
@@ -124,7 +124,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                 />
 
                 {parsed && (
-                    <div className="mt-3 border rounded-lg p-3 border-[var(--color-border)]">
+                    <div className="mt-3 border rounded-xs p-3 border-[var(--color-border)]">
                         <div className="font-semibold text-sm mb-2">
                             {parsed.matched} line{parsed.matched === 1 ? '' : 's'} read
                             {parsed.unmatched.length > 0 && (
@@ -220,7 +220,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                     spelled out with the actual numbers, because "omit"/"include"
                     in a footnote is exactly the wording people read backwards. */}
                 {printedSixty != null && (
-                    <div className="mt-3 border rounded-lg p-3 border-[var(--color-border)]">
+                    <div className="mt-3 border rounded-xs p-3 border-[var(--color-border)]">
                         <div className="text-xs font-semibold mb-1">
                             Rollout basis — check before importing
                         </div>
@@ -303,7 +303,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                     <button
                         type="button" onClick={handleImport}
                         disabled={busy || !hasAnything}
-                        className="btn btn-primary text-sm py-1.5 px-4 disabled:opacity-40"
+                        className="btn btn-commit text-sm py-1.5 px-4 disabled:opacity-40"
                         title={!hasAnything ? 'Paste a result block first' : undefined}
                     >
                         {busy ? 'Importing…' : 'Import result'}

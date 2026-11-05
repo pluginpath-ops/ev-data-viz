@@ -106,7 +106,7 @@ export default function SpecsChartView({ plot, col, colorOf, units, scope = 'sel
                     label: col.label,
                     data: numeric ? plot.points.map(p => p.value) : plot.points.map(() => 1),
                     backgroundColor: colors,
-                    borderRadius: 4,
+                    borderRadius: 2,
                     borderSkipped: false,
                 }],
             },

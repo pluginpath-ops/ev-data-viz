@@ -53,7 +53,7 @@ export default function RolesPermissions({ users, loading, saving, currentUserId
                                                         key={role}
                                                         onClick={() => onRoleChange(u.id, role)}
                                                         disabled={u.role === role || saving === u.id}
-                                                        className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
+                                                        className={`px-2.5 py-1 rounded-xs border text-xs font-medium transition ${
                                                             u.role === role
                                                                 ? 'opacity-40 cursor-default'
                                                                 : 'bg-[var(--color-surface-input)] hover:bg-[var(--color-surface-sunken)] border-[var(--color-border)] text-secondary'

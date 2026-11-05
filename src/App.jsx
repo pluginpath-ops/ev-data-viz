@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { VEHICLE_PALETTE } from './utils/colorUtils';
+import { DEFAULT_SERIES_PALETTE } from './utils/colorUtils';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
 import { AxisLimitsProvider } from './hooks/useAxisLimits';
@@ -883,11 +883,9 @@ export default function App() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-background)' }}>
-                <div className="text-center">
-                    <div className="text-6xl mb-4">&#9889;</div>
-                    <div className="text-2xl font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Loading EV Data...</div>
-                </div>
+            <div className="app-loading" role="status">
+                <div className="app-loading-glyph" aria-hidden="true">⚡</div>
+                <div className="app-loading-label">Loading EV data…</div>
             </div>
         );
     }
@@ -1022,7 +1020,7 @@ export default function App() {
                                             <div key={vehicleId} className="flex items-center">
                                                 {/* Drop indicator before this pill */}
                                                 {dragOverIdx === idx && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded mr-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs mr-1 shrink-0" />
                                                 )}
                                                 <div
                                                     draggable
@@ -1069,7 +1067,7 @@ export default function App() {
                                                 </div>
                                                 {/* Drop indicator after the last pill */}
                                                 {idx === selectedVehicles.length - 1 && dragOverIdx === selectedVehicles.length && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded ml-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs ml-1 shrink-0" />
                                                 )}
                                             </div>
                                         );
@@ -1211,7 +1209,7 @@ export default function App() {
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
                         <ChargingView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -1222,15 +1220,19 @@ export default function App() {
                             setPairings={setPairings}
                         />
                     )}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'roadtrip' && (
+                    {/* Trip Optimizer is Road Trip's view as its optimizer
+                        variant; keyed so switching between them starts clean. */}
+                    {activeChartCategory && selectedVehicles.length > 0 && (chartMode === 'roadtrip' || chartMode === 'optimizer') && (
                         <RoadTripView
                             vehicles={chartVehicles}
+                            key={chartMode}
+                            optimizer={chartMode === 'optimizer'}
                             selectedVehicleIds={selectedVehicles}
                             roadTripConfig={roadTripConfig}
                             setRoadTripConfig={setRoadTripConfig}
                             pairings={pairings}
                             setPairings={setPairings}
-                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
@@ -1257,7 +1259,7 @@ export default function App() {
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
                             correctionTarget={chartConfig.correctionTarget}
-                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             testSpread={chartConfig.testSpread ?? true}
                             setChartConfig={setChartConfig}
@@ -1283,7 +1285,7 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             epaConfig={epaConfig}
                             setEpaConfig={setEpaConfig}
-                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
@@ -1398,7 +1400,7 @@ export default function App() {
             {appNotification && (
                 <div className={`fixed-action-bar z-[60] ${appNotification.type === 'error' ? 'is-danger' : 'is-good'}`}>
                     <div className="page-container py-3 flex items-center gap-4">
-                        <span className="text-xl">{appNotification.type === 'error' ? '⚠️' : '✓'}</span>
+                        <span className="text-xl">{appNotification.type === 'error' ? '⚠' : '✓'}</span>
                         <p className={`flex-1 text-sm font-medium ${
                             appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
                         }`}>

@@ -32,23 +32,36 @@ import MenuButton from '../../shell/MenuButton';
  * a facet whose rows carry several values (tags, test data) gets an any / all
  * switch: match rows with any of the chosen values, or every one of them.
  * Both are opt-in, so a caller that passes neither sees the menu it had.
+ *
+ * ── Or by value ─────────────────────────────────────────────────────────────
+ *
+ * `order` overrides the count order where the value itself is the order a
+ * reader looks in: 'year' (newest first) for model years, 'alpha' for names
+ * a reader scans for — Vehicles & Specs' make and model (owner, 2026-11-03).
  */
+const ORDER_NAME = { count: 'by count', year: 'newest first', alpha: 'A–Z' };
+
 export default function GuideFacetMenu({
     label, values, selected, countFor, onToggle, onClear, format = String, hint,
     excluded = [], onExclude = null, all = false, onAllChange = null,
     // What one count counts, for the option's tooltip.
     unit = 'configuration',
+    // 'count' (default), 'year' (newest first) or 'alpha'.
+    order = 'count',
 }) {
     const [query, setQuery] = useState('');
 
 
     const ordered = useMemo(() => {
         const withCounts = values.map(v => ({ v, n: countFor(v), text: String(format(v)) }));
-        // Count descending, then by label so equal counts do not shuffle
+        const byText = (a, b) => a.text.localeCompare(b.text, undefined, { numeric: true, sensitivity: 'base' });
+        // By count: descending, then by label so equal counts do not shuffle
         // between renders.
-        withCounts.sort((a, b) => b.n - a.n || a.text.localeCompare(b.text, undefined, { numeric: true }));
+        withCounts.sort(order === 'year' ? (a, b) => byText(b, a)
+            : order === 'alpha' ? byText
+                : (a, b) => b.n - a.n || byText(a, b));
         return withCounts;
-    }, [values, countFor, format]);
+    }, [values, countFor, format, order]);
 
     const needle = query.trim().toLowerCase();
     const shown = needle ? ordered.filter(o => o.text.toLowerCase().includes(needle)) : ordered;
@@ -91,7 +104,7 @@ export default function GuideFacetMenu({
 
                     <div className="guide-facet-panel-head">
                         <span className="text-nano">
-                            {selected.length} of {values.length} · by count
+                            {selected.length} of {values.length} · {ORDER_NAME[order] ?? ORDER_NAME.count}
                         </span>
                         {chosen > 0 && (
                             <button type="button" className="section-action" onClick={onClear}>

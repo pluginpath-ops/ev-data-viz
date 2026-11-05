@@ -115,7 +115,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div
-                className="modal-panel rounded-xl shadow-2xl mx-4 flex flex-col"
+                className="modal-panel mx-4 flex flex-col"
                 style={{ maxWidth: 'min(92vw, 640px)', maxHeight: '85vh' }}
                 onClick={e => e.stopPropagation()}
             >
@@ -220,7 +220,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                     {!confirmDelete && (
                         <>
                             <button onClick={onClose} className="btn btn-secondary text-sm">Cancel</button>
-                            <button onClick={handleSave} disabled={saving} className="btn btn-primary text-sm">
+                            <button onClick={handleSave} disabled={saving} className="btn btn-commit text-sm">
                                 {saving ? 'Saving…' : 'Save'}
                             </button>
                         </>

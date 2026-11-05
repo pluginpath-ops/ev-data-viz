@@ -17,6 +17,7 @@ import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
+import ColorSourceNote from './ColorSourceNote';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import TestSpreadToggle from './TestSpreadToggle';
 import { correctionCaption, correctionSummary } from '../utils/correctionSettings';
@@ -24,7 +25,7 @@ import { spreadOf, rangeBasesFor, drawTestSpread, testSpreadHoverPlugin, testPoi
 import { useRunSelection } from '../hooks/useRunSelection';
 import { DEFAULT_COMPARE_ORIENTATION } from '../utils/chartUrlState';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -36,6 +37,7 @@ import { countParts } from '../utils/plotCaption';
 import { PRESENTED_HALF_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyLinkButton from './charts/CopyLinkButton';
+import { loadRunPoints, runsByIdString } from '../utils/runPoints';
 
 
 /**
@@ -380,7 +382,7 @@ export default function ChargeCompareView({
     verboseLabels = false,
     correctionMode = 'none',
     correctionTarget = undefined,
-    palette = VEHICLE_PALETTE,
+    palette = DEFAULT_SERIES_PALETTE,
     handSet = false,
     testSpread = true,
     setChartConfig = null,
@@ -474,25 +476,15 @@ export default function ChargeCompareView({
             const missing = neededRunIds.filter(id => !(id in runDataCache));
             if (missing.length === 0) return;
             setLoading(true);
-            const updates = {};
-            const allRuns = vehicles.flatMap(v => v.runs || []);
-            for (const runId of missing) {
-                try {
-                    if (dataService.useSupabase) {
-                        const run = allRuns.find(r => String(r.id) === String(runId));
-                        if (run?._inherited) {
-                            updates[runId] = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
-                        } else {
-                            updates[runId] = await dataService.getRunData(runId);
-                        }
-                    } else {
-                        for (const v of vehicles) {
-                            const run = v.runs?.find(r => r.id === runId);
-                            if (run) { updates[runId] = run.data || []; break; }
-                        }
+            let updates = {};
+            if (dataService.useSupabase) {
+                updates = await loadRunPoints(dataService, missing, runsByIdString(vehicles));
+            } else {
+                for (const runId of missing) {
+                    for (const v of vehicles) {
+                        const run = v.runs?.find(r => r.id === runId);
+                        if (run) { updates[runId] = run.data || []; break; }
                     }
-                } catch {
-                    updates[runId] = [];
                 }
             }
             setRunDataCache(prev => ({ ...prev, ...updates }));
@@ -566,7 +558,7 @@ export default function ChargeCompareView({
         () => selectedRuns.map(k => parsePairKey(k).rangeRunId),
         [selectedRuns]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf, clearHandSet } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
@@ -845,7 +837,7 @@ export default function ChargeCompareView({
             data:            flatRuns.map(r => r._yValue),
             backgroundColor: flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.35)' : r.color),
             borderColor:     flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.6)'  : r.color),
-            borderRadius:    4,
+            borderRadius: 2,
             borderSkipped:   false,
         }];
 
@@ -1029,7 +1021,7 @@ export default function ChargeCompareView({
                 </SidebarDisplaySection>
 
                 <RunSelector
-                    colorControl={setChartConfig ? <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} /> : null}
+                    colorControl={<ColorSourceNote palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} onClearHandSet={clearHandSet} />}
                         handSetColorOf={handSetColorOf}
                         chartPalette={palette}
                         onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
@@ -1105,6 +1097,7 @@ export default function ChargeCompareView({
                         loadingMessage="Loading charging data…"
                         exportControls={!presentationMode && (
                             <>
+                                {setChartConfig && <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
                                 <FeatureChartButton />
                                 <CopyLinkButton />
                                 <button

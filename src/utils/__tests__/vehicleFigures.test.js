@@ -69,6 +69,33 @@ describe('resolveEpaRange', () => {
         expect(resolveEpaRange(v, [v])).toMatchObject({ mi: 300, basis: 'epa-label' });
     });
 
+    describe('the cert\'s own charging efficiency (#506)', () => {
+        const withTest = (test, over = {}) => testVehicle({ label_range_published: 300, epa_tests: [test], ...over });
+        const recharge = (dc, ac) => ({ procedure_code: 77, total_dc_energy_kwh: dc, ac_recharge_kwh: ac, test_number: 'T1', test_date: '2026-01-01' });
+        const chargerOf = (g) => resolveEpaRange(vehicle({ epa_mappings: [link(g)] }), []).chargerEfficiency;
+
+        it('is DC energy ÷ AC recharge where the cert reports both', () => {
+            expect(chargerOf(withTest(recharge(89.5, 104.7)))).toBeCloseTo(89.5 / 104.7);
+        });
+
+        it('is null, not the assumed fallback, where the cert reports no AC recharge', () => {
+            expect(chargerOf(withTest(mct(80)))).toBeNull();
+        });
+
+        it('is null for a ratio outside the band: a bad read, not a charger', () => {
+            expect(chargerOf(withTest(recharge(5, 100)))).toBeNull();
+        });
+
+        it('honors a curator\'s pinned value', () => {
+            expect(chargerOf(withTest(mct(80), { charger_efficiency_override: 0.9 }))).toBe(0.9);
+        });
+
+        it('is null with no label to resolve', () => {
+            const g = testVehicle({ epa_tests: [recharge(89.5, 104.7)] });
+            expect(resolveEpaRange(vehicle({ epa_mappings: [link(g)] }), []).chargerEfficiency).toBeNull();
+        });
+    });
+
     it('picks nothing among several labels with no primary: a span, then the tiers below', () => {
         const v = vehicle({ range: 340, epa_mappings: [link(testVehicle({ label_range_published: 337 })), link(testVehicle({ label_range_published: 450 }))] });
         expect(resolveEpaRange(v, [v])).toMatchObject({ mi: 340, basis: 'unsorted', spanMi: [337, 450] });

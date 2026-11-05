@@ -26,6 +26,9 @@
  *   compare       cmp_soc cmp_mins cmp_mi  cmp_o (orientation)  cmp_sel (the
  *                 plotted pairs)
  *   roadtrip      rt_*
+ *   optimizer     rt_* and rt_otd rt_oc rt_bp rt_osn rt_osx (its own distance,
+ *                 chart, best-plan switch and the speeds the best plan may use). A roadtrip link whose rt_xa is a sweep
+ *                 (written before the optimizer had its own tab) opens here.
  *   specs         sf (the field charted)
  *   specscatter   scx scy
  *   epacurves     epa_ya epa_m epa_ov
@@ -45,6 +48,7 @@
 import { ALL_CHART_MODES, DEFAULT_CHART_MODE } from '../constants/chartNav';
 import { decodeCorrection, encodeCorrection } from './correctionSettings';
 import { encodePairings, decodePairings } from './pairings';
+import { isChargingAxis } from './chargingAxes';
 import {
     AXIS_LIMITS_PARAM, axisLimitsOf, axisLimitsOfLink, encodeAxisLimits, hasAxisLimits, withAxisLimits,
 } from './axisLimits';
@@ -59,6 +63,12 @@ import { encodeShortLink } from './shortLink';
 // The defaults live with the rest of a fresh page's settings (chartDefaults.js);
 // re-exported because the views have always found them here.
 export { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION };
+
+/** Road Trip X axes that are sweeps: Trip Optimizer's charts since it got its own tab. */
+const ROAD_TRIP_SWEEPS = ['speed', 'tripDist'];
+
+/** Trip Optimizer's charts. */
+export const OPTIMIZER_CHARTS = ['speed', 'tripDist', 'map'];
 
 /** The Range & Efficiency chart types, in the order the view lists them. */
 export const RANGE_CHART_TYPES = [
@@ -88,6 +98,12 @@ const ROAD_TRIP_PARAMS = [
     ['rt_sp', 'speed', true], ['rt_oh', 'overhead', true],
     ['rt_ya', 'yAxis'], ['rt_xa', 'xAxis'], ['rt_sya', 'sweepYAxis'],
 ];
+// Trip Optimizer's own, on its links alone. Its chart is read apart from the
+// table (an unknown one is dropped) and written through its own row.
+const OPTIMIZER_PARAMS = [
+    ['rt_otd', 'optimizerDistance', true], ['rt_osn', 'optimizerSpeedMin', true], ['rt_osx', 'optimizerSpeedMax', true],
+];
+const OPTIMIZER_CHART_PARAM = [['rt_oc', 'optimizerChart']];
 // Written only on a towing link: they mean nothing without rt_tw=1.
 const TOWING_PARAMS = [['rt_te', 'towingEfficiency', true], ['rt_tr', 'towingRefSpeedMph', true]];
 
@@ -131,7 +147,11 @@ export function parseChartUrl(search) {
     const effUnit = p.get('eff');
     // A stale or hand-edited ?m= would otherwise fall through to the charging
     // chart with no indication why.
-    const chartMode = ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE;
+    const linkedMode = ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE;
+    // The sweeps were Road Trip X axes until Trip Optimizer took them; a link
+    // to one opens the optimizer on that chart, with the trip it named.
+    const sweepLink = linkedMode === 'roadtrip' && ROAD_TRIP_SWEEPS.includes(p.get('rt_xa'));
+    const chartMode = sweepLink ? 'optimizer' : linkedMode;
 
     const chart = {
         vehicleIds:    idList(p.get('v')),
@@ -177,9 +197,19 @@ export function parseChartUrl(search) {
     // Road Trip
     const roadTrip = {
         ...readParams(p, ROAD_TRIP_PARAMS),
+        // A sweep was a Road Trip X axis before Trip Optimizer took them: the
+        // link opens the optimizer on that chart, with the trip it named.
+        ...(sweepLink && { optimizerChart: p.get('rt_xa'), bestPlan: false,
+            ...(p.get('rt_td') != null && { optimizerDistance: Number(p.get('rt_td')) }) }),
+        ...readParams(p, OPTIMIZER_PARAMS),
+        ...(OPTIMIZER_CHARTS.includes(p.get('rt_oc')) && { optimizerChart: p.get('rt_oc') }),
+        ...(p.get('rt_bp') === '0' && { bestPlan: false }),
+        ...(p.get('rt_bp') === '1' && { bestPlan: true }),
         ...(p.get('rt_tw') === '1' && { towingMode: true }),
         ...readParams(p, TOWING_PARAMS),
     };
+    // The sweep was its X axis; on the optimizer it is the chart, above.
+    if (sweepLink) delete roadTrip.xAxis;
 
     // Modeled Efficiency · selected vehicles
     const epa = {};
@@ -222,9 +252,11 @@ export function chartConfigFromParsed(chart, base) {
     const s = chart;
     return {
         ...base,
-        ...(s.xAxis         && { xAxis: s.xAxis }),
-        ...(s.yAxis         && { yAxis: s.yAxis }),
-        ...(s.y2Axis        && { y2Axis: s.y2Axis }),
+        // An axis the chart no longer offers (Temperature, Frame) is left at
+        // what `base` has, so an old link or saved comparison still opens.
+        ...(isChargingAxis(s.xAxis)  && { xAxis: s.xAxis }),
+        ...(isChargingAxis(s.yAxis)  && { yAxis: s.yAxis }),
+        ...(isChargingAxis(s.y2Axis) && { y2Axis: s.y2Axis }),
         ...(s.runIds.length > 0 && (s.chartMode === 'charging' || s.chartMode === 'range') && { selectedRuns: s.runIds }),
         alignRaw:      s.alignRaw,
         raceThreshold: s.raceThreshold,
@@ -349,9 +381,14 @@ export function buildChartParams({
     if (pairsEncoded) p.set('pairs', pairsEncoded);
 
     // Road Trip
-    if (chartMode === 'roadtrip') {
+    if (chartMode === 'roadtrip' || chartMode === 'optimizer') {
         const defaults = defaultRoadTripConfig();
         writeParams(p, ROAD_TRIP_PARAMS, roadTripConfig, defaults);
+        if (chartMode === 'optimizer') {
+            writeParams(p, OPTIMIZER_PARAMS, roadTripConfig, defaults);
+            writeParams(p, OPTIMIZER_CHART_PARAM, roadTripConfig, defaults);
+            if (roadTripConfig.bestPlan === false) p.set('rt_bp', '0');
+        }
         if (roadTripConfig.towingMode) {
             p.set('rt_tw', '1');
             writeParams(p, TOWING_PARAMS, roadTripConfig, defaults);
@@ -418,9 +455,16 @@ export function withDefaultsWrittenOut(search) {
     };
     const mode = p.get('m');
     if (mode === 'compare') fill(COMPARE_PARAMS, defaultCompareConfig());
-    if (mode === 'roadtrip') {
+    if (mode === 'roadtrip' || mode === 'optimizer') {
         const defaults = defaultRoadTripConfig();
-        fill(ROAD_TRIP_PARAMS, defaults);
+        // An old Road Trip link on a sweep axis opens the optimizer; writing
+        // the timeline's default X axis into it would make it a Road Trip.
+        fill(ROAD_TRIP_SWEEPS.includes(p.get('rt_xa')) ? ROAD_TRIP_PARAMS.filter(([k]) => k !== 'rt_xa') : ROAD_TRIP_PARAMS, defaults);
+        if (mode === 'optimizer') {
+            fill(OPTIMIZER_PARAMS, defaults);
+            fill(OPTIMIZER_CHART_PARAM, defaults);
+            if (!p.has('rt_bp')) p.set('rt_bp', defaults.bestPlan ? '1' : '0');
+        }
         if (p.get('rt_tw') === '1') fill(TOWING_PARAMS, defaults);
     }
     return p.toString();

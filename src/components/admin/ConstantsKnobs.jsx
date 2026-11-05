@@ -164,16 +164,16 @@ export default function ConstantsKnobs() {
             </div>
 
             {failure && !failure.key && (
-                <div className="notice-error my-3 p-3 rounded-lg text-sm">{failure.message}</div>
+                <div className="notice-error my-3 p-3 rounded-xs text-sm">{failure.message}</div>
             )}
 
             {dirty && (
-                <div className="notice-info my-3 flex items-center justify-between gap-3 p-3 rounded-lg">
+                <div className="notice-info my-3 flex items-center justify-between gap-3 p-3 rounded-xs">
                     <span className="text-sm">
                         Saved — reload to apply the change to the calculations here. Anyone else
                         picks up a published value on their next load.
                     </span>
-                    <button onClick={() => window.location.reload()} className="btn btn-primary text-sm whitespace-nowrap">
+                    <button onClick={() => window.location.reload()} className="btn btn-secondary text-sm whitespace-nowrap">
                         ↻ Reload now
                     </button>
                 </div>
@@ -278,7 +278,7 @@ function KnobRow({
             <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">{label}</span>
-                    <code className="text-[11px] text-secondary bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded">
+                    <code className="text-[11px] text-secondary bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded-xs">
                         {key}
                     </code>
                     <SourceBadge source={source} />

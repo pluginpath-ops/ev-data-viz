@@ -376,7 +376,7 @@ export default function VehiclesView({
                                 onClick={() => onViewRuns(vehicle)}
                                 className="btn btn-primary flex-1"
                             >
-                                View Tests &amp; Data →
+                                View Tests &amp; Data ↘
                             </button>
                             <SpecsButton vehicle={vehicle} />
                         </div>
@@ -485,7 +485,7 @@ export default function VehiclesView({
                     buttons push its figures sideways. */}
                 <span role="cell" className="vehicle-list-actions" onClick={e => e.stopPropagation()}>
                     <button onClick={() => onViewRuns(vehicle)} className="btn btn-primary">
-                        Tests &amp; Data →
+                        Tests &amp; Data ↘
                     </button>
                     <VehicleRowMenu label={vehicle.name} items={rowMenuItems(vehicle, dismiss)} />
                 </span>
@@ -623,7 +623,7 @@ export default function VehiclesView({
                         onClick={(e) => handleDuplicateVehicle(vehicle, e)}
                         disabled={duplicatingId !== null}
                         title="Copy this vehicle, with its own copies of its specs and tests"
-                        className="btn btn-primary disabled:opacity-50"
+                        className="btn btn-secondary disabled:opacity-50"
                     >
                         {duplicatingId === vehicle.id
                             ? <><span className="spinner-inline"/>Copying…</>
@@ -797,7 +797,7 @@ export default function VehiclesView({
                             </button>
                             <button
                                 onClick={() => { setEditingId(null); setShowForm(!showForm); }}
-                                className="btn btn-primary"
+                                className="btn btn-secondary"
                             >
                                 {showForm && !editingId ? 'Cancel' : '+ Add Vehicle'}
                             </button>
@@ -848,7 +848,7 @@ export default function VehiclesView({
                             className={`btn btn-toggle${editingOrder ? ' active' : ''} flex-shrink-0`}
                             style={editingOrder ? { backgroundColor: 'var(--color-primary-light)', borderColor: 'var(--color-primary)', color: 'var(--color-primary-text)' } : {}}
                         >
-                            ✏️ Edit Order
+                            ✎ Edit Order
                         </button>
                     )}
             </VehicleFilterBar>
@@ -857,7 +857,7 @@ export default function VehiclesView({
                 <div className="flex justify-end gap-2 mb-4 -mt-3">
                     <button
                         onClick={() => onSelectAllVisible(shownVehicles.map(v => v.id))}
-                        className="btn btn-primary"
+                        className="btn btn-secondary"
                         title="Add all currently visible vehicles to the comparison selection"
                     >
                         Select All Visible ({shownVehicles.length})
@@ -982,14 +982,14 @@ export default function VehiclesView({
                         <button onClick={handleCancelOrder} disabled={savingOrder} className="btn btn-secondary text-sm">
                             Cancel
                         </button>
-                        <button onClick={handleSaveOrder} disabled={savingOrder} className="btn btn-primary text-sm flex items-center gap-2">
+                        <button onClick={handleSaveOrder} disabled={savingOrder} className="btn btn-commit text-sm flex items-center gap-2">
                             {savingOrder && (
                                 <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                                 </svg>
                             )}
-                            {savingOrder ? 'Saving…' : 'Save Order →'}
+                            {savingOrder ? 'Saving…' : 'Save Order'}
                         </button>
                     </div>
                 </div>
@@ -1009,7 +1009,7 @@ export default function VehiclesView({
             {/* Add / Edit vehicle modal */}
             {showForm && (
                 <div className="modal-overlay" onClick={handleCancel}>
-                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    <div className="modal-panel max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <LazyBoundary><EditVehicleForm {...editFormProps} /></LazyBoundary>
                     </div>
                 </div>

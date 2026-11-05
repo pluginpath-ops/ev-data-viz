@@ -47,7 +47,7 @@ import RunCard from './runs/RunCard';
 import CompositeRunCard from './runs/CompositeRunCard';
 import LineageChargingNote from './runs/LineageChargingNote';
 import VehicleCombobox from './VehicleCombobox';
-import { DATA_FLAGS, RunKindPill, FIELD_META, inferRunFlags } from './runs/runDisplay';
+import { DATA_FLAGS, RunKindBadge, FIELD_META, inferRunFlags } from './runs/runDisplay';
 
 
 
@@ -80,7 +80,7 @@ const EFFICIENCY_HELP =
 // On a charging test efficiency is not inert, but it is nearly so: the only
 // distance such a run carries is the range readout on its data points. Saying
 // so is the difference between "this knob does nothing" and "this knob does
-// one specific thing" — the question the missing kind pill left open.
+// one specific thing" — the question the missing kind badge left open.
 const EFFICIENCY_ON_CHARGING =
     'On a charging test the only distance to scale is the range readout on ' +
     'its data points — kWh and kW are capacity\'s job.';
@@ -105,13 +105,13 @@ const TESTS_SECTION_HELP =
 // Counts are computed from data the view already has, so a tab can say how much
 // is behind it without fetching anything to find out.
 const SUBTABS = [
-    { id: 'tests',       label: '📏 Charging & Range', count: d => d.displayRuns.length },
-    { id: 'inherited',   label: '🔗 Inherited',     count: d => d.inheritedRuns.length },
-    { id: 'performance', label: '⚡ Performance',   count: d => {
+    { id: 'tests',       label: 'Charging & Range', count: d => d.displayRuns.length },
+    { id: 'inherited',   label: 'Inherited',     count: d => d.inheritedRuns.length },
+    { id: 'performance', label: 'Performance',   count: d => {
         const c = d.performanceCounts?.[d.vehicle.id];
         return c ? (c.accel ?? 0) + (c.braking ?? 0) : null;
     } },
-    { id: 'epa',         label: '🏛 EPA',           count: d => d.vehicle.epa_mappings?.length || null },
+    { id: 'epa',         label: 'EPA',           count: d => d.vehicle.epa_mappings?.length || null },
 ];
 
 /** Valid sub-tab ids, for App.jsx to validate the ?sub= URL param against. */
@@ -227,7 +227,7 @@ const DeriveAxisPanel = ({
     const canPreview = !batteryMissing && ready && editData !== null && !editDataLoading;
 
     return (
-        <div className="mt-2 border rounded bg-[var(--color-surface-muted)] p-3 space-y-3">
+        <div className="mt-2 border rounded-xs bg-[var(--color-surface-muted)] p-3 space-y-3">
             {/* Mode selector */}
             <div className="flex items-center gap-1 flex-wrap">
                 <span className="text-xs text-secondary mr-1">Derive:</span>
@@ -236,7 +236,7 @@ const DeriveAxisPanel = ({
                         key={key}
                         type="button"
                         onClick={() => onChangeMode(key)}
-                        className={`text-xs px-2 py-1 rounded border ${mode === key
+                        className={`text-xs px-2 py-1 rounded-xs border ${mode === key
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'bg-[var(--color-surface)] text-secondary hover:text-[var(--color-text-primary)]'}`}
                         title={`from ${m.source}`}
@@ -373,7 +373,7 @@ const DeriveAxisPanel = ({
                             type="button"
                             onClick={onApply}
                             disabled={!preview || applying}
-                            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+                            className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                         >{applying ? 'Applying…' : 'Apply'}</button>
                         {!batteryMissing && usingAnchors && validAnchors.length < cfg.calibMinAnchors && (
                             <span className="text-xs text-meta">Need ≥{cfg.calibMinAnchors} anchors to preview</span>
@@ -394,7 +394,7 @@ const DeriveAxisPanel = ({
                                     {preview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
                                 </div>
                             )}
-                            <div className="max-h-64 overflow-y-auto border rounded">
+                            <div className="max-h-64 overflow-y-auto border rounded-xs">
                                 <table className="text-xs w-full">
                                     <thead className="bg-[var(--color-surface-sunken)] sticky top-0">
                                         <tr>
@@ -1371,7 +1371,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <div className="list-thumbnail">
                     {displayImageUrl(vehicle)
                         ? <img src={displayImageUrl(vehicle)} alt={vehicle.name} decoding="async" className="w-full h-full object-cover" />
-                        : <span>🚗</span>
+                        : null
                     }
                 </div>
                 <div className="flex-1 min-w-0">
@@ -1442,7 +1442,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <button
                             onClick={async () => { setDuplicatingVehicle(true); await onDuplicateVehicle(vehicle.id); setDuplicatingVehicle(false); }}
                             disabled={duplicatingVehicle}
-                            className="btn btn-primary disabled:opacity-50"
+                            className="btn btn-secondary disabled:opacity-50"
                         >
                             {duplicatingVehicle ? <><span className="spinner-inline"/>Copying…</> : '⧉ Copy'}
                         </button>
@@ -1532,7 +1532,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div>
                                             <p className="text-xs text-secondary mb-1">Data type</p>
                                             <div className="data-type-flags">
-                                                {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
+                                                {DATA_FLAGS.map(({ key, label, desc }) => {
                                                     const active = runMetadata.dataFlags.includes(key);
                                                     return (
                                                         <button
@@ -1540,7 +1540,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             type="button"
                                                             title={desc}
                                                             onClick={() => setRunMetadata(m => ({ ...m, dataFlags: [key] }))}
-                                                            className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-meta border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
+                                                            className={`guide-chip${active ? ' active' : ''}`}
                                                         >
                                                             {label}
                                                         </button>
@@ -1738,7 +1738,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 setFieldMapping({});
                                                 setUploadStep('file');
                                             }}
-                                            className="rounded"
+                                            className="rounded-xs"
                                         />
                                         CSV has no header row (use column numbers)
                                     </label>
@@ -1770,7 +1770,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <button
                                             onClick={handleSaveRecord}
                                             disabled={!runMetadata.name}
-                                            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="btn btn-commit disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save record
                                         </button>
@@ -1790,7 +1790,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                             {/* In create mode, allow editing metadata here too */}
                             {uploadMode === 'create' && (
-                                <div className="mb-6 p-4 bg-[var(--color-surface-muted)] rounded">
+                                <div className="mb-6 p-4 bg-[var(--color-surface-muted)] rounded-xs">
                                     <h4 className="font-semibold mb-3">Test Metadata</h4>
                                     <div className="space-y-3">
                                         <input
@@ -1862,7 +1862,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 if (!tsMapped && !timeColTs) return null;
                                 return (
                                     <p className="note-panel is-info mt-3">
-                                        📅 Timestamps detected — will be converted to elapsed minutes from the first data point
+                                        Timestamps detected — will be converted to elapsed minutes from the first data point
                                         {tsMapped && !timeMapped && ' (Elapsed Time will be derived automatically)'}
                                     </p>
                                 );
@@ -1876,7 +1876,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div className={`estimation-panel ${estimations.range === 'measured' ? 'is-good' : 'is-warning'}`}>
                                             <div className="flex-1 min-w-0">
                                                 <p className="state-panel-title">
-                                                    {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : '📏 Estimate from measured range test'}
+                                                    {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : 'Estimate from measured range test'}
                                                 </p>
                                                 {rangeTestRuns.length > 1 && (
                                                     <select
@@ -1953,7 +1953,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 {uploadMode === 'create' ? (
                                     <button
                                         onClick={handleImport}
-                                        className="btn btn-primary"
+                                        className="btn btn-commit"
                                     >
                                         Import Run
                                     </button>
@@ -1961,7 +1961,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         onClick={handleMerge}
                                         disabled={merging || missingJoinKey}
-                                        className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
                                         {merging ? 'Merging…' : 'Merge into Run'}
                                     </button>
@@ -2015,7 +2015,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <div>
                                         <p className="text-xs text-secondary mb-1">Data type</p>
                                         <div className="data-type-flags">
-                                            {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
+                                            {DATA_FLAGS.map(({ key, label, desc }) => {
                                                 const active = (editFormData.dataFlags || ['charging']).includes(key);
                                                 return (
                                                     <button
@@ -2023,7 +2023,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         type="button"
                                                         title={desc}
                                                         onClick={() => setEditFormData(f => ({ ...f, dataFlags: [key] }))}
-                                                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-meta border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
+                                                        className={`guide-chip${active ? ' active' : ''}`}
                                                     >
                                                         {label}
                                                     </button>
@@ -2206,7 +2206,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         onClick={() => handleSaveEdit(run.id)}
                                         disabled={savingData}
-                                        className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
                                         {savingData ? 'Saving…' : 'Save Changes'}
                                     </button>
@@ -2296,7 +2296,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 return (
                                                                     <button
                                                                         onClick={() => handleEstimateRangeInEdit(effectiveRangeFromTest)}
-                                                                        className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
+                                                                        className="text-xs px-3 py-1 rounded-xs border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
                                                                         title={tip}
                                                                     >
                                                                         Measured ({effectiveRangeFromTest} mi / 100%){!hasSocMeta && ' *'}
@@ -2306,7 +2306,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             {epaRange && (
                                                                 <button
                                                                     onClick={() => handleEstimateRangeInEdit(epaRange)}
-                                                                    className="text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
+                                                                    className="text-xs px-3 py-1 rounded-xs border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
                                                                     title={`Use the vehicle's ${epaName} range (${epaRange} mi) as the 100% SoC baseline`}
                                                                 >
                                                                     {epaName} ({epaRange} mi)
@@ -2334,7 +2334,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 return (
                                                     <div className={`state-panel ${tone}`}>
                                                         <span className="text-xs text-secondary">
-                                                            {editCalcKwh != null && <>⚡ <strong>Data points → {editCalcKwh} kWh</strong> · </>}
+                                                            {editCalcKwh != null && <><strong>Data points → {editCalcKwh} kWh</strong> · </>}
                                                             {packE != null
                                                                 ? <>pack ≈ {packE} kWh <span className="text-secondary">({dSoC}% × {cap} kWh)</span></>
                                                                 : <span className="text-secondary">add SoC data + battery capacity to validate energy</span>}
@@ -2347,7 +2347,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         )}
                                                         {excess != null && !good && (
                                                             <span className="badge-status is-warning">
-                                                                ⚠️ {excess >= 0 ? '+' : ''}{excess.toFixed(1)}% vs pack {excess < 0 ? '(below SoC-implied)' : '(>10% of capacity)'}
+                                                                ⚠ {excess >= 0 ? '+' : ''}{excess.toFixed(1)}% vs pack {excess < 0 ? '(below SoC-implied)' : '(>10% of capacity)'}
                                                             </span>
                                                         )}
                                                         {packE != null && !hasManual && (
@@ -2360,7 +2360,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <p className="text-sm text-secondary py-4 text-center">Loading…</p>
                                             ) : (
                                                 <>
-                                                    <div className="overflow-auto rounded border" style={{ maxHeight: 360 }}>
+                                                    <div className="overflow-auto rounded-xs border" style={{ maxHeight: 360 }}>
                                                         <table className="w-full text-xs border-collapse">
                                                             <thead className="bg-[var(--color-surface-muted)] sticky top-0 z-10 border-b">
                                                                 <tr>
@@ -2626,7 +2626,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div className="run-card-header">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <RunKindPill run={run} />
+                                                    <RunKindBadge run={run} />
                                                     <h3 className="section-title">
                                                         {run.name}
                                                         <RunSourceLinks run={run} className="text-sm font-normal" />
@@ -2847,7 +2847,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     key={opt.key}
                                                     type="button"
                                                     onClick={() => { setNewLinkKind(opt.key); setNewLinkRunIds(null); }}
-                                                    className={`btn text-xs ${newLinkKind === opt.key ? 'btn-primary' : 'btn-secondary'}`}
+                                                    className={`btn btn-toggle text-xs${newLinkKind === opt.key ? ' active' : ''}`}
                                                 >
                                                     {opt.label}
                                                 </button>
@@ -2875,7 +2875,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             className="w-4 h-4 shrink-0"
                                                         />
                                                         <span className={`spec-link-kind-pill is-${runKindFrom(r)}`}>
-                                                            {runKindFrom(r) === 'charging' ? '⚡' : '📏'}
+                                                            {runKindFrom(r) === 'charging' ? '↯' : '↔'}
                                                         </span>
                                                         <span className="truncate">{r.name}</span>
                                                         {r.date && <span className="text-xs text-meta shrink-0">{r.date}</span>}
@@ -2945,7 +2945,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         type="button"
                                         onClick={handleAdd}
                                         disabled={!newLinkSourceId || runsToLink.length === 0 || linkSaving}
-                                        className="btn btn-primary text-sm disabled:opacity-40"
+                                        className="btn btn-commit text-sm disabled:opacity-40"
                                     >
                                         {linkSaving ? 'Linking…' : `Link ${runsToLink.length > 0 ? runsToLink.length + ' ' : ''}Test${runsToLink.length !== 1 ? 's' : ''}`}
                                     </button>
@@ -2994,7 +2994,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {/* Edit vehicle modal */}
             {showEditVehicle && (
                 <div className="modal-overlay" onClick={closeEditVehicle}>
-                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    <div className="modal-panel max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <LazyBoundary>
                             <EditVehicleForm
                                 formData={vehicleFormData}
@@ -3061,7 +3061,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 type="button"
                                 onClick={handleCopyToConfirm}
                                 disabled={!copyingToVehicleId}
-                                className="btn btn-primary text-sm disabled:opacity-40"
+                                className="btn btn-commit text-sm disabled:opacity-40"
                             >
                                 Copy test
                             </button>

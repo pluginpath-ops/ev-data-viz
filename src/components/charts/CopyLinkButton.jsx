@@ -29,7 +29,7 @@ export default function CopyLinkButton({ withExtra, title = 'Copy a short link t
     return (
         <button type="button" onClick={copy} title={title}
                 className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}>
-            {copied ? '✓ Copied' : '🔗 URL'}
+            {copied ? '✓ Copied' : 'URL'}
         </button>
     );
 }

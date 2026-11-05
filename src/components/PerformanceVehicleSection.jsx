@@ -173,8 +173,8 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                 info={<InfoIcon text={SECTION_HELP} className="ml-1" />}
                 actions={canEdit && (
                     <>
-                        <SectionAction onClick={() => setShowImport(true)}>📄 Import testing CSV</SectionAction>
-                        <SectionAction onClick={() => setShowPaste(true)}>📋 Paste a result block</SectionAction>
+                        <SectionAction onClick={() => setShowImport(true)}>Import testing CSV</SectionAction>
+                        <SectionAction onClick={() => setShowPaste(true)}>Paste a result block</SectionAction>
                         <SectionAction onClick={() => setAddingResult(true)}>+ Add reported result</SectionAction>
                     </>
                 )}
@@ -211,7 +211,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                     onClick={() => setShowImport(true)}
                     className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
                 >
-                    📄 Import testing CSV
+                    Import testing CSV
                 </button>
             )}
 
@@ -245,7 +245,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                         onClick={() => setShowPaste(true)}
                         className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
                     >
-                        📋 Paste a result block
+                        Paste a result block
                     </button>
                     <button
                         type="button"
@@ -258,7 +258,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
             )}
 
             {canEdit && addingResult && (
-                <div className="border rounded-lg p-3 border-[var(--color-border)]">
+                <div className="border rounded-xs p-3 border-[var(--color-border)]">
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="text-xs">
                             <span className="text-secondary block mb-0.5">Source</span>
@@ -280,7 +280,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                     </p>
                     <div className="flex gap-2 mt-2">
                         <button type="button" onClick={handleAddResult} disabled={creating}
-                            className="btn btn-primary text-xs py-1 px-3 disabled:opacity-50">
+                            className="btn btn-secondary text-xs py-1 px-3 disabled:opacity-50">
                             {creating ? 'Adding…' : 'Add'}
                         </button>
                         <button type="button" onClick={() => setAddingResult(false)} disabled={creating}
