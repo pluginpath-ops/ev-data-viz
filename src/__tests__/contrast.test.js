@@ -251,41 +251,20 @@ describe('every intended text/surface pairing is readable, in both themes', () =
  * them off the handoff's pinned accents) or the labels get large-text metrics.
  * Neither belongs in the foundation phase.
  */
-// `parseColor` handles hex, rgb/rgba and oklch — not CSS keywords, and the
-// button rules say `color: white` literally.
-const WHITE = 'rgb(255, 255, 255)';
-
-const FILLED_CONTROLS = [
-    '--color-primary',
-    '--color-edit',
-    '--color-danger',
-    '--color-secondary',
-    '--color-warning',
-];
-
-describe('white on a filled control', () => {
-    // Pairings under 4.5:1 right now, across both themes. Lower this when one
-    // is fixed; it fails on a rise AND on a fall, so neither goes unnoticed.
-    const KNOWN_LOW = 8;
-
-    it('does not grow', () => {
-        const low = [];
+describe('the one filled control', () => {
+    // The ratchet that stood here counted white on five solid fills
+    // (primary, edit, danger, secondary, warning): eight pairings under AA,
+    // held still until "a decision, not a tweak". The decision was to retire
+    // the fills — every intent is tinted now, a light label on its own wash —
+    // and keep ONE solid button, .btn-commit, on its own triple. So this is
+    // pass/fail again: the only filled control there is clears AA, both themes.
+    it('commit text clears AA on the commit fill', () => {
         for (const theme of ['light', 'dark']) {
-            for (const tok of FILLED_CONTROLS) {
-                const t = THEMES[theme];
-                const ratio = ratioOf(WHITE, t[tok], t[BASE[theme]]);
-                expect(ratio, `could not parse white on ${tok}`).not.toBeNull();
-                if (ratio < AA_NORMAL) low.push(`${theme} ${tok} ${ratio.toFixed(2)}:1`);
-            }
+            const t = THEMES[theme];
+            const ratio = ratioOf(t['--color-commit-text'], t['--color-commit'], t[BASE[theme]]);
+            expect(ratio, `could not parse the commit triple in ${theme}`).not.toBeNull();
+            expect(ratio, `${theme} commit ${ratio?.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA_NORMAL);
         }
-        expect(
-            low.length,
-            low.length > KNOWN_LOW
-                ? `A filled control dropped below AA. Darken the fill, or leave the `
-                  + `token alone.\n${low.join('\n')}`
-                : `${KNOWN_LOW - low.length} fixed — lower KNOWN_LOW to ${low.length}.`
-              + `\n${low.join('\n')}`,
-        ).toBe(KNOWN_LOW);
     });
 });
 

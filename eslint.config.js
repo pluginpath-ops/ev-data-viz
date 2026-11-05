@@ -31,6 +31,9 @@ const EXPLAINER_MAY_IMPORT = [
     'components/Popover',
     'components/InfoIcon',
     'components/reference/PlatformLink',
+    // The "▾ More" pill Home uses, so the landing's subjects say when another
+    // waits below the fold. Navigation only: it reads the page, no data.
+    'components/ScrollMoreHint',
 ];
 
 export default [

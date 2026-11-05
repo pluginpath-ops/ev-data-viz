@@ -12,6 +12,7 @@ import Chart from 'chart.js/auto';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import PlotFrame from '../charts/PlotFrame';
 import { useChartPng } from '../../hooks/useChartPng';
+import { useSourceLine } from '../../hooks/useSourceLine';
 
 export default function PerformanceCompareChart({
     title,
@@ -21,7 +22,7 @@ export default function PerformanceCompareChart({
     valueModes,          // optional [{ key, label }] — e.g. braking distance vs g
     valueMode,
     onValueModeChange,
-    rows,                // [{ id, name, value, display, badge, sub, fullData, flags, sourceCount }]
+    rows,                // [{ id, name, value, display, badge, sub, sourceName, fullData, flags, sourceCount }]
     axisLabel,
     barMode,
     isDark,
@@ -37,10 +38,9 @@ export default function PerformanceCompareChart({
     // The caption the export carries. `title` was an <h3> above the card and the
     // measure lived in a <select> beside it, so a pasted PNG was a row of bars
     // labelled with vehicle names and a bare axis — no statement of which
-    // metric, in which mode, over how many vehicles.
+    // metric, in which mode. No vehicle count: the bars show it (#443).
     const plotSubtitle = useMemo(() => {
-        const n = withData.length;
-        const parts = [`${n} vehicle${n === 1 ? '' : 's'}`];
+        const parts = [];
         // The mode is frequently the first word of the axis label ("Distance" /
         // "Distance (ft)"), and "distance · Distance (ft)" reads as a stutter
         // rather than as two facts.
@@ -51,11 +51,19 @@ export default function PerformanceCompareChart({
         }
         if (axis) parts.push(axis);
         return parts.join(' · ');
-    }, [withData, valueModes, valueMode, axisLabel]);
+    }, [valueModes, valueMode, axisLabel]);
 
     const [urlCopied, setUrlCopied] = useState(false);
+    // The deriver's placeholder for a result with no source is not a source.
+    const sourceRuns = useMemo(
+        () => withData.map(r => ({ id: r.id, source: r.sourceName === 'Unattributed' ? '' : r.sourceName })),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [rows]);
+    const sourceLine = useSourceLine({ runs: sourceRuns });
+
     const { copyPng, copied, preview, dismissPreview } =
-        useChartPng(chartRef, { title, subtitle: plotSubtitle });
+        useChartPng(chartRef, { title, subtitle: plotSubtitle, sources: sourceLine.text,
+            signature: String(withData.length) });
 
     useEffect(() => {
         if (!canvasRef.current || withData.length === 0) {
@@ -115,7 +123,7 @@ export default function PerformanceCompareChart({
                 datasets: [{
                     data: withData.map(r => r.value),
                     backgroundColor: withData.map(r => r.color),
-                    borderRadius: 4,
+                    borderRadius: 2,
                 }],
             },
             options: {
@@ -210,6 +218,7 @@ export default function PerformanceCompareChart({
             <PlotFrame
                 title={title}
                 subtitle={plotSubtitle}
+                sourceLine={sourceLine}
                 preview={preview}
                 onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (
@@ -229,7 +238,7 @@ export default function PerformanceCompareChart({
                         className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
                         title="Copy link to this chart view"
                     >
-                        {urlCopied ? '✓ Copied' : '🔗 URL'}
+                        {urlCopied ? '✓ Copied' : 'URL'}
                     </button>
                     <button
                         onClick={copyPng}

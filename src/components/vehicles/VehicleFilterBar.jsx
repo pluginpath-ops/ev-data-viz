@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import TestCountFilter from './TestCountFilter';
 import GuideFacetMenu from '../epa/guide/GuideFacetMenu';
 import {
     VEHICLE_FACETS, facetState, filtersActive, vehicleFacetCounts, activeFilterChips, removeChip,
@@ -19,7 +20,7 @@ import {
  */
 export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, shownCount, children }) {
     const counts = useMemo(() => vehicleFacetCounts(vehicles, filters, ctx), [vehicles, filters, ctx]);
-    const chips = activeFilterChips(filters);
+    const chips = activeFilterChips(filters, { curator: ctx.curator });
     const active = filtersActive(filters);
 
     return (
@@ -33,7 +34,7 @@ export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, sho
                     aria-label="Search vehicles"
                     className="form-input guide-search-input"
                 />
-                {VEHICLE_FACETS.map(f => {
+                {VEHICLE_FACETS.filter(f => !f.curatorOnly || ctx.curator).map(f => {
                     const st = facetState(filters, f.key);
                     return (
                         <GuideFacetMenu
@@ -42,6 +43,7 @@ export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, sho
                             hint={f.hint}
                             format={f.format}
                             unit="vehicle"
+                            order={f.order}
                             values={counts[f.key].values}
                             selected={st.in}
                             excluded={st.out}
@@ -54,6 +56,7 @@ export default function VehicleFilterBar({ vehicles, filters, onChange, ctx, sho
                         />
                     );
                 })}
+                {ctx.curator && <TestCountFilter filters={filters} onChange={onChange} />}
                 {children}
                 <div className="guide-filter-tally">
                     <span className="text-data">{shownCount?.toLocaleString()}</span>

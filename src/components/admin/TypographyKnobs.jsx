@@ -47,7 +47,7 @@ export default function TypographyKnobs() {
             </div>
 
             {/* Live preview */}
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 my-3 space-y-1">
+            <div className="rounded-xs border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 my-3 space-y-1">
                 <p className="page-title">Page title</p>
                 <p className="section-title">Section title</p>
                 <p className="subsection-title">Subsection title</p>
@@ -83,7 +83,7 @@ function KnobRow({ knob, value, modified, onChange }) {
             <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium">{label}</span>
-                    <code className="text-[11px] text-secondary bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded">{cssVar}</code>
+                    <code className="text-[11px] text-secondary bg-[var(--color-surface-sunken)] px-1.5 py-0.5 rounded-xs">{cssVar}</code>
                     {modified && (
                         <span className="badge-micro is-warning">
                             modified

@@ -12,6 +12,7 @@
  * where it stops being flat.
  */
 import { distanceValue, distanceUnit, fmtSpeed, fmtTemp } from '../../utils/unitConversions';
+import { whenNewRange } from '../../utils/testedRange';
 import { rangeTestReference, testHref } from '../../utils/testDetails';
 import Popover from '../Popover';
 import TestPeek from '../TestPeek';
@@ -24,7 +25,10 @@ import TestPeek from '../TestPeek';
  */
 export default function TestedFigure({ vehicle, tested, units, onOpenTest, bare = false }) {
     if (!tested) return null;
-    const test = vehicle ? rangeTestReference(vehicle, tested, units) : null;
+    // What the same test says the pack holds against a new one; null unless the
+    // pack is well down from its new-car capacity (whenNewRange).
+    const whenNew = vehicle ? whenNewRange(vehicle) : null;
+    const test = vehicle ? rangeTestReference(vehicle, tested, units, 'range', whenNew) : null;
     const href = testHref(test);
 
     // The scaled figure when there is one, because that is what the EPA number
@@ -75,6 +79,11 @@ export default function TestedFigure({ vehicle, tested, units, onOpenTest, bare 
             {tested.startSoc == null && (
                 <span className="tested-figure-window">
                     window not stated
+                </span>
+            )}
+            {whenNew && (
+                <span className="tested-figure-scaled">
+                    ≈ {distanceValue(whenNew.whenNewMi, units)} {distanceUnit(units)} when new · {Math.round(whenNew.retention * 100)}% capacity retention
                 </span>
             )}
             {conditions.length > 0 && (href

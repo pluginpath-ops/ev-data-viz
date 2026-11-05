@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-    testedRangeSummary, testedEfficiency, reportedRangeRun, socWindow, coversPracticalPack,
+    testedRangeSummary, testedEfficiency, whenNewRange, reportedRangeRun, socWindow, coversPracticalPack,
     FULL_WINDOW_MIN_PCT, WINDOW_START_MIN_PCT, WINDOW_END_MAX_PCT, WIDE_SPAN_MIN_PCT,
 } from '../testedRange';
 
@@ -279,5 +279,57 @@ describe('testedEfficiency (#335)', () => {
     it('is null with nothing to divide', () => {
         expect(testedEfficiency(vehicle([]))).toBeNull();
         expect(testedEfficiency(vehicle([rangeRun({ energy_kwh: null, start_soc: null })]))).toBeNull();
+    });
+});
+
+describe('whenNewRange — what the pack holds against a new one', () => {
+    // 270 mi on 84 kWh over a full 100→0 is 3.214 mi/kWh. A new 90 kWh pack
+    // would reach 289 mi at that efficiency; this one reached 270.
+    const aged = (over = {}, vOver = {}) => vehicle(
+        [rangeRun({ distance_miles: 270, energy_kwh: 84, start_soc: 100, end_soc: 0, ...over })],
+        { socWindowKwh: 90, socWindowBasis: 'epa-tested', ...vOver });
+
+    it('prices the same efficiency at the new-car capacity', () => {
+        const w = whenNewRange(aged());
+        expect(w.whenNewMi).toBeCloseTo(289.3, 1);
+        expect(w.testedMi).toBeCloseTo(270, 5);
+        expect(w.retention).toBeCloseTo(84 / 90, 5);
+        expect(w.impliedKwh).toBeCloseTo(84, 5);
+    });
+
+    it('says nothing for a pack within five points of what it was rated at', () => {
+        // Test scatter is as large as that; a figure on every card would be noise.
+        expect(whenNewRange(aged({ energy_kwh: 90, distance_miles: 289.3 }))).toBeNull();   // 100%
+        expect(whenNewRange(aged({ energy_kwh: 95, distance_miles: 305 }))).toBeNull();     // above rated
+        expect(whenNewRange(aged({ energy_kwh: 85.6, distance_miles: 275 }))).toBeNull();   // 95.1%
+        expect(whenNewRange(aged({ energy_kwh: 85.4, distance_miles: 275 }))).not.toBeNull(); // 94.9%
+    });
+
+    it('infers the full pack from a window that saw most of it', () => {
+        // 80→10 is 70 points on 56 kWh: an 80 kWh pack against a 90 kWh rating.
+        const w = whenNewRange(aged({ start_soc: 80, end_soc: 10, energy_kwh: 56, distance_miles: 180 }));
+        expect(w.impliedKwh).toBeCloseTo(80, 5);
+        expect(w.retention).toBeCloseTo(80 / 90, 5);
+    });
+
+    it('says nothing where the energy was only estimated from the window', () => {
+        // The estimate uses the capacity being compared against: 100% by construction.
+        expect(whenNewRange(aged({ energy_kwh: null }))).toBeNull();
+    });
+
+    it('says nothing from a window too narrow to infer a pack from', () => {
+        expect(whenNewRange(aged({ start_soc: 56, end_soc: 10, energy_kwh: 40, distance_miles: 120 }))).toBeNull();
+    });
+
+    it('says nothing against a capacity that is not a new pack’s own', () => {
+        expect(whenNewRange(aged({}, { socWindowBasis: 'gross' }))).toBeNull();
+        expect(whenNewRange(aged({}, { socWindowBasis: 'unsorted' }))).toBeNull();
+        expect(whenNewRange(aged({}, { socWindowBasis: 'usable' }))).not.toBeNull();
+        expect(whenNewRange(aged({}, { socWindowKwh: null }))).toBeNull();
+    });
+
+    it('reads the same test the card reports, and nothing without one', () => {
+        expect(whenNewRange(aged()).run.id).toBe(reportedRangeRun(aged()).id);
+        expect(whenNewRange(vehicle([], { socWindowKwh: 90, socWindowBasis: 'epa-tested' }))).toBeNull();
     });
 });

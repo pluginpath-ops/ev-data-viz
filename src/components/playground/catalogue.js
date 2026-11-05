@@ -52,6 +52,11 @@ export const OWNED_FAMILIES = [
  * teaches nothing — or variants whose parent is already shown.
  */
 export const NOT_CATALOGUED = {
+    'color-source-note': 'Not a menu — a line of secondary text at the top of the run picker (ColorSourceNote), matched here only by its color- prefix. It holds the applied dot, which is catalogued with the section band, and a .color-source-link.',
+    'color-source-link': 'The underlined text button inside .color-source-note (Use each vehicle\'s own color, Clear picks): primary color, no box. Shown with the note it sits in.',
+    'featured-vehicle-chip': 'The same pill as .selected-vehicle-chip (one rule, two names) where Home and the featured comparison editor name a comparison\'s vehicles. It reports a set, so it is not the selection. The selection chip is catalogued.',
+    'featured-chip-button': 'The ‹ › × buttons inside a .featured-vehicle-chip in the editor (move earlier, move later, remove): inherit the chip\'s color, dim on hover and when unavailable.',
+    'selected-vehicle-chip-name': 'The name inside .selected-vehicle-chip, drawn as a button: inherits the chip\'s color and only underlines on hover. The chip is catalogued.',
     'info-icon':        'Layout wrapper — an inline-flex span holding the glyph. The glyph is catalogued.',
     'popover-foot-gap': 'A flex spacer inside the action row — it has no appearance at '
         + 'all, it is the gap that keeps Auto away from Apply. The row is catalogued.',
@@ -109,11 +114,10 @@ export const NOT_CATALOGUED = {
  * and cannot silently grow.
  */
 export const DARK_OVERRIDE_CLASSES = new Set([
-    'badge-hidden',
-    'brand-alias-chip', 'chart-copy-btn-active',
+    'chart-copy-btn-active',
     'guide-row', 'guide-tested-note',
     'merge-target-banner', 'stats-suppressed-flag',
-    'sweep-batch', 'vote-btn-vouch'
+    'sweep-batch'
 ]);
 
 /** Whether a specimen's class list contains one that cannot scope. */
@@ -141,7 +145,7 @@ export const SECTIONS = [
             { cls: 'note-panel', as: 'span', label: '⚠ Set the battery capacity to derive charging axes.',
               note: 'Warning is the default.' },
             { cls: 'note-panel is-danger', as: 'span', label: 'Could not read that file.' },
-            { cls: 'note-panel is-info', as: 'span', label: '📅 Timestamps detected — will be converted.',
+            { cls: 'note-panel is-info', as: 'span', label: 'Timestamps detected — will be converted.',
               note: 'The brand surface, not a status one: nothing is wrong.' },
             { cls: 'state-panel', as: 'span', label: 'Neutral — nothing to report yet.' },
             { cls: 'state-panel is-good', as: 'span', label: '✓ Range will be estimated from test data.' },
@@ -221,7 +225,7 @@ export const SECTIONS = [
              + 'line, a band and a tick — and the axis has to match the data exactly.',
         specimens: [
             { composite: 'plot-frame', label: 'Plot frame',
-              covers: ['plot-frame', 'plot-frame-head', 'plot-frame-title', 'plot-frame-subtitle', 'plot-frame-mark'],
+              covers: ['plot-frame', 'plot-frame-head', 'plot-frame-title', 'plot-frame-subtitle', 'plot-frame-mark', 'plot-frame-sources', 'plot-frame-sources-gap'],
               note: 'The figure boundary a PNG export captures — title, subtitle, and the accent mark.' },
             { composite: 'stat-cell', label: 'Stat cell',
               covers: ['stat-cell', 'stat-cell-value', 'stat-cell-unit', 'stat-cell-basis', 'stat-cell-empty'],
@@ -244,17 +248,20 @@ export const SECTIONS = [
     {
         id: 'buttons',
         title: 'Buttons',
-        blurb: 'Solid, rectangular actions. `.btn` is the base; add one intent class. '
+        blurb: 'Tinted, rectangular actions — a wash, a deep edge and a light label, one shape for every intent. `.btn` is the base; add one intent class. '
              + 'One size — the compact metrics that used to be `.btn-sm` are now the base, '
              + 'and the modifier is gone (#277).',
         specimens: [
-            { cls: 'btn btn-primary',   as: 'button', label: 'Primary',   note: 'Additive / available actions — Add, Save, View.' },
+            { cls: 'btn btn-commit',    as: 'button', label: 'Commit',    note: 'The one action a view or modal exists to take — Save, Import N. Orange, the "now" hue; the only solid fill.' },
+            { cls: 'btn btn-primary',   as: 'button', label: 'Go ↘',      note: 'Takes you somewhere — Tests & Data ↘, Open chart ↘. Blue is location and selection.' },
             { cls: 'btn btn-secondary', as: 'button', label: 'Secondary', note: 'Cancel, Back, and the unselected half of an exclusive pair.' },
-            { cls: 'btn btn-edit',      as: 'button', label: 'Edit',      note: 'Edit actions. Currently the same green as success.' },
+            { cls: 'btn btn-edit',      as: 'button', label: 'Edit',      note: 'Edit actions. The same neutral as Secondary — green is the success hue.' },
             { cls: 'btn btn-warning',   as: 'button', label: 'Warning',   note: 'Attention-drawing but not destructive.' },
             { cls: 'btn btn-danger',    as: 'button', label: 'Danger',    note: 'Destructive. Delete, Remove.' },
             { cls: 'btn-icon-danger',   as: 'button', label: 'Danger · icon',
               note: 'A destructive glyph that stays quiet until you approach it — a row × , a clear-column ×.' },
+            { cls: 'btn-symbol',        as: 'span',   label: '⌧',
+              note: 'A text symbol leading a button label — ⌧ on the chips row\'s Clear. Text, not an image, so it takes the button\'s color in either theme.' },
             { cls: 'btn-tab',        as: 'button', label: 'Nav tab',   note: 'Top-level navigation. Add `.active` for the current one.' },
             { cls: 'btn-tab active', as: 'button', label: 'Nav tab · active' },
             { cls: 'btn-subtab',        as: 'button', label: 'Sub-tab',
@@ -278,9 +285,9 @@ export const SECTIONS = [
             { cls: 'guide-chip',        as: 'button', label: 'Filter chip',  note: 'The shared chip metrics — text-xs, px-2 py-0.5.' },
             { cls: 'guide-chip active', as: 'button', label: 'Filter chip · active' },
             { cls: 'tag-filter-btn tag-filter-na',  as: 'button', label: 'Tag filter · off',  note: 'Was text-sm/px-3 py-1; now matches the filter chip.' },
-            { cls: 'tag-filter-btn tag-filter-and', as: 'button', label: 'Tag filter · AND',  note: 'Raw bg-blue-500, outside the token system.' },
-            { cls: 'tag-filter-btn tag-filter-or',  as: 'button', label: 'Tag filter · OR',   note: 'Raw bg-green-500.' },
-            { cls: 'tag-filter-btn tag-filter-not', as: 'button', label: 'Tag filter · NOT',  note: 'Raw bg-red-500.' },
+            { cls: 'tag-filter-btn tag-filter-and', as: 'button', label: 'Tag filter · AND',  note: 'Primary tint.' },
+            { cls: 'tag-filter-btn tag-filter-or',  as: 'button', label: 'Tag filter · OR',   note: 'Success tint.' },
+            { cls: 'tag-filter-btn tag-filter-not', as: 'button', label: 'Tag filter · NOT',  note: 'Danger tint — the exclusion.' },
             { cls: 'selected-vehicle-chip', as: 'span', label: 'Selected vehicle', note: 'Persistent selection row. No border — "blue on blue".' },
             { cls: 'combobox-chip', as: 'span', label: 'Model Y LR · 2021',
               note: 'A vehicle picker\'s chosen vehicle: the name button reopens the search, the × beside it clears. Shown without them — the specimen is the pill.' },
@@ -303,7 +310,6 @@ export const SECTIONS = [
               note: 'DEF. The one accent-colored marker, because it is the only one saying which row is privileged rather than what a row measured.' },
             { cls: 'badge-hidden',    as: 'span', label: 'Hidden' },
             { cls: 'badge-status',    as: 'span', label: 'Status' },
-            { cls: 'owner-badge',     as: 'span', label: 'Owner' },
             { cls: 'badge-micro is-qualified', as: 'span', label: 'Corrected' },
             { cls: 'guide-narrowed-chip', as: 'button', label: '2026 ✕',
               note: 'Removes its own value. The opposite of the chips it replaced, which selected one — hence the ✕ and the danger-colored hover.' },

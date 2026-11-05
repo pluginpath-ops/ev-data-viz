@@ -7,13 +7,14 @@
  * it would mean this chart breaks when that lands, for no shared behaviour
  * beyond a checkbox list.
  *
- * It borrows RunSelector's semantic classes (.run-selector-header, .runs-list,
- * .vehicle-run-group, .run-items) so the two read as the same control, and
+ * It borrows RunSelector's section band (SectionBand) and semantic classes
+ * (.runs-list, .vehicle-run-group, .run-items) so the two read as the same control, and
  * groups by DRIVE MODE inside each vehicle, which is the axis that matters
  * here: a session is the same launch repeated, and picking runs means picking
  * which modes and which attempts within them.
  */
 import { useState } from 'react';
+import SectionBand from '../SectionBand';
 import RunSourceLinks from '../RunSourceLinks';
 import SeriesColorPicker from '../SeriesColorPicker';
 import { DEFAULT_RUN_COLOR } from '../../utils/colorUtils';
@@ -47,11 +48,12 @@ export default function PerformanceRunSelector({
 
     return (
         <div>
-            <button onClick={() => setExpanded(e => !e)} className="run-selector-header">
-                <span style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
-                Select Runs to Plot
-                <span className="text-sm font-normal text-secondary">({effective.length} of {allIds.length})</span>
-            </button>
+            <SectionBand
+                open={expanded}
+                onToggle={setExpanded}
+                label="Select runs to plot"
+                count={`${effective.length} / ${allIds.length}`}
+            />
 
             {expanded && (
                 <div className="mt-3">

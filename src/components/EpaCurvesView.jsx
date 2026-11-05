@@ -1,16 +1,19 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import Chart from 'chart.js/auto';
+import { useChartReadout } from '../hooks/useChartReadout';
+import { readoutNumber, withUnit } from '../utils/readoutAtX';
 import { useTheme } from '../hooks/useTheme';
 import { useAppContext } from '../context/AppContext';
 import { convSpeed, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { vehicleLabel, resolveEffectiveSpecs } from '../utils/specHelpers';
+import { buildVehicleLabels } from '../utils/seriesLabel';
 import { PALETTE } from '../utils/specHelpers';
-import { resolveChartColors, seriesRowsOf, applyColorOverrides, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { resolveChartColors, seriesRowsOf, applyColorOverrides, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import {
     resolveUseableKwh, resolveUseableKwhSource,
     HIGHWAY_BAND_MPH, MPG_E_CONVERSION,
 } from '../utils/epaPhysics';
-import { buildEpaCurveFromModel, resolveCurveEta, resolvePrimaryCoeffs, correctMeasuredConsumption, STANDARD_TEMP_F, DEFAULT_ACCESSORY_W } from '../utils/epaDerivations';
+import { buildEpaCurveFromModel, resolveCurveEta, resolvePrimaryCoeffs, correctMeasuredConsumption, curveAccessoryW } from '../utils/epaDerivations';
 import { filterRangeRuns } from '../utils/runUtils';
 import AxisScaleControls from './AxisScaleControls';
 import InfoIcon from './InfoIcon';
@@ -20,18 +23,30 @@ import { EPA_EXPLAINERS } from '../utils/epaExplainers';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { useSourceLine } from '../hooks/useSourceLine';
 import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
 import CollapsibleSection from './CollapsibleSection';
-import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE } from '../constants/epa';
+import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE, STANDARD_CONDITIONS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromTestVehicle, NO_RECORD_REASONS } from '../utils/epaRecordFromTestVehicle';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
+import ColorSourceNote from './ColorSourceNote';
 import { useRunSelection } from '../hooks/useRunSelection';
-import ViewingConditions, { useViewingConditions } from './epa/ViewingConditions';
+import WindAndElevationFields from './epa/WindAndElevationFields';
+import CorrectionTargetFields from './CorrectionTargetFields';
+import { normalizeCorrectionTarget, accessoryText } from '../utils/correctionSettings';
+import { useViewingConditions } from '../hooks/useViewingConditions';
+import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
+import FeatureChartButton from './home/FeatureChartButton';
+import { useAxisLimits } from '../hooks/useAxisLimits';
+import CopyPngButton from './charts/CopyPngButton';
+
+const NO_RUNS = [];
+const EPA_TESTS = { tests: true };
 
 
 // ── Highway band plugin ───────────────────────────────────────────────────────
@@ -221,8 +236,12 @@ function mappingColor(baseColor, mappingIdx) {
  * Props:
  *   vehicles           {Array}    — full vehicles array from context (with epa_mappings)
  *   selectedVehicleIds {Array}    — currently selected vehicle IDs
- *   epaConfig          {object}   — { yAxis, xMin, xMax, yMin, yMax }
+ *   epaConfig          {object}   — { yAxis, selectedMappings, mappingColors, overlay, extras }
  *   setEpaConfig       {function}
+ *   correctionTarget   {object}   — the site-wide correction target (altitude, temperature and
+ *                                   accessory load; speed is the x axis). Modeled Efficiency does
+ *                                   not follow the "Correct:" mode: it is a model, with no measured
+ *                                   figure to leave uncorrected, so the target always applies (#449)
  *   presentationMode   {boolean}  — strips controls for popout window
  */
 export default function EpaCurvesView({
@@ -231,29 +250,41 @@ export default function EpaCurvesView({
     epaConfig,
     setEpaConfig,
     presentationMode = false,
-    palette = VEHICLE_PALETTE,
+    palette = DEFAULT_SERIES_PALETTE,
     setChartConfig = null,
+    correctionTarget = undefined,
 }) {
     const { units } = useAppContext();
     const { isDark } = useTheme();
     const canvasRef = useRef(null);
+    const readout = useChartReadout();
     const chartRef  = useRef(null);
 
     // ── UI state ──────────────────────────────────────────────────────────────
     const [urlCopied,        setUrlCopied]        = useState(false);
-    // Altitude, temperature, and accessory load are viewing conditions (like the
-    // unit toggle): they scale the plotted curve at plot time for ALL curves.
-    // Never persisted; never affect stored coefficients, accessory fields, or
-    // the standard-condition η.
-    // Viewing conditions — altitude, temperature, accessory load, wind, grade.
-    // Shared with the certification-anchored curves (#237) rather than kept
-    // here, so the two cannot compute air density differently.
-    const conditions = useViewingConditions();
+    // The curve is drawn under the SHARED correction target — altitude,
+    // temperature and accessory load, the same sliders every chart and the
+    // vehicle table read — and under two extras of its own, wind and elevation
+    // gain/loss, held in the hook and mirrored to epaConfig so a pop-out is
+    // driven by them (it has no controls, and used to draw standard conditions
+    // whatever the main window showed). Display-time only: none of it touches
+    // stored coefficients, accessory fields, or the standard-condition η.
+    // Shared with the certification-anchored curves (#237), so the two cannot
+    // compute air density slightly differently.
+    const conditions = useViewingConditions({
+        driven: presentationMode ? (epaConfig.extras ?? null) : null,
+        target: correctionTarget,
+    });
     const {
-        densityRatio, densityAdjusted, accessoryAdjusted, accessoryOverrideWNum,
+        densityRatio, densityAdjusted, accessoryAdjusted, accessoryDeltaW,
         windAdjusted, windSpeedMphNum, windDirectionDegNum,
         gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted,
     } = conditions.derived;
+    const extrasKey = JSON.stringify(conditions.values);
+    useEffect(() => {
+        if (presentationMode) return;
+        setEpaConfig?.(prev => (JSON.stringify(prev.extras) === extrasKey ? prev : { ...prev, extras: JSON.parse(extrasKey) }));
+    }, [extrasKey, presentationMode, setEpaConfig]);
 
     // Overlay real-world range-test points on top of the curve. null = off.
     // 'corrected' scales each point (temp, wind, and elevation gain/loss) to
@@ -266,13 +297,21 @@ export default function EpaCurvesView({
     const setOverlayMode = (mode) => setEpaConfig?.(prev => ({ ...prev, overlay: mode }));
 
 
-    const { yAxis, xMin, xMax, yMin, yMax } = epaConfig;
+    const { yAxis } = epaConfig;
+    // Axis limits live in chartConfig, not here (#478). They were epaConfig
+    // fields, which the pop-out carried but the chart link never wrote or read.
+    const { limits: { xMin, xMax, yMin, yMax }, setLimit } = useAxisLimits('epacurves');
 
     // ── Vehicle lists ─────────────────────────────────────────────────────────
 
     const selectedVehicles = useMemo(() =>
         selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
     [vehicles, selectedVehicleIds]);
+
+    // What each selected vehicle is called: its curated name, widened only where
+    // two selected vehicles would otherwise read the same.
+    const vehicleNames = useMemo(() => buildVehicleLabels(selectedVehicles), [selectedVehicles]);
+    const nameOf = useCallback(v => vehicleNames.get(v.id)?.short ?? vehicleLabel(v), [vehicleNames]);
 
     const vehiclesWithEpa    = selectedVehicles.filter(v => v.epa_mappings?.length > 0);
     const vehiclesWithoutEpa = selectedVehicles.filter(v => !v.epa_mappings?.length);
@@ -385,7 +424,7 @@ export default function EpaCurvesView({
         let shownIdx = 0;
         return {
             ...vehicle,
-            name: vehicleLabel(vehicle),
+            name: nameOf(vehicle),
             runs: (vehicle.epa_mappings ?? []).map((mapping) => {
                 const testVehicle = mapping.epaTestVehicle;
                 if (!testVehicle) return null;
@@ -404,7 +443,7 @@ export default function EpaCurvesView({
                 };
             }).filter(Boolean),
         };
-    }), [vehiclesWithEpa, vehicles, vehicleColorMap, shown]);
+    }), [vehiclesWithEpa, vehicles, vehicleColorMap, shown, nameOf]);
 
     /**
      * Everything the picker's wider scopes are allowed to touch.
@@ -459,7 +498,7 @@ export default function EpaCurvesView({
                 // no grade, drop the curve (and its overlay) entirely and flag it.
                 if (gradeAdjusted && !resolvePrimaryCoeffs(epaTestVehicle)?.equivTestWeightLbs) {
                     missingWeightWarnings.push({
-                        vehicleName: vehicleLabel(vehicle),
+                        vehicleName: nameOf(vehicle),
                         epaLabel: epaTestVehicle.display_name || epaTestVehicle.epa_carline_name,
                     });
                     return;
@@ -467,7 +506,7 @@ export default function EpaCurvesView({
 
                 const useableKwh       = resolveUseableKwh(epaTestVehicle, effectiveVehicle);
                 const useableKwhSource = resolveUseableKwhSource(epaTestVehicle, effectiveVehicle);
-                const curve            = buildEpaCurveFromModel(epaTestVehicle, useableKwh, densityRatio, accessoryOverrideWNum, windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum);
+                const curve            = buildEpaCurveFromModel(epaTestVehicle, useableKwh, densityRatio, curveAccessoryW(epaTestVehicle, accessoryDeltaW), windSpeedMphNum, windDirectionDegNum, gradeGainFtNum, gradeDistanceMilesNum);
                 if (!curve.length) return;
 
                 // Color: user override → vehicleColorMap/vehicle color → palette (with alpha for 2nd+ mapping)
@@ -475,8 +514,8 @@ export default function EpaCurvesView({
                 const color = mappingColors[mapping.id] ?? mappingColor(baseColor, mi);
                 const epaLabel = epaTestVehicle.display_name || epaTestVehicle.epa_carline_name;
                 const baseLabel = vehiclesWithEpa.length > 1 || mi > 0
-                    ? `${vehicleLabel(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
-                    : vehicleLabel(vehicle);
+                    ? `${nameOf(vehicle)}${vehicle.epa_mappings.length > 1 ? ` (${epaLabel})` : ''}`
+                    : nameOf(vehicle);
                 // Subtle "adjusted" marker on each curve's legend entry (density or accessory load).
                 const label = (densityAdjusted || accessoryAdjusted || windAdjusted || gradeAdjusted) ? `${baseLabel} ▲` : baseLabel;
 
@@ -510,7 +549,7 @@ export default function EpaCurvesView({
                 if (overlayMode) {
                     const viewConditions = {
                         densityRatio,
-                        accessoryOverrideW:     accessoryOverrideWNum,
+                        accessoryDeltaW,
                         windSpeedMph:           windSpeedMphNum,
                         windDirectionDeg:       windDirectionDegNum,
                         elevationGainFt:        gradeGainFtNum,
@@ -568,7 +607,7 @@ export default function EpaCurvesView({
             });
         });
         return { datasets: result, missingWeightWarnings };
-    }, [vehiclesWithEpa, vehicles, yAxis, units, shown, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryOverrideWNum, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode]);
+    }, [vehiclesWithEpa, vehicles, yAxis, units, shown, mappingColors, vehicleColorMap, densityRatio, densityAdjusted, accessoryDeltaW, accessoryAdjusted, windSpeedMphNum, windDirectionDegNum, windAdjusted, gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted, overlayMode, nameOf]);
 
     // ── Chart build / rebuild ─────────────────────────────────────────────────
     useEffect(() => {
@@ -587,7 +626,14 @@ export default function EpaCurvesView({
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
-            plugins: [refPlugin, calloutPlugin],
+            plugins: [refPlugin, calloutPlugin, readout.plugin({
+                title: (x) => `${readoutNumber(x)} ${speedLabel(units)}`,
+                subtitle: yAxisLabel(yAxis, units),
+                describe: (row) => ({
+                    name: datasets[row.datasetIndex].label,
+                    value: withUnit(readoutNumber(row.y), yAxis === 'range_mi' ? distanceLabel(units) : yAxisLabel(yAxis, units)),
+                }),
+            })],
             data: { datasets },
             options: {
                 animation: false,
@@ -645,63 +691,15 @@ export default function EpaCurvesView({
                             },
                         },
                     },
-                    tooltip: {
-                        callbacks: {
-                            title(items) {
-                                const spd = items[0]?.parsed.x;
-                                return `${spd?.toFixed(1)} ${speedLabel(units)}`;
-                            },
-                            label(item) {
-                                const ds = item.dataset;
-                                if (ds._isOverlay) {
-                                    // Overlay points are already corrected/converted at build
-                                    // time (see the datasets useMemo) — use the plotted value
-                                    // directly rather than re-deriving from a curve.
-                                    const decimals = yAxis === 'range_mi' ? 0 : yAxis === 'mi_kwh' ? 2 : 1;
-                                    return `${ds.label}: ${item.parsed.y?.toFixed(decimals)} ${yAxisLabel(yAxis, units)}`;
-                                }
-                                const curve = ds._curve;
-                                const speedMph = units === 'metric'
-                                    ? item.parsed.x / 1.60934
-                                    : item.parsed.x;
-                                const pt = curve?.reduce((best, p) =>
-                                    Math.abs(p.mph - speedMph) < Math.abs(best.mph - speedMph) ? p : best
-                                , curve[0]);
-                                if (!pt) return ds.label;
-
-                                let valStr = '';
-                                if (yAxis === 'kwh100mi') {
-                                    valStr = pt.kwh100mi != null
-                                        ? `${(units === 'metric' ? pt.kwh100mi / 1.60934 : pt.kwh100mi).toFixed(1)} ${units === 'metric' ? 'kWh/100km' : 'kWh/100mi'}`
-                                        : '—';
-                                } else if (yAxis === 'wh_mi') {
-                                    const wh = pt.kwh100mi != null ? pt.kwh100mi * 10 : null;
-                                    valStr = wh != null
-                                        ? `${(units === 'metric' ? wh / 1.60934 : wh).toFixed(1)} ${units === 'metric' ? 'Wh/km' : 'Wh/mi'}`
-                                        : '—';
-                                } else if (yAxis === 'mi_kwh') {
-                                    valStr = pt.miPerKwh != null
-                                        ? `${(units === 'metric' ? pt.miPerKwh * 1.60934 : pt.miPerKwh).toFixed(2)} ${units === 'metric' ? 'km/kWh' : 'mi/kWh'}`
-                                        : '—';
-                                } else if (yAxis === 'mpge') {
-                                    valStr = pt.mpge != null ? `${pt.mpge.toFixed(1)} MPGe` : '—';
-                                } else if (yAxis === 'range_mi') {
-                                    valStr = pt.rangeMi != null
-                                        ? `${(units === 'metric' ? pt.rangeMi * 1.60934 : pt.rangeMi).toFixed(0)} ${distanceLabel(units)}`
-                                        : '—';
-                                }
-                                return `${ds.label}: ${valStr}`;
-                            },
-                        },
-                        mode: 'nearest',
-                        intersect: false,
-                    },
+                    // The readout answers hovers here (#455): the curves are
+                    // interpolated, the real-world overlay points are sampled.
+                    tooltip: { enabled: false },
                 },
             },
         });
 
         return () => { chartRef.current?.destroy(); chartRef.current = null; };
-    }, [datasets, yAxis, units, isDark, xMin, xMax, yMin, yMax]);
+    }, [datasets, yAxis, units, isDark, xMin, xMax, yMin, yMax, readout]);
 
     // ── The frame's caption, and its export ─────────────────────────────────
     // The export was a hand-rolled copy of chartToPngDataUrl that drew the
@@ -714,8 +712,7 @@ export default function EpaCurvesView({
     );
 
     const plotSubtitle = useMemo(() => {
-        const n = datasets.filter(d => !d._isOverlay).length;
-        const parts = [`${n} curve${n === 1 ? '' : 's'}`, 'from EPA road-load coefficients'];
+        const parts = ['from EPA road-load coefficients'];
         const c = conditions?.values ?? {};
         // These are TEXT INPUT values, so an empty field is '' rather than null
         // — and `'' != null` is true, so a `!= null` guard let the empty string
@@ -723,19 +720,30 @@ export default function EpaCurvesView({
         // read as absent, not as zero, on a chart whose whole subject is the
         // conditions it was drawn under.
         const num = v => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
-        const t = num(c.tempF);
         const w = num(c.windSpeedMph);
-        const el = num(c.elevationFt);
-        if (t != null) parts.push(fmtTemp(t, units));
+        // The target's figures, named only where they differ from the standard
+        // conditions the curve is anchored to: a default chart says nothing.
+        const target = normalizeCorrectionTarget(correctionTarget);
+        if (target.temperatureF !== STANDARD_CONDITIONS.temperatureF) parts.push(fmtTemp(target.temperatureF, units));
         parts.push(w ? `${fmtSpeed(w, units)} wind` : 'still air');
-        if (el) parts.push(`${Math.round(el)} ft`);
+        if (target.altitudeFt !== STANDARD_CONDITIONS.altitudeFt) parts.push(`${Math.round(target.altitudeFt)} ft`);
+        if (target.accessoryW != null) parts.push(`${accessoryText(target.accessoryW)} accessories`);
         if (overlayMode) parts.push(`${overlayMode === 'corrected' ? 'corrected' : 'raw'} tests overlaid`);
         parts.push(units === 'metric' ? 'metric' : 'imperial');
         return parts.join(' · ');
-    }, [datasets, conditions, overlayMode, units]);
+    }, [conditions, correctionTarget, overlayMode, units]);
 
-    const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+    // The curves are EPA's tests; the overlay, when on, adds ours.
+    const overlayRuns = useMemo(
+        () => overlayMode
+            ? vehiclesWithEpa.flatMap(v => filterRangeRuns(v.runs).filter(r => !r._inherited && r.speed_mph != null && r.distance_miles > 0 && r.energy_kwh != null))
+            : NO_RUNS,
+        [overlayMode, vehiclesWithEpa]);
+    const sourceLine = useSourceLine({ runs: overlayRuns, epa: EPA_TESTS });
+
+    const { copyPng, copyPngBeside, copiedBeside, copied: imageCopied, preview, dismissPreview } =
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
+            signature: String(datasets.length) });
 
     const handleCopyUrl = () => {
         navigator.clipboard.writeText(window.location.href).then(() => {
@@ -763,7 +771,7 @@ export default function EpaCurvesView({
                 if (!epaTestVehicle) continue;
                 if (!shown.has(mapping.id)) continue;
 
-                const vehicleName = vehicleLabel(vehicle);
+                const vehicleName = nameOf(vehicle);
                 const epaLabel = epaTestVehicle.display_name || epaTestVehicle.epa_carline_name || null;
                 const { record, reason } =
                     epaRecordFromTestVehicle(epaTestVehicle, { vehicleName, configuration: epaLabel });
@@ -788,22 +796,13 @@ export default function EpaCurvesView({
             }
         }
         return out;
-    }, [vehiclesWithEpa, shown]);
+    }, [vehiclesWithEpa, shown, nameOf]);
 
     const methodologyModels = methodologyEntries.filter(e => e.model);
     const methodologyGaps   = methodologyEntries.filter(e => !e.model);
 
-    // ── Empty state ───────────────────────────────────────────────────────────
-    if (selectedVehicleIds.length === 0) {
-        return (
-            <div>
-                <h2 className="page-title mb-6">Modeled Efficiency · selected vehicles</h2>
-                <div className="empty-state">
-                    <p className="text-lg">No vehicles selected. Select vehicles from the Vehicles tab to see their modeled efficiency beside their tests.</p>
-                </div>
-            </div>
-        );
-    }
+    // Nothing selected never reaches here: App draws SelectionEmptyState, the
+    // same for every chart, and PresentedChart only draws with a selection.
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
@@ -861,9 +860,9 @@ export default function EpaCurvesView({
                             Overlay real-world tests
                             <InfoIcon
                                 title="Overlay real-world tests"
-                                text="Plot this vehicle's own range-test points over its curve — corrected to the viewing conditions above, or exactly as recorded."
+                                text="Plot this vehicle's own range-test points over its curve — corrected to the conditions above, or exactly as recorded."
                             >
-                                    <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature, wind, and elevation gain/loss to match the curve's current viewing conditions above — an apples-to-apples comparison.</p>
+                                    <p className="mt-1.5"><strong>Corrected:</strong> scaled by temperature, accessory load, wind, and elevation gain/loss to match the conditions the curve is drawn under — an apples-to-apples comparison.</p>
                                     <p className="mt-1.5"><strong>Uncorrected:</strong> the raw measured value as recorded, unadjusted — not a valid comparison across different test conditions, but useful to see the true recorded data.</p>
                             </InfoIcon>
                         </span>
@@ -892,13 +891,25 @@ export default function EpaCurvesView({
                         </div>
                     </div>
 
-                    {/* The viewing-condition controls, shared with the
-                        certification-anchored curves (#237). The overlay above
-                        stays here: it plots a VEHICLE's own range runs, which
-                        that view has no way to reach. */}
+                    {/* The shared correction target, less its speed (speed is
+                        this chart's x axis), and Modeled Efficiency's own
+                        extras. No "Correct:" dropdown: the sliders always
+                        apply, because a modelled curve has no measured value
+                        to leave uncorrected. The overlay above stays here: it
+                        plots a VEHICLE's own range runs, which the
+                        certification view has no way to reach. */}
+                    {setChartConfig && (
+                        <div className="chart-rail-group">
+                            <CorrectionTargetFields
+                                fields={['temperatureF', 'altitudeFt', 'accessoryW']}
+                                target={correctionTarget}
+                                onChange={t => setChartConfig(prev => ({ ...prev, correctionTarget: t }))}
+                            />
+                        </div>
+                    )}
                     <div className="chart-rail-group">
-                        <span className="text-micro">Viewing conditions</span>
-                        <ViewingConditions conditions={conditions} />
+                        <span className="text-micro">Wind &amp; elevation change</span>
+                        <WindAndElevationFields conditions={conditions} />
                     </div>
 
 
@@ -908,17 +919,6 @@ export default function EpaCurvesView({
                         </div>
                     )}
 
-                    {/* ── DISPLAY ── where every other chart in this section
-                      * keeps Auto Color, rather than tucked into the subject
-                      * selector's header. */}
-                    {setChartConfig && (
-                        <div className="chart-rail-group">
-                            <span className="text-micro">Display</span>
-                            {/* No .display-grid: that is a two-column grid for
-                                checkboxes, and this group holds one select. */}
-                            <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />
-                        </div>
-                    )}
 
                     {/* ── SELECT ── the certification records this chart draws.
                       *
@@ -941,6 +941,7 @@ export default function EpaCurvesView({
                                 <InfoIcon text={EPA_EXPLAINERS.curveEta} />
                             </span>
                             <RunSelector
+                                colorControl={<ColorSourceNote palette={palette} setChartConfig={setChartConfig} />}
                                 vehicles={selectorVehicles}
                                 selectedRunIds={selectedMappings}
                                 onToggleRun={toggleMapping}
@@ -962,7 +963,7 @@ export default function EpaCurvesView({
                                 has not opened the list. */}
                             {vehiclesWithoutEpa.length > 0 && (
                                 <p className="text-note">
-                                    No EPA data: {vehiclesWithoutEpa.map(v => vehicleLabel(v)).join(', ')}
+                                    No EPA data: {vehiclesWithoutEpa.map(v => nameOf(v)).join(', ')}
                                     {' '}— link a test vehicle via Edit Vehicle.
                                 </p>
                             )}
@@ -984,30 +985,27 @@ export default function EpaCurvesView({
                 <PlotFrame
                     title={plotTitle}
                     subtitle={plotSubtitle}
+                    sourceLine={sourceLine}
                     preview={preview}
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
                         <>
+                            {setChartConfig && <SeriesPaletteSelect palette={palette} setChartConfig={setChartConfig} />}
+                            <FeatureChartButton />
                             <button
                                 onClick={handleCopyUrl}
                                 className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
                                 title="Copy link to this chart view"
                             >
-                                {urlCopied ? '✓ Copied' : '🔗 URL'}
+                                {urlCopied ? '✓ Copied' : 'URL'}
                             </button>
-                            <button
-                                onClick={copyPng}
-                                disabled={!datasets.length}
-                                className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                                title="Copy the framed chart as a PNG"
-                            >
-                                {imageCopied ? '✓ Copied' : 'PNG'}
-                            </button>
+                            <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} disabled={!datasets.length} />
                         </>
                     )}
                 >
-                    <div style={{ height: presentationMode ? 'calc(100vh - 2rem)' : 500 }}>
+                    <div className="chart-readout-host" style={{ height: presentationMode ? PRESENTED_HEIGHT : 500 }}>
                         <canvas ref={canvasRef} />
+                        {readout.overlay}
                     </div>
                     <p className="text-note mt-2">Shaded band — 65–75 mph typical highway</p>
                 </PlotFrame>
@@ -1026,7 +1024,7 @@ export default function EpaCurvesView({
                     xMin={xMin} xMax={xMax} yMin={yMin} yMax={yMax}
                     xAxisLabel={`Speed (${speedLabel(units)})`}
                     yAxisLabel={yAxisLabel(yAxis, units)}
-                    onChange={(key, value) => setEpaConfig(p => ({ ...p, [key]: value }))}
+                    onChange={setLimit}
                 />
             )}
 

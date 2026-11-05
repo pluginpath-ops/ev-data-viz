@@ -12,6 +12,14 @@
 # the repo would be a third copy of the same facts — able to disagree with both,
 # conflicting on every branch, and stale the moment someone merged without
 # regenerating it.
+#
+# Three jobs, not one. Lint, test and build do not read each other's output, so
+# running them in sequence only added their times together: lint ~30s, test
+# ~15s, build ~5s was a ~70s run where the slowest of them is a ~35s one. Each
+# repeats checkout + `npm ci` (~5s, mostly cached) — cheap next to the overlap.
+# The tests are NOT split by area: the wiring, drift, contrast and stylesheet
+# suites exist to catch a change breaking something far from where it was made,
+# and a path filter would switch exactly those off. They total ~5s anyway.
 name: CI
 
 on:
@@ -26,7 +34,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,22 +48,61 @@ jobs:
       # package.json and package-lock.json disagree.
       - run: npm ci
 
+      # ~9 of lint's ~12s is the React Compiler analysis behind the
+      # `react-hooks/*` warnings, run on every file. ESLint's cache skips files
+      # whose content and config are unchanged and still reports their stored
+      # warnings, so a warm run is ~1s and the annotations are unchanged. The
+      # cache is keyed on the run so each run saves the newest state;
+      # restore-keys picks up the latest one. A config or plugin change
+      # invalidates the entries by itself — ESLint hashes both into the cache.
+      - name: Restore ESLint cache
+        uses: actions/cache@v4
+        with:
+          path: .eslintcache
+          key: eslint-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: eslint-${{ runner.os }}-
+
       # Zero errors is the bar; the warnings are a visible backlog, per
       # CLAUDE.md. `--max-warnings` is deliberately NOT set — a lint that fails
       # on arrival is one nobody runs.
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --cache
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
 
       # The ratchets live here. A drift count that no longer matches the ledger
       # fails this step and says which number to write down.
       - name: Test
         run: npm test
 
-      - name: Build
-        run: npm run build
-
-      # Last, and never gating: it is a view of numbers the suites already
-      # asserted. If it disagreed with them, the Test step would have failed.
+      # After the tests, and never gating: it is a view of numbers the suites
+      # already asserted. If it disagreed with them, the Test step would have
+      # failed. It reads source files only, so it does not need the build.
       - name: Ratchets
         if: always()
         run: npm run health --silent -- --markdown >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build

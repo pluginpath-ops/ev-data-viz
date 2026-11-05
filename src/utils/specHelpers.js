@@ -4,9 +4,41 @@ import { platformProvides } from './platforms';
 
 // ── Vehicle display label ─────────────────────────────────────────────────────
 
+/** Lowercased alphanumeric words of a string: "Premium AWD" -> ["premium", "awd"]. */
+const words = (s) => String(s).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/**
+ * True when `part` already appears inside `earlier`, as a whole run of words.
+ * Case-insensitive and ignores punctuation, but never matches inside a word:
+ * "L" is not contained in "Long Range", nor "3" in "Model 30", so a trim that
+ * merely shares letters with the name is kept. (`vehicleDetailLabel` uses a
+ * plain substring test, which would drop that "L".) A part with no words at
+ * all is never "contained" — it is kept as written.
+ */
+function containedIn(earlier, part) {
+    const need = words(part);
+    if (!need.length) return false;
+    const have = words(earlier);
+    for (let i = 0; i + need.length <= have.length; i++) {
+        if (need.every((w, k) => have[i + k] === w)) return true;
+    }
+    return false;
+}
+
+/**
+ * What we CALL a vehicle: `year name · trim`. The year and the trim are each
+ * dropped when the name already carries them as whole words, so a vehicle named
+ * "Model Y Premium AWD" with trim "Premium AWD" reads "2026 Model Y Premium AWD"
+ * rather than "... · Premium AWD". A missing name, year or trim is simply left
+ * out. Display only: it does not edit the stored name.
+ */
 export function vehicleLabel(v) {
-    const base = v?.year ? `${v.year} ${v.name}` : (v?.name ?? '');
-    return v?.trim ? `${base} · ${v.trim}` : base;
+    const clean = (x) => (x == null ? '' : String(x).trim());
+    const name = clean(v?.name);
+    const year = clean(v?.year);
+    const trim = clean(v?.trim);
+    const base = [year && !containedIn(name, year) ? year : '', name].filter(Boolean).join(' ');
+    return trim && !containedIn(base, trim) ? (base ? `${base} · ${trim}` : trim) : base;
 }
 
 /**
@@ -81,6 +113,16 @@ export function vehicleOption(v) {
  */
 export function makeModelLine(v) {
     return [v?.make, v?.model, v?.trim, v?.year].filter(Boolean).join(' · ');
+}
+
+/**
+ * The vehicles a spec chart plots, each carrying `effectiveSpecs` — its own
+ * values, else its source chain's, else its platform's. `extractValue` reads
+ * that in preference to `specs`, so an inherited value plots instead of
+ * showing a blank bar while the table beside it shows the figure.
+ */
+export function withEffectiveSpecs(picked, allVehicles) {
+    return picked.map(v => ({ ...v, effectiveSpecs: resolveEffectiveSpecs(v, allVehicles) }));
 }
 
 // ── Spec inheritance merge ────────────────────────────────────────────────────
@@ -265,9 +307,10 @@ export function vehicleColor(vehicle, idx) {
 export function buildFieldGroups(vehicles, vehicleFields) {
     const catCustomKeys = {};
     for (const v of vehicles) {
-        if (!v.specs) continue;
+        const specs = v.effectiveSpecs ?? v.specs;
+        if (!specs) continue;
         for (const cat of SPEC_CATEGORIES) {
-            const custom = v.specs[cat.key]?._custom || {};
+            const custom = specs[cat.key]?._custom || {};
             if (!catCustomKeys[cat.key]) catCustomKeys[cat.key] = new Set();
             for (const ck of Object.keys(custom)) catCustomKeys[cat.key].add(ck);
         }
@@ -302,7 +345,7 @@ export function getFieldDef(fieldKey, vehicleFields) {
 export function extractValue(vehicle, fieldKey) {
     if (fieldKey.startsWith('vehicle.')) return vehicle[fieldKey.split('.')[1]] ?? null;
     const [catKey, sub, customKey] = fieldKey.split('.');
-    const catData = vehicle.specs?.[catKey];
+    const catData = (vehicle.effectiveSpecs ?? vehicle.specs)?.[catKey];
     if (!catData) return null;
     if (sub === '_custom') return catData._custom?.[customKey] ?? null;
     return catData[sub] ?? null;

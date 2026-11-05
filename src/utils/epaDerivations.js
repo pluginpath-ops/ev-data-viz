@@ -48,8 +48,9 @@ import {
     LBF_MILE_TO_KWH, DEFAULT_ETA, DEFAULT_SS_ETA, HWFET_AVG_MPH, MPG_E_CONVERSION, CURVE_SPEED_RANGE,
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
     ETA_BAND, CHARGER_EFF_BAND, SS_SPEED_BAND, SS_CYCLE_SPEED_MPH,
-    DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF, HWFET_TO_SS_ETA_RATIO,
+    DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF, HWFET_TO_SS_ETA_RATIO, STANDARD_CONDITIONS,
 } from '../constants/epa';
+import { assumedAccessoryW } from './accessoryLoad';
 
 export {
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
@@ -109,10 +110,28 @@ function phaseConsumptionKwh100mi(phases) {
     return dist > 0 ? (dc / dist) * 100 : null;
 }
 
-/** Accessory load in kW from the test vehicle override, defaulting to 300 W. */
-function accessoryKw(testVehicle) {
+/** Accessory load in W from the test vehicle override, defaulting to DEFAULT_ACCESSORY_W. */
+function accessoryW(testVehicle) {
     const w = num(testVehicle?.accessory_load_w_override);
-    return (w != null && w > 0 ? w : DEFAULT_ACCESSORY_W) / 1000;
+    return w != null && w > 0 ? w : DEFAULT_ACCESSORY_W;
+}
+
+/** The same in kW. */
+function accessoryKw(testVehicle) {
+    return accessoryW(testVehicle) / 1000;
+}
+
+/**
+ * The accessory load a curve is drawn with once the reader has moved the shared
+ * correction target (#449): the record's OWN load (its override, else the
+ * default) moved by `deltaW`, the difference between the target's accessory
+ * load and the standard conditions'. At no difference it is null — "use the
+ * record's own, as before" — so a page nobody touched draws exactly the curve it
+ * always did. Never below zero.
+ */
+export function curveAccessoryW(testVehicle, deltaW = 0) {
+    if (!deltaW) return null;
+    return Math.max(0, accessoryW(testVehicle) + deltaW);
 }
 
 /** Battery-side consumption (kWh/100mi) at a steady speed for a given η.
@@ -712,7 +731,7 @@ export function gradeEnergyKwh100mi(weightLbs, elevationGainFt, distanceMiles, e
  * @param {number} speedMph          — the run's recorded test speed
  * @param {number} measuredKwh100mi  — the run's measured consumption (kWh/100mi)
  * @param {object} runConditions     — { temperatureF, altitudeFt, windSpeedMph, windDirectionDeg, elevationGainFt, distanceMiles } as recorded on the run
- * @param {object} viewConditions    — { densityRatio, accessoryOverrideW, windSpeedMph, windDirectionDeg, elevationGainFt, elevationDistanceMiles } — the SAME values driving the curve
+ * @param {object} viewConditions    — { densityRatio, accessoryDeltaW, windSpeedMph, windDirectionDeg, elevationGainFt, elevationDistanceMiles } — the SAME values driving the curve
  * @returns {number|null} corrected kWh/100mi, or null if the model can't be evaluated
  */
 export function correctMeasuredConsumption(testVehicle, speedMph, measuredKwh100mi, runConditions, viewConditions) {
@@ -720,8 +739,19 @@ export function correctMeasuredConsumption(testVehicle, speedMph, measuredKwh100
     if (!coeffs || !speedMph || !measuredKwh100mi) return null;
 
     const eta   = deriveDrivetrainEta(testVehicle).value;
-    const accKw = viewConditions.accessoryOverrideW != null ? viewConditions.accessoryOverrideW / 1000 : accessoryKw(testVehicle);
     const { a, b, c, equivTestWeightLbs } = coeffs;
+
+    // The accessory load at the view is the record's own moved by the target's
+    // difference from standard (curveAccessoryW); at the run it is the same
+    // record's moved by the load the run's own weather is ASSUMED to have
+    // cost (accessoryLoad.js), so a cold test is not credited with a heater it
+    // did not need. Both are measured from the standard conditions' load, which
+    // is why a default view and a test at standard temperature leave it
+    // unchanged, as they did when this was one constant on both sides.
+    const ownW = accessoryW(testVehicle);
+    const standardW = assumedAccessoryW(STANDARD_CONDITIONS.temperatureF);
+    const accKwAtView = Math.max(0, ownW + (viewConditions.accessoryDeltaW ?? 0)) / 1000;
+    const accKwAtRun  = Math.max(0, ownW + assumedAccessoryW(runConditions.temperatureF) - standardW) / 1000;
 
     // Altitude AND temperature, matching how the view side builds its ratio.
     // This was temperature alone, so a measurement was always priced as though
@@ -733,8 +763,8 @@ export function correctMeasuredConsumption(testVehicle, speedMph, measuredKwh100
     const cAtRun  = c * runDensityRatio;
     const cAtView = c * viewConditions.densityRatio;
 
-    const predictedAtRun  = batteryConsumptionAt(speedMph, a, b, cAtRun,  eta, accKw, runConditions.windSpeedMph  || 0, runConditions.windDirectionDeg  || 0);
-    const predictedAtView = batteryConsumptionAt(speedMph, a, b, cAtView, eta, accKw, viewConditions.windSpeedMph || 0, viewConditions.windDirectionDeg || 0);
+    const predictedAtRun  = batteryConsumptionAt(speedMph, a, b, cAtRun,  eta, accKwAtRun,  runConditions.windSpeedMph  || 0, runConditions.windDirectionDeg  || 0);
+    const predictedAtView = batteryConsumptionAt(speedMph, a, b, cAtView, eta, accKwAtView, viewConditions.windSpeedMph || 0, viewConditions.windDirectionDeg || 0);
 
     if (!predictedAtRun || predictedAtRun <= 0 || !predictedAtView) return null;
 
@@ -761,8 +791,9 @@ export function correctMeasuredConsumption(testVehicle, speedMph, measuredKwh100
  * coefficients are never modified — passing 1 (default) reproduces the standard
  * sea-level curve exactly.
  *
- * Accessory load (viewing condition): `accessoryOverrideW`, when given, replaces
- * the test vehicle's stored accessory load for THIS curve only, at plot time. η (which
+ * Accessory load (viewing condition): `accessoryOverrideW`, when given (see
+ * curveAccessoryW), replaces the test vehicle's stored accessory load for THIS
+ * curve only, at plot time. η (which
  * was derived using the test vehicle's own accessory load) is never recomputed.
  *
  * Side wind (viewing condition): `windSpeedMph`/`windDirectionDeg`, when given,

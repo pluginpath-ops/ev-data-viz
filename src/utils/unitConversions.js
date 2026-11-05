@@ -28,7 +28,7 @@ export {
 export const distanceValue = (mi, sys) => sys === 'metric' ? r1(mi * MI_TO_KM) : r1(mi);
 export const distanceUnit  = (sys)     => sys === 'metric' ? 'km' : 'mi';
 export const fmtDistance  = (mi,   sys) => `${distanceValue(mi, sys)} ${distanceUnit(sys)}`;
-export const fmtSpeed     = (mph,  sys) => sys === 'metric' ? `${r1(mph * MI_TO_KM)} kph`          : `${r1(mph)} mph`;
+export const fmtSpeed     = (mph,  sys) => sys === 'metric' ? `${r1(mph * MI_TO_KM)} km/h`        : `${r1(mph)} mph`;
 /**
  * A run's speed basis, when it needs one: an average over a varying-speed cycle
  * rather than a held setpoint.
@@ -42,7 +42,7 @@ export const speedBasisNote = (run) =>
     run?.speed_basis === 'mixed' ? 'mixed cycle' : null;
 
 export const fmtTemp      = (degF, sys) => sys === 'metric' ? `${r1((degF - 32) * 5 / 9)}°C`       : `${r1(degF)}°F`;
-export const fmtWeight    = (lbs,  sys) => sys === 'metric' ? `${r1(lbs * LBS_TO_KG)} kg`          : `${r1(lbs)} lbs`;
+export const fmtWeight    = (lbs,  sys) => sys === 'metric' ? `${r1(lbs * LBS_TO_KG)} kg`          : `${r1(lbs)} lb`;
 export const fmtVolume    = (cuft, sys) => sys === 'metric' ? `${r1(cuft * CUFT_TO_L)} L`          : `${r1(cuft)} cu ft`;
 export const fmtDimension = (in_,  sys) => sys === 'metric' ? `${Math.round(in_ * IN_TO_MM)} mm`   : `${r1(in_)} in`;
 export const fmtTorque    = (lbft, sys) => sys === 'metric' ? `${r1(lbft * LBFT_TO_NM)} Nm`       : `${r1(lbft)} lb-ft`;
@@ -57,7 +57,7 @@ export const convTemp     = (degF, sys) => sys === 'metric' ? r1((degF - 32) * 5
 // ── Unit label strings ────────────────────────────────────────────────────
 
 export const distanceLabel = sys => sys === 'metric' ? 'km'  : 'mi';
-export const speedLabel    = sys => sys === 'metric' ? 'kph' : 'mph';
+export const speedLabel    = sys => sys === 'metric' ? 'km/h' : 'mph';
 export const tempLabel     = sys => sys === 'metric' ? '°C'  : '°F';
 
 // ── Efficiency ────────────────────────────────────────────────────────────

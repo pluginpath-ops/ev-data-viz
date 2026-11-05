@@ -7,7 +7,9 @@ import { autoMapHeaders } from '../utils/csvColumnMapping';
 import PreconditionedSelect from './PreconditionedSelect';
 import { toPreconditioned, preconditionedFormValue } from '../utils/runPreconditioning';
 import ChargerClassSelect from './ChargerClassSelect';
+import ChargerCurrentSelect from './ChargerCurrentSelect';
 import { toChargerClass, chargerClassFormValue } from '../utils/runChargerClass';
+import { toChargerCurrent, chargerCurrentFormValue } from '../utils/chargerCurrentClass';
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
@@ -32,25 +34,30 @@ import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import { RunVoteButtons } from './VoteButtons';
 import RunSourceLinks from './RunSourceLinks';
+import SourceField from './SourceField';
+import { useSources } from '../hooks/useSources';
+import { pickedSource, runSourceText, startingName } from '../utils/sources';
 import EpaVehicleSection from './EpaVehicleSection';
 import PerformanceVehicleSection from './PerformanceVehicleSection';
 import { deriveChargingAxis } from '../utils/deriveChargingAxis';
 import { displayImageUrl } from '../utils/imageRenditions';
 import { isRangeRun, runKindFrom, linkableRuns, linkableCounts, isCompositeRun } from '../utils/runUtils';
-import { isTimestampValue, timestampToMs } from '../utils/parseElapsedTime';
+import { isTimestampValue, timestampToMs, wallClockTimestamp } from '../utils/parseElapsedTime';
 import RunCard from './runs/RunCard';
 import CompositeRunCard from './runs/CompositeRunCard';
+import LineageChargingNote from './runs/LineageChargingNote';
 import VehicleCombobox from './VehicleCombobox';
-import { DATA_FLAGS, RunKindPill, FIELD_META, inferRunFlags } from './runs/runDisplay';
+import { DATA_FLAGS, RunKindBadge, FIELD_META, inferRunFlags } from './runs/runDisplay';
 
 
 
 
 const INHERITED_SECTION_HELP =
-    'Tests borrowed from another vehicle that shares this one\'s hardware — a ' +
-    'trim with the same battery can inherit its charging curves, a battery ' +
-    'variant of the same body can inherit its range tests. Linked per test, ' +
-    'with a scaling factor where the two differ.';
+    'Tests borrowed from another vehicle that shares this one\'s hardware. A ' +
+    'variant\'s charging tests come down its lineage by themselves, unless it ' +
+    'is a battery revision (set with Edit). Anything else — range tests, ' +
+    'or a test from outside the lineage — is linked per test, with a scaling ' +
+    'factor where the two differ.';
 
 // The two knobs on an inherited test (migration 055). What a field IS decides
 // which factors reach it, so neither needs to know the run's kind:
@@ -73,7 +80,7 @@ const EFFICIENCY_HELP =
 // On a charging test efficiency is not inert, but it is nearly so: the only
 // distance such a run carries is the range readout on its data points. Saying
 // so is the difference between "this knob does nothing" and "this knob does
-// one specific thing" — the question the missing kind pill left open.
+// one specific thing" — the question the missing kind badge left open.
 const EFFICIENCY_ON_CHARGING =
     'On a charging test the only distance to scale is the range readout on ' +
     'its data points — kWh and kW are capacity\'s job.';
@@ -98,13 +105,13 @@ const TESTS_SECTION_HELP =
 // Counts are computed from data the view already has, so a tab can say how much
 // is behind it without fetching anything to find out.
 const SUBTABS = [
-    { id: 'tests',       label: '📏 Charging & Range', count: d => d.displayRuns.length },
-    { id: 'inherited',   label: '🔗 Inherited',     count: d => d.inheritedRuns.length },
-    { id: 'performance', label: '⚡ Performance',   count: d => {
+    { id: 'tests',       label: 'Charging & Range', count: d => d.displayRuns.length },
+    { id: 'inherited',   label: 'Inherited',     count: d => d.inheritedRuns.length },
+    { id: 'performance', label: 'Performance',   count: d => {
         const c = d.performanceCounts?.[d.vehicle.id];
         return c ? (c.accel ?? 0) + (c.braking ?? 0) : null;
     } },
-    { id: 'epa',         label: '🏛 EPA',           count: d => d.vehicle.epa_mappings?.length || null },
+    { id: 'epa',         label: 'EPA',           count: d => d.vehicle.epa_mappings?.length || null },
 ];
 
 /** Valid sub-tab ids, for App.jsx to validate the ?sub= URL param against. */
@@ -115,6 +122,9 @@ export const DEFAULT_RUNS_SUBTAB = 'tests';
 
 /** How long a test a link pointed at stays marked, in ms: long enough to find, short enough not to linger. */
 const LINK_TARGET_MS = 2500;
+
+// What the source picker holds before anything is chosen.
+const NO_SOURCE_PICK = { sourceId: null, newName: null };
 
 /**
  * One of the two scaling knobs on an inherited test, as an editable number.
@@ -217,7 +227,7 @@ const DeriveAxisPanel = ({
     const canPreview = !batteryMissing && ready && editData !== null && !editDataLoading;
 
     return (
-        <div className="mt-2 border rounded bg-[var(--color-surface-muted)] p-3 space-y-3">
+        <div className="mt-2 border rounded-xs bg-[var(--color-surface-muted)] p-3 space-y-3">
             {/* Mode selector */}
             <div className="flex items-center gap-1 flex-wrap">
                 <span className="text-xs text-secondary mr-1">Derive:</span>
@@ -226,7 +236,7 @@ const DeriveAxisPanel = ({
                         key={key}
                         type="button"
                         onClick={() => onChangeMode(key)}
-                        className={`text-xs px-2 py-1 rounded border ${mode === key
+                        className={`text-xs px-2 py-1 rounded-xs border ${mode === key
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'bg-[var(--color-surface)] text-secondary hover:text-[var(--color-text-primary)]'}`}
                         title={`from ${m.source}`}
@@ -363,7 +373,7 @@ const DeriveAxisPanel = ({
                             type="button"
                             onClick={onApply}
                             disabled={!preview || applying}
-                            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+                            className="btn btn-secondary disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                         >{applying ? 'Applying…' : 'Apply'}</button>
                         {!batteryMissing && usingAnchors && validAnchors.length < cfg.calibMinAnchors && (
                             <span className="text-xs text-meta">Need ≥{cfg.calibMinAnchors} anchors to preview</span>
@@ -384,7 +394,7 @@ const DeriveAxisPanel = ({
                                     {preview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
                                 </div>
                             )}
-                            <div className="max-h-64 overflow-y-auto border rounded">
+                            <div className="max-h-64 overflow-y-auto border rounded-xs">
                                 <table className="text-xs w-full">
                                     <thead className="bg-[var(--color-surface-sunken)] sticky top-0">
                                         <tr>
@@ -415,8 +425,8 @@ const DeriveAxisPanel = ({
     );
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, onFocused, onBack, onClose }) {
-    const { runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, updateSpecLink, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, editOnFocus = false, onFocused, onBack, onClose }) {
+    const { ensureSourceId, runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, overrideInheritedRun, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -469,11 +479,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [fieldMapping, setFieldMapping] = useState({});
     const [runMetadata, setRunMetadata] = useState({
         name: '',
-        date: new Date().toISOString().split('T')[0],
+        date: '',
         softwareVersion: '',
         conditions: '',
         dataFlags: ['charging'],
-        source: '',
+        sourcePick: NO_SOURCE_PICK,
         startSoc: '',
         endSoc: '',
         speedMph: '',
@@ -484,6 +494,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         speedBasis: '',
         preconditioned: '',
         chargerVoltageClass: '',
+        chargerCurrentClass: '',
         altitudeFt: '',
         elevationGainFt: '',
         windSpeedMph: '',
@@ -563,12 +574,28 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
+    // A test's source comes from the one source list (#426); the form keeps the
+    // picker's value and only `runs.source` text is written, always canonical.
+    const { sources, available: sourcesAvailable } = useSources();
+
+    /** The form with this source picked — and its name offered if the test has none. */
+    const withPickedSource = (form, pick) => {
+        const start = startingName(form.name, pickedSource(sources, pick, form.sourceUrl).source);
+        return { ...form, sourcePick: pick, ...(start ? { name: start } : {}) };
+    };
+
+    /** The text for `runs.source`; a source typed as new joins the list first. */
+    const sourceToWrite = async (form) => {
+        if (sourcesAvailable && form.sourcePick) await ensureSourceId(pickedSource(sources, form.sourcePick, form.sourceUrl));
+        return runSourceText(sources, form.sourcePick, form.sourceUrl, form.storedSource);
+    };
+
     const resetUploadState = () => {
         setShowUpload(false);
         setUploadStep('file');
         setCsvData(null);
         setFieldMapping({});
-        setRunMetadata({ name: '', date: new Date().toISOString().split('T')[0], softwareVersion: '', conditions: '', dataFlags: ['charging'], source: '', startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', chargerVoltageClass: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
+        setRunMetadata({ name: '', date: '', softwareVersion: '', conditions: '', dataFlags: ['charging'], sourcePick: NO_SOURCE_PICK, startSoc: '', endSoc: '', speedMph: '', distanceMiles: '', energyKwh: '', chargeEnergyKwh: '', temperatureF: '', speedBasis: '', preconditioned: '', chargerVoltageClass: '', chargerCurrentClass: '', altitudeFt: '', elevationGainFt: '', windSpeedMph: '', windDirectionDeg: '', sourceUrl: '' });
         setUploadMode('create');
         setMergeTargetRun(null);
         setEstimations({ range: null });
@@ -671,16 +698,18 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     // ── Create-mode import ────────────────────────────────────────────────────
 
-    const handleSaveRecord = () => {
-        const { dataFlags, ...metaRest } = runMetadata;
+    const handleSaveRecord = async () => {
+        const { dataFlags, sourcePick, ...metaRest } = runMetadata;
         const run = {
             ...metaRest,
+            source: await sourceToWrite(runMetadata),
             kind: dataFlags.includes('range') ? 'range' : 'charging',
             data: [],
             uploadDate: new Date().toISOString()
         };
-        onAddRun(run);
-        resetUploadState();
+        // Keep the form (and every typed value) until the save is accepted;
+        // addRun resolves undefined on failure after showing the error.
+        if (await onAddRun(run) !== undefined) resetUploadState();
     };
 
     // Sort data points by a field, toggling direction on repeated clicks.
@@ -709,7 +738,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             return (a.soc ?? Infinity) - (b.soc ?? Infinity);
         });
 
-    const handleImport = () => {
+    const handleImport = async () => {
         if (!csvData) return;
 
         let transformedData = csvData.data.map(row => {
@@ -742,9 +771,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             }
         }
 
-        const { dataFlags, ...metaRest } = runMetadata;
+        const { dataFlags, sourcePick, ...metaRest } = runMetadata;
         const run = {
             ...metaRest,
+            source: await sourceToWrite(runMetadata),
             kind: dataFlags.includes('range') ? 'range' : 'charging',
             data: transformedData,
             fieldMapping,
@@ -752,8 +782,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             uploadDate: new Date().toISOString()
         };
 
-        onAddRun(run);
-        resetUploadState();
+        // Keep the form (and every typed value) until the save is accepted;
+        // addRun resolves undefined on failure after showing the error.
+        if (await onAddRun(run) !== undefined) resetUploadState();
     };
 
     // ── Merge-mode import ─────────────────────────────────────────────────────
@@ -833,7 +864,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             softwareVersion: run.softwareVersion || run.software_version || '',
             conditions: run.conditions || '',
             dataFlags: inferRunFlags(run),
-            source: run.source || '',
+            // null until the picker is touched: the stored text stands in (SourceField).
+            sourcePick: null,
+            storedSource: run.source || '',
             startSoc: run.start_soc ?? '',
             endSoc: run.end_soc ?? '',
             speedMph: run.speed_mph ?? '',
@@ -844,6 +877,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             speedBasis: run.speed_basis ?? '',
             preconditioned: preconditionedFormValue(run.preconditioned),
             chargerVoltageClass: chargerClassFormValue(run.charger_voltage_class),
+            chargerCurrentClass: chargerCurrentFormValue(run.charger_current_class_a),
             altitudeFt: run.altitude_ft ?? '',
             elevationGainFt: run.elevation_gain_ft ?? '',
             windSpeedMph: run.avg_wind_speed_mph ?? '',
@@ -857,15 +891,18 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setSavingData(true);
         try {
             // Convert dataFlags → boolean columns and drop the flags field
-            const { dataFlags, preconditioned, chargerVoltageClass, ...formRest } = editFormData;
+            const { dataFlags, preconditioned, chargerVoltageClass, chargerCurrentClass, sourcePick, storedSource, ...formRest } = editFormData;
             // Sent only when it changed, so saving any other field never names
             // a column an unmigrated database lacks (migrations 073, 076).
             const storedRun = vehicle.runs?.find(r => r.id === runId);
             await onUpdateRun(runId, {
                 ...formRest,
+                source: await sourceToWrite(editFormData),
                 ...(toPreconditioned(preconditioned) !== (storedRun?.preconditioned ?? null) ? { preconditioned } : {}),
                 ...(toChargerClass(chargerVoltageClass) !== toChargerClass(storedRun?.charger_voltage_class)
                     ? { chargerVoltageClass } : {}),
+                ...(toChargerCurrent(chargerCurrentClass) !== toChargerCurrent(storedRun?.charger_current_class_a)
+                    ? { chargerCurrentClass } : {}),
                 kind: dataFlags.includes('range') ? 'range' : 'charging',
                 calculated_fields: editCalculatedFields,
             });
@@ -1291,6 +1328,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         return () => clearTimeout(done);
     }, [linkTarget, linkGroupKey, onFocused]);
 
+    // …and, when the link asks (&edit=1, from Admin → Data Checks), opens that
+    // test's edit form once, so a finding is one click from the field that
+    // settles it.
+    useEffect(() => {
+        if (!editOnFocus || linkTarget == null) return;
+        const target = (vehicle.runs ?? []).find(r => String(r.id) === linkTarget);
+        if (target && canEdit(vehicle)) handleEditRun(target);
+        // Once per arrival: what the form holds afterwards is the reader's.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editOnFocus, linkTarget]);
+
     const inheritedRuns    = allDisplayRuns.filter(r => r._inherited);
     const barVisible       = pendingDeletes.size > 0 || !!undoState;
 
@@ -1323,7 +1371,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <div className="list-thumbnail">
                     {displayImageUrl(vehicle)
                         ? <img src={displayImageUrl(vehicle)} alt={vehicle.name} decoding="async" className="w-full h-full object-cover" />
-                        : <span>🚗</span>
+                        : null
                     }
                 </div>
                 <div className="flex-1 min-w-0">
@@ -1368,11 +1416,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 onClick={() => onToggleVehicleVisibility(vehicle.id, isPublic ? 'private' : 'public')}
                                 className={`${base} ${isPublic ? 'is-public' : 'is-private'}`}
                             >
-                                {isPublic ? '🌐 Public' : '🔒 Private'}
+                                {isPublic ? 'Listed' : 'Unlisted'}
                             </button>
                         ) : (
                             <span className={`${base} ${isPublic ? 'is-public' : 'is-private'}`}>
-                                {isPublic ? '🌐 Public' : '🔒 Private'}
+                                {isPublic ? 'Listed' : 'Unlisted'}
                             </span>
                         );
                     })()}
@@ -1394,7 +1442,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <button
                             onClick={async () => { setDuplicatingVehicle(true); await onDuplicateVehicle(vehicle.id); setDuplicatingVehicle(false); }}
                             disabled={duplicatingVehicle}
-                            className="btn btn-primary disabled:opacity-50"
+                            className="btn btn-secondary disabled:opacity-50"
                         >
                             {duplicatingVehicle ? <><span className="spinner-inline"/>Copying…</> : '⧉ Copy'}
                         </button>
@@ -1484,7 +1532,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div>
                                             <p className="text-xs text-secondary mb-1">Data type</p>
                                             <div className="data-type-flags">
-                                                {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
+                                                {DATA_FLAGS.map(({ key, label, desc }) => {
                                                     const active = runMetadata.dataFlags.includes(key);
                                                     return (
                                                         <button
@@ -1492,7 +1540,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             type="button"
                                                             title={desc}
                                                             onClick={() => setRunMetadata(m => ({ ...m, dataFlags: [key] }))}
-                                                            className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-meta border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
+                                                            className={`guide-chip${active ? ' active' : ''}`}
                                                         >
                                                             {label}
                                                         </button>
@@ -1538,6 +1586,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             onChange={(e) => setRunMetadata({...runMetadata, sourceUrl: e.target.value})}
                                             className="form-input form-input w-full"
                                         />
+                                        <SourceField
+                                            sources={sources}
+                                            pick={runMetadata.sourcePick}
+                                            onPick={pick => setRunMetadata(withPickedSource(runMetadata, pick))}
+                                            url={runMetadata.sourceUrl}
+                                        />
 
                                         {/* Charging energy field (create mode) */}
                                         {runMetadata.dataFlags.includes('charging') && (
@@ -1562,6 +1616,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     value={runMetadata.chargerVoltageClass}
                                                     onChange={v => setRunMetadata({ ...runMetadata, chargerVoltageClass: v })}
                                                 />
+                                                <ChargerCurrentSelect
+                                                    value={runMetadata.chargerCurrentClass}
+                                                    onChange={v => setRunMetadata({ ...runMetadata, chargerCurrentClass: v })}
+                                                />
                                             </div>
                                         )}
 
@@ -1570,12 +1628,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             <div className="data-subpanel p-4 space-y-3">
                                                 <p className="text-sm font-semibold text-secondary">Range Test Details</p>
                                                 <div className="form-grid gap-3">
-                                                    <input
-                                                        placeholder="Source (e.g., Out of Spec)"
-                                                        value={runMetadata.source}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, source: e.target.value})}
-                                                        className="form-input form-input col-span-2"
-                                                    />
                                                     <input
                                                         type="number"
                                                         placeholder="Start SoC (%)"
@@ -1662,8 +1714,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     />
                                                     <input
                                                         type="number"
-                                                        placeholder="Wind dir. vs travel (0-360°)"
-                                                        title="Direction relative to travel: 0° = tailwind, 180° = headwind, 90/270° = crosswind"
+                                                        placeholder="Wind dir., one heading only"
+                                                        title="Only for a test that held one heading: 0° = tailwind, 180° = headwind, 90/270° = crosswind. Leave blank for an out-and-back or a loop, whatever the wind did — the legs cancel except for a cost the wind speed alone records."
                                                         value={runMetadata.windDirectionDeg}
                                                         onChange={(e) => setRunMetadata({...runMetadata, windDirectionDeg: e.target.value})}
                                                         className="form-input form-input"
@@ -1686,7 +1738,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 setFieldMapping({});
                                                 setUploadStep('file');
                                             }}
-                                            className="rounded"
+                                            className="rounded-xs"
                                         />
                                         CSV has no header row (use column numbers)
                                     </label>
@@ -1718,7 +1770,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <button
                                             onClick={handleSaveRecord}
                                             disabled={!runMetadata.name}
-                                            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="btn btn-commit disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save record
                                         </button>
@@ -1738,7 +1790,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                             {/* In create mode, allow editing metadata here too */}
                             {uploadMode === 'create' && (
-                                <div className="mb-6 p-4 bg-[var(--color-surface-muted)] rounded">
+                                <div className="mb-6 p-4 bg-[var(--color-surface-muted)] rounded-xs">
                                     <h4 className="font-semibold mb-3">Test Metadata</h4>
                                     <div className="space-y-3">
                                         <input
@@ -1810,7 +1862,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 if (!tsMapped && !timeColTs) return null;
                                 return (
                                     <p className="note-panel is-info mt-3">
-                                        📅 Timestamps detected — will be converted to elapsed minutes from the first data point
+                                        Timestamps detected — will be converted to elapsed minutes from the first data point
                                         {tsMapped && !timeMapped && ' (Elapsed Time will be derived automatically)'}
                                     </p>
                                 );
@@ -1824,7 +1876,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div className={`estimation-panel ${estimations.range === 'measured' ? 'is-good' : 'is-warning'}`}>
                                             <div className="flex-1 min-w-0">
                                                 <p className="state-panel-title">
-                                                    {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : '📏 Estimate from measured range test'}
+                                                    {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : 'Estimate from measured range test'}
                                                 </p>
                                                 {rangeTestRuns.length > 1 && (
                                                     <select
@@ -1901,7 +1953,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 {uploadMode === 'create' ? (
                                     <button
                                         onClick={handleImport}
-                                        className="btn btn-primary"
+                                        className="btn btn-commit"
                                     >
                                         Import Run
                                     </button>
@@ -1909,7 +1961,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         onClick={handleMerge}
                                         disabled={merging || missingJoinKey}
-                                        className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
                                         {merging ? 'Merging…' : 'Merge into Run'}
                                     </button>
@@ -1963,7 +2015,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <div>
                                         <p className="text-xs text-secondary mb-1">Data type</p>
                                         <div className="data-type-flags">
-                                            {DATA_FLAGS.map(({ key, label, pillStyle, desc }) => {
+                                            {DATA_FLAGS.map(({ key, label, desc }) => {
                                                 const active = (editFormData.dataFlags || ['charging']).includes(key);
                                                 return (
                                                     <button
@@ -1971,7 +2023,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         type="button"
                                                         title={desc}
                                                         onClick={() => setEditFormData(f => ({ ...f, dataFlags: [key] }))}
-                                                        className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${active ? pillStyle : 'bg-[var(--color-surface-sunken)] text-meta border-[var(--color-border)] hover:border-[var(--color-border)]'}`}
+                                                        className={`guide-chip${active ? ' active' : ''}`}
                                                     >
                                                         {label}
                                                     </button>
@@ -2012,17 +2064,18 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         onChange={(e) => setEditFormData({...editFormData, sourceUrl: e.target.value})}
                                         className="form-input form-input w-full"
                                     />
+                                    <SourceField
+                                        sources={sources}
+                                        pick={editFormData.sourcePick}
+                                        onPick={pick => setEditFormData(withPickedSource(editFormData, pick))}
+                                        url={editFormData.sourceUrl ?? ''}
+                                        stored={editFormData.storedSource ?? ''}
+                                    />
                                     {/* Range test fields */}
                                     {(editFormData.dataFlags || ['charging']).includes('range') && (
                                         <div className="data-subpanel p-4 space-y-3">
                                             <p className="text-sm font-semibold text-secondary">Range Test Details</p>
                                             <div className="form-grid gap-3">
-                                                <input
-                                                    placeholder="Source (e.g., Out of Spec)"
-                                                    value={editFormData.source}
-                                                    onChange={(e) => setEditFormData({...editFormData, source: e.target.value})}
-                                                    className="form-input form-input col-span-2"
-                                                />
                                                 <input
                                                     type="number"
                                                     placeholder="Start SoC (%)"
@@ -2109,8 +2162,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 />
                                                 <input
                                                     type="number"
-                                                    placeholder="Wind dir. vs travel (0-360°)"
-                                                    title="Direction relative to travel: 0° = tailwind, 180° = headwind, 90/270° = crosswind"
+                                                    placeholder="Wind dir., one heading only"
+                                                    title="Only for a test that held one heading: 0° = tailwind, 180° = headwind, 90/270° = crosswind. Leave blank for an out-and-back or a loop, whatever the wind did — the legs cancel except for a cost the wind speed alone records."
                                                     value={editFormData.windDirectionDeg}
                                                     onChange={(e) => setEditFormData({...editFormData, windDirectionDeg: e.target.value})}
                                                     className="form-input form-input"
@@ -2142,6 +2195,10 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 value={editFormData.chargerVoltageClass}
                                                 onChange={v => setEditFormData({ ...editFormData, chargerVoltageClass: v })}
                                             />
+                                            <ChargerCurrentSelect
+                                                value={editFormData.chargerCurrentClass}
+                                                onChange={v => setEditFormData({ ...editFormData, chargerCurrentClass: v })}
+                                            />
                                         </div>
                                     )}
                                 </div>
@@ -2149,7 +2206,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     <button
                                         onClick={() => handleSaveEdit(run.id)}
                                         disabled={savingData}
-                                        className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
                                         {savingData ? 'Saving…' : 'Save Changes'}
                                     </button>
@@ -2239,7 +2296,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 return (
                                                                     <button
                                                                         onClick={() => handleEstimateRangeInEdit(effectiveRangeFromTest)}
-                                                                        className="text-xs px-3 py-1 rounded border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
+                                                                        className="text-xs px-3 py-1 rounded-xs border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
                                                                         title={tip}
                                                                     >
                                                                         Measured ({effectiveRangeFromTest} mi / 100%){!hasSocMeta && ' *'}
@@ -2249,7 +2306,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             {epaRange && (
                                                                 <button
                                                                     onClick={() => handleEstimateRangeInEdit(epaRange)}
-                                                                    className="text-xs px-3 py-1 rounded border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
+                                                                    className="text-xs px-3 py-1 rounded-xs border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
                                                                     title={`Use the vehicle's ${epaName} range (${epaRange} mi) as the 100% SoC baseline`}
                                                                 >
                                                                     {epaName} ({epaRange} mi)
@@ -2277,7 +2334,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 return (
                                                     <div className={`state-panel ${tone}`}>
                                                         <span className="text-xs text-secondary">
-                                                            {editCalcKwh != null && <>⚡ <strong>Data points → {editCalcKwh} kWh</strong> · </>}
+                                                            {editCalcKwh != null && <><strong>Data points → {editCalcKwh} kWh</strong> · </>}
                                                             {packE != null
                                                                 ? <>pack ≈ {packE} kWh <span className="text-secondary">({dSoC}% × {cap} kWh)</span></>
                                                                 : <span className="text-secondary">add SoC data + battery capacity to validate energy</span>}
@@ -2290,7 +2347,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         )}
                                                         {excess != null && !good && (
                                                             <span className="badge-status is-warning">
-                                                                ⚠️ {excess >= 0 ? '+' : ''}{excess.toFixed(1)}% vs pack {excess < 0 ? '(below SoC-implied)' : '(>10% of capacity)'}
+                                                                ⚠ {excess >= 0 ? '+' : ''}{excess.toFixed(1)}% vs pack {excess < 0 ? '(below SoC-implied)' : '(>10% of capacity)'}
                                                             </span>
                                                         )}
                                                         {packE != null && !hasManual && (
@@ -2303,7 +2360,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                 <p className="text-sm text-secondary py-4 text-center">Loading…</p>
                                             ) : (
                                                 <>
-                                                    <div className="overflow-auto rounded border" style={{ maxHeight: 360 }}>
+                                                    <div className="overflow-auto rounded-xs border" style={{ maxHeight: 360 }}>
                                                         <table className="w-full text-xs border-collapse">
                                                             <thead className="bg-[var(--color-surface-muted)] sticky top-0 z-10 border-b">
                                                                 <tr>
@@ -2375,9 +2432,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                         {/* Timestamp cell — read-only, only rendered when column is visible */}
                                                                         {editData?.some(r => r.timestamp != null) && (
                                                                             <td className="px-2 py-0.5 text-secondary whitespace-nowrap text-[11px] font-mono select-all">
-                                                                                {row.timestamp
-                                                                                    ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                                                                                    : <span className="text-meta">—</span>}
+                                                                                {!row.timestamp
+                                                                                    ? <span className="text-meta">—</span>
+                                                                                    : wallClockTimestamp(row.timestamp)
+                                                                                        ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                                                                                        // An elapsed timecode shows as written; it is not saved
+                                                                                        : row.timestamp}
                                                                             </td>
                                                                         )}
                                                                         {['soc','chargeRate','time','range','temperature'].map(field => (
@@ -2499,6 +2559,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             </SectionAction>
                         )}
                     />
+                    <LineageChargingNote vehicle={vehicle} canEdit={isContributor && canEdit(vehicle)} />
                 </div>
             )}
             {subtab === 'inherited' && inheritedRuns.length === 0 && !(isContributor && canEdit(vehicle)) && (
@@ -2522,7 +2583,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 // list, and VehicleLink falls back to text.
                                 const srcVehicle = (vehicles || [])
                                     .find(v => String(v.id) === String(run._sourceVehicleId));
+                                // Null for a test that came down the lineage with no
+                                // link of its own (086): the first change writes one.
                                 const linkId = run._specLinkId;
+                                // In-progress edits keyed by the run, which has an id
+                                // whether or not it has a link yet.
+                                const editKey = run.id;
                                 const isChargingLink = runKindFrom(run) === 'charging';
 
                                 // Both knobs, saved the same way. `edits` holds the in-progress
@@ -2551,8 +2617,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     const next = raw === '' ? null : parseFloat(raw);
                                     if (next === (f.stored ?? null)) return;
                                     try {
-                                        await updateSpecLink(linkId, { [f.field]: next });
-                                        f.setEdits(prev => { const n = { ...prev }; delete n[linkId]; return n; });
+                                        await overrideInheritedRun(run, { [f.field]: next }, vehicle.id);
+                                        f.setEdits(prev => { const n = { ...prev }; delete n[editKey]; return n; });
                                     } catch (_) { /* error shown by context */ }
                                 };
                                 return (
@@ -2560,7 +2626,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         <div className="run-card-header">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <RunKindPill run={run} />
+                                                    <RunKindBadge run={run} />
                                                     <h3 className="section-title">
                                                         {run.name}
                                                         <RunSourceLinks run={run} className="text-sm font-normal" />
@@ -2601,8 +2667,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     {isContributor && canEdit(vehicle) ? (
                                                         <button
                                                             onClick={() => run.isDefault
-                                                                ? updateSpecLink(linkId, { useAsDefault: false })
-                                                                : updateSpecLink(linkId, { useAsDefault: true }, vehicle.id)
+                                                                ? overrideInheritedRun(run, { useAsDefault: false }, vehicle.id)
+                                                                : overrideInheritedRun(run, { useAsDefault: true }, vehicle.id)
                                                             }
                                                             title={run.isDefault ? 'Click to clear default' : 'Set as default for charts'}
                                                             className={`btn btn-toggle${run.isDefault ? ' active' : ''}`}
@@ -2612,12 +2678,17 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     ) : run.isDefault ? (
                                                         <span className="btn btn-toggle active">Default</span>
                                                     ) : null}
-                                                    {isContributor && canEdit(vehicle) && (
+                                                    {/* A linked test is removed. One the lineage
+                                                        brings has nothing to remove — a battery
+                                                        revision is what stops it — but its override
+                                                        can be dropped, back to the lineage's reading. */}
+                                                    {isContributor && canEdit(vehicle) && linkId != null && (
                                                         <button
                                                             onClick={() => deleteSpecLink(linkId)}
-                                                            className="btn btn-danger text-sm"
+                                                            className={run._viaLineage ? 'btn btn-secondary text-sm' : 'btn btn-danger text-sm'}
+                                                            title={run._viaLineage ? 'Drop this test\'s own factors and default, back to what the lineage gives it' : undefined}
                                                         >
-                                                            Remove
+                                                            {run._viaLineage ? 'Reset' : 'Remove'}
                                                         </button>
                                                     )}
                                                 </div>
@@ -2633,9 +2704,9 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             key={f.key}
                                                             label={f.label}
                                                             title={f.title}
-                                                            value={f.edits[linkId] ?? (f.stored != null ? String(f.stored) : '')}
-                                                            onChange={v => f.setEdits(prev => ({ ...prev, [linkId]: v }))}
-                                                            onCommit={() => saveFactor(f, f.edits[linkId] ?? (f.stored != null ? String(f.stored) : ''))}
+                                                            value={f.edits[editKey] ?? (f.stored != null ? String(f.stored) : '')}
+                                                            onChange={v => f.setEdits(prev => ({ ...prev, [editKey]: v }))}
+                                                            onCommit={() => saveFactor(f, f.edits[editKey] ?? (f.stored != null ? String(f.stored) : ''))}
                                                         />
                                                     ) : (
                                                         f.stored !== 1 && f.stored != null && (
@@ -2655,10 +2726,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
                     {/* Add link form */}
                     {showAddLink && (() => {
-                        // Run IDs already linked to this vehicle
-                        const alreadyLinkedRunIds = new Set(
-                            (vehicle.spec_links || []).map(l => Number(l.source_run_id))
-                        );
+                        // Run IDs this vehicle already shows: linked, or down its
+                        // lineage (086), which a link would only duplicate.
+                        const alreadyLinkedRunIds = new Set([
+                            ...(vehicle.spec_links || []).map(l => Number(l.source_run_id)),
+                            ...inheritedRuns.map(r => Number(r._realRunId)),
+                        ]);
                         // Source vehicles: any vehicle with at least one run it could still lend
                         const sourceVehicles = (vehicles || [])
                             .filter(v =>
@@ -2774,7 +2847,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     key={opt.key}
                                                     type="button"
                                                     onClick={() => { setNewLinkKind(opt.key); setNewLinkRunIds(null); }}
-                                                    className={`btn text-xs ${newLinkKind === opt.key ? 'btn-primary' : 'btn-secondary'}`}
+                                                    className={`btn btn-toggle text-xs${newLinkKind === opt.key ? ' active' : ''}`}
                                                 >
                                                     {opt.label}
                                                 </button>
@@ -2802,7 +2875,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             className="w-4 h-4 shrink-0"
                                                         />
                                                         <span className={`spec-link-kind-pill is-${runKindFrom(r)}`}>
-                                                            {runKindFrom(r) === 'charging' ? '⚡' : '📏'}
+                                                            {runKindFrom(r) === 'charging' ? '↯' : '↔'}
                                                         </span>
                                                         <span className="truncate">{r.name}</span>
                                                         {r.date && <span className="text-xs text-meta shrink-0">{r.date}</span>}
@@ -2872,7 +2945,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         type="button"
                                         onClick={handleAdd}
                                         disabled={!newLinkSourceId || runsToLink.length === 0 || linkSaving}
-                                        className="btn btn-primary text-sm disabled:opacity-40"
+                                        className="btn btn-commit text-sm disabled:opacity-40"
                                     >
                                         {linkSaving ? 'Linking…' : `Link ${runsToLink.length > 0 ? runsToLink.length + ' ' : ''}Test${runsToLink.length !== 1 ? 's' : ''}`}
                                     </button>
@@ -2921,7 +2994,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             {/* Edit vehicle modal */}
             {showEditVehicle && (
                 <div className="modal-overlay" onClick={closeEditVehicle}>
-                    <div className="modal-panel rounded-xl shadow-2xl max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    <div className="modal-panel max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                         <LazyBoundary>
                             <EditVehicleForm
                                 formData={vehicleFormData}
@@ -2988,7 +3061,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 type="button"
                                 onClick={handleCopyToConfirm}
                                 disabled={!copyingToVehicleId}
-                                className="btn btn-primary text-sm disabled:opacity-40"
+                                className="btn btn-commit text-sm disabled:opacity-40"
                             >
                                 Copy test
                             </button>

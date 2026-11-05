@@ -17,11 +17,15 @@ import { useState } from 'react';
  *   value       — the selected id as a string, '' for none
  *   onChange    — (id: string) => void; '' when "— None —" is chosen
  *   noneLabel   — text for the empty choice, closed and in the list
+ *   suggestedSearch — what the list opens already filtered by (say, the
+ *                 vehicle's own model, when picking its source), selected so
+ *                 the first key typed replaces it with a search of your own
  */
 export default function VehicleCombobox({
     options, value, onChange,
     placeholder = 'Type to filter vehicles…',
     noneLabel = '— None —',
+    suggestedSearch = '',
 }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -40,7 +44,7 @@ export default function VehicleCombobox({
         setOpen(false);
         setSearch('');
     };
-    const reopen = () => { setSearch(''); setOpen(true); };
+    const reopen = () => { setSearch(suggestedSearch ?? ''); setOpen(true); };
 
     return (
         <div className="relative flex-1 min-w-0">
@@ -50,6 +54,7 @@ export default function VehicleCombobox({
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
+                    onFocus={e => e.target.select()}
                     onBlur={() => setTimeout(() => setOpen(false), 150)}
                     placeholder={placeholder}
                     className="form-input w-full"
@@ -87,7 +92,7 @@ export default function VehicleCombobox({
                 </button>
             )}
             {open && (
-                <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
+                <ul className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-xs border shadow-lg bg-[var(--color-surface-input)] border-[var(--color-border)]">
                     <li
                         className="px-3 py-2 text-sm cursor-pointer text-meta hover:bg-[var(--color-surface-sunken)]"
                         onMouseDown={() => choose('')}

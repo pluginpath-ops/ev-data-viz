@@ -170,7 +170,7 @@ function scanCss(key, test) {
 export const LEDGER = [
     {
         key: 'palette-text',
-        count: 180,
+        count: 178,
         scope: 'src/**/*.jsx',
         what: 'Text colors written as Tailwind palette utilities. These sit outside '
             + 'the theme: when the re-skin re-valued the tokens, every one of these '
@@ -213,7 +213,7 @@ export const LEDGER = [
     },
     {
         key: 'arbitrary-text-size',
-        count: 95,  // 96 → 95: the Admin EPA list's Test Group line became .text-caption (#374)
+        count: 94,  // 96 → 95: the Admin EPA list's Test Group line became .text-caption (#374); 95 → 94: the accessory-load reference footnote became .text-meta (#449)
         scope: 'src/**/*.jsx',
         what: 'Font sizes written as arbitrary values — `text-[10px]`, `text-[11px]`. '
             + 'Every one is a size the global UI-scale knob cannot move and the type '
@@ -225,7 +225,7 @@ export const LEDGER = [
     },
     {
         key: 'hex-literal',
-        count: 44,
+        count: 38,  // 44 → 40: the spec chart's hard-coded yes/no greens and reds, and its grey, went when yes/no became vehicle-colored bars (#450); 40 → 38: Road Trip's box-zoom drag, written out at each of its charts, became one ZOOM_DRAG (Trip Optimizer)
         scope: 'src/**/*.jsx',
         what: 'Raw hex colors in component source. Mostly canvas drawing and the '
             + '`#3b82f6` default series color, repeated at eight call sites rather '
@@ -241,7 +241,7 @@ export const LEDGER = [
     },
     {
         key: 'rgb-literal',
-        count: 22,
+        count: 20,  // 22 → 20: Road Trip's box-zoom drag, written out at each of its charts, became one ZOOM_DRAG (Trip Optimizer)
         scope: 'src/**/*.jsx',
         what: 'rgb()/rgba()/hsl() color literals, almost all of them canvas fills and '
             + 'alpha washes drawn by chart plugins. Canvas cannot take a class — but '
@@ -266,7 +266,7 @@ export const LEDGER = [
     },
     {
         key: 'apply-palette',
-        count: 17,
+        count: 11,  // 16 → 11: .badge-hidden, the vote buttons and .owner-badge moved onto the status tints (button and pill pass)
         scope: 'src/index.css',
         what: 'Semantic classes whose @apply line reaches for a palette color. These '
             + 'are the sharpest kind of drift: the class NAME says the right thing, so '
@@ -280,7 +280,7 @@ export const LEDGER = [
     },
     {
         key: 'off-scale-font-size',
-        count: 10,
+        count: 9,
         scope: 'src/index.css',
         what: 'font-size declarations that do not derive from the type scale. A size '
             + 'the --ui-scale knob cannot reach, in the stylesheet that defines the '

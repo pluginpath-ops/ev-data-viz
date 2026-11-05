@@ -33,8 +33,8 @@ import CollapsibleSection from '../../CollapsibleSection';
  */
 const PAGE_SIZE = 50;
 
-export default function EpaGuideView({ subtab = 'browse' }) {
-    const { getFeGuideRows, getFeGuideVehicleLinks, getBrandAliases } = useAppContext();
+export default function EpaGuideView({ subtab = 'browse', onPlotColumn = null }) {
+    const { getFeGuideRows, getFeGuideVehicleLinks, getBrandAliases, selectedVehicles } = useAppContext();
 
     const loadRows    = useCallback(() => getFeGuideRows(), [getFeGuideRows]);
     const loadLinks   = useCallback(() => getFeGuideVehicleLinks(), [getFeGuideVehicleLinks]);
@@ -238,6 +238,7 @@ export default function EpaGuideView({ subtab = 'browse' }) {
                     onOpenRow={setOpenRow}
                     vehicleLinks={vehicleLinks}
                     barMaxima={barMaxima}
+                    plot={onPlotColumn ? { enabled: selectedVehicles.length > 0, onPlot: onPlotColumn } : null}
                 />
 
                 {unpinned.length > PAGE_SIZE && (

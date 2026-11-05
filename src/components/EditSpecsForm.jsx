@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, normalizeCustomKey, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecVouchButton, SpecFieldFlagButton } from './VoteButtons';
-import { vehicleLabel, vehicleOption, fallbackSpecs } from '../utils/specHelpers';
-import VehicleCombobox from './VehicleCombobox';
+import { vehicleLabel, fallbackSpecs } from '../utils/specHelpers';
 import { chemistrySuggestions } from '../utils/platforms';
 
 /**
@@ -221,10 +220,6 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     // Per-category "add custom field" input state
     const [newCustomKey, setNewCustomKey] = useState({});
     const [newCustomVal, setNewCustomVal] = useState({});
-    // Spec inheritance
-    const [inheritFromId, setInheritFromId] = useState(
-        vehicle.spec_source_vehicle_id ? String(vehicle.spec_source_vehicle_id) : ''
-    );
 
     // Load vouch count for display in footer
     useEffect(() => { loadSpecVouches(vehicle.id); }, [vehicle.id]);
@@ -236,9 +231,10 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
 
     // What a blank field would show: the source vehicle's value through its full
     // ancestor chain (not just the direct parent's own fields), else what the
-    // vehicle's platform provides (#352). The source is the one chosen in this
-    // form, so the hints follow it before it is saved.
-    const sourceVehicle  = inheritFromId ? vehicles.find(v => String(v.id) === inheritFromId) : null;
+    // vehicle's platform provides (#352). The source is set on the vehicle form
+    // now (SourceVehiclePicker), so this reads the saved one.
+    const sourceId = liveVehicle.spec_source_vehicle_id;
+    const sourceVehicle  = sourceId != null ? vehicles.find(v => v.id === sourceId) ?? null : null;
     const { specs: inheritedSpecs, fromPlatform } = fallbackSpecs(liveVehicle, vehicles, sourceVehicle);
 
     // A platform's chemistries are what the vehicle's MAY be. Offered, never
@@ -248,26 +244,6 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     const suggestionsFor = (fieldKey) => (fieldKey === 'charging.battery_chemistry' && chemistries.length
         ? { label: `${electrical.name} uses`, options: chemistries }
         : null);
-
-    // Build the set of descendant IDs so we can exclude them from the parent picker
-    // (selecting a descendant as parent would create a circular inheritance chain).
-    const getDescendantIds = (rootId, allVehicles, visited = new Set()) => {
-        const ids = new Set();
-        for (const v of allVehicles) {
-            if (v.spec_source_vehicle_id === rootId && !visited.has(v.id)) {
-                ids.add(v.id);
-                const childVisited = new Set([...visited, v.id]);
-                for (const d of getDescendantIds(v.id, allVehicles, childVisited)) ids.add(d);
-            }
-        }
-        return ids;
-    };
-    const descendantIds = getDescendantIds(vehicle.id, vehicles || []);
-
-    // Other vehicles available as inheritance sources (excluding self and descendants)
-    const otherVehicles = (vehicles || [])
-        .filter(v => v.id !== vehicle.id && !descendantIds.has(v.id))
-        .sort((a, b) => vehicleLabel(a).localeCompare(vehicleLabel(b)));
 
     const toggleCategory = (key) => {
         setOpenCategories(prev => {
@@ -346,7 +322,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
         setSaving(true);
         try {
             const cleaned = cleanSpecs(localSpecs);
-            await onSave(vehicle.id, cleaned, inheritFromId || null);
+            await onSave(vehicle.id, cleaned);
             onClose();
         } finally {
             setSaving(false);
@@ -356,7 +332,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div
-                className="modal-panel rounded-xl shadow-2xl w-full mx-4"
+                className="modal-panel w-full mx-4"
                 style={{ maxWidth: '640px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
                 onClick={e => e.stopPropagation()}
             >
@@ -375,22 +351,15 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                 {/* Scrollable body */}
                 <div className="modal-body flex-1 overflow-y-auto">
 
-                    {/* ── Inherit from selector (combobox) ── */}
-                    <div className="mb-4 pb-4 border-b">
-                        <div className="flex items-center gap-3">
-                            <label className="text-sm font-medium text-secondary whitespace-nowrap">Inherit from:</label>
-                            <VehicleCombobox
-                                options={otherVehicles.map(vehicleOption)}
-                                value={inheritFromId}
-                                onChange={setInheritFromId}
-                            />
-                        </div>
-                        {sourceVehicle && (
-                            <p className="spec-inherit-note">
-                                Fields you leave blank will show <span className="font-medium">↑ inherited</span> hints.
-                            </p>
-                        )}
-                    </div>
+                    {/* The source is set on the vehicle form (SourceVehiclePicker): it carries
+                        color, photo, tags, platforms and charging tests as well as
+                        specs. Named here because the ↑ hints below come from it. */}
+                    {sourceVehicle && (
+                        <p className="spec-inherit-note mb-4">
+                            Fields you leave blank show <span className="font-medium">↑ inherited</span> values
+                            from {vehicleLabel(sourceVehicle)}. Change the source with Edit.
+                        </p>
+                    )}
 
                     <div className="flex items-center justify-between mb-4">
                         <p className="text-sm text-secondary">Fields left blank are not saved.</p>
@@ -517,7 +486,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                     <button
                                                         type="button"
                                                         onClick={() => addCustomField(cat.key)}
-                                                        className="px-2 py-1 rounded text-xs bg-[var(--color-surface-sunken)] hover:bg-[var(--color-surface-muted)] text-secondary flex-shrink-0"
+                                                        className="px-2 py-1 rounded-xs text-xs bg-[var(--color-surface-sunken)] hover:bg-[var(--color-surface-muted)] text-secondary flex-shrink-0"
                                                     >
                                                         Add
                                                     </button>
@@ -571,7 +540,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                 type="button"
                                 onClick={handleSave}
                                 disabled={saving}
-                                className="btn btn-primary text-sm"
+                                className="btn btn-commit text-sm"
                             >
                                 {saving ? 'Saving…' : 'Save Specs'}
                             </button>

@@ -4,6 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+    countRange, setCountRange, countRangeText,
     EMPTY_VEHICLE_FILTERS, filtersActive, facetState, toggleInclude, toggleExclude, setMatchAll, clearFacet, setSearch,
     vehicleFilterContext, filterVehicles, vehicleFacetCounts, activeFilterChips, removeChip,
     encodeVehicleFilters, decodeVehicleFilters, searchMatches, VEHICLE_FILTER_PARAMS,
@@ -40,6 +41,14 @@ describe('matching', () => {
         expect(facetState(both, 'data').all).toBe(true);
         expect(ids(both)).toEqual([1]);
         expect(ids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'data', 'charging'))).toEqual([3, 4]);
+    });
+
+    it('matches a year inside a span, and lists single years only', () => {
+        expect(ids(toggleInclude(EMPTY_VEHICLE_FILTERS, 'year', '2025'))).toEqual([1, 3]);
+        expect(ids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'year', '2024'))).toEqual([1, 2]);
+        const counts = vehicleFacetCounts(fleet, EMPTY_VEHICLE_FILTERS, ctx);
+        expect(counts.year.values.sort()).toEqual(['2024', '2025', '2026']);
+        expect(counts.year.counts.get('2026')).toBe(2);
     });
 
     it('including a value clears its exclusion, and the other way round', () => {
@@ -111,6 +120,96 @@ describe('URL', () => {
     });
 
     it('decodes anything a URL holds without throwing', () => {
-        expect(decodeVehicleFilters('mk=,,,-&tg_all=yes&dt=-')).toEqual({ search: '', facets: {} });
+        expect(decodeVehicleFilters('mk=,,,-&tg_all=yes&dt=-&n_range=-&n_epa=x')).toEqual({ search: '', facets: {}, counts: {} });
+    });
+});
+
+describe('the Curation facet', () => {
+    const cfleet = [
+        { id: 1, visibility: 'public',  color: '#f00', image_url: 'a.jpg', socWindowKwh: 80, epaRangeMi: 300 },
+        { id: 2, visibility: 'private', color: null,   image_url: null },
+        // A variant: shows its source's color, owns none.
+        { id: 3, visibility: 'public',  color: '#f00', own: { color: null, image_url: null }, spec_source_vehicle_id: 1 },
+    ];
+    const cctx = vehicleFilterContext(cfleet, {}, { curator: true });
+    const cids = (f, c = cctx) => filterVehicles(cfleet, f, c).map(v => v.id);
+    const inc = (...keys) => keys.reduce((f, k) => toggleInclude(f, 'curation', k), EMPTY_VEHICLE_FILTERS);
+
+    it('"is" includes and "is not" excludes the same check', () => {
+        expect(cids(inc('color'))).toEqual([1, 3]);
+        expect(cids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'curation', 'color'))).toEqual([2]);
+        expect(cids(toggleExclude(EMPTY_VEHICLE_FILTERS, 'curation', 'listed'))).toEqual([2]);
+    });
+
+    it('tells a shown color from an own one', () => {
+        expect(cids(inc('color', 'own-color'))).toEqual([1, 3]);   // any
+        expect(cids(setMatchAll(inc('color', 'own-color'), 'curation', true))).toEqual([1]);
+        expect(cids(inc('variant'))).toEqual([3]);
+        expect(cids(inc('has-variants'))).toEqual([1]);
+        expect(cids(inc('origin'))).toEqual([1]);   // has variants and no source of its own
+    });
+
+    it('offers every check, even one no vehicle passes', () => {
+        const counts = vehicleFacetCounts(cfleet, EMPTY_VEHICLE_FILTERS, cctx);
+        expect(counts.curation.values).toContain('own-photo');
+    });
+
+    it('does nothing for a reader who is not a curator', () => {
+        const reader = vehicleFilterContext(cfleet, {});
+        expect(cids(inc('variant'), reader)).toEqual([1, 2, 3]);
+        expect(activeFilterChips(inc('variant'))).toEqual([]);
+        expect(activeFilterChips(inc('variant'), { curator: true })).toHaveLength(1);
+    });
+
+    it('travels in the URL', () => {
+        const p = encodeVehicleFilters(toggleExclude(inc('color'), 'curation', 'photo'));
+        expect(p.get('cu')).toBe('color,-photo');
+        expect(facetState(decodeVehicleFilters(p.toString()), 'curation').out).toEqual(['photo']);
+    });
+});
+
+describe('test count bounds', () => {
+    const run = (kind) => ({ kind });
+    const cfleet = [
+        { id: 1, runs: [run('range'), run('range'), run('range'), run('range'), run('charging')] },
+        { id: 2, runs: [run('range'), run('charging'), run('charging')] },
+        { id: 3, runs: [] },
+    ];
+    const cctx = vehicleFilterContext(cfleet, {}, { curator: true });
+    const cids = (f, c = cctx) => filterVehicles(cfleet, f, c).map(v => v.id);
+    const bound = (key, range) => setCountRange(EMPTY_VEHICLE_FILTERS, key, range);
+
+    it('bounds a kind\'s test count from either side', () => {
+        expect(cids(bound('range', { min: 4 }))).toEqual([1]);              // more than 3
+        expect(cids(bound('charging', { max: 1 }))).toEqual([1, 3]);        // fewer than 2, none included
+        expect(cids(bound('range', { min: 1, max: 3 }))).toEqual([2]);
+        expect(cids(setCountRange(bound('range', { min: 1 }), 'charging', { min: 2 }))).toEqual([2]);
+    });
+
+    it('is active, and removed when both bounds are cleared', () => {
+        expect(filtersActive(bound('range', { min: 4 }))).toBe(true);
+        expect(filtersActive(setCountRange(bound('range', { min: 4 }), 'range', {}))).toBe(false);
+        expect(countRange(EMPTY_VEHICLE_FILTERS, 'range')).toEqual({ min: null, max: null });
+    });
+
+    it('reads as a chip a click removes, and does nothing for a reader', () => {
+        const f = bound('range', { min: 4 });
+        const [chip] = activeFilterChips(f, { curator: true });
+        expect(chip.text).toBe('Range tests ≥ 4');
+        expect(filtersActive(removeChip(f, chip))).toBe(false);
+        expect(activeFilterChips(f)).toEqual([]);
+        expect(cids(f, vehicleFilterContext(cfleet, {}))).toEqual([1, 2, 3]);
+        expect(countRangeText({ min: 2, max: 2 })).toBe('= 2');
+    });
+
+    it('travels in the URL: at least, at most, between, exactly', () => {
+        const f = setCountRange(setCountRange(bound('range', { min: 4 }), 'charging', { max: 1 }), 'epa', { min: 2, max: 2 });
+        const p = encodeVehicleFilters(f);
+        expect([p.get('n_range'), p.get('n_charging'), p.get('n_epa')]).toEqual(['4-', '-1', '2']);
+        expect(decodeVehicleFilters(p.toString()).counts).toEqual({
+            range: { min: 4, max: null }, charging: { min: null, max: 1 }, epa: { min: 2, max: 2 },
+        });
+        expect(decodeVehicleFilters('n_range=2-4').counts.range).toEqual({ min: 2, max: 4 });
+        expect([...p.keys()].every(k => VEHICLE_FILTER_PARAMS.has(k))).toBe(true);
     });
 });

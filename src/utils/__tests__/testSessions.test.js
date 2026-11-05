@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     toSessionRow, sessionLabel, runsInSession, vehiclesInSession, sessionsForPicker,
     sessionDateMismatch, suggestedPairing, summariseSessions, filterSessions,
-    groupRunsBySession, sessionFor,
+    groupRunsBySession, sessionFor, sessionSeedFromRun,
 } from '../testSessions';
 
 const car = (id, name, runs, extra = {}) => ({ id, name, runs, ...extra });
@@ -182,5 +182,35 @@ describe('groupRunsBySession — composite curves (#313)', () => {
 
     it('has no composite group when there are none', () => {
         expect(groupRunsBySession([run(1, 'charging', null)]).map(g => g.key)).toEqual(['__none__']);
+    });
+});
+
+describe('sessionSeedFromRun', () => {
+    const SOURCES = [{ id: 2, name: 'Out of Spec', aliases: ['OoS'], domains: [] }];
+    const tested = {
+        date: '2026-03-14', source: 'OoS', source_url: 'https://www.youtube.com/watch?v=KzzTAAfAN-Y',
+        temperature_f: 41, altitude_ft: 5280, name: 'Out of Spec 70mph',
+    };
+
+    it('starts a session with the test\'s date, source, link and conditions', () => {
+        expect(sessionSeedFromRun(tested, SOURCES)).toEqual({
+            testedAt: '2026-03-14', sourceName: 'Out of Spec',
+            url: 'https://www.youtube.com/watch?v=KzzTAAfAN-Y', temperatureF: 41, altitudeFt: 5280,
+        });
+    });
+
+    it('keeps a source that is not listed as the test has it, and leaves out what the test lacks', () => {
+        expect(sessionSeedFromRun({ source: 'Oos Reviews' }, SOURCES)).toEqual({
+            testedAt: null, sourceName: 'Oos Reviews', url: null, temperatureF: null, altitudeFt: null,
+        });
+        expect(sessionSeedFromRun({}, [])).toMatchObject({ sourceName: null });
+    });
+
+    it('does not carry the name, which is the curator\'s to give', () => {
+        expect(sessionSeedFromRun(tested, SOURCES)).not.toHaveProperty('name');
+    });
+
+    it('writes through toSessionRow, a zero degrees included', () => {
+        expect(toSessionRow(sessionSeedFromRun({ ...tested, temperature_f: 0 }, SOURCES)).temperature_f).toBe(0);
     });
 });

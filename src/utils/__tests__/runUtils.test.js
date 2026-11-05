@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyDefaultRun, clearDefaultRuns, runKindFrom, defaultChargingRun, nativeComposite, filterTests, compositesFirst } from '../runUtils';
+import { applyDefaultRun, clearDefaultRuns, runKindFrom, defaultChargingRun, nativeComposite, filterTests, compositesFirst, buildInheritedRunId, buildLineageRunId, parseInheritedRunId, isInheritedRunId } from '../runUtils';
 
 // A vehicle after the 046 split: charging halves and range halves side by side.
 const fleet = () => ([
@@ -107,5 +107,20 @@ describe('compositesFirst', () => {
     it('puts composites at the top, own class first, and leaves the tests in order', () => {
         const runs = [{ id: 1 }, { id: 9, composite: { chargerClassV: 400 } }, { id: 2 }, { id: 8, composite: { chargerClassV: 800 } }];
         expect(compositesFirst(runs).map(r => r.id)).toEqual([8, 9, 1, 2]);
+    });
+});
+
+describe('inherited run ids', () => {
+    it('reads both forms back to the real run', () => {
+        expect(parseInheritedRunId(buildInheritedRunId(7, 202))).toEqual({ linkId: 7, vehicleId: null, realRunId: 202 });
+        expect(parseInheritedRunId(buildLineageRunId(3, 202))).toEqual({ linkId: null, vehicleId: 3, realRunId: 202 });
+        expect(isInheritedRunId(buildLineageRunId(3, 202))).toBe(true);
+    });
+});
+
+describe('nativeComposite', () => {
+    it('passes over a composite that reaches the vehicle through a link', () => {
+        const inherited = { id: 'inherited_7_300', composite: { chargerClassV: null }, _inherited: true };
+        expect(nativeComposite([inherited])).toBeNull();
     });
 });

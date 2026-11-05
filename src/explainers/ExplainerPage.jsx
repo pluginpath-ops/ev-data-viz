@@ -77,7 +77,7 @@ export default function ExplainerPage({ topic, afterNotes = null }) {
 
                 {hasNotes && (
                     <section className="explainer-notes" aria-labelledby="explainer-notes">
-                        <h3 id="explainer-notes" className="text-micro">Notes</h3>
+                        <h3 id="explainer-notes" className="subsection-title">Notes</h3>
                         <ol>
                             {Object.entries(doc.footnotes).map(([n, inline]) => (
                                 <li key={n} id={`fn-${n}`}><Inline nodes={inline} ctx={ctx} /></li>
@@ -90,7 +90,7 @@ export default function ExplainerPage({ topic, afterNotes = null }) {
 
                 {doc.citations.length > 0 && (
                     <section className="explainer-sources" aria-labelledby="explainer-sources">
-                        <h3 id="explainer-sources" className="text-micro">Sources</h3>
+                        <h3 id="explainer-sources" className="subsection-title">Sources</h3>
                         <ol>
                             {doc.citations.map(id => <SourceItem key={id} id={id} />)}
                         </ol>
@@ -243,7 +243,7 @@ function TestsCard({ runIds, caption, axes }) {
             {caption && <figcaption className="explainer-para">{caption}</figcaption>}
             <ChargingPreview tests={tests} x={axes.x} y={axes.y} />
             <a className="explainer-link explainer-tests-link" href={href}>
-                Open {runIds.length === 1 ? 'the charging test' : `the ${runIds.length} charging tests`} in Charging Curves →
+                Open {runIds.length === 1 ? 'the charging test' : `the ${runIds.length} charging tests`} in Charging Curves ↘
             </a>
         </figure>
     );
@@ -300,7 +300,7 @@ function ModeledCard({ mappingIds, caption, y }) {
             {caption && <figcaption className="explainer-para">{caption}</figcaption>}
             <ModeledPreview curves={curves} y={y} />
             <a className="explainer-link explainer-tests-link" href={href}>
-                Open in Modeled Efficiency →
+                Open in Modeled Efficiency ↘
             </a>
         </figure>
     );

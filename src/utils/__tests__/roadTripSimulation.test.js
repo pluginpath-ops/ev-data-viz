@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { simulateRoadTrip } from '../roadTripSimulation';
+import { simulateRoadTrip, untimedSpans } from '../roadTripSimulation';
 
 // A flat, easy-to-reason-about charging curve: 1 minute per % SoC, 0→100.
 const LINEAR_CURVE = [{ soc: 0, time: 0 }, { soc: 100, time: 100 }];
@@ -293,5 +293,77 @@ describe('destination SoC requirement (road trip)', () => {
         expect(topUp.endSoc).toBeLessThanOrEqual(100);
         // This is the one stop expected to add more than a leg's worth.
         expect(topUp.endSoc - topUp.startSoc).toBeGreaterThan(cap);
+    });
+});
+
+describe('a last stop a few miles short (fixed charge time)', () => {
+    // 90 mi to the first stop, a 30-minute stop adds 30 mi, and the second
+    // stop is half a mile short. Charging just enough to finish is +1% there;
+    // the "too slow for a meaningful charge" check used to read that as a
+    // failed stop and abandon the trip — isolated blank cells on the maps.
+    it('finishes rather than calling the charger too slow', () => {
+        const result = simulateRoadTrip({
+            ...baseParams,
+            startSoc: 100, minSoc: 10, destinationMinSoc: 10,
+            totalDistanceMi: 120.5, mode: 'time', chargeTimeMinutes: 30,
+        });
+        expect(result.completed).toBe(true);
+        expect(result.warnings).not.toContain('Charger too slow for meaningful charge');
+        expect(result.chargeStops).toBe(2);
+    });
+
+    // A full 30-minute stop at 90 mi leaves exactly 30 mi of range for 30.05
+    // mi of trip. Held to 0.01 mi, the car drove to its floor, stopped 0.05 mi
+    // short to charge 1% with overhead, then failed the minimum-drive check
+    // for the sliver left. Within MIN_DRIVE_MI of the destination it finishes.
+    it('drives the last hundred feet rather than stopping for them', () => {
+        const result = simulateRoadTrip({
+            ...baseParams,
+            startSoc: 100, minSoc: 10, destinationMinSoc: 10,
+            totalDistanceMi: 120.05, mode: 'time', chargeTimeMinutes: 30,
+        });
+        expect(result.completed).toBe(true);
+        expect(result.warnings).toEqual([]);
+        expect(result.chargeStops).toBe(1);   // no stop for the sliver, no top-up
+    });
+
+    it('still calls a full-duration stop that adds under 1% too slow', () => {
+        const flat = [{ soc: 0, time: 0 }, { soc: 10, time: 10 }, { soc: 10.5, time: 1000 }];
+        const result = simulateRoadTrip({
+            ...baseParams, chargingData: flat,
+            startSoc: 100, minSoc: 10, destinationMinSoc: 10,
+            totalDistanceMi: 300, mode: 'time', chargeTimeMinutes: 30,
+        });
+        expect(result.completed).toBe(false);
+        expect(result.warnings).toContain('Charger too slow for meaningful charge');
+    });
+});
+
+describe('untimedSpans', () => {
+    it('reports where a curve has SoC but no clock', () => {
+        // The R2 500 A composite before its rebuild: timed 8–14%, power to 98%.
+        const pts = [8, 10, 14, 15, 50, 98].map((soc, i) => ({ soc, time: i < 3 ? i : null }));
+        expect(untimedSpans(pts)).toEqual([[15, 98]]);
+    });
+
+    it('reports a gap in the middle, and a curve with no clock at all', () => {
+        const gap = [{ soc: 10, time: 0 }, { soc: 30, time: null }, { soc: 40, time: null }, { soc: 50, time: 9 }];
+        expect(untimedSpans(gap)).toEqual([[30, 40]]);
+        expect(untimedSpans([{ soc: 5 }, { soc: 95 }])).toEqual([[5, 95]]);
+    });
+
+    it('keeps to the SoC a trip charges through, and drops slivers', () => {
+        // The rebuilt R2 composite: untimed only past 95%. The Gravity's: 0–2%.
+        const r2 = [{ soc: 90, time: 20 }, { soc: 96 }, { soc: 100 }];
+        expect(untimedSpans(r2, { within: [10, 95] })).toEqual([]);
+        expect(untimedSpans([{ soc: 0 }, { soc: 2 }, { soc: 3, time: 0 }], { within: [10, 95] })).toEqual([]);
+        expect(untimedSpans([{ soc: 12, time: 0 }, { soc: 13 }, { soc: 14, time: 1 }])).toEqual([]);   // 1% wide
+        expect(untimedSpans([{ soc: 0 }, { soc: 99 }], { within: [10, 95] })).toEqual([[10, 95]]);
+    });
+
+    it('says nothing of a curve that is timed throughout, or simply ends', () => {
+        expect(untimedSpans(LINEAR_CURVE)).toEqual([]);
+        expect(untimedSpans([{ soc: 10, time: 0 }, { soc: 80, time: 30 }])).toEqual([]);
+        expect(untimedSpans(null)).toEqual([]);
     });
 });

@@ -447,7 +447,39 @@ function parsePhases(items, start, end, cold) {
 }
 
 /**
- * The manufacturer's note for the test beginning at `ti`.
+ * A manufacturer's free-text field read whole: every item after `labelIdx` up
+ * to the next label in `stops` (or `end`), joined with spaces.
+ *
+ * A long note wraps across several text items. Reading only `items[i + 1]`,
+ * as this parser first did, kept the first line: GM's
+ * "4K CDEM TEST DC ENERGY CONSUMPTION UDDS1 = 247.9979 WH/MI; …" lost the
+ * usable battery energy at its end, which is the one figure the file states
+ * nowhere else.
+ */
+function freeText(items, labelIdx, end, stops) {
+    const out = [];
+    for (let i = labelIdx + 1; i < end; i++) {
+        const s = items[i];
+        if (stops.some(x => (typeof x === 'string' ? s === x : x.test(s)))) break;
+        out.push(s);
+    }
+    const text = out.join(' ').replace(/\s+/g, ' ').trim();
+    // The label is present on every certificate; the value is often the
+    // placeholder EPA writes when a manufacturer said nothing.
+    return text && text !== '--' ? text : null;
+}
+
+/** Where a test vehicle's note ends: the next test, or the page header. */
+const VEHICLE_NOTE_STOPS = ['Test #', /^CSI Submission\/Revision Date/];
+
+/**
+ * Where a test's own note ends: the emission results table that follows it
+ * ("Certification", "Region", …), the next test, or the page header.
+ */
+const TEST_NOTE_STOPS = ['Certification', 'Test #', /^CSI Submission\/Revision Date/];
+
+/**
+ * The manufacturer's note on the test vehicle, for the test beginning at `ti`.
  *
  * Searched BACKWARDS, because the field sits above its test rather than inside
  * it — in the Volvo certificate the comment is item 516 and that test's `Test #`
@@ -462,13 +494,23 @@ function parsePhases(items, start, end, cold) {
 function commentsBefore(items, ti, lowerBound) {
     for (let b = ti - 1; b >= lowerBound; b--) {
         if (items[b] === 'Manufacturer Test Vehicle Comments') {
-            const v = items[b + 1];
-            // The label is present on every certificate; the value is often the
-            // placeholder EPA writes when a manufacturer said nothing.
-            return v && v !== '--' ? v : null;
+            return freeText(items, b, ti, VEHICLE_NOTE_STOPS);
         }
     }
     return null;
+}
+
+/**
+ * The manufacturer's note on one test — "Manufacturer Test Comments", inside
+ * the test's own block, below its charge-depleting figures. A different field
+ * from the test vehicle's note above, and the richer one: across the 2021–2027
+ * corpus 2,980 tests carry one and 2,329 of those state energy — per-cycle DC
+ * Wh/mi, usable battery energy, the wheel and test weight the run used. Of the
+ * 336 files with no DC energy in the structured fields, 172 state it here.
+ */
+function testComments(items, ti, tEnd) {
+    const i = idxOf(items, 'Manufacturer Test Comments', ti, tEnd);
+    return i < 0 ? null : freeText(items, i, tEnd, TEST_NOTE_STOPS);
 }
 
 /**
@@ -584,6 +626,7 @@ function parseTests(items, start, end) {
             // inch tire, covering 22 inch tire as worst case", which its
             // covered-models table — naming only 21 inch — does not.
             mfr_test_vehicle_comments: commentsBefore(items, ti, tStart),
+            mfr_test_comments: testComments(items, ti, tEnd),
             test_date: toIsoDate(valAfter(items, 'Test Date', ti, tEnd)),
             source: 'csi_pdf',   // epa_tests.source enum (override field-tag stays 'pdf')
             recharge_voltage: parseNum(valAfter(items, 'Recharge Event Voltage', ti, tEnd)),

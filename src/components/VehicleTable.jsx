@@ -8,7 +8,8 @@
  * `selectedVehicles` the chips render and every chart reads. There is no second,
  * local notion of chosen. The band at the top holds the selected vehicles, in
  * chip order, kept through filters and sorting; deselecting one drops it from
- * every chart, which is intended. (The band borrows the FE Guide's pinned band,
+ * every chart, which is intended. Sorting by a header reorders the selection to
+ * match (#457), so the chips and the charts follow the table. (The band borrows the FE Guide's pinned band,
  * but it is a selection, not a pin — see docs/vocabulary.md, Tables.)
  *
  * ── State ───────────────────────────────────────────────────────────────────
@@ -20,128 +21,54 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { useAsyncResource } from '../hooks/useAsyncResource';
-import SortHeader from './tables/SortHeader';
+import { useVehicleRows } from '../hooks/useVehicleRows';
+import VehicleTableGrid from './vehicles/VehicleTableGrid';
+import FeatureChartButton from './home/FeatureChartButton';
 import ColumnPicker from './tables/ColumnPicker';
 import PresetPicker from './tables/PresetPicker';
+import { PLOT_NEEDS_SELECTION } from './tables/SortHeader';
+import { readMemory, writeMemory } from '../utils/vehicleTableStorage';
+import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import VehicleTableAssumptions from './VehicleTableAssumptions';
 import useColumnDrag from '../hooks/useColumnDrag';
 import TableCell from './tables/TableCell';
 import { useCellPeek } from '../hooks/useCellPeek';
 import TestPeek from './TestPeek';
-import { testHref } from '../utils/testDetails';
-import { platformHref } from '../utils/platforms';
-import { useNavigation } from '../context/NavigationContext';
+import { cellUnit, figureWithUnit } from '../utils/tableColumns';
 import VehicleFilterBar from './vehicles/VehicleFilterBar';
 import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { decodeVehicleFilters } from '../utils/vehicleFilters';
 import ViewSpecsModal from './ViewSpecsModal';
-import { vehicleColor } from '../utils/specHelpers';
-import { groupPerformanceByVehicle } from '../utils/dataChecks';
+import VehicleCardPopover from './vehicles/VehicleCardPopover';
+import { reorderSelectionBySort } from '../utils/sortSelection';
 import {
     VEHICLE_COLUMNS, DEFAULT_VEHICLE_COLUMNS, VEHICLE_TABLE_PARAM_PREFIX,
-    vehicleColumnByKey, unitFor, needsPerformance, buildVehicleRows, formatVehicleCell,
+    vehicleColumnByKey, unitFor, needsPerformance, formatVehicleCell,
     sortVehicleRows, firstSortDir,
-    vehicleBarMaxima, vehicleBarPercent, encodeVehicleTableParams, decodeVehicleTableParams,
+    vehicleBarMaxima, encodeVehicleTableParams, decodeVehicleTableParams,
     vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
     labelledColumn, needsAssumptions, assumptionsFor,
 } from '../utils/vehicleTable';
-
-/*
- * Columns and sort are kept across visits; the reasoning is at
- * vehicleTableStartSearch. Storage can be missing or refuse a write (a private
- * window, blocked site data), and the table must still work, so every touch is
- * guarded and a failure just means no memory. Filters are not the table's to
- * remember since #338: they are Vehicles & Specs', held by App.
- */
-const VIEW_KEY = 'evbench.vehicleTable.view';
-
-function readMemory() {
-    try { return { view: window.localStorage.getItem(VIEW_KEY) ?? '' }; } catch { return { view: '' }; }
-}
-
-function writeMemory({ view }) {
-    try { if (view) window.localStorage.setItem(VIEW_KEY, view); else window.localStorage.removeItem(VIEW_KEY); } catch { /* no memory, no harm */ }
-}
-
-/** One vehicle. Rendered by the selected band and the body from the same component. */
-function VehicleTableRow({ row, cols, units, maxima, selected, onToggle, onOpen, onOpenTest }) {
-    const { openPlatform } = useNavigation();
-    return (
-        <tr className={`guide-row${selected ? ' selected' : ''}`} data-row-id={row.id} onClick={() => onOpen(row.vehicle)}>
-            <td className="guide-td guide-td-select sticky-select" onClick={e => e.stopPropagation()}>
-                <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() => onToggle(row.id)}
-                    aria-label={selected ? `Remove ${row.values.name} from the selection` : `Add ${row.values.name} to the selection`}
-                />
-            </td>
-            {cols.map(col => {
-                const text = formatVehicleCell(row, col, units);
-                if (col.key === 'name') {
-                    return (
-                        // The name selects, like the checkbox beside it: it is the
-                        // biggest target in the row and the one the eye lands on.
-                        // Every other cell still opens View Specs.
-                        <TableCell
-                            key={col.key}
-                            className="sticky-name"
-                            restate={text}
-                            onClick={(e) => { e.stopPropagation(); onToggle(row.id); }}
-                        >
-                            <span className="vehicle-table-name">
-                                {/* The vehicle's series color, so a row ties to the
-                                    same vehicle on every chart. */}
-                                <span className="series-swatch" style={{ backgroundColor: vehicleColor(row.vehicle, row.index) }} aria-hidden="true" />
-                                <span className="guide-cell-name">{text}</span>
-                            </span>
-                        </TableCell>
-                    );
-                }
-                return (
-                    <TableCell
-                        key={col.key}
-                        numeric={col.numeric}
-                        text={text}
-                        pct={vehicleBarPercent(row, col, maxima)}
-                        note={row.notes[col.key]}
-                        flagged={row.flagged.has(col.key)}
-                        test={testLink(row.tests[col.key], onOpenTest)}
-                        testKey={col.key}
-                        link={platformNoteLink(row.links?.[col.key], openPlatform)}
-                    />
-                );
-            })}
-        </tr>
-    );
-}
-
-/**
- * A cell's test as TableCell links it: the href always, and an in-app open
- * where the table has one. The pop-out window has none — it holds only the
- * table — so there a click opens the test in a new tab instead.
- */
-/** A "from <platform>" note as TableCell links it (#354). */
-function platformNoteLink(link, openPlatform) {
-    if (link?.platformId == null) return null;
-    return { href: platformHref(link.platformId), onOpen: openPlatform ? () => openPlatform(link.platformId) : null };
-}
-
-function testLink(ref, onOpenTest) {
-    if (!ref) return null;
-    return { href: testHref(ref), onOpen: onOpenTest ? () => onOpenTest(ref) : null };
-}
 
 /**
  * Props:
  *   onOpenTest  {(TestReference) => void}  open a test in Tests & Data
  *               without a reload; absent in the pop-out window
+ *   onViewRuns  {(vehicle, subtab?) => void}  open a vehicle's Tests & Data,
+ *               from its card; absent in the pop-out window
  */
-export default function VehicleTable({ onOpenTest = null, filters: sharedFilters = null, onFiltersChange = null }) {
+export default function VehicleTable({
+    onOpenTest = null, onViewRuns = null, filters: sharedFilters = null, onFiltersChange = null,
+    correctionTarget: sharedTarget = null, onCorrectionTargetChange = null,
+    // The reader's correction mode, set on the charts' Correct control. Read
+    // only here: 'none' shows the reported test's figures as measured.
+    correctionMode = DEFAULT_READER_MODE,
+    assumptions: sharedAssumptions = null, onAssumptionsChange = null,
+    // Open a column plotted in the spec chart; absent in the pop-out window.
+    onPlotColumn = null,
+}) {
     const {
-        vehicles, selectedVehicles, toggleVehicleSelection, units, platformsById,
-        getPerformanceSummaries, getPerformanceSessions, performanceCounts,
+        vehicles, selectedVehicles, toggleVehicleSelection, setVehicleSelection, units, performanceCounts,
     } = useAppContext();
 
     const [initial] = useState(() => decodeVehicleTableParams(
@@ -155,7 +82,17 @@ export default function VehicleTable({ onOpenTest = null, filters: sharedFilters
     const [localFilters, setLocalFilters] = useState(() => decodeVehicleFilters(window.location.search));
     const filters = sharedFilters ?? localFilters;
     const setFilters = onFiltersChange ?? setLocalFilters;
-    const [assumptions, setAssumptions] = useState(initial.assumptions);
+    // The assumptions are App's (chartConfig) so the spec chart's sidebar edits
+    // the same ones and the chart agrees with the cell the reader came from
+    // (#450). The pop-out window keeps its own.
+    const [localAssumptions, setLocalAssumptions] = useState(initial.assumptions);
+    const assumptions = sharedAssumptions ?? localAssumptions;
+    const setAssumptions = onAssumptionsChange ?? setLocalAssumptions;
+    // The site-wide correction target (correctionSettings.js), App's. The
+    // pop-out window shows the one it was handed and keeps any change local.
+    const [localTarget, setLocalTarget] = useState(sharedTarget ?? DEFAULT_CORRECTION_TARGET);
+    const correctionTarget = onCorrectionTargetChange ? (sharedTarget ?? DEFAULT_CORRECTION_TARGET) : localTarget;
+    const setCorrectionTarget = onCorrectionTargetChange ?? setLocalTarget;
     // The preset the columns last WERE, kept so a changed set can say what it
     // was changed from. Which preset is showing is never stored: it is read
     // off the columns (presetMatching).
@@ -179,24 +116,10 @@ export default function VehicleTable({ onOpenTest = null, filters: sharedFilters
     }, [columns, sortKey, sortDir, modifiedFrom, assumptions]);
 
     // Tested results are fetched only while a tested column is shown or sorted
-    // by: sessions carry every run and split, which is the heaviest read here.
-    const wantsPerformance = needsPerformance([...columns, sortKey]);
-    const idsKey = vehicles.map(v => v.id).join(',');
-    const loadPerformance = useCallback(async () => {
-        if (!wantsPerformance || !idsKey) return null;
-        const ids = vehicles.map(v => v.id);
-        const [summaries, sessions] = await Promise.all([getPerformanceSummaries(ids), getPerformanceSessions(ids)]);
-        return groupPerformanceByVehicle(summaries ?? [], sessions ?? []);
-        // Keyed on the ids, not the fleet array: every save hands back a new
-        // array, and refetching every run after each edit elsewhere is waste.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [wantsPerformance, idsKey]);
-    const { data: performance, loading: performanceLoading } = useAsyncResource(loadPerformance, [loadPerformance]);
-
-    const rows     = useMemo(
-        () => buildVehicleRows(vehicles, { performance, assumptions, units, platformsById }),
-        [vehicles, performance, assumptions, units, platformsById],
-    );
+    // by (useVehicleRows).
+    const { rows, performance, wantsPerformance, performanceLoading } = useVehicleRows({
+        keys: [...columns, sortKey], assumptions, correctionTarget, correctionMode,
+    });
     // A tested cell peeks with its test — which one, why, and its conditions —
     // rather than restating its own text. One peek for every clipped cell in
     // the table, rather than one per cell.
@@ -207,10 +130,10 @@ export default function VehicleTable({ onOpenTest = null, filters: sharedFilters
         const test = row?.tests?.[key];
         const col = vehicleColumnByKey(key);
         if (!test || !col) return null;
-        const unit = unitFor(col, units);
-        const figure = `${labelledColumn(col, assumptions, units).label}: ${formatVehicleCell(row, col, units)}${unit && row.values[key] != null ? ` ${unit}` : ''}`;
+        const unit = cellUnit(unitFor(col, units), row.values[key]);
+        const figure = `${labelledColumn(col, assumptions, units, correctionTarget, correctionMode).label}: ${figureWithUnit(formatVehicleCell(row, col, units), unit)}`;
         return <TestPeek test={test} figure={figure} />;
-    }, [rowsById, assumptions, units]);
+    }, [rowsById, assumptions, units, correctionTarget, correctionMode]);
     const { tableProps: peekProps, panel: cellPeek } = useCellPeek({ renderPeek });
     const { ctx: filterCtx, filtered: filteredVehicles } = useFilteredVehicles(vehicles, filters, performanceCounts);
     const shownIds = useMemo(() => new Set(filteredVehicles.map(v => v.id)), [filteredVehicles]);
@@ -233,7 +156,7 @@ export default function VehicleTable({ onOpenTest = null, filters: sharedFilters
     // Headers drag the same list the column picker does.
     const { dragProps, dragClass } = useColumnDrag({ visible: columns, fixedKey: 'name', onChange: changeColumns });
     // Named from the assumptions where a name carries one ("Time to add 150 mi").
-    const label    = useCallback((col) => labelledColumn(col, assumptions, units), [assumptions, units]);
+    const label    = useCallback((col) => labelledColumn(col, assumptions, units, correctionTarget, correctionMode), [assumptions, units, correctionTarget, correctionMode]);
     const cols     = useMemo(() => columns.map(vehicleColumnByKey).filter(Boolean).map(label), [columns, label]);
     const pickable = useMemo(() => VEHICLE_COLUMNS.map(label), [label]);
     const maxima   = useMemo(() => vehicleBarMaxima(filtered, cols), [filtered, cols]);
@@ -241,16 +164,20 @@ export default function VehicleTable({ onOpenTest = null, filters: sharedFilters
     const byId = useMemo(() => new Map(rows.map(r => [r.id, r])), [rows]);
     const selectedRows = selectedVehicles.map(id => byId.get(id)).filter(Boolean);
     const bodyRows = sorted.filter(r => !selectedVehicles.includes(r.id));
-    const span = cols.length + 1;
 
     const sortBy = (key) => {
-        if (key === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
-        else {
-            setSortKey(key);
-            setSortDir(firstSortDir(vehicleColumnByKey(key)));
-        }
+        const dir = key === sortKey ? (sortDir === 'asc' ? 'desc' : 'asc') : firstSortDir(vehicleColumnByKey(key));
+        if (key !== sortKey) setSortKey(key);
+        setSortDir(dir);
+        // The selection follows the sort (#457): chips and charts take the
+        // table's order. Over every row, not the filtered ones — the band keeps
+        // a selected vehicle through filters. Held back while a tested column's
+        // results are still loading, when every cell would read blank.
+        if (needsPerformance([key]) && !performance) return;
+        const next = reorderSelectionBySort(selectedVehicles, rows, key, dir);
+        if (next !== selectedVehicles) setVehicleSelection(next);
     };
-    const rowProps = { cols, units, maxima, onToggle: toggleVehicleSelection, onOpen: setViewing, onOpenTest };
+    const rowProps = { cols, units, maxima, onToggle: toggleVehicleSelection, onOpen: setViewing, onOpenTest, onViewRuns, performanceCounts };
 
     return (
         <div className="vehicle-table">
@@ -272,8 +199,13 @@ export default function VehicleTable({ onOpenTest = null, filters: sharedFilters
                 shownCount={sorted.length}
             >
                 {needsAssumptions(columns) && (
-                    <VehicleTableAssumptions assumptions={assumptions} needed={assumptionsFor(columns)} units={units} onChange={setAssumptions} />
+                    <VehicleTableAssumptions
+                        assumptions={assumptions} needed={assumptionsFor(columns)} units={units} onChange={setAssumptions}
+                        correctionTarget={correctionTarget} onCorrectionTargetChange={setCorrectionTarget}
+                    />
                 )}
+                {/* The table has no chart toolbar, so its Save as featured comparison is here. */}
+                <FeatureChartButton className="btn btn-secondary" />
                 <ColumnPicker
                     columns={pickable}
                     visible={columns}
@@ -283,48 +215,21 @@ export default function VehicleTable({ onOpenTest = null, filters: sharedFilters
                     onChange={changeColumns}
                 />
                 {wantsPerformance && performanceLoading && <span className="text-meta">loading tested results…</span>}
+                {onPlotColumn && selectedVehicles.length === 0 && <span className="text-meta">{PLOT_NEEDS_SELECTION}</span>}
             </VehicleFilterBar>
 
-            <div className="guide-table-container">
-                <table className="guide-table" {...peekProps}>
-                    <thead>
-                        <tr>
-                            <th className="guide-th guide-th-select sticky-select" />
-                            {cols.map(col => (
-                                <SortHeader key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={sortBy} unit={unitFor(col, units)}
-                                    dragProps={dragProps(col.key)} dragClass={dragClass(col.key)} />
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {selectedRows.length > 0 && (
-                            <>
-                                <tr className="vehicle-table-band">
-                                    <td colSpan={span}>
-                                        <div className="guide-band-content">
-                                            <span className="text-nano">Selected · {selectedRows.length}</span>
-                                            <span className="text-note">on every chart, and kept here through filters and sorting</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {selectedRows.map(row => (
-                                    <VehicleTableRow key={`selected-${row.id}`} row={row} selected {...rowProps} />
-                                ))}
-                                <tr className="vehicle-table-band-spacer"><td colSpan={span} /></tr>
-                            </>
-                        )}
-                        {bodyRows.map(row => (
-                            <VehicleTableRow key={row.id} row={row} selected={false} {...rowProps} />
-                        ))}
-                    </tbody>
-                </table>
-                {cellPeek}
-                {bodyRows.length === 0 && selectedRows.length === 0 && (
-                    <div className="empty-state">
-                        {rows.length ? 'No vehicles match these filters.' : 'No vehicles yet.'}
-                    </div>
-                )}
-            </div>
+            <VehicleTableGrid
+                cols={cols}
+                sort={{ key: sortKey, dir: sortDir, onSort: sortBy }}
+                drag={{ dragProps, dragClass }}
+                plot={onPlotColumn ? { enabled: selectedVehicles.length > 0, onPlot: onPlotColumn } : null}
+                selectedRows={selectedRows}
+                bodyRows={bodyRows}
+                rowProps={rowProps}
+                peekProps={peekProps}
+                peek={cellPeek}
+                emptyText={rows.length ? 'No vehicles match these filters.' : 'No vehicles yet.'}
+            />
 
             {viewing && <ViewSpecsModal vehicle={viewing} onClose={() => setViewing(null)} />}
         </div>

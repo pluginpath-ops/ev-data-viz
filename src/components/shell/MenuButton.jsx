@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLightDismiss } from '../../hooks/useLightDismiss';
+import { placePopover } from '../../utils/popoverPlacement';
 
 /**
  * A button that states what it holds, and opens a panel (#236).
@@ -37,31 +38,47 @@ export default function MenuButton({
     buttonClass = null, ariaLabel,
 }) {
     const [open, setOpen] = useState(false);
-    // How far the panel is nudged sideways to stay on screen, in px.
-    const [shift, setShift] = useState(0);
+    // Where the panel sits, in viewport px; null until it has been measured.
+    const [pos, setPos] = useState(null);
     const ref = useLightDismiss(open, () => setOpen(false));
     const close = () => setOpen(false);
 
     /**
-     * Keep the panel inside the viewport, 8px from either edge.
+     * Place the panel against its button, inside the viewport.
      *
-     * It opens from its button's left edge, which on a phone runs a 320px
-     * column list off the right of the screen from any button past the first
-     * few — and right-aligning instead only moves the problem to the left edge
-     * for a button in the middle. So it measures itself once attached and
-     * slides just far enough. A callback ref rather than an effect: it runs
-     * before paint, so the unshifted panel is never drawn (see
-     * useAnchoredPosition for the same reasoning).
+     * Fixed rather than absolute under the button: an absolute panel is
+     * clipped by any scrolling ancestor, and the ⋯ menu on a List row opens
+     * inside the lineage popover (which scrolls), where its last items were
+     * cut off at the popover's edge. A fixed box is not clipped by ancestor
+     * overflow, and `placePopover` flips it above its button, or slides it up,
+     * when below cannot hold it. It stays a DOM descendant of the button's
+     * wrapper (no portal), so light dismiss and the owning popover's own
+     * dismissal both still count a click on it as inside.
+     *
+     * A callback ref rather than an effect: it runs before paint, so the
+     * unplaced panel is never drawn (see useAnchoredPosition for the same
+     * reasoning).
      */
     const place = useCallback((panel) => {
-        if (!panel || !ref.current) return;
-        const edge = 8;
-        const anchorLeft = ref.current.getBoundingClientRect().left;
-        const viewport = document.documentElement.clientWidth;
-        const left = Math.max(edge, Math.min(anchorLeft, viewport - edge - panel.offsetWidth));
-        const next = Math.round(left - anchorLeft);
-        setShift(prev => (prev === next ? prev : next));
+        if (!panel || !ref.current) { setPos(null); return; }
+        const next = placePopover(
+            ref.current.getBoundingClientRect(),
+            { width: panel.offsetWidth, height: panel.offsetHeight },
+            { width: document.documentElement.clientWidth, height: window.innerHeight },
+        );
+        setPos(prev => (prev && prev.top === next.top && prev.left === next.left ? prev : next));
     }, [ref]);
+
+    // A fixed panel does not follow its button, so a scroll elsewhere would
+    // leave it hanging. Scrolling the panel itself (a long column list) is fine.
+    useEffect(() => {
+        if (!open) return;
+        const onScroll = (e) => {
+            if (!ref.current?.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+        return () => document.removeEventListener('scroll', onScroll, { capture: true });
+    }, [open, ref]);
 
     return (
         <div className="menu-button" ref={ref}>
@@ -84,8 +101,8 @@ export default function MenuButton({
             {open && (
                 <div
                     ref={place}
-                    className={`popover popover--below guide-facet-panel ${panelClass}`.trim()}
-                    style={shift ? { left: shift } : undefined}
+                    className={`popover popover--anchored guide-facet-panel ${panelClass}`.trim()}
+                    style={pos ? { top: pos.top, left: pos.left } : { top: 0, left: 0, visibility: 'hidden' }}
                 >
                     {typeof children === 'function' ? children({ close }) : children}
                 </div>

@@ -21,14 +21,17 @@ import { isListed } from './runListing';
 /**
  * Category definitions, in display order.
  *
- * `count` reads a vehicle's total for that category. `colorClass` is the pill
- * styling; keeping it here means the filter chip and the card pill can share it.
+ * `count` reads a vehicle's total for that category. `glyph` leads the card's
+ * count badge where a flat symbol exists; the others use `short` or `label`.
+ * `subtab` is the Tests & Data sub-tab the tests live on (RunsView SUBTABS), so a
+ * count can link straight to them — charging and range share one.
  */
 export const DATA_CATEGORIES = [
     {
         key: 'charging',
+        subtab: 'tests',
         label: 'Charging',
-        colorClass: 'text-green-600 dark:text-green-400',
+        glyph: '↯',   // the same mark as the run-kind badge
         // Tests only: a stored composite curve (#313) is a charging run but
         // not a test anyone ran. Listed tests only (#394) — a contributor's
         // runs include the unlisted ones, a viewer's do not, and the count
@@ -38,29 +41,30 @@ export const DATA_CATEGORIES = [
     },
     {
         key: 'range',
+        subtab: 'tests',
         label: 'Range',
-        colorClass: 'text-amber-600 dark:text-amber-400',
+        glyph: '↔',
         count: (v) => (v.runs || []).filter(r => isRangeRun(r) && isListed(r)).length,
         pooled: (v) => (v.pooledRuns || []).filter(isRangeRun).length,
     },
     {
         key: 'epa',
+        subtab: 'epa',
         label: 'EPA',
-        colorClass: 'text-blue-600 dark:text-blue-400',
         count: (v) => v.epa_mappings?.length ?? 0,
     },
     {
         key: 'accel',
+        subtab: 'performance',
         label: 'Acceleration',
         // Where a line has no room for the word (the list's Tests column).
         short: 'Accel',
-        colorClass: 'text-purple-600 dark:text-purple-400',
         count: (v, perf) => perf?.[v.id]?.accel ?? 0,
     },
     {
         key: 'braking',
+        subtab: 'performance',
         label: 'Braking',
-        colorClass: 'text-rose-600 dark:text-rose-400',
         count: (v, perf) => perf?.[v.id]?.braking ?? 0,
     },
 ];

@@ -84,7 +84,7 @@ export default function VariantEpaSuggestions({ vehicle, source, labels = [], st
             ) : (
                 <button
                     type="button"
-                    className="btn btn-primary disabled:opacity-60"
+                    className="btn btn-secondary disabled:opacity-60"
                     disabled={linking != null}
                     onClick={() => link(s.testVehicle)}
                 >

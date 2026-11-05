@@ -42,7 +42,7 @@ export default function SessionBrowserModal({
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div
-                className="modal-panel rounded-xl shadow-2xl mx-4 flex flex-col"
+                className="modal-panel mx-4 flex flex-col"
                 style={{ maxWidth: 'min(92vw, 760px)', maxHeight: '85vh' }}
                 onClick={e => e.stopPropagation()}
             >
@@ -113,7 +113,7 @@ export default function SessionBrowserModal({
                                             )}
                                             <button
                                                 onClick={() => { onPick(isCurrent ? null : session.id); onClose(); }}
-                                                className={`btn text-sm ${isCurrent ? 'btn-secondary' : 'btn-primary'}`}
+                                                className={`btn text-sm ${isCurrent ? 'btn-secondary' : 'btn-secondary'}`}
                                             >
                                                 {isCurrent ? 'Detach' : 'Use'}
                                             </button>

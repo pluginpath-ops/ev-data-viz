@@ -150,28 +150,6 @@ export function curveSubjects(testVehicles) {
 // ── Chart labelling ──────────────────────────────────────────────────────────
 
 /**
- * The three lines of a curve tooltip.
- *
- * Name first (the color swatch sits beside it), then each axis with its unit:
- *
- *     ■ Blazer EV AWD
- *     60 mph
- *     3.116 mi/kWh
- *
- * Chart.js's default puts the x value in the title and crams the series name
- * and the y value onto one line, which read differently from the other charts
- * here. Pure so the format is pinned by a test rather than by looking at a
- * canvas, which nothing can read back.
- */
-export function curveTooltipLines({ name, x, y, xUnit, yUnit, digits = 1 }) {
-    return [
-        name,
-        `${Math.round(x)} ${xUnit}`,
-        `${Number(y).toFixed(digits)} ${yUnit}`,
-    ];
-}
-
-/**
  * Display names, disambiguated only where they collide.
  *
  * Two records can share a carline — the same car certified in consecutive

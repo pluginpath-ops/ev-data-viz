@@ -10,13 +10,18 @@
  *   - dropdowns with counts, one filter bar above every view, each active
  *     filter a removable chip beneath (VehicleFilterBar);
  *   - any value can be excluded as well as included;
- *   - tags and test data have an any / all switch; make, model, year and
- *     drive are one value per vehicle, so "all" would mean nothing there;
+ *   - tags and test data have an any / all switch; make, model and drive are
+ *     one value per vehicle, so "all" would mean nothing there. Year is one
+ *     value per model year: a "2024-2026" vehicle is in 2024, 2025 and 2026,
+ *     so the menu lists single years and a span is never a value of its own;
  *   - the filters travel in the URL, tidily.
  *
  * ── Shape ───────────────────────────────────────────────────────────────────
  *
  *   { search: '', facets: { make: { in: [], out: [], all: false }, … } }
+ *
+ * Beside the facets, `counts` bounds how many tests of a kind a vehicle has
+ * (below): `{ range: { min: 4, max: null } }` is "at least 4 range tests".
  *
  * A facet with nothing in it may be absent. `in` narrows to vehicles with any
  * (or, with `all`, every) of its values; `out` drops vehicles with any of its.
@@ -35,21 +40,65 @@
  */
 import { resolveEffectiveSpecs } from './specHelpers';
 import { DATA_CATEGORIES, hasDataCategory } from './vehicleDataCategories';
+import { ownValues } from './vehicleInheritance';
+import { yearSpan } from './vehicleImportPlan';
+
+/**
+ * What a curator audits a vehicle for: one yes/no question per entry, each
+ * true or false of a vehicle. They share ONE facet (Curation) because the
+ * facet's include / exclude already says "is" and "is not" — "Color set"
+ * included is vehicles with a color, excluded is vehicles without.
+ * `has(vehicle, ctx)` answers it. "Own" asks about the vehicle's stored value;
+ * "Color set" is what it shows, inherited or not.
+ */
+export const CURATION_CHECKS = [
+    { key: 'listed',        label: 'Listed',
+      has: (v) => v.visibility === 'public' },
+    { key: 'color',         label: 'Color set',
+      has: (v) => !!v.color },
+    { key: 'own-color',     label: 'Own color',
+      has: (v) => !!ownValues(v).color },
+    { key: 'photo',         label: 'Photo set',
+      has: (v) => !!v.image_url },
+    { key: 'own-photo',     label: 'Own photo',
+      has: (v) => !!ownValues(v).image_url },
+    { key: 'battery',       label: 'Battery size',
+      has: (v) => v.socWindowKwh != null },
+    { key: 'epa-range',     label: 'EPA range',
+      has: (v) => v.epaRangeMi != null && v.epaRangeMi !== '' },
+    { key: 'variant',       label: 'Variant',
+      has: (v) => v.spec_source_vehicle_id != null },
+    { key: 'has-variants',  label: 'Has variants',
+      has: (v, ctx) => ctx.sourceIds.has(v.id) },
+    // Where a lineage starts (docs/vocabulary.md: origin): the one place a
+    // curator sets specs, photo, range and charging for every variant below.
+    { key: 'origin',        label: 'Origin',
+      has: (v, ctx) => v.spec_source_vehicle_id == null && ctx.sourceIds.has(v.id) },
+];
 
 /**
  * The facets, in the order the filter bar shows them.
  *
  * `values(vehicle, ctx)` gives a vehicle's values for the facet — several for
  * tags and test data. `format(value)`, where given, is how a value reads on
- * screen; otherwise the value is its own text.
+ * screen; otherwise the value is its own text. `order` is the menu's order
+ * (GuideFacetMenu): by count unless the value is what a reader scans for —
+ * years newest first, makes and models A–Z (owner, 2026-11-03).
  */
 export const VEHICLE_FACETS = [
-    { key: 'make',  label: 'Make',  param: 'mk', legacy: 'vt_mk',
+    { key: 'make',  label: 'Make',  param: 'mk', legacy: 'vt_mk', order: 'alpha',
       values: (v) => [v.make || v.manufacturer?.name].filter(Boolean) },
-    { key: 'model', label: 'Model', param: 'md',
+    { key: 'model', label: 'Model', param: 'md', order: 'alpha',
       values: (v) => [v.model].filter(Boolean) },
-    { key: 'year',  label: 'Year',  param: 'yr', legacy: 'vt_y',
-      values: (v) => (v.year != null && v.year !== '' ? [String(v.year)] : []) },
+    { key: 'year',  label: 'Year',  param: 'yr', legacy: 'vt_y', order: 'year',
+      // Every model year of the span: "2024-2026" is in 2024, 2025 and 2026.
+      // As spans the menu listed "2024", "2024-2025", "2024-2026"… as
+      // unrelated values, and choosing 2024 missed every vehicle in a span.
+      values: (v) => {
+          const span = yearSpan(v.year);
+          if (!span) return [];
+          return Array.from({ length: span[1] - span[0] + 1 }, (_, i) => String(span[0] + i));
+      } },
     { key: 'drive', label: 'Drive', param: 'dr', legacy: 'vt_dr',
       // Through inheritance and the platform, as the table shows it.
       values: (v, ctx) => [ctx.specsOf(v)?.powertrain?.drive_type].filter(Boolean) },
@@ -61,11 +110,54 @@ export const VEHICLE_FACETS = [
       hint: 'which kinds of test a vehicle has',
       values: (v, ctx) => DATA_CATEGORIES.filter(c => hasDataCategory(v, c.key, ctx.performanceCounts)).map(c => c.key),
       format: (key) => DATA_CATEGORIES.find(c => c.key === key)?.label ?? key },
+    // Curators only: it asks what a viewer has no use for. Include is "is",
+    // exclude is "is not"; with `all`, a vehicle must pass every one chosen.
+    { key: 'curation', label: 'Curation', param: 'cu', anyAll: true, curatorOnly: true,
+      hint: 'what is and is not set on a vehicle',
+      values: (v, ctx) => CURATION_CHECKS.filter(c => c.has(v, ctx)).map(c => c.key),
+      format: (key) => CURATION_CHECKS.find(c => c.key === key)?.label ?? key,
+      // Every check is offered, even when no vehicle passes it: "not Listed"
+      // needs "Listed" in the menu while every vehicle is listed.
+      options: () => CURATION_CHECKS.map(c => c.key) },
 ];
 const FACET_BY_KEY = new Map(VEHICLE_FACETS.map(f => [f.key, f]));
 export const vehicleFacetByKey = (key) => FACET_BY_KEY.get(key) ?? null;
 
-export const EMPTY_VEHICLE_FILTERS = Object.freeze({ search: '', facets: Object.freeze({}) });
+export const EMPTY_VEHICLE_FILTERS = Object.freeze({ search: '', facets: Object.freeze({}), counts: Object.freeze({}) });
+
+// ── Test counts ──────────────────────────────────────────────────────────────
+
+/**
+ * "More than 3 range tests", "fewer than 2 charging tests": a bound on how many
+ * tests of a kind a vehicle has, by the number its card shows (listed tests;
+ * the unlisted pool is not counted). Each kind of DATA_CATEGORIES takes an
+ * inclusive `min` and `max`, either of which may be absent. Curators only, as
+ * the Curation facet is: it is a question about the data, not about a car.
+ */
+const countKey = (key) => DATA_CATEGORIES.some(c => c.key === key);
+
+/** One kind's bounds, never undefined: `{ min: number|null, max: number|null }`. */
+export function countRange(filters, key) {
+    const r = filters?.counts?.[key];
+    return { min: r?.min ?? null, max: r?.max ?? null };
+}
+
+/** Bound one kind's test count; both null removes the filter. */
+export function setCountRange(filters, key, { min = null, max = null }) {
+    if (!countKey(key)) return filters;
+    const counts = { ...(filters?.counts ?? {}) };
+    if (min == null && max == null) delete counts[key];
+    else counts[key] = { min, max };
+    return { ...EMPTY_VEHICLE_FILTERS, ...filters, counts };
+}
+
+/** How a bound reads: "≥ 4", "≤ 1", "2–4", "= 3". */
+export function countRangeText({ min, max }) {
+    if (min != null && max != null) return min === max ? `= ${min}` : `${min}–${max}`;
+    return min != null ? `≥ ${min}` : `≤ ${max}`;
+}
+
+const countPass = (n, { min, max }) => (min == null || n >= min) && (max == null || n <= max);
 
 const EMPTY_FACET = Object.freeze({ in: [], out: [], all: false });
 
@@ -77,6 +169,7 @@ export function facetState(filters, key) {
 /** Whether anything narrows the vehicles shown. */
 export function filtersActive(filters) {
     if (filters?.search?.trim()) return true;
+    if (Object.keys(filters?.counts ?? {}).length) return true;
     return Object.values(filters?.facets ?? {}).some(f => f.in?.length || f.out?.length);
 }
 
@@ -134,10 +227,14 @@ export function setSearch(filters, search) {
  * comes through inheritance and the platform) and its performance counts.
  * Build once per render; `specsOf` caches per vehicle.
  */
-export function vehicleFilterContext(vehicles = [], performanceCounts = {}) {
+export function vehicleFilterContext(vehicles = [], performanceCounts = {}, { curator = false } = {}) {
     const cache = new Map();
     return {
         performanceCounts,
+        // Curators get the Curation facet; for anyone else a ?cu= in a shared
+        // link must not silently narrow a list they cannot see the filter for.
+        curator,
+        sourceIds: new Set(vehicles.map(v => v.spec_source_vehicle_id).filter(id => id != null)),
         specsOf: (v) => {
             if (!cache.has(v.id)) cache.set(v.id, resolveEffectiveSpecs(v, vehicles));
             return cache.get(v.id);
@@ -174,8 +271,14 @@ export function searchMatches(vehicle, needle) {
 export function vehicleMatches(vehicle, filters, ctx, { skip = null } = {}) {
     const needle = filters?.search?.trim().toLowerCase();
     if (!searchMatches(vehicle, needle)) return false;
+    if (ctx.curator) {
+        for (const c of DATA_CATEGORIES) {
+            const range = countRange(filters, c.key);
+            if ((range.min != null || range.max != null) && !countPass(c.count(vehicle, ctx.performanceCounts), range)) return false;
+        }
+    }
     for (const facet of VEHICLE_FACETS) {
-        if (facet.key === skip) continue;
+        if (facet.key === skip || (facet.curatorOnly && !ctx.curator)) continue;
         if (!facetMatches(facet, facetState(filters, facet.key), vehicle, ctx)) return false;
     }
     return true;
@@ -196,7 +299,7 @@ export function filterVehicles(vehicles = [], filters, ctx) {
 export function vehicleFacetCounts(vehicles = [], filters, ctx) {
     const out = {};
     for (const facet of VEHICLE_FACETS) {
-        const values = new Set();
+        const values = new Set(facet.options?.() ?? []);
         const counts = new Map();
         for (const v of vehicles) {
             const vals = facet.values(v, ctx);
@@ -216,9 +319,10 @@ export function vehicleFacetCounts(vehicles = [], filters, ctx) {
  * Every active filter as a chip: its text and how to remove it. The search is
  * not one — it shows in its own box.
  */
-export function activeFilterChips(filters) {
+export function activeFilterChips(filters, { curator = false } = {}) {
     const chips = [];
     for (const facet of VEHICLE_FACETS) {
+        if (facet.curatorOnly && !curator) continue;
         const st = facetState(filters, facet.key);
         const fmt = facet.format ?? String;
         const joiner = st.all && facet.anyAll && st.in.length > 1 ? 'all of' : null;
@@ -230,11 +334,19 @@ export function activeFilterChips(filters) {
             chips.push({ id: `${facet.key}:out:${v}`, facet: facet.key, value: v, mode: 'out', text: `not ${fmt(v)}` });
         }
     }
+    if (curator) {
+        for (const c of DATA_CATEGORIES) {
+            const range = countRange(filters, c.key);
+            if (range.min == null && range.max == null) continue;
+            chips.push({ id: `count:${c.key}`, facet: c.key, mode: 'count', text: `${c.label} tests ${countRangeText(range)}` });
+        }
+    }
     return chips;
 }
 
 /** Remove one chip's filter. */
 export function removeChip(filters, chip) {
+    if (chip.mode === 'count') return setCountRange(filters, chip.facet, {});
     return chip.mode === 'out'
         ? toggleExclude(filters, chip.facet, chip.value)
         : toggleInclude(filters, chip.facet, chip.value);
@@ -243,8 +355,11 @@ export function removeChip(filters, chip) {
 // ── URL ──────────────────────────────────────────────────────────────────────
 
 /** Every parameter the filters own, for a caller that rebuilds a query string. */
+const countParam = (key) => `n_${key}`;
+
 export const VEHICLE_FILTER_PARAMS = new Set([
     'q', ...VEHICLE_FACETS.flatMap(f => [f.param, `${f.param}_all`]),
+    ...DATA_CATEGORIES.map(c => countParam(c.key)),
 ]);
 
 /** Filters → query parameters; only what is set. */
@@ -256,6 +371,12 @@ export function encodeVehicleFilters(filters) {
         const parts = [...st.in, ...st.out.map(v => `-${v}`)];
         if (parts.length) p.set(facet.param, parts.join(','));
         if (st.all && facet.anyAll && st.in.length) p.set(`${facet.param}_all`, '1');
+    }
+    // "4-" at least 4, "-1" at most 1, "2-4" between, "3" exactly 3.
+    for (const c of DATA_CATEGORIES) {
+        const { min, max } = countRange(filters, c.key);
+        if (min == null && max == null) continue;
+        p.set(countParam(c.key), min != null && min === max ? String(min) : `${min ?? ''}-${max ?? ''}`);
     }
     return p;
 }
@@ -278,5 +399,13 @@ export function decodeVehicleFilters(search) {
         if (facet.legacy) for (const v of p.getAll(facet.legacy)) if (v && !st.in.includes(v)) st.in.push(v);
         if (st.in.length || st.out.length) facets[facet.key] = st;
     }
-    return { search: p.get('q') ?? p.get('vt_q') ?? '', facets };
+    const counts = {};
+    for (const c of DATA_CATEGORIES) {
+        const m = /^(\d*)(-?)(\d*)$/.exec((p.get(countParam(c.key)) ?? '').trim());
+        if (!m || (!m[1] && !m[3])) continue;
+        const min = m[1] ? Number(m[1]) : null;
+        const max = m[2] ? (m[3] ? Number(m[3]) : null) : min;   // a bare "3" is exactly 3
+        counts[c.key] = { min, max };
+    }
+    return { search: p.get('q') ?? p.get('vt_q') ?? '', facets, counts };
 }

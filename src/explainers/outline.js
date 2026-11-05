@@ -9,26 +9,47 @@
  * page shows a hub by its title.
  */
 export const OUTLINE = [
+    // Listed in the order the landing shows them, set by hand: the subjects
+    // with the most readable pages first, so the page does not open on one
+    // with nothing to read. Revisit it as pages are written.
     {
-        slug: 'charging-speed',
-        title: 'What decides how fast an EV charges?',
-        blurb: 'Peak kW, the taper, and which limit is in charge at each point of a session.',
-        glyph: 'curve',
+        // Ordered by what a reader arrives asking, not by how the label is
+        // built: "why doesn't my range match?" first, the lab procedure under it.
+        slug: 'epa-ratings',
+        title: 'Where the EPA numbers come from',
+        blurb: 'The label, the lab tests behind it, and what they can and can’t tell you about your own drive.',
+        glyph: 'cycle',
         children: [
-            { slug: 'charging-curve-basics', title: 'Reading a charging curve',
-              blurb: 'kW against SoC, the taper, and why 10–80 % is the number to compare.' },
-            { slug: 'what-limits-charging', title: 'The five limits on charging speed',
-              blurb: 'The charger, the cable, the car’s wiring, the cells’ chemistry, and heat.',
+            { slug: 'epa-vs-real-world', title: 'Why your highway range isn’t the label',
+              blurb: 'Nothing on the sticker was driven at 70 mph, so compare with care.',
               children: [
-                  { slug: 'cell-chemistry-limits', title: 'What the cells allow',
-                    blurb: 'Lithium plating, SoC and temperature windows, LFP against NMC.' },
-                  { slug: 'heat-generation', title: 'Where the heat comes from',
-                    blurb: 'I²R, internal resistance, and why heat shapes the taper.' },
-                  { slug: 'heat-rejection', title: 'Getting the heat out',
-                    blurb: 'Cooling plates, cell formats, and the paths heat takes.' },
+                  { slug: 'epa-label-basics', title: 'Reading the window sticker',
+                    blurb: 'MPGe, kWh/100 mi, city and highway, and the 55/45 blend.' },
+                  { slug: 'wind-and-range-tests', title: 'How wind changes a range test',
+                    blurb: 'Why a wind never cancels on a round trip, and how to record its speed and angle.' },
+                  { slug: 'heating-cooling-and-range', title: 'How heating and cooling change a range test',
+                    blurb: 'Why a heater costs more per mile at low speed, what EVBench assumes a test used, and how far to trust it.' },
+                  { slug: 'epa-drive-cycles', title: 'The five test cycles',
+                    blurb: 'What each cycle drives, how fast, and what it stands in for.' },
+                  { slug: 'epa-test-procedures', title: 'How an EV is actually tested',
+                    blurb: 'Driving to empty, bags and phases, and DC out against AC back in.' },
+                  { slug: 'epa-label-adjustment', title: 'From lab result to label',
+                    blurb: 'The ×0.7, the regression, the measured factor, and who takes which.' },
+                  { slug: 'epa-certification-records', title: 'Certifications, configurations and guide rows',
+                    blurb: 'Three levels of detail that never map one to one.' },
               ] },
-            { slug: 'voltage-vs-charge-time', title: 'Does 800 V charge faster?',
-              blurb: 'Voltage raises the peak, and not necessarily the average.' },
+            { slug: 'reading-modeled-efficiency', title: 'Reading the Modeled Efficiency chart',
+              blurb: 'Efficiency against speed for any EPA-certified car, and how far to trust each curve.',
+              children: [
+                  { slug: 'road-load-and-efficiency', title: 'Road load and drivetrain efficiency',
+                    blurb: 'The A, B and C of drag, and why EVBench measures η at 65 mph.' },
+              ] },
+            { slug: 'epa-battery-figures', title: 'What EPA says about the battery',
+              blurb: 'Gross against usable, pack voltage, and charging loss.',
+              children: [
+                  { slug: 'dc-fast-charging-loss', title: 'How much energy does DC fast charging lose?',
+                    blurb: 'Why the label’s charging loss is an AC figure, what a fast charge loses instead, and how EVBench came to 9%.' },
+              ] },
         ],
     },
     {
@@ -50,35 +71,34 @@ export const OUTLINE = [
         ],
     },
     {
-        // Ordered by what a reader arrives asking, not by how the label is
-        // built: "why doesn't my range match?" first, the lab procedure under it.
-        slug: 'epa-ratings',
-        title: 'Where the EPA numbers come from',
-        blurb: 'The label, the lab tests behind it, and what they can and can’t tell you about your own drive.',
-        glyph: 'cycle',
+        slug: 'ev-energy-sharing',
+        title: 'Using an EV as a power source',
+        blurb: 'Outlets, home backup and the grid: what each automaker allows, and what its hardware could do.',
         children: [
-            { slug: 'epa-vs-real-world', title: 'Why your highway range isn’t the label',
-              blurb: 'Nothing on the sticker was driven at 70 mph, so compare with care.',
+            { slug: 'v2l-v2h-v2g', title: 'Can your EV power your devices? Your home? The grid?',
+              blurb: 'And can it help pay for the car? V2L, V2H and V2G from Ford, GM and Tesla.' },
+        ],
+    },
+    {
+        slug: 'charging-speed',
+        title: 'What decides how fast an EV charges?',
+        blurb: 'Peak kW, the taper, and which limit is in charge at each point of a session.',
+        glyph: 'curve',
+        children: [
+            { slug: 'charging-curve-basics', title: 'Reading a charging curve',
+              blurb: 'kW against SoC, the taper, and why 10–80 % is the number to compare.' },
+            { slug: 'what-limits-charging', title: 'The five limits on charging speed',
+              blurb: 'The charger, the cable, the car’s wiring, the cells’ chemistry, and heat.',
               children: [
-                  { slug: 'epa-label-basics', title: 'Reading the window sticker',
-                    blurb: 'MPGe, kWh/100 mi, city and highway, and the 55/45 blend.' },
-                  { slug: 'epa-drive-cycles', title: 'The five test cycles',
-                    blurb: 'What each cycle drives, how fast, and what it stands in for.' },
-                  { slug: 'epa-test-procedures', title: 'How an EV is actually tested',
-                    blurb: 'Driving to empty, bags and phases, and DC out against AC back in.' },
-                  { slug: 'epa-label-adjustment', title: 'From lab result to label',
-                    blurb: 'The ×0.7, the regression, the measured factor, and who takes which.' },
-                  { slug: 'epa-certification-records', title: 'Certifications, configurations and guide rows',
-                    blurb: 'Three levels of detail that never map one to one.' },
+                  { slug: 'cell-chemistry-limits', title: 'What the cells allow',
+                    blurb: 'Lithium plating, SoC and temperature windows, LFP against NMC.' },
+                  { slug: 'heat-generation', title: 'Where the heat comes from',
+                    blurb: 'I²R, internal resistance, and why heat shapes the taper.' },
+                  { slug: 'heat-rejection', title: 'Getting the heat out',
+                    blurb: 'Cooling plates, cell formats, and the paths heat takes.' },
               ] },
-            { slug: 'reading-modeled-efficiency', title: 'Reading the Modeled Efficiency chart',
-              blurb: 'Efficiency against speed for any EPA-certified car, and how far to trust each curve.',
-              children: [
-                  { slug: 'road-load-and-efficiency', title: 'Road load and drivetrain efficiency',
-                    blurb: 'The A, B and C of drag, and why EVBench measures η at 65 mph.' },
-              ] },
-            { slug: 'epa-battery-figures', title: 'What EPA says about the battery',
-              blurb: 'Gross against usable, pack voltage, and charging loss.' },
+            { slug: 'voltage-vs-charge-time', title: 'Does 800 V charge faster?',
+              blurb: 'Voltage raises the peak, and not necessarily the average.' },
         ],
     },
 ];

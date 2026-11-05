@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useAppContext } from '../context/AppContext';
 import { vehicleFilterContext, filterVehicles } from '../utils/vehicleFilters';
 
 /**
@@ -7,7 +8,9 @@ import { vehicleFilterContext, filterVehicles } from '../utils/vehicleFilters';
  * the same filters, so the three views always show the same vehicles.
  */
 export function useFilteredVehicles(vehicles, filters, performanceCounts) {
-    const ctx = useMemo(() => vehicleFilterContext(vehicles, performanceCounts), [vehicles, performanceCounts]);
+    const { canPublish } = useAppContext();
+    const curator = canPublish();
+    const ctx = useMemo(() => vehicleFilterContext(vehicles, performanceCounts, { curator }), [vehicles, performanceCounts, curator]);
     const filtered = useMemo(() => filterVehicles(vehicles, filters, ctx), [vehicles, filters, ctx]);
     return { ctx, filtered };
 }

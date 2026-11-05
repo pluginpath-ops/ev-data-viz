@@ -20,10 +20,10 @@ import { MPG_E_CONVERSION } from '../constants/units';
  * record with no energy of its own previews with no range rather than a borrowed one.
  */
 
-/** Standard conditions: sea level, standard temperature, the record's own accessory load, still air, flat. */
+/** Standard conditions: sea level, standard temperature, the record's own accessory load (no delta), still air, flat. */
 export const STANDARD_VIEW = {
     densityRatio: 1,
-    accessoryOverrideW: null,
+    accessoryDeltaW: 0,
     windSpeedMph: 0,
     windDirectionDeg: 0,
     elevationGainFt: 0,

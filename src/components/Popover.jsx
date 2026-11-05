@@ -126,7 +126,12 @@ export default function Popover({
     useEffect(() => {
         if (ready) {
             restoreFocus.current = true;
-            dismissRef.current?.focus();
+            // A panel whose job starts with typing — the vehicle quick-add's
+            // search — marks its field `data-autofocus` and gets it instead.
+            // `autoFocus` on the field cannot do this: it fires on the first
+            // commit, while the panel is still hidden, and this would take it.
+            const panel = dismissRef.current;
+            (panel?.querySelector('[data-autofocus]') ?? panel)?.focus();
         } else if (!isOpen && restoreFocus.current) {
             restoreFocus.current = false;
             anchorRef.current?.focus();

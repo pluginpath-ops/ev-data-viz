@@ -15,7 +15,8 @@ import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
  * cannot be present on one chart and missing on the next.
  *
  * @param {{current: object}} chartRef  Ref holding the Chart.js INSTANCE.
- * @param {{title: string, subtitle: string}} frame  Caption drawn onto the PNG.
+ * @param {{title: string, subtitle: string, sources?: string}} frame  Caption drawn onto the PNG;
+ *        `sources` is the source line's text (useSourceLine).
  */
 export function useChartPng(chartRef, frame) {
     const [copied, setCopied] = useState(false);
@@ -25,22 +26,30 @@ export function useChartPng(chartRef, frame) {
     // up after the chart changes and it quietly becomes a picture of something
     // else — two different answers on screen at once, the stale one looking
     // just as authoritative. Keyed on the caption because that is what encodes
-    // the run count, the mode, the corrections and the units; a plain object
-    // dependency would be a new identity every render and clear it instantly.
-    const caption = `${frame?.title ?? ''}|${frame?.subtitle ?? ''}`;
+    // the mode, the corrections and the units. The subtitle no longer carries
+    // the run/vehicle counts (#443), so a view passes `frame.signature` (a
+    // string of what is plotted) to keep a change of selection clearing the
+    // preview. A plain object dependency would be a new identity every render
+    // and clear it instantly.
+    const caption = `${frame?.title ?? ''}|${frame?.subtitle ?? ''}|${frame?.signature ?? ''}|${frame?.sources ?? ''}`;
     const firstRun = useRef(true);
     useEffect(() => {
         if (firstRun.current) { firstRun.current = false; return; }
         setPreview(null);
     }, [caption]);
 
-    const copyPng = async () => {
+    // `side`: the values of a fixed readout in a panel beside the plot (#456),
+    // instead of over it. `copied` is shared by both buttons; `copiedSide` says
+    // which one was pressed.
+    const [copiedSide, setCopiedSide] = useState(false);
+    const copy = async (side) => {
         const chart = chartRef?.current;
         if (!chart) return;
-        const opts = { title: frame?.title, subtitle: frame?.subtitle };
+        const opts = { title: frame?.title, subtitle: frame?.subtitle, sources: frame?.sources, side };
         try {
             setPreview(await copyChartAsPng(chart, opts));
             setCopied(true);
+            setCopiedSide(side);
             setTimeout(() => setCopied(false), 2500);
         } catch {
             // No clipboard here. The image is still worth having, so it is
@@ -49,5 +58,13 @@ export function useChartPng(chartRef, frame) {
         }
     };
 
-    return { copyPng, copied, preview, dismissPreview: () => setPreview(null) };
+    const copyPng = () => copy(false);
+    const copyPngBeside = () => copy(true);
+
+    return {
+        copyPng,
+        copyPngBeside,
+        copied: copied && !copiedSide, copiedBeside: copied && copiedSide,
+        preview, dismissPreview: () => setPreview(null),
+    };
 }

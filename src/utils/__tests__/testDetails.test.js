@@ -42,7 +42,7 @@ describe('rangeTestReference', () => {
     it('marks the speed of a mixed cycle, and converts for a metric reader', () => {
         const v = vehicle([rangeRun({ speed_basis: 'mixed' })]);
         const facts = rangeTestReference(v, testedRangeSummary(v), 'metric').facts;
-        expect(facts.find(f => f.label === 'Speed').value).toBe('112.7 kph (mixed cycle)');
+        expect(facts.find(f => f.label === 'Speed').value).toBe('112.7 km/h (mixed cycle)');
         expect(facts.find(f => f.label === 'Temperature').value).toBe('22°C');
     });
 
@@ -102,6 +102,8 @@ describe('testHref', () => {
     it('is a Tests & Data link the app restores, sub-tab always stated', () => {
         expect(testHref({ vehicleId: 12, runId: 5, sub: 'tests' })).toBe('?tab=runs&vid=12&sub=tests&run=5');
         expect(testHref({ vehicleId: 12, runId: null, sub: 'performance' })).toBe('?tab=runs&vid=12&sub=performance');
+        expect(testHref({ vehicleId: 12, runId: 5, sub: 'tests', edit: true })).toBe('?tab=runs&vid=12&sub=tests&run=5&edit=1');
+        expect(testHref({ vehicleId: 12, sub: 'tests', edit: true })).toBe('?tab=runs&vid=12&sub=tests');
         expect(testHref(null)).toBeNull();
     });
 });

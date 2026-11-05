@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import SidebarDisplaySection from './SidebarDisplaySection';
 import Chart from 'chart.js/auto';
 import { dataService } from '../services/DataService';
 import RunSelector from './RunSelector';
@@ -9,25 +10,33 @@ import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, speedBasisNote, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
 import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
-import { figureSources } from '../utils/vehicleFigures';
+import { figureSources, epaCredits } from '../utils/vehicleFigures';
+import { useSourceLine } from '../hooks/useSourceLine';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
-import { buildSeriesLabels } from '../utils/seriesLabel';
+import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
+import ColorSourceNote from './ColorSourceNote';
 import VerboseLabelToggle from './VerboseLabelToggle';
 import TestSpreadToggle from './TestSpreadToggle';
+import { correctionCaption, correctionSummary } from '../utils/correctionSettings';
 import { spreadOf, rangeBasesFor, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip, spreadSummary } from '../utils/rangeTestSpread';
 import { useRunSelection } from '../hooks/useRunSelection';
+import { DEFAULT_COMPARE_ORIENTATION } from '../utils/chartUrlState';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
-import LoadingSpinner from './LoadingSpinner';
+import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import NumberInput from './NumberInput';
+import { wrapCanvasText } from '../utils/wrapCanvasText';
+import { countParts } from '../utils/plotCaption';
+import { PRESENTED_HALF_HEIGHT } from '../utils/presentedHeight';
+import FeatureChartButton from './home/FeatureChartButton';
+import { loadRunPoints, runsByIdString } from '../utils/runPoints';
 
 
 /**
@@ -279,15 +288,13 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     ctx2.fillStyle    = legendColor;
                     ctx2.textAlign    = 'right';
                     ctx2.textBaseline = 'middle';
-                    let vLabel = group.vehicleName;
-                    const vRoom = area.left - 16;
-                    if (ctx2.measureText(vLabel).width > vRoom) {
-                        while (vLabel.length > 1 && ctx2.measureText(vLabel + '…').width > vRoom) {
-                            vLabel = vLabel.slice(0, -1);
-                        }
-                        vLabel += '…';
-                    }
-                    ctx2.fillText(vLabel, area.left - 10, cy);
+                    // Wrapped to three lines before anything is cut, so the
+                    // trim that tells two variants apart survives.
+                    const vLines = wrapCanvasText(ctx2, group.vehicleName, area.left - 16, 3);
+                    const vLead  = fonts.label * 1.25;
+                    vLines.forEach((ln, li) => {
+                        ctx2.fillText(ln, area.left - 10, cy + (li - (vLines.length - 1) / 2) * vLead);
+                    });
                     ctx2.restore();
 
                     if (gi < groups.length - 1) {
@@ -332,7 +339,9 @@ function makeBarPlugin(flatRuns, isHorizontal, units) {
                     ctx2.fillStyle    = legendColor;
                     ctx2.textAlign    = 'center';
                     ctx2.textBaseline = 'top';
-                    ctx2.fillText(group.vehicleName, cx, groupLabelY + 4);
+                    const gLead = fonts.axis * 1.25;
+                    wrapCanvasText(ctx2, group.vehicleName, x2 - x1 - 6, 3)
+                        .forEach((ln, li) => ctx2.fillText(ln, cx, groupLabelY + 4 + li * gLead));
                     ctx2.restore();
 
                     if (gi < groups.length - 1) {
@@ -371,17 +380,22 @@ export default function ChargeCompareView({
     presentationMode = false,
     verboseLabels = false,
     correctionMode = 'none',
-    palette = VEHICLE_PALETTE,
+    correctionTarget = undefined,
+    palette = DEFAULT_SERIES_PALETTE,
     handSet = false,
     testSpread = true,
     setChartConfig = null,
+    // Lifted to App with the rest of the controls (compareConfig), so a link and
+    // the pop-out reopen the chart as it was left. `selectedKeys` null keeps the
+    // selection local, which is what a caller with no App above it gets.
+    orientation = DEFAULT_COMPARE_ORIENTATION, setOrientation = () => {},
+    selectedKeys = null, onSelectedChange = null,
 }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const [runDataCache,    setRunDataCache]    = useState({});
     const [loading,         setLoading]         = useState(false);
     const [copied,          setCopied]          = useState(false);
-    const [orientation,     setOrientation]     = useState('horizontal');
     const isHorizontal = orientation === 'horizontal';
 
     const chart1Ref      = useRef(null);
@@ -441,7 +455,7 @@ export default function ChargeCompareView({
                     const rangeSrc = resolveRangeSource(chargingRun, {
                         vehicle,
                         explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
-                        correction: { mode: correctionMode },
+                        correction: { mode: correctionMode, target: correctionTarget },
                         session: sessionFor(testSessions, rangeRun),
                     });
 
@@ -458,7 +472,7 @@ export default function ChargeCompareView({
         }
 
         return result;
-    }, [selectedVehicles, pairings, testSessions, correctionMode]);
+    }, [selectedVehicles, pairings, testSessions, correctionMode, correctionTarget]);
 
     const neededRunIds = useMemo(
         () => [...new Set(resolvedPairs.map(p => p.chargingRun?.id).filter(Boolean))],
@@ -471,25 +485,15 @@ export default function ChargeCompareView({
             const missing = neededRunIds.filter(id => !(id in runDataCache));
             if (missing.length === 0) return;
             setLoading(true);
-            const updates = {};
-            const allRuns = vehicles.flatMap(v => v.runs || []);
-            for (const runId of missing) {
-                try {
-                    if (dataService.useSupabase) {
-                        const run = allRuns.find(r => String(r.id) === String(runId));
-                        if (run?._inherited) {
-                            updates[runId] = await dataService.getRunData(run._realRunId, run._efficiencyFactor ?? 1, run._capacityFactor ?? 1);
-                        } else {
-                            updates[runId] = await dataService.getRunData(runId);
-                        }
-                    } else {
-                        for (const v of vehicles) {
-                            const run = v.runs?.find(r => r.id === runId);
-                            if (run) { updates[runId] = run.data || []; break; }
-                        }
+            let updates = {};
+            if (dataService.useSupabase) {
+                updates = await loadRunPoints(dataService, missing, runsByIdString(vehicles));
+            } else {
+                for (const runId of missing) {
+                    for (const v of vehicles) {
+                        const run = v.runs?.find(r => r.id === runId);
+                        if (run) { updates[runId] = run.data || []; break; }
                     }
-                } catch {
-                    updates[runId] = [];
                 }
             }
             setRunDataCache(prev => ({ ...prev, ...updates }));
@@ -542,7 +546,7 @@ export default function ChargeCompareView({
     }, [selectedVehicles]);
 
     const { selected: selectedRuns, toggle: toggleRun } = useRunSelection(
-        selectionRows, { shouldBootstrap: bootstrapOneRow }
+        selectionRows, { shouldBootstrap: bootstrapOneRow, value: selectedKeys, onChange: onSelectedChange ?? (() => {}) }
     );
 
     // Bars are colored by the range test (the row's subject). The hook gives the
@@ -563,7 +567,7 @@ export default function ChargeCompareView({
         () => selectedRuns.map(k => parsePairKey(k).rangeRunId),
         [selectedRuns]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf, clearHandSet } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
@@ -593,9 +597,14 @@ export default function ChargeCompareView({
             baseColor:  colorMap[p.rangeRun.id] || DEFAULT_RUN_COLOR,
         })));
 
+        const vehicleNames = buildVehicleLabels(active.map(p => p.vehicle));
         return active.map(p => ({
             ...p,
-            label: (verboseLabels ? labels.get(p.key)?.full : labels.get(p.key)?.short) ?? p.rangeRun.name,
+            rangeRun: {
+                ...p.rangeRun,
+                vehicleName: (verboseLabels ? vehicleNames.get(p.vehicle.id)?.full : vehicleNames.get(p.vehicle.id)?.short) ?? p.rangeRun.vehicleName,
+            },
+            label: (verboseLabels ? labels.get(p.key)?.fullBeside : labels.get(p.key)?.short) ?? p.rangeRun.name,
             fullLabel: labels.get(p.key)?.full ?? p.rangeRun.name,
             color: pairColors[p.key],
         }));
@@ -611,11 +620,12 @@ export default function ChargeCompareView({
         for (const p of activePairs) {
             out.set(p.key, rangeBasesFor(p.chargingRun, p.vehicle, {
                 correctionMode,
+                correctionTarget,
                 sessionOf: r => sessionFor(testSessions, r),
             }).filter(b => b.miPerSoc > 0));
         }
         return out;
-    }, [testSpread, activePairs, correctionMode, testSessions]);
+    }, [testSpread, activePairs, correctionMode, correctionTarget, testSessions]);
 
     // ── The frames' caption, and their exports ───────────────────────────────
     // This view had no PNG export at all — only a Copy URL — so the one chart
@@ -627,19 +637,31 @@ export default function ChargeCompareView({
         const pairs = activePairs.length;
         const vehicles = new Set(activePairs.map(p2 => p2.vehicleName ?? p2.vehicle?.id)).size;
         return [
-            `${pairs} pair${pairs === 1 ? '' : 's'}`,
-            `${vehicles} vehicle${vehicles === 1 ? '' : 's'}`,
+            ...countParts(verboseLabels, [[pairs, 'pair'], [vehicles, 'vehicle']]),
             `from ~${startSoc}% SoC`,
-            correctionMode === 'none' ? 'no correction' : `corrected: ${correctionMode}`,
+            correctionCaption(correctionMode, correctionTarget, units),
             units === 'metric' ? 'metric' : 'imperial',
         ].join(' · ');
-    }, [activePairs, startSoc, correctionMode, units]);
+    }, [activePairs, startSoc, verboseLabels, correctionMode, correctionTarget, units]);
 
     // Two frames, two exports, so two independent previews.
     const title1 = `Range added in ${xMinutes} minutes`;
     const title2 = `Time to add ${units === 'metric' ? Math.round(mMiles * MI_TO_KM) : mMiles} ${distanceLabel(units)}`;
-    const png1 = useChartPng(chart1Instance, { title: title1, subtitle: plotSubtitle });
-    const png2 = useChartPng(chart2Instance, { title: title2, subtitle: plotSubtitle });
+    const plotSignature = activePairs.map(p2 => p2.key).join(',');
+
+    // Source line: each bar is a charging test priced from a range test, or
+    // from the vehicle's EPA range. Both frames draw from the same pairs.
+    const sourceRuns = useMemo(
+        () => activePairs.flatMap(p2 => [p2.chargingRun, p2.rangeSrc?.source === 'epa' ? null : p2.rangeRun]).filter(Boolean),
+        [activePairs]);
+    const fleetRuns = useMemo(() => selectedVehicles.flatMap(v => v.runs || []), [selectedVehicles]);
+    const sourceEpa = useMemo(() => epaCredits(
+        activePairs.filter(p2 => p2.rangeSrc?.source === 'epa').map(p2 => selectedVehicles.find(v => v.id === p2.rangeRun.vehicleId)),
+        { range: true }), [activePairs, selectedVehicles]);
+    const sourceLine = useSourceLine({ runs: sourceRuns, allRuns: fleetRuns, epa: sourceEpa });
+
+    const png1 = useChartPng(chart1Instance, { title: title1, subtitle: plotSubtitle, sources: sourceLine.text, signature: plotSignature });
+    const png2 = useChartPng(chart2Instance, { title: title2, subtitle: plotSubtitle, sources: sourceLine.text, signature: plotSignature });
 
     // ── Compute bars for one chart type ──────────────────────────────────────
     // chartType: 'range_added' | 'time_to_range'
@@ -824,7 +846,7 @@ export default function ChargeCompareView({
             data:            flatRuns.map(r => r._yValue),
             backgroundColor: flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.35)' : r.color),
             borderColor:     flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.6)'  : r.color),
-            borderRadius:    4,
+            borderRadius: 2,
             borderSkipped:   false,
         }];
 
@@ -858,7 +880,7 @@ export default function ChargeCompareView({
                 })],
                 options: {
                     indexAxis: isHorizontal ? 'y' : undefined,
-                    layout: { padding: isHorizontal ? { top: 0, left: 140, right: 10 } : { top: 0, bottom: 55 } },
+                    layout: { padding: isHorizontal ? { top: 0, left: 160, right: 10 } : { top: 0, bottom: 75 } },
                     animation: false,
                     responsive: true,
                     maintainAspectRatio: false,
@@ -984,8 +1006,7 @@ export default function ChargeCompareView({
                 </div>
 
                 {/* ── DISPLAY ── as in the other two charts. */}
-                <div className="chart-rail-group">
-                    <span className="text-micro">Display</span>
+                <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={correctionSummary(correctionMode, correctionTarget, units)}>
                     <div className="efficiency-unit-toggle">
                         {['vertical', 'horizontal'].map(o => (
                             <button
@@ -1003,13 +1024,13 @@ export default function ChargeCompareView({
                                 <VerboseLabelToggle verbose={verboseLabels} setChartConfig={setChartConfig} />
                                 <TestSpreadToggle on={testSpread} setChartConfig={setChartConfig} />
                             </div>
-                            <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
-                            <CorrectionControl mode={correctionMode} setChartConfig={setChartConfig} />
+                            <CorrectionControl mode={correctionMode} target={correctionTarget} setChartConfig={setChartConfig} />
                         </>
                     )}
-                </div>
+                </SidebarDisplaySection>
 
                 <RunSelector
+                    colorControl={<ColorSourceNote palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} onClearHandSet={clearHandSet} />}
                         handSetColorOf={handSetColorOf}
                         chartPalette={palette}
                         onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
@@ -1065,12 +1086,6 @@ export default function ChargeCompareView({
             </aside>}
 
             <div className="chart-main">
-                {loading && (
-                    <span className="chart-loading">
-                        <LoadingSpinner message="Loading charging data…" />
-                    </span>
-                )}
-
             {!hasRangeRuns ? (
                 <div className="card text-center py-12 text-meta">
                     <p className="text-lg font-medium">No range test runs found for selected vehicles</p>
@@ -1084,16 +1099,21 @@ export default function ChargeCompareView({
                     <PlotFrame
                         title={title1}
                         subtitle={plotSubtitle}
+                        sourceLine={sourceLine}
                         preview={png1.preview}
                         onDismissPreview={png1.dismissPreview}
+                        loading={loading}
+                        loadingMessage="Loading charging data…"
                         exportControls={!presentationMode && (
                             <>
+                                {setChartConfig && <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
+                                <FeatureChartButton />
                                 <button
                                     onClick={handleCopyUrl}
                                     className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
                                     title="Copy link to this chart view"
                                 >
-                                    {copied ? '✓ Copied' : '🔗 URL'}
+                                    {copied ? '✓ Copied' : 'URL'}
                                 </button>
                                 <button
                                     onClick={png1.copyPng}
@@ -1105,7 +1125,7 @@ export default function ChargeCompareView({
                             </>
                         )}
                     >
-                        <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
+                        <div style={{ height: presentationMode ? PRESENTED_HALF_HEIGHT : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                             <canvas ref={chart1Ref} />
                         </div>
                     </PlotFrame>
@@ -1114,8 +1134,11 @@ export default function ChargeCompareView({
                         <PlotFrame
                             title={title2}
                             subtitle={plotSubtitle}
+                            sourceLine={sourceLine}
                             preview={png2.preview}
                             onDismissPreview={png2.dismissPreview}
+                            loading={loading}
+                            loadingMessage="Loading charging data…"
                             exportControls={!presentationMode && (
                                 <button
                                     onClick={png2.copyPng}
@@ -1126,7 +1149,7 @@ export default function ChargeCompareView({
                                 </button>
                             )}
                         >
-                            <div style={{ height: presentationMode ? '45vh' : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
+                            <div style={{ height: presentationMode ? PRESENTED_HALF_HEIGHT : isHorizontal ? `${Math.max(300, activePairs.length * 48)}px` : '450px', position: 'relative' }}>
                                 <canvas ref={chart2Ref} />
                             </div>
                         </PlotFrame>

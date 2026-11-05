@@ -190,7 +190,7 @@ export const COMPOSITES = {
             <div className="account-panel" style={{ position: 'static' }}>
                 <div className="account-identity">
                     <span className="account-email">greg@evbench.io</span>
-                    <span className="owner-badge">ADMIN</span>
+                    <span className="badge-micro is-accent ml-2">ADMIN</span>
                 </div>
                 <div className="account-row">
                     <span className="text-nano">Units</span>
@@ -270,8 +270,14 @@ export const COMPOSITES = {
             <div className="plot-frame-head">
                 <span className="plot-frame-mark" aria-hidden="true" />
                 <span className="plot-frame-title">Charge rate</span>
-                <span className="plot-frame-subtitle">4 runs · 70 mph · 98°F</span>
+                <span className="plot-frame-subtitle">corrected for wind · 70°F · 0 ft · imperial</span>
             </div>
+            <p className="plot-frame-sources">
+                <span>Data:</span>
+                <a href="https://www.fueleconomy.gov">fueleconomy.gov</a>
+                <span>Out of Spec</span>
+                <span className="plot-frame-sources-gap">⚠ 2 unattributed</span>
+            </p>
         </div>
     ),
 

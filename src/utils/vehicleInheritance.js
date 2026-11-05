@@ -1,17 +1,25 @@
 /**
  * What a vehicle inherits beyond its specs: series color, photo and tags.
  *
- * A vehicle that inherits from another (`spec_source_vehicle_id`, "Inherit
- * from:" on the specs form) already falls back to that vehicle's specs field by
+ * A vehicle that inherits from another (`spec_source_vehicle_id`, "Inherits
+ * from" on the vehicle form) already falls back to that vehicle's specs field by
  * field, through the whole chain (`resolveEffectiveSpecs`). A variant is the
  * same car with a stated difference, so the things a reader RECOGNISES it by
  * come down the same chain:
  *
- *   color   the nearest vehicle in the chain with one set, else the palette
- *   photo   the nearest vehicle with a photo; image_url, image_thumb_url and
- *           image_focal_y travel together, so a thumbnail never pairs with
- *           another car's full image and a photo is never framed by a number
- *           that was set against a different picture (#340)
+ *   color   the nearest vehicle in the chain with one set, else the brand's
+ *           default color (`manufacturers.color`, set in Admin), else the
+ *           palette. The brand color is the weakest layer: any color a vehicle
+ *           or its source carries, hand-set or pulled from the photo, wins
+ *   photo   the nearest vehicle IN THE SAME MODEL LINE with a photo (same
+ *           make and model, trim ignored: `sameModelLine`); image_url,
+ *           image_thumb_url and image_focal_y travel together, so a
+ *           thumbnail never pairs with another car's full image and a photo is
+ *           never framed by a number that was set against a different picture
+ *           (#340). A source of another model passes on its specs but not its
+ *           picture: a C-HR that inherits an Uncharted's figures must not wear
+ *           the Uncharted's photo, and an R1T is not an R1S. With no match the
+ *           vehicle shows the placeholder until it has a photo of its own
  *   platforms  each of the two platform links (#318) from the nearest vehicle
  *           with that link set, separately: a variant can keep its source's
  *           structure and change its electrics (the 2025 R1 did)
@@ -39,7 +47,7 @@
  * read `own`, and `inheritedFrom` says where each resolved value came from.
  */
 import { vehicleLabel } from './specHelpers';
-import { isCompositeRun } from './runUtils';
+import { isCompositeRun, runKindFrom } from './runUtils';
 
 /* One unit. The focal point is a property OF the photo -- it says which slice
    of that particular image the card's band shows -- so it can only ever be
@@ -52,7 +60,44 @@ const PHOTO_KEYS = ['image_url', 'image_thumb_url', 'image_focal_y'];
 const PLATFORM_KEYS = ['mechanical_platform_id', 'electrical_platform_id'];
 
 const hasColor = (v) => v?.color != null && v.color !== '';
+
+/* Where a brand's color comes from, in the shape `inheritedFrom.color` has for
+   a vehicle: `brand` is what tells the card "Brand color" from "Inherited
+   from <vehicle>", and the absence of an `id` that any lineage link could use. */
+const brandRef = (m) => ({ id: null, name: m.name, brand: true });
 const hasPhoto = (v) => Boolean(v?.image_url || v?.image_thumb_url);
+
+/* A name as a list of comparable tokens: case, punctuation and anything in
+   parentheses dropped, so "F-150 Lightning" and "F150 Lightning" agree, and
+   "Cybertruck (CyberBeast)" is "cybertruck". */
+const nameTokens = (s) => String(s ?? '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(Boolean);
+
+/* One name is the other with words added: "Model Y" / "Model Y L",
+   "Gravity" / "Gravity GT". Tokens, not characters, so "Model 3" is not
+   "Model 3Y" and "R1T" is not "R1S". A blank name matches anything: it
+   cannot be told apart, and a vehicle with no model on record has not said it
+   is a different car. */
+function sameNameLine(a, b) {
+    const x = nameTokens(a);
+    const y = nameTokens(b);
+    if (x.length === 0 || y.length === 0) return true;
+    const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+    return short.every((t, i) => t === long[i]);
+}
+
+/**
+ * Whether two vehicles are the same car for the purpose of lending a photo:
+ * the same make and the same model, spelled loosely. Trim and year are not
+ * asked, since a trim changes the car's specs and not its looks.
+ */
+function sameModelLine(a, b) {
+    return sameNameLine(a?.make, b?.make) && sameNameLine(a?.model, b?.model);
+}
 
 /** A vehicle as an inheritance source: enough to name it and link to it. */
 const sourceRef = (v) => ({ id: v.id, name: vehicleLabel(v) });
@@ -75,6 +120,124 @@ function inheritanceChain(vehicle, byId) {
     return chain;
 }
 
+/**
+ * The fleet indexed for lineage questions: vehicles by id, and the ids that
+ * are a source to at least one visible vehicle. Build it once per fleet and
+ * pass it to `lineageRole` and `vehicleStack`.
+ */
+export function lineageIndex(vehicles = []) {
+    const byId = new Map(vehicles.map(v => [v.id, v]));
+    const sources = new Set();
+    for (const v of vehicles) {
+        if (v.spec_source_vehicle_id != null && byId.has(v.spec_source_vehicle_id)) {
+            sources.add(v.spec_source_vehicle_id);
+        }
+    }
+    return { byId, sources };
+}
+
+/**
+ * Where a vehicle sits in its lineage, for the role icon:
+ *
+ *   'origin'        no source, has variants
+ *   'has-variants'  has a source and variants of its own
+ *   'end'           has a source, no variants
+ *   null            neither: not part of a lineage
+ *
+ * Read over the whole fleet, unlisted vehicles included, so a variant of an
+ * unlisted source is still a variant.
+ */
+export function lineageRole(vehicle, index) {
+    const hasSource = inheritanceChain(vehicle, index.byId).length > 0;
+    const hasVariants = index.sources.has(vehicle?.id);
+    if (!hasSource) return hasVariants ? 'origin' : null;
+    return hasVariants ? 'has-variants' : 'end';
+}
+
+/** How many rolodex cards a stack shows before the rest fold into "+N more". */
+const STACK_ROLODEX_CAP = 2;
+
+/**
+ * How a source sits in a stack or a lineage tree for this reader: a vehicle
+ * to show, one the filters removed ('gap'), or one this reader is not shown
+ * at all because it is unlisted ('unlisted') — named only as "Unlisted
+ * record", and never opened, though the lineage carries on past it.
+ */
+const lineageKind = (v, isShown, isVisible) =>
+    !isVisible(v) ? 'unlisted' : isShown(v) ? 'vehicle' : 'gap';
+
+/**
+ * A vehicle's stack on the Cards grid: the vehicle on top, its source chain
+ * above it as rolodex cards.
+ *
+ * `isShown(v)` says whether a source passes the current filters, and
+ * `isVisible(v)` whether it is listed for this reader (unlisted vehicles are
+ * listed for curators and their creator only). A run of sources that fail
+ * either way is ONE entry, so a long stretch costs one rolodex card, not one
+ * each. `index` is built from the whole fleet, unlisted vehicles included, so
+ * the chain carries on past an unlisted source to the listed ones beyond it.
+ *
+ * Returns
+ *   rolodex  entries to draw, furthest first (the order they sit above the
+ *            card): { vehicle }, { gap: n } or { unlisted: n }, at most `cap`
+ *   more     sources folded into "+N more" past the cap: every kind
+ *            counted, and never 1, since a single entry past the cap is shown
+ *   members  every source shown, furthest first, then the vehicle: what the
+ *            fanned-out stack shows, gaps and unlisted records left out
+ *
+ * A vehicle with no source gets an empty stack, and draws as a card.
+ */
+export function vehicleStack(vehicle, index, isShown = () => true, isVisible = () => true, cap = STACK_ROLODEX_CAP) {
+    const chain = inheritanceChain(vehicle, index.byId);
+    const entries = [];
+    for (const source of chain) {
+        const kind = lineageKind(source, isShown, isVisible);
+        const last = entries.at(-1);
+        if (kind === 'vehicle') entries.push({ vehicle: source });
+        else if (last?.[kind]) last[kind] += 1;
+        else entries.push({ [kind]: 1 });
+    }
+
+    // One entry past the cap is shown, whatever it is: a "+1 more" card would
+    // take the same room as the card it hides. Two or more fold into "+N
+    // more", N counting every source folded, so it never reads "+1".
+    const fold = entries.length > cap + 1;
+    const shown = entries.slice(0, fold ? cap : entries.length);
+    const more = fold
+        ? entries.slice(cap).reduce((n, e) => n + (e.vehicle ? 1 : e.gap ?? e.unlisted), 0)
+        : 0;
+
+    const members = chain.filter(v => lineageKind(v, isShown, isVisible) === 'vehicle').reverse();
+    return {
+        rolodex: shown.reverse(),
+        more,
+        members: chain.length ? [...members, vehicle] : [],
+    };
+}
+
+/**
+ * Every vehicle below `vehicleId` in its lineage: its variants, theirs, and so
+ * on. What a source picker leaves out, since choosing one as the source would
+ * make a cycle. Guarded against a cycle already in the data.
+ */
+export function descendantIds(vehicleId, vehicles = []) {
+    const below = new Map();
+    for (const v of vehicles) {
+        if (v.spec_source_vehicle_id == null) continue;
+        if (!below.has(v.spec_source_vehicle_id)) below.set(v.spec_source_vehicle_id, []);
+        below.get(v.spec_source_vehicle_id).push(v.id);
+    }
+    const found = new Set();
+    const stack = [...(below.get(vehicleId) ?? [])];
+    while (stack.length) {
+        const id = stack.pop();
+        if (found.has(id) || id === vehicleId) continue;
+        found.add(id);
+        stack.push(...(below.get(id) ?? []));
+    }
+    return found;
+}
+
 /** A vehicle's own, un-inherited values: what an editor must read. */
 export function ownValues(vehicle) {
     return vehicle?.own ?? {
@@ -95,12 +258,18 @@ export function ownValues(vehicle) {
  *   own            { color, image_url, image_thumb_url, image_focal_y,
  *                    mechanical_platform_id, electrical_platform_id, tags } as stored
  *   inheritedFrom  { color, photo, mechanical_platform_id, electrical_platform_id,
- *                  tags } — a { id, name } source for each, or null when the
+ *                  tags } — a { id, name } source for each (a brand's color is
+ *                  { id: null, name, brand: true }), or null when the
  *                  vehicle's own value (or none) is shown; tags is
  *                  { [tagId]: { id, name } } for inherited tags
  */
-export function withInheritance(vehicles = []) {
+export function withInheritance(vehicles = [], manufacturers = []) {
     const byId = new Map(vehicles.map(v => [v.id, v]));
+    const brandById = new Map(manufacturers.filter(m => m?.color).map(m => [m.id, m]));
+    // The brand's default, for a vehicle whose own and inherited colors are
+    // both absent. Read from the registry, not `vehicle.manufacturer`, which is
+    // a snapshot taken when the fleet loaded.
+    const brandFor = (vehicle) => brandById.get(vehicle.manufacturer_id ?? vehicle.manufacturer?.id);
     return vehicles.map(vehicle => {
         const own = {
             color: vehicle.color ?? null,
@@ -113,8 +282,11 @@ export function withInheritance(vehicles = []) {
         };
         const none = { color: null, photo: null, mechanical_platform_id: null, electrical_platform_id: null, tags: {} };
         const chain = inheritanceChain(vehicle, byId);
+        const brand = hasColor(vehicle) ? null : brandFor(vehicle);
         if (chain.length === 0) {
-            return { ...vehicle, own, inheritedFrom: none };
+            return brand
+                ? { ...vehicle, color: brand.color, own, inheritedFrom: { ...none, color: brandRef(brand) } }
+                : { ...vehicle, own, inheritedFrom: none };
         }
 
         const resolved = {};
@@ -125,11 +297,14 @@ export function withInheritance(vehicles = []) {
             if (source) {
                 resolved.color = source.color;
                 inheritedFrom.color = sourceRef(source);
+            } else if (brand) {
+                resolved.color = brand.color;
+                inheritedFrom.color = brandRef(brand);
             }
         }
 
         if (!hasPhoto(vehicle)) {
-            const source = chain.find(hasPhoto);
+            const source = chain.find(v => hasPhoto(v) && sameModelLine(vehicle, v));
             if (source) {
                 for (const key of PHOTO_KEYS) resolved[key] = source[key] ?? null;
                 inheritedFrom.photo = sourceRef(source);
@@ -161,12 +336,19 @@ export function withInheritance(vehicles = []) {
  * What a new variant of `source` links to, so it shows every test the source
  * shows.
  *
- * Tests are inherited per run (`spec_links`, migrations 016 and 055), with a
- * capacity and an efficiency factor on each link. So a variant gets one link
- * per run the source shows: its own runs at factor 1 (the variant has not been
- * measured as different yet), and the runs the source itself inherits with the
- * source's factors, so the variant starts out reading exactly as its source
- * does. Hidden runs are included: hiding is a judgement about the run, and it
+ * Charging tests mostly need no link: they come down the lineage (migration
+ * 086, lineageCharging.js), the source's own and everything it inherits that
+ * way, and keep coming as tests are added above. What still needs one:
+ *
+ *   range tests      range keeps the link model — its own at factor 1 (the
+ *                    variant has not been measured as different yet), and the
+ *                    ones the source inherits with the source's factors
+ *   linked charging  a charging test the source reads through a link of its
+ *                    own: one from outside the lineage, or a lineage test it
+ *                    rescales — copied with its factors, so the variant starts
+ *                    out reading exactly as its source does
+ *
+ * Unlisted runs are included: unlisting is a judgement about the run, and it
  * travels with the run.
  *
  * Stored composites are not: the variant builds its own from the tests it
@@ -174,11 +356,111 @@ export function withInheritance(vehicles = []) {
  * would be the same curve twice.
  */
 export function variantLinkPlan(source) {
-    return (source?.runs ?? []).filter(run => !isCompositeRun(run)).map(run => run._inherited
-        ? {
-            sourceRunId: run._realRunId,
-            efficiencyFactor: run._efficiencyFactor !== 1 ? run._efficiencyFactor : null,
-            capacityFactor: run._capacityFactor !== 1 ? run._capacityFactor : null,
+    const factor = (f) => (f != null && f !== 1 ? f : null);
+    return (source?.runs ?? []).filter(run => !isCompositeRun(run)).flatMap(run => {
+        const charging = runKindFrom(run) === 'charging';
+        if (!run._inherited) {
+            return charging ? [] : [{ sourceRunId: run.id, efficiencyFactor: null, capacityFactor: null }];
         }
-        : { sourceRunId: run.id, efficiencyFactor: null, capacityFactor: null });
+        const efficiencyFactor = factor(run._efficiencyFactor);
+        const capacityFactor = factor(run._capacityFactor);
+        // Down the lineage already, at a factor the variant's own walk repeats.
+        if (charging && run._viaLineage && run._specLinkId == null) return [];
+        if (charging && run._viaLineage && efficiencyFactor == null && capacityFactor == null) return [];
+        return [{ sourceRunId: run._realRunId, efficiencyFactor, capacityFactor }];
+    });
+}
+
+/**
+ * The lineage tree view: every lineage with something that passes the
+ * filters, from its origin down, each vehicle once.
+ *
+ * Unlike a stack, nothing repeats: a vehicle appears where it sits in its
+ * tree. A vehicle that fails the filters is kept only as a gap on the way to
+ * one that passes, so a matching variant is never hidden because its source
+ * did not match; a run of failing sources in a line is one gap. A branch with
+ * nothing that passes is left out entirely.
+ *
+ * A vehicle that is not listed for this reader (`isVisible`) is kept the same
+ * way, as an "unlisted" row: never named, but the tree carries on past it, so
+ * the listed variants of an unlisted source stay together under it.
+ *
+ * `order` is the fleet in display order (the view's sort). Trees follow the
+ * position of their first passing member, and variants under a source follow
+ * the same order. `vehicles` and `index` are the whole fleet.
+ *
+ * Returns trees: [{ root, rows }], rows in reading order, each
+ * { vehicle, depth, trail, hasVariants }, { gap: n, hidden, depth, trail,
+ * hasVariants } (`hidden` being the vehicles the gap stands for, furthest
+ * first, so a reader can open it and see what the filters left out), or
+ * { unlisted: n, depth, trail, hasVariants }.
+ *
+ * `trail` and `hasVariants` are what the connector lines need: trail[k] is
+ * true when the row's ancestor at depth k + 1 (or, at the last place, the
+ * row itself) has a later sibling, so its line carries on down past this row;
+ * `hasVariants` is true when rows hang below this one.
+ */
+export function lineageTrees(vehicles, index, isShown = () => true, order = vehicles, isVisible = () => true) {
+    const passes = v => isVisible(v) && isShown(v);
+    const rank = new Map(order.map((v, i) => [v.id, i]));
+    const rankOf = v => rank.get(v.id) ?? Infinity;
+    const variants = new Map();
+    for (const v of vehicles) {
+        const src = v.spec_source_vehicle_id;
+        if (src == null || !index.byId.has(src) || src === v.id) continue;
+        if (!variants.has(src)) variants.set(src, []);
+        variants.get(src).push(v);
+    }
+    for (const list of variants.values()) list.sort((a, b) => rankOf(a) - rankOf(b));
+
+    // The earliest passing member of each subtree, or Infinity when none
+    // passes; guarded against cycles like the chain walk.
+    const first = new Map();
+    const firstShown = (v, seen = new Set()) => {
+        if (first.has(v.id)) return first.get(v.id);
+        if (seen.has(v.id)) return Infinity;
+        seen.add(v.id);
+        let best = passes(v) ? rankOf(v) : Infinity;
+        for (const c of variants.get(v.id) ?? []) best = Math.min(best, firstShown(c, seen));
+        first.set(v.id, best);
+        return best;
+    };
+    const kept = v => (variants.get(v.id) ?? []).filter(c => firstShown(c) !== Infinity);
+
+    const walk = (v, depth, rows, seen, trail) => {
+        if (seen.has(v.id)) return;
+        seen.add(v.id);
+        const kind = lineageKind(v, isShown, isVisible);
+        let row, node = v;
+        if (kind === 'vehicle') {
+            row = { vehicle: v, depth, trail };
+        } else {
+            // Fold a single line of sources of the same kind into one row.
+            const hidden = [v];
+            for (;;) {
+                const next = kept(node);
+                if (next.length === 1 && lineageKind(next[0], isShown, isVisible) === kind && !seen.has(next[0].id)) {
+                    node = next[0];
+                    seen.add(node.id);
+                    hidden.push(node);
+                } else break;
+            }
+            row = kind === 'gap'
+                ? { gap: hidden.length, hidden, depth, trail }
+                : { unlisted: hidden.length, depth, trail };
+        }
+        const below = kept(node).filter(c => !seen.has(c.id));
+        row.hasVariants = below.length > 0;
+        rows.push(row);
+        below.forEach((c, i) => walk(c, depth + 1, rows, seen, [...trail, i < below.length - 1]));
+    };
+
+    // A tree starts at an origin: a vehicle whose chain walk finds no source.
+    const roots = vehicles.filter(v => inheritanceChain(v, index.byId).length === 0 && firstShown(v) !== Infinity);
+    roots.sort((a, b) => firstShown(a) - firstShown(b));
+    return roots.map(root => {
+        const rows = [];
+        walk(root, 0, rows, new Set(), []);
+        return { root, rows };
+    });
 }

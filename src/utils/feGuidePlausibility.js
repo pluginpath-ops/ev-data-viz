@@ -89,4 +89,9 @@ export const PLAUSIBILITY_MESSAGES = {
         'Highway and city ranges are implausibly far apart — one of them is likely wrong in EPA\'s file.',
     'combined-outside-cycles':
         'Combined range sits outside both cycle ranges, which cannot happen if all three are correct.',
+    // Import-time only (parseFeGuide.repairUnitLines): put right, not distrusted.
+    'units-swapped':
+        'EPA printed this row\'s MPGe and kWh/100mi figures on each other\'s lines — read the right way round.',
+    'mpge-from-kwh':
+        'EPA repeated a kWh/100mi figure on the MPGe line — its MPGe is that figure converted.',
 };

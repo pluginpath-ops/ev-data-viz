@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { AXIS_LIMIT_CHARTS } from '../utils/axisLimits';
 
 /**
  * Does anything actually CALL the thing?
@@ -48,15 +49,19 @@ describe('utilities built for the UI are reached by the UI', () => {
     const WATCHED = ['conditionCorrection.js', 'testSessions.js', 'seriesLabel.js', 'socAlignment.js',
                      'feGuidePlausibility.js', 'phaseTypes.js', 'epaRecordFromTestVehicle.js',
                      'epaDerivationCheck.js', 'epaSectionLabels.js', 'feGuideMatch.js',
-                     'epaLinkSweep.js', 'epaCertStats.js', 'epaCurveSubjects.js',
+                     'epaCertStats.js', 'epaCurveSubjects.js',
                      'epaIntegrity.js', 'epaAudit.js', 'epaTestSelection.js',
                      'epaBandEvidence.js', 'dataChecks.js', 'epaConfiguration.js', 'vehicleFigures.js', 'dataCheckFixes.js',
                      'sources.js', 'publishedResultsBatch.js', 'vehicleTable.js',
                      'vehicleInheritance.js', 'cardBand.js', 'variantEpaSuggestions.js', 'chargeWindows.js',
-                     'epaCertifications.js'];
+                     'epaCertifications.js', 'featuredComparisons.js', 'accessoryLoad.js'];
 
     // Deliberately unused, and why. An entry here is a decision, not an oversight.
     const ALLOWED_UNUSED = {
+        'accessoryLoad.accessoryWhPerMile':
+            'Reached through accessoryFactor; exported so the watts-per-mph conversion is tested on its own.',
+        'featuredComparisons.slugify':
+            'Reached through uniqueSlug; exported so the slug rule is tested on its own.',
         'sources.domainOf':
             'Reached through findSource and pickedSource; exported so link reading is tested on its own.',
         'chargeWindows.countsTowardBest':
@@ -135,12 +140,6 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The candidate filter, consumed inside the module by rankFeCandidates. Exported so "same manufacturer" is testable without ranking.',
         'feGuideMatch.carlineScore':
             'The similarity metric, consumed inside the module by rankFeCandidates. Exported so a score can be pinned against real carline pairs.',
-        'epaLinkSweep.hasDerivableEnergy':
-            'Consumed inside the module by tierOf. Exported so the procedure-code rule — 77 and 84 only, never 86 — is asserted on its own.',
-        'epaLinkSweep.hasCoefficients':
-            'As above, consumed by tierOf and exported so the target-set check is testable without tiering.',
-        'epaLinkSweep.tierOf':
-            'Consumed inside the module by classifyTestVehicle. Exported so the priority order is asserted directly rather than inferred from a sorted sweep.',
         'epaCurveSubjects.curveSubject':
             'Consumed inside the module by curveSubjects, which the explorer calls. Exported so one record\'s tier and energy source are assertable without building a whole list.',
         'epaCurveSubjects.resolveCurveEnergy':
@@ -175,16 +174,6 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The import-time form of checkRecordIntegrity, called by EpaPdfImportModal. Listed because the checks it wraps are also read directly by the curator card, and only this spelling reaches the import path.',
         'epaCertStats.NOT_MEASURED_SOURCES':
             'The source names that mean "not derived", consumed inside the module and asserted BY NAME against what epaDerivations actually returns — deriveDrivetrainEta says "estimated" where deriveChargerEfficiency says "assumed", and a single check for one of them published DEFAULT_ETA as a fleet measurement.',
-        'epaLinkSweep.wheelMentions':
-            'Called by the sweep view to distil a manufacturer note, and inside the module by coveredWheelSizes. Exported so the four real notations — inch, in, doubled quote, and Lucid\'s 20F21R pair — are pinned by name.',
-        'epaLinkSweep.coveredModelMatches':
-            'Consumed inside the module by classifyTestVehicle. Exported so the certificate-covers-this-carline match, and its refusal when a certificate covers several candidates, are asserted directly.',
-        'epaLinkSweep.exactTestGroupMatches':
-            'Consumed inside the module by classifyTestVehicle. Exported so the identifier match — and its refusal to fire when several rows share the id — is asserted directly.',
-        'epaLinkSweep.sharedCertification':
-            'Consumed inside the module by classifyTestVehicle. Exported so the one-certification-several-wheels case is pinned against the real Lucid data on its own.',
-        'epaLinkSweep.classifyTestVehicle':
-            'Consumed inside the module by buildSweep, which the sweep view calls. Exported so one test vehicle\'s proposal and decline reason can be asserted without building a whole sweep.',
     };
 
     for (const mod of WATCHED) {
@@ -207,7 +196,7 @@ describe('the seams that broke before', () => {
         // Backspacing a field to retype it committed Number('') (0) or a
         // clamp's floor, and the next digits appended: "100" → "1" → "120".
         const files = ['ChargeCompareView', 'RoadTripView', 'ChargingView', 'AxisScaleControls',
-            'admin/ConstantsKnobs', 'admin/TypographyKnobs', 'epa/ViewingConditions'];
+            'admin/ConstantsKnobs', 'admin/TypographyKnobs', 'epa/WindAndElevationFields'];
         for (const f of files) {
             const src = read(`src/components/${f}.jsx`);
             expect(src, `${f} uses the shared field`).toMatch(/<NumberInput/);
@@ -347,6 +336,22 @@ describe('the seams that broke before', () => {
         }
     });
 
+    it("wraps Road Trip's By-test lane labels with the shared wrap helper (#454)", () => {
+        const view = read('src/components/RoadTripView.jsx');
+        // The tick callback must hand the lane labels to wrapAxisLabel (which is
+        // wrapCanvasText underneath, the helper the other charts wrap with) — not
+        // return the label as one long string.
+        const callback = view.slice(view.indexOf('stepSize: 0.5,'),
+                                    view.indexOf('suppress integer tick labels'));
+        expect(callback.length).toBeGreaterThan(0);
+        expect(callback).toMatch(/entryLabel\(validEntries\[idx\]\)/);
+        expect(callback).toMatch(/'ICE Reference'/);
+        expect(callback).toMatch(/wrapAxisLabel\(/);
+        expect(callback).toMatch(/laneLabelBudget\(/);
+        expect(callback).toMatch(/autoSkip:\s*false/);
+        expect(read('src/utils/wrapCanvasText.js')).toMatch(/wrapCanvasText\(ctx, text, maxWidth, maxLines\)/);
+    });
+
     it('renders vehicle images through the thumbnail resolver', () => {
         // image_url is the FULL-resolution original — 1600x900, ~210KB each, and
         // 91% of a cold first load when 23 of them render at once. Displaying it
@@ -462,14 +467,15 @@ describe('the seams that broke before', () => {
         // ran the app's largest query 98 times, so the sweep appeared to hang
         // and only the last of 98 toasts survived. The batch path refreshes
         // once. Nothing about that is visible from either file alone.
-        const sweep = read('src/components/admin/FeGuideLinkSweep.jsx');
-        const batchFn = sweep.slice(sweep.indexOf('const linkBatch'));
-        const body = batchFn.slice(0, batchFn.indexOf('\n    };'));
+        // The Guide-row sweep submits its whole queue the same way.
+        const sweep = read('src/components/admin/GuideRowLinkSweep.jsx');
+        const submitFn = sweep.slice(sweep.indexOf('const submit'));
+        const body = submitFn.slice(0, submitFn.indexOf('\n    };'));
 
-        expect(body, 'linkBatch must call linkFeGuideRows, the batch path')
+        expect(body, 'submit must call linkFeGuideRows, the batch path')
             .toMatch(/linkFeGuideRows\(/);
-        expect(body, 'linkBatch must not loop the single-link call')
-            .not.toMatch(/await\s+linkFeGuideRow\(/);
+        expect(body, 'submit must not loop the single-link call')
+            .not.toMatch(/linkFeGuideRow\(/);
 
         // And the batch path must refresh once rather than per link.
         const ctx = read('src/context/AppContext.jsx');
@@ -500,7 +506,7 @@ describe('the seams that broke before', () => {
             // The select is GUIDE_VIEW_FIELDS plus what only the picker shows
             // (#374: candidates are checked against the lab data before linking).
             [
-                ...(svc.match(/const GUIDE_VIEW_FIELDS = '([^']*)'/)?.[1] ?? '').split(','),
+                ...(svc.match(/const GUIDE_VIEW_FIELDS = [`']([^`']*)[`']/)?.[1] ?? '').split(','),
                 ...(fn.match(/\.select\(`\$\{GUIDE_VIEW_FIELDS\}((?:, [a-z_]+)*)`\)/)?.[1] ?? '').split(','),
             ].map(s => s.trim()).filter(Boolean),
         );
@@ -571,7 +577,10 @@ describe('the seams that broke before', () => {
         // alone. A picker never mounted, or a choice the checks never read,
         // would store a primary that changes nothing anyone can see.
         const section = read('src/components/EpaVehicleSection.jsx');
-        expect(section, 'the EPA section must mount the picker').toMatch(/<PrimaryConfigurationPicker[\s\S]*?onChoose=\{onSetPrimary\}/);
+        // The vehicle's EPA section marks a primary from its EPA Label
+        // (or a card no label reaches); Data Checks keeps the picker.
+        expect(section, 'the EPA Label must be handed the write').toMatch(/<VehicleEpaLabel[\s\S]*?onSetPrimary=\{\(mapping\) => onSetPrimary\(vehicle\.id, mapping\.id\)\}/);
+        expect(read('src/components/epa/GuideRowMatchList.jsx'), 'the label must offer it').toMatch(/Mark as primary/);
         expect(read('src/components/RunsView.jsx'), 'RunsView must hand the write to the section')
             .toMatch(/onSetPrimary=\{setPrimaryEpaMapping\}/);
         expect(read('src/context/AppContext.jsx')).toMatch(/dataService\.setPrimaryEpaMapping\(/);
@@ -684,11 +693,62 @@ describe('the seams that broke before', () => {
         expect(read('supabase/migrations/068_sources.sql')).toMatch(/source_id bigint REFERENCES sources\(id\) ON DELETE SET NULL/);
     });
 
+    it('shows every test whose source, name or link disagrees, and opens its edit form (#426)', () => {
+        const panel = read('src/components/admin/DataChecksPanel.jsx');
+        expect(panel, 'the panel must mount the attribution check').toMatch(/<TestAttributionCheck\s*\/>/);
+
+        const check = read('src/components/admin/TestAttributionCheck.jsx');
+        // Reads the tests and the source list, and judges them by the pure check.
+        expect(check).toMatch(/testAttribution\(fleet, \{ sources, socRanges/);
+        expect(check).toMatch(/useSources\(\)/);
+        // The curve's span comes from its points, never from runs.start_soc/end_soc.
+        expect(check).toMatch(/dataService\.getSocRanges\(/);
+        // Every finding the check can raise has a filter option, and each row opens its edit.
+        expect(check).toMatch(/ATTRIBUTION_FINDINGS\.filter\(/);
+        expect(check).toMatch(/testHref\(\{[^}]*edit: true/);
+
+        // …and the edit link lands on the form: App carries the flag, RunsView acts on it.
+        expect(read('src/App.jsx')).toMatch(/editOnFocus=\{focusRunEdit\}/);
+        expect(read('src/App.jsx')).toMatch(/get\('edit'\) === '1'/);
+        expect(read('src/components/RunsView.jsx')).toMatch(/if \(target && canEdit\(vehicle\)\) handleEditRun\(target\)/);
+    });
+
+    it('takes a test\'s source from the source list, never from free text (#426)', () => {
+        const runs = read('src/components/RunsView.jsx');
+        // Both forms — create and edit — mount the field; two inputs typed by hand
+        // is how "Out of Spec" came to be spelled 35 ways.
+        expect((runs.match(/<SourceField/g) ?? []).length, 'create and edit must both mount SourceField').toBe(2);
+        expect(read('src/components/SourceField.jsx')).toMatch(/<SourcePicker/);
+        expect(runs, 'no hand-typed source input may come back').not.toMatch(/placeholder="Source \(e\.g\./);
+        // What is written is the canonical name; a source typed as new joins the list.
+        expect((runs.match(/await sourceToWrite\(/g) ?? []).length, 'create, CSV import and edit must resolve the source').toBe(3);
+        expect(runs).toMatch(/ensureSourceId\(pickedSource\(/);
+        expect(runs).toMatch(/startingName\(/);
+    });
+
+    it('chooses a session\'s source from the source list, and starts a session from its test (#426)', () => {
+        const edit = read('src/components/SessionEditModal.jsx');
+        expect(edit, 'the session form must mount the source field').toMatch(/<SourceField/);
+        expect(edit, 'no hand-typed source input may come back').not.toMatch(/key: 'sourceName'/);
+        // What is written is the canonical name; a source typed as new joins the list.
+        expect(edit).toMatch(/runSourceText\(sources, sourcePick/);
+        expect(edit).toMatch(/ensureSourceId\(pickedSource\(/);
+        // A session created from a test starts with that test's own fields.
+        expect(read('src/components/SessionControl.jsx')).toMatch(/\.\.\.sessionSeedFromRun\(run, sources\)/);
+    });
+
     it('lets a variant inherit color, photo and tags by pointer, and keeps editors on own values', () => {
         // Resolved where the figures are, so every reader of the fleet sees it.
         const ctx = read('src/context/AppContext.jsx');
-        expect(ctx).toMatch(/withVehicleFigures\(withPlatforms\(withInheritance\(shown\), platformsById\)\)/);
-        expect(ctx, 'createVariant must link every run the source shows').toMatch(/dataService\.createVariant\(source, variantLinkPlan\(source\)\)/);
+        expect(ctx).toMatch(/withVehicleFigures\(withPlatforms\(withInheritance\(shown, manufacturers\), platformsById\)\)/);
+        // The brand's color (#311) reaches the fleet only through that second
+        // argument, and is set from Admin and pulled from the card.
+        expect(read('src/components/admin/BrandRegistry.jsx')).toMatch(/updateManufacturer\(id, updates\)/);
+        expect(read('src/components/admin/BrandRegistry.jsx')).toMatch(/onSave\(brand\.id, \{ color: hex \}\)/);
+        expect(read('src/components/VehiclesView.jsx')).toMatch(/<PullColorButton vehicle=\{vehicle\} onUpdate=\{onUpdate\} \/>/);
+        expect(read('src/components/vehicles/PullColorButton.jsx')).toMatch(/sampleImageColor/);
+        expect(read('src/components/EditVehicleForm.jsx')).toMatch(/Clear color/);
+        expect(ctx, 'createVariant must link every run the source shows that the lineage does not bring').toMatch(/dataService\.createVariant\(source, variantLinkPlan\(source\)\)/);
 
         // Editors read own values. A form seeded from the resolved ones saves
         // the source's color or tags onto the variant and cuts the pointer.
@@ -746,9 +806,9 @@ describe('the seams that broke before', () => {
         expect(read('src/components/ImportVehiclesModal.jsx')).toMatch(/buildImportPlan\([^)]*platforms/);
         expect(read('src/utils/parseVehicleImport.js')).toMatch(/mechanical_platform: \[/);
 
-        expect(read('src/components/VehiclesView.jsx')).toMatch(/<PlatformLine vehicle=\{vehicle\} \/>/);
+        expect(read('src/components/vehicles/VehicleCardFigures.jsx')).toMatch(/<PlatformLine vehicle=\{vehicle\} \/>/);
         expect(read('src/components/ViewSpecsModal.jsx')).toMatch(/<PlatformFacts vehicle=\{liveVehicle\} \/>/);
-        expect(read('src/components/VehicleTable.jsx')).toMatch(/buildVehicleRows\(vehicles, \{[^}]*platformsById/);
+        expect(read('src/hooks/useVehicleRows.js')).toMatch(/buildVehicleRows\(vehicles, \{[^}]*platformsById/);
     });
 
     it('carries the #352 spec fields to a column, the importer and View Specs', async () => {
@@ -852,8 +912,42 @@ describe('the seams that broke before', () => {
         expect(body('createVariant')).toMatch(/dataService\.rebuildComposites\(/);
         // The rebuild reads what it inherits, scaled as the chart scales it.
         const ds = read('src/services/DataService.js');
-        expect(ds).toMatch(/buildInheritedRuns\(\{ spec_links: links\.data \}/);
+        expect(ds).toMatch(/buildInheritedRuns\(\{ id: vehicleId, spec_links: links\.data \}, runById, runToVehicle, lineageTests\)/);
         expect(ds).toMatch(/shapePoint\(p, r\._efficiencyFactor \?\? 1, r\._capacityFactor \?\? 1\)/);
+    });
+
+    it('brings charging tests down the lineage, and stops them at a battery revision (086)', () => {
+        const ds = read('src/services/DataService.js');
+        const ctx = read('src/context/AppContext.jsx');
+        // Both doors a vehicle's runs come through build the lineage's tests.
+        expect(ds, 'getVehicles reads the lineage').toMatch(/buildInheritedRuns\(v, runById, runToVehicle, lineageChargingTests\(v, byId\)\)/);
+        expect(ds, 'the composite rebuild reads it too').toMatch(/rebuildComposites\(vehicle, lineage = \[\]\)[\s\S]*getVehicleRuns\(vehicle\.id, lineage\)/);
+        // Every rebuild is handed the lineage, or a variant's composite forgets
+        // the tests it inherits.
+        expect(ctx).toMatch(/const lineage = chargingLineage\(raw, /);
+        expect(ctx).toMatch(/rebuildComposites\(v, chargingLineage\(v, byId\)\)/);
+        // A test added above reaches the variants below, and their composites.
+        const body = (fn) => {
+            const start = ctx.indexOf(`    const ${fn} = async`);
+            return ctx.slice(start, ctx.indexOf('\n    const ', start + 1));
+        };
+        for (const fn of ['addRun', 'duplicateRun', 'copyRunToVehicle']) {
+            expect(body(fn), `${fn} must reach the variants below`).toMatch(/refreshLineageHeirs\(/);
+        }
+        // A write to a test rebuilds every variant reading it down the lineage.
+        expect(ctx).toMatch(/const inheritorsOf = \(runIds\) => \{[\s\S]*?lineageInheritors\(id, vehicles\)/);
+        // Changing the source, the revision or the factor re-resolves the lineage.
+        expect(body('updateVehicle')).toMatch(/if \(lineageChanged\) await reresolveLineage\(vehicleId\)/);
+        // The two fields are saved, only where the columns exist.
+        expect(ds).toMatch(/if \(this\.batteryRevisionAvailable\) \{\s*set\('battery_revision'/);
+        // The source vehicle is chosen on the vehicle form, and seeded from the record.
+        expect(read('src/components/EditVehicleForm.jsx')).toMatch(/<SourceVehiclePicker/);
+        expect(read('src/components/EditSpecsForm.jsx')).not.toMatch(/<VehicleCombobox/);
+        expect(read('src/utils/vehicleForm.js')).toMatch(/battery_revision: !!vehicle\.battery_revision/);
+        // A lineage test with no link gets one on its first change.
+        expect(read('src/components/RunsView.jsx')).toMatch(/overrideInheritedRun\(run, \{ \[f\.field\]: next \}, vehicle\.id\)/);
+        // The lineage tree marks where tests stop.
+        expect(read('src/components/vehicles/LineageTree.jsx')).toMatch(/<BatteryRevisionNote/);
     });
 
     it('measures a composite from the start SoC, built live from its tests (#408)', () => {
@@ -868,7 +962,7 @@ describe('the seams that broke before', () => {
         expect(view, 'a thin start estimates the spread from all its tests').toMatch(/spreadAlong\(seriesFrom\(members, live\.fullStart\), xs\)/);
         expect(view, 'and the legend says how many it rests on').toMatch(/\$\{live\.tests\.length\} of \$\{live\.of\} tests/);
         expect(view, 'that spread is its own setting, off by default').toMatch(/chartConfig\.addedSpread \?\? false/);
-        expect(read('src/App.jsx'), 'and rides the URL').toMatch(/p\.set\('aspread', '1'\)/);
+        expect(read('src/utils/chartUrlState.js'), 'and rides the URL').toMatch(/p\.set\('aspread', '1'\)/);
     });
 
     it('takes a composite as the default charging curve everywhere: DEF → composite → newest (#313)', () => {
@@ -884,8 +978,8 @@ describe('the seams that broke before', () => {
         expect(view, 'the test spread must be shaded').toMatch(/edge\('spreadLo'\)/);
         expect(view, 'its ⓘ sits where a source link would').toMatch(/renderRunSource=\{run => isCompositeRun\(run\)/);
         expect(read('src/components/RunSelector.jsx'), 'a derived row is told apart by its name').toMatch(/run-name-derived/);
-        expect(read('src/utils/colorUtils.js'), 'a composite wears the vehicle color').toMatch(/r\.composite \? -\(r\.composite\.chargerClassV/);
-        expect(read('src/App.jsx'), 'the spread toggle rides the URL').toMatch(/p\.set\('cspread'/);
+        expect(read('src/utils/colorUtils.js'), 'a composite wears the vehicle color').toMatch(/r\.composite \? -compositeClassRank\(r\.composite\)/);
+        expect(read('src/utils/chartUrlState.js'), 'the spread toggle rides the URL').toMatch(/p\.set\('cspread'/);
     });
 
     it('draws Modeled vs Tested under the EPA tab, keeping it a chart mode (#338)', () => {
@@ -894,7 +988,7 @@ describe('the seams that broke before', () => {
         expect(app).toMatch(/view=\{headerTab\}/);
         expect(app, 'only top-level categories are tabs').toMatch(/chartCategories=\{TOP_CHART_CATEGORIES\}/);
         expect(app, 'EPA\'s own sub-tabs are its All EVs section').toMatch(/group: 'All EVs'/);
-        expect(app, 'a tab\'s sub-nav must carry the chart modes under it').toMatch(/\.\.\.chartModesUnder\(parentStrip\.tab\)\.map/);
+        expect(app, 'a tab\'s sub-nav must carry the chart modes under it').toMatch(/\.\.\.chartModesUnder\(parentStrip\.tab\)/);
         expect(app).toMatch(/epa:\s+\{ tab: 'epa'/);
         expect(app, 'a chart mode keeps its pop-out wherever it is drawn').toMatch(/end=\{showsPopout && popoutButton\}[\s\S]*end=\{showsPopout && popoutButton\}/);
         expect(app, 'and showsPopout covers every chart mode').toMatch(/const showsPopout = Boolean\(activeChartCategory\)/);
@@ -905,7 +999,8 @@ describe('the seams that broke before', () => {
         const app = read('src/App.jsx');
         expect(app, 'App owns Cards or List now').toMatch(/viewMode=\{vehiclesMode\}/);
         expect(app).toMatch(/vehicles: \{ tab: 'vehicles', items: VEHICLES_STRIP_ITEMS/);
-        expect(app, 'the bar/scatter switch must be drawn for both spec charts').toMatch(/<SpecChartKind mode=\{chartMode\} onChange=\{handleChartModeChange\} \/>/);
+        expect(app, 'the spec chart is handed the mode switch').toMatch(/onModeChange=\{handleChartModeChange\}/);
+        expect(read('src/components/SpecChart.jsx'), 'the bar/scatter switch lives in the spec chart sidebar').toMatch(/<SpecChartKind mode=\{mode\} onChange=\{onModeChange\} \/>/);
         expect(app, 'a header tab returns to the chart mode last shown under it').toMatch(/onNavigate=\{navigateToTab\}/);
         expect(read('src/components/VehiclesView.jsx'), 'the in-page toggle is gone').not.toMatch(/setViewMode/);
         expect(read('src/components/shell/SubTabStrip.jsx'), 'sections are labelled').toMatch(/subtab-section-label/);
@@ -934,20 +1029,55 @@ describe('the seams that broke before', () => {
         expect(app).toMatch(/<ReferenceSection\s+subtab=\{referenceSubtab\}\s+platformId=\{referencePlatformId\}/);
     });
 
+    it('opens Reference on Explainers, and reaches Platforms only by name (#444)', () => {
+        const app = read('src/App.jsx');
+        const section = read('src/components/reference/ReferenceSection.jsx');
+        expect(section, 'a bare ?tab=reference is Explainers').toMatch(/DEFAULT_REFERENCE_SUBTAB = 'explainers'/);
+        // The constant means "what a bare URL opens" and nothing else: the
+        // platform paths must not borrow it to mean Platforms.
+        expect(app, 'a platform link names Platforms').toMatch(/subtab: 'platforms', platformId: String\(id\)/);
+        expect(app).toMatch(/setReferenceSubtab\('platforms'\)/);
+        expect(app, 'openPlatform does not use the default').not.toMatch(/subtab: DEFAULT_REFERENCE_SUBTAB, platformId/);
+        expect(app, 'a pid with no sub is read as Platforms, from the URL and from history')
+            .toMatch(/referenceSubtabFromParam\(p\.get\('sub'\), pid\)/);
+        expect(app).toMatch(/referenceSubtabFromParam\(e\.state\.subtab, e\.state\.platformId\)/);
+        expect(app, 'a platform page is written as ?pid= alone')
+            .toMatch(/referenceSubtab === 'platforms' && referencePlatformId != null\) p\.set\('pid'/);
+        expect(read('src/components/reference/PlatformPage.jsx'), 'the crumb back to the list names it')
+            .toMatch(/href="\?tab=reference&sub=platforms"/);
+    });
+
+    it('lists Explainers before Platforms in the Reference sub-nav (#444)', async () => {
+        const { REFERENCE_SUBTAB_IDS } = await import('../components/reference/ReferenceSection');
+        expect(REFERENCE_SUBTAB_IDS).toEqual(['explainers', 'platforms']);
+    });
+
+    it('reads the Reference sub-tab out of a URL or history state (#444)', async () => {
+        const { referenceSubtabFromParam, DEFAULT_REFERENCE_SUBTAB } = await import('../components/reference/ReferenceSection');
+        expect(DEFAULT_REFERENCE_SUBTAB).toBe('explainers');
+        expect(referenceSubtabFromParam(null), '?tab=reference').toBe('explainers');
+        expect(referenceSubtabFromParam('bogus')).toBe('explainers');
+        expect(referenceSubtabFromParam('platforms'), '?tab=reference&sub=platforms').toBe('platforms');
+        expect(referenceSubtabFromParam('explainers')).toBe('explainers');
+        expect(referenceSubtabFromParam(null, '12'), '?tab=reference&pid=12, which predates the flip').toBe('platforms');
+        expect(referenceSubtabFromParam(undefined, 12), 'a history state with only a platform').toBe('platforms');
+        expect(referenceSubtabFromParam('explainers', '12'), 'a named sub-tab wins').toBe('explainers');
+    });
+
     it('opens a platform\'s page from every place a platform is named (#354)', () => {
         const app = read('src/App.jsx');
         expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform[ ,]/);
-        expect(app, 'and restores ?pid=').toMatch(/setReferencePlatformId\(p\.get\('pid'\) \|\| null\)/);
+        expect(app, 'and restores ?pid=').toMatch(/const pid = p\.get\('pid'\) \|\| null;[\s\S]*?setReferencePlatformId\(pid\)/);
         expect(read('src/components/vehicles/PlatformLine.jsx'), 'the card line and View Specs').toMatch(/<PlatformLink platform=/);
         expect(read('src/components/VehicleSpecsDisplay.jsx'), 'a provided value\'s basis').toMatch(/from <PlatformLink platform=\{platform\} \/>/);
         expect(read('src/utils/vehicleTable.js'), 'a table note names its platform').toMatch(/links\[col\.key\] = \{ platformId: platform\.id \}/);
-        expect(read('src/components/VehicleTable.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\)\}/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/link=\{platformNoteLink\(row\.links\?\.\[col\.key\], openPlatform\) \?\? explainerNoteLink\(row\.links\?\.\[col\.key\], openExplainer\)\}/);
         expect(read('src/components/tables/TableCell.jsx'), 'without borrowing the test peek').toMatch(/const noteLink = test \?\? link/);
     });
 
     it('opens an explainer from a link, and restores it from the URL (#355)', () => {
         const app = read('src/App.jsx');
-        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform, openExplainer \}\}>/);
+        expect(app, 'App provides the way in').toMatch(/<NavigationContext\.Provider value=\{\{ openPlatform, openExplainer[ ,]/);
         expect(app, 'and restores ?topic=').toMatch(/setReferenceTopic\(p\.get\('topic'\) \|\| null\)/);
         expect(app, 'and writes it back').toMatch(/p\.set\('topic', referenceTopic\)/);
         expect(read('src/components/reference/ReferenceSection.jsx'), 'Reference mounts the section')
@@ -959,11 +1089,28 @@ describe('the seams that broke before', () => {
     it('lays out every List row on the header\'s grid, with one set of actions (#338)', () => {
         const view = read('src/components/VehiclesView.jsx');
         expect(view, 'the header row is drawn').toMatch(/<VehicleListHeader/);
-        expect(view, 'every row gets the same ⋯ menu').toMatch(/<VehicleRowMenu label=\{vehicle\.name\} items=\{rowMenuItems\(vehicle\)\} \/>/);
+        expect(view, 'every row gets the same ⋯ menu').toMatch(/<VehicleRowMenu label=\{vehicle\.name\} items=\{rowMenuItems\(vehicle, dismiss\)\} \/>/);
         expect(view, 'the Tests column').toMatch(/<TestCounts vehicle=\{vehicle\}/);
         const css = read('src/index.css');
         expect(css, 'rows and header share the tracks').toMatch(/\.vehicle-row,\s*\.vehicle-list-head \{\s*display: grid;\s*grid-template-columns: var\(--vehicle-list-cols\)/);
         expect(css, 'no auto track, or the empty header cell collapses it').not.toMatch(/--vehicle-list-cols:[^;]*\bauto;/);
+    });
+
+    it('links every test count to its Tests & Data sub-tab, without selecting the vehicle', () => {
+        // The card and the row both select on click; a count that forgets to
+        // stop the click looks linked and quietly toggles the selection too.
+        const view = read('src/components/VehiclesView.jsx');
+        expect(view, 'the card\'s figures open their tests').toMatch(/<VehicleCardFigures[^>]*onOpenSubtab=\{onViewRuns\}/);
+        expect(read('src/components/vehicles/VehicleCardFigures.jsx'), 'the card\'s counts open their tests').toMatch(/<TestCountPills [^>]*onOpenSubtab=\{onOpenSubtab\}/);
+        expect(view, 'the list\'s counts open their tests').toMatch(/<TestCounts [^>]*onOpenSubtab=\{onViewRuns\}/);
+        expect(read('src/components/vehicles/TestCounts.jsx'), 'and the click stays off the row')
+            .toMatch(/e\.stopPropagation\(\); onOpenSubtab\(vehicle, category\.subtab\)/);
+        expect(read('src/App.jsx'), 'App takes the sub-tab, checked against the real ones')
+            .toMatch(/const viewVehicleRuns = \(v, sub\) => \{[^}]*RUNS_SUBTAB_IDS\.includes\(sub\)[\s\S]*onViewRuns=\{viewVehicleRuns\}/);
+        const cats = read('src/utils/vehicleDataCategories.js');
+        for (const m of cats.matchAll(/subtab: '(\w+)'/g)) {
+            expect(read('src/components/RunsView.jsx'), `${m[1]} is a real sub-tab`).toMatch(new RegExp(`id: '${m[1]}'`));
+        }
     });
 
     it('links a tested figure to its test, and lands on it', () => {
@@ -978,7 +1125,7 @@ describe('the seams that broke before', () => {
         expect(runs).toMatch(/data-run-id=\{run\.id\}/);
         expect(runs).toMatch(/is-link-target/);
         // The table hands each cell its test, and the cell links the note.
-        expect(read('src/components/VehicleTable.jsx')).toMatch(/test=\{testLink\(row\.tests\[col\.key\]/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/test=\{testLink\(row\.tests\[col\.key\]/);
         expect(read('src/components/tables/TableCell.jsx')).toMatch(/is-test-link/);
         expect(read('src/index.css')).toMatch(/\.card\.is-link-target\s*\{/);
     });
@@ -990,24 +1137,50 @@ describe('the seams that broke before', () => {
         expect(app).not.toMatch(/selectedVehicles\.length > 0 && chartMode === 'specstable'/);
         // The chart URL writer must carry the table's own parameters, or every
         // selection change wipes the reader's columns, sort and filters.
-        expect(app).toMatch(/startsWith\(VEHICLE_TABLE_PARAM_PREFIX\)/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/startsWith\(VEHICLE_TABLE_PARAM_PREFIX\)/);
 
-        // Its tab is a way to pick vehicles, so it must never wait for a pick:
-        // the top nav gates on the modes, and entering lands on one that works.
-        expect(read('src/components/shell/AppNav.jsx')).toMatch(/modes\.every\(modeNeedsSelection\)/);
+        // No chart waits for a pick any more: tabs and sub-tabs are never
+        // disabled for an empty selection, entering restores the remembered
+        // mode, and an empty chart says so and points at ＋ Add (the vehicle
+        // quick-add) instead of drawing a blank page.
+        expect(read('src/components/shell/AppNav.jsx')).not.toMatch(/Select a vehicle first/);
+        expect(app).not.toMatch(/Select a vehicle first/);
         expect(app).toMatch(/entryModeFor\(/);
-        expect(app, 'sub-tabs must disable the charts that need a selection').toMatch(/disabled: selectedVehicles\.length === 0 && modeNeedsSelection/);
+        expect(app, 'an empty chart must show the shared empty state')
+            .toMatch(/chartMode !== 'specstable' && selectedVehicles\.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && \(\s*<SelectionEmptyState/);
+        // The spec chart can plot every filtered vehicle, so it shows the same
+        // empty state itself, with its way out, instead of vanishing.
+        expect(read('src/components/SpecChart.jsx')).toMatch(/<SelectionEmptyState chart="Chart"/);
+        expect(read('src/components/SelectionEmptyState.jsx')).toMatch(/＋ Add/);
 
         // Selecting here IS the app's selection — no second, local notion of chosen.
         const table = read('src/components/VehicleTable.jsx');
         expect(table).toMatch(/toggleVehicleSelection/);
         expect(table).toMatch(/selectedVehicles\.map/);
         expect(table, 'the table must not keep its own selected ids').not.toMatch(/useState\([^)]*[Ss]elected/);
+
+        // Sorting reorders the selection (#457) — through the one guarded writer,
+        // from the pure reorder, never by writing the selection state directly.
+        const sortHandler = table.slice(table.indexOf('const sortBy = '), table.indexOf('const rowProps'));
+        expect(sortHandler, 'the sort handler must reorder the selection').toMatch(/reorderSelectionBySort\(/);
+        expect(sortHandler, 'the reorder must go through setVehicleSelection').toMatch(/setVehicleSelection\(next\)/);
+        expect(table, 'the table must not call the raw selection setter').not.toMatch(/setSelectedVehicles/);
+        expect(read('src/utils/sortSelection.js').replace(/\/\*[\s\S]*?\*\//g, ''), 'the reorder is pure: it writes nothing').not.toMatch(/setVehicleSelection|setSelectedVehicles|localStorage/);
         // "Pin is local, select is global": the word stays out of this table.
         expect(table.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')).not.toMatch(/pin/i);
+        // The selected band says it is kept across the site, at the top.
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/Selected · \{selectedRows\.length\}[\s\S]*maintained site-wide, at the top/);
 
         // The mechanisms are shared, not copied.
-        for (const f of ['src/components/VehicleTable.jsx', 'src/components/epa/guide/GuideTable.jsx']) {
+        // The vehicle table's grid is its own file since #448 (Home draws the same
+        // one, read-only), so the vehicle table is checked in two places.
+        const grid = read('src/components/vehicles/VehicleTableGrid.jsx');
+        expect(grid, 'the grid must use the shared sort header').toMatch(/import SortHeader from/);
+        expect(grid, 'the grid must draw data cells through TableCell').toMatch(/<TableCell/);
+        expect(grid, 'the grid must not draw its own bar markup').not.toMatch(/guide-spark/);
+        expect(table, 'the live table must draw through the shared grid').toMatch(/<VehicleTableGrid/);
+        expect(table, 'the live table must restate clipped cells with useCellPeek').toMatch(/useCellPeek\([^)]*\)[\s\S]*peekProps=\{peekProps\}[\s\S]*peek=\{cellPeek\}/);
+        for (const f of ['src/components/epa/guide/GuideTable.jsx']) {
             expect(read(f), `${f} must use the shared sort header`).toMatch(/import SortHeader from/);
             // Cells go through TableCell, which restates clipped text on hover;
             // a bare <td> for data would clip silently again.
@@ -1016,11 +1189,14 @@ describe('the seams that broke before', () => {
             // ...and the restatement is the shared peek, not a browser title.
             expect(read(f), `${f} must restate clipped cells with useCellPeek`).toMatch(/useCellPeek\([^)]*\)[\s\S]*\{\.\.\.peekProps\}[\s\S]*\{cellPeek\}/);
         }
-        // Clicking the name picks the row in both tables; other cells open details.
-        expect(table).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggle\(row\.id\); \}\}/);
+        // The vehicle table's name TEXT opens the vehicle's card in a popover;
+        // the rest of the name cell picks the row, as in the guide table. Other
+        // cells open details.
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/<VehicleCardPopover/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/onClick=\{selectable \? \(e\) => \{ e\.stopPropagation\(\); onToggle\(row\.id\); \} : undefined\}/);
         expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onToggleSelect\(row\.id\); \}\}/);
         // Community flags reach the table's cells (flagging itself stays in View Specs).
-        expect(table).toMatch(/flagged=\{row\.flagged\.has\(col\.key\)\}/);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/flagged=\{row\.flagged\.has\(col\.key\)\}/);
         expect(read('src/hooks/useCellPeek.jsx'), 'a flagged cell must peek even when it fits').toMatch(/dataset\.peek !== 'always'/);
         // Widths by what a column holds are one vocabulary in both column lists,
         // and the shared header is what turns it into a class.
@@ -1359,6 +1535,92 @@ describe('the seams that broke before', () => {
     });
 });
 
+describe('one correction, everywhere it is applied', () => {
+    // Four charts and the table each built their own conditions object, and a
+    // field added to one (wind, for the composite range) reached none of the
+    // others; each also corrected to the Admin standard while the table let a
+    // reader choose. Every correction now reads the run through runConditions
+    // and corrects to the reader's target (utils/correctionSettings.js).
+    const sources = () => [
+        'src/utils/rangeSource.js', 'src/utils/roadTripSpread.js', 'src/utils/compositeRange.js',
+        'src/components/RangeChartView.jsx', 'src/components/ChargingView.jsx',
+    ];
+
+    it('builds every correction\'s conditions in one place', () => {
+        for (const file of sources()) {
+            const src = read(file);
+            expect(src, `${file} corrects`).toMatch(/correctionFactor\(/);
+            expect(src, `${file} must read the run through runConditions`).toMatch(/correctionFactor\(runConditions\(/);
+        }
+    });
+
+    it('hands every chart\'s correction control the reader\'s target', () => {
+        for (const file of ['src/components/RangeChartView.jsx', 'src/components/ChargingView.jsx',
+                            'src/components/RoadTripView.jsx', 'src/components/ChargeCompareView.jsx']) {
+            const src = read(file);
+            for (const use of src.match(/<CorrectionControl[^>]*\/>/g) ?? []) {
+                expect(use, `${file}: a CorrectionControl without the target edits nothing the charts read`).toMatch(/target=\{/);
+            }
+        }
+    });
+
+    it('shares the target between the charts and the table, and writes it to the URL once', () => {
+        const app = read('src/App.jsx');
+        const codec = read('src/utils/chartUrlState.js');
+        expect(codec).toMatch(/encodeCorrection\(/);
+        expect(codec).toMatch(/decodeCorrection\(/);
+        expect(app, 'the table must get App\'s target, not its own').toMatch(/correctionTarget=\{chartConfig\.correctionTarget\}[\s\S]{0,200}onCorrectionTargetChange=/);
+        // And the mode: a reader who turns correction off on a chart must see
+        // the table's reported-test figures as measured too.
+        expect(app, 'the table must get the reader\'s correction mode').toMatch(/<VehicleTable[^>]*correctionMode=\{chartConfig\.correctionMode/);
+    });
+});
+
+describe('the charger current class (#313, migration 092)', () => {
+    it('is written by the form, normalised on the way in and out, and read by the composite', () => {
+        const runs = read('src/components/RunsView.jsx');
+        expect(runs, 'both forms offer it').toMatch(/<ChargerCurrentSelect[\s\S]+<ChargerCurrentSelect/);
+        expect(runs, 'an edit sends it only when it changed').toMatch(/toChargerCurrent\(chargerCurrentClass\) !== toChargerCurrent\(storedRun\?\.charger_current_class_a\)/);
+        const data = read('src/services/DataService.js');
+        expect(data, 'add').toMatch(/charger_current_class_a: toChargerCurrent\(/);
+        expect(data, 'update').toMatch(/updates\.chargerCurrentClass !== undefined/);
+        expect(read('src/context/AppContext.jsx'), 'import').toMatch(/charger_current_class_a = toChargerCurrent/);
+        const composite = read('src/utils/compositeCurve.js');
+        expect(composite, 'the composite buckets by it').toMatch(/currentClassOf\(/);
+        expect(composite, 'and stores which class a composite stands for').toMatch(/chargerCurrentA: curve\.chargerCurrentA/);
+        expect(read('src/utils/runUtils.js'), 'the native composite ranks by it').toMatch(/compositeClassRank\(b\.composite\)/);
+        const migration = read('supabase/migrations/092_runs_charger_current_class.sql');
+        expect(migration).toMatch(/ADD COLUMN IF NOT EXISTS charger_current_class_a/);
+        expect(migration, 'one stored composite per voltage AND current class').toMatch(/chargerCurrentA/);
+    });
+});
+
+describe('race mode draws a composite from a start one test reaches', () => {
+    it('lets compositeFrom build from one test, and no other caller', () => {
+        const composite = read('src/utils/compositeCurve.js');
+        expect(composite).toMatch(/buildComposite\(reaching, \{ minTests: 1 \}\)/);
+        expect((composite.match(/minTests: 1/g) || []).length, 'only the live build lowers the floor').toBe(1);
+        const view = read('src/components/ChargingView.jsx');
+        expect(view, 'the warning is for no test, not for one').toMatch(/none of its tests reach/);
+        expect(view, 'the legend says how many tests it rests on').toMatch(/live\.tests\.length < live\.of/);
+        expect(view, 'a composite with no clock says why it is not on a time axis').toMatch(/noClockComposites/);
+        expect(view).toMatch(/no time data, so it cannot be drawn against time/);
+    });
+});
+
+describe('the Range chart scales a test to a full pack (utils/fullPackRange)', () => {
+    it('draws its bars and its selector badge from the one helper', () => {
+        // The bar and the badge beside the test were each doing their own SoC
+        // arithmetic, and a test with energy but no SoC window was drawn at its
+        // raw distance — a 23-mile "range" beside 250-mile ones.
+        const view = read('src/components/RangeChartView.jsx');
+        expect(view).toMatch(/from '\.\.\/utils\/fullPackRange'/);
+        expect(view, 'the bar').toMatch(/calcRange\(run, run\.vehicle\)/);
+        expect(view, 'the badge, with the vehicle that holds the capacity').toMatch(/fullPackRange\(run, selectedVehicles\.find/);
+        expect(view, 'no second copy of the SoC arithmetic').not.toMatch(/\* 100\) \/ used/);
+    });
+});
+
 describe('constants exposed for tuning are reachable in the Admin panel', () => {
     it('offers every correction constant as a knob', () => {
         // AERO_FRACTION drives every correction magnitude. It was made
@@ -1368,6 +1630,102 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
                            'STD_SPEED_MPH', 'STD_ALTITUDE_FT', 'STD_TEMP_F']) {
             expect(knobs, `${key} is tunable but absent from the Admin knobs`).toContain(key);
         }
+    });
+
+    it('offers every assumed heating and cooling constant as a knob (#449)', () => {
+        // The slopes are a starting point the owner means to tune once #475
+        // compares predicted corrections with actual tests, so each has to be
+        // reachable from Admin and resolved through the override layers.
+        const knobs = read('src/constants/knobs.js');
+        const epa = read('src/constants/epa.js');
+        for (const key of ['DEFAULT_ACCESSORY_W', 'ACCESSORY_COMFORT_BAND_F', 'ACCESSORY_HEAT_W_PER_F',
+                           'ACCESSORY_COOL_W_PER_F', 'ASSUMED_TEST_CONSUMPTION_WH_MI']) {
+            expect(knobs, `${key} is tunable but absent from the Admin knobs`).toContain(`key: '${key}'`);
+            expect(epa, `${key} is not resolved through the override layers`).toMatch(new RegExp(`resolve\\('${key}'`));
+        }
+    });
+
+    it('offers the DC fast charging loss as a knob, and prices the fast cost on it, not on the wall figure (#506)', () => {
+        const knobs = read('src/constants/knobs.js');
+        const epa = read('src/constants/epa.js');
+        expect(knobs, 'the loss is tunable but absent from the Admin knobs').toContain("key: 'DC_FAST_LOSS'");
+        expect(epa, 'and is not resolved through the override layers').toMatch(/resolve\('DC_FAST_LOSS'/);
+        const table = read('src/utils/vehicleTable.js');
+        const fast = table.slice(table.indexOf('const costPer100Fast'), table.indexOf('const CALCULATED_COLUMNS'));
+        expect(fast, 'the fast cost must be grossed up by the knob').toMatch(/1 - DC_FAST_LOSS/);
+        // The fast column must not go back to the AC wall basis: a DC session
+        // bypasses the onboard charger the home cost pays for.
+        expect(fast, 'the fast cost must not read wallEfficiency').not.toMatch(/wallEfficiency/);
+        expect(table, 'the fast column must read the cost it is built on').toMatch(/costPer100Fast\(inputs, fastPrice, chargerEff\)/);
+        // And the home figure stays on the wall basis.
+        expect(table, 'the home cost stays on wall-side efficiency').toMatch(/costPer100\(homePrice\)\(inputs\)/);
+        const figures = read('src/utils/vehicleFigures.js');
+        expect(figures, 'the cert\'s own charging efficiency must reach the table').toMatch(/chargerEfficiency: measuredChargerEfficiency/);
+        expect(table, 'and be read from the resolved range').toMatch(/vehicle\.epaRange\?\.chargerEfficiency/);
+        // The estimate note on every fast cell must reach the explainer, with its tooltip.
+        expect(table, 'the fast column must carry its note link').toMatch(/noteLink: fastCostNoteLink/);
+        expect(table, 'and the table must hand it to the cell').toMatch(/links\[col\.key\] = col\.noteLink\(\)/);
+        expect(read('src/components/tables/TableCell.jsx'), 'and the cell must show the tooltip').toMatch(/title=\{noteLink\.title\}/);
+        // The default and the evidence behind it must say the same number.
+        const ledger = JSON.parse(read('src/explainers/facts.json')).facts.find(f => f.id === 'dc-fast-round-trip-pairs');
+        expect(epa, 'the default must be the ledger\'s').toContain(`DC_FAST_LOSS: ${ledger.value.evbench_default},`);
+        expect(read('src/explainers/content/dc-fast-charging-loss.md'), 'and the explainer must cite the round trip').toContain('[[fact:dc-fast-round-trip-pairs]]');
+    });
+
+    it('offers the accessory load on the correction target, and writes it to the link only when set (#449)', () => {
+        const fields = read('src/components/CorrectionTargetFields.jsx');
+        expect(fields, 'the row must resolve auto through the temperature').toMatch(/effectiveAccessoryW\(/);
+        expect(fields, 'and say which state it is in, in the owner’s words').toMatch(/set by you/);
+        expect(fields, 'and let the reader give it back').toMatch(/accessoryW: null/);
+        const settings = read('src/utils/correctionSettings.js');
+        expect(settings, 'c_acc is read and written with the other target parameters').toMatch(/accessoryW: 'c_acc'/);
+        expect(settings, 'auto is the default, so an untouched page writes nothing').toMatch(/accessoryW: null/);
+    });
+
+    it('draws both Modeled Efficiency views under the shared correction target, without its speed (#449)', () => {
+        for (const f of ['src/components/EpaCurvesView.jsx', 'src/components/epa/curves/EpaCurveExplorer.jsx']) {
+            const src = read(f);
+            expect(src, `${f} must offer the shared sliders`).toMatch(/<CorrectionTargetFields/);
+            expect(src, `${f}: speed is its x axis, so no speed slider`).toMatch(/fields=\{\['temperatureF', 'altitudeFt', 'accessoryW'\]\}/);
+            expect(src, `${f} must hand the target to the hook, or it draws standard conditions`).toMatch(/useViewingConditions\(\{[^}]*target: correctionTarget/);
+            expect(src, `${f} scales the accessory load by the target's difference`).toMatch(/curveAccessoryW\(/);
+            expect(src, `${f} does not follow the "Correct:" mode: it is a model`).not.toMatch(/correctionMode/);
+        }
+        expect(read('src/hooks/useViewingConditions.js'), 'the extras are only wind and elevation change')
+            .not.toMatch(/setElevationFt|setTempF|setAccessoryOverrideW/);
+    });
+
+    it('offers Road Trip no correction speed slider, and states the trip speed instead', () => {
+        // Trip -> Speed is the only speed on that chart: a trip is corrected to
+        // the speed it is driven (tripTarget), so the shared target's speed is
+        // redundant there.
+        const src = read('src/components/RoadTripView.jsx');
+        const fields = src.match(/const TRIP_CORRECTION_FIELDS = (\[[^\]]*\])/)?.[1];
+        expect(fields, 'Road Trip must name the conditions it offers').toBeTruthy();
+        expect(fields, 'no correction speed slider on Road Trip').not.toMatch(/speedMph/);
+        expect(src, 'the control must be given that list').toMatch(/<CorrectionControl[^>]*fields=\{TRIP_CORRECTION_FIELDS\}/);
+        expect(src, 'the collapsed summary must not state the hidden speed').toMatch(/summary=\{tripCorrectionSummary\(/);
+        expect(read('src/components/CorrectionControl.jsx'), 'the control must pass fields on').toMatch(/<CorrectionTargetFields[^>]*fields=\{fields\}/s);
+    });
+
+    it('carries the target, and the extras, to both pop-outs (#449)', () => {
+        // The Selected-vehicles pop-out used to call the hook with nothing
+        // driving it and silently draw standard conditions.
+        expect(read('src/components/PopoutView.jsx')).toMatch(/<EpaCurveExplorer[^>]*correctionTarget=\{chartConfig\?\.correctionTarget\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/<EpaCurvesView[\s\S]{0,400}correctionTarget=\{chartConfig\?\.correctionTarget\}/);
+        expect(read('src/App.jsx')).toMatch(/<EpaSection[^>]*correctionTarget=\{chartConfig\.correctionTarget\}[^>]*setChartConfig=\{setChartConfig\}/);
+        const view = read('src/components/EpaCurvesView.jsx');
+        expect(view, 'the extras travel in epaConfig').toMatch(/driven: presentationMode \? \(epaConfig\.extras/);
+        expect(view, 'and are written there by the window that has the controls').toMatch(/extras: JSON\.parse\(extrasKey\)/);
+        expect(read('src/utils/chartUrlState.js'), 'the extras stay out of the link (#476 is the compact key)').not.toMatch(/windSpeed|gradeGain|extras/);
+    });
+
+    it('reads the accessory load in the correction and takes a run’s own consumption to it (#449)', () => {
+        const correction = read('src/utils/conditionCorrection.js');
+        expect(correction, 'the correction must import the accessory load').toMatch(/from '\.\/accessoryLoad'/);
+        expect(correction, 'and apply it in the corrected modes').toMatch(/accessoryFactor\(/);
+        expect(correction, 'every caller builds its conditions here, so the consumption reaches them all').toMatch(/whPerMile:\s+consumptionWhPerMile\(run\)/);
+        expect(correction, 'the retired placeholders must not come back').not.toMatch(/aero_hvac/);
     });
 
     it('defines every knob it advertises', () => {
@@ -1684,8 +2042,8 @@ describe('the EPA curve explorer follows the pop-out channel (#259)', () => {
 
     it('the explorer reports its state up, and App broadcasts it', () => {
         expect(read('src/components/epa/EpaSection.jsx')).toMatch(/<EpaCurveExplorer onStateChange=\{onExplorerState\}/);
-        expect(app).toMatch(/<EpaSection subtab=\{epaSubtab\} onExplorerState=\{setEpaExplorer\}/);
-        expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, viewScale, sendState\]/);
+        expect(app).toMatch(/<EpaSection subtab=\{epaSubtab\} onPlotColumn=\{plotColumn\} onExplorerState=\{setEpaExplorer\}/);
+        expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, sendState\]/);
     });
 
     it('the channel carries it both ways, null included', () => {
@@ -1700,23 +2058,85 @@ describe('the EPA curve explorer follows the pop-out channel (#259)', () => {
     });
 });
 
-describe('charts that hold their axis limits locally reach the pop-out (#259)', () => {
-    const sync = read('src/hooks/useChartSync.js');
-    const app = read('src/App.jsx');
+describe('every chart\'s axis limits go through one door (#478)', () => {
+    // Axis limits once lived in four places: chartConfig (Charging Curves),
+    // epaConfig (Modeled Efficiency), and component state in Range & Efficiency,
+    // Road Trip, the Acceleration Curve and the All EVs explorer. Only the first
+    // reached the chart link; the pop-out got the rest through a side channel
+    // (#259) and a Home panel got none. They are now chartConfig.axisLimits, read
+    // and written through useAxisLimits, which is why the link, the pop-out and a
+    // Home panel carry them with no further wiring.
+    const CHARTS = {
+        'src/components/ChargingView.jsx':                  'charging',
+        'src/components/RangeChartView.jsx':                'range',
+        // Road Trip's view is also Trip Optimizer's, and asks for both.
+        'src/components/RoadTripView.jsx':                  ['roadtrip', 'optimizer'],
+        'src/components/PerformanceCurveView.jsx':          'perfcurve',
+        'src/components/EpaCurvesView.jsx':                 'epacurves',
+        'src/components/epa/curves/EpaCurveExplorer.jsx':   'epaexplorer',
+    };
 
-    it('the three charts draw with the synced limits', () => {
-        // Charging Curves and Modeled Efficiency keep theirs in synced config;
-        // these three keep theirs in component state the pop-out never saw.
-        expect(read('src/components/PerformanceCurveView.jsx')).toMatch(/const scale = useSyncedScale\(scaleOwn\)/);
-        expect(read('src/components/RangeChartView.jsx')).toMatch(/= useSyncedScale\(\{\s*xMin: xMinOwn/);
-        expect(read('src/components/RoadTripView.jsx')).toMatch(/const axisScale = useSyncedScale\(axisScaleOwn\)/);
+    it('every view that draws Axis Scale controls reads and writes through useAxisLimits', () => {
+        const withControls = ALL.filter(x => /<AxisScaleControls\b/.test(x.text) && !x.file.endsWith('AxisScaleControls.jsx')).map(x => x.file);
+        expect(withControls.sort(), 'a chart view with Axis Scale controls that is not in CHARTS above').toEqual(Object.keys(CHARTS).sort());
+        for (const [file, keys] of Object.entries(CHARTS)) {
+            const text = read(file);
+            for (const key of [keys].flat()) {
+                expect(text, `${file} must ask for the '${key}' limits`).toMatch(new RegExp(`useAxisLimits\\('${key}'\\)`));
+            }
+            expect(text, `${file} must hand the controls the hook's setter`).toMatch(/<AxisScaleControls[\s\S]*?onChange=\{(setLimit|setScaleLimit|onAxisChange)\}/);
+            expect(text, `${file} must not hold its own limits`).not.toMatch(/useState\(\s*\{\s*xMin|useSyncedScale|NO_SCALE|setXMin|setScale\b/);
+        }
     });
 
-    it('the main tab reports, the pop-out receives, over the same channel', () => {
-        expect(app).toMatch(/synced: isPopout \? viewScale : null, report: isPopout \? null : setViewScale/);
-        expect(app, 'both trees need the provider').toMatch(/<ScaleSyncContext\.Provider value=\{scaleSync\}>[\s\S]*<ScaleSyncContext\.Provider value=\{scaleSync\}>/);
-        expect(sync).toMatch(/if \('viewScale' in data\) setViewScale\(data\.viewScale\)/);
-        expect((sync.match(/viewScale,\n/g) || []).length).toBeGreaterThanOrEqual(2);
+    it('every key the views ask for is registered, and every registered key has a view', () => {
+        expect(Object.values(CHARTS).flat().sort()).toEqual(Object.keys(AXIS_LIMIT_CHARTS).sort());
+    });
+
+    it('nothing outside the hook keeps limits in chartConfig or epaConfig by field name', () => {
+        // The flat xMin/xMax/yMin/yMax/y2Min/y2Max fields are gone from both configs.
+        const defaults = read('src/utils/chartDefaults.js');
+        expect(defaults).toMatch(/axisLimits: \{\}/);
+        expect(defaults).not.toMatch(/\bxMin\b|\byMax\b|\by2Min\b/);
+        expect(read('src/components/EpaCurvesView.jsx')).not.toMatch(/setEpaConfig\([^)]*(xMin|yMax)/);
+    });
+
+    it('the link writes them for every mode that has them, and reads them back onto the config', () => {
+        const link = read('src/utils/chartUrlState.js');
+        expect(link).toMatch(/if \(hasAxisLimits\(chartMode\)\)[\s\S]*?encodeAxisLimits\(axisLimitsOf\(chartConfig\.axisLimits, chartMode\), chartMode\)/);
+        expect(link).toMatch(/axisLimits:\s+axisLimitsOfLink\(p, chartMode\)/);
+        expect(link).toMatch(/withAxisLimits\(base\.axisLimits, s\.chartMode, s\.axisLimits\)/);
+        // ...and the six separate parameters are not written any more.
+        expect(link).not.toMatch(/p\.set\('(xn|xx|yn|yx|y2n|y2x)'/);
+    });
+
+    it('a Home panel draws with its own copy, and the main window and the pop-out with the site\'s', () => {
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/<AxisLimitsProvider chartConfig=\{chartConfig\} setChartConfig=\{setChartConfig\}>/);
+        const app = read('src/App.jsx');
+        expect((app.match(/<AxisLimitsProvider chartConfig=\{chartConfig\} setChartConfig=\{setChartConfig\}>/g) || []).length,
+            'both trees (pop-out and main) need the provider').toBe(2);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/chartConfig=\{chartConfig\}\s+setChartConfig=\{setChartConfig\}/);
+    });
+
+    it('the pop-out gets them in the chartConfig the main tab broadcasts, both ways', () => {
+        const sync = read('src/hooks/useChartSync.js');
+        expect(sync).toMatch(/setChartConfig\(data\.chartConfig\)/);
+        expect((sync.match(/^\s+chartConfig,$/gm) || []).length, 'the main tab posts chartConfig on request and on change').toBeGreaterThanOrEqual(2);
+        expect(sync, 'no side channel for limits any more').not.toMatch(/viewScale|ScaleSync/);
+        expect(read('src/App.jsx')).toMatch(/\[chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, sendState\]/);
+    });
+
+    it('Modeled Efficiency · All EVs writes them to its own address and App reads them back', () => {
+        const explorer = read('src/components/epa/curves/EpaCurveExplorer.jsx');
+        expect(explorer).toMatch(/encodeAxisLimits\(scale, 'epaexplorer'\)/);
+        expect(explorer).toMatch(/p\.set\(AXIS_LIMITS_PARAM, limitsParam\)/);
+        expect(read('src/App.jsx')).toMatch(/sub === 'curves' && p\.get\(AXIS_LIMITS_PARAM\) !== null[\s\S]*?decodeAxisLimits\(p\.get\(AXIS_LIMITS_PARAM\), 'epaexplorer'\)/);
+    });
+
+    it('Road Trip converts hours to minutes in one helper', () => {
+        const road = read('src/components/RoadTripView.jsx');
+        expect(road).toMatch(/hoursToMinutes\(axisLimits\./);
+        expect(road, 'a stored limit must not be multiplied by hand at the plot').not.toMatch(/axisLimits\.\w+ \* 60/);
     });
 });
 
@@ -1752,15 +2172,15 @@ describe('a pop-out receives every setting the chart it was opened from does (#3
         const end = src.indexOf('/>', at);
         return [...src.slice(at, end).matchAll(/^\s+([A-Za-z]+)(?==|\s*$)/gm)].map(m => m[1]);
     };
-    // The pop-out is read-only, so setters are left out on purpose.
-    const READ_ONLY = (p) => /^set[A-Z]/.test(p);
+    // The pop-out is read-only, so setters and change handlers are left out on purpose.
+    const READ_ONLY = (p) => /^(set|on)[A-Z]/.test(p);
 
     for (const tag of ['ChargeCompareView', 'RoadTripView']) {
         it(`${tag}: the pop-out passes every non-setter prop the main tab does`, () => {
             const main = propsOf(read('src/App.jsx'), tag);
-            const popout = propsOf(read('src/components/PopoutView.jsx'), tag);
+            const popout = propsOf(read('src/components/PresentedChart.jsx'), tag);
             expect(main, `${tag} in App.jsx`).toBeTruthy();
-            expect(popout, `${tag} in PopoutView.jsx`).toBeTruthy();
+            expect(popout, `${tag} in PresentedChart.jsx`).toBeTruthy();
             const missing = main.filter(p => !READ_ONLY(p) && !popout.includes(p));
             expect(missing, `props App passes to ${tag} that PopoutView does not`).toEqual([]);
         });
@@ -1777,7 +2197,8 @@ describe('the vehicle swatch is connected (#308, #317)', () => {
     });
 
     it('session bases live in chartConfig, so the pop-out window receives them', () => {
-        expect(app).toMatch(/vehicleBases: NO_VEHICLE_BASES/);
+        expect(read('src/utils/chartDefaults.js')).toMatch(/vehicleBases: NO_VEHICLE_BASES/);
+        expect(app).toMatch(/\.\.\.defaultChartConfig\(\),/);
         // useChartSync ships the whole chartConfig; if that ever narrows to named
         // fields, this is where it is noticed.
         expect(read('src/hooks/useChartSync.js')).toMatch(/chartConfig,/);
@@ -1907,5 +2328,988 @@ describe('the years and certifications reach both surfaces the owner named (#374
         const editor = read('src/components/epa/EpaCuratorEditor.jsx');
         expect(editor).not.toMatch(/saveTestVehicle\('model_year'/);
         expect(editor).toMatch(/label="Since"[^>]*canEdit=\{false\}/);
+    });
+});
+
+describe('bulk import lists the vehicles it creates', () => {
+    const appContext = read('src/context/AppContext.jsx');
+    const dataService = read('src/services/DataService.js');
+
+    it('the import create path asks for a listed vehicle', () => {
+        const create = appContext.slice(appContext.indexOf("if (row.action === 'create') {"));
+        expect(create.slice(0, create.indexOf('rowVehicleIds.set'))).toMatch(/visibility:\s*'public'/);
+    });
+
+    it('addVehicle honors it, and a hand-made vehicle stays unlisted', () => {
+        expect(dataService).toMatch(/visibility:\s*vehicle\.visibility === 'public' \? 'public' : 'private'/);
+    });
+
+    it('the update branch never writes visibility', () => {
+        const update = appContext.slice(appContext.indexOf('const updates = { ...row.coreWrites'));
+        expect(update.slice(0, update.indexOf('rowVehicleIds.set'))).not.toMatch(/visibility/);
+    });
+});
+
+describe('a vehicle save that RLS refuses is an error, not a silent success', () => {
+    // RLS filters a disallowed UPDATE to 0 rows and PostgREST answers 204, so a
+    // write that does not read its row back cannot tell "saved" from "refused".
+    // Every contributor's Edit vehicle save did nothing that way until 087.
+    const dataService = read('src/services/DataService.js');
+    const vehiclesView = read('src/components/VehiclesView.jsx');
+
+    it('the one direct vehicles UPDATE outside the guard writes a row just created', () => {
+        const direct = [...dataService.matchAll(/\.from\('vehicles'\)\s*\.update\(([^)]*)\)/g)].map(m => m[1]);
+        // The guard's own call, and addVehicle's spec_source link on the new row.
+        expect(direct).toEqual(['patch', '{ spec_source_vehicle_id: source.id }']);
+    });
+
+    it('the guard reads the row back and raises on 0 rows', () => {
+        const guard = dataService.slice(dataService.indexOf('async #updateVehicleRow('));
+        const body = guard.slice(0, guard.indexOf('\n  }\n'));
+        expect(body).toMatch(/\.select\('id'\)/);
+        expect(body).toMatch(/if \(!data\?\.length\)[\s\S]*throw/);
+    });
+
+    it('the Edit vehicle form stays open when the save is refused', () => {
+        expect(vehiclesView).toMatch(/if \(await onUpdate\(editingId, formData\) === false\) return;/);
+    });
+});
+
+describe('a unit is stated in the cell, not the header (#446)', () => {
+    const cell = read('src/components/tables/TableCell.jsx');
+    const header = read('src/components/tables/SortHeader.jsx');
+    const code = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+    it('the cell draws its unit in the card\'s unit style', () => {
+        expect(cell).toMatch(/className="stat-cell-unit"/);
+        expect(cell).toMatch(/from '\.\.\/\.\.\/utils\/tableColumns'/);
+    });
+
+    it('the header draws no unit line, and the stylesheet no longer styles one', () => {
+        expect(code(header), 'no unit prop').not.toMatch(/function SortHeader\(\{[^)]*\bunit\b/);
+        expect(code(header), 'no unit drawn').not.toMatch(/\{unit\b|stat-cell-unit/);
+        expect(read('src/index.css')).not.toMatch(/guide-th-unit/);
+    });
+
+    it('both tables hand each cell its column\'s unit, and only where the cell has a value', () => {
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/unit=\{col\.numeric \? cellUnit\(unitFor\(col, units\), row\.values\[col\.key\]\)/);
+        expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/unit=\{cellUnit\(col\.unit, row\[col\.key\]\)\}/);
+    });
+
+    it('no screen prints weight as "lbs" or metric speed as "kph" (one spelling: lb, km/h)', () => {
+        // A figure's unit as the reader sees it: after `} `, a quote or `>`. The EPA sheet's own
+        // column header ("Equivalent Test Weight (lbs.)") and the stored enum 'kph' are not display.
+        const shown = ALL
+            .filter(x => !x.file.endsWith('parseEpaTestCarSheet.js'))
+            .filter(x => /(\} |['"`>])lbs\b/.test(code(x.text)) || /\$\{[^}]*\}\s*kph\b/.test(code(x.text)))
+            .map(x => x.file);
+        expect(shown).toEqual([]);
+    });
+
+    it('the pinned name header says "drag to reorder columns", in both tables, and not on a phone', () => {
+        expect(header).toMatch(/text-nano guide-th-reorder">drag to reorder columns</);
+        expect(read('src/components/tables/ColumnPicker.jsx'), 'the picker\'s own role').toMatch(/className="text-nano">Shown · drag to reorder</);
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/reorderHint=\{!!drag && col\.sticky\}/);
+        expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/reorderHint=\{col\.sticky\}/);
+        const css = read('src/index.css');
+        expect(css).toMatch(/\.guide-th-reorder \{\s*position: absolute;/);
+        expect(css, 'hidden at phone width').toMatch(/@media \(max-width: 48rem\) \{[\s\S]*\.guide-th-reorder \{ display: none; \}/);
+    });
+
+    it('a spec column\'s unit is declared by the schema, never read out of its label', () => {
+        const table = code(read('src/utils/vehicleTable.js'));
+        expect(table).not.toMatch(/UNIT_WORD|splitUnit/);
+        expect(table).toMatch(/f\.unit \?\? null/);
+    });
+});
+
+describe('the chart subtitle leads with conditions; counts follow Full Labels (#443)', () => {
+    // The counts cost a phone's width and a reader can see them, so they come
+    // back only under Full Labels - on screen and in the PNG export, which
+    // captions itself from the same plotSubtitle.
+    const SUBTITLE_WITH_COUNTS = {
+        'ChargingView.jsx': 'chartConfig.verboseLabels',
+        'RangeChartView.jsx': 'verboseLabels',
+        'ChargeCompareView.jsx': 'verboseLabels',
+        'RoadTripView.jsx': 'verboseLabels',
+    };
+
+    for (const [file, flag] of Object.entries(SUBTITLE_WITH_COUNTS)) {
+        it(`${file} builds its counts through countParts(${flag})`, () => {
+            const text = read(`src/components/${file}`);
+            const body = text.slice(text.indexOf('const plotSubtitle = useMemo('));
+            const subtitle = body.slice(0, body.indexOf('\n    }, ['));
+            expect(subtitle).toContain(`countParts(${flag}`);
+            // No hand-rolled "N runs" phrase left in the subtitle.
+            expect(subtitle).not.toMatch(/\$\{(runs|vehicles|pairs)\} (run|vehicle|pair)/);
+        });
+
+        it(`${file} re-memoizes the subtitle when Full Labels flips`, () => {
+            const text = read(`src/components/${file}`);
+            const from = text.indexOf('const plotSubtitle = useMemo(');
+            const deps = text.slice(from, text.indexOf('useChartPng', from));
+            expect(deps).toMatch(new RegExp(`\\}, \\[[^\\]]*${flag.replace('.', '\\.')}`));
+        });
+    }
+
+    it('the pop-out hands Full Labels to every view that shows counts', () => {
+        const popout = read('src/components/PresentedChart.jsx');
+        // Charging + Range ride chartConfig whole; the others take the flag.
+        expect(popout).toMatch(/<ChargingView[\s\S]*?chartConfig=\{chartConfig\}/);
+        for (const view of ['ChargeCompareView', 'RoadTripView']) {
+            const tag = popout.slice(popout.indexOf(`<${view}`));
+            expect(tag.slice(0, tag.indexOf('/>'))).toMatch(/verboseLabels=\{chartConfig\?\.verboseLabels \?\? false\}/);
+        }
+    });
+
+    // The other six chart views have no Full Labels control to restore counts
+    // with, so they never show them (owner decision on #443).
+    const NEVER_COUNTS = ['SpecsChartView.jsx', 'SpecsScatterView.jsx', 'PerformanceCurveView.jsx',
+        'performance/PerformanceCompareChart.jsx', 'EpaCurvesView.jsx', 'epa/curves/EpaCurveExplorer.jsx'];
+
+    for (const file of NEVER_COUNTS) {
+        it(`${file} puts no run, vehicle, curve or record count in its subtitle`, () => {
+            const text = read(`src/components/${file}`);
+            const from = text.indexOf('const plotSubtitle');
+            const subtitle = text.slice(from, text.indexOf('useChartPng', from));
+            expect(subtitle).not.toMatch(/\$\{n\}|countParts|\.length\}/);
+            expect(subtitle).not.toMatch(/\b(runs?|vehicles?|curves?|records?)\b['`]/);
+        });
+    }
+
+    it('every view that dropped its counts still clears a stale PNG preview when the selection changes', () => {
+        for (const file of [...Object.keys(SUBTITLE_WITH_COUNTS), ...NEVER_COUNTS]) {
+            expect(read(`src/components/${file}`), file).toMatch(/signature:/);
+        }
+        expect(read('src/hooks/useChartPng.js')).toMatch(/frame\?\.signature/);
+    });
+
+    it('Range & Efficiency hides a legend that has nothing to tell apart', () => {
+        expect(read('src/components/RangeChartView.jsx'))
+            .toMatch(/legend: \{ display: legendWorthShowing\(built\.data\.datasets\) \}/);
+    });
+});
+
+describe('a chart link is read and written in one module (#448 layer 1)', () => {
+    const codec = read('src/utils/chartUrlState.js');
+    const [parseSrc, buildSrc] = codec.split('export function buildChartParams');
+    const app = read('src/App.jsx');
+
+    it('App parses and builds the query through chartUrlState, not inline', () => {
+        expect(app).toMatch(/parseChartUrl\(window\.location\.search\)/);
+        expect(app).toMatch(/buildChartParams\(\{/);
+        expect(app).not.toMatch(/p\.get\('cmp_soc'\)/);
+        expect(app).not.toMatch(/p\.set\('cmp_soc'/);
+    });
+
+    it('every key the builder writes, the parser reads', () => {
+        const written = [...buildSrc.matchAll(/p\.set\('([a-z0-9_]+)'/g)].map(m => m[1]);
+        expect(written.length).toBeGreaterThan(40);
+        // `tab` is read by App itself before the parse, `m` and `v` through
+        // their own names — the check is on the quoted key appearing at all.
+        const unread = written.filter(k => k !== 'tab' && !parseSrc.includes(`'${k}'`));
+        expect(unread).toEqual([]);
+    });
+
+    it('the settings a link now carries have a home in the state App holds', () => {
+        // The starting state is in chartDefaults.js; App starts from it.
+        const defaults = read('src/utils/chartDefaults.js');
+        for (const field of ['rangeChartType', 'effUnit', 'specsField']) {
+            expect(defaults).toMatch(new RegExp(`${field}:`));
+        }
+        expect(defaults).toMatch(/orientation: DEFAULT_COMPARE_ORIENTATION/);
+        expect(defaults).toMatch(/selected: \[\]/);
+        expect(app).toMatch(/useState\(defaultCompareConfig\)/);
+    });
+
+    it('Range & Efficiency draws the chart type and unit it is given, and asks App to change them', () => {
+        const view = read('src/components/RangeChartView.jsx');
+        expect(view).not.toMatch(/useState\('range-vehicle-bar'\)/);
+        expect(view).not.toMatch(/useState\('mi_kwh'\)/);
+        expect(view).toMatch(/rangeChartType/);
+        const charging = read('src/components/ChargingView.jsx');
+        expect(charging).toMatch(/chartType=\{chartConfig\.rangeChartType\}/);
+        expect(charging).toMatch(/effUnit=\{chartConfig\.effUnit\}/);
+    });
+
+    it('Charge Stop takes its orientation and plotted pairs from App, in the tab and the pop-out', () => {
+        const view = read('src/components/ChargeCompareView.jsx');
+        expect(view).not.toMatch(/useState\('horizontal'\)/);
+        expect(view).toMatch(/value: selectedKeys/);
+        expect(app).toMatch(/selectedKeys=\{compareConfig\.selected\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/selectedKeys=\{compareConfig\.selected\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/orientation=\{compareConfig\.orientation\}/);
+    });
+
+    it('the plotted tests are applied from the link for range as well as charging', () => {
+        expect(codec).toMatch(/s\.chartMode === 'charging' \|\| s\.chartMode === 'range'/);
+        expect(app).toMatch(/chartConfigFromParsed\(s, prev\)/);
+    });
+});
+
+describe('featured comparisons are stored, saved safely and openable (#448 layer 2)', () => {
+    const migration = read('supabase/migrations/089_featured_comparisons.sql');
+    const service = read('src/services/DataService.js');
+    const app = read('src/App.jsx');
+
+    it('the migration is safe to run twice and mirrors the curators\' policies', () => {
+        expect(migration).toMatch(/CREATE TABLE IF NOT EXISTS public\.featured_comparisons/);
+        const created = migration.match(/CREATE POLICY/g) ?? [];
+        const dropped = migration.match(/DROP POLICY IF EXISTS/g) ?? [];
+        expect(created.length).toBe(4);
+        expect(dropped.length, 'every policy is dropped IF EXISTS first').toBe(created.length);
+        expect(migration).toMatch(/DROP TRIGGER IF EXISTS featured_comparisons_stamp_listed/);
+        expect(migration).toMatch(/FOR DELETE\s+USING \(public\.current_user_role\(\) = 'admin'\)/);
+        expect(migration).toMatch(/is_listed OR public\.current_user_role\(\) IN \('admin', 'contributor'\)/);
+    });
+
+    it('an update or delete that RLS filtered raises, instead of looking saved', () => {
+        const update = service.slice(service.indexOf('async updateFeaturedComparison'), service.indexOf('async deleteFeaturedComparison'));
+        expect(update).toMatch(/\.select\(\)/);
+        expect(update).toMatch(/!data\?\.length/);
+        const del = service.slice(service.indexOf('async deleteFeaturedComparison'));
+        expect(del.slice(0, 700)).toMatch(/\.select\('id'\)/);
+        expect(del.slice(0, 700)).toMatch(/!data\?\.length/);
+    });
+
+    it('the list degrades to empty before 089 is applied, since Home is the landing page', () => {
+        const read_ = service.slice(service.indexOf('async getFeaturedComparisons'), service.indexOf('async addFeaturedComparison'));
+        expect(read_).toMatch(/42P01/);
+        expect(read_).toMatch(/return \[\];/);
+    });
+
+    it('App can open a comparison\'s chart and reset to it, and shares both through the navigation context', () => {
+        expect(app).toMatch(/const openFeaturedChart = useCallback/);
+        expect(app).toMatch(/const resetToComparison = useCallback/);
+        expect(app).toMatch(/<NavigationContext\.Provider value=\{\{[^}]*openFeaturedChart, resetToComparison/);
+        // Both write the selection through the guarded writer, not the setter.
+        const open = app.slice(app.indexOf('const openFeaturedChart'), app.indexOf('const resetToComparison'));
+        expect(open).toMatch(/setVehicleSelection\(state\.vehicleIds\)/);
+    });
+
+    it('opening a chart applies a clean slate: every config comes from the saved state, none from the live one', () => {
+        const open = app.slice(app.indexOf('const openFeaturedChart'), app.indexOf('const resetToComparison'));
+        for (const setter of ['setChartConfig', 'setCompareConfig', 'setRoadTripConfig', 'setEpaConfig', 'setPairings']) {
+            expect(open, setter).toMatch(new RegExp(`${setter}\\(state\\.`));
+        }
+    });
+
+    it('the hook writes through the service and reloads', () => {
+        const hook = read('src/hooks/useFeaturedComparisons.js');
+        for (const call of ['addFeaturedComparison', 'updateFeaturedComparison', 'deleteFeaturedComparison']) {
+            expect(hook).toMatch(new RegExp(call));
+        }
+        expect(hook).toMatch(/reload\(\)/);
+    });
+});
+
+describe('Home draws a featured comparison and curators can make one (#448 layer 3)', () => {
+    const app = read('src/App.jsx');
+    const home = read('src/components/home/HomeView.jsx');
+    const panel = read('src/components/home/FeaturedChartPanel.jsx');
+
+    it('Home is the first tab, a view of its own, and reads no selection', () => {
+        const nav = read('src/components/shell/AppNav.jsx');
+        expect(nav.indexOf("key: 'home'")).toBeGreaterThan(-1);
+        expect(nav.indexOf("key: 'home'")).toBeLessThan(nav.indexOf("key: 'vehicles'"));
+        expect(app).toMatch(/SELECTION_INERT_VIEWS = new Set\(\['home',/);
+        expect(app).toMatch(/\{view === 'home' && <HomeView/);
+        expect(app).toMatch(/if \(tab === 'home'\)/);
+    });
+
+    it('Home opens with the intro, whether or not anything is featured', () => {
+        expect(home.match(/<HomeIntro \/>/g)?.length).toBe(3);
+    });
+
+    it('the featured comparison sits under its own section header', () => {
+        expect(home).toMatch(/<h2 className="home-section-head text-meta">Featured comparison<\/h2>/);
+    });
+
+    it('a panel draws through PresentedChart, the view the pop-out uses, from its own state', () => {
+        expect(panel).toMatch(/<PresentedChart/);
+        expect(read('src/components/PopoutView.jsx')).toMatch(/<PresentedChart/);
+        // Its own copy: the live site's chart state must not reach a panel.
+        expect(panel).not.toMatch(/useChartSync|chartConfig=\{chartConfig\}.*live/);
+        expect(panel).toMatch(/chartStateOf\(/);
+        // A chart that fills its own selection on first sight needs somewhere to
+        // write it, or it stays blank (Charge Stop did, on Home).
+        for (const setter of ['setChartConfig', 'setCompareConfig', 'setRoadTripConfig', 'setEpaConfig']) {
+            expect(panel, setter).toMatch(new RegExp(`${setter}=\\{${setter}\\}`));
+        }
+        expect(panel).toMatch(/useInView\(/);
+    });
+
+    it('opening a chart and resetting both warn before replacing a selection', () => {
+        expect(home).toMatch(/replacesSelection\(selectedVehicles, shown, vehicles\)/);
+        expect(home).toMatch(/openFeaturedChart\(shown, index\)/);
+        expect(home).toMatch(/resetToComparison\(shown\)/);
+        expect(home).toMatch(/<ReplaceSelectionDialog/);
+    });
+
+    it('every chart view offers Save as featured comparison, to curators only', () => {
+        for (const f of ['ChargingView', 'RangeChartView', 'ChargeCompareView', 'RoadTripView', 'EpaCurvesView', 'SpecsChartView', 'SpecsScatterView']) {
+            expect(read(`src/components/${f}.jsx`), f).toMatch(/<FeatureChartButton \/>/);
+        }
+        const button = read('src/components/home/FeatureChartButton.jsx');
+        expect(button).toMatch(/if \(!canCurate \|\| !featureThisChart\) return null/);
+        // No button in the pop-out, and none for anyone who cannot curate.
+        expect(app).toMatch(/featureThisChart: isPopout \|\| !canCurate \? null : featureThisChart/);
+        expect(app).toMatch(/const canCurate = isContributor/);
+    });
+
+    it('the editor saves through the hook, and only an admin sees Delete', () => {
+        expect(app).toMatch(/featured\.create\(c\) : featured\.save\(c\)/);
+        expect(app).toMatch(/canDelete=\{isAdmin\}/);
+        expect(read('src/components/home/FeaturedComparisonEditor.jsx')).toMatch(/!isNew && canDelete/);
+    });
+
+    it('a presented chart is as tall as its frame says, not as tall as the window', () => {
+        for (const f of ['ChargingView', 'RangeChartView', 'EpaCurvesView']) {
+            const src = read(`src/components/${f}.jsx`);
+            expect(src, f).toMatch(/presentationMode \? PRESENTED_HEIGHT/);
+            expect(src, f).not.toMatch(/calc\(100vh - 2rem\)/);
+        }
+        expect(read('src/components/ChargeCompareView.jsx')).not.toMatch(/'45vh'/);
+        expect(read('src/index.css')).toMatch(/--presented-h: /);
+        // One height for every panel: a taller one leaves a gap under its neighbor.
+        expect(read('src/index.css')).not.toMatch(/\.home-panel\.is-tall/);
+    });
+
+    it('the address carries the comparison Home shows (fc), written beside the tab', () => {
+        expect(app).toMatch(/p\.set\('fc', homeSlug\)/);
+        expect(app).toMatch(/setHomeSlug\(p\.get\('fc'\) \|\| null\)/);
+    });
+});
+
+describe('every chart credits its data on a source line', () => {
+    const framed = ALL.filter(x => /<PlotFrame\b/.test(x.text) && !x.file.endsWith('PlotFrame.jsx'));
+
+    it('finds the chart views to check', () => {
+        expect(framed.length).toBeGreaterThanOrEqual(10);
+    });
+
+    it.each(framed.map(x => [x.file, x.text]))('%s gives each PlotFrame a sourceLine and the export its text', (file, text) => {
+        const frames = (text.match(/<PlotFrame\b/g) || []).length;
+        expect((text.match(/^\s*sourceLine=\{sourceLine\}/gm) || []).length).toBe(frames);
+        expect(text).toMatch(/useSourceLine\(/);
+        expect(text).toMatch(/sources:\s*sourceLine\.text/);
+    });
+
+    it('PlotFrame draws it and the PNG export carries it as text', () => {
+        expect(read('src/components/charts/PlotFrame.jsx')).toMatch(/<SourceLine line=\{sourceLine\}/);
+        expect(read('src/hooks/useChartPng.js')).toMatch(/sources: frame\?\.sources/);
+        expect(read('src/utils/chartUtils.js')).toMatch(/sourceLines\.forEach\(/);
+    });
+});
+
+describe('chart views show a loading indicator from their real loading state (#453)', () => {
+    const plotFrame = read('src/components/charts/PlotFrame.jsx');
+    const chartLoading = read('src/components/charts/ChartLoading.jsx');
+
+    it('PlotFrame renders the indicator and marks itself busy', () => {
+        expect(plotFrame).toMatch(/<ChartLoading\b[^>]*loading=\{loading\}/);
+        expect(plotFrame).toMatch(/aria-busy=\{loading/);
+    });
+
+    it('the indicator is announced, delayed, and drawn out of flow', () => {
+        expect(chartLoading).toMatch(/role="status"/);
+        expect(chartLoading).toMatch(/useDelayedLoading\(loading\)/);
+        expect(chartLoading).toMatch(/className="chart-loading"/);
+        const css = read('src/index.css');
+        expect(css).toMatch(/\.chart-loading \{[^}]*position: absolute/);
+        expect(css).toMatch(/prefers-reduced-motion[^{]*\{\s*\.chart-loading/);
+    });
+
+    it('the hook is driven by the helper, so the delay lives in one place', () => {
+        expect(read('src/hooks/useDelayedLoading.js')).toMatch(/isLoadingIndicatorVisible\(/);
+    });
+
+    it.each([
+        ['ChargingView', 'loadingData'],
+        ['ChargeCompareView', 'loading'],
+    ])('%s passes its loading state to PlotFrame', (file, flag) => {
+        expect(read(`src/components/${file}.jsx`)).toMatch(new RegExp(`loading=\\{${flag}\\}`));
+    });
+
+    it('RoadTripView, which builds no frame while loading, mounts the indicator directly', () => {
+        expect(read('src/components/RoadTripView.jsx')).toMatch(/<ChartLoading loading=\{loading\}/);
+    });
+
+    it('no view keeps its own copy of the floating badge', () => {
+        const copies = ALL
+            .filter(x => /className="chart-loading"/.test(x.text))
+            .map(x => x.file);
+        expect(copies).toEqual([expect.stringMatching(/ChartLoading\.jsx$/)]);
+    });
+});
+
+describe('site events are counted without knowing who (#448 layer 4)', () => {
+    const migration = read('supabase/migrations/090_site_events.sql');
+    const events = read('src/utils/siteEvents.js');
+    const service = read('src/services/DataService.js');
+
+    it('the client, the table and the function agree on the events', () => {
+        const client = [...events.matchAll(/:\s+'([a-z_]+)',/g)].map(m => m[1]).sort();
+        expect(client).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view']);
+        const quoted = (src) => [...src.matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
+        const check = migration.match(/CHECK \(event IN \(([^)]*)\)/)[1];
+        const fn = migration.match(/p_event NOT IN \(([^)]*)\)/)[1];
+        expect(quoted(check).sort()).toEqual(client);
+        expect(quoted(fn).sort()).toEqual(client);
+    });
+
+    it('only the function writes, and only an admin reads', () => {
+        expect(migration).toMatch(/SECURITY DEFINER/);
+        expect(migration).toMatch(/REVOKE ALL ON public\.site_events FROM anon, authenticated/);
+        expect(migration).not.toMatch(/FOR INSERT/);
+        expect(migration).toMatch(/FOR SELECT\s+USING \(public\.current_user_role\(\) = 'admin'\)/);
+        expect(migration).toMatch(/DROP POLICY IF EXISTS "site_events: admin read"/);
+    });
+
+    it('the function refuses a flood and never raises', () => {
+        expect(migration).toMatch(/>= 60 THEN/);
+        expect(migration).toMatch(/EXCEPTION WHEN OTHERS THEN\s+RETURN false/);
+    });
+
+    it('nothing identifying is stored or sent: no user id, email, IP or user agent', () => {
+        const table = migration.slice(migration.indexOf('CREATE TABLE'), migration.indexOf(');', migration.indexOf('CREATE TABLE')));
+        expect(table).not.toMatch(/user_id|email|ip_|user_agent/);
+        const send = service.slice(service.indexOf('async logSiteEvent'), service.indexOf('// ── Access logging'));
+        expect(send).toMatch(/p_browser_token: this\.getBrowserToken\(\)/);
+        expect(send).not.toMatch(/this\.user|navigator/);
+        expect(send).toMatch(/catch \{/);
+    });
+
+    it('the events are recorded where they happen, through the one hook', () => {
+        const home = read('src/components/home/HomeView.jsx');
+        expect(home).toMatch(/record\(SITE_EVENTS\.HOME_VIEW, \{ slug: shownSlug, once: true \}\)/);
+        expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_OPEN/);
+        expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_RESET/);
+        expect(read('src/App.jsx')).toMatch(/recordEvent\(SITE_EVENTS\.CHART_VIEW/);
+        const hook = read('src/hooks/useSiteEvents.js');
+        expect(hook).toMatch(/shouldRecord\(\{ role: userRole, popout \}\)/);
+        // Nobody else calls the service directly, or the curator skip is bypassable.
+        const callers = consumersOf('logSiteEvent', ['src/services/DataService.js']);
+        expect(callers).toEqual([expect.stringMatching(/hooks[\\/]useSiteEvents\.js$/)]);
+    });
+});
+
+describe('the site events are read by an admin, in counts (#477)', () => {
+    const service = read('src/services/DataService.js');
+    const panel = read('src/components/admin/SiteEventsPanel.jsx');
+    const stats = read('src/utils/siteEventStats.js');
+
+    it('is an Admin sub-tab, reachable by ?sub= and drawn from the one panel', () => {
+        const admin = read('src/components/AdminView.jsx');
+        expect(admin).toMatch(/\{ id: 'events',\s+label: 'Site Events' \}/);
+        expect(admin).toMatch(/events:\s+'[^']+'/);
+        expect(admin).toMatch(/subtab === 'events' && <SiteEventsPanel \/>/);
+    });
+
+    it('reads through the admin policy, bounded, and says when it was cut', () => {
+        const read_ = service.slice(service.indexOf('async getSiteEvents'), service.indexOf('// ── Access logging'));
+        expect(read_).toMatch(/\.from\('site_events'\)/);
+        expect(read_).toMatch(/\.order\('id', \{ ascending: false \}\)/);
+        expect(read_).toMatch(/truncated: true/);
+        expect(panel).toMatch(/cap: EVENT_ROW_CAP/);
+        expect(panel).toMatch(/data\?\.truncated/);
+    });
+
+    it('asks for no identity: the select names no user, email or address column', () => {
+        const read_ = service.slice(service.indexOf('async getSiteEvents'), service.indexOf('// ── Access logging'));
+        expect(read_).toMatch(/\.select\('id, created_at, event, browser_token, slug, detail'\)/);
+        expect(panel).not.toMatch(/user_id|ip_address|user_agent/);
+    });
+
+    it('the panel shows n beside what it ranks, and the counting module carries the threshold', () => {
+        expect(stats).toMatch(/export const MIN_N_TO_RANK = /);
+        expect(panel).toMatch(/MIN_N_TO_RANK/);
+        expect(panel).toMatch(/TooFew/);
+        expect(panel).toMatch(/a browser, not a person|browsers, not of people/);
+    });
+});
+
+describe('Home is where a bare address lands (#448 layer 5)', () => {
+    const app = read('src/App.jsx');
+
+    it('the first view is Home, and Vehicles & Specs is reached by saying so', () => {
+        expect(app).toMatch(/useState\('home'\)/);
+        expect(app).not.toMatch(/const \[view, setView\] = useState\('vehicles'\)/);
+        // The mount parse names it, or a link to ?tab=vehicles would land on Home.
+        expect(app).toMatch(/if \(tab === 'vehicles'\) \{\s+setView\('vehicles'\);/);
+    });
+
+    it('the wordmark goes Home', () => {
+        expect(read('src/components/shell/AppNav.jsx')).toMatch(/\(onHome \?\? onNavigate\)\('home'\)/);
+    });
+
+    it('nothing writes the address while the app loads, so a link to another tab survives the first render', () => {
+        const home = app.slice(app.indexOf('Keep URL in sync while on Home'));
+        expect(home.slice(0, 500)).toMatch(/view !== 'home' \|\| loading/);
+    });
+});
+
+describe('a curator\'s text on Home is drawn as basic Markdown, never as HTML (#448)', () => {
+    const component = read('src/components/MarkdownText.jsx');
+
+    it('the blurb and a chart\'s caption go through MarkdownText', () => {
+        expect(read('src/components/home/HomeView.jsx')).toMatch(/<MarkdownText text=\{shown\.blurb\} \/>/);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/<MarkdownText text=\{chart\.caption\} \/>/);
+    });
+
+    it('it builds React elements and never sets HTML', () => {
+        expect(component).not.toMatch(/dangerouslySetInnerHTML|innerHTML/);
+        expect(read('src/utils/miniMarkdown.js')).not.toMatch(/innerHTML|document\./);
+    });
+
+    it('external links open in a new tab without handing over the opener', () => {
+        expect(component).toMatch(/target: '_blank', rel: 'noopener noreferrer'/);
+    });
+
+    it('a link is only ever made from an address safeHref allowed', () => {
+        const src = read('src/utils/miniMarkdown.js');
+        expect(src).toMatch(/const safe = safeHref\(href\)/);
+        // The bare address is the other way a link appears: it can only match http(s).
+        expect(src).toMatch(/\(https\?:\\\/\\\/\[\^\\s<\]\+\)/);
+    });
+
+    it('the editor offers a multi-line box for each, and says what it understands', () => {
+        const editor = read('src/components/home/FeaturedComparisonEditor.jsx');
+        expect(editor).toMatch(/<textarea className="form-input" rows=\{4\} value=\{draft\.blurb\}/);
+        expect(editor).toMatch(/aria-label=\{`Chart \$\{i \+ 1\} caption`\}/);
+        expect(editor).toMatch(/MARKDOWN_HINT/);
+        // A title is one line of plain text.
+        expect(editor).toMatch(/<input className="form-input" value=\{chart\.title\}/);
+    });
+});
+
+describe('a featured comparison keeps its vehicles in the order the curator set (#448)', () => {
+    it('Home and its panels take the order from the comparison, not from the vehicle list', () => {
+        expect(read('src/components/home/HomeView.jsx')).toMatch(/vehiclesInOrder\(liveVehicleIds\(shown, vehicles\), vehicles\)/);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/vehiclesInOrder\(seed\.vehicleIds, vehicles\)/);
+        // The failure was `vehicles.filter(v => ids.has(v.id))`, which is list order.
+        for (const f of ['HomeView', 'FeaturedChartPanel']) {
+            expect(read(`src/components/home/${f}.jsx`), f).not.toMatch(/vehicles\.filter\(v => (ids|seed)/);
+        }
+    });
+
+    it('the editor can move a vehicle earlier or later', () => {
+        const editor = read('src/components/home/FeaturedComparisonEditor.jsx');
+        expect(editor).toMatch(/moveVehicle\(draft, i, i - 1\)/);
+        expect(editor).toMatch(/moveVehicle\(draft, i, i \+ 1\)/);
+    });
+});
+
+describe('Home and the Explainers landing say when there is more below the window (#448)', () => {
+    const hint = read('src/components/ScrollMoreHint.jsx');
+
+    it('Home shows the "More" pill over its panels', () => {
+        expect(read('src/components/home/HomeView.jsx')).toMatch(/<ScrollMoreHint target="\.home-panel"/);
+    });
+
+    it('the Explainers landing shows it over its subjects', () => {
+        expect(read('src/explainers/ExplainersSection.jsx')).toMatch(/<ScrollMoreHint target="\.explainer-hub"/);
+    });
+
+    it('it watches the panels as they scroll, resize and grow, and is gone when none is below', () => {
+        expect(hint).toMatch(/addEventListener\('scroll'/);
+        expect(hint).toMatch(/addEventListener\('resize'/);
+        expect(hint).toMatch(/new ResizeObserver/);
+        expect(hint).toMatch(/if \(!more\) return null/);
+    });
+
+    it('pressing it goes to the next panel, without animation for a reader who asked for less', () => {
+        expect(hint).toMatch(/prefers-reduced-motion: reduce/);
+        expect(hint).toMatch(/scrollIntoView\(\{ behavior: reduced \? 'auto' : 'smooth'/);
+        expect(read('src/index.css')).toMatch(/\.scroll-more \{ animation: none; \}/);
+    });
+});
+
+describe('Home offers the other featured comparisons and a link to this one (#448)', () => {
+    const home = read('src/components/home/HomeView.jsx');
+
+    it('everyone, not only curators, can pick another listed comparison, at the bottom of Home', () => {
+        expect(home).toMatch(/comparisons\.filter\(c => c\.isListed && c\.slug !== shown\?\.slug\)/);
+        expect(home).toMatch(/Other comparisons/);
+        // After the panels, and outside the curators' bar.
+        expect(home.indexOf('Other comparisons')).toBeGreaterThan(home.indexOf('className="home-panels"'));
+        expect(home.indexOf('Other comparisons')).toBeGreaterThan(home.indexOf('const curatorBar'));
+        expect(home).toMatch(/onSlugChange\(slug\)/);
+    });
+
+    it('a section header, with its rule, separates the other comparisons from the charts above', () => {
+        expect(home).toMatch(/<h2 className="home-section-head text-meta">Other comparisons<\/h2>/);
+        // The header is not part of the dropdown's own block.
+        expect(home).not.toMatch(/<label className="home-others">\s*<h2/);
+        expect(home).toMatch(/Past comparisons/);
+    });
+
+    it('the copied link names this comparison, so a shared link stays on the one shared', () => {
+        expect(home).toMatch(/\?tab=home&fc=\$\{encodeURIComponent\(shown\.slug\)\}/);
+        expect(home).toMatch(/navigator\.clipboard\?\.writeText\(url\)/);
+    });
+});
+
+describe('the vehicle table can be a featured comparison\'s panel (#448)', () => {
+    const presented = read('src/components/vehicles/PresentedVehicleTable.jsx');
+    const grid = read('src/components/vehicles/VehicleTableGrid.jsx');
+    const app = read('src/App.jsx');
+
+    it('Home draws it, full width, from the saved settings and the correction', () => {
+        const panel = read('src/components/home/FeaturedChartPanel.jsx');
+        expect(panel).toMatch(/seed\.chartMode === 'specstable'/);
+        expect(panel).toMatch(/<PresentedVehicleTable/);
+        expect(panel).toMatch(/search=\{explicitChartParams\(chart\.params\)\}/);
+        expect(panel).toMatch(/correctionTarget=\{seed\.chartConfig\.correctionTarget\}/);
+        expect(read('src/index.css')).toMatch(/\.home-panel\.is-wide \{\s*grid-column: 1 \/ -1;/);
+    });
+
+    it('the live table and the Home table are one grid', () => {
+        expect(presented).toMatch(/<VehicleTableGrid/);
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/<VehicleTableGrid/);
+    });
+
+    it('it touches neither the address nor the reader\'s remembered columns', () => {
+        const code = presented.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+        expect(code).not.toMatch(/window\.|history\.|localStorage|readMemory|writeMemory/);
+        // Settings come from the saved parameters, with no memory to fall back on.
+        expect(code).toMatch(/decodeVehicleTableParams\(search\)/);
+    });
+
+    it('it is read-only: no selection, no sorting, no dragging', () => {
+        expect(presented).toMatch(/selectable=\{false\}/);
+        expect(presented).not.toMatch(/sort=|drag=|onToggle|toggleVehicleSelection|setVehicleSelection/);
+        // Nothing over it, so it scrolls sideways; a click on a row opens it instead.
+        expect(presented).toMatch(/rowProps=\{\{ cols, units, maxima, onOpen \}\}/);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/\{!isTable && <button type="button" className="home-panel-cover"/);
+        // And no card popover on the name: nothing to select there.
+        expect(grid).toMatch(/selectable \? \(\s*<VehicleCardPopover/);
+        expect(grid).toMatch(/\{selectable && <th className="guide-th guide-th-select/);
+    });
+
+    it('without a checkbox column the pinned name sits at the edge, not over its neighbor', () => {
+        expect(grid).toMatch(/guide-table\$\{selectable \? '' : ' is-read-only'\}/);
+        const css = read('src/index.css');
+        expect(css).toMatch(/\.guide-table\.is-read-only \.sticky-name \{ left: 0; \}/);
+        expect(css).toMatch(/\.guide-table\.is-read-only \.guide-th\.sticky-name \.guide-th-name \{ margin-left: 0; \}/);
+    });
+
+    it('its rows are the comparison\'s vehicles, in the comparison\'s order', () => {
+        expect(presented).toMatch(/vehiclesInOrder\(vehicleIds, vehicles\)/);
+        expect(presented).toMatch(/ordered\.map\(v => byId\.get\(String\(v\.id\)\)\)/);
+    });
+
+    it('opening it hands the real table the saved link whole and an unfiltered fleet', () => {
+        const open = app.slice(app.indexOf('const openFeaturedChart'), app.indexOf('const resetToComparison'));
+        expect(open).toMatch(/explicitChartParams\(comparison\.charts\[index\]\.params\)/);
+        expect(open).toMatch(/setVehicleFilters\(EMPTY_VEHICLE_FILTERS\)/);
+    });
+
+    it('a curator saves it from the table\'s own control row, as an ordinary button', () => {
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/<FeatureChartButton className="btn btn-secondary" \/>/);
+    });
+});
+
+describe('the line charts read every series at the cursor\'s X (#455)', () => {
+    // The charts whose lines are functions of X. Each swaps Chart.js's canvas
+    // tooltip for the readout, mounts its overlay beside the canvas, and passes
+    // the plugin to the chart it builds. A view that did only some of those
+    // would have no tooltip at all, which is the failure this checks for.
+    const READ_EVERY_SERIES = [
+        'src/components/ChargingView.jsx',
+        'src/components/RangeChartView.jsx',
+        'src/components/RoadTripView.jsx',
+        'src/components/PerformanceCurveView.jsx',
+        'src/components/EpaCurvesView.jsx',
+        'src/components/epa/curves/EpaCurveExplorer.jsx',
+    ];
+
+    for (const file of READ_EVERY_SERIES) {
+        it(`${file.split('/').pop()} builds, mounts and hosts the readout`, () => {
+            const src = read(file);
+            expect(src).toMatch(/useChartReadout\(\)/);
+            expect(src).toMatch(/readout\.plugin\(/);
+            expect(src).toMatch(/\{readout\.overlay\}/);
+            expect(src).toMatch(/className="chart-readout-host"/);
+            expect(src).toMatch(/tooltip: \{[^}]*enabled: (false|built\.kind !== 'line')/);
+        });
+    }
+
+    it('the charts that must deviate keep a tooltip, and say why', () => {
+        // Range & Efficiency draws bars from the same Chart: bars keep theirs.
+        expect(read('src/components/RangeChartView.jsx')).toMatch(/enabled: built\.kind !== 'line'[\s\S]{0,80}filter: suppressBarTooltip/);
+        // Road Trip: all four of its charts read through the one readout, the
+        // timeline with its own describe (it says what each vehicle is DOING),
+        // and Trip Optimizer's map with its own (its lines are the ridge of
+        // best stop plans and the reader's own stop plan).
+        const trip = read('src/components/RoadTripView.jsx');
+        expect(trip.match(/readout\.plugin\(/g)).toHaveLength(4);
+        expect(trip).toMatch(/tooltip: \{ enabled: false \}/);
+        expect(trip).not.toMatch(/displayColors: true/);
+        // The spec scatter plots one point per vehicle; there is no shared X.
+        expect(read('src/components/SpecsScatterView.jsx')).not.toMatch(/useChartReadout/);
+    });
+
+    it('the readout\'s source links are RunSourceLinks, not a second renderer', () => {
+        expect(read('src/components/charts/ChartReadout.jsx')).toMatch(/import RunSourceLinks from '\.\.\/RunSourceLinks'/);
+    });
+
+    it('the PNG export draws a FIXED readout through one seam, and never a hover one (#456)', () => {
+        // chartUtils knows nothing of the readout by name: it asks the chart.
+        const utils = read('src/utils/chartUtils.js');
+        expect(utils).not.toMatch(/readout|crosshair/i);
+        expect(utils).toMatch(/chartInstance\.\$exportExtra\?\.\(\{ side \}\)/);
+        expect(utils).toMatch(/extra\?\.draw\(ctx/);
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/chart\.\$exportExtra = /);
+        expect(hook).toMatch(/s\.mode === 'fixed' \? prepareFixedReadout\(/);
+        expect(hook).toMatch(/delete chart\.\$exportExtra/);
+    });
+
+    it('every chart that fixes a readout offers [PNG | Side readout] as one control (#456)', () => {
+        for (const file of READ_EVERY_SERIES) {
+            const src = read(file);
+            expect(src, file).toMatch(/<CopyPngButton readout=\{readout\} onCopy=\{copyPng\} onCopyBeside=\{copyPngBeside\}/);
+        }
+        expect(read('src/hooks/useChartPng.js')).toMatch(/copyPngBeside = \(\) => copy\(true\)/);
+    });
+
+    it('fixing a readout re-renders the button, never the view: a chart effect listing `readout` would rebuild and clear it (#456)', () => {
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/return useMemo\(\(\) => \(\{ plugin, overlay: <ChartReadout store=\{store\} \/>, store \}\), \[plugin, store\]\);/);
+        expect(read('src/components/charts/CopyPngButton.jsx')).toMatch(/useReadoutFixed\(readout\)/);
+    });
+
+    it('Road Trip\'s valid entries are memoized: a fresh array each render rebuilt the chart and cleared a fixed readout (#456)', () => {
+        expect(read('src/components/RoadTripView.jsx')).toMatch(/const validEntries\s+= useMemo\(\(\) => runEntries\.filter\(/);
+    });
+
+    it('pressing the copy buttons does not clear the readout they are about to export (#456)', () => {
+        expect(read('src/hooks/useChartReadout.jsx')).toMatch(/closest\?\.\('\.chart-readout, \.chart-export-strip, \.chart-copy-btn'\)/);
+    });
+
+    it('the fixed readout is not in the URL or the pop-out: it is a reader\'s inspection, not a setting (#456)', () => {
+        expect(read('src/utils/chartUrlState.js')).not.toMatch(/readout/i);
+        expect(read('src/hooks/useChartSync.js')).not.toMatch(/readout/i);
+    });
+
+    it('the readout clears when the chart it belongs to is rebuilt', () => {
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/beforeDestroy\(\) \{ detach\?\.\(\)/);
+        expect(hook).toMatch(/store\.set\(IDLE\);\s*\};\s*\}/);
+    });
+
+    it('the zoom plugin and the readout agree on what a click is (#456)', () => {
+        // The plugin's default drag threshold is 0, so a click that moved 2px
+        // fixed the readout and zoomed the chart.
+        for (const file of ['src/components/ChargingView.jsx', 'src/components/RoadTripView.jsx']) {
+            const src = read(file);
+            const drags = src.match(/drag: \{\s*enabled: true,\s*threshold: CLICK_SLOP/g) ?? [];
+            expect(drags.length, file).toBe(src.match(/drag: \{/g)?.length ?? 0);
+            // Or one shared drag, named once with the threshold and used by name.
+            if (/drag: ZOOM_DRAG/.test(src)) {
+                expect(src, file).toMatch(/const ZOOM_DRAG = \{\s*enabled: true, threshold: CLICK_SLOP/);
+            }
+            expect(src).toMatch(/import \{ useChartReadout, CLICK_SLOP \}/);
+        }
+    });
+
+    it('a drag is a box-zoom, never a click that fixes the readout', () => {
+        const hook = read('src/hooks/useChartReadout.jsx');
+        expect(hook).toMatch(/CLICK_SLOP/);
+        expect(hook).toMatch(/if \(press\.dragged\) \{ clear\(\); return; \}/);
+    });
+});
+
+describe('the spec chart plots the vehicle table’s columns (#450)', () => {
+    const app = read('src/App.jsx');
+    const chart = read('src/components/SpecChart.jsx');
+
+    it('reads the table’s own rows, through the one builder, not the spec schema', () => {
+        expect(chart).toMatch(/useVehicleRows\(/);
+        expect(read('src/components/VehicleTable.jsx')).toMatch(/useVehicleRows\(/);
+        for (const f of ['SpecChart', 'SpecsChartView', 'SpecsScatterView']) {
+            expect(read(`src/components/${f}.jsx`), `${f} must not read the spec schema directly`).not.toMatch(/makeVehicleFields|buildFieldGroups|extractValue/);
+        }
+        expect(chart).toMatch(/plotValues\(/);
+    });
+
+    it('draws the selected vehicles in their series colors, as the other charts do', () => {
+        expect(app, 'chartVehicles carry the session color bases').toMatch(/chartVehicles\.find\(v => v\.id === id\)[\s\S]{0,200}fleet=\{chartVehicles\}/);
+        expect(chart).toMatch(/resolveChartColors\(/);
+        expect(chart).not.toMatch(/vehicleColor\(/);
+    });
+
+    it('shares the table’s assumptions through chartConfig, so chart and cell agree', () => {
+        expect(read('src/utils/chartDefaults.js')).toMatch(/assumptions:\s+\{ \.\.\.DEFAULT_ASSUMPTIONS \}/);
+        expect(app).toMatch(/assumptions=\{chartConfig\.assumptions\}/);
+        expect(app).toMatch(/onAssumptionsChange=\{a => setChartConfig/);
+        expect(chart).toMatch(/chartConfig\.assumptions/);
+        // Both frames hold the same fields; the link carries them in the spec modes.
+        expect(read('src/components/VehicleTableAssumptions.jsx')).toMatch(/<VehicleAssumptionFields/);
+        expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<VehicleAssumptionFields/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/chartMode === 'specs' \|\| chartMode === 'specscatter'\)[\s\S]{0,120}encodeAssumptionParams\(chartConfig\.assumptions\)/);
+    });
+
+    it('every chart with box-zoom resets it from the Axis Scale controls and the zoom hint', () => {
+        for (const file of ['ChargingView', 'RoadTripView']) {
+            const view = read(`src/components/${file}.jsx`);
+            expect(view, `${file} tracks the zoom`).toMatch(/useChartZoom\(/);
+            expect(view, `${file} hands the zoom state to the controls`).toMatch(/zoomed=\{zoomed\} onResetZoom=\{resetZoom\}/);
+            expect(view, `${file} links the hint`).toMatch(/<ZoomHint onReset=\{resetZoom\}/);
+            expect(view, `${file} no longer keeps Reset zoom in the toolbar`).not.toMatch(/>\s*Reset zoom\s*</);
+            expect(view, `${file} clears the state when a chart is rebuilt`).toMatch(/zoomStatePlugin/);
+        }
+        expect(read('src/components/AxisScaleControls.jsx')).toMatch(/zoomed && onResetZoom/);
+    });
+
+    it('Charging Curves chooses its axes through the axis picker, from the one axis list', () => {
+        const view = read('src/components/ChargingView.jsx');
+        expect(view).toMatch(/<AxisPicker/);
+        expect(view).toMatch(/chargingAxisOptions\(units\)/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/isChargingAxis\(s\.xAxis\)/);
+    });
+
+    it('lists its columns through the field picker, a variant of the column picker’s matching', () => {
+        expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<FieldPicker mode="dual"/);
+        expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<FieldPicker mode="single"/);
+        expect(read('src/components/tables/FieldPicker.jsx')).toMatch(/columnMatches\(/);
+        expect(read('src/components/tables/ColumnPicker.jsx')).toMatch(/columnMatches\(/);
+    });
+
+    it('puts the chart icon on both tables’ headers, and it opens the column plotted', () => {
+        expect(read('src/components/vehicles/VehicleTableGrid.jsx')).toMatch(/plot=\{plot && col\.key !== 'name'/);
+        expect(read('src/components/epa/guide/GuideTable.jsx')).toMatch(/plot=\{plot && col\.plotAs/);
+        expect(read('src/components/tables/SortHeader.jsx')).toMatch(/e\.stopPropagation\(\); plot\.onPlot\(col\.key\)/);
+        expect(app).toMatch(/onPlotColumn=\{plotColumn\}/);
+        expect(app).toMatch(/specsField: key[\s\S]{0,80}handleChartModeChange\('specs'\)/);
+    });
+
+    it('every guide column that claims a vehicle-table twin names a column that exists', async () => {
+        const { GUIDE_COLUMNS } = await import('../utils/feGuideBrowse');
+        const { vehicleColumnByKey } = await import('../utils/vehicleTable');
+        const claimed = GUIDE_COLUMNS.filter(c => c.plotAs);
+        expect(claimed.length).toBeGreaterThan(0);
+        for (const c of claimed) expect(vehicleColumnByKey(c.plotAs), `${c.key} → ${c.plotAs}`).not.toBeNull();
+    });
+
+    it('can plot every vehicle the filters leave, with the table’s own filter bar', () => {
+        expect(read('src/components/specchart/SpecChartSidebar.jsx')).toMatch(/<VehicleFilterBar/);
+        expect(chart).toMatch(/useFilteredVehicles\(/);
+        expect(app).toMatch(/filters=\{vehicleFilters\}\s+onFiltersChange=\{setVehicleFilters\}\s+chartConfig/);
+        expect(read('src/utils/chartUrlState.js')).toMatch(/chartConfig\.specScope === 'all'[\s\S]{0,160}encodeVehicleFilters\(vehicleFilters\)/);
+    });
+
+    it('keeps the old chart keys alive in saved links', () => {
+        expect(chart).toMatch(/currentFieldKey\(chartConfig\.specsField\)/);
+    });
+});
+
+describe('point requests are skipped for a test counted at zero (#497)', () => {
+    it('Charging Curves asks pointsKnownEmpty before it looks up a range test\'s points', () => {
+        expect(read('src/components/ChargingView.jsx')).toMatch(/pointsKnownEmpty\(/);
+    });
+
+    it('the shared loader (every view\'s point read) asks it before fetching', () => {
+        expect(read('src/utils/runPoints.js')).toMatch(/if \(pointsKnownEmpty\(run\)\)/);
+    });
+
+    it('Charging Curves skips the range-per-SoC lookup for a source with no points', () => {
+        expect(read('src/components/ChargingView.jsx')).toMatch(/!pointsKnownEmpty\(src\.sourceRun\)/);
+    });
+
+    it('a write that changes a run\'s points puts the new count back in state, on its copies too', () => {
+        const ctx = read('src/context/AppContext.jsx');
+        expect(ctx.match(/withPointCount\(/g)?.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('a run read without the count embed is "unknown" (null), not "none" (0)', () => {
+        expect(read('src/services/DataService.js')).toMatch(/\?\s*\(r\.data_points\[0\]\?\.count \?\? 0\) : null/);
+    });
+});
+
+describe('the three chart views load points in one batch, not one test at a time (#496)', () => {
+    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s reads through loadRunPoints and never awaits getRunData itself', (name) => {
+        const text = read(`src/components/${name}.jsx`);
+        expect(text).toMatch(/loadRunPoints\(dataService,/);
+        expect(text).not.toMatch(/dataService\.getRunData\(/);
+        expect(text).not.toMatch(/dataService\.buildRangePerSocLookup\(/);
+    });
+
+    it('the batch is getPointsForRuns (through the shared cache), which chunks its id list', () => {
+        expect(read('src/utils/runPoints.js')).toMatch(/dataService\.getPointsForRuns(Cached)?\(/);
+        expect(read('src/services/DataService.js')).toMatch(/POINTS_IDS_PER_REQUEST/);
+    });
+});
+
+describe('the shared points cache is read by the chart views and cleared by every write (#498)', () => {
+    const service = read('src/services/DataService.js');
+    // The text of one method, from its signature to the next method at the same indent.
+    const body = (name) => {
+        const start = service.search(new RegExp(`\\n  (async )?${name}\\(`));
+        expect(start, `${name} exists`).toBeGreaterThan(-1);
+        const rest = service.slice(start + 1);
+        const next = rest.slice(1).search(/\n {2}(async |get |#|static )?[A-Za-z#_]+\([^)]*\) \{/);
+        return rest.slice(0, next === -1 ? undefined : next + 1);
+    };
+
+    it('the shared loader reads through the cached methods only', () => {
+        const text = read('src/utils/runPoints.js');
+        expect(text).toMatch(/getPointsForRunsCached\(/);
+        expect(text).toMatch(/getRunDataCached\(/);
+        expect(text).not.toMatch(/dataService\.getRunData\(|dataService\.getPointsForRuns\(/);
+    });
+
+    it.each(['ChargingView', 'ChargeCompareView', 'RoadTripView'])('%s loads through the shared loader — and Home\'s panels render these views', (name) => {
+        expect(read(`src/components/${name}.jsx`)).toMatch(/loadRunPoints\(/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(new RegExp(`<${name}\\b`));
+    });
+
+    it.each(['addRun', 'replaceRunData', 'mergeRunData', 'writeCompositePoints', 'deleteRun', 'deleteVehicle', 'importTableauSessions', 'signOut', 'initialize'])(
+        '%s invalidates cached points', (name) => {
+            expect(body(name)).toMatch(/invalidateRunPoints\(/);
+        });
+
+    it('the writers that race a read invalidate on both sides of the write', () => {
+        for (const name of ['replaceRunData', 'mergeRunData', 'writeCompositePoints']) {
+            expect(body(name).match(/invalidateRunPoints\(/g)?.length, name).toBeGreaterThanOrEqual(2);
+        }
+    });
+
+    it('a fresh vehicle read reconciles the cache against the new counts', () => {
+        expect(body('getVehicles')).toMatch(/reconcileRunPoints\(/);
+    });
+
+    it('the callers that must see the table as it is NOW stay uncached', () => {
+        for (const name of ['duplicateRun', 'copyRunToVehicle', 'refreshChargeSummary', 'backfillChargeSummaries']) {
+            expect(body(name), name).not.toMatch(/Cached\(/);
+        }
+        expect(read('src/components/RunsView.jsx')).not.toMatch(/Cached\(/);
+        expect(body('rebuildComposites')).toMatch(/getPointsForRuns\(/);
+    });
+});
+
+/**
+ * ── The Colors field is in the toolbar; the run picker keeps one line ─────────
+ *
+ * The palette is a property of the plot, so its field sits in the chart's
+ * toolbar beside URL and PNG. The run picker keeps ColorSourceNote, which hints
+ * at vehicle colors and says when picks override the field. A view that put the
+ * select back into `colorControl` would show it twice or not at all.
+ */
+describe('the Colors field lives in the toolbar', () => {
+    const VIEWS = ['ChargingView', 'RangeChartView', 'ChargeCompareView', 'RoadTripView', 'EpaCurvesView'];
+
+    it.each(VIEWS)('%s draws SeriesPaletteSelect in exportControls and ColorSourceNote in the run picker', (f) => {
+        const text = read(`src/components/${f}.jsx`);
+        const toolbar = text.slice(text.indexOf('exportControls='));
+        expect(toolbar.indexOf('<SeriesPaletteSelect'), 'no Colors field in the toolbar').toBeGreaterThan(-1);
+        expect(toolbar.indexOf('<SeriesPaletteSelect')).toBeLessThan(toolbar.indexOf('<FeatureChartButton'));
+        expect(text).toMatch(/colorControl=\{<ColorSourceNote /);
+    });
+
+    it('charts open on the house palette', () => {
+        expect(read('src/utils/chartDefaults.js')).toMatch(/seriesPalette: DEFAULT_SERIES_PALETTE/);
+        expect(read('src/utils/colorUtils.js')).toMatch(/DEFAULT_SERIES_PALETTE = 'evbench'/);
     });
 });

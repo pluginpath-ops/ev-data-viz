@@ -19,8 +19,11 @@
  * database call — and is the reference the SQL is held to.
  *
  * Tests are the part that cannot be passed down. They belong to the deleted
- * vehicle (`runs`), and a variant reads them through `spec_links`, which go
- * when the run does. `deletionImpact` says so before the delete.
+ * vehicle (`runs`), and a variant reads them through `spec_links` or down its
+ * lineage (migration 086), both of which go when the run does. What IS passed
+ * down is the battery revision and capacity factor that decide which charging
+ * tests above reach the variant, and at what scale. `deletionImpact` says what
+ * stops showing before the delete.
  *
  * Pure module: no data access, no React.
  */
@@ -85,6 +88,16 @@ function passDownTo(variant, source) {
     // only those.
     if ((variant.tags ?? []).length === 0 && (source.tags ?? []).length > 0) next.tags = source.tags;
 
+    // Charging tests down the lineage (migration 086). A variant of a battery
+    // revision carries the revised pack, so re-pointed above it, it is a
+    // revision too; otherwise the two capacity factors multiply, and it reads
+    // the tests above at the same scale as before.
+    if (source.battery_revision || variant.battery_revision) {
+        next.battery_revision = true;
+    } else if (source.capacity_factor != null && Number(source.capacity_factor) !== 1) {
+        next.capacity_factor = Number(variant.capacity_factor ?? 1) * Number(source.capacity_factor);
+    }
+
     return next;
 }
 
@@ -138,7 +151,11 @@ export function deletionImpact(vehicles, ids) {
             .filter(v => v.id !== id && !going.has(v.id))
             .map(v => ({
                 vehicle: v,
-                count: (v.spec_links ?? []).filter(l => runIds.has(Number(l.source_run_id))).length,
+                // Through a link or down the lineage: one count per test.
+                count: new Set([
+                    ...(v.spec_links ?? []).map(l => Number(l.source_run_id)),
+                    ...(v.runs ?? []).filter(r => r._inherited).map(r => Number(r._realRunId)),
+                ].filter(id => runIds.has(id))).size,
             }))
             .filter(s => s.count > 0);
         if (variants.length > 0 || shownOn.length > 0) {

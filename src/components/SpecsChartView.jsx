@@ -1,17 +1,15 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import Chart from 'chart.js/auto';
-import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
-import { convValue, formatSpecValue } from '../utils/unitConversions';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
-import {
-    makeVehicleFields, buildFieldGroups, getFieldDef, extractValue,
-    detectMode, formatNumericLabel, vehicleColor,
-} from '../utils/specHelpers';
-import { fieldFigureSource } from '../utils/vehicleFigures';
+import { fieldFigureSource, epaCreditsForFields } from '../utils/vehicleFigures';
+import { axisTitle, betterNote, missingNote } from '../utils/specChart';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
+import { useSourceLine } from '../hooks/useSourceLine';
+import { buildVehicleLabels } from '../utils/seriesLabel';
+import FeatureChartButton from './home/FeatureChartButton';
 
 // ── Inside-bar label afterDraw plugin ─────────────────────────────────────────
 
@@ -49,119 +47,66 @@ function makeInsideLabelPlugin(getLabelFn) {
 
 // ── SpecsChartView ────────────────────────────────────────────────────────────
 
-export default function SpecsChartView({ vehicles, selectedField: controlledField = null, onFieldChange, presentationMode = false }) {
-    const { units } = useAppContext();
+/**
+ * One column of the vehicle table across the selected vehicles, as bars (#450).
+ *
+ * A numeric column draws bars with a length. A text or yes/no column has no
+ * length, so every vehicle gets the same bar with its value printed inside —
+ * the display the owner has not yet named (docs/vocabulary.md, Open names),
+ * called `text` here.
+ *
+ * The figures are the table's own: the container (SpecChart) hands over
+ * `plot` already worked out from the table's rows, in the reader's units.
+ *
+ * Props:
+ *   plot     {object}  plotValues() of the column: { kind, points, missing, total }
+ *   col      {object}  the table column, labelled
+ *   colorOf  {(vehicleId) => string}  the vehicle's series color
+ *   units    {string}
+ */
+export default function SpecsChartView({ plot, col, colorOf, units, scope = 'selection', presentationMode = false }) {
     const { isDark } = useTheme();
-
-    const vehicleFields = useMemo(() => makeVehicleFields(units), [units]);
-
-    const fieldGroups = useMemo(() => buildFieldGroups(vehicles, vehicleFields), [vehicles, vehicleFields]);
-    const allFields   = useMemo(() => fieldGroups.flatMap(g => g.fields), [fieldGroups]);
-
-    const [localField,   setLocalField]   = useState('');
-    const [copiedUrl,    setCopiedUrl]    = useState(false);
-    const selectedField = controlledField || localField;
-
-    const setSelectedField = (field) => {
-        setLocalField(field);
-        onFieldChange?.(field);
-    };
-
-    // Auto-select the first field that has any data across vehicles
-    useEffect(() => {
-        if (selectedField) return;
-        const first = allFields.find(f =>
-            vehicles.some(v => {
-                const val = extractValue(v, f.key);
-                return val !== null && val !== undefined && val !== '';
-            })
-        );
-        if (first) setSelectedField(first.key);
-    }, [allFields, vehicles, selectedField]);
-
+    const [copiedUrl, setCopiedUrl] = useState(false);
     const canvasRef = useRef(null);
     const chartRef  = useRef(null);
 
+    const plottedVehicles = useMemo(() => plot.points.map(p => p.row.vehicle), [plot]);
+
     useEffect(() => {
-        if (!selectedField || !canvasRef.current || !vehicles.length) return;
+        if (!canvasRef.current || !plot.points.length) return;
 
         // From the stylesheet, not retyped here — see utils/chartTheme.
-        const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
+        const { tick: tickColor, grid: gridColor } = chartTheme();
         const fonts = applyChartDefaults(Chart);
 
-        const fieldDef  = allFields.find(f => f.key === selectedField) || getFieldDef(selectedField, vehicleFields);
-        const mode      = detectMode(vehicles, selectedField, fieldDef);
-        const rawValues = vehicles.map(v => extractValue(v, selectedField));
-        const labels    = vehicles.map(v => v.name);
+        const names  = buildVehicleLabels(plottedVehicles);
+        const labels = plot.points.map(p => names.get(p.row.id)?.short ?? p.row.values.name);
+        const colors = plot.points.map(p => colorOf(p.row.id));
+        const numeric = plot.kind === 'numeric';
 
-        let barData, bgColors, insideLabelFn, valueAxisOptions;
+        // Battery and EPA range are resolved per vehicle, so two bars can be
+        // different kinds of figure (#323, #324). Said on the bar, which is
+        // what a PNG export keeps.
+        const sourceOf = (p) => fieldFigureSource(p.row.vehicle, col.key, units);
+        const insideLabels = plot.points.map(p => {
+            const source = numeric ? sourceOf(p) : null;
+            return source ? `${p.text} · ${source.basis}` : p.text;
+        });
 
-        if (mode === 'boolean') {
-            barData = rawValues.map(v =>
-                v === null || v === undefined || v === '' ? 0.08 :
-                v ? 1.0 : 0.25
-            );
-            bgColors = rawValues.map(v =>
-                v === null || v === undefined || v === '' ? '#d1d5db' :
-                v ? '#22c55e' : '#ef4444'
-            );
-            const insideLabels = rawValues.map(v =>
-                v === null || v === undefined || v === '' ? '—' : v ? 'Yes' : 'No'
-            );
-            insideLabelFn = i => insideLabels[i];
-            valueAxisOptions = { display: false, max: 1.15 };
-
-        } else if (mode === 'categorical') {
-            barData = rawValues.map(() => 1.0);
-            bgColors = vehicles.map((v, i) => vehicleColor(v, i));
-            const insideLabels = rawValues.map(v =>
-                v === null || v === undefined || v === '' ? '—' : String(v)
-            );
-            insideLabelFn = i => insideLabels[i];
-            valueAxisOptions = { display: false, max: 1.15 };
-
-        } else {
-            // numeric
-            barData = rawValues.map(v => {
-                if (v === null || v === undefined || v === '') return null;
-                const n = parseFloat(String(v));
-                return isNaN(n) ? null : convValue(n, fieldDef.unitGroup, units);
-            });
-            bgColors = rawValues.map((v, i) =>
-                (v === null || v === undefined || v === '') ? '#d1d5db' : vehicleColor(vehicles[i], i)
-            );
-            const insideLabels = barData.map((n, i) => {
-                if (n === null) return null;
-                const text = fieldDef.unitGroup
-                    ? formatSpecValue(rawValues[i], fieldDef.unitGroup, units)
-                    : formatNumericLabel(n);
-                // Battery and EPA range are resolved per vehicle, so two bars
-                // can be different kinds of figure (#323, #324). Said on the bar,
-                // which is what a PNG export keeps.
-                const source = fieldFigureSource(vehicles[i], selectedField, units);
-                return source ? `${text} · ${source.basis}` : text;
-            });
-            insideLabelFn = i => insideLabels[i];
-            valueAxisOptions = { display: true, beginAtZero: true, ticks: { color: tickColor }, grid: { color: gridColor } };
-        }
-
-        // Destroy previous instance
         if (chartRef.current) {
             chartRef.current.destroy();
             chartRef.current = null;
         }
-
-        const fieldLabel = allFields.find(f => f.key === selectedField)?.label || selectedField;
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'bar',
             data: {
                 labels,
                 datasets: [{
-                    label: fieldLabel,
-                    data: barData,
-                    backgroundColor: bgColors,
-                    borderRadius: 4,
+                    label: col.label,
+                    data: numeric ? plot.points.map(p => p.value) : plot.points.map(() => 1),
+                    backgroundColor: colors,
+                    borderRadius: 2,
                     borderSkipped: false,
                 }],
             },
@@ -175,83 +120,68 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                         displayColors: false,
                         callbacks: {
                             label: ctx => {
-                                const raw = rawValues[ctx.dataIndex];
-                                if (raw === null || raw === undefined || raw === '') return 'N/A';
-                                if (mode === 'boolean') return raw ? 'Yes' : 'No';
-                                const value = fieldDef.unitGroup ? formatSpecValue(raw, fieldDef.unitGroup, units) : String(raw);
-                                const source = fieldFigureSource(vehicles[ctx.dataIndex], selectedField, units);
-                                return source ? [value, source.line] : value;
+                                const p = plot.points[ctx.dataIndex];
+                                const source = sourceOf(p);
+                                const lines = [p.text];
+                                if (source) lines.push(source.line);
+                                else if (p.note) lines.push(p.note);
+                                return lines;
                             },
                         },
                     },
                 },
                 scales: {
-                    x: valueAxisOptions,
+                    x: numeric
+                        ? { display: true, beginAtZero: true, ticks: { color: tickColor }, grid: { color: gridColor } }
+                        : { display: false, max: 1.15 },
                     y: {
                         grid: { display: false },
                         ticks: { font: { size: fonts.axis }, color: tickColor },
                     },
                 },
             },
-            plugins: [makeInsideLabelPlugin(insideLabelFn)],
+            plugins: [makeInsideLabelPlugin(i => insideLabels[i])],
         });
 
         return () => {
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [selectedField, vehicles, allFields, units, isDark]);
+    }, [plot, col, colorOf, units, isDark, plottedVehicles]);
 
     // ── The frame's caption, and its export ─────────────────────────────────
     // The chart answered "which vehicle has the most of X" without ever saying
     // what X was: the field name lived in a <select> above the canvas, and the
     // export flattened the canvas alone, so a pasted image was a row of bars
     // with vehicle names and no measure.
-    const plotTitle = useMemo(
-        () => allFields.find(f => f.key === selectedField)?.label || 'Compare specs',
-        [allFields, selectedField],
-    );
+    const plotTitle = axisTitle(col, units);
 
-    const plotSubtitle = useMemo(() => {
-        const n = vehicles.length;
-        return [
-            `${n} vehicle${n === 1 ? '' : 's'}`,
-            units === 'metric' ? 'metric' : 'imperial',
-        ].join(' · ');
-    }, [vehicles, units]);
+    // Units, and which way is better where the column has a best. The vehicle
+    // count is visible on the chart (#443).
+    const plotSubtitle = [units === 'metric' ? 'metric' : 'imperial', betterNote(col)].filter(Boolean).join(' · ');
+
+    // Spec values are the manufacturer's; EPA is credited when the plotted
+    // column is an EPA-resolved figure.
+    const sourceEpa = useMemo(() => epaCreditsForFields(plottedVehicles, [col.key]), [plottedVehicles, col.key]);
+    const sourceLine = useSourceLine({ epa: sourceEpa });
 
     const { copyPng, copied: imageCopied, preview, dismissPreview } =
-        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle });
+        useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
+            signature: plot.points.map(p => p.row.id).join(',') });
+
+    const dropped = missingNote(plot.missing, plot.total, scope);
 
     return (
         <>
-        <div className="specs-chart-card mb-4">
-            <div className="specs-chart-controls">
-                <label className="text-sm font-medium text-secondary">Compare:</label>
-                <select
-                    className="form-input specs-chart-field-select"
-                    value={selectedField}
-                    onChange={e => setSelectedField(e.target.value)}
-                >
-                    {fieldGroups.map(group => (
-                        <optgroup key={group.groupLabel} label={group.groupLabel}>
-                            {group.fields.map(f => (
-                                <option key={f.key} value={f.key}>{f.label}</option>
-                            ))}
-                        </optgroup>
-                    ))}
-                </select>
-            </div>
-
-        </div>
-
         <PlotFrame
             title={plotTitle}
             subtitle={plotSubtitle}
+            sourceLine={sourceLine}
             preview={preview}
             onDismissPreview={dismissPreview}
             exportControls={!presentationMode && (
                 <>
+                    <FeatureChartButton />
                     <button
                         onClick={() => {
                             navigator.clipboard.writeText(window.location.href).then(() => {
@@ -262,7 +192,7 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                         className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
                         title="Copy link to this chart view"
                     >
-                        {copiedUrl ? '✓ Copied' : '🔗 URL'}
+                        {copiedUrl ? '✓ Copied' : 'URL'}
                     </button>
                     <button
                         onClick={copyPng}
@@ -274,10 +204,11 @@ export default function SpecsChartView({ vehicles, selectedField: controlledFiel
                 </>
             )}
         >
-            <div style={{ height: `${Math.max(220, vehicles.length * 52)}px`, position: 'relative' }}>
+            <div className="spec-chart-canvas" style={{ height: `${Math.max(220, plot.points.length * 52)}px` }}>
                 <canvas ref={canvasRef} />
             </div>
         </PlotFrame>
+        {dropped && <p className="text-note spec-chart-dropped">{dropped}</p>}
         {!presentationMode && <ChartInfoBubble chartKey="specs" />}
         </>
     );

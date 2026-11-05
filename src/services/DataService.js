@@ -4,17 +4,25 @@ import { fetchSiteSettings, updateCachedSetting, MODEL_CONSTANTS_KEY } from './s
 import { vehicleLabel } from '../utils/specHelpers';
 import { passDown } from '../utils/vehicleDeletion';
 import { roundTo, } from '../utils/unitConversions';
+import { wallClockTimestamp } from '../utils/parseElapsedTime';
 import { toSessionRow } from '../utils/testSessions';
 import { rankFeCandidates } from '../utils/feGuideMatch';
 import { demotionUpdates, acceptGuideTags, guideOverlay, isCuratorOwned } from '../utils/feGuidePromotion';
 import { selectTestForGuide } from '../utils/epaTestSelection';
 import { planTestVehicleImport, uniqueCoveredModels } from '../utils/epaImportMerge';
 import { planCertificationImport, guideLinkTarget, testGroupYear, isTestGroup, viewForVehicle, viewForTestVehicle, certifiedYears } from '../utils/epaCertifications';
-import { detectPopulatedFields, buildInheritedRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
+import { lineageChargingTests, testsFromLineage } from '../utils/lineageCharging';
+import { detectPopulatedFields, buildInheritedRunId, buildLineageRunId, isInheritedRunId, parseInheritedRunId, runKindFrom, applyDefaultRun, clearDefaultRuns, scaleInheritedMagnitudes } from '../utils/runUtils';
 import { summarizeChargeSession, isCurrentSummary } from '../utils/chargeWindows';
 import { planCompositeRebuild, compositeEligible, mayHaveComposite, storedComposites } from '../utils/compositeCurve';
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
+import { toChargerCurrent } from '../utils/chargerCurrentClass';
+import { rangePerSocLookup } from '../utils/runPoints';
+import { testFingerprint } from '../utils/epaTestVehicleIdentity';
+import { testedVia, guideTestedViaPool } from '../utils/guideTestedVia';
+import { configurationsFromTestedVia, planVehicleGuideLinks } from '../utils/vehicleGuideLinks';
+import { planBehindNoLabel, NO_LABEL_NOTE, isNoLabelSkip } from '../utils/epaBehindNoLabel';
 import { THUMB_MAX, THUMB_QUALITY, thumbPathFor, renderToJpegBlob, loadBitmapFromUrl } from '../utils/imageRenditions';
 
 const roundField = roundTo;
@@ -33,6 +41,20 @@ const roundField = roundTo;
  * the cap. Paging is for the reads that genuinely want every row.
  */
 const PAGE_SIZE = 1000;
+
+// RLS turns a delete by anyone but an admin into one that removes nothing.
+const ONLY_ADMINS_UNLINK = 'Nothing was unlinked — only an admin can unlink.';
+
+/** Test ids per data_points request: ~7 characters each, so a request stays far under any URL limit. */
+const POINTS_IDS_PER_REQUEST = 100;
+
+/**
+ * How many data points the shared points cache may hold (#498). The mirror's
+ * whole table is ~12,000 rows and a 16-vehicle selection ~2,000, so this keeps
+ * dozens of selections; at a few hundred bytes a row it is a few MB. Past it,
+ * the least recently read finished entries go first.
+ */
+const POINT_CACHE_MAX_ROWS = 60000;
 
 /**
  * Read every row a query matches, a page at a time.
@@ -93,7 +115,7 @@ function normalisePoint(point, runId, frame) {
   return {
     run_id:      runId,
     frame,
-    timestamp:   point.timestamp ?? null,
+    timestamp:   wallClockTimestamp(point.timestamp),  // timecodes are durations, not moments
     soc:         roundField(point.soc,         1),  // 0–100 %,   1 dp  e.g. 42.5
     charge_rate: roundField(point.chargeRate,  2),  // kW,        2 dp  e.g. 150.00
     time_value:  roundField(point.time,        1),  // min/s,     1 dp
@@ -143,6 +165,18 @@ function shapePoint(p, efficiencyFactor = 1, capacityFactor = 1) {
 }
 
 /**
+ * Each requested run's points, shaped and scaled by ITS factors, out of rows
+ * grouped by real run id — what getPointsForRuns and its cached twin share.
+ */
+function shapeRunPoints(runs, out, rowsByRunId) {
+  for (const r of runs) {
+    const rows = rowsByRunId.get(Number(r._realRunId ?? r.id)) ?? [];
+    out[r.id] = rows.map(p => shapePoint(p, r._efficiencyFactor ?? 1, r._capacityFactor ?? 1));
+  }
+  return out;
+}
+
+/**
  * A runs row as the app holds it. The one door every run comes through —
  * getVehicles, and a vehicle's runs re-read after its composites are rebuilt —
  * so the two can never shape a run differently.
@@ -166,8 +200,10 @@ function shapeRun(r) {
     isExcluded: r.is_excluded === undefined ? !!r.is_hidden : !!r.is_excluded,
     // A curator's "I have looked; count it" (migration 080, runListing).
     qualityOverride: !!r.quality_override,
-    // data_points(count) returns [{ count: N }]; normalise to a plain number
-    dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : 0,
+    // data_points(count) returns [{ count: N }]; normalise to a plain number.
+    // null when the select carried no embed at all: "not counted" is not "none",
+    // and utils/runPoints.js skips a fetch only for a counted 0.
+    dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : null,
   };
 }
 
@@ -189,19 +225,31 @@ function splitPerformance(performance = {}) {
 
 /**
  * Given a processed vehicle, a Map of runId→run, and a Map of runId→{vehicleId,vehicleName},
- * returns synthetic run objects for all runs inherited via spec_links.
+ * returns synthetic run objects for every run the vehicle inherits: through its
+ * spec_links, and down its lineage (`lineage`, from lineageChargingTests —
+ * migration 086).
+ *
+ * A link naming a test the lineage also provides is an OVERRIDE of that test,
+ * not a second copy: its factors win where set, and a null capacity factor
+ * defers to the lineage's. A lineage test with no link is read at the
+ * lineage's factor, with no color, DEF or notes of its own.
+ *
  * Each inherited run gets a synthetic string id to prevent runDataCache collisions.
  */
-function buildInheritedRuns(vehicle, runById, runToVehicle) {
+function buildInheritedRuns(vehicle, runById, runToVehicle, lineage = []) {
   const inherited = [];
+  const fromLineage = new Map(lineage.map(t => [Number(t.run.id), t]));
   for (const link of (vehicle.spec_links || [])) {
     const run = runById.get(Number(link.source_run_id));
     if (!run) continue;
     const vInfo = runToVehicle.get(Number(link.source_run_id));
+    const viaLineage = fromLineage.get(Number(run.id));
+    fromLineage.delete(Number(run.id));
     // Two independent knobs (migration 055). Null reads as 1 for both, so a
-    // link predating the split keeps exactly its old meaning.
+    // link predating the split keeps exactly its old meaning — or, for a test
+    // the lineage provides, as the lineage's capacity factor.
     const eff = link.efficiency_factor != null ? Number(link.efficiency_factor) : 1;
-    const cap = link.capacity_factor   != null ? Number(link.capacity_factor)   : 1;
+    const cap = link.capacity_factor   != null ? Number(link.capacity_factor)   : (viaLineage?.capacityFactor ?? 1);
     inherited.push({
       ...run,
       // Synthetic id prevents runDataCache collision when both source and
@@ -212,6 +260,7 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       _efficiencyFactor:  eff,
       _capacityFactor:    cap,
       _specLinkId:        link.id,
+      _viaLineage:        !!viaLineage,
       _sourceVehicleId:   vInfo?.vehicleId,
       _sourceVehicleName: vInfo?.vehicleName,
       // The link's own color still overrides, and is a separate stored value
@@ -226,6 +275,25 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
       ...scaleInheritedMagnitudes(run, cap, eff),
     });
   }
+  for (const { run, capacityFactor, source } of fromLineage.values()) {
+    inherited.push({
+      ...run,
+      id:                 buildLineageRunId(vehicle.id, run.id),
+      _inherited:         true,
+      _realRunId:         run.id,
+      _efficiencyFactor:  1,
+      _capacityFactor:    capacityFactor,
+      _specLinkId:        null,
+      _viaLineage:        true,
+      _sourceVehicleId:   source.id,
+      _sourceVehicleName: vehicleLabel(source),
+      color:              RETIRED_RUN_COLOR,
+      // The source's DEF is the source's: a variant's default is its own
+      // composite unless a curator marks one (which writes an override link).
+      isDefault:          false,
+      ...scaleInheritedMagnitudes(run, capacityFactor, 1),
+    });
+  }
   return inherited;
 }
 
@@ -235,7 +303,34 @@ function buildInheritedRuns(vehicle, runById, runToVehicle) {
  * curves group by. One list, so every reader of a certification's Guide row
  * reads the same row.
  */
-const GUIDE_VIEW_FIELDS = 'id, model_year, smog_test_group, division, carline, carline_class, drive_desc, label_comb_range_mi, label_city_range_mi, label_hwy_range_mi, label_comb_mpge, label_city_mpge, label_hwy_mpge, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, calc_approach, total_voltage_v, batt_specific_energy_wh_kg, nominal_pack_kwh, adjustment_signature';
+ /** A certification membership as guideTestedViaPool reads it (EPA Label, 095; layer 4). */
+const TESTED_VIA_MEMBER = `id, test_vehicle_id, carryover_test_group, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note,
+  certification:epa_certifications!inner(test_group),
+  test_vehicle:epa_test_vehicles(epa_carline_name,
+    epa_tests(test_number, procedure_code, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc),
+    epa_covered_models(carline_name))`;
+
+function testedViaMember(r) {
+  return {
+    membershipId: r.id,
+    test_group: r.certification?.test_group ?? null,
+    test_vehicle_id: r.test_vehicle_id,
+    carryover_test_group: r.carryover_test_group,
+    fe_guide_row_id: r.fe_guide_row_id ?? null,
+    fe_guide_skipped_at: r.fe_guide_skipped_at ?? null,
+    fe_guide_skip_note: r.fe_guide_skip_note ?? null,
+    epa_carline_name: r.test_vehicle?.epa_carline_name ?? null,
+    tests: r.test_vehicle?.epa_tests ?? [],
+    covered_models: (r.test_vehicle?.epa_covered_models ?? []).map(c => c.carline_name),
+  };
+}
+
+// `model_type_desc` is the maker's own description of the model type, read
+// out of the stored CSV row. EPA's carline column can be the same for two
+// different cars — Audi's 2027 Q6 e-tron quattro and its Sportback both read
+// "Q6 e-tron quattro" — and only this says "Q6 e-tron SB quattro 20in".
+const GUIDE_MODEL_TYPE_DESC = 'model_type_desc:raw->>"Model Type Desc (MFR entered)"';
+const GUIDE_VIEW_FIELDS = `id, model_year, smog_test_group, division, carline, carline_class, drive_desc, label_comb_range_mi, label_city_range_mi, label_hwy_range_mi, label_comb_mpge, label_city_mpge, label_hwy_mpge, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, calc_approach, total_voltage_v, batt_specific_energy_wh_kg, nominal_pack_kwh, adjustment_signature, ${GUIDE_MODEL_TYPE_DESC}`;
 
 /**
  * A test vehicle's certifications (migration 082), each with its Guide row —
@@ -255,7 +350,7 @@ const CERTIFICATIONS_EMBED = `certifications:epa_certification_test_vehicles(id,
  * Guide candidate check derive from. Shared with the link sweep, so a
  * suggestion is checked against exactly what the EPA tab will read.
  */
-const EPA_LAB_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
+const EPA_LAB_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, mfr_test_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
 
 const EPA_TEST_VEHICLE_FIELDS = `${EPA_LAB_FIELDS}, ${CERTIFICATIONS_EMBED}`;
 
@@ -266,6 +361,11 @@ class DataService {
     this.useSupabase = false;
     // Whether migration 072's platform columns exist; set by getPlatforms().
     this.platformsAvailable = false;
+    // Whether migration 086's battery_revision / capacity_factor exist; set by getVehicles().
+    this.batteryRevisionAvailable = false;
+    // The shared points cache (#498): see getPointsForRunsCached.
+    this.pointCache = new Map();
+    this.pointCacheRows = 0;
   }
 
   get isAdmin()       { return this.role === 'admin'; }
@@ -280,6 +380,9 @@ class DataService {
     // Always use Supabase for reads when credentials are configured,
     // so unauthenticated visitors can see public vehicles.
     this.useSupabase = true;
+    // Who is asking decides which rows a read can see (RLS): never carry one
+    // identity's points into another's session.
+    this.invalidateRunPoints();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       this.user = user;
@@ -362,6 +465,14 @@ class DataService {
       };
     });
 
+    // Migration 086 is applied when the rows carry its column: `*` brings it
+    // back once it exists, and updateVehicle writes it only then.
+    this.batteryRevisionAvailable = (data || []).some(v => 'battery_revision' in v);
+
+    // The runs were just counted fresh: any cached points that disagree with
+    // the count are from before someone else's change.
+    this.reconcileRunPoints(processed.flatMap(v => v.runs));
+
     // Pass 2: build flat run lookup maps, then attach inherited runs.
     // buildInheritedRuns needs to locate source runs across all vehicles.
     const runById      = new Map(); // runId → run object
@@ -373,9 +484,13 @@ class DataService {
       }
     }
 
+    // Charging tests also come down the lineage (migration 086). Read from
+    // `processed`, whose runs are still each vehicle's OWN: a source's
+    // inherited tests are reached by walking further up, at the right factor.
+    const byId = new Map(processed.map(v => [v.id, v]));
     return processed.map(v => ({
       ...v,
-      runs: [...v.runs, ...buildInheritedRuns(v, runById, runToVehicle)],
+      runs: [...v.runs, ...buildInheritedRuns(v, runById, runToVehicle, lineageChargingTests(v, byId))],
     }));
   }
 
@@ -454,11 +569,19 @@ class DataService {
     return data;
   }
 
-  async updateManufacturer(id, { name, country }) {
-    const { error } = await getSupabase()
-      .from('manufacturers')
-      .update({ name, country: country || null })
-      .eq('id', id);
+  // Written on PRESENCE: a save that sends only `color` must not null the
+  // country, which this used to do to every field it was not handed. The
+  // brand registry's parent_name was never reaching the table at all.
+  // `color` needs migration 091; an update that does not carry it works
+  // without.
+  async updateManufacturer(id, updates) {
+    const row = {};
+    if ('name' in updates) row.name = updates.name;
+    if ('country' in updates) row.country = updates.country || null;
+    if ('parent_name' in updates) row.parent_name = updates.parent_name || null;
+    if ('color' in updates) row.color = updates.color || null;
+    if (Object.keys(row).length === 0) return;
+    const { error } = await getSupabase().from('manufacturers').update(row).eq('id', id);
     if (error) throw error;
   }
 
@@ -669,6 +792,86 @@ class DataService {
     return data;
   }
 
+  // ── Featured comparisons (#448) ───────────────────────────────────────────
+
+  /**
+   * Every featured comparison the reader may see: the listed ones, and for a
+   * curator the unlisted too (the RLS policy decides, migration 089), newest
+   * listed first. Raw rows; utils/featuredComparisons.js normalizes them.
+   *
+   * Resilient like getChartHelp: Home is the landing page, so a missing table
+   * (089 not yet applied) is an empty list and a console note, not a broken
+   * first screen.
+   */
+  async getFeaturedComparisons() {
+    if (!this.useSupabase) return [];
+    const { data, error } = await getSupabase()
+      .from('featured_comparisons')
+      .select('*')
+      .order('listed_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205') {
+        console.warn('featured_comparisons unavailable — is migration 089 applied?', error.message);
+        return [];
+      }
+      throw error;
+    }
+    return data || [];
+  }
+
+  /**
+   * Create a featured comparison. `fields` is { slug, title, blurb, vehicle_ids,
+   * charts, is_listed }. Returns the saved row, so the caller holds what the
+   * database stored (the slug it accepted, the listed_at it stamped).
+   */
+  async addFeaturedComparison(fields) {
+    const { data, error } = await getSupabase()
+      .from('featured_comparisons')
+      .insert({ ...fields, created_by: this.user?.id ?? null, updated_by: this.user?.id ?? null })
+      .select()
+      .single();
+    if (error) {
+      if (error.code === '23505') throw new Error(`There is already a featured comparison with the link name "${fields.slug}".`);
+      throw error;
+    }
+    return data;
+  }
+
+  /**
+   * Change a featured comparison. Reads the row back and raises on 0 rows: RLS
+   * does not refuse a filtered UPDATE, it matches nothing and PostgREST answers
+   * 204, which is how every vehicle save looked like it worked until 087.
+   */
+  async updateFeaturedComparison(id, fields) {
+    const { data, error } = await getSupabase()
+      .from('featured_comparisons')
+      .update({ ...fields, updated_at: new Date().toISOString(), updated_by: this.user?.id ?? null })
+      .eq('id', id)
+      .select();
+    if (error) {
+      if (error.code === '23505') throw new Error(`There is already a featured comparison with the link name "${fields.slug}".`);
+      throw error;
+    }
+    if (!data?.length) {
+      throw new Error('The featured comparison was not saved: it no longer exists, or your role does not allow editing it (is migration 089 applied?).');
+    }
+    return data[0];
+  }
+
+  /** Delete one (admin only, by policy). Raises on 0 rows, as the update does. */
+  async deleteFeaturedComparison(id) {
+    const { data, error } = await getSupabase()
+      .from('featured_comparisons')
+      .delete()
+      .eq('id', id)
+      .select('id');
+    if (error) throw error;
+    if (!data?.length) {
+      throw new Error('The featured comparison was not deleted: it no longer exists, or only an admin may delete one.');
+    }
+  }
+
   // ── Spec links ────────────────────────────────────────────────────────────
 
   async addSpecLink({ targetVehicleId, sourceRunId, efficiencyFactor, capacityFactor, notes }) {
@@ -727,19 +930,7 @@ class DataService {
    * fewer than two usable SoC+range point pairs.
    */
   async buildRangePerSocLookup(rangeTestRunId) {
-    const data = await this.getRunData(rangeTestRunId);
-    const pts = data
-      .filter(p => p.soc != null && p.range != null)
-      .sort((a, b) => a.soc - b.soc);
-    if (pts.length < 2) return null;
-    return (soc) => {
-      if (soc <= pts[0].soc)              return pts[0].range;
-      if (soc >= pts[pts.length - 1].soc) return pts[pts.length - 1].range;
-      const hi = pts.findIndex(p => p.soc >= soc);
-      const lo = hi - 1;
-      const t = (soc - pts[lo].soc) / (pts[hi].soc - pts[lo].soc);
-      return Math.round((pts[lo].range + t * (pts[hi].range - pts[lo].range)) * 10) / 10;
-    };
+    return rangePerSocLookup(await this.getRunDataCached(rangeTestRunId));
   }
 
   async deleteSpecLink(id) {
@@ -796,9 +987,7 @@ class DataService {
     ]);
 
     const patch = { image_url: fullResult, image_thumb_url: thumbResult, image_focal_y: null };
-    const { error: updateError } = await getSupabase()
-      .from('vehicles').update(patch).eq('id', vehicleId);
-    if (updateError) throw updateError;
+    await this.#updateVehicleRow(vehicleId, patch);
     return patch;
   }
 
@@ -822,6 +1011,28 @@ class DataService {
     if (error) throw error;
     const { data } = getSupabase().storage.from('vehicle-images').getPublicUrl(path);
     return `${data.publicUrl}?v=${Date.now()}`;
+  }
+
+  /**
+   * Write a patch to one vehicle row, and fail loudly if no row took it.
+   *
+   * Row-level security does not refuse an UPDATE it disallows. It filters the
+   * row out, and PostgREST answers 204 as if the write landed. For years the
+   * vehicles policies admitted only the `is_owner` account (made in the
+   * dashboard, never the role check 001_rbac meant), so every contributor's
+   * Edit vehicle save "succeeded" and changed nothing. Reading the row back is
+   * how a refusal becomes an error. The 42501 code routes it through the
+   * app's access-attempt log the same way a real RLS violation would be.
+   */
+  async #updateVehicleRow(vehicleId, patch) {
+    const { data, error } = await getSupabase()
+      .from('vehicles').update(patch).eq('id', vehicleId).select('id');
+    if (error) throw error;
+    if (!data?.length) {
+      const refused = new Error('the change was not saved: this account may not edit this vehicle, or it no longer exists.');
+      refused.code = '42501';
+      throw refused;
+    }
   }
 
   /**
@@ -861,9 +1072,7 @@ class DataService {
         const thumbUrl = await this.#putVehicleImageObject(
           thumbPathFor(`${vehicle.id}.jpg`), thumb,
         );
-        const { error: updateError } = await getSupabase()
-          .from('vehicles').update({ image_thumb_url: thumbUrl }).eq('id', vehicle.id);
-        if (updateError) throw updateError;
+        await this.#updateVehicleRow(vehicle.id, { image_thumb_url: thumbUrl });
         updated++;
       } catch (err) {
         failures.push({ id: vehicle.id, name: vehicle.name, error: err.message });
@@ -898,7 +1107,10 @@ class DataService {
       // and naming one there would refuse the whole insert.
       ...(this.platformsAvailable && vehicle.mechanical_platform_id ? { mechanical_platform_id: Number(vehicle.mechanical_platform_id) } : {}),
       ...(this.platformsAvailable && vehicle.electrical_platform_id ? { electrical_platform_id: Number(vehicle.electrical_platform_id) } : {}),
-      visibility: 'private'
+      // Unlisted unless the caller says otherwise. Only the bulk import does:
+      // its rows are curated records meant to be seen, and a hand-made vehicle
+      // stays unlisted until its creator lists it.
+      visibility: vehicle.visibility === 'public' ? 'public' : 'private'
     }).select().single();
     if (error) throw error;
     return { ...data, runs: [] };
@@ -939,6 +1151,20 @@ class DataService {
     // `|| null` is what lets the picker's Auto hand the vehicle back to the
     // palette rather than storing an empty string.
     set('color', updates.color !== undefined ? (updates.color || null) : undefined);
+    // The source pointer, here since "Inherit from" moved to the vehicle form.
+    // An id, or empty for none; the picker leaves out the vehicle's own
+    // variants, so it cannot make a cycle.
+    set('spec_source_vehicle_id', updates.spec_source_vehicle_id !== undefined
+        ? (updates.spec_source_vehicle_id ? Number(updates.spec_source_vehicle_id) : null)
+        : undefined);
+    // Battery revision and capacity factor (migration 086), only once the
+    // columns exist: naming one that does not would refuse the whole save.
+    if (this.batteryRevisionAvailable) {
+      set('battery_revision', updates.battery_revision !== undefined ? !!updates.battery_revision : undefined);
+      set('capacity_factor', updates.capacity_factor !== undefined
+        ? (Number(updates.capacity_factor) > 0 ? Number(updates.capacity_factor) : 1)
+        : undefined);
+    }
     // The two platform links (#318): an id, or empty for "none". Only where
     // migration 072 is applied: the form always sends them, and naming a
     // column that does not exist would refuse the whole save.
@@ -956,8 +1182,7 @@ class DataService {
             ? null : Math.round(Number(updates.image_focal_y)))
         : undefined);
 
-    const { error } = await getSupabase().from('vehicles').update(patch).eq('id', vehicleId);
-    if (error) throw error;
+    await this.#updateVehicleRow(vehicleId, patch);
   }
 
   async updateVehicleSpecs(vehicleId, specs, specSourceVehicleId = undefined) {
@@ -980,22 +1205,14 @@ class DataService {
     if (specSourceVehicleId !== undefined) {
       update.spec_source_vehicle_id = specSourceVehicleId ? Number(specSourceVehicleId) : null;
     }
-    const { error } = await getSupabase()
-      .from('vehicles')
-      .update(update)
-      .eq('id', vehicleId);
-    if (error) throw error;
+    await this.#updateVehicleRow(vehicleId, update);
   }
 
   async updateVehicleSortOrders(sortUpdates) {
     // sortUpdates: [{ id, sort_order }, ...]
     if (!this.useSupabase || !this.user) return; // no-op in localStorage mode
     for (const { id, sort_order } of sortUpdates) {
-      const { error } = await getSupabase()
-        .from('vehicles')
-        .update({ sort_order })
-        .eq('id', id);
-      if (error) throw error;
+      await this.#updateVehicleRow(id, { sort_order });
     }
   }
 
@@ -1023,8 +1240,11 @@ class DataService {
    * the name gets " (variant)" so the new card is findable. Everything a reader
    * sees beyond that comes from the source at read time — specs through
    * `spec_source_vehicle_id`, color, photo and tags through the same pointer
-   * (vehicleInheritance.js), and tests through one spec link per run in
-   * `links` (variantLinkPlan). Color stays null on purpose: null inherits.
+   * (vehicleInheritance.js), charging tests down the same pointer
+   * (lineageCharging.js, migration 086), and the rest — range tests, and any
+   * test the source reads through a link of its own — through one spec link
+   * per run in `links` (variantLinkPlan). Color stays null on purpose: null
+   * inherits.
    *
    * Not atomic: a failure part-way leaves the vehicle with fewer links, which
    * the Tests & Data link list shows and can finish. The vehicle row is written
@@ -1095,6 +1315,8 @@ class DataService {
       return;
     }
     const { error } = await getSupabase().rpc('delete_vehicle_passing_down', { p_vehicle_id: vehicleId });
+    // Its runs go (or pass down to variants) with it: not worth working out which.
+    this.invalidateRunPoints();
     if (error) {
       // PGRST202: the function is not there yet. Falling back to a plain delete
       // would orphan the vehicle's variants, which is what the function exists
@@ -1126,7 +1348,7 @@ class DataService {
       return v != null && v !== '' ? Number(v) : null;
     };
     const { data: newRun, error } = await getSupabase().from('runs').insert({
-      vehicle_id: vehicleId, name: run.name, date: run.date,
+      vehicle_id: vehicleId, name: run.name, date: run.date || null,
       software_version: coalesce(run.softwareVersion,   run.software_version)  || null,
       conditions: run.conditions || null,
       is_default: coalesce(run.isDefault,  run.is_default)  || false,
@@ -1152,6 +1374,9 @@ class DataService {
       // The same rule for the charger's class (migration 076).
       ...(toChargerClass(run.chargerVoltageClass ?? run.charger_voltage_class) != null
         ? { charger_voltage_class: toChargerClass(run.chargerVoltageClass ?? run.charger_voltage_class) } : {}),
+      // And for its current class (migration 092).
+      ...(toChargerCurrent(run.chargerCurrentClass ?? run.charger_current_class_a) != null
+        ? { charger_current_class_a: toChargerCurrent(run.chargerCurrentClass ?? run.charger_current_class_a) } : {}),
     }).select().single();
     if (error) throw error;
     if (run.data?.length > 0) {
@@ -1165,6 +1390,7 @@ class DataService {
         const { error: batchError } = await getSupabase().from('data_points').insert(batch);
         if (batchError) throw batchError;
       }
+      this.invalidateRunPoints(newRun.id);
 
       const fieldsUpdate = {};
       if (populatedFields.length > 0)           fieldsUpdate.populated_fields  = populatedFields;
@@ -1238,30 +1464,48 @@ class DataService {
 
   /**
    * A vehicle's runs straight from the database, shaped as getVehicles shapes
-   * them — its own, then those it inherits through spec links, built by the
-   * same buildInheritedRuns so their ids and factors match what is on screen.
+   * them — its own, then those it inherits through spec links and down its
+   * lineage, built by the same buildInheritedRuns so their ids and factors
+   * match what is on screen.
+   *
+   * `lineage` is chargingLineage(vehicle, fleet) — the sources and the factor
+   * each is read at — worked out by the caller, who holds the fleet. The
+   * sources' charging tests are re-read here, since this runs straight after
+   * a write to one of them.
    */
-  async getVehicleRuns(vehicleId) {
+  async getVehicleRuns(vehicleId, lineage = []) {
     const sb = getSupabase();
-    const [own, links] = await Promise.all([
+    const sourceVehicleIds = lineage.map(e => e.source.id);
+    const [own, links, fromSources] = await Promise.all([
       sb.from('runs').select('*, data_points(count)').eq('vehicle_id', vehicleId),
       sb.from('spec_links').select('*').eq('target_vehicle_id', vehicleId),
+      sourceVehicleIds.length
+        ? sb.from('runs').select('*, data_points(count)').in('vehicle_id', sourceVehicleIds).eq('kind', 'charging')
+        : Promise.resolve({ data: [] }),
     ]);
     if (own.error) throw own.error;
     if (links.error) throw links.error;
+    if (fromSources.error) throw fromSources.error;
     const runs = (own.data ?? []).map(shapeRun);
-    const sourceIds = (links.data ?? []).map(l => Number(l.source_run_id));
-    if (!sourceIds.length) return runs;
+    const sourceRuns = (fromSources.data ?? []).map(shapeRun);
+    const lineageTests = testsFromLineage(lineage, (source) => sourceRuns.filter(r => r.vehicle_id === source.id));
 
-    const { data: sources, error } = await sb.from('runs')
-      .select('*, data_points(count), vehicles(name, year, trim)').in('id', sourceIds);
-    if (error) throw error;
     const runById = new Map(), runToVehicle = new Map();
-    for (const { vehicles: sv, ...r } of sources ?? []) {
-      runById.set(Number(r.id), shapeRun(r));
-      runToVehicle.set(Number(r.id), { vehicleId: r.vehicle_id, vehicleName: vehicleLabel(sv) });
+    for (const { run, source } of lineageTests) {
+      runById.set(Number(run.id), run);
+      runToVehicle.set(Number(run.id), { vehicleId: source.id, vehicleName: vehicleLabel(source) });
     }
-    return [...runs, ...buildInheritedRuns({ spec_links: links.data }, runById, runToVehicle)];
+    const missing = (links.data ?? []).map(l => Number(l.source_run_id)).filter(id => !runById.has(id));
+    if (missing.length) {
+      const { data: sources, error } = await sb.from('runs')
+        .select('*, data_points(count), vehicles(name, year, trim)').in('id', missing);
+      if (error) throw error;
+      for (const { vehicles: sv, ...r } of sources ?? []) {
+        runById.set(Number(r.id), shapeRun(r));
+        runToVehicle.set(Number(r.id), { vehicleId: r.vehicle_id, vehicleName: vehicleLabel(sv) });
+      }
+    }
+    return [...runs, ...buildInheritedRuns({ id: vehicleId, spec_links: links.data }, runById, runToVehicle, lineageTests)];
   }
 
   /**
@@ -1275,10 +1519,13 @@ class DataService {
    *
    * Each composite is rebuilt IN PLACE where one of its class exists
    * (planCompositeRebuild), so its id, DEF tag and pairings survive.
+   *
+   * `lineage` is chargingLineage(vehicle, fleet): where its inherited charging
+   * tests come from (see getVehicleRuns).
    */
-  async rebuildComposites(vehicle) {
+  async rebuildComposites(vehicle, lineage = []) {
     if (!this.useSupabase || !this.isContributor || !vehicle) return null;
-    const runs = await this.getVehicleRuns(vehicle.id);
+    const runs = await this.getVehicleRuns(vehicle.id, lineage);
     const withRuns = { ...vehicle, runs };
     if (!mayHaveComposite(withRuns) && !storedComposites(withRuns).length) return runs;
 
@@ -1320,7 +1567,7 @@ class DataService {
         throw new Error(`${deletes.length - (gone?.length ?? 0)} obsolete composite curve(s) could not be deleted — is migration 077 applied?`);
       }
     }
-    return this.getVehicleRuns(vehicle.id);
+    return this.getVehicleRuns(vehicle.id, lineage);
   }
 
   /**
@@ -1330,6 +1577,7 @@ class DataService {
    */
   async writeCompositePoints(runId, points) {
     const sb = getSupabase();
+    this.invalidateRunPoints(runId);
     const { error: delError } = await sb.from('data_points').delete().eq('run_id', runId);
     if (delError) throw delError;
     const rows = points.map((p, frame) => ({
@@ -1343,6 +1591,7 @@ class DataService {
       const { error } = await sb.from('data_points').insert(rows.slice(i, i + 1000));
       if (error) throw error;
     }
+    this.invalidateRunPoints(runId);
   }
 
   async updateRun(vehicleId, runId, updates) {
@@ -1356,7 +1605,7 @@ class DataService {
       return;
     }
     const { error } = await getSupabase().from('runs').update({
-      name: updates.name, date: updates.date,
+      name: updates.name, date: updates.date || null,
       software_version: updates.softwareVersion, conditions: updates.conditions,
       ...(updates.calculated_fields !== undefined ? { calculated_fields: updates.calculated_fields } : {}),
       ...(updates.kind !== undefined ? { kind: updates.kind } : {}),
@@ -1379,6 +1628,7 @@ class DataService {
       ...(updates.qualityOverride !== undefined ? { quality_override: updates.qualityOverride } : {}),
       ...(updates.preconditioned !== undefined ? { preconditioned: toPreconditioned(updates.preconditioned) } : {}),
       ...(updates.chargerVoltageClass !== undefined ? { charger_voltage_class: toChargerClass(updates.chargerVoltageClass) } : {}),
+      ...(updates.chargerCurrentClass !== undefined ? { charger_current_class_a: toChargerCurrent(updates.chargerCurrentClass) } : {}),
     }).eq('id', runId);
     if (error) throw error;
   }
@@ -1473,6 +1723,7 @@ class DataService {
       return;
     }
     const { error } = await getSupabase().from('runs').delete().eq('id', runId);
+    this.invalidateRunPoints(runId);
     if (error) throw error;
   }
 
@@ -1619,35 +1870,154 @@ class DataService {
     const out = Object.fromEntries(runs.map(r => [r.id, []]));
     const realIds = [...new Set(runs.map(r => Number(r._realRunId ?? r.id)))];
     if (!realIds.length) return out;
-    const data = await fetchAllRows(() => getSupabase()
+    return shapeRunPoints(runs, out, await this.#fetchPointRows(realIds));
+  }
+
+  /** Raw data_points rows for real run ids, grouped by run_id: chunked, paged, ordered. */
+  async #fetchPointRows(realIds) {
+    // Chunked so the id list never outgrows a URL (a Home page or a long
+    // selection can name hundreds); a run's rows all come from one chunk, so
+    // each run's own order is the query's. Chunks go side by side.
+    const chunks = [];
+    for (let i = 0; i < realIds.length; i += POINTS_IDS_PER_REQUEST) chunks.push(realIds.slice(i, i + POINTS_IDS_PER_REQUEST));
+    const data = (await Promise.all(chunks.map(ids => fetchAllRows(() => getSupabase()
       .from('data_points')
       .select('*')
-      .in('run_id', realIds)
+      .in('run_id', ids)
       .order('run_id', { ascending: true })
       .order('frame', { ascending: true })
-      .order('id', { ascending: true }));
+      .order('id', { ascending: true }))))).flat();
     const rowsByRunId = new Map();
     for (const p of data || []) {
       if (!rowsByRunId.has(p.run_id)) rowsByRunId.set(p.run_id, []);
       rowsByRunId.get(p.run_id).push(p);
     }
-    for (const r of runs) {
-      const rows = rowsByRunId.get(Number(r._realRunId ?? r.id)) ?? [];
-      out[r.id] = rows.map(p => shapePoint(p, r._efficiencyFactor ?? 1, r._capacityFactor ?? 1));
+    return rowsByRunId;
+  }
+
+  // ── The shared points cache (#498) ─────────────────────────────────────────
+  //
+  // What the chart views and Home panels read points through. Keyed by REAL run
+  // id and holding the raw rows (or the promise of them, so two readers asking
+  // at once share one request): an own test, an inherited test of the same run
+  // and a range lookup of it are one entry, and every reader applies its own
+  // efficiency/capacity factors on the way out — shapePoint makes new objects,
+  // so the cached rows are never handed out to be changed.
+  //
+  // It is deliberately NOT under getRunData / getPointsForRuns. Those stay
+  // uncached for the callers that must see the table as it is NOW: the edit
+  // table, CSV export, duplicate and copy, the charge-summary backfill, and
+  // the composite rebuild, which reads tests this very session may have just
+  // rewritten.
+  //
+  // WHEN AN ENTRY GOES (a stale chart is worse than a slow one):
+  //   invalidateRunPoints(runId)   after every write that changes a run's
+  //                                points: addRun, replaceRunData, mergeRunData,
+  //                                writeCompositePoints (so every composite
+  //                                rebuild), deleteRun; once before the write
+  //                                and once after, so a read racing it cannot
+  //                                keep the old rows
+  //   invalidateRunPoints()        everything: deleteVehicle (its runs pass
+  //                                down), a Tableau import, initialize and
+  //                                signOut (a new identity sees different rows)
+  //   a failed read                its entry is dropped, so the next ask retries
+  //   getVehicles()                an entry whose length disagrees with the
+  //                                run's fresh dataPointCount is dropped — what
+  //                                catches a change made in another session
+  //   POINT_CACHE_MAX_ROWS         least recently read finished entries first
+  // A run being unlisted or excluded changes the run row, not its points, so it
+  // is not here: the views choose which runs to ask for, the cache holds rows.
+
+  /** The raw rows of each real run id, from cache or one batched request; Map of id → Promise. */
+  #cachedRows(realIds) {
+    const out = new Map();
+    const missing = [];
+    for (const id of new Set(realIds)) {
+      const hit = this.pointCache.get(id);
+      if (hit) {
+        // Re-insert: Map order is read order, so the front is the stalest.
+        this.pointCache.delete(id);
+        this.pointCache.set(id, hit);
+        out.set(id, hit.rows);
+      } else {
+        missing.push(id);
+      }
+    }
+    if (missing.length) {
+      const batch = this.#fetchPointRows(missing);
+      for (const id of missing) {
+        const entry = { rows: batch.then(m => m.get(id) ?? []), size: null };
+        this.pointCache.set(id, entry);
+        out.set(id, entry.rows);
+        entry.rows.then(rows => {
+          // Dropped (invalidated) while it was in flight: do not count it.
+          if (this.pointCache.get(id) !== entry) return;
+          entry.size = rows.length;
+          this.pointCacheRows += rows.length;
+          this.#trimPointCache();
+        }, () => { if (this.pointCache.get(id) === entry) this.pointCache.delete(id); });
+      }
     }
     return out;
   }
 
-  async toggleVehicleVisibility(vehicleId, newVisibility) {
-    const { data, error } = await getSupabase()
-      .from('vehicles')
-      .update({ visibility: newVisibility })
-      .eq('id', vehicleId)
-      .select('id');
-    if (error) throw error;
-    if (!data || data.length === 0) {
-      throw new Error('Update blocked — vehicle may have no owner assigned. Run the SQL fix in Supabase.');
+  #trimPointCache() {
+    for (const [id, entry] of this.pointCache) {
+      if (this.pointCacheRows <= POINT_CACHE_MAX_ROWS || this.pointCache.size <= 1) return;
+      if (entry.size == null) continue;   // still loading: someone is waiting on it
+      this.pointCache.delete(id);
+      this.pointCacheRows -= entry.size;
     }
+  }
+
+  /**
+   * Drop one run's cached points (by real run id), or all of them. Safe to call
+   * for an id that is not cached.
+   */
+  invalidateRunPoints(runId) {
+    if (runId === undefined) {
+      this.pointCache.clear();
+      this.pointCacheRows = 0;
+      return;
+    }
+    const entry = this.pointCache.get(Number(runId));
+    if (!entry) return;
+    this.pointCache.delete(Number(runId));
+    if (entry.size != null) this.pointCacheRows -= entry.size;
+  }
+
+  /** Drop cached points that no longer match what a fresh runs read says is there. */
+  reconcileRunPoints(runs) {
+    for (const r of runs) {
+      const entry = this.pointCache.get(Number(r.id));
+      if (entry?.size != null && r.dataPointCount != null && entry.size !== r.dataPointCount) {
+        this.invalidateRunPoints(r.id);
+      }
+    }
+  }
+
+  /** getRunData, through the shared cache. Same answer; for the chart views. */
+  async getRunDataCached(runId, efficiencyFactor = 1, capacityFactor = 1) {
+    const actualId = isInheritedRunId(runId) ? parseInheritedRunId(runId).realRunId : runId;
+    // An id that is not a run number cannot be cached by it: the plain read.
+    if (!Number.isFinite(Number(actualId))) return this.getRunData(runId, efficiencyFactor, capacityFactor);
+    const rows = await this.#cachedRows([Number(actualId)]).get(Number(actualId));
+    return rows.map(p => shapePoint(p, efficiencyFactor, capacityFactor));
+  }
+
+  /** getPointsForRuns, through the shared cache. Same answer; for the chart views. */
+  async getPointsForRunsCached(runs) {
+    const out = Object.fromEntries(runs.map(r => [r.id, []]));
+    const realIds = [...new Set(runs.map(r => Number(r._realRunId ?? r.id)))];
+    if (!realIds.length) return out;
+    const pending = this.#cachedRows(realIds);
+    const rowsByRunId = new Map();
+    await Promise.all([...pending].map(async ([id, rows]) => rowsByRunId.set(id, await rows)));
+    return shapeRunPoints(runs, out, rowsByRunId);
+  }
+
+  async toggleVehicleVisibility(vehicleId, newVisibility) {
+    await this.#updateVehicleRow(vehicleId, { visibility: newVisibility });
   }
 
   // ── Site settings ────────────────────────────────────────────────────────
@@ -1796,6 +2166,7 @@ class DataService {
       results.runsImported++;
       results.pointsImported += session.dataPoints.length;
     }
+    this.invalidateRunPoints();
     return results;
   }
 
@@ -1826,12 +2197,14 @@ class DataService {
       temperature: roundField(p.temperature, 1),
     }));
 
+    this.invalidateRunPoints(runId);
     const { data, error } = await getSupabase()
       .rpc('merge_run_data_points', {
         p_run_id:   runId,
         p_join_key: joinKey,
         p_rows:     rows,
       });
+    this.invalidateRunPoints(runId);
     if (error) throw error;
 
     // After a successful merge, union any newly-populated fields into populated_fields
@@ -1855,7 +2228,13 @@ class DataService {
     // session is re-read: the merged rows alone are only part of it.
     result.chargeSummary = await this.refreshChargeSummary(runId);
 
-    return result; // { updated: N, inserted: M, populatedFields?: [...], chargeSummary }
+    // The run's point count after the merge, for the caller to put back in
+    // state: charts skip the points request for a test counted at 0 (#497).
+    const { count } = await getSupabase()
+      .from('data_points').select('id', { count: 'exact', head: true }).eq('run_id', runId);
+    if (count != null) result.rowCount = count;
+
+    return result; // { updated: N, inserted: M, rowCount?: N, populatedFields?: [...], chargeSummary }
   }
 
   /**
@@ -1880,8 +2259,10 @@ class DataService {
       range_value: roundField(p.range,       1),
       temperature: roundField(p.temperature, 1),
     }));
+    this.invalidateRunPoints(runId);
     const { error } = await getSupabase()
       .rpc('replace_run_data_points', { p_run_id: runId, p_rows: rows });
+    this.invalidateRunPoints(runId);
     if (error) throw error;
 
     const populatedFields = detectPopulatedFields(points);
@@ -1902,6 +2283,7 @@ class DataService {
     this.user = null;
     this.role = null;
     this.useSupabase = false;
+    this.invalidateRunPoints();
   }
 
   // ── Admin RPCs ────────────────────────────────────────────────────────────
@@ -2089,7 +2471,7 @@ class DataService {
     if (error) throw error;
   }
 
-  // ── EPA Test Groups ───────────────────────────────────────────────────────
+  // ── EPA test vehicles ───────────────────────────────────────────────────────
 
   /**
    * Search epa_test_vehicles for the vehicle-linking combobox.
@@ -2150,6 +2532,8 @@ class DataService {
     return (data || [])
       .filter(t => certifiedYears(t).some(y => years.includes(y))
         || (!t.certifications?.length && years.includes(Number(t.model_year))))
+      // Behind no EPA Label (layer 4): no car anyone bought, so never a suggestion.
+      .filter(t => !(t.certifications ?? []).some(isNoLabelSkip))
       .map(t => viewForVehicle(span, t));
   }
 
@@ -2202,11 +2586,13 @@ class DataService {
    */
   async unlinkEpaTestVehicle(mappingId) {
     if (!this.useSupabase) return;
-    const { error } = await getSupabase()
+    const { data, error } = await getSupabase()
       .from('epa_vehicle_mappings')
       .delete()
-      .eq('id', mappingId);
+      .eq('id', mappingId)
+      .select('id');
     if (error) throw error;
+    if (!data?.length) throw new Error(ONLY_ADMINS_UNLINK);
   }
 
   /**
@@ -2222,6 +2608,23 @@ class DataService {
    */
   async bulkUpsertEpaTestVehicles(rows) {
     if (!this.useSupabase || !rows.length) return;
+
+    // 0. A Vehicle ID the CSI import already stored suffixed, as
+    //    `<ID>-<config>` because its PDF listed several configurations, is
+    //    that record: writing the bare ID made a second one with no tests
+    //    (21 pairs, merged by migration 093).
+    const twinOf = (r) => (r.vehicle_config_number != null ? `${r.test_vehicle_id}-${r.vehicle_config_number}` : null);
+    const probe = [...new Set(rows.flatMap(r => [r.test_vehicle_id, twinOf(r)]).filter(Boolean))];
+    const stored = new Set();
+    for (let i = 0; i < probe.length; i += 100) {
+      const { data, error } = await getSupabase().from('epa_test_vehicles')
+        .select('test_vehicle_id').in('test_vehicle_id', probe.slice(i, i + 100));
+      if (error) throw error;
+      for (const r of data || []) stored.add(r.test_vehicle_id);
+    }
+    rows = rows.map(r => (!stored.has(r.test_vehicle_id) && stored.has(twinOf(r))
+      ? { ...r, test_vehicle_id: twinOf(r) }
+      : r));
 
     // 1. Test vehicle rows — strip private helpers.
     const testVehicleRows = rows.map(({ _coefficientSet, _hasCoeffs, _hasMpge, ...g }) => g);
@@ -2330,6 +2733,473 @@ class DataService {
       found.push(...(data || []).map(r => r.test_vehicle_id));
     }
     return found;
+  }
+
+  /**
+   * What the database already holds for these parsed test vehicles, in the
+   * shape resolveTestVehicleIds (utils/epaTestVehicleIdentity) reads: which
+   * record each of their test numbers is stored under, which record each test's
+   * fingerprint is stored under (a renumbered test), and the carline and test
+   * weight of any record their keys already name.
+   *
+   * Fingerprints are fetched by test date — a date narrows a corpus of ~1,600
+   * tests to a handful — and compared here, so the rule lives in one place.
+   */
+  async getEpaTestVehicleIdentity(testVehicles) {
+    const out = { byTestNumber: {}, byFingerprint: {}, records: {} };
+    if (!this.useSupabase || !testVehicles?.length) return out;
+    const tests = testVehicles.flatMap(tv => tv.tests ?? []);
+    const numbers = [...new Set(tests.map(t => t.test_number).filter(Boolean))];
+    const dates = [...new Set(tests.filter(t => testFingerprint(t)).map(t => t.test_date))];
+    // The bare Vehicle ID of a suffixed key too: the Test Car List record
+    // of that configuration (testCarListTwin).
+    const keys = [...new Set(testVehicles.flatMap(tv => [tv.test_vehicle_id, /^(.+)[-/]\d+$/.exec(tv.test_vehicle_id)?.[1]]).filter(Boolean))];
+    const chunks = (xs) => Array.from({ length: Math.ceil(xs.length / 100) }, (_, i) => xs.slice(i * 100, i * 100 + 100));
+    const TEST_COLS = 'test_vehicle_id, test_number, procedure_code, test_date, cd_range_combined_calc, ac_recharge_kwh';
+
+    for (const c of chunks(numbers)) {
+      const { data, error } = await getSupabase().from('epa_tests').select(TEST_COLS).in('test_number', c);
+      if (error) throw error;
+      for (const r of data || []) out.byTestNumber[r.test_number] ??= r.test_vehicle_id;
+    }
+    for (const c of chunks(dates)) {
+      const { data, error } = await getSupabase().from('epa_tests').select(TEST_COLS).in('test_date', c);
+      if (error) throw error;
+      for (const r of data || []) {
+        const fp = testFingerprint(r);
+        if (fp) out.byFingerprint[fp] ??= r.test_vehicle_id;
+      }
+    }
+    for (const c of chunks(keys)) {
+      const { data, error } = await getSupabase().from('epa_test_vehicles')
+        .select('test_vehicle_id, epa_carline_name, vehicle_config_number, epa_coefficient_sets(equiv_test_weight_lbs), epa_tests(count)')
+        .in('test_vehicle_id', c);
+      if (error) throw error;
+      for (const r of data || []) {
+        out.records[r.test_vehicle_id] = {
+          epa_carline_name: r.epa_carline_name,
+          equiv_test_weight_lbs: (r.epa_coefficient_sets ?? []).find(cs => cs.equiv_test_weight_lbs != null)?.equiv_test_weight_lbs ?? null,
+          vehicle_config_number: r.vehicle_config_number,
+          has_tests: (r.epa_tests?.[0]?.count ?? 0) > 0,
+        };
+      }
+    }
+    return out;
+  }
+
+  // ── A vehicle's EPA Label (migration 095) ────────────────────────────────────
+  //
+  // A vehicle links to the Guide rows that are the car; its EPA test vehicles
+  // come through each row's Tested via (utils/vehicleGuideLinks.js).
+
+  /**
+   * Every certification membership in these Test Groups' families, in the
+   * shape guideTestedViaPool reads: the row's Test Group, its carryover
+   * origins, and any membership whose carryover names one of them.
+   */
+  async getTestedViaMembers(testGroups) {
+    const groups = [...new Set((testGroups ?? []).filter(Boolean))];
+    if (!this.useSupabase || !groups.length) return [];
+    // Paged: the move reads every vehicle's families at once, and a capped
+    // read would judge a row against part of its pool.
+    const fetch = (filter) => fetchAllRows(() =>
+      filter(getSupabase().from('epa_certification_test_vehicles').select(TESTED_VIA_MEMBER)).order('id', { ascending: true }));
+    const byGroup = (gs) => fetch(q => q.in('certification.test_group', gs));
+    const byCarryover = (gs) => fetch(q => q.in('carryover_test_group', gs));
+
+    const first = [...await byGroup(groups), ...await byCarryover(groups)];
+    const origins = [...new Set(first.map(r => r.carryover_test_group).filter(g => g && !groups.includes(g)))];
+    const rows = origins.length ? [...first, ...await byGroup(origins), ...await byCarryover(origins)] : first;
+
+    const seen = new Set();
+    return rows.flatMap(r => {
+      const key = `${r.certification?.test_group}|${r.test_vehicle_id}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [testedViaMember(r)];
+    });
+  }
+
+  /**
+   * Tested via for each Guide row, with the ids of the pool it was judged
+   * against (configurationStanding needs both).
+   * @returns {Object<number, { via, poolIds: Set<string> }>}
+   */
+  async getGuideRowsTestedVia(guideRows) {
+    const rows = (guideRows ?? []).filter(Boolean);
+    const members = await this.getTestedViaMembers(rows.map(r => r.smog_test_group));
+    return Object.fromEntries(rows.map(r => {
+      const pool = guideTestedViaPool(r.smog_test_group, members);
+      return [r.id, { via: testedVia(r, pool), pool, poolIds: new Set(pool.map(m => m.test_vehicle_id)) }];
+    }));
+  }
+
+  /**
+   * Every Guide row of these certifications (by smog Test Group), with the
+   * same fields as a linked row — what "behind another EPA Label" is judged
+   * against (configurationStanding's `others`).
+   */
+  async getGuideRowsOfTestGroups(testGroups) {
+    const groups = [...new Set((testGroups ?? []).filter(Boolean))];
+    const out = [];
+    for (let i = 0; i < groups.length; i += 100) {
+      const { data, error } = await getSupabase().from('epa_fe_guide')
+        .select(`${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`)
+        .in('smog_test_group', groups.slice(i, i + 100));
+      if (error) throw error;
+      out.push(...(data || []));
+    }
+    return out;
+  }
+
+  /**
+   * Everything the Guide-row link sweep judges (utils/guideRowSweep.js):
+   * every Guide row with its kWh/100mi lines, and every certification
+   * membership with its tests. Both paged — the sweep judges each row against
+   * its whole pool, and a capped read would judge it against part of one.
+   */
+  async getGuideRowSweep() {
+    if (!this.useSupabase) return { rows: [], members: [] };
+    const [rows, members] = await Promise.all([
+      fetchAllRows(() => getSupabase().from('epa_fe_guide')
+        .select(`${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`)
+        .order('id', { ascending: true })),
+      fetchAllRows(() => getSupabase().from('epa_certification_test_vehicles')
+        .select(TESTED_VIA_MEMBER.replace('epa_certifications!inner(test_group)', 'epa_certifications!inner(test_group, model_year)'))
+        .order('id', { ascending: true })),
+    ]);
+    return {
+      rows,
+      members: members.map(r => ({ ...testedViaMember(r), model_year: r.certification?.model_year ?? null })),
+    };
+  }
+
+  /**
+   * A vehicle's Guide rows, each with its Tested via, and `others`: the
+   * other rows of the same certifications with theirs. Null when migration
+   * 095 is not applied, so the section can say so instead of showing nothing.
+   *
+   * @returns {{ rows: Array<{ linkId, rowId, guide, via, poolIds }>, others: Array<{ rowId, guide, via }> } | null}
+   */
+  async getVehicleGuideRows(vehicleId) {
+    if (!this.useSupabase || vehicleId == null) return [];
+    const { data, error } = await getSupabase()
+      .from('vehicle_guide_rows')
+      .select(`id, fe_guide_row_id, guide:epa_fe_guide(${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi)`)
+      .eq('vehicle_id', vehicleId)
+      .order('id', { ascending: true });
+    if (error) {
+      if (isMissingRelation(error) || error.code === 'PGRST205') return null;
+      throw error;
+    }
+    const links = (data || []).filter(l => l.guide);
+    if (!links.length) return { rows: [], others: [] };
+    const linkedIds = new Set(links.map(l => l.fe_guide_row_id));
+    const siblings = (await this.getGuideRowsOfTestGroups(links.map(l => l.guide.smog_test_group)))
+      .filter(g => !linkedIds.has(g.id));
+    const judged = await this.getGuideRowsTestedVia([...links.map(l => l.guide), ...siblings]);
+    return {
+      rows: links.map(l => ({ linkId: l.id, rowId: l.fe_guide_row_id, guide: l.guide, ...judged[l.fe_guide_row_id] })),
+      others: siblings.map(g => ({ rowId: g.id, guide: g, via: judged[g.id]?.via })),
+    };
+  }
+
+  /** Guide rows ranked for a vehicle, as the test vehicle picker ranks them. */
+  async getVehicleGuideCandidates(vehicle) {
+    if (!this.useSupabase || !vehicle) return [];
+    const rows = await fetchAllRows(() => getSupabase()
+      .from('epa_fe_guide')
+      .select(`${GUIDE_VIEW_FIELDS}, motor_count, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`)
+      .order('id', { ascending: true }));
+    return rankFeCandidates({
+      make: vehicle.make,
+      model_year: String(vehicle.year ?? '').match(/\d{4}/)?.[0] ?? null,
+      epa_carline_name: [vehicle.model, vehicle.trim].filter(Boolean).join(' ') || vehicle.name,
+    }, rows);
+  }
+
+  /**
+   * Link a vehicle to a Guide row, and the test vehicles its Tested via names.
+   *
+   * A configuration the vehicle already links is left as it is. The row's
+   * primary member (a blend's nearest) becomes the vehicle's primary only when
+   * the vehicle has none — 067's trigger makes a first link primary, so it is
+   * inserted first.
+   *
+   * @returns {{ linked: string[], kept: string[] }}
+   */
+  async linkVehicleGuideRow(vehicleId, guideRow, via) {
+    if (!this.useSupabase) return { linked: [], kept: [] };
+    const sb = getSupabase();
+    const { error } = await sb.from('vehicle_guide_rows')
+      .upsert({ vehicle_id: vehicleId, fe_guide_row_id: guideRow.id }, { onConflict: 'vehicle_id,fe_guide_row_id', ignoreDuplicates: true });
+    if (error) throw error;
+
+    const { data: existing, error: readErr } = await sb.from('epa_vehicle_mappings')
+      .select('id, test_vehicle_id, is_primary').eq('vehicle_id', vehicleId);
+    if (readErr) throw readErr;
+    const have = new Set((existing || []).map(m => m.test_vehicle_id));
+    const hasPrimary = (existing || []).some(m => m.is_primary);
+
+    const out = { linked: [], kept: [] };
+    for (const c of configurationsFromTestedVia(via)) {
+      if (have.has(c.test_vehicle_id)) { out.kept.push(c.test_vehicle_id); continue; }
+      const { error: insErr } = await sb.from('epa_vehicle_mappings').insert({
+        vehicle_id: vehicleId, test_vehicle_id: c.test_vehicle_id, confidence: c.confidence,
+        via_guide_row_id: guideRow.id, is_primary: c.primary && !hasPrimary,
+      });
+      if (insErr) throw insErr;
+      out.linked.push(c.test_vehicle_id);
+    }
+    return out;
+  }
+
+  /**
+   * Unlink a vehicle's Guide row and the configurations it brought; one linked
+   * by hand stays, and so does one another linked row names (`keepFor`: test
+   * vehicle id → that row), which is that row's from then on. Admin, like
+   * unlinking a configuration: RLS turns anyone else's delete into a no-op,
+   * which is reported rather than passed off as done.
+   *
+   * @param {Object<string, number>} [keepFor]
+   */
+  async unlinkVehicleGuideRow(vehicleId, guideRowId, keepFor = {}) {
+    if (!this.useSupabase) return;
+    const sb = getSupabase();
+    const { data: brought, error: readErr } = await sb.from('epa_vehicle_mappings')
+      .select('id, test_vehicle_id')
+      .eq('vehicle_id', vehicleId).eq('via_guide_row_id', guideRowId);
+    if (readErr) throw readErr;
+    const drop = [];
+    for (const m of brought || []) {
+      const other = keepFor[m.test_vehicle_id];
+      if (other == null) { drop.push(m.id); continue; }
+      const { error } = await sb.from('epa_vehicle_mappings').update({ via_guide_row_id: other }).eq('id', m.id);
+      if (error) throw error;
+    }
+    if (drop.length) {
+      const { data, error } = await sb.from('epa_vehicle_mappings').delete().in('id', drop).select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error(ONLY_ADMINS_UNLINK);
+    }
+    const { data, error } = await sb.from('vehicle_guide_rows')
+      .delete().eq('vehicle_id', vehicleId).eq('fe_guide_row_id', guideRowId).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error(ONLY_ADMINS_UNLINK);
+  }
+
+  /**
+   * The one-time move to vehicle → Guide row links, for every vehicle with a
+   * configuration (Admin → Data Checks). Reads only; applyVehicleGuideLinkPlan
+   * writes.
+   *
+   * @returns {Array<{ vehicle: { id, name, year }, plan, rows: Object }>} one
+   *   entry per vehicle whose plan changes something or leaves a
+   *   configuration unconfirmed
+   */
+  async planVehicleGuideLinks() {
+    if (!this.useSupabase) return [];
+    const sb = getSupabase();
+    const mappings = await fetchAllRows(() => sb.from('epa_vehicle_mappings')
+      .select(`id, vehicle_id, test_vehicle_id, is_primary, vehicles(id, name, year, model),
+        test_vehicle:epa_test_vehicles(test_vehicle_id, epa_tests(test_number, procedure_code, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc))`)
+      .order('id', { ascending: true }));
+    const ids = [...new Set(mappings.map(m => m.test_vehicle_id))];
+    const certLinks = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await sb.from('epa_certification_test_vehicles')
+        .select('test_vehicle_id, fe_guide_row_id').in('test_vehicle_id', ids.slice(i, i + 100)).not('fe_guide_row_id', 'is', null);
+      if (error) throw error;
+      certLinks.push(...(data || []));
+    }
+    const guideRowsOf = {};
+    for (const l of certLinks) (guideRowsOf[l.test_vehicle_id] ??= []).push(l.fe_guide_row_id);
+
+    // The rows the certifications point at, and every other row of the same
+    // certifications — what a configuration not named by its vehicle's rows
+    // may stand behind instead ("elsewhere").
+    const rowIds = [...new Set(certLinks.map(l => l.fe_guide_row_id))];
+    const pointed = [];
+    for (let i = 0; i < rowIds.length; i += 100) {
+      const { data, error } = await sb.from('epa_fe_guide')
+        .select('id, smog_test_group').in('id', rowIds.slice(i, i + 100));
+      if (error) throw error;
+      pointed.push(...(data || []));
+    }
+    const guideRows = await this.getGuideRowsOfTestGroups(pointed.map(g => g.smog_test_group));
+    const missing = rowIds.filter(id => !guideRows.some(g => g.id === id));
+    for (let i = 0; i < missing.length; i += 100) {
+      const { data, error } = await sb.from('epa_fe_guide')
+        .select(`${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`).in('id', missing.slice(i, i + 100));
+      if (error) throw error;
+      guideRows.push(...(data || []));
+    }
+    const judged = await this.getGuideRowsTestedVia(guideRows);
+    const guideById = Object.fromEntries(guideRows.map(g => [g.id, g]));
+    const rows = Object.fromEntries(Object.entries(judged).map(([id, j]) => [id, { ...j, guide: guideById[id] }]));
+    const others = Object.entries(rows).map(([id, r]) => ({ rowId: Number(id), via: r.via }));
+
+    const linked = await fetchAllRows(() => sb.from('vehicle_guide_rows').select('vehicle_id, fe_guide_row_id').order('id', { ascending: true }));
+    const byVehicle = new Map();
+    for (const m of mappings) {
+      if (!byVehicle.has(m.vehicle_id)) byVehicle.set(m.vehicle_id, { vehicle: m.vehicles, mappings: [] });
+      byVehicle.get(m.vehicle_id).mappings.push({ ...m, testVehicle: m.test_vehicle });
+    }
+    return [...byVehicle.entries()].map(([vehicleId, { vehicle, mappings: ms }]) => ({
+      vehicle,
+      plan: planVehicleGuideLinks({
+        mappings: ms, guideRowsOf, rows, others, vehicle,
+        linkedRowIds: linked.filter(l => l.vehicle_id === vehicleId).map(l => l.fe_guide_row_id),
+      }),
+      rows,
+    }));
+  }
+
+  /**
+   * Write what planVehicleGuideLinks proposed. One vehicle at a time and never
+   * throwing for one: a failure is reported with everything that worked, as
+   * linkFeGuideRows does.
+   */
+  async applyVehicleGuideLinkPlan(entries) {
+    const result = { rows: 0, dropped: 0, added: 0, primaries: 0, failures: [] };
+    if (!this.useSupabase) return result;
+    const sb = getSupabase();
+    for (const { vehicle, plan } of entries) {
+      try {
+        if (plan.linkRows.length) {
+          const { error } = await sb.from('vehicle_guide_rows').upsert(
+            plan.linkRows.map(id => ({ vehicle_id: vehicle.id, fe_guide_row_id: Number(id) })),
+            { onConflict: 'vehicle_id,fe_guide_row_id', ignoreDuplicates: true });
+          if (error) throw error;
+          result.rows += plan.linkRows.length;
+        }
+        if (plan.drop.length) {
+          const { error } = await sb.from('epa_vehicle_mappings').delete().in('id', plan.drop.map(d => d.mappingId));
+          if (error) throw error;
+          result.dropped += plan.drop.length;
+        }
+        for (const a of plan.add) {
+          const { error } = await sb.from('epa_vehicle_mappings').insert({
+            vehicle_id: vehicle.id, test_vehicle_id: a.test_vehicle_id, confidence: a.confidence,
+            via_guide_row_id: Number(a.rowId),
+          });
+          if (error) throw error;
+          result.added += 1;
+        }
+        if (plan.primary) {
+          const { error } = await sb.from('epa_vehicle_mappings').update({ is_primary: true })
+            .eq('vehicle_id', vehicle.id).eq('test_vehicle_id', plan.primary);
+          if (error) throw error;
+          result.primaries += 1;
+        }
+      } catch (error) {
+        result.failures.push({ vehicle: vehicle.name, message: error.message });
+      }
+    }
+    return result;
+  }
+
+  // ── EPA test vehicles behind no EPA Label (layer 4) ──────────────────────────
+
+  /**
+   * Which test vehicles stand behind no Guide row of a certification whose
+   * rows are all reproduced by others (utils/epaBehindNoLabel.js), and what
+   * marking them changes. Reads everything: every membership with its tests,
+   * every Guide row with figures. Admin → Data Checks only.
+   *
+   * @returns {{ plan, names: Object<string, string> }}  names: test_vehicle_id → its carline
+   */
+  async planBehindNoLabel() {
+    if (!this.useSupabase) return { plan: planBehindNoLabel([]), names: {} };
+    const sb = getSupabase();
+    const members = (await fetchAllRows(() => sb.from('epa_certification_test_vehicles')
+      .select(TESTED_VIA_MEMBER).order('id', { ascending: true }))).map(testedViaMember);
+    const guide = (await fetchAllRows(() => sb.from('epa_fe_guide')
+      .select(`${GUIDE_VIEW_FIELDS}, unadj_city_kwh_100mi, unadj_hwy_kwh_100mi`)
+      .order('id', { ascending: true })))
+      .filter(g => g.smog_test_group && (g.unadj_city_kwh_100mi != null || g.unadj_city_mpge != null));
+
+    const rowsByTv = new Map();
+    for (const g of guide) {
+      const pool = guideTestedViaPool(g.smog_test_group, members);
+      if (!pool.length) continue;
+      const entry = { guide: g, via: testedVia(g, pool), pool };
+      for (const m of pool) {
+        if (!rowsByTv.has(m.test_vehicle_id)) rowsByTv.set(m.test_vehicle_id, []);
+        rowsByTv.get(m.test_vehicle_id).push(entry);
+      }
+    }
+
+    const byTv = new Map();
+    for (const m of members) {
+      if (!byTv.has(m.test_vehicle_id)) byTv.set(m.test_vehicle_id, { test_vehicle_id: m.test_vehicle_id, tests: m.tests, carline: m.epa_carline_name, memberships: [], mappings: [] });
+      byTv.get(m.test_vehicle_id).memberships.push({
+        id: m.membershipId, test_group: m.test_group, fe_guide_row_id: m.fe_guide_row_id,
+        fe_guide_skipped_at: m.fe_guide_skipped_at, fe_guide_skip_note: m.fe_guide_skip_note,
+      });
+    }
+    const mappings = await fetchAllRows(() => sb.from('epa_vehicle_mappings')
+      .select('id, test_vehicle_id, is_primary, vehicles(id, name, year)').order('id', { ascending: true }));
+    for (const m of mappings) byTv.get(m.test_vehicle_id)?.mappings.push({ id: m.id, vehicle: m.vehicles, isPrimary: m.is_primary });
+
+    const tvs = [...byTv.values()];
+    const names = Object.fromEntries(tvs.map(t => [t.test_vehicle_id, t.carline ?? '']));
+    const plan = planBehindNoLabel(tvs, id => rowsByTv.get(id) ?? []);
+
+    // Vehicles the pass leaves with no configuration at all, for the preview
+    // to say so: the owner's rule is to remove a bad one even when it is the
+    // last (2026-11-01), but a curator should see which before applying.
+    const removed = new Set(plan.mark.flatMap(m => m.unlink.map(u => u.id)));
+    const left = new Map();
+    for (const m of mappings) {
+      if (!removed.has(m.id)) left.set(m.vehicles?.id, (left.get(m.vehicles?.id) ?? 0) + 1);
+    }
+    const leftBare = [...new Set(plan.mark.flatMap(m => m.unlink.map(u => u.vehicle?.id)))]
+      .filter(id => id != null && !left.has(id));
+    return { plan, names, leftBare };
+  }
+
+  /**
+   * Write what planBehindNoLabel proposed: clear each wrong Guide link (as
+   * unlinkFeGuideRow does, so what the link promoted is demoted), skip the
+   * memberships with NO_LABEL_NOTE, remove the vehicle links, and lift this
+   * mark where a row now names the test vehicle. Never a curator's own skip.
+   */
+  async applyBehindNoLabel(plan) {
+    const result = { cleared: 0, skipped: 0, unlinked: 0, unmarked: 0, failures: [] };
+    if (!this.useSupabase) return result;
+    const sb = getSupabase();
+    for (const m of plan.mark) {
+      try {
+        for (const linkRowId of m.clearLinks) {
+          await this.unlinkFeGuideRow(m.test_vehicle_id, { linkRowId });
+          result.cleared += 1;
+        }
+        if (m.skip) {
+          const { data, error } = await sb.from('epa_certification_test_vehicles')
+            .update({ fe_guide_skipped_at: new Date().toISOString(), fe_guide_skip_note: NO_LABEL_NOTE })
+            .eq('test_vehicle_id', m.test_vehicle_id).is('fe_guide_row_id', null).is('fe_guide_skipped_at', null)
+            .select('id');
+          if (error) throw error;
+          if (data?.length) result.skipped += 1;
+        }
+        if (m.unlink.length) {
+          const { error } = await sb.from('epa_vehicle_mappings').delete().in('id', m.unlink.map(u => u.id));
+          if (error) throw error;
+          result.unlinked += m.unlink.length;
+        }
+      } catch (error) {
+        result.failures.push({ test_vehicle_id: m.test_vehicle_id, message: error.message });
+      }
+    }
+    for (const id of plan.unmark) {
+      const { error } = await sb.from('epa_certification_test_vehicles')
+        .update({ fe_guide_skipped_at: null, fe_guide_skip_note: null })
+        .eq('test_vehicle_id', id).eq('fe_guide_skip_note', NO_LABEL_NOTE);
+      if (error) result.failures.push({ test_vehicle_id: id, message: error.message });
+      else result.unmarked += 1;
+    }
+    return result;
   }
 
   // ── EPA Certifications (#374, migration 082) ─────────────────────────────────
@@ -2549,7 +3419,7 @@ class DataService {
    * @param {Object} testVehicle  Output element of parseEpaCsiText().testVehicles
    * @returns {Promise<{kept: Array, guarded: Array, spared: number}>} curator-held values the PDF
    *   disagreed with, identity fields an older certification was stopped from
-   *   overwriting (#374), and rows another file supplied that this one does not list
+   *   overwriting (#374), and how many stored rows this file does not list (all kept)
    */
   async importEpaTestVehicleFull(testVehicle) {
     if (!this.useSupabase) return { kept: [], guarded: [], spared: 0 };
@@ -2580,10 +3450,11 @@ class DataService {
       .upsert({ test_vehicle_id: tgid, ...plan.testVehicle.payload, overrides: plan.testVehicle.overrides },
               { onConflict: 'test_vehicle_id', ignoreDuplicates: false }));
 
-    // 2. Coefficient sets — remove, then update in place, then insert (the
-    //    one-primary-per-test-vehicle index is checked per statement).
+    // 2. Coefficient sets — update in place, then insert (the
+    //    one-primary-per-test-vehicle index is checked per statement). Nothing
+    //    is removed here or below: another certification's file may list what
+    //    this one does not (see planTestVehicleImport).
     const cp = plan.coefficients;
-    if (cp.remove.length) check(await supabase.from('epa_coefficient_sets').delete().in('id', cp.remove));
     for (const u of cp.update) {
       check(await supabase.from('epa_coefficient_sets')
         .update({ ...u.payload, overrides: u.overrides }).eq('id', u.id));
@@ -2610,10 +3481,11 @@ class DataService {
     }
 
     // 3. Tests + phases.
-    //    `mfr_test_vehicle_comments` arrives in migration 059. Retry without it
-    //    rather than failing a whole import over a field that is a curator's
-    //    reading aid — the numbers matter more than the note.
-    const withoutNote = ({ mfr_test_vehicle_comments: _dropped, ...rest }) => rest;
+    //    `mfr_test_vehicle_comments` arrives in migration 059 and
+    //    `mfr_test_comments` in 093. Retry without them rather than failing a
+    //    whole import over fields that are a curator's reading aid — the
+    //    numbers matter more than the notes.
+    const withoutNote = ({ mfr_test_vehicle_comments: _v, mfr_test_comments: _t, ...rest }) => rest;
     const writeTest = async (write, row) => {
       let res = await write(row);
       if (res.error && isMissingColumn(res.error)) res = await write(withoutNote(row));
@@ -2621,7 +3493,6 @@ class DataService {
       return res.data;
     };
     const applyPhases = async (testId, pp) => {
-      if (pp.remove.length) check(await supabase.from('epa_test_phases').delete().in('id', pp.remove));
       for (const u of pp.update) {
         check(await supabase.from('epa_test_phases')
           .update({ ...u.payload, overrides: u.overrides }).eq('id', u.id));
@@ -2633,7 +3504,6 @@ class DataService {
     };
 
     const tp = plan.tests;
-    if (tp.remove.length) check(await supabase.from('epa_tests').delete().in('id', tp.remove));
     for (const u of tp.update) {
       await writeTest(
         (row) => supabase.from('epa_tests').update({ ...row, overrides: u.overrides }).eq('id', u.id).select('id').single(),
@@ -2838,59 +3708,6 @@ class DataService {
     // hand-set value keeps.
     const { applied, held } = guideOverlay(testVehicle, feRow);
     return { applied, held, selection };
-  }
-
-  /**
-   * Every test vehicle still awaiting a guide link (#238).
-   *
-   * Includes what each one would unlock, so the sweep can prioritise: the
-   * procedure codes and DC energy that decide whether a link adds a charger
-   * efficiency, and the coefficient targets that decide whether it adds a
-   * road-load figure. Both are read here rather than counted server-side
-   * because the sweep needs the values anyway.
-   *
-   * Skipped test vehicles are excluded by default. "We looked and there is nothing" is
-   * a decision, and a sweep that keeps re-asking it never finishes — but the
-   * caller can ask for them, because that is different from having no opinion.
-   */
-  async getTestVehiclesAwaitingFeLink({ includeSkipped = false } = {}) {
-    if (!this.useSupabase) return [];
-    // One item per test vehicle PER CERTIFICATION (#374): the Guide is
-    // published by year, so a test vehicle certified in three years has three
-    // links to make. Each item is shaped as the test vehicle in that year — its
-    // year and Test Group are the certification's, its covered models the
-    // certificate's — so the matching reads it as it read a record before.
-    const rows = await fetchAllRows(() => {
-      let q = getSupabase()
-        .from('epa_certification_test_vehicles')
-        .select(`
-          id, fe_guide_row_id, fe_guide_skipped_at, fe_guide_skip_note,
-          carryover_test_group, carryover_model_year,
-          certification:epa_certifications(id, test_group, model_year, basis,
-            epa_covered_models(carline_number, carline_name, certification_region, drive_system)),
-          test_vehicle:epa_test_vehicles(${EPA_LAB_FIELDS}, epa_vehicle_mappings(vehicles(id, name, year)))
-        `)
-        .is('fe_guide_row_id', null)
-        .order('id', { ascending: true });
-      if (!includeSkipped) q = q.is('fe_guide_skipped_at', null);
-      return q;
-    });
-    return rows
-      .filter(r => r.test_vehicle && r.certification)
-      .map(r => ({
-        ...r.test_vehicle,
-        model_year:           r.certification.model_year,
-        test_group:           r.certification.test_group,
-        carryover_test_group: r.carryover_test_group,
-        carryover_model_year: r.carryover_model_year,
-        fe_guide_row_id:      null,
-        fe_guide_skipped_at:  r.fe_guide_skipped_at,
-        fe_guide_skip_note:   r.fe_guide_skip_note,
-        epa_covered_models:   r.certification.epa_covered_models ?? [],
-        _linkRowId:           r.id,
-        _certificationBasis:  r.certification.basis,
-      }))
-      .sort((a, b) => String(a.test_vehicle_id).localeCompare(String(b.test_vehicle_id)) || a.model_year - b.model_year);
   }
 
   /** How far the sweep has got: linked, skipped, still awaiting a decision. */
@@ -3983,6 +4800,66 @@ class DataService {
     if (error) throw error;
   }
 
+  // ── Site events (#448) ──────────────────────────────────────────────────────
+
+  /**
+   * Record that a reader did something worth counting (utils/siteEvents.js lists
+   * the events). Writes through the SECURITY DEFINER log_site_event (migration
+   * 090), which an anonymous visitor may call and which refuses anything not on
+   * its list or past its rate limit. Identity is the anonymous browser token:
+   * no user id, no IP. Never throws and never reaches the reader: counting must
+   * not get in the way of the thing being counted.
+   *
+   * @param {{ event: string, slug?: string|null, detail?: object }} opts
+   */
+  async logSiteEvent({ event, slug = null, detail = {} }) {
+    if (!this.useSupabase) return;
+    try {
+      await getSupabase().rpc('log_site_event', {
+        p_event:         event,
+        p_browser_token: this.getBrowserToken(),
+        p_slug:          slug,
+        p_detail:        detail,
+      });
+    } catch {
+      // Intentionally swallowed, as for access logging.
+    }
+  }
+
+  /**
+   * Read the site events since a moment, newest first, for Admin → Site Events
+   * (#477). Direct reads of the table are revoked for everyone but the admin
+   * read policy (migration 090), which RLS applies without raising: a
+   * non-admin gets no rows, not an error, and the view is admin-only anyway.
+   *
+   * Bounded: at most `cap` rows. Past it the OLDEST are left out and
+   * `truncated` is true, so the caller can say the window is shorter than asked.
+   * Paged by id (unique, and in time order) as fetchAllRows says it must be.
+   *
+   * @param {{ since?: string|null, cap: number }} opts  `since` an ISO timestamp, or null for all
+   * @returns {Promise<{ rows: object[], truncated: boolean, missing: boolean }>}
+   *          `missing`: migration 090 is not applied here yet
+   */
+  async getSiteEvents({ since = null, cap }) {
+    if (!this.useSupabase) return { rows: [], truncated: false, missing: false };
+    const rows = [];
+    for (let from = 0; rows.length < cap; from += PAGE_SIZE) {
+      let query = getSupabase()
+        .from('site_events')
+        .select('id, created_at, event, browser_token, slug, detail')
+        .order('id', { ascending: false });
+      if (since) query = query.gte('created_at', since);
+      const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
+      if (error) {
+        if (isMissingRelation(error)) return { rows: [], truncated: false, missing: true };
+        throw error;
+      }
+      rows.push(...(data || []));
+      if (!data || data.length < PAGE_SIZE) return { rows, truncated: false, missing: false };
+    }
+    return { rows: rows.slice(0, cap), truncated: true, missing: false };
+  }
+
   // ── Access logging ──────────────────────────────────────────────────────────
 
   /**
@@ -4037,6 +4914,9 @@ export function feGuidePayload(r, sourceFile = null) {
     unadj_city_mpge: r.unadjCityMpge,
     unadj_hwy_mpge:  r.unadjHwyMpge,
     unadj_comb_mpge: r.unadjCombMpge,
+    // The kWh/100mi twin's, usually the more precise copy (migration 094).
+    unadj_city_kwh_100mi: r.unadjCityKwh100mi ?? null,
+    unadj_hwy_kwh_100mi:  r.unadjHwyKwh100mi ?? null,
     adj_city_mpge:   r.adjCityMpge,
     adj_hwy_mpge:    r.adjHwyMpge,
     adj_comb_mpge:   r.adjCombMpge,

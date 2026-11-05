@@ -43,7 +43,7 @@ export default function DeleteQueueBar({
                     <span className="text-gray-400 text-sm tabular-nums w-6 text-right">
                         {secondsLeft}s
                     </span>
-                    <button onClick={onUndo} className="btn btn-primary text-sm">
+                    <button onClick={onUndo} className="btn btn-secondary text-sm">
                         ↩ Undo
                     </button>
                 </div>
@@ -62,13 +62,13 @@ export default function DeleteQueueBar({
                 )}
                 <div className="page-container py-3 flex items-center gap-4">
                     <span className="text-red-700 font-medium flex-1">
-                        🗑 {plural(pendingCount)} queued for deletion
+                        {plural(pendingCount)} queued for deletion
                     </span>
                     <button onClick={onClearQueue} className="btn btn-secondary text-sm">
                         Clear queue
                     </button>
                     <button onClick={onCommit} className="btn btn-danger text-sm">
-                        Delete {plural(pendingCount)} →
+                        Delete {plural(pendingCount)}
                     </button>
                 </div>
             </div>

@@ -1,3 +1,6 @@
+import ChartLoading from './ChartLoading';
+import SourceLine from './SourceLine';
+
 /**
  * The bordered frame a chart lives in — and the boundary a PNG export captures.
  *
@@ -10,13 +13,20 @@
  * The strip above it says so in as many words, because the alternative is a
  * reader finding out what an export does and does not include only after they
  * have already pasted it somewhere.
+ *
+ * `sourceLine` is who the plotted data came from (useSourceLine); the export
+ * draws the same words as text, since a canvas cannot hold a link.
+ *
+ * `loading` is the view's real data-loading state (#453). The indicator is
+ * DOM laid over the frame, out of flow, and the export draws the canvas — so
+ * it can appear and clear without moving anything or reaching a PNG.
  */
-export default function PlotFrame({ title, subtitle, exportControls, preview, onDismissPreview, children }) {
+export default function PlotFrame({ title, subtitle, sourceLine, exportControls, preview, onDismissPreview, loading = false, loadingMessage, children }) {
     return (
         <>
             {exportControls && (
                 <div className="chart-export-strip">
-                    <span className="text-micro">PNG / URL export captures the frame below</span>
+                    <span className="text-micro truncate min-w-0" title="PNG / URL export captures the frame below">PNG / URL export captures the frame below</span>
                     <span className="chart-export-rule" />
                     {exportControls}
                 </div>
@@ -38,7 +48,7 @@ export default function PlotFrame({ title, subtitle, exportControls, preview, on
                     </div>
                 </div>
             )}
-            <div className="plot-frame">
+            <div className="plot-frame" aria-busy={loading || undefined}>
                 <div className="plot-frame-head">
                     <div>
                         <h3 className="plot-frame-title">{title}</h3>
@@ -49,6 +59,8 @@ export default function PlotFrame({ title, subtitle, exportControls, preview, on
                     <span className="plot-frame-mark" aria-hidden="true">EV<span>BENCH</span></span>
                 </div>
                 {children}
+                <SourceLine line={sourceLine} />
+                <ChartLoading loading={loading} message={loadingMessage} />
             </div>
         </>
     );

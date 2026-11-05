@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { VEHICLE_PALETTE } from './utils/colorUtils';
+import { DEFAULT_SERIES_PALETTE } from './utils/colorUtils';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
-import { ScaleSyncContext } from './hooks/useSyncedScale';
+import { AxisLimitsProvider } from './hooks/useAxisLimits';
+import { AXIS_LIMITS_PARAM, decodeAxisLimits, withAxisLimits } from './utils/axisLimits';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import AppNav from './components/shell/AppNav';
 import SubTabStrip from './components/shell/SubTabStrip';
@@ -15,9 +16,19 @@ import RoadTripView from './components/RoadTripView';
 import PopoutView from './components/PopoutView';
 import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
-import { VEHICLE_TABLE_PARAM_PREFIX } from './utils/vehicleTable';
-import SpecsChartView from './components/SpecsChartView';
-import SpecsScatterView from './components/SpecsScatterView';
+import { DEFAULT_READER_MODE } from './utils/correctionSettings';
+import { decodeVehicleTableParams, vehicleTableStartSearch } from './utils/vehicleTable';
+import { readMemory } from './utils/vehicleTableStorage';
+import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './utils/chartDefaults';
+import { chartStateOf, resetStateOf, chartParamsFromSearch, defaultChartTitle, explicitChartParams } from './utils/featuredComparisons';
+import { useFeaturedComparisons } from './hooks/useFeaturedComparisons';
+import { useSiteEvents } from './hooks/useSiteEvents';
+import { SITE_EVENTS } from './utils/siteEvents';
+import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext';
+import HomeView from './components/home/HomeView';
+import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
+import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink } from './utils/chartUrlState';
+import SpecChart from './components/SpecChart';
 import EpaCurvesView from './components/EpaCurvesView';
 import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
@@ -25,17 +36,20 @@ import AdminView, { ADMIN_SUBTAB_IDS, DEFAULT_ADMIN_SUBTAB } from './components/
 import Playground from './components/playground/Playground';
 import { explorerStateFromUrl } from './components/epa/curves/EpaCurveExplorer';
 import EpaSection, { EPA_SUBTABS, DEFAULT_EPA_SUBTAB, epaSubtabFromParam } from './components/epa/EpaSection';
-import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, modeNeedsSelection, entryModeFor, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
-import SpecChartKind from './components/SpecChartKind';
+import { DEFAULT_CHART_MODE, ALL_CHART_MODES, TOP_CHART_CATEGORIES, categoryForMode, categoryByKey, isChartCategory, entryModeFor, labelForMode, navTabFor, chartModesUnder, navItemForMode } from './constants/chartNav';
 import { NavigationContext } from './context/NavigationContext';
 import { platformHref } from './utils/platforms';
-import { decodeVehicleFilters, encodeVehicleFilters } from './utils/vehicleFilters';
+import { decodeVehicleFilters, encodeVehicleFilters, EMPTY_VEHICLE_FILTERS } from './utils/vehicleFilters';
 import ReferenceSection, { REFERENCE_SUBTABS, DEFAULT_REFERENCE_SUBTAB, referenceSubtabFromParam } from './components/reference/ReferenceSection';
-import { encodePairings, decodePairings, prunePairings } from './utils/pairings';
+import { prunePairings } from './utils/pairings';
 import { isEpaPartnerId } from './utils/rangeSource';
 import { applyVehicleBases, withVehicleBase, NO_VEHICLE_BASES } from './utils/vehicleBase';
 import { VehicleBaseContext } from './context/VehicleBaseContext';
 import VehicleSwatch from './components/VehicleSwatch';
+import VehicleQuickAdd from './components/VehicleQuickAdd';
+import SelectionEmptyState from './components/SelectionEmptyState';
+import { useStackedStripActions } from './hooks/useStackedStripActions';
+import { buildVehicleLabels } from './utils/seriesLabel';
 
 /* SubTabStrip speaks `key`; the EPA registry has always spoken `id`, and it is
    read by name in several places, so it is mapped here rather than renamed. */
@@ -48,6 +62,7 @@ const REFERENCE_STRIP_ITEMS = REFERENCE_SUBTABS.map(t => ({ key: t.id, label: t.
 const VEHICLES_STRIP_ITEMS = [
     { key: 'card', label: 'Cards', group: 'Summary' },
     { key: 'list', label: 'List',  group: 'Summary' },
+    { key: 'lineage', label: 'Lineage', group: 'Summary' },
 ];
 
 /**
@@ -67,7 +82,7 @@ const VEHICLES_STRIP_ITEMS = [
  * Hiding is not clearing. The selection survives the trip and the chips are
  * back the moment a view uses them again.
  */
-const SELECTION_INERT_VIEWS = new Set(['runs', 'epa', 'reference', 'admin', 'playground']);
+const SELECTION_INERT_VIEWS = new Set(['home', 'runs', 'epa', 'reference', 'admin', 'playground']);
 
 export default function App() {
     const {
@@ -128,7 +143,11 @@ export default function App() {
 
 
     const [activeVehicle, setActiveVehicle] = useState(null);
-    const [view, setView] = useState('vehicles');
+    // Home is where a bare address lands (#448): a first-time visitor meets the
+    // featured comparison, not the full vehicle grid. Every other tab is reached
+    // by its own ?tab=, which the mount parse below turns into a view; a tab name
+    // it does not know stays here.
+    const [view, setView] = useState('home');
     // Which Runs-tab sub-tab is showing (Charging & Range / Inherited /
     // Performance / EPA). Lifted out of RunsView so it can be persisted in the
     // URL the same way activeVehicle is.
@@ -136,9 +155,12 @@ export default function App() {
     // The test a link pointed at (?tab=runs&run=…), which Tests & Data scrolls
     // to and marks once, then hands back. Only a link sets it.
     const [focusRunId, setFocusRunId] = useState(null);
+    // Whether that link also opens the test's edit form (&edit=1, from Admin →
+    // Data Checks), so a finding is one click from the field that settles it.
+    const [focusRunEdit, setFocusRunEdit] = useState(false);
     // Stable, because Tests & Data's landing effect depends on it: a new
     // function each render would re-scroll and restart its timer every time.
-    const clearFocusRun = useCallback(() => setFocusRunId(null), []);
+    const clearFocusRun = useCallback(() => { setFocusRunId(null); setFocusRunEdit(false); }, []);
     // Same lift for the Admin tab's sub-tabs (Roles / EPA Data / Fuel Economy
     // Guide / Model Constants / Interface Settings).
     const [adminSubtab, setAdminSubtab] = useState(DEFAULT_ADMIN_SUBTAB);
@@ -165,8 +187,11 @@ export default function App() {
         vehiclePage: 1,
     }));
     const [dragOverIdx, setDragOverIdx] = useState(null); // pill drop-indicator position
+    const stripRowRef = useRef(null);
+    const chipScrollRef = useRef(null);
+    const stripActionsRef = useRef(null);
     const [chartMode, setChartMode] = useState('charging'); // 'charging' | 'range' | 'compare' | 'epacurves' | …
-    const [compareConfig, setCompareConfig] = useState({ xMinutes: 15, mMiles: 150, startSoc: 10 });
+    const [compareConfig, setCompareConfig] = useState(defaultCompareConfig);
     // Which range test supplies the miles for which charging test. Global to the
     // chart session rather than per-view, so two charts on one screen can never
     // disagree about what "range" means. See utils/pairings.js.
@@ -181,74 +206,26 @@ export default function App() {
             ? { ...explorerStateFromUrl(), conditions: null }
             : null;
     });
-    // Axis limits of the chart on screen, for the charts that keep them locally
-    // (see useSyncedScale). Reported by that chart in the main tab; received by a
-    // pop-out.
-    const [viewScale, setViewScale] = useState(null);
-    const [epaConfig, setEpaConfig] = useState({
-        yAxis: 'kwh100mi', xMin: null, xMax: null, yMin: null, yMax: null,
-        // Which curves are drawn, and any colors overridden for them (#221).
-        // Held here rather than inside EpaCurvesView so they reach the URL and
-        // the pop-out, exactly as every other chart's selection does.
-        selectedMappings: [], mappingColors: {},
-        // The real-world overlay (null | 'corrected' | 'uncorrected'). Here, not
-        // in the view, so a link can open the chart with its tests showing: an
-        // explainer's modeled-efficiency card links in with epa_ov=corrected.
-        overlay: null,
-    });
-    const [roadTripConfig, setRoadTripConfig] = useState({
-        mode: 'distance', startSoc: 90, minSoc: 10, destinationMinSoc: 10,
-        legDistance: 150, chargeTime: 30,
-        totalDistance: 500, speed: 70,
-        overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
-        yAxis: 'chargeTime',      // 'distance' | 'chargeTime' | 'byTest'
-        xAxis: 'totalTime',       // 'totalTime' | 'driveTime' | 'speed' | 'tripDist'
-        sweepYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' (sweep modes only)
-        towingMode: false,        // override all vehicle efficiencies with a fixed trailer-system value
-        towingEfficiency: 1.5,    // mi/kWh for the whole vehicle+trailer system
-        towingRefSpeedMph: 70,    // speed at which towingEfficiency was measured
-        perRun: {},               // { [runId]: { minSoc?, legDistance?, chargeTime? } } — per-run overrides
-    });
-    const [chartConfig, setChartConfig] = useState({
-        xAxis: 'soc',
-        yAxis: 'chargeRate',
-        y2Axis: null,
-        selectedRuns: [],
-        // Time-axis alignment is on by default (#195): unaligned, every run
-        // starts at zero whatever SoC it began at, which compares nothing.
-        // alignRaw is the opt-out.
-        alignRaw: false,
-        // null means "follow the data" — the lowest SoC every selected run
-        // actually reaches. A fixed 10 looked like a default and behaved like a
-        // decision, drawing a run that began at 25% from t=0 alongside runs that
-        // began at 10%.
-        raceThreshold: null,
-        xMin: null,
-        xMax: null,
-        yMin: 0,
-        yMax: null,
-        y2Min: null,
-        y2Max: null,
-        showLine:   true,
-        showPoints: false,
-        // Where series colors come from: each vehicle's curated color by
-        // default, or a SERIES_PALETTES id to assign from that set instead.
-        seriesPalette: VEHICLE_PALETTE,
-        // Whether hand-set colors are in force over that base. Choosing a
-        // palette parks them; selecting Hand-set brings them back.
-        handSet: false,
-        // { [vehicleId]: hex } — a color asked of one car for this session
-        // (utils/vehicleBase.js). Lives here so the pop-out window gets it with
-        // the rest of the chart's state.
-        vehicleBases: NO_VEHICLE_BASES,
-        specsField:     null,   // selected field key for Spec Chart mode
-        scatterXField:  null,   // selected X field key for Spec Scatter mode
-        scatterYField:  null,   // selected Y field key for Spec Scatter mode
-    });
+    const [epaConfig, setEpaConfig] = useState(defaultEpaConfig);
+    const [roadTripConfig, setRoadTripConfig] = useState(defaultRoadTripConfig);
+    // The vehicle table's assumptions live in chartConfig, not in the table, so
+    // the spec chart's sidebar and the table read and write the same ones (#450).
+    // Read once from the address, else from what the table remembered.
+    const [chartConfig, setChartConfig] = useState(() => ({
+        ...defaultChartConfig(),
+        assumptions: decodeVehicleTableParams(vehicleTableStartSearch(window.location.search, readMemory())).assumptions,
+    }));
     // The vehicles as the charts should draw them: a session base replaces the
     // vehicle's color on the copy, so every chart, sidebar accent and swatch
     // that reads `vehicle.color` follows without knowing a second layer exists.
     const vehicleBases = chartConfig.vehicleBases ?? NO_VEHICLE_BASES;
+    // The selected chips' names: the curated name, widened only where two
+    // selected vehicles would otherwise read the same.
+    const chipNames = useMemo(
+        () => buildVehicleLabels(selectedVehicles.map(id => vehicles.find(v => v.id === id))),
+        [selectedVehicles, vehicles]);
+    // Keyed on the chips' names, so a name that widens re-measures too.
+    const stackStripActions = useStackedStripActions(stripRowRef, chipScrollRef, stripActionsRef, chipNames);
     const chartVehicles = useMemo(
         () => applyVehicleBases(vehicles, vehicleBases), [vehicles, vehicleBases]);
     const vehicleBaseApi = useMemo(() => ({
@@ -283,17 +260,26 @@ export default function App() {
         if (view === 'runs') lastModeUnderTab.current.vehicles = 'runs';
     }, [view]);
     // Cards or List (#338): a sub-nav item now, so App owns it.
-    const [vehiclesMode, setVehiclesMode] = useState('card');
+    // ?tab=vehicles&sub=list|lineage; Cards is the default and writes no `sub`.
+    const [vehiclesMode, setVehiclesMode] = useState(() => {
+        const p = new URLSearchParams(window.location.search);
+        const sub = p.get('tab') === 'vehicles' ? p.get('sub') : null;
+        return VEHICLES_STRIP_ITEMS.find((i) => i.key === sub)?.key ?? 'card';
+    });
     // Vehicles & Specs' filters (#338): one set for Cards, List and Table, so
     // switching views never changes which vehicles show. Read from the link
     // the page opened on (vehicleFilters.js reads the table's old vt_ ones too).
     const [vehicleFilters, setVehicleFilters] = useState(() => decodeVehicleFilters(window.location.search));
-    // Reference's sub-tab (#338): Platforms or Explainers.
+    // Reference's sub-tab (#338): Explainers or Platforms.
     const [referenceSubtab, setReferenceSubtab] = useState(DEFAULT_REFERENCE_SUBTAB);
     // The platform whose page is showing under Reference › Platforms (#354), or null for the list.
     const [referencePlatformId, setReferencePlatformId] = useState(null);
     // The explainer showing under Reference › Explainers (#355), by slug, or null for the list.
     const [referenceTopic, setReferenceTopic] = useState(null);
+    // Home (#448): the featured comparison named by ?fc=, or null for the newest
+    // listed; and the editor request (a chart to save, or a comparison to edit).
+    const [homeSlug, setHomeSlug] = useState(null);
+    const [featuredEditor, setFeaturedEditor] = useState(null);
 
     const handleChartModeChange = (newMode) => {
         const categoryKey = categoryForMode(newMode).key;
@@ -326,14 +312,41 @@ export default function App() {
     const navigateToChartCategory = (categoryKey) => {
         const category = categoryByKey(categoryKey);
         if (!category) return;
-        const mode = entryModeFor(category, lastModeByCategory.current[categoryKey], selectedVehicles.length > 0);
+        const mode = entryModeFor(category, lastModeByCategory.current[categoryKey]);
         if (mode) handleChartModeChange(mode);
     };
 
     const { isPopout, sendState } = useChartSync({
-        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, viewScale,
-        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer, setViewScale,
+        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer,
+        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer,
     });
+
+    // The featured comparisons (#448), loaded once here so Home and the editor
+    // share one list. The pop-out has no Home and loads nothing.
+    // A chart tab or mode opened, however the reader got there (#448). One event
+    // per change of tab or mode; a curator's own and the pop-out's are skipped.
+    const recordEvent = useSiteEvents();
+    useEffect(() => {
+        if (loading || !isChartCategory(view)) return;
+        recordEvent(SITE_EVENTS.CHART_VIEW, { detail: { mode: chartMode } });
+    }, [loading, view, chartMode, recordEvent]);
+
+    const featured = useFeaturedComparisons({ enabled: !isPopout });
+    const canCurate = isContributor;
+
+    /** The chart on screen, as the address now states it, into the editor. */
+    const featureThisChart = () => {
+        const params = chartParamsFromSearch(window.location.search);
+        if (!params) return;
+        setFeaturedEditor({ add: { title: defaultChartTitle(chartMode), params }, vehicleIds: selectedVehicles });
+    };
+
+    const featuredContext = {
+        comparisons: featured.comparisons, loading: featured.loading, error: featured.error,
+        canCurate, canDelete: isAdmin,
+        openEditor: setFeaturedEditor,
+        featureThisChart: isPopout || !canCurate ? null : featureThisChart,
+    };
 
     /**
      * Open a test in Tests & Data from a figure that rests on it — the vehicle
@@ -348,6 +361,7 @@ export default function App() {
         setActiveVehicle(v);
         setRunsSubtab(sub);
         setFocusRunId(ref.runId ?? null);
+        setFocusRunEdit(!!ref.edit);
         setView('runs');
         window.scrollTo(0, 0);
     }, [vehicles]);
@@ -368,6 +382,15 @@ export default function App() {
      * A header tab that is not a chart category. Returns to the chart mode last
      * shown under it, if there was one and it can still show; else its own view.
      */
+    /**
+     * A table column's chart icon: open that column plotted, as bars, in the
+     * spec chart (#450). The scatter is one switch away.
+     */
+    const plotColumn = (key) => {
+        setChartConfig(prev => ({ ...prev, specsField: key }));
+        handleChartModeChange('specs');
+    };
+
     const navigateToTab = (tab) => {
         const mode = lastModeUnderTab.current[tab];
         // The vehicle's page is a place under Vehicles & Specs too (#338).
@@ -375,8 +398,7 @@ export default function App() {
             navigateTo(currentActiveVehicle ? 'runs' : tab);
             return;
         }
-        const modeDef = mode ? categoryForMode(mode).modes.find(m => m.key === mode) : null;
-        if (modeDef && (selectedVehicles.length > 0 || !modeNeedsSelection(modeDef))) {
+        if (mode && categoryForMode(mode).modes.some(m => m.key === mode)) {
             handleChartModeChange(mode);
             return;
         }
@@ -384,12 +406,64 @@ export default function App() {
     };
 
     /**
+     * Put one chart of a featured comparison on screen (#448): its vehicles, and
+     * its saved settings laid over a clean slate, so the previous chart's tweaks
+     * do not leak in. A history entry, so Back returns to Home. From here the
+     * reader's changes are theirs; Home's reset puts the comparison back.
+     *
+     * Replacing a selection of two or more is the caller's to warn about
+     * (featuredComparisons.replacesSelection) — this does what it is told.
+     */
+    const openFeaturedChart = useCallback((comparison, index) => {
+        const state = chartStateOf(comparison, index, vehicles);
+        if (!state) return;
+        // The vehicle table reads its columns, sort and prices from the address when
+        // it opens, so for it the saved link goes in whole; every other chart gets
+        // its settings as state and a bare address that the URL sync completes.
+        // The Vehicles & Specs filters are the reader's: a table opens unfiltered.
+        const isTable = state.chartMode === 'specstable';
+        history.pushState(
+            { view: state.view, chartMode: state.chartMode },
+            '',
+            isTable ? `?${explicitChartParams(comparison.charts[index].params)}` : `?tab=${state.view}&m=${state.chartMode}`,
+        );
+        if (isTable) setVehicleFilters(EMPTY_VEHICLE_FILTERS);
+        lastModeByCategory.current[state.view] = state.chartMode;
+        const parentTab = categoryForMode(state.chartMode).navParent;
+        if (parentTab) lastModeUnderTab.current[parentTab] = state.chartMode;
+        setVehicleSelection(state.vehicleIds);
+        setChartMode(state.chartMode);
+        setChartConfig(state.chartConfig);
+        setCompareConfig(state.compareConfig);
+        setRoadTripConfig(state.roadTripConfig);
+        setEpaConfig(state.epaConfig);
+        setPairings(state.pairings);
+        setView(state.view);
+        window.scrollTo(0, 0);
+    }, [vehicles, setVehicleSelection, setVehicleFilters]);
+
+    /**
+     * Put the site back to a featured comparison: its vehicles and its
+     * correction, every other setting at a fresh visitor's. Stays where it is.
+     */
+    const resetToComparison = useCallback((comparison) => {
+        const state = resetStateOf(comparison, vehicles);
+        setVehicleSelection(state.vehicleIds);
+        setChartConfig(state.chartConfig);
+        setCompareConfig(state.compareConfig);
+        setRoadTripConfig(state.roadTripConfig);
+        setEpaConfig(state.epaConfig);
+        setPairings(state.pairings);
+    }, [vehicles, setVehicleSelection]);
+
+    /**
      * A platform's page, from anywhere a platform is named (#354). A history
      * entry, so Back returns to the card, table or View Specs it came from.
      */
     const openPlatform = (id) => {
-        history.pushState({ view: 'reference', subtab: DEFAULT_REFERENCE_SUBTAB, platformId: String(id) }, '', platformHref(id));
-        setReferenceSubtab(DEFAULT_REFERENCE_SUBTAB);
+        // Named, not the default: a bare ?tab=reference is Explainers (#444).
+        history.pushState({ view: 'reference', subtab: 'platforms', platformId: String(id) }, '', platformHref(id));
+        setReferenceSubtab('platforms');
         setReferencePlatformId(String(id));
         setView('reference');
         window.scrollTo(0, 0);
@@ -397,8 +471,10 @@ export default function App() {
 
     /** A Reference sub-tab's top level (the platform list, or Explainers), or one explainer. */
     const openReference = (subtab, topic = null) => {
-        const url = subtab === DEFAULT_REFERENCE_SUBTAB ? '?tab=reference'
-            : `?tab=reference&sub=${subtab}${topic ? `&topic=${encodeURIComponent(topic)}` : ''}`;
+        // Only the default is left out of the URL (Platforms is written as
+        // sub=platforms), and the topic rides on whichever sub-tab holds it.
+        const topicPart = subtab === 'explainers' && topic ? `&topic=${encodeURIComponent(topic)}` : '';
+        const url = `?tab=reference${subtab === DEFAULT_REFERENCE_SUBTAB ? '' : `&sub=${subtab}`}${topicPart}`;
         history.pushState({ view: 'reference', subtab, platformId: null, topic }, '', url);
         setReferenceSubtab(subtab);
         setReferencePlatformId(null);
@@ -414,6 +490,17 @@ export default function App() {
 
     /** Show the opened vehicle's page (#338). */
     const openVehiclePage = () => navigateTo('runs');
+
+    /**
+     * A vehicle's Tests & Data (its page), optionally at a sub-tab — from a
+     * card's button, a test-count pill, or a selected-vehicle chip.
+     */
+    const viewVehicleRuns = (v, sub) => {
+        setActiveVehicle(v);
+        setRunsSubtab(RUNS_SUBTAB_IDS.includes(sub) ? sub : DEFAULT_RUNS_SUBTAB);
+        setFocusRunId(null);
+        navigateTo('runs');
+    };
 
     /**
      * Close the opened vehicle (#338): it leaves the header, Vehicles & Specs
@@ -435,6 +522,7 @@ export default function App() {
     const pendingRunsVehicleId = useRef(null);
     const pendingRunsSubtab = useRef(null);
     const pendingRunsRunId = useRef(null);
+    const pendingRunsEdit = useRef(false);
     // Whether to land on the Admin tab (?tab=admin&sub=…) once the user's role
     // has loaded, and which sub-tab to restore.
     const pendingAdminView = useRef(false);
@@ -470,6 +558,7 @@ export default function App() {
             const sub = p.get('sub');
             if (RUNS_SUBTAB_IDS.includes(sub)) pendingRunsSubtab.current = sub;
             if (p.get('run')) pendingRunsRunId.current = p.get('run');
+            pendingRunsEdit.current = p.get('edit') === '1';
             return;
         }
         // Unlinked, but a real route: nothing here needs a role or a selection
@@ -478,9 +567,21 @@ export default function App() {
             setView('playground');
             return;
         }
+        if (tab === 'home') {
+            setHomeSlug(p.get('fc') || null);
+            setView('home');
+            return;
+        }
+        // Vehicles & Specs is no longer the default, so a link to it must say so.
+        // Its sub-nav and filters read their own state from the address.
+        if (tab === 'vehicles') {
+            setView('vehicles');
+            return;
+        }
         if (tab === 'reference') {
-            setReferenceSubtab(referenceSubtabFromParam(p.get('sub')));
-            setReferencePlatformId(p.get('pid') || null);
+            const pid = p.get('pid') || null;
+            setReferenceSubtab(referenceSubtabFromParam(p.get('sub'), pid));
+            setReferencePlatformId(pid);
             setReferenceTopic(p.get('topic') || null);
             setView('reference');
             return;
@@ -489,7 +590,17 @@ export default function App() {
             // Nothing to wait for — the guide loads its own data and needs no
             // vehicle, role or selection resolved first, so the sub-tab is set
             // here rather than parked on a ref the way runs and admin need.
-            setEpaSubtab(epaSubtabFromParam(p.get('sub')));
+            const sub = p.get('sub');
+            setEpaSubtab(epaSubtabFromParam(sub));
+            // Modeled Efficiency · All EVs is a sub-tab, not a chart mode, so the
+            // chart link's parse below never sees it; its limits come from the
+            // same `ax` parameter.
+            if (sub === 'curves' && p.get(AXIS_LIMITS_PARAM) !== null) {
+                setChartConfig(prev => ({
+                    ...prev,
+                    axisLimits: withAxisLimits(prev.axisLimits, 'epaexplorer', decodeAxisLimits(p.get(AXIS_LIMITS_PARAM), 'epaexplorer')),
+                }));
+            }
             setView('epa');
             return;
         }
@@ -500,83 +611,14 @@ export default function App() {
             return;
         }
         if (!isChartCategory(tab)) return;
-        pendingUrlState.current = {
-            vehicleIds:    (p.get('v')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
-            runIds:        (p.get('r')?.split(',').filter(Boolean) || []).map(id => isNaN(Number(id)) ? id : Number(id)),
-            xAxis:         p.get('x')  || null,
-            yAxis:         p.get('y')  || null,
-            y2Axis:        p.get('y2') || null,
-            alignRaw:      p.get('raw') === '1',
-            raceThreshold: p.get('rt')  ? Number(p.get('rt'))  : null,
-            xMin:  p.get('xn')  !== null && p.get('xn')  !== '' ? Number(p.get('xn'))  : null,
-            xMax:  p.get('xx')  !== null && p.get('xx')  !== '' ? Number(p.get('xx'))  : null,
-            yMin:  p.get('yn')  !== null && p.get('yn')  !== '' ? Number(p.get('yn'))  : 0,
-            yMax:  p.get('yx')  !== null && p.get('yx')  !== '' ? Number(p.get('yx'))  : null,
-            y2Min: p.get('y2n') !== null && p.get('y2n') !== '' ? Number(p.get('y2n')) : null,
-            y2Max: p.get('y2x') !== null && p.get('y2x') !== '' ? Number(p.get('y2x')) : null,
-            showLine:   p.get('line') !== '0', // default to true if not present, false if explicitly set to 0
-            showPoints: p.get('pts') === '1', // default to false if not present, true if explicitly set to 1
-            compositeSpread: p.get('cspread') !== '0',
-            addedSpread:     p.get('aspread') === '1',
-            // Guard against a stale or hand-edited ?m= — an unknown mode would
-            // otherwise fall through to the charging chart with no indication why.
-            chartMode:     ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE,
-            scatterXField: p.get('scx') || null,
-            scatterYField: p.get('scy') || null,
-        };
-
-        // Charge Compare config
-        const cmpSoc  = p.get('cmp_soc');
-        const cmpMins = p.get('cmp_mins');
-        const cmpMi   = p.get('cmp_mi');
-        if (cmpSoc != null || cmpMins != null || cmpMi != null) {
-            setCompareConfig(prev => ({
-                ...prev,
-                ...(cmpSoc  != null && { startSoc: Number(cmpSoc)  }),
-                ...(cmpMins != null && { xMinutes: Number(cmpMins) }),
-                ...(cmpMi   != null && { mMiles:   Number(cmpMi)   }),
-            }));
-        }
-
-        // Pairings — global across chart modes, so read unconditionally.
-        const pairsParam = p.get('pairs');
-        if (pairsParam) setPairings(decodePairings(pairsParam));
-
-        // Road Trip config
-        const n = (key) => { const v = p.get(key); return v != null ? Number(v) : null; };
-        const rtOverride = {
-            ...(p.get('rt_m')  && { mode:             p.get('rt_m')           }),
-            ...(n('rt_ss') != null && { startSoc:     n('rt_ss')               }),
-            ...(n('rt_ms') != null && { minSoc:        n('rt_ms')               }),
-            ...(n('rt_ld') != null && { legDistance:   n('rt_ld')               }),
-            ...(n('rt_ct') != null && { chargeTime:    n('rt_ct')               }),
-            ...(n('rt_td') != null && { totalDistance: n('rt_td')               }),
-            ...(n('rt_sp') != null && { speed:         n('rt_sp')               }),
-            ...(n('rt_oh') != null && { overhead:      n('rt_oh')               }),
-            ...(p.get('rt_ya') && { yAxis:              p.get('rt_ya')          }),
-            ...(p.get('rt_xa') && { xAxis:              p.get('rt_xa')          }),
-            ...(p.get('rt_sya') && { sweepYAxis:         p.get('rt_sya')         }),
-            ...(p.get('rt_tw') === '1' && { towingMode: true                    }),
-            ...(n('rt_te') != null && { towingEfficiency:   n('rt_te')          }),
-            ...(n('rt_tr') != null && { towingRefSpeedMph:  n('rt_tr')          }),
-        };
-        if (Object.keys(rtOverride).length > 0) setRoadTripConfig(prev => ({ ...prev, ...rtOverride }));
-
-        // Modeled Efficiency · selected vehicles (EPA Curves) config
-        const epaYa = p.get('epa_ya');
-        const epaSel = p.get('epa_m');
-        const epaOverride = {};
-        if (epaYa) epaOverride.yAxis = epaYa;
-        const epaOv = p.get('epa_ov');
-        if (epaOv === 'corrected' || epaOv === 'uncorrected') epaOverride.overlay = epaOv;
-        if (epaSel) {
-            // Mapping ids are numeric; `filter(Boolean)` runs BEFORE the map
-            // because Number('') is 0 and 0 is finite, so `epa_m=` alone would
-            // decode to a selection of the mapping with id zero.
-            epaOverride.selectedMappings = epaSel.split(',').filter(Boolean)
-                .map(Number).filter(Number.isFinite);
-        }
-        if (Object.keys(epaOverride).length > 0) setEpaConfig(prev => ({ ...prev, ...epaOverride }));
+        // One parse for the whole query (utils/chartUrlState.js). The main chart's
+        // state waits for the data to load; the per-mode configs apply now.
+        const parsed = parseChartUrl(window.location.search);
+        pendingUrlState.current = parsed.chart;
+        if (parsed.compare)  setCompareConfig(prev => ({ ...prev, ...parsed.compare }));
+        if (parsed.pairings) setPairings(parsed.pairings);
+        if (parsed.roadTrip) setRoadTripConfig(prev => ({ ...prev, ...parsed.roadTrip }));
+        if (parsed.epa)      setEpaConfig(prev => ({ ...prev, ...parsed.epa }));
     }, []);
 
     // ── Handle browser back/forward ─────────────────────────────────────────
@@ -598,7 +640,7 @@ export default function App() {
                 if (RUNS_SUBTAB_IDS.includes(e.state.subtab)) setRunsSubtab(e.state.subtab);
             }
             if (e.state.view === 'reference') {
-                setReferenceSubtab(referenceSubtabFromParam(e.state.subtab));
+                setReferenceSubtab(referenceSubtabFromParam(e.state.subtab, e.state.platformId));
                 setReferencePlatformId(e.state.platformId ?? null);
                 setReferenceTopic(e.state.topic ?? null);
             }
@@ -616,37 +658,13 @@ export default function App() {
         urlApplied.current = true;
         const s = pendingUrlState.current;
 
-        // Derive vehicle IDs from run IDs, then merge with any explicit v= IDs
-        // (v= carries vehicles that have no runs selected)
-        const runIdSet = new Set(s.runIds.map(String));
-        const fromRuns = vehicles
-            .filter(v => (v.runs || []).some(r => runIdSet.has(String(r.id))))
-            .map(v => v.id);
-        const vehicleIds = [...new Set([...s.vehicleIds, ...fromRuns])];
+        // Vehicles from the plotted tests as well as v= (v= carries only those
+        // with no plotted test).
+        const vehicleIds = vehicleIdsOfLink(s, vehicles);
         if (vehicleIds.length > 0) setVehicleSelection(vehicleIds);
         if (s.chartMode) setChartMode(s.chartMode);
 
-        setChartConfig(prev => ({
-            ...prev,
-            ...(s.xAxis         && { xAxis: s.xAxis }),
-            ...(s.yAxis         && { yAxis: s.yAxis }),
-            ...(s.y2Axis        && { y2Axis: s.y2Axis }),
-            ...(s.runIds.length  > 0 && s.chartMode === 'charging' && { selectedRuns: s.runIds }),
-            alignRaw:      s.alignRaw,
-            raceThreshold: s.raceThreshold,
-            xMin:          s.xMin,
-            xMax:          s.xMax,
-            yMin:          s.yMin,
-            yMax:          s.yMax,
-            y2Min:         s.y2Min ?? null,
-            y2Max:         s.y2Max ?? null,
-            showLine:      s.showLine ?? true, // default to true if not present, false if explicitly set to 0
-            showPoints:    s.showPoints ?? false, // default to false if not present, true if explicitly set to 1
-            compositeSpread: s.compositeSpread ?? true,
-            addedSpread:     s.addedSpread ?? false,
-            ...(s.scatterXField && { scatterXField: s.scatterXField }),
-            ...(s.scatterYField && { scatterYField: s.scatterYField }),
-        }));
+        setChartConfig(prev => chartConfigFromParsed(s, prev));
         // Land on the category that owns the restored mode.
         setView(categoryForMode(s.chartMode).key);
     }, [loading]);
@@ -660,12 +678,14 @@ export default function App() {
         pendingRunsSubtab.current = null;
         const runId = pendingRunsRunId.current;
         pendingRunsRunId.current = null;
+        const editRun = pendingRunsEdit.current;
+        pendingRunsEdit.current = false;
         const v = vehicles.find(v => v.id === id);
         if (v) {
             setActiveVehicle(v);
             setView('runs');
             if (RUNS_SUBTAB_IDS.includes(sub)) setRunsSubtab(sub);
-            if (runId) setFocusRunId(runId);
+            if (runId) { setFocusRunId(runId); setFocusRunEdit(editRun); }
         }
     }, [loading, vehicles]);
 
@@ -687,94 +707,11 @@ export default function App() {
     useEffect(() => {
         if (isPopout) return;   // pop-out doesn't manage its own URL
         if (!isChartCategory(view)) return;
-        const p = new URLSearchParams();
-        p.set('tab', view);
-        if (chartMode === 'charging' && chartConfig.selectedRuns.length > 0)  p.set('r', chartConfig.selectedRuns.join(','));
-        // Include v= only for selected vehicles that have no runs in r (run-less selections)
-        const runVehicleIds = new Set(
-            vehicles
-                .filter(v => (v.runs || []).some(r => chartConfig.selectedRuns.includes(r.id)))
-                .map(v => String(v.id))
-        );
-        const runlessVehicles = selectedVehicles.filter(id => !runVehicleIds.has(String(id)));
-        if (runlessVehicles.length > 0)           p.set('v', runlessVehicles.join(','));
-        p.set('x', chartConfig.xAxis);
-        p.set('y', chartConfig.yAxis);
-        if (chartConfig.y2Axis)                   p.set('y2',   chartConfig.y2Axis);
-        if (chartConfig.alignRaw)                 p.set('raw', '1');
-        if (chartConfig.raceThreshold != null)    p.set('rt',   String(chartConfig.raceThreshold));
-        if (chartConfig.xMin != null)             p.set('xn',   String(chartConfig.xMin));
-        if (chartConfig.xMax != null)             p.set('xx',   String(chartConfig.xMax));
-        if (chartConfig.yMin != null && chartConfig.yMin !== 0) p.set('yn', String(chartConfig.yMin));
-        if (chartConfig.yMax != null)             p.set('yx',   String(chartConfig.yMax));
-        if (chartConfig.y2Min != null)            p.set('y2n',  String(chartConfig.y2Min));
-        if (chartConfig.y2Max != null)            p.set('y2x',  String(chartConfig.y2Max));
-        if (chartConfig.showLine === false)       p.set('line',   '0'); // default to true if not present, false if explicitly set to 0
-        if (chartConfig.showPoints)               p.set('pts',    '1');
-        if (chartConfig.compositeSpread === false) p.set('cspread', '0');
-        if (chartConfig.addedSpread)              p.set('aspread', '1');
-        if (chartMode !== 'charging')             p.set('m', chartMode);
-
-        // Charge Compare options
-        if (chartMode === 'compare') {
-            p.set('cmp_soc',  compareConfig.startSoc);
-            p.set('cmp_mins', compareConfig.xMinutes);
-            p.set('cmp_mi',   compareConfig.mMiles);
-        }
-
-        // Pairings apply to every chart mode, so they are written whenever any
-        // exist rather than being scoped to one tab. Omitted when empty so an
-        // untouched chart keeps a clean URL.
-        const pairsEncoded = encodePairings(pairings);
-        if (pairsEncoded) p.set('pairs', pairsEncoded);
-
-        // Road Trip options
-        if (chartMode === 'roadtrip') {
-            const rt = roadTripConfig;
-            p.set('rt_m',  rt.mode);
-            p.set('rt_ss', rt.startSoc);
-            p.set('rt_ms', rt.minSoc);
-            p.set('rt_ld', rt.legDistance);
-            p.set('rt_ct', rt.chargeTime);
-            p.set('rt_td', rt.totalDistance);
-            p.set('rt_sp', rt.speed);
-            p.set('rt_oh', rt.overhead);
-            p.set('rt_ya',  rt.yAxis);
-            p.set('rt_xa',  rt.xAxis);
-            if (rt.sweepYAxis !== 'totalTime')     p.set('rt_sya', rt.sweepYAxis);
-            if (rt.towingMode)                    p.set('rt_tw', '1');
-            if (rt.towingMode) {
-                p.set('rt_te', rt.towingEfficiency);
-                p.set('rt_tr', rt.towingRefSpeedMph);
-            }
-        }
-
-        // Spec Scatter options
-        if (chartMode === 'specscatter') {
-            if (chartConfig.scatterXField) p.set('scx', chartConfig.scatterXField);
-            if (chartConfig.scatterYField) p.set('scy', chartConfig.scatterYField);
-        }
-
-        // Modeled Efficiency · selected vehicles (EPA Curves) options
-        if (chartMode === 'epacurves') {
-            if (epaConfig.yAxis && epaConfig.yAxis !== 'kwh100mi') p.set('epa_ya', epaConfig.yAxis);
-            // Written whenever anything is selected. Without it the curves a
-            // link was sent to show are whatever BOOTSTRAP happens to pick on
-            // the recipient's machine.
-            if (epaConfig.selectedMappings?.length) p.set('epa_m', epaConfig.selectedMappings.join(','));
-            if (epaConfig.overlay) p.set('epa_ov', epaConfig.overlay);
-        }
-
-        // The vehicle table writes its own columns, sort and filters (vt_*);
-        // carry them over rather than wiping them on every selection change.
-        if (chartMode === 'specstable') {
-            for (const [key, value] of new URLSearchParams(window.location.search)) {
-                if (key.startsWith(VEHICLE_TABLE_PARAM_PREFIX)) p.append(key, value);
-            }
-            // Vehicles & Specs' filters, the same parameters Cards and List write (#338).
-            for (const [key, value] of encodeVehicleFilters(vehicleFilters)) p.set(key, value);
-        }
-
+        const p = buildChartParams({
+            view, chartMode, chartConfig, selectedVehicles, vehicles,
+            compareConfig, roadTripConfig, epaConfig, pairings,
+            vehicleFilters, currentSearch: window.location.search,
+        });
         history.replaceState({ view, chartMode }, '', '?' + p.toString());
     }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings, vehicleFilters]);
 
@@ -814,6 +751,15 @@ export default function App() {
         history.replaceState({ view: 'epa', subtab: epaSubtab }, '', '?' + p.toString());
     }, [isPopout, view, epaSubtab]);
 
+    // ── Keep URL in sync while on Home (#448) ───────────────────────────────
+    // The tab, and fc= when a particular comparison was asked for.
+    useEffect(() => {
+        if (isPopout || view !== 'home' || loading) return;
+        const p = new URLSearchParams({ tab: 'home' });
+        if (homeSlug) p.set('fc', homeSlug);
+        history.replaceState({ view: 'home' }, '', '?' + p.toString());
+    }, [isPopout, view, loading, homeSlug]);
+
     // ── Keep URL in sync while on Vehicles & Specs' Cards or List (#338) ────
     // Only the filters: the tab alone otherwise. The table writes its own
     // parameters, and the chart-tab effect carries the filters for it.
@@ -830,11 +776,12 @@ export default function App() {
         if (loading) return;
         const p = new URLSearchParams();
         p.set('tab', 'vehicles');
+        if (vehiclesMode !== 'card') p.set('sub', vehiclesMode);
         for (const [k, v] of encodeVehicleFilters(vehicleFilters)) p.set(k, v);
         history.replaceState({ view: 'vehicles', chartMode }, '', '?' + p.toString());
     // chartMode rides in the history state only; it does not decide the URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isPopout, view, vehicleFilters]);
+    }, [isPopout, view, vehicleFilters, vehiclesMode]);
 
     // ── Keep URL in sync while on the Reference tab (#338) ──────────────────
     useEffect(() => {
@@ -842,8 +789,10 @@ export default function App() {
         if (view !== 'reference') return;
         const p = new URLSearchParams();
         p.set('tab', 'reference');
-        if (referenceSubtab !== DEFAULT_REFERENCE_SUBTAB) p.set('sub', referenceSubtab);
-        else if (referencePlatformId != null) p.set('pid', referencePlatformId);
+        // A platform's page is ?pid= alone (the parser reads it as Platforms);
+        // the list is sub=platforms, since a bare ?tab=reference is Explainers (#444).
+        if (referenceSubtab === 'platforms' && referencePlatformId != null) p.set('pid', referencePlatformId);
+        else if (referenceSubtab !== DEFAULT_REFERENCE_SUBTAB) p.set('sub', referenceSubtab);
         if (referenceSubtab === 'explainers' && referenceTopic) p.set('topic', referenceTopic);
         history.replaceState({ view: 'reference', subtab: referenceSubtab, platformId: referencePlatformId, topic: referenceTopic }, '', '?' + p.toString());
     }, [isPopout, view, referenceSubtab, referencePlatformId, referenceTopic]);
@@ -888,7 +837,7 @@ export default function App() {
     // ── Broadcast chart state to any open pop-out windows ───────────────────
     useEffect(() => {
         sendState();
-    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, viewScale, sendState]);
+    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, sendState]);
 
     // The header tab a view is shown under (#338): a vehicle's page (the
     // `runs` view) is under Vehicles & Specs; a chart category drawn under
@@ -900,16 +849,9 @@ export default function App() {
         epa:      { tab: 'epa',      items: EPA_STRIP_ITEMS,      active: epaSubtab,    select: setEpaSubtab },
         vehicles: { tab: 'vehicles', items: VEHICLES_STRIP_ITEMS, active: vehiclesMode, select: setVehiclesMode },
         reference: { tab: 'reference', items: REFERENCE_STRIP_ITEMS, active: referenceSubtab,
-            // A sub-tab opens its own top level: Platforms is the list.
+            // A sub-tab opens its own top level: Platforms is the list, Explainers the index.
             select: (key) => { setReferenceSubtab(key); setReferencePlatformId(null); setReferenceTopic(null); } },
     }[headerTab] ?? null;
-
-    // Who holds axis limits that live inside a chart: the main tab reports them,
-    // a pop-out receives them (useSyncedScale).
-    const scaleSync = useMemo(
-        () => ({ synced: isPopout ? viewScale : null, report: isPopout ? null : setViewScale }),
-        [isPopout, viewScale],
-    );
 
     // Where the pop-out is offered: any chart mode, and the EPA curve explorer,
     // which is a sub-tab rather than a mode but follows the same channel (#259).
@@ -933,18 +875,16 @@ export default function App() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-background)' }}>
-                <div className="text-center">
-                    <div className="text-6xl mb-4">&#9889;</div>
-                    <div className="text-2xl font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Loading EV Data...</div>
-                </div>
+            <div className="app-loading" role="status">
+                <div className="app-loading-glyph" aria-hidden="true">⚡</div>
+                <div className="app-loading-label">Loading EV data…</div>
             </div>
         );
     }
 
     if (isPopout) {
         return (
-            <ScaleSyncContext.Provider value={scaleSync}>
+            <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
             <PopoutView
                 vehicles={chartVehicles}
                 selectedVehicles={selectedVehicles}
@@ -957,13 +897,14 @@ export default function App() {
                 pairings={pairings}
                 epaExplorer={epaExplorer}
             />
-            </ScaleSyncContext.Provider>
+            </AxisLimitsProvider>
         );
     }
 
     return (
-        <ScaleSyncContext.Provider value={scaleSync}>
-        <NavigationContext.Provider value={{ openPlatform, openExplainer }}>
+        <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
+        <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison }}>
+        <FeaturedComparisonsContext.Provider value={featuredContext}>
         <VehicleBaseContext.Provider value={vehicleBaseApi}>
             {showAuthModal && (
                 <AuthModal
@@ -987,7 +928,6 @@ export default function App() {
                         onOpenVehicle={openVehiclePage}
                         onCloseVehicle={closeVehicle}
                         onHome={navigateTo}
-                        hasSelection={selectedVehicles.length > 0}
                         isAdmin={isAdmin}
                         user={user}
                         userRole={userRole}
@@ -1016,11 +956,7 @@ export default function App() {
                         <SubTabStrip
                             items={[
                                 ...parentStrip.items,
-                                ...chartModesUnder(parentStrip.tab).map(m => ({
-                                    ...m,
-                                    disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
-                                    hint: 'Select a vehicle first',
-                                })),
+                                ...chartModesUnder(parentStrip.tab),
                             ]}
                             // On a vehicle's page no item is current: the header's
                             // opened vehicle is.
@@ -1040,11 +976,7 @@ export default function App() {
                         />
                     ) : (
                         <SubTabStrip
-                            items={(activeChartCategory?.modes ?? []).map(m => ({
-                                ...m,
-                                // A chart with nothing to plot is not somewhere to go.
-                                disabled: selectedVehicles.length === 0 && modeNeedsSelection(m),
-                            }))}
+                            items={activeChartCategory?.modes ?? []}
                             activeKey={chartMode}
                             onSelect={handleChartModeChange}
                             end={showsPopout && popoutButton}
@@ -1059,15 +991,14 @@ export default function App() {
                           * below it for good — a fifteen-vehicle selection used
                           * to pin a third of a phone viewport, and the chart
                           * sidebar sizes itself against this height. The label
-                          * and Clear all sit outside the scroller so the way
+                          * and Clear sit outside the scroller so the way
                           * out of a large selection never scrolls away. */}
-                        <div className="selected-strip-row">
+                        <div className="selected-strip-row" ref={stripRowRef}>
                             <span className="text-micro">Selected</span>
                             {selectedVehicles.length === 0 ? (
                                 <span className="text-meta">None</span>
                             ) : (
-                                <>
-                                    <div className="selected-chip-scroll">
+                                    <div className="selected-chip-scroll" ref={chipScrollRef}>
                                     {selectedVehicles.map((vehicleId, idx) => {
                                         const vehicle = vehicles.find(v => v.id === vehicleId);
                                         if (!vehicle) return null;
@@ -1081,7 +1012,7 @@ export default function App() {
                                             <div key={vehicleId} className="flex items-center">
                                                 {/* Drop indicator before this pill */}
                                                 {dragOverIdx === idx && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded mr-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs mr-1 shrink-0" />
                                                 )}
                                                 <div
                                                     draggable
@@ -1108,7 +1039,16 @@ export default function App() {
                                                     title="Drag to reorder"
                                                 >
                                                     <VehicleSwatch vehicle={vehicle} />
-                                                    <span>{vehicle.name}</span>
+                                                    {/* The name goes to the vehicle's Tests & Data. A
+                                                        button inside a draggable chip still lets the chip drag. */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => viewVehicleRuns(vehicle)}
+                                                        className="selected-vehicle-chip-name"
+                                                        title={`View ${chipNames.get(vehicle.id)?.full ?? vehicle.name} tests & data`}
+                                                    >
+                                                        {chipNames.get(vehicle.id)?.short ?? vehicle.name}
+                                                    </button>
                                                     <button
                                                         onClick={() => removeVehicleSelection(vehicleId)}
                                                         className="ml-1 hover:opacity-70 rounded-full w-4 h-4 flex items-center justify-center"
@@ -1119,33 +1059,54 @@ export default function App() {
                                                 </div>
                                                 {/* Drop indicator after the last pill */}
                                                 {idx === selectedVehicles.length - 1 && dragOverIdx === selectedVehicles.length && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded ml-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs ml-1 shrink-0" />
                                                 )}
                                             </div>
                                         );
                                     })}
                                     </div>
-                                    {/* Not btn-warning. Orange is the single
-                                      * "active / now" signal in this design and
-                                      * nothing else is allowed to use it — that
-                                      * is the only reason it answers "where am
-                                      * I" from across the room. Clearing a
-                                      * selection is neither active nor a
-                                      * warning; it is an ordinary action. */}
+                            )}
+                            {/* Clear and ＋ Add: side by side while the
+                              * chips fit on one line, stacked once they wrap
+                              * (useStackedStripActions). ＋ Add is LAST, so the
+                              * first chip's Clear appears beside it rather
+                              * than moving it. */}
+                            <div
+                                ref={stripActionsRef}
+                                className={`selected-strip-actions${stackStripActions ? ' is-stacked' : ''}`}
+                            >
+                                {/* Not btn-warning. Orange is the single
+                                  * "active / now" signal in this design and
+                                  * nothing else is allowed to use it — that
+                                  * is the only reason it answers "where am
+                                  * I" from across the room. Clearing a
+                                  * selection is neither active nor a
+                                  * warning; it is an ordinary action. */}
+                                {selectedVehicles.length > 0 && (
                                     <button
                                         onClick={clearAllSelections}
                                         className="btn btn-secondary"
+                                        title="Clear the selection"
                                     >
-                                        Clear all
+                                        {/* ⌧ is the ISO "clear" key: all of it,
+                                          * where ⌫ would read as one entry. */}
+                                        <span className="btn-symbol" aria-hidden="true">⌧</span>
+                                        Clear
                                     </button>
-                                </>
-                            )}
+                                )}
+                                <VehicleQuickAdd
+                                    vehicles={chartVehicles}
+                                    selectedIds={selectedVehicles}
+                                    onToggle={toggleVehicleSelection}
+                                />
+                            </div>
                         </div>
                         </div>
                     </div>}
                 </nav>
 
                 <main className="page-container py-6 flex-1 flex flex-col">
+                    {view === 'home' && <HomeView slug={homeSlug} onSlugChange={setHomeSlug} />}
                     {view === 'vehicles' && (
                         <VehiclesView
                             vehicles={vehicles}
@@ -1160,7 +1121,7 @@ export default function App() {
                             onAdd={addVehicle}
                             onUpdate={updateVehicle}
                             onDelete={deleteVehicle}
-                            onViewRuns={(v) => { setActiveVehicle(v); setRunsSubtab(DEFAULT_RUNS_SUBTAB); setFocusRunId(null); navigateTo('runs'); }}
+                            onViewRuns={viewVehicleRuns}
                             onOpenTest={openTest}
                             canCreate={canCreate}
                             canEdit={canEdit}
@@ -1225,14 +1186,22 @@ export default function App() {
                             subtab={runsSubtab}
                             onSubtabChange={setRunsSubtab}
                             focusRunId={focusRunId}
+                            editOnFocus={focusRunEdit}
                             onFocused={clearFocusRun}
                         />
+                    )}
+                    {/* Every chart but the vehicle table plots the selection.
+                      * With none, it says so and points at ＋ Add rather than
+                      * being unreachable; the views below draw only once
+                      * there is something to plot. */}
+                    {activeChartCategory && chartMode !== 'specstable' && selectedVehicles.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && (
+                        <SelectionEmptyState chart={labelForMode(chartMode)} />
                     )}
                     {/* ChargingView is the fall-through: it renders for any mode NOT
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
                         <ChargingView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -1243,18 +1212,23 @@ export default function App() {
                             setPairings={setPairings}
                         />
                     )}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'roadtrip' && (
+                    {/* Trip Optimizer is Road Trip's view as its optimizer
+                        variant; keyed so switching between them starts clean. */}
+                    {activeChartCategory && selectedVehicles.length > 0 && (chartMode === 'roadtrip' || chartMode === 'optimizer') && (
                         <RoadTripView
                             vehicles={chartVehicles}
+                            key={chartMode}
+                            optimizer={chartMode === 'optimizer'}
                             selectedVehicleIds={selectedVehicles}
                             roadTripConfig={roadTripConfig}
                             setRoadTripConfig={setRoadTripConfig}
                             pairings={pairings}
                             setPairings={setPairings}
-                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
-                            correctionMode={chartConfig.correctionMode ?? 'none'}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                            correctionTarget={chartConfig.correctionTarget}
                             setChartConfig={setChartConfig}
                         />
                     )}
@@ -1268,44 +1242,46 @@ export default function App() {
                             setXMinutes={v => setCompareConfig(p => ({ ...p, xMinutes: v }))}
                             setMMiles={v => setCompareConfig(p => ({ ...p, mMiles: v }))}
                             setStartSoc={v => setCompareConfig(p => ({ ...p, startSoc: v }))}
+                            orientation={compareConfig.orientation}
+                            setOrientation={o => setCompareConfig(p => ({ ...p, orientation: o }))}
+                            selectedKeys={compareConfig.selected}
+                            onSelectedChange={keys => setCompareConfig(p => ({ ...p, selected: keys }))}
                             pairings={pairings}
                             setPairings={setPairings}
                             verboseLabels={chartConfig.verboseLabels ?? false}
-                            correctionMode={chartConfig.correctionMode ?? 'none'}
-                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                            correctionTarget={chartConfig.correctionTarget}
+                            palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             testSpread={chartConfig.testSpread ?? true}
                             setChartConfig={setChartConfig}
                         />
                     )}
-                    {activeChartCategory && selectedVehicles.length > 0 && (chartMode === 'specs' || chartMode === 'specscatter') && (
-                        <SpecChartKind mode={chartMode} onChange={handleChartModeChange} />
-                    )}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specs' && (
-                        <SpecsChartView
-                            vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
-                            selectedField={chartConfig.specsField}
-                            onFieldChange={field => setChartConfig(p => ({ ...p, specsField: field }))}
+                    {activeChartCategory && (chartMode === 'specs' || chartMode === 'specscatter') && (
+                        <SpecChart
+                            mode={chartMode}
+                            onModeChange={handleChartModeChange}
+                            vehicles={selectedVehicles.map(id => chartVehicles.find(v => v.id === id)).filter(Boolean)}
+                            fleet={chartVehicles}
+                            filters={vehicleFilters}
+                            onFiltersChange={setVehicleFilters}
+                            chartConfig={chartConfig}
+                            setChartConfig={setChartConfig}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                            correctionTarget={chartConfig.correctionTarget}
                         />
                     )}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specscatter' && (
-                        <SpecsScatterView
-                            vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
-                            xField={chartConfig.scatterXField}
-                            yField={chartConfig.scatterYField}
-                            onFieldChange={(x, y) => setChartConfig(p => ({ ...p, scatterXField: x, scatterYField: y }))}
-                        />
-                    )}
-                    {activeChartCategory && chartMode === 'epacurves' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'epacurves' && (
                         <EpaCurvesView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                             epaConfig={epaConfig}
                             setEpaConfig={setEpaConfig}
-                            palette={chartConfig.seriesPalette ?? VEHICLE_PALETTE}
+                            palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
                             verboseLabels={chartConfig.verboseLabels ?? false}
-                            correctionMode={chartConfig.correctionMode ?? 'none'}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                            correctionTarget={chartConfig.correctionTarget}
                             setChartConfig={setChartConfig}
                         />
                     )}
@@ -1324,9 +1300,16 @@ export default function App() {
                     {/* No selection gate: the vehicle table is where a selection is
                         made, over the whole fleet (#315). */}
                     {activeChartCategory && chartMode === 'specstable' && (
-                        <VehicleTable onOpenTest={openTest} filters={vehicleFilters} onFiltersChange={setVehicleFilters} />
+                        <VehicleTable onOpenTest={openTest} onViewRuns={viewVehicleRuns} filters={vehicleFilters} onFiltersChange={setVehicleFilters}
+                            correctionTarget={chartConfig.correctionTarget}
+                            correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
+                            onCorrectionTargetChange={t => setChartConfig(prev => ({ ...prev, correctionTarget: t }))}
+                            assumptions={chartConfig.assumptions}
+                            onAssumptionsChange={a => setChartConfig(prev => ({ ...prev, assumptions: a }))}
+                            onPlotColumn={plotColumn}
+                        />
                     )}
-                    {view === 'epa' && <EpaSection subtab={epaSubtab} onExplorerState={setEpaExplorer} />}
+                    {view === 'epa' && <EpaSection subtab={epaSubtab} onPlotColumn={plotColumn} onExplorerState={setEpaExplorer} correctionTarget={chartConfig.correctionTarget} setChartConfig={setChartConfig} />}
                     {view === 'reference' && (
                         <ReferenceSection
                             subtab={referenceSubtab}
@@ -1376,6 +1359,18 @@ export default function App() {
                     )}
                 </main>
 
+                {featuredEditor && (
+                    <FeaturedComparisonEditor
+                        request={featuredEditor}
+                        comparisons={featured.comparisons}
+                        vehicles={vehicles}
+                        canDelete={isAdmin}
+                        onSave={(c) => (c.id == null ? featured.create(c) : featured.save(c))}
+                        onDelete={featured.remove}
+                        onClose={() => setFeaturedEditor(null)}
+                    />
+                )}
+
                 {/* Footer, and the ~100px of clear space below it.
                     Every bottom-anchored panel here — the delete/undo bar, the
                     reorder bar, the notification banner — is fixed to the
@@ -1397,12 +1392,20 @@ export default function App() {
             {appNotification && (
                 <div className={`fixed-action-bar z-[60] ${appNotification.type === 'error' ? 'is-danger' : 'is-good'}`}>
                     <div className="page-container py-3 flex items-center gap-4">
-                        <span className="text-xl">{appNotification.type === 'error' ? '⚠️' : '✓'}</span>
+                        <span className="text-xl">{appNotification.type === 'error' ? '⚠' : '✓'}</span>
                         <p className={`flex-1 text-sm font-medium ${
                             appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
                         }`}>
                             {appNotification.message}
                         </p>
+                        {appNotification.action && (
+                            <button
+                                onClick={() => { appNotification.action.onClick(); clearNotification(); }}
+                                className="btn btn-secondary text-sm"
+                            >
+                                ↩ {appNotification.action.label}
+                            </button>
+                        )}
                         <button
                             onClick={clearNotification}
                             className={`text-lg leading-none opacity-50 hover:opacity-100 transition ${
@@ -1414,7 +1417,8 @@ export default function App() {
                 </div>
             )}
         </VehicleBaseContext.Provider>
+        </FeaturedComparisonsContext.Provider>
         </NavigationContext.Provider>
-        </ScaleSyncContext.Provider>
+        </AxisLimitsProvider>
     );
 }

@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import MenuButton from '../shell/MenuButton';
 import useColumnDrag from '../../hooks/useColumnDrag';
+import { columnMatches } from '../../utils/tableColumns';
 
 /**
  * Which columns a table shows, and in what ORDER — shared by the FE Guide table
@@ -42,9 +43,8 @@ export default function ColumnPicker({ columns, visible, defaults, fixedKey, onC
     const shown = visible.map(k => byKey.get(k)).filter(Boolean);
     const hidden = columns.filter(c => !visible.includes(c.key));
 
-    const needle = query.trim().toLowerCase();
-    const matches = (col) => !needle
-        || [col.label, col.fullLabel, unitOf(col), col.group].some(t => t && String(t).toLowerCase().includes(needle));
+    const needle = query.trim();
+    const matches = (col) => columnMatches(col, needle, unitOf);
     const shownMatching = shown.filter(col => col.key === fixedKey || matches(col));
     const hiddenMatching = hidden.filter(matches);
 

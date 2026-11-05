@@ -17,6 +17,7 @@ import { REPORTED_RANGE_REASON } from './testedRange';
 import { fmtSpeed, fmtDistance } from './unitConversions';
 import { preconditionedFact } from './runPreconditioning';
 import { chargerClassFact } from './runChargerClass';
+import { chargerCurrentFact } from './chargerCurrentClass';
 
 /**
  * @typedef {Object} TestReference
@@ -50,7 +51,7 @@ const commonFacts = (run, units) => [
  *        behind, which decides the caveat: a narrow window costs a range its
  *        claim and costs an efficiency nothing
  */
-export function rangeTestReference(vehicle, t, units = 'imperial', figure = 'range') {
+export function rangeTestReference(vehicle, t, units = 'imperial', figure = 'range', whenNew = null) {
     if (!t?.run) return null;
     const run = t.run;
     const speed = t.speedMph != null ? `${fmtSpeed(t.speedMph, units)}${t.speedNote ? ` (${t.speedNote})` : ''}` : null;
@@ -68,8 +69,14 @@ export function rangeTestReference(vehicle, t, units = 'imperial', figure = 'ran
             fact('Distance', run.distance_miles > 0 ? fmtDistance(run.distance_miles, units) : null),
             fact('Energy used', run.energy_kwh > 0 ? `${round1(Number(run.energy_kwh))} kWh` : null),
             fact('Full pack', t.isScaled && t.fullPackMi != null ? `${fmtDistance(t.fullPackMi, units)}, scaled from the window` : null),
+            // What the same test reaches on a new pack, said only where the pack
+            // is far enough down for it to matter (whenNewRange).
+            fact('When new', whenNew ? `${fmtDistance(whenNew.whenNewMi, units)} at ${round1(whenNew.capacityKwh)} kWh` : null),
+            fact('Capacity retention', whenNew ? `${Math.round(whenNew.retention * 100)}%` : null),
         ].filter(Boolean),
-        caveat: figure === 'efficiency'
+        caveat: figure === 'when-new'
+            ? 'Measured efficiency at the new-car capacity. A pack that has aged shows as capacity retention under 100%; a test run in unusual conditions can read the same way.'
+            : figure === 'efficiency'
             ? (t.estimated ? 'The test logged no energy, so it is estimated from the window and the battery.' : null)
             : t.startSoc == null ? 'The test does not record its state-of-charge window.'
             : t.isScaled ? 'Scaled to a full pack assuming consumption is flat across it.'
@@ -101,6 +108,7 @@ export function chargeTimeTestReference(vehicle, tested, { from, to }, units = '
             fact(`${from}→${to}%`, `${Math.round(tested.minutes)} min`),
             fact('Preconditioned', preconditionedFact(run.preconditioned)),
             fact('Charger', chargerClassFact(run.charger_voltage_class)),
+            fact('Charger current', chargerCurrentFact(run.charger_current_class_a)),
             fact('Started at', summary.startSoc != null ? `${summary.startSoc}%` : null),
             fact('Peak', summary.peakKw != null ? `${Math.round(summary.peakKw)} kW` : null),
             fact('Session', summary.durationMin != null ? `${Math.round(summary.durationMin)} min` : null),
@@ -173,5 +181,7 @@ export function testHref(ref) {
     // sub-tab was last open, and a test link could land on EPA.
     const p = new URLSearchParams({ tab: 'runs', vid: String(ref.vehicleId), sub: ref.sub ?? 'tests' });
     if (ref.runId != null) p.set('run', String(ref.runId));
+    // Open the test's edit form on arrival (Data Checks → a test's attribution).
+    if (ref.runId != null && ref.edit) p.set('edit', '1');
     return `?${p.toString()}`;
 }

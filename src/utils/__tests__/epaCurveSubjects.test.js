@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     CURVE_TIERS, tierByKey, curveSubject, curveSubjects, resolveCurveEnergy,
-    curveTooltipLines, disambiguateLabels,
+    disambiguateLabels,
 } from '../epaCurveSubjects';
 
 const coeffs = [{ is_primary: true, target_a: 37, target_b: 0.2, target_c: 0.02, equiv_test_weight_lbs: 5500 }];
@@ -139,16 +139,6 @@ describe('labels', () => {
 });
 
 describe('chart labelling', () => {
-    it('builds the three tooltip lines: name, x with unit, y with unit', () => {
-        expect(curveTooltipLines({
-            name: 'Blazer EV AWD', x: 60, y: 3.1163, xUnit: 'mph', yUnit: 'mi/kWh', digits: 3,
-        })).toEqual(['Blazer EV AWD', '60 mph', '3.116 mi/kWh']);
-    });
-    it('rounds the speed and honours the axis precision', () => {
-        expect(curveTooltipLines({ name: 'X', x: 96.56, y: 41.53, xUnit: 'km/h', yUnit: 'kWh/100mi', digits: 1 }))
-            .toEqual(['X', '97 km/h', '41.5 kWh/100mi']);
-    });
-
     it('leaves distinct names alone', () => {
         const subs = [
             { key: 'a', label: 'R1S Dual Max', testVehicle: { model_year: 2025 } },

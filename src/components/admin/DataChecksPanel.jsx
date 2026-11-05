@@ -1,7 +1,11 @@
 import ChargeSummaryMaintenance from './ChargeSummaryMaintenance';
 import CompositeMaintenance from './CompositeMaintenance';
+import EpaLabelLinkMaintenance from './EpaLabelLinkMaintenance';
+import BehindNoLabelMaintenance from './BehindNoLabelMaintenance';
+import TestAttributionCheck from './TestAttributionCheck';
 import { useState, useMemo, useCallback } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { sessionFor } from '../../utils/testSessions';
 import { useAsyncResource } from '../../hooks/useAsyncResource';
 import { KNOB_GROUPS } from '../../constants/knobs';
 import { setOverride } from '../../constants/overrides';
@@ -360,8 +364,10 @@ export default function DataChecksPanel() {
     const {
         vehicles, getPerformanceSummaries, getPerformanceSessions,
         getDataCheckSkips, setDataCheckSkip, recordDataCheckSkips,
-        updateVehicle, updateVehicleSpecs, setPrimaryEpaMapping,
+        updateVehicle, updateVehicleSpecs, setPrimaryEpaMapping, testSessions,
     } = useAppContext();
+    // A range test's session supplies the conditions it omits ('range-test-conditions').
+    const sessionOf = useCallback(r => sessionFor(testSessions, r), [testSessions]);
     const fleet = useMemo(() => vehicles ?? [], [vehicles]);
 
     // Performance results are not on the vehicle object — getVehicles keeps the
@@ -408,7 +414,7 @@ export default function DataChecksPanel() {
     const [showSkipped, setShowSkipped] = useState(false);
     const [writeError, setWriteError]   = useState(null);
 
-    const rows   = useMemo(() => runDataChecks(fleet, { limits, testedRule: rule, performance, skips }), [fleet, limits, rule, performance, skips]);
+    const rows   = useMemo(() => runDataChecks(fleet, { limits, testedRule: rule, performance, skips, sessionOf }), [fleet, limits, rule, performance, skips, sessionOf]);
     const counts = useMemo(() => checkCounts(rows), [rows]);
 
     // What each rule would report, so the choice between them is made against numbers.
@@ -416,7 +422,7 @@ export default function DataChecksPanel() {
         r.key,
         r.key === rule
             ? counts['tested-vs-label']
-            : checkCounts(runDataChecks(fleet, { limits, testedRule: r.key, performance, skips }))['tested-vs-label'],
+            : checkCounts(runDataChecks(fleet, { limits, testedRule: r.key, performance, skips, sessionOf }))['tested-vs-label'],
     ])), [fleet, limits, rule, performance, skips, counts]);
 
     const variants = useMemo(() => sourceNameVariants(perfData?.summaries ?? []), [perfData]);
@@ -578,6 +584,12 @@ export default function DataChecksPanel() {
             <h4 className="subsection-title mt-6">Composite curves</h4>
             <CompositeMaintenance />
 
+            <h4 className="subsection-title mt-6">EPA Label links</h4>
+            <EpaLabelLinkMaintenance />
+
+            <h4 className="subsection-title mt-6">Behind no EPA Label</h4>
+            <BehindNoLabelMaintenance />
+
             <h4 className="subsection-title mt-6">Limits</h4>
             <p className="text-note mb-2">
                 Change a limit and every count below updates at once. Nothing is saved until you
@@ -667,7 +679,7 @@ export default function DataChecksPanel() {
                         <button type="button" className="btn btn-secondary text-sm" onClick={() => setOnly('no-400v-support')}>
                             Show them
                         </button>
-                        <button type="button" className="btn btn-primary text-sm" disabled={filling} onClick={fillAllNative}>
+                        <button type="button" className="btn btn-secondary text-sm" disabled={filling} onClick={fillAllNative}>
                             {filling ? 'Filling…' : `Fill all ${fillPlan.length}`}
                         </button>
                     </span>
@@ -747,6 +759,9 @@ export default function DataChecksPanel() {
             ) : (
                 <p className="text-note">Every published source is spelled one way.</p>
             )}
+
+            <h4 className="subsection-title mt-6">Test attribution</h4>
+            <TestAttributionCheck />
         </div>
     );
 }

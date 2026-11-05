@@ -1,9 +1,9 @@
 /**
  * VoteButtons — three reusable vote widgets for accuracy vouching and flagging.
  *
- * SpecVouchButton    — whole-vehicle spec vouch (👍 with count)
- * SpecFieldFlagButton — per-field flag inline button (🚩)
- * RunVoteButtons      — vouch/flag pair for a run (👍 N  🚩 N)
+ * SpecVouchButton    — whole-vehicle spec vouch (▲ with count)
+ * SpecFieldFlagButton — per-field flag inline button (⚑)
+ * RunVoteButtons      — vouch/flag pair for a run (▲ N  ⚑ N)
  */
 
 // ── SpecVouchButton ────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ export function SpecVouchButton({ count = 0, myVouch = false, onVouch, readOnly 
     if (readOnly) {
         return count > 0 ? (
             <span className="vote-readonly">
-                👍 {count} {count === 1 ? 'person vouched' : 'people vouched'} for accuracy
+                ▲ {count} {count === 1 ? 'person vouched' : 'people vouched'} for accuracy
             </span>
         ) : null;
     }
@@ -30,7 +30,7 @@ export function SpecVouchButton({ count = 0, myVouch = false, onVouch, readOnly 
             onClick={onVouch}
             title={myVouch ? 'Remove your vouch' : 'Vouch that these specs look accurate'}
         >
-            👍 {myVouch ? 'Vouched' : 'Vouch for accuracy'}{count > 0 ? ` (${count})` : ''}
+            ▲ {myVouch ? 'Vouched' : 'Vouch for accuracy'}{count > 0 ? ` (${count})` : ''}
         </button>
     );
 }
@@ -38,7 +38,7 @@ export function SpecVouchButton({ count = 0, myVouch = false, onVouch, readOnly 
 // ── SpecFieldFlagButton ────────────────────────────────────────────────────────
 
 /**
- * Small inline 🚩 button shown next to a spec field value.
+ * Small inline ⚑ button shown next to a spec field value.
  *
  * Props:
  *   isFlagged {boolean}  — whether this field is currently flagged (DB or pending)
@@ -62,10 +62,10 @@ export function SpecFieldFlagButton({ isFlagged = false, isPending = false, onFl
                 style={{ cursor: clickable ? 'pointer' : 'default' }}
                 title={
                     isAdmin
-                        ? '🚩 Users flagged this value — click to clear'
+                        ? '⚑ Users flagged this value — click to clear'
                         : isPending
-                            ? '🚩 Click to undo flag'
-                            : '🚩 Users have flagged this value as potentially inaccurate'
+                            ? '⚑ Click to undo flag'
+                            : '⚑ Users have flagged this value as potentially inaccurate'
                 }
             >
                 ⚑{(isAdmin || isPending) && <span className="text-xs opacity-70 ml-0.5">×</span>}
@@ -103,14 +103,14 @@ export function RunVoteButtons({ vouch = 0, flag = 0, myVote = null, onVote }) {
                 onClick={() => onVote('vouch')}
                 title={myVote === 'vouch' ? 'Remove your vouch' : 'Vouch that this test data looks accurate'}
             >
-                👍{vouch > 0 ? ` ${vouch}` : ''}
+                ▲{vouch > 0 ? ` ${vouch}` : ''}
             </button>
             <button
                 className={`vote-btn vote-btn-flag${myVote === 'flag' ? ' vote-btn-active' : ''}`}
                 onClick={() => onVote('flag')}
                 title={myVote === 'flag' ? 'Remove your flag' : 'Flag this test data as questionable'}
             >
-                🚩{flag > 0 ? ` ${flag}` : ''}
+                ⚑{flag > 0 ? ` ${flag}` : ''}
             </button>
         </span>
     );

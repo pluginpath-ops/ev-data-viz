@@ -1,0 +1,91 @@
+import { useMemo, useState } from 'react';
+import PresentedChart from '../PresentedChart';
+import MarkdownText from '../MarkdownText';
+import { useAppContext } from '../../context/AppContext';
+import { useInView } from '../../hooks/useInView';
+import PresentedVehicleTable from '../vehicles/PresentedVehicleTable';
+import { chartStateOf, defaultChartTitle, vehiclesInOrder, explicitChartParams } from '../../utils/featuredComparisons';
+
+/**
+ * One chart of a featured comparison, drawn on Home from its saved settings.
+ *
+ * The chart is the same view the pop-out shows, fed its own copy of the state
+ * rather than the site's live state: the reader's selection and tweaks neither
+ * change it nor are changed by it. It holds that copy because the chart writes
+ * to it as it settles (which tests, pairs or curves are plotted, once it has
+ * bootstrapped them) — a chart with nowhere to write that stays blank.
+ *
+ * The whole panel opens the chart on the real tab, where the reader can change
+ * anything; the panel is a shop window, so the chart under the glass takes no
+ * clicks. Charts draw only once they are near the viewport.
+ *
+ * Remount it (key) when the saved chart changes — the state is seeded once.
+ */
+export default function FeaturedChartPanel({ comparison, index, onOpen }) {
+    const { vehicles } = useAppContext();
+    const chart = comparison.charts[index];
+    const [ref, near] = useInView();
+
+    const seed = useMemo(() => chartStateOf(comparison, index, vehicles), [comparison, index, vehicles]);
+    const [chartConfig, setChartConfig] = useState(() => seed?.chartConfig);
+    const [compareConfig, setCompareConfig] = useState(() => seed?.compareConfig);
+    const [roadTripConfig, setRoadTripConfig] = useState(() => seed?.roadTripConfig);
+    const [epaConfig, setEpaConfig] = useState(() => seed?.epaConfig);
+
+    if (!seed || !chart) return null;
+    // In the comparison's order: it is the order the series are drawn and listed in.
+    const shown = vehiclesInOrder(seed.vehicleIds, vehicles);
+
+    // The vehicle table is not a chart: it has no frame to size, and a table is too
+    // wide for half a row, so its panel takes the whole row.
+    const isTable = seed.chartMode === 'specstable';
+
+    return (
+        <section ref={ref} className={`home-panel${isTable ? ' is-wide' : ''}`} aria-label={chart.title}>
+            <header className="home-panel-head">
+                <div className="home-panel-heading">
+                    <h3 className="section-title">{chart.title}</h3>
+                    <span className="text-meta">{defaultChartTitle(seed.chartMode)}</span>
+                </div>
+                <button type="button" className="btn btn-primary home-panel-open" onClick={onOpen}>
+                    Open chart ↘
+                </button>
+            </header>
+            <MarkdownText text={chart.caption} />
+            <div className="home-panel-body">
+                {near && isTable && (
+                    <PresentedVehicleTable
+                        vehicleIds={seed.vehicleIds}
+                        search={explicitChartParams(chart.params)}
+                        correctionTarget={seed.chartConfig.correctionTarget}
+                        correctionMode={seed.chartConfig.correctionMode}
+                        onOpen={onOpen}
+                    />
+                )}
+                {near && !isTable && shown.length > 0 && (
+                    <PresentedChart
+                        vehicles={shown}
+                        selectedVehicles={shown.map(v => v.id)}
+                        chartMode={seed.chartMode}
+                        chartConfig={chartConfig}
+                        setChartConfig={setChartConfig}
+                        compareConfig={compareConfig}
+                        setCompareConfig={setCompareConfig}
+                        roadTripConfig={roadTripConfig}
+                        setRoadTripConfig={setRoadTripConfig}
+                        epaConfig={epaConfig}
+                        setEpaConfig={setEpaConfig}
+                        pairings={seed.pairings}
+                    />
+                )}
+                {near && !isTable && shown.length === 0 && (
+                    <p className="text-note">None of this comparison's vehicles are available any more.</p>
+                )}
+                {/* Over the chart, so a click anywhere on the panel opens it. Not over
+                    a table, which scrolls sideways under the reader's finger and opens
+                    from its own rows. */}
+                {!isTable && <button type="button" className="home-panel-cover" onClick={onOpen} aria-label={`Open ${chart.title}`} tabIndex={-1} />}
+            </div>
+        </section>
+    );
+}

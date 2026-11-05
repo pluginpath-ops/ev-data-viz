@@ -62,6 +62,23 @@ export const timestampToMs = (val) => {
 };
 
 /**
+ * The cell as stored in data_points.timestamp (timestamptz), or null when it
+ * isn't a real datetime. An elapsed clock / timecode ("00:01:04:12") is a
+ * duration, not a moment: it feeds `time` via {@link timestampToMs} but must
+ * never reach the timestamptz column — Postgres rejects it and the whole save
+ * fails ("invalid input syntax for type timestamp with time zone").
+ *
+ * @param {string|null|undefined} val
+ * @returns {string|null}
+ */
+export const wallClockTimestamp = (val) => {
+    if (typeof val !== 'string') return null;
+    const s = val.trim();
+    if (s === '' || clockToSeconds(s) != null) return null;
+    return timestampToMs(s) != null ? s : null;
+};
+
+/**
  * True when a cell looks like a wall-clock timestamp or elapsed clock/timecode
  * string rather than a plain number (which dynamicTyping would already have
  * turned into a JS number).

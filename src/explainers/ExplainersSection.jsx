@@ -2,6 +2,7 @@ import './explainers.css';
 import ExplainerLink from './ExplainerLink';
 import ExplainerPage from './ExplainerPage';
 import ExplainerTree, { HubGlyph } from './ExplainerTree';
+import ScrollMoreHint from '../components/ScrollMoreHint';
 import { OUTLINE, outlineNode, hubOf } from './outline';
 import { topicBySlug, visibleTopics } from './topics';
 
@@ -65,6 +66,7 @@ export default function ExplainersSection({ topic = null, onBack }) {
                     </section>
                 ))}
             </div>
+            <ScrollMoreHint target=".explainer-hub" label="Scroll to the next subject" />
         </div>
     );
 }
@@ -101,7 +103,7 @@ function WhereThisFits({ slug, readable }) {
             <div className="explainer-hub-head">
                 <HubGlyph glyph={hub.glyph} />
                 <div>
-                    <h3 id="explainer-fits" className="text-micro">Where this fits</h3>
+                    <h3 id="explainer-fits" className="subsection-title">Where this fits</h3>
                     <p className="subsection-title">{hub.title}</p>
                 </div>
             </div>

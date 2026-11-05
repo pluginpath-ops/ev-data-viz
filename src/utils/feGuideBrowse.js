@@ -240,11 +240,23 @@ export function decorateRow(row, brandIndex) {
  * `group` drives the column picker's sections and the detail view's headings,
  * so the two never drift apart — one list, two renderings.
  *
- * `unit` is separate from `label` so a header can stay short while the value
- * still carries its unit. `digits` is fixed per column rather than inferred:
+ * `unit` is separate from `label`: the header names the column and each cell
+ * states the unit beside its figure (TableCell). A numeric column has a `unit`
+ * or says `unitless: true` — a ratio, a count, a year — and "no unit" is a
+ * decision the column makes, not a field somebody forgot (tableColumns.test.js
+ * fails the column that does neither). Units are cased as written: MPGe, kWh.
+ * `digits` is fixed per column rather than inferred:
  * EPA publishes the label figures rounded and the unadjusted ones to three
  * decimals, and showing 154.2 where the source says 154.214 quietly discards
  * the precision that makes the derivation check meaningful.
+ */
+/*
+ * `plotAs` names the vehicle table column a guide column is the same figure as
+ * (#450), which is what its header chart icon opens in the spec chart. The
+ * guide's rows are EPA configurations and the spec chart plots vehicles, so
+ * only a column with a vehicle-table twin carries one; the rest have no icon
+ * rather than one that plots something else. Battery pack is not mapped: the
+ * guide's is the GROSS pack and the table's Battery is the resolved window.
  */
 export const GUIDE_COLUMNS = [
     // Identity. Configuration leads and is sticky in the table — it is the only
@@ -257,20 +269,20 @@ export const GUIDE_COLUMNS = [
       hint: 'Corporate parent: Chevrolet, Cadillac and GMC all read General Motors. Blank until a curator sets it.' },
     { key: 'division',         label: 'EPA division', group: 'Identity',
       hint: 'The division exactly as EPA filed it, before brand resolution.' },
-    { key: 'model_year',       label: 'Year',        group: 'Identity',   numeric: true,  digits: 0, default: true, holds: 'short-values' },
+    { key: 'model_year',       label: 'Year',        group: 'Identity',   numeric: true,  digits: 0, default: true, holds: 'short-values', unitless: true, plotAs: 'year' },
     { key: 'model_type_index', label: 'Model type',  group: 'Identity',   holds: 'short-values',
       hint: 'EPA’s own index for a model type. Part of the natural key — carline alone is not unique.' },
     { key: 'smog_test_group',  label: 'Test Group',  group: 'Identity',
       hint: 'EPA’s smog Test Group. Configurations certified together share one; it is not unique per configuration.' },
 
     // Label figures — the window sticker. Range first: it is what people come for.
-    { key: 'label_comb_range_mi', label: 'Range',      unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true },
-    { key: 'label_hwy_range_mi',  label: 'Hwy range',  unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true },
-    { key: 'label_city_range_mi', label: 'City range', unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true },
+    { key: 'label_comb_range_mi', label: 'Range',      unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true, plotAs: 'figures.epaRangeMi' },
+    { key: 'label_hwy_range_mi',  label: 'Hwy range',  unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true, plotAs: 'figures.epaHwyMi' },
+    { key: 'label_city_range_mi', label: 'City range', unit: 'mi',   group: 'Label', numeric: true, digits: 0, default: true, bar: true, plotAs: 'figures.epaCityMi' },
     { key: 'label_comb_mpge',     label: 'Combined',   unit: 'MPGe', group: 'Label', numeric: true, digits: 0, default: true },
     { key: 'label_city_mpge',     label: 'City',       unit: 'MPGe', group: 'Label', numeric: true, digits: 0 },
     { key: 'label_hwy_mpge',      label: 'Hwy',        unit: 'MPGe', group: 'Label', numeric: true, digits: 0 },
-    { key: 'city_hwy_ratio',      label: 'City:Hwy',   group: 'Label', numeric: true, digits: 3, derived: true,
+    { key: 'city_hwy_ratio',      label: 'City:Hwy',   group: 'Label', numeric: true, digits: 3, derived: true, unitless: true,
       hint: 'City MPGe ÷ highway MPGe. Mostly aerodynamics and mass, so it reads as a verdict on the body and drivetrain rather than on battery size.' },
 
     // Battery
@@ -291,7 +303,7 @@ export const GUIDE_COLUMNS = [
     // several configurations into one row, which puts nine motors on a Taycan.
     // Still offered, because it is right for the ~94% of rows that are not
     // collapsed, and those rows are flagged.
-    { key: 'motor_count',    label: 'Motors',      group: 'Powertrain', numeric: true, digits: 0, holds: 'short-values',
+    { key: 'motor_count',    label: 'Motors',      group: 'Powertrain', numeric: true, digits: 0, holds: 'short-values', unitless: true,
       hint: 'EPA’s motor-generator count. A union on collapsed rows — see the "multi" flag — so read it alongside that.' },
     { key: 'wheel_size_in',  label: 'Wheels', unit: 'in', group: 'Powertrain', numeric: true, digits: 0, derived: true, holds: 'short-values',
       hint: 'Read from the configuration name. EPA has no wheel column, and only some makers state it — about 43% of rows resolve, mostly Rivian and BMW. Blank means the maker did not say.' },
@@ -306,13 +318,13 @@ export const GUIDE_COLUMNS = [
     { key: 'charge_time_240v_h', label: '240V charge', unit: 'h', group: 'Charging', numeric: true, digits: 1 },
 
     // Unadjusted and adjusted, as EPA publishes them
-    { key: 'unadj_city_mpge', label: 'Unadj city', unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3 },
-    { key: 'unadj_hwy_mpge',  label: 'Unadj hwy',  unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3 },
-    { key: 'unadj_comb_mpge', label: 'Unadj comb', unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3 },
-    { key: 'adj_city_mpge',   label: 'Adj city',   unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3 },
-    { key: 'adj_hwy_mpge',    label: 'Adj hwy',    unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3 },
-    { key: 'adj_comb_mpge',   label: 'Adj comb',   unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3 },
-    { key: 'label_adjustment_factor', label: 'Adj factor', group: 'Unadjusted & adjusted', numeric: true, digits: 4,
+    { key: 'unadj_city_mpge', label: 'Unadj city', unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3, holds: 'long-figures' },
+    { key: 'unadj_hwy_mpge',  label: 'Unadj hwy',  unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3, holds: 'long-figures' },
+    { key: 'unadj_comb_mpge', label: 'Unadj comb', unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3, holds: 'long-figures' },
+    { key: 'adj_city_mpge',   label: 'Adj city',   unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3, holds: 'long-figures' },
+    { key: 'adj_hwy_mpge',    label: 'Adj hwy',    unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3, holds: 'long-figures' },
+    { key: 'adj_comb_mpge',   label: 'Adj comb',   unit: 'MPGe', group: 'Unadjusted & adjusted', numeric: true, digits: 3, holds: 'long-figures' },
+    { key: 'label_adjustment_factor', label: 'Adj factor', group: 'Unadjusted & adjusted', numeric: true, digits: 4, unitless: true,
       hint: 'The adjustment EPA applied to THIS configuration. Not a flat 0.7 — the 2027 R2 is 0.7051 at 20" and 0.7294 at 21".' },
     { key: 'adjustment_signature', label: 'Signature', group: 'Unadjusted & adjusted',
       hint: 'Read from the numbers, not from EPA’s declaration: 57% of rows declaring a 5-cycle label carry exactly 0.700000, the fixed factor. This is the value to trust.' },

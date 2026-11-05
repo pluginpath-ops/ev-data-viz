@@ -46,7 +46,7 @@ export default function PlatformPage({ platformId, onBack }) {
             <h2 className="page-title mb-4">{platform.name}</h2>
             <div className="platform-page-grid">
                 <section className="card platform-page-card" aria-labelledby="platform-provides">
-                    <h3 id="platform-provides" className="text-micro">What it is and provides</h3>
+                    <h3 id="platform-provides" className="subsection-title">What it is and provides</h3>
                     <dl className="platform-facts">
                         {facts.map(f => (
                             <div key={f.label} className="platform-fact" title={f.title}>
@@ -62,25 +62,25 @@ export default function PlatformPage({ platformId, onBack }) {
                     </p>
                     {method && (
                         <ExplainerLink topic="400v-charger-compatibility" className="platform-page-more">
-                            How 400 V support works →
+                            How 400 V support works ↘
                         </ExplainerLink>
                     )}
                 </section>
 
                 <section className="card platform-page-card" aria-labelledby="platform-notes">
-                    <h3 id="platform-notes" className="text-micro">Notes</h3>
+                    <h3 id="platform-notes" className="subsection-title">Notes</h3>
                     <p className="platform-page-notes">{platform.notes || 'No notes yet.'}</p>
                 </section>
 
                 <section className="card platform-page-card" aria-labelledby="platform-vehicles">
                     <div className="flex items-center justify-between gap-2">
-                        <h3 id="platform-vehicles" className="text-micro">
+                        <h3 id="platform-vehicles" className="subsection-title">
                             {onIt.length} {onIt.length === 1 ? 'vehicle' : 'vehicles'} on it
                         </h3>
                         {onIt.length > 0 && (
                             <button
                                 type="button"
-                                className="btn btn-primary text-sm"
+                                className="btn btn-secondary text-sm"
                                 disabled={allSelected}
                                 onClick={() => setVehicleSelection([...new Set([...selectedVehicles, ...onIt.map(v => v.id)])])}
                             >
@@ -115,7 +115,7 @@ export default function PlatformPage({ platformId, onBack }) {
 function PlatformCrumb({ onBack, current }) {
     return (
         <nav aria-label="Breadcrumb" className="page-crumb mb-1">
-            <a href="?tab=reference" onClick={e => { e.preventDefault(); onBack?.(); }}>Platforms</a>
+            <a href="?tab=reference&sub=platforms" onClick={e => { e.preventDefault(); onBack?.(); }}>Platforms</a>
             {current && <><span aria-hidden="true"> / </span><span aria-current="page">{current}</span></>}
         </nav>
     );

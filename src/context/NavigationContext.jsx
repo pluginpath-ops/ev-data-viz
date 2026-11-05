@@ -10,7 +10,9 @@ import { createContext, useContext } from 'react';
  *
  *   openPlatform(id)     show a platform's page under Reference
  *   openExplainer(slug)  show an explainer under Reference › Explainers (#355)
+ *   openFeaturedChart(comparison, index)  put one chart of a featured comparison on screen (#448)
+ *   resetToComparison(comparison)         put the site back to a featured comparison's vehicles and correction
  */
-export const NavigationContext = createContext({ openPlatform: null, openExplainer: null });
+export const NavigationContext = createContext({ openPlatform: null, openExplainer: null, openFeaturedChart: null, resetToComparison: null });
 
 export const useNavigation = () => useContext(NavigationContext);

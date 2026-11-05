@@ -1,5 +1,5 @@
 /**
- * Which spec chart is showing, above the plot: a bar of one column, or a
+ * Which spec chart is showing, at the top of its sidebar: a bar of one column, or a
  * scatter of two (#338).
  *
  * The two were separate sub-tabs, Spec Chart and Spec Scatter. Under Vehicles
@@ -15,21 +15,19 @@ const KINDS = [
 
 export default function SpecChartKind({ mode, onChange }) {
     return (
-        <div className="controls-strip">
-            <div className="stats-segmented" role="group" aria-label="Chart kind">
-                {KINDS.map(k => (
-                    <button
-                        key={k.mode}
-                        type="button"
-                        className={mode === k.mode ? 'active' : ''}
-                        aria-pressed={mode === k.mode}
-                        title={k.title}
-                        onClick={() => onChange(k.mode)}
-                    >
-                        {k.label}
-                    </button>
-                ))}
-            </div>
+        <div className="stats-segmented" role="group" aria-label="Chart kind">
+            {KINDS.map(k => (
+                <button
+                    key={k.mode}
+                    type="button"
+                    className={mode === k.mode ? 'active' : ''}
+                    aria-pressed={mode === k.mode}
+                    title={k.title}
+                    onClick={() => onChange(k.mode)}
+                >
+                    {k.label}
+                </button>
+            ))}
         </div>
     );
 }

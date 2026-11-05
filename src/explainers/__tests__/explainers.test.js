@@ -121,8 +121,15 @@ describe('peakOnCharger', () => {
 describe('topics', () => {
     it('reads every content file, and each has a title', () => {
         expect(TOPICS.map(t => t.slug).sort()).toEqual(['400v-charger-compatibility', '400v-vs-800v',
-            'epa-battery-figures', 'epa-drive-cycles', 'epa-test-procedures', 'epa-vs-real-world', 'reading-modeled-efficiency']);
+            'dc-fast-charging-loss', 'epa-battery-figures', 'epa-drive-cycles', 'epa-test-procedures', 'epa-vs-real-world', 'heating-cooling-and-range',
+            'reading-modeled-efficiency', 'v2l-v2h-v2g', 'wind-and-range-tests']);
         for (const t of TOPICS) expect(t.title).not.toBe(t.slug);
+    });
+
+    it('keeps the heating and cooling page a draft while it cites the unsourced reference table (#449)', () => {
+        const page = TOPICS.find(t => t.slug === 'heating-cooling-and-range');
+        expect(page.unverified).toEqual(['evbench-accessory-reference-table']);
+        expect(page.isDraft).toBe(true);
     });
 
     it('lets only a draft cite an unverified fact', () => {
@@ -190,7 +197,6 @@ describe('previewAxes', () => {
     });
 
     it('measures an added axis from the run’s first reading', () => {
-        expect(axisPoints(pts, 'time', 'deltaSoc')).toEqual([[0, 0], [10, 40], [20, 70]]);
         expect(axisPoints(pts, 'time', 'deltaRange')).toEqual([[0, 0], [10, 120], [20, 210]]);
     });
 
@@ -201,7 +207,7 @@ describe('previewAxes', () => {
     });
 
     it('keys its axes as Charging Curves does', () => {
-        const chartView = readFileSync(join(ROOT, 'src', 'components', 'ChargingView.jsx'), 'utf8');
+        const chartView = readFileSync(join(ROOT, 'src', 'utils', 'chargingAxes.js'), 'utf8');
         for (const key of Object.keys(PREVIEW_AXES)) expect(chartView, key).toMatch(new RegExp(`value: '${key}'`));
     });
 });

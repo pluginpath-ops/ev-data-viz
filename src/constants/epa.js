@@ -144,12 +144,34 @@ export const EPA_DEFAULTS = {
     DEFAULT_SS_ETA:      0.929,
     DEFAULT_ACCESSORY_W: 300,         // constant accessory draw, watts
     // Used when AC recharge energy is unavailable. Was 0.88 from a read of CSI
-    // observations (~0.87–0.89); now 0.855, from the two cert records where BOTH
-    // sides are reported and the ratio is measured rather than inferred:
+    // observations (~0.87–0.89), then 0.855 from the two cert records where
+    // BOTH sides are reported (#206):
     //   Rivian R2 (MCT)        89,549.27 DC / 104,689 AC = 85.5%
     //   Ford Lightning ER (SCT) ~131 kWh usable / 152.974 = 85.6%
-    // Refine as more MCT records with real DC energy accumulate (#206).
-    ASSUMED_CHARGER_EFF: 0.855,
+    // Now 0.885, the fleet median: Certification Statistics, charger efficiency,
+    // model year 2025, n = 174 (quartiles 0.872–0.894, range 0.805–0.918). The
+    // two records above both sit below its lower quartile, so they were a low
+    // read of the fleet (#506). Refresh it as the data grows.
+    ASSUMED_CHARGER_EFF: 0.885,
+    // What a DC fast session loses between the car's port and the pack's DC
+    // output (what the inverter draws), as a fraction of the energy the
+    // station bills (#506). The same span the AC figure above covers, so the
+    // two are comparable, but not the AC loss above (0.115 assumed, the median of the
+    // 2025 certifications): that recharge runs the
+    // onboard charger for hours. A DC session bypasses it, and the station's
+    // own conversion (about 3%) is not billed. What is left is the cable and
+    // port, cooling and battery heating (including the preconditioning on the
+    // way in), auxiliary draw, and the pack's own losses charging and
+    // discharging. Measured by charging for 15 minutes, then driving the same
+    // SoC back down (Out of Spec's 10% challenge): nine tests, 6.0–12.7%, mean
+    // 9.4%, median 9.3%, as the owner read them from the videos. The only
+    // measurement that stops at the battery (ADAC, four cars) is 1–6%
+    // preconditioned, which leaves the pack's internal losses out. 9% is the
+    // round number at the centre; it is one value on purpose, since the spread
+    // does not follow maker or platform in any way the unlogged conditions
+    // do not also explain. Sources and the gaps: explainers/facts.json,
+    // `dc-fast-round-trip-pairs`.
+    DC_FAST_LOSS: 0.09,
     // Condition correction (#188). The aero/rolling split is what lets a
     // measurement be re-priced for speed and air density without per-vehicle
     // road-load coefficients — see utils/conditionCorrection.js. These moved
@@ -164,6 +186,53 @@ export const EPA_DEFAULTS = {
     STD_SPEED_MPH:   70,
     STD_ALTITUDE_FT: 0,
     STD_TEMP_F:      70,
+
+    // What a range test that leaves a condition blank is taken to have been
+    // driven in, when it is corrected (owner's call, 2026-10-21). Before the
+    // reader could move the target, a blank axis was "taken as the target",
+    // which looked like no correction; with a movable target that made a blank
+    // altitude shrink a speed correction as the target altitude rose, and grow
+    // it on another test. A fixed assumption moves every blank-altitude test
+    // the same way. Blanks are a Data Checks gap ('range-test-conditions'), so
+    // the assumption is named in every correction note and shrinks as they are
+    // filled.
+    ASSUMED_TEST_SPEED_MPH:   70,
+    ASSUMED_TEST_TEMP_F:      70,
+    ASSUMED_TEST_ALTITUDE_FT: 0,
+
+    // The heating and cooling a range test is assumed to have run with (#449).
+    // No test records its HVAC use, so the load is a stand-in: DEFAULT_ACCESSORY_W
+    // while the cabin holds itself, plus a heater or A/C once the weather leaves
+    // the comfort band. One straight line each way, for every car, whatever
+    // heats it — a heat pump draws roughly half a resistive heater, and the
+    // line cannot tell them apart. The slopes are a starting point, not a fit
+    // (owner, 2026-10-25), read against the reference table in
+    // AccessoryLoadReference.jsx, whose own figures are unsourced: heating at
+    // 50 W/°F is 1,700 W at 32°F (between its heat-pump and resistive columns)
+    // and 3,300 W at 0°F (inside the heat pump's); cooling at 70 W/°F is 1,000 W
+    // at 80°F, the low end of its A/C column. The truth is probably very much
+    // vehicle size and shape dependent; #475 will compare predicted corrections
+    // with actual tests before anything is fitted.
+    ACCESSORY_COMFORT_BAND_F: [60, 70],   // °F: no heating or cooling inside it
+    ACCESSORY_HEAT_W_PER_F:   50,         // W for each °F below the band
+    ACCESSORY_COOL_W_PER_F:   70,         // W for each °F above the band
+    // What a range test is taken to have used, in Wh/mi, when it records no
+    // energy — the load in watts is turned into range through the test's OWN
+    // consumption, and a blank has to be taken as something.
+    ASSUMED_TEST_CONSUMPTION_WH_MI: 300,
+
+    // Which range tests the composite range (utils/compositeRange.js) takes.
+    // Temperature is corrected for air density and for the assumed heating and
+    // cooling load (ACCESSORY_*), so the band can be wide. Its edges still
+    // matter: below freezing the error in that load (battery conditioning, cold
+    // tyres, heat pump against resistive heater) is comparable to the effect
+    // itself, and hot-soak A/C pull-down is not in the line either. The owner
+    // chose [0, 100] on 2026-10-25 knowing that. Speed is corrected fully,
+    // but the further a test is from the target the more the single
+    // fleet-wide AERO_FRACTION is doing the work, so a test more than this
+    // far from it is left out too.
+    COMPOSITE_RANGE_TEMP_BAND:     [0, 100],  // °F, as tested
+    COMPOSITE_RANGE_SPEED_GAP_MPH: 15,        // mph from the target speed
 
     // How far the EPA label range may sit from the vehicle's spec range before
     // the curator form flags it. NOT a tie between the fields: one vehicle trim
@@ -305,6 +374,7 @@ export const DEFAULT_SS_ETA      = resolve('DEFAULT_SS_ETA',      EPA_DEFAULTS.D
 export const DEFAULT_ACCESSORY_W = resolve('DEFAULT_ACCESSORY_W', EPA_DEFAULTS.DEFAULT_ACCESSORY_W);
 export const ACCESSORY_LOAD_KW   = DEFAULT_ACCESSORY_W / 1000;  // derived (kW)
 export const ASSUMED_CHARGER_EFF = resolve('ASSUMED_CHARGER_EFF', EPA_DEFAULTS.ASSUMED_CHARGER_EFF);
+export const DC_FAST_LOSS        = resolve('DC_FAST_LOSS',        EPA_DEFAULTS.DC_FAST_LOSS);
 export const AERO_FRACTION        = resolve('AERO_FRACTION',        EPA_DEFAULTS.AERO_FRACTION);
 export const TOWING_AERO_FRACTION = resolve('TOWING_AERO_FRACTION', EPA_DEFAULTS.TOWING_AERO_FRACTION);
 export const REFERENCE_SPEED_MPH  = resolve('REFERENCE_SPEED_MPH',  EPA_DEFAULTS.REFERENCE_SPEED_MPH);
@@ -315,6 +385,28 @@ export const STANDARD_CONDITIONS = {
     altitudeFt:   resolve('STD_ALTITUDE_FT', EPA_DEFAULTS.STD_ALTITUDE_FT),
     temperatureF: resolve('STD_TEMP_F',      EPA_DEFAULTS.STD_TEMP_F),
 };
+
+/** What a range test that leaves a condition blank is taken to have been driven in. */
+export const ASSUMED_TEST_CONDITIONS = {
+    speedMph:     resolve('ASSUMED_TEST_SPEED_MPH',   EPA_DEFAULTS.ASSUMED_TEST_SPEED_MPH),
+    temperatureF: resolve('ASSUMED_TEST_TEMP_F',      EPA_DEFAULTS.ASSUMED_TEST_TEMP_F),
+    altitudeFt:   resolve('ASSUMED_TEST_ALTITUDE_FT', EPA_DEFAULTS.ASSUMED_TEST_ALTITUDE_FT),
+};
+
+/** The heating and cooling a range test is assumed to have run with (#449). */
+export const ACCESSORY_COMFORT_BAND_F =
+    resolve('ACCESSORY_COMFORT_BAND_F', EPA_DEFAULTS.ACCESSORY_COMFORT_BAND_F);
+export const ACCESSORY_HEAT_W_PER_F =
+    resolve('ACCESSORY_HEAT_W_PER_F', EPA_DEFAULTS.ACCESSORY_HEAT_W_PER_F);
+export const ACCESSORY_COOL_W_PER_F =
+    resolve('ACCESSORY_COOL_W_PER_F', EPA_DEFAULTS.ACCESSORY_COOL_W_PER_F);
+export const ASSUMED_TEST_CONSUMPTION_WH_MI =
+    resolve('ASSUMED_TEST_CONSUMPTION_WH_MI', EPA_DEFAULTS.ASSUMED_TEST_CONSUMPTION_WH_MI);
+
+export const COMPOSITE_RANGE_TEMP_BAND =
+    resolve('COMPOSITE_RANGE_TEMP_BAND', EPA_DEFAULTS.COMPOSITE_RANGE_TEMP_BAND);
+export const COMPOSITE_RANGE_SPEED_GAP_MPH =
+    resolve('COMPOSITE_RANGE_SPEED_GAP_MPH', EPA_DEFAULTS.COMPOSITE_RANGE_SPEED_GAP_MPH);
 
 export const LABEL_RANGE_TOLERANCE_PCT = resolve('LABEL_RANGE_TOLERANCE_PCT', EPA_DEFAULTS.LABEL_RANGE_TOLERANCE_PCT);
 export const ETA_BAND          = resolve('ETA_BAND',          EPA_DEFAULTS.ETA_BAND);

@@ -11,6 +11,54 @@ const MIN_DRIVE_MI         = 0.1;  // minimum driveable distance before bailing
 const TAIL_END_KW          = 5;    // assumed charging power at 100% SoC for the synthetic tail
 const TAIL_STEP_SOC        = 2;    // % SoC step when generating the synthetic high-SoC tail
 
+// ── Charge times the simulation cannot see ───────────────────────────────────
+
+/**
+ * The SoC spans of a charging curve that carry data but no clock: points with a
+ * SoC and no time. The simulation reads time against SoC, so it drops them —
+ * and across a dropped span it interpolates, or past the last timed point
+ * builds the synthetic tail below, without saying so.
+ *
+ * Which is how the R2's 500 A composite came to put the optimum at short legs:
+ * it held power to 98% but times only to 14%, so from 14% up the trip charged
+ * on a taper the car does not have. A curve that simply ENDS (a test stopped
+ * at 80%) is not reported: nothing was measured past it, and the tail is the
+ * designed answer to that.
+ *
+ * Only the part a trip charges through is worth saying: `within` clips the
+ * spans to it (a stop starts at Min SoC; past the 95% ceiling a plan is
+ * blanked anyway), and a sliver under `minWidth` % is a composite's ragged
+ * end, not a gap. Unclipped, half the defaults reported 96–100% or 0–2%.
+ *
+ * @param {Array} points  a run's points, any order
+ * @param {Object} [opts]
+ * @param {[number, number]} [opts.within]  SoC range to clip to
+ * @param {number} [opts.minWidth]          narrowest span reported, % SoC (default 2)
+ * @returns {Array<[number, number]>}  [fromSoc, toSoc] spans, ascending; [] when every point is timed
+ */
+export function untimedSpans(points, { within = [0, 100], minWidth = 2 } = {}) {
+    const bySoc = (points ?? [])
+        .filter(p => p?.soc != null && Number.isFinite(Number(p.soc)))
+        .sort((a, b) => a.soc - b.soc);
+    const spans = [];
+    let open = null;
+    for (const p of bySoc) {
+        const timed = p.time != null && Number.isFinite(Number(p.time));
+        if (!timed) {
+            if (open) open[1] = Number(p.soc);
+            else open = [Number(p.soc), Number(p.soc)];
+        } else if (open) {
+            spans.push(open);
+            open = null;
+        }
+    }
+    if (open) spans.push(open);
+    const [lo, hi] = within;
+    return spans
+        .map(([a, b]) => [Math.max(a, lo), Math.min(b, hi)])
+        .filter(([a, b]) => b - a >= minWidth);
+}
+
 // ── High-SoC charging tail ─────────────────────────────────────────────────────
 
 /**
@@ -180,7 +228,13 @@ export function simulateRoadTrip({
         // this branch agrees with the one below it (the higher floor reaches
         // less far, so it can only ever fire when minSoc would have finished
         // the trip too) and any shortfall is the top-up's job after the loop.
-        const canFinishAtDestFloor = rangeFrom(currentSoc, destFloor) >= remainingTrip - 0.01;
+        //
+        // Short by less than MIN_DRIVE_MI counts as finishing: a driver covers
+        // the last hundred feet on what the gauge rounds to the floor. Held to
+        // 0.01 mi, a leg that ended a few hundredths short stopped to charge
+        // 1% (overhead and all) and then failed the MIN_DRIVE_MI check below
+        // for the sliver left — a blank cell amid finished trips on the maps.
+        const canFinishAtDestFloor = rangeFrom(currentSoc, destFloor) >= remainingTrip - MIN_DRIVE_MI;
         const driveDist = canFinishAtDestFloor
             ? remainingTrip
             : Math.max(0, Math.min(rangeFrom(currentSoc, minSoc), remainingTrip));
@@ -246,11 +300,18 @@ export function simulateRoadTrip({
                     targetSoc = endSoc != null ? Math.min(endSoc, 100) : Math.min(currentSoc + chargeTimeMinutes * 2, 100);
                 }
                 chargeTime = chargeTimeMinutes;
-            }
 
-            if (targetSoc <= currentSoc + 1) {
-                warnings.push('Charger too slow for meaningful charge');
-                break;
+                // Only a FULL-duration stop can be "too slow": the branch
+                // above charges just enough to finish, and when the car
+                // arrives a few miles short that is legitimately +1% — which
+                // this check, when it sat after both branches, read as a
+                // failed stop and abandoned the trip. Which few miles short
+                // depends on where the last leg lands, so the sweep maps
+                // showed it as isolated blank cells amid finished ones.
+                if (targetSoc <= currentSoc + 1) {
+                    warnings.push('Charger too slow for meaningful charge');
+                    break;
+                }
             }
         }
 
@@ -286,7 +347,10 @@ export function simulateRoadTrip({
     // guarantees arrival at or above minSoc on its own, and destFloor is
     // clamped to never sit below it (see its definition above) — so a
     // separate minSoc check here could only ever agree with this one.
-    if (completed && currentSoc < destFloor - 0.01) {
+    //
+    // Below destFloor by no more than the MIN_DRIVE_MI of slack the drive step
+    // allows is arriving at it, not a reason to stop.
+    if (completed && currentSoc < destFloor - socForMiles(MIN_DRIVE_MI) - 0.01) {
         const targetSoc = Math.min(100, destFloor);
         if (targetSoc > currentSoc + 0.01) {
             const tStart = timeAtSoc(currentSoc);
