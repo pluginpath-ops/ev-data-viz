@@ -53,7 +53,7 @@ a house one, so that a new reader already knows it.
 | Where it opens relative to its anchor | **placement** | Floating UI *placement* | `--above`, `--below`, `--center`, `--right`, `--end`, `--stretch` |
 | A row of them above a table or chart | **controls strip** | — | `.controls-strip` — one class, shared |
 | One choice, always visible, of two or three — or more when every option is a short word and the row may scroll sideways (the preset picker's eight) | **segmented control** | Apple HIG *segmented control* | `.stats-segmented`, `.account-segmented`; `.preset-picker` wraps one |
-| Row 3 — the removable selected-vehicle pills | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip` |
+| Row 3 — the removable selected-vehicle pills; and a vehicle picker's chosen vehicle, closed | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip`; `.combobox-chip` ([VehicleCombobox.jsx](../src/components/VehicleCombobox.jsx)) — its name reopens the search, its × clears, and `.combobox-detail` beside it carries what tells lookalikes apart |
 | The capped box the chips scroll inside | **chip scroller** | — | `.selected-chip-scroll` — two rows, then it scrolls |
 | The centred max-width content column | **page container** | — | `.page-container` |
 

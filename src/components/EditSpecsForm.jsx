@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { SPEC_CATEGORIES, normalizeCustomKey, formatCustomKey } from '../utils/vehicleSpecSchema';
 import { SpecVouchButton, SpecFieldFlagButton } from './VoteButtons';
-import { vehicleLabel, vehicleDetailLabel, vehicleSearchText, fallbackSpecs } from '../utils/specHelpers';
+import { vehicleLabel, vehicleOption, fallbackSpecs } from '../utils/specHelpers';
 import VehicleCombobox from './VehicleCombobox';
 import { chemistrySuggestions } from '../utils/platforms';
 
@@ -380,18 +380,10 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                         <div className="flex items-center gap-3">
                             <label className="text-sm font-medium text-secondary whitespace-nowrap">Inherit from:</label>
                             <VehicleCombobox
-                                options={otherVehicles.map(v => ({ id: v.id, label: vehicleDetailLabel(v), search: vehicleSearchText(v) }))}
+                                options={otherVehicles.map(vehicleOption)}
                                 value={inheritFromId}
                                 onChange={setInheritFromId}
                             />
-                            {inheritFromId && (
-                                <button
-                                    type="button"
-                                    onClick={() => setInheritFromId('')}
-                                    className="text-meta hover:text-secondary text-lg leading-none flex-shrink-0"
-                                    title="Clear inheritance"
-                                >×</button>
-                            )}
                         </div>
                         {sourceVehicle && (
                             <p className="spec-inherit-note">

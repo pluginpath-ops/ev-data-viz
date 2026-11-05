@@ -60,6 +60,10 @@ export const NOT_CATALOGUED = {
     'tag-filter-bar':    'Layout wrapper for the filter row.',
     'tag-filter-legend': 'The "AND / OR / NOT" key beside the bar, not a control.',
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
+    'combobox-chip-label': 'The name button inside .combobox-chip, which reopens the search; '
+        + 'it has no pill of its own, so shown as part of that specimen.',
+    'combobox-chip-clear': 'The × button inside .combobox-chip, which clears the choice; '
+        + 'shown as part of that specimen.',
     'guide-chip-count':  'The count suffix inside .guide-chip; shown as part of that specimen.',
     'text-control': 'A size, not a role — the one step down that control surfaces run at. '
         + 'It has no color of its own, so a specimen would be body text at 12px.',
@@ -278,6 +282,8 @@ export const SECTIONS = [
             { cls: 'tag-filter-btn tag-filter-or',  as: 'button', label: 'Tag filter · OR',   note: 'Raw bg-green-500.' },
             { cls: 'tag-filter-btn tag-filter-not', as: 'button', label: 'Tag filter · NOT',  note: 'Raw bg-red-500.' },
             { cls: 'selected-vehicle-chip', as: 'span', label: 'Selected vehicle', note: 'Persistent selection row. No border — "blue on blue".' },
+            { cls: 'combobox-chip', as: 'span', label: 'Model Y LR · 2021',
+              note: 'A vehicle picker\'s chosen vehicle: the name button reopens the search, the × beside it clears. Shown without them — the specimen is the pill.' },
             { cls: 'session-vehicle-chip',  as: 'span', label: 'Session vehicle' },
             { cls: 'tag-pill',        as: 'span', label: 'Tag' },
             { cls: 'path-chip',       as: 'span', label: 'Path' },

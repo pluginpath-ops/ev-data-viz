@@ -10,20 +10,33 @@ export function vehicleLabel(v) {
 }
 
 /**
- * Name · Year · Manufacturer · Model · Trim · Platforms, for telling similar vehicles
- * apart in a list. A part already contained in an earlier one is dropped, so
- * a vehicle named "R1S" with model "R1S" does not read "R1S · R1S".
+ * The parts of a vehicle's detail label, in order, each with the field it came
+ * from. A part already contained in an earlier one is dropped, so a vehicle
+ * named "R1S" with model "R1S" does not read "R1S · R1S".
+ *
+ * The one place that decides what is a duplicate: `vehicleDetailLabel` joins
+ * every part, `vehicleOption` splits them into the name and what tells
+ * lookalikes apart, and the two cannot disagree about which parts survive.
  */
-export function vehicleDetailLabel(v) {
+function vehicleDetailParts(v) {
     const parts = [];
-    for (const raw of [v?.name, v?.year, v?.manufacturer?.name ?? v?.make, v?.model, v?.trim,
-        v?.platforms?.mechanical?.name, v?.platforms?.electrical?.name]) {
-        const part = raw == null ? '' : String(raw).trim();
-        if (!part) continue;
-        if (parts.some(p => p.toLowerCase().includes(part.toLowerCase()))) continue;
-        parts.push(part);
+    const fields = [
+        ['name', v?.name], ['year', v?.year],
+        ['make', v?.manufacturer?.name ?? v?.make], ['model', v?.model], ['trim', v?.trim],
+        ['platform', v?.platforms?.mechanical?.name], ['platform', v?.platforms?.electrical?.name],
+    ];
+    for (const [field, raw] of fields) {
+        const text = raw == null ? '' : String(raw).trim();
+        if (!text) continue;
+        if (parts.some(p => p.text.toLowerCase().includes(text.toLowerCase()))) continue;
+        parts.push({ field, text });
     }
-    return parts.join(' · ');
+    return parts;
+}
+
+/** Name · Year · Manufacturer · Model · Trim · Platforms, for telling similar vehicles apart in a list. */
+export function vehicleDetailLabel(v) {
+    return vehicleDetailParts(v).map(p => p.text).join(' · ');
 }
 
 /**
@@ -36,6 +49,24 @@ export function vehicleSearchText(v) {
         v?.platforms?.mechanical?.name, v?.platforms?.electrical?.name,
         ...(v?.tags ?? []).map(t => t?.name),
     ].filter(Boolean).join(' ').toLowerCase();
+}
+
+/**
+ * A vehicle as a VehicleCombobox option: `label` is what the closed chip says
+ * (name and year), `detail` is what tells lookalikes apart (make, model, trim,
+ * platforms — the rest of `vehicleDetailLabel`), `search` is everything a person
+ * might type. Both pickers build their options with this, so a vehicle reads the
+ * same in the Inherit-from field and the Source-vehicle field.
+ */
+export function vehicleOption(v) {
+    const parts = vehicleDetailParts(v);
+    const join = ps => ps.map(p => p.text).join(' · ');
+    return {
+        id: v.id,
+        label: join(parts.filter(p => p.field === 'name' || p.field === 'year')),
+        detail: join(parts.filter(p => p.field !== 'name' && p.field !== 'year')),
+        search: vehicleSearchText(v),
+    };
 }
 
 /**
