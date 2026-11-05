@@ -19,6 +19,7 @@ import VerboseLabelToggle from './VerboseLabelToggle';
 import TestSpreadToggle from './TestSpreadToggle';
 import { spreadOf, drawTestSpread, testSpreadHoverPlugin, testPointLines, suppressBarTooltip, countedRangeTests, spreadSummary, rangeCoverageOk, spreadEfficiency } from '../utils/rangeTestSpread';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
+import ColorSourceNote from './ColorSourceNote';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import {
@@ -30,7 +31,7 @@ import {
 import { filterRangeRuns, isRangeRun } from '../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, DEFAULT_RUN_COLOR, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { seriesRowsOf, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
@@ -77,7 +78,7 @@ const hasDataForType = (run, type) => {
 // view's selection through the shared useRunSelection hook (#176). This file
 // used to roll its own toggle against chartConfig — one more copy of the
 // behaviour, and the reason a run could be switched off here and come back.
-export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = VEHICLE_PALETTE,
+export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = DEFAULT_SERIES_PALETTE,
     chartType = DEFAULT_RANGE_CHART_TYPE, effUnit = DEFAULT_EFFICIENCY_UNIT,
     handSet = false, verboseLabels = false, correctionMode = 'none', correctionTarget = undefined, testSpread = true }) {
     const { units, testSessions } = useAppContext();
@@ -152,7 +153,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // has ever recorded, landing both selected runs on distant, muted shades
     // with no clash to avoid. `plottedIds` narrows the shading to what is
     // actually selected while `allRangeRuns` still holds step 3 steady.
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(allRangeRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf, clearHandSet } = useStickyChartColors(allRangeRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
@@ -744,7 +745,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
 
                 {/* ── Run selector ── */}
                 <RunSelector
-                    colorControl={<SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
+                    colorControl={<ColorSourceNote palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} onClearHandSet={clearHandSet} />}
                     handSetColorOf={handSetColorOf}
                     chartPalette={palette}
                     onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
@@ -822,6 +823,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 onDismissPreview={dismissPreview}
                 exportControls={!presentationMode && (
                     <>
+                        <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                         <FeatureChartButton />
                         <button
                             onClick={() => {

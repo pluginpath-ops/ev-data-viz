@@ -10,7 +10,7 @@
  * Each function returns a FRESH object, since the configs hold arrays and maps
  * that a caller must be free to replace without touching the defaults.
  */
-import { VEHICLE_PALETTE } from './colorUtils';
+import { DEFAULT_SERIES_PALETTE } from './colorUtils';
 import { NO_VEHICLE_BASES } from './vehicleBase';
 import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from './correctionSettings';
 import { DEFAULT_ASSUMPTIONS } from './vehicleTable';
@@ -37,9 +37,9 @@ export function defaultChartConfig() {
         axisLimits: {},
         showLine:   true,
         showPoints: false,
-        // Where series colors come from: each vehicle's curated color by
-        // default, or a SERIES_PALETTES id to assign from that set instead.
-        seriesPalette: VEHICLE_PALETTE,
+        // Where series colors come from: a SERIES_PALETTES id (the house
+        // palette by default), or VEHICLE_PALETTE for each vehicle's own color.
+        seriesPalette: DEFAULT_SERIES_PALETTE,
         // Whether hand-set colors are in force over that base. Choosing a
         // palette parks them; selecting Hand-set brings them back.
         handSet: false,

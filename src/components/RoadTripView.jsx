@@ -23,6 +23,7 @@ import VerboseLabelToggle from './VerboseLabelToggle';
 import CorrectionControl from './CorrectionControl';
 import { sessionFor } from '../utils/testSessions';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
+import ColorSourceNote from './ColorSourceNote';
 import RunSelector from './RunSelector';
 import AxisScaleControls from './AxisScaleControls';
 import ZoomHint from './ZoomHint';
@@ -35,7 +36,7 @@ import {
 import { useRunSelection } from '../hooks/useRunSelection';
 import ChartLoading from './charts/ChartLoading';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, resolvePairColors, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
@@ -818,7 +819,7 @@ export default function RoadTripView({
     pairings = {},
     setPairings = () => {},
     presentationMode = false,
-    palette = VEHICLE_PALETTE,
+    palette = DEFAULT_SERIES_PALETTE,
     handSet = false,
     verboseLabels = false,
     correctionMode = 'none',
@@ -1042,7 +1043,7 @@ export default function RoadTripView({
         () => selectedRunIds.map(k => parsePairKey(k).rangeRunId),
         [selectedRunIds]
     );
-    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf } = useStickyChartColors(colorableRuns, {
+    const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf, clearHandSet } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
@@ -2667,7 +2668,7 @@ export default function RoadTripView({
 
                     {/* Run selector */}
                     <RunSelector
-                        colorControl={setChartConfig ? <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} /> : null}
+                        colorControl={<ColorSourceNote palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} onClearHandSet={clearHandSet} />}
                             handSetColorOf={handSetColorOf}
                             chartPalette={palette}
                             onChartPaletteChange={id => setChartConfig(prev => ({ ...prev, seriesPalette: id }))}
@@ -2802,6 +2803,7 @@ export default function RoadTripView({
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
                         <>
+                            {setChartConfig && <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
                             <FeatureChartButton />
                             <button
                                 onClick={() => {

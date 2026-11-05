@@ -52,6 +52,8 @@ export const OWNED_FAMILIES = [
  * teaches nothing — or variants whose parent is already shown.
  */
 export const NOT_CATALOGUED = {
+    'color-source-note': 'Not a menu — a line of secondary text at the top of the run picker (ColorSourceNote), matched here only by its color- prefix. It holds the applied dot, which is catalogued with the section band, and a .color-source-link.',
+    'color-source-link': 'The underlined text button inside .color-source-note (Use each vehicle\'s own color, Clear picks): primary color, no box. Shown with the note it sits in.',
     'featured-vehicle-chip': 'The same pill as .selected-vehicle-chip (one rule, two names) where Home and the featured comparison editor name a comparison\'s vehicles. It reports a set, so it is not the selection. The selection chip is catalogued.',
     'featured-chip-button': 'The ‹ › × buttons inside a .featured-vehicle-chip in the editor (move earlier, move later, remove): inherit the chip\'s color, dim on hover and when unavailable.',
     'selected-vehicle-chip-name': 'The name inside .selected-vehicle-chip, drawn as a button: inherits the chip\'s color and only underlines on hover. The chip is catalogued.',

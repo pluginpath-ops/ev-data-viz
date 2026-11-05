@@ -207,6 +207,10 @@ export function useStickyChartColors(runs, {
         // choosing. It is also what makes the option disappear at zero, so a
         // mode that would do nothing is never offered.
         handSetCount: Object.keys(picks).length,
+        // Drop every pick at once — Clear picks in the run picker's color line
+        // (ColorSourceNote). Back to auto in the color panel does the same at
+        // one scope; this is the whole set.
+        clearHandSet: () => setOverrideState({ key: resetKey, map: EMPTY }),
         /**
          * The color this run holds by hand, in force or PARKED — or null.
          *

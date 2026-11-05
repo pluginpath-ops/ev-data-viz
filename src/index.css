@@ -3393,9 +3393,79 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 }
 .chart-export-rule {
     flex: 1;
+    min-width: 12px;
     height: 1px;
     background-color: var(--color-border);
 }
+/* The strip's caption (PlotFrame, `truncate`) gives way first: every control
+   in the toolbar keeps its width, so the caption truncates before any of them
+   is squeezed or wrapped. Its tooltip keeps the whole sentence. */
+.chart-export-strip > :not(.text-micro):not(.chart-export-rule) {
+    flex-shrink: 0;
+}
+
+/* The Colors field in the toolbar (SeriesPaletteSelect): a label, then one
+   bordered box holding a preview of the palette's first colors and the select
+   itself, borderless inside it so the box is the field. */
+.chart-colors-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.chart-colors-box {
+    @apply text-sm;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+    background-color: var(--color-surface-input);
+}
+.chart-colors-box:focus-within {
+    border-color: var(--color-primary);
+}
+/* Hand-set mode: picks are in force over the palette. Orange outline, the
+   "applied / now" signal (docs/design-tokens.md), as on Reset zoom. */
+.chart-colors-box--hand-set {
+    border-color: var(--color-accent-orange);
+}
+.chart-colors-box > select {
+    padding: 4px 6px 4px 0;
+    background: transparent;
+    color: var(--color-text-primary);
+    border: 0;
+    outline: none;
+}
+.chart-colors-preview {
+    display: inline-flex;
+    gap: 2px;
+}
+.chart-colors-preview > i {
+    width: 7px;
+    height: 7px;
+    border-radius: 1px;
+}
+
+/* The run picker's line about where the colors come from (ColorSourceNote):
+   the hint toward vehicle colors, or the notice that picks have taken over. */
+.color-source-note {
+    @apply text-xs;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 8px;
+    color: var(--color-text-secondary);
+}
+.color-source-note > .applied-dot {
+    align-self: center;
+}
+.color-source-link {
+    color: var(--color-primary);
+    text-decoration: underline;
+    cursor: pointer;
+}
+.color-source-link:hover { color: var(--color-text-primary); }
 
 /* The export receipt. A quarter width, because its job is to say "this is what
    you got" and to be right-clickable — not to be a second copy of the chart
@@ -4379,8 +4449,11 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* The applied dot: something inside the band is in force — a correction
    moving the figures. Accent orange because that is the "active / now"
-   signal (docs/design-tokens.md), and the only thing it may mean. */
-.section-band-dot {
+   signal (docs/design-tokens.md), and the only thing it may mean. The same
+   dot, as .applied-dot, marks hand-set colors in force (SeriesPaletteSelect,
+   ColorSourceNote). */
+.section-band-dot,
+.applied-dot {
     flex-shrink: 0;
     width: 6px;
     height: 6px;
