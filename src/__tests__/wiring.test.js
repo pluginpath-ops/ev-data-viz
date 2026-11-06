@@ -1542,7 +1542,7 @@ describe('one correction, everywhere it is applied', () => {
     // reader choose. Every correction now reads the run through runConditions
     // and corrects to the reader's target (utils/correctionSettings.js).
     const sources = () => [
-        'src/utils/rangeSource.js', 'src/utils/roadTripSpread.js', 'src/utils/compositeRange.js',
+        'src/utils/rangeSource.js', 'src/utils/compositeRange.js',
         'src/components/RangeChartView.jsx', 'src/components/ChargingView.jsx',
     ];
 
@@ -1552,6 +1552,27 @@ describe('one correction, everywhere it is applied', () => {
             expect(src, `${file} corrects`).toMatch(/correctionFactor\(/);
             expect(src, `${file} must read the run through runConditions`).toMatch(/correctionFactor\(runConditions\(/);
         }
+        // Road Trip corrects per trip, from a basis that carries the run's
+        // conditions, so its runConditions call is where the basis is built.
+        const trip = read('src/utils/tripEfficiency.js');
+        expect(trip).toMatch(/correctionFactor\(basis\.conditions/);
+        expect(trip).toMatch(/conditions: runConditions\(run, session\)/);
+    });
+
+    // Road Trip had two speed models: the correction priced a trip at its
+    // speed, and the simulation re-priced it again with its own aero-only
+    // factor — a no-op when corrected, the only pricing when not, and
+    // towing's. One path now: every trip is priced by tripEfficiency, through
+    // the correction model, and the simulation takes the figure as given.
+    it('prices every Road Trip trip through one function, and the simulation prices no speed', () => {
+        const view = read('src/components/RoadTripView.jsx');
+        expect(view.match(/simulateRoadTrip\(/g), 'only simulateAt calls the simulation').toHaveLength(1);
+        expect(view).toMatch(/const simulateAt = \(priced, speedMph, inputs\) =>\s*\(\{ \.\.\.simulateRoadTrip\(/);
+        expect(view.match(/efficiencyAtSpeed\(/g)?.length, 'priced only through tripEfficiency').toBeGreaterThan(0);
+        expect(view, 'a correction applied at rangeSource would be applied twice').not.toMatch(/correction: \{ mode: correctionMode/);
+        const sim = read('src/utils/roadTripSimulation.js');
+        expect(sim).not.toMatch(/AERO_FRACTION|testSpeedMph|towingMode/);
+        expect(read('src/utils/roadTripSpread.js')).not.toMatch(/correctionFactor\(/);
     });
 
     it('hands every chart\'s correction control the reader\'s target', () => {
@@ -1697,8 +1718,8 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
 
     it('offers Road Trip no correction speed slider, and states the trip speed instead', () => {
         // Trip -> Speed is the only speed on that chart: a trip is corrected to
-        // the speed it is driven (tripTarget), so the shared target's speed is
-        // redundant there.
+        // the speed it is driven (utils/tripEfficiency.js), so the shared
+        // target's speed is redundant there.
         const src = read('src/components/RoadTripView.jsx');
         const fields = src.match(/const TRIP_CORRECTION_FIELDS = (\[[^\]]*\])/)?.[1];
         expect(fields, 'Road Trip must name the conditions it offers').toBeTruthy();
