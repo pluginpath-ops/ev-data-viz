@@ -320,3 +320,19 @@ describe('a saved vehicle table does not borrow the reader\'s columns', () => {
         expect(chartParamsFromSearch('?tab=specifications&m=specstable&v=1,2&q=a')).toBe('tab=specifications&m=specstable&vt_preset=overview');
     });
 });
+
+describe('a saved Charge Stop or Road Trip does not follow a moved default (#476)', () => {
+    it('writes out the settings the slim address bar leaves out', () => {
+        const saved = new URLSearchParams(chartParamsFromSearch('?tab=efficiency&m=roadtrip&v=1&rt_ct=15'));
+        expect(saved.get('rt_ct')).toBe('15');
+        for (const k of ['rt_m', 'rt_ss', 'rt_ms', 'rt_ld', 'rt_td', 'rt_sp', 'rt_oh', 'rt_ya', 'rt_xa']) expect(saved.has(k), k).toBe(true);
+        const stop = new URLSearchParams(chartParamsFromSearch('?tab=efficiency&m=compare'));
+        for (const k of ['cmp_soc', 'cmp_mins', 'cmp_mi']) expect(stop.has(k), k).toBe(true);
+    });
+
+    it('leaves the rows already saved, which wrote everything, as they were', () => {
+        const row = 'tab=efficiency&m=roadtrip&rt_m=time&rt_ss=90&rt_ms=10&rt_ld=150&rt_ct=15&rt_td=500&rt_sp=70&rt_oh=5&rt_ya=byTest&rt_xa=totalTime';
+        const out = new URLSearchParams(explicitChartParams(row));
+        for (const [k, v] of new URLSearchParams(row)) expect(out.get(k)).toBe(v);
+    });
+});

@@ -65,6 +65,7 @@ import NumberInput from './NumberInput';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyPngButton from './charts/CopyPngButton';
+import CopyLinkButton from './charts/CopyLinkButton';
 import { pointsKnownEmpty, loadRunPoints, runsByIdString, rangeAtFrom } from '../utils/runPoints';
 
 // A charging line is told apart by its vehicle and its test. One atom, since a
@@ -103,7 +104,6 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const { zoomed, resetZoom, zoomOptions, plugin: zoomStatePlugin } = useChartZoom(chartInstance);
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
-    const [copied, setCopied] = useState(false);
 
     // Preserve the user's pill order
     // Memoised, as every other chart view already does it. Unmemoised this was a
@@ -1410,18 +1410,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     <>
                         <SeriesPaletteSelect palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />
                         <FeatureChartButton />
-                        <button
-                            onClick={() => {
-                                navigator.clipboard.writeText(window.location.href).then(() => {
-                                    setCopied(true);
-                                    setTimeout(() => setCopied(false), 2000);
-                                });
-                            }}
-                            className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
-                            title="Copy link to this chart view"
-                        >
-                            {copied ? '✓ Copied' : 'URL'}
-                        </button>
+                        <CopyLinkButton />
                         <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                     </>
                 )}

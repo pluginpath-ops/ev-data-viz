@@ -15,7 +15,7 @@
  *
  * Pure module — no React, no `window`.
  */
-import { parseChartUrl, chartConfigFromParsed, vehicleIdsOfLink } from './chartUrlState';
+import { parseChartUrl, chartConfigFromParsed, vehicleIdsOfLink, withDefaultsWrittenOut } from './chartUrlState';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './chartDefaults';
 import { DEFAULT_READER_MODE, DEFAULT_CORRECTION_TARGET } from './correctionSettings';
 import { categoryForMode, isChartCategory } from '../constants/chartNav';
@@ -66,20 +66,26 @@ export function chartParamsFromSearch(search) {
 }
 
 /**
- * A saved chart's parameters with nothing left to a default the reader's own
- * settings could change. Only the vehicle table has such a default.
+ * A saved chart's parameters with nothing left to a default that could change
+ * under it.
  *
- * The table's address leaves out whatever is the default: the Overview preset
- * writes no `vt_` parameter at all, and a table opened with none falls back to
- * the columns the reader last used, remembered in their browser. A saved
- * Overview table would then show a reader their own remembered columns instead
- * of the curator's, so it says `vt_preset=overview` outright.
+ * The address bar leaves out Charge Stop's and Road Trip's settings where they
+ * are a fresh page's (#476). A saved chart that did so would follow the default
+ * the day it is opened rather than the one the curator saw, so they are written
+ * out (chartUrlState.js `withDefaultsWrittenOut`).
+ *
+ * The vehicle table's address leaves out whatever is the default too: the
+ * Overview preset writes no `vt_` parameter at all, and a table opened with
+ * none falls back to the columns the reader last used, remembered in their
+ * browser. A saved Overview table would then show a reader their own
+ * remembered columns instead of the curator's, so it says `vt_preset=overview`
+ * outright.
  *
  * Its filters are dropped. A comparison names its vehicles itself; a filter
  * would only change which others the real table lists beneath them.
  */
 export function explicitChartParams(params) {
-    const p = new URLSearchParams(params ?? '');
+    const p = new URLSearchParams(withDefaultsWrittenOut(params));
     if (p.get('m') !== 'specstable') return p.toString();
     for (const key of [...p.keys()]) if (VEHICLE_FILTER_PARAMS.has(key)) p.delete(key);
     if (![...p.keys()].some(k => k.startsWith(VEHICLE_TABLE_PARAM_PREFIX))) p.set('vt_preset', 'overview');

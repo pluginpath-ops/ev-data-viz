@@ -27,7 +27,7 @@ import { SITE_EVENTS } from './utils/siteEvents';
 import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext';
 import HomeView from './components/home/HomeView';
 import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
-import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink } from './utils/chartUrlState';
+import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink, chartQueryString } from './utils/chartUrlState';
 import SpecChart from './components/SpecChart';
 import EpaCurvesView from './components/EpaCurvesView';
 import PerformanceCompareView from './components/PerformanceCompareView';
@@ -125,12 +125,20 @@ export default function App() {
         initializeApp,
         appNotification,
         clearNotification,
+        showError,
         updateVehicleSpecs,
         specCustomFieldSuggestions,
         copyRunToVehicle,
         units,
         toggleUnits,
     } = useAppContext();
+
+    // A short link that could not be read (#476): main.jsx opened the page on
+    // Home and left the reason in history.state. Said once, on arrival.
+    useEffect(() => {
+        const error = history.state?.shortLinkError;
+        if (error) showError(error);
+    }, []);
 
     // Auto-dismiss notifications after 6 s
     useEffect(() => {
@@ -712,7 +720,7 @@ export default function App() {
             compareConfig, roadTripConfig, epaConfig, pairings,
             vehicleFilters, currentSearch: window.location.search,
         });
-        history.replaceState({ view, chartMode }, '', '?' + p.toString());
+        history.replaceState({ view, chartMode }, '', '?' + chartQueryString(p));
     }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings, vehicleFilters]);
 
     // ── Keep URL in sync while on the Runs tab ──────────────────────────────
