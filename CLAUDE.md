@@ -2,31 +2,37 @@
 
 ## How to Work
 
-Think like a principal engineer.
+Think like a principal engineer: know what must be built carefully for the
+future and what should stay simple. Over-generalizing bites as hard as
+over-fitting to today's case.
 
 - **Survey before you start.** Look around the site for related appearance
   and behavior, then:
   1. **Reuse** what already exists — a component, class, hook or pattern.
-  2. **Expand scope where it fits** — if the same fix belongs in three places,
-     say so and propose doing all three.
+  2. **Think it through.** Does this change how other features should work?
+     What follow-on work does it shake out? Say so. This widens the thinking,
+     not the build.
   3. **Ask about conflicts** — if the request clashes with how the site
      already works, or with an earlier decision, ask before building.
-- **Ask why, not just what.** Find the need behind the request and where the
-  product is likely to go. Build for that, not only the literal ask. If the ask
-  and the need disagree, say so.
+- **Decide how to build it; ask about intent.** Implementation is your call —
+  make it and say why. What the feature is for and where it is going is the
+  owner's; ask when it isn't clear.
 - **Look for knock-on effects.** What else reads this data, shares this
   component, or assumes this behavior? Check before you change it, and say what
   you found.
 - **Delete ruthlessly.** Old, dead, confusing, or slow code goes — in the same
-  change that makes it dead. Don't leave a second path "just in case".
+  change that makes it dead. Don't leave a second path "just in case". Code
+  kept on purpose (a tripwire, a deferred rename) says so in a comment with a
+  revisit date a few months out; past that date, it is a candidate to delete.
 - **Don't optimize early, but write down where you didn't.** When you take the
-  simple path over the fast one, add a line to `docs/optimization-ledger.md`:
-  where, what the cost is, and what would make it worth fixing.
-- **Design for** generality, modularity, fast round trips (fewer, smaller
-  queries; no waterfalls), and consistent data (one source of truth; writes
-  that can't leave things half-done).
-- **Have taste.** Make the call and say why. Clear and responsive for the user
-  beats clever.
+  simple path over the fast one, add a line to `docs/optimization-ledger.md`.
+  It is a judgment call, not a checklist — the point is a list of likely
+  targets when things get slow.
+- **Design for** modularity, fast round trips (fewer, smaller queries; no
+  waterfalls), and consistent data (one source of truth; writes that can't
+  leave things half-done). Generalize when a second real case appears, not
+  before.
+- **Clear and responsive for the user beats clever.**
 - **Fewer words, simpler words** — in UI text, comments, commits, and replies.
 
 ## Site Overview
@@ -38,33 +44,23 @@ vehicle specs.
 
 ### Tabs
 
-The nav is defined in `src/components/shell/AppNav.jsx`; chart tabs and their
-sub-tabs come from `src/constants/chartNav.js`. `docs/vocabulary.md` names
-every tab, sub-tab and section — use its names.
+The nav is `src/components/shell/AppNav.jsx`; chart sub-tabs are
+`src/constants/chartNav.js`. `docs/vocabulary.md` has every tab and sub-tab
+name — this is only the map.
 
-- **Home** — a featured comparison a curator chose, every chart drawn at once.
-  The landing for a bare address.
-- **Vehicles & Specs** — the cards and list (*Summary*), plus the vehicle table
-  and the spec chart (*Specifications & Data*). Select vehicles here or with
-  ＋ Add from any tab; the selection drives the chart tabs.
-  - **The vehicle's page** (`?tab=runs&vid=…`, "Tests & Data") — one vehicle's
-    tests, EPA configurations and performance. Not a tab; opened from a card,
-    row or chip, and shown in the header as the opened vehicle.
-- **Performance** — acceleration Compare and Acceleration Curve.
-- **Charging & Range** (key `efficiency`) — Charging Curves, Range &
-  Efficiency, Charge Stop, Road Trip, Trip Optimizer.
-- **EPA** — every EV EPA has rated: Browse, Label Statistics, Certification
-  Statistics, and Modeled Efficiency (all EVs, or the selected vehicles with
-  their tests).
-- **Reference** — Explainers (`src/explainers/`, own CLAUDE.md) and Platforms.
-- **Admin** *(admin only)* — roles, EPA and Guide imports, Data Checks,
-  Published Results, brands/platforms/tags, Site Events, Model Constants
-  (`src/constants/` knobs), Interface Settings, and the design Playground.
+- **Home** — a curator's featured comparison.
+- **Vehicles & Specs** — browse and select vehicles; the vehicle table and spec
+  chart. Each vehicle also has its own page (tests, EPA, performance), reached
+  from a card or row, not a tab.
+- **Performance**, **Charging & Range** — charts of the selected vehicles'
+  tests.
+- **EPA** — every EV EPA has rated.
+- **Reference** — explainers (`src/explainers/`, own CLAUDE.md) and platforms.
+- **Admin** — imports, data checks, model constants, site settings.
 
-Every chart has a pop-out window synced over `BroadcastChannel`, a URL that
-reopens it as left (`utils/chartUrlState.js`), and a help bubble. **Mode keys
-in `chartNav.js` are frozen** — the pop-out, the help-bubble rows and shared
-links all depend on them. Rename labels, not keys.
+Every chart has a pop-out window, a link that reopens it as left
+(`utils/chartUrlState.js`), and a help bubble. **Mode keys in `chartNav.js`
+are frozen** — all three depend on them. Rename labels, not keys.
 
 ### Data model, in brief
 
@@ -101,6 +97,8 @@ own file rather than duplicating it.
 
 - **Color and size never go inline.** Colors come from tokens; sizes derive
   from `--fs-body` through `--fs-step`. No raw `bg-blue-50` or `text-[11px]`.
+- Why: when tokens change, semantic classes follow; inline clusters keep
+  painting the old palette.
 - **A cluster that describes what something IS wants a name.** Give it a
   semantic class in `src/index.css` (via `@apply`) named for what it is, not
   how it looks (`.vehicle-grid`, not `.blue-box`). Reuse an existing class
@@ -109,7 +107,9 @@ own file rather than duplicating it.
   subtree.
 
 Three ratchets track what is left. Each fails on a fall as well as a rise, so
-when you clear something, lower the count; a rise needs a reason in the PR.
+when you clear something, lower the count; a rise needs a reason in the PR. (A
+cap alone would hide cleanups, and nobody could tell progress from a broken
+probe.)
 
 - `npm run drift` — appearance outside the theme, by probe
   (`scripts/driftProbes.js`). `npm run drift <probe>` lists the sites.
@@ -121,7 +121,8 @@ when you clear something, lower the count; a rise needs a reason in the PR.
 ### Naming
 
 **One name per thing — `docs/vocabulary.md` is the list.** Read it before
-naming anything, and use its term rather than inventing one.
+naming anything, and use its term rather than inventing one. A word with no
+fixed meaning soaks up whatever needs naming next.
 `docs/design-tokens.md` does the same for color, `docs/typography.md` for type.
 Common ones: **chrome** is the category (furniture, not data), **header** is
 the pinned block at the top, **sidebar** is the chart's control column,
@@ -164,7 +165,8 @@ npm run vocab -- --text "$(gh pr view --json body -q .body)"
 
 It can't catch the Retired words that are right in some places — "chrome" for
 the header, "Runs" in UI text, "pinning", a bare "band", "Hidden" for a test,
-"test group" for the EPA test vehicle record. Only a reader can.
+"test group" for the EPA test vehicle record. Only a reader can — so the
+pledge exists to make sure the file actually gets opened.
 
 **The pledge: one line in the commit or PR body saying what you checked:**
 
@@ -190,7 +192,8 @@ runtime crash Vite won't catch. The React Compiler rules are `warn` —
 
 **The wiring suite** (`src/__tests__/wiring.test.js`) checks that code is
 actually connected — that what is written is read, and what is built is
-called. Expect it to fail on a new utility until something uses it. If it is
+called. Unit tests can't catch code that works but nothing uses, and that is
+this project's most common defect. Expect it to fail on a new utility until something uses it. If it is
 deliberately unused, add it to `ALLOWED_UNUSED` with the reason.
 
 ### Database and privileged work: local mirror first
