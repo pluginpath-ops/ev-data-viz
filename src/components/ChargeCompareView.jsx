@@ -36,6 +36,7 @@ import { wrapCanvasText } from '../utils/wrapCanvasText';
 import { countParts } from '../utils/plotCaption';
 import { PRESENTED_HALF_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
+import CopyLinkButton from './charts/CopyLinkButton';
 import { loadRunPoints, runsByIdString } from '../utils/runPoints';
 
 
@@ -395,22 +396,12 @@ export default function ChargeCompareView({
     const { isDark } = useTheme();
     const [runDataCache,    setRunDataCache]    = useState({});
     const [loading,         setLoading]         = useState(false);
-    const [copied,          setCopied]          = useState(false);
     const isHorizontal = orientation === 'horizontal';
 
     const chart1Ref      = useRef(null);
     const chart1Instance = useRef(null);
     const chart2Ref      = useRef(null);
     const chart2Instance = useRef(null);
-
-    const handleCopyUrl = () => {
-        // App.jsx auto-syncs cmp_soc / cmp_mins / cmp_mi into the URL whenever
-        // compareConfig changes, so window.location.href always has the latest state.
-        navigator.clipboard.writeText(window.location.href).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        });
-    };
 
     // Preserve the user's pill order
     const selectedVehicles = useMemo(
@@ -1108,13 +1099,7 @@ export default function ChargeCompareView({
                             <>
                                 {setChartConfig && <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
                                 <FeatureChartButton />
-                                <button
-                                    onClick={handleCopyUrl}
-                                    className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
-                                    title="Copy link to this chart view"
-                                >
-                                    {copied ? '✓ Copied' : 'URL'}
-                                </button>
+                                <CopyLinkButton />
                                 <button
                                     onClick={png1.copyPng}
                                     className={`chart-copy-btn ${png1.copied ? 'chart-copy-btn-active' : ''}`}

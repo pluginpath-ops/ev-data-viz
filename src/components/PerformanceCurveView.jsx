@@ -30,6 +30,7 @@ import { useChartPng } from '../hooks/useChartPng';
 import { useSourceLine } from '../hooks/useSourceLine';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 import CopyPngButton from './charts/CopyPngButton';
+import CopyLinkButton from './charts/CopyLinkButton';
 
 /** Okabe-Ito, matching the palette the other charts use for run colors. */
 const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
@@ -448,7 +449,6 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
             signature: String(series.length) });
 
-    const [urlCopied, setUrlCopied] = useState(false);
 
     if (loading) return <LoadingSpinner />;
 
@@ -553,23 +553,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
                     onDismissPreview={dismissPreview}
                     exportControls={!presentationMode && (
                         <>
-                            <button
-                                onClick={() => {
-                                    const p = new URLSearchParams(window.location.search);
-                                    p.set('tab', 'performance');
-                                    p.set('m', 'perfcurve');
-                                    navigator.clipboard.writeText(
-                                        `${window.location.origin}${window.location.pathname}?${p}`
-                                    ).then(() => {
-                                        setUrlCopied(true);
-                                        setTimeout(() => setUrlCopied(false), 2000);
-                                    });
-                                }}
-                                className={`chart-copy-btn ${urlCopied ? 'chart-copy-btn-active' : ''}`}
-                                title="Copy link to this chart view"
-                            >
-                                {urlCopied ? '✓ Copied' : 'URL'}
-                            </button>
+                            <CopyLinkButton withExtra={p => { p.set('tab', 'performance'); p.set('m', 'perfcurve'); }} />
                             <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={copied} copiedBeside={copiedBeside} />
                         </>
                     )}

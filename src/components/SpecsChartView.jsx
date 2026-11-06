@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import { useTheme } from '../hooks/useTheme';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
@@ -10,6 +10,7 @@ import { useChartPng } from '../hooks/useChartPng';
 import { useSourceLine } from '../hooks/useSourceLine';
 import { buildVehicleLabels } from '../utils/seriesLabel';
 import FeatureChartButton from './home/FeatureChartButton';
+import CopyLinkButton from './charts/CopyLinkButton';
 
 // ── Inside-bar label afterDraw plugin ─────────────────────────────────────────
 
@@ -66,7 +67,6 @@ function makeInsideLabelPlugin(getLabelFn) {
  */
 export default function SpecsChartView({ plot, col, colorOf, units, scope = 'selection', presentationMode = false }) {
     const { isDark } = useTheme();
-    const [copiedUrl, setCopiedUrl] = useState(false);
     const canvasRef = useRef(null);
     const chartRef  = useRef(null);
 
@@ -182,18 +182,7 @@ export default function SpecsChartView({ plot, col, colorOf, units, scope = 'sel
             exportControls={!presentationMode && (
                 <>
                     <FeatureChartButton />
-                    <button
-                        onClick={() => {
-                            navigator.clipboard.writeText(window.location.href).then(() => {
-                                setCopiedUrl(true);
-                                setTimeout(() => setCopiedUrl(false), 2000);
-                            });
-                        }}
-                        className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy link to this chart view"
-                    >
-                        {copiedUrl ? '✓ Copied' : 'URL'}
-                    </button>
+                    <CopyLinkButton />
                     <button
                         onClick={copyPng}
                         className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}

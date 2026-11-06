@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import Chart from 'chart.js/auto';
 import { useTheme } from '../hooks/useTheme';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
@@ -11,6 +11,7 @@ import { useChartPng } from '../hooks/useChartPng';
 import { useSourceLine } from '../hooks/useSourceLine';
 import { buildVehicleLabels } from '../utils/seriesLabel';
 import FeatureChartButton from './home/FeatureChartButton';
+import CopyLinkButton from './charts/CopyLinkButton';
 
 // ── Linear regression ─────────────────────────────────────────────────────────
 
@@ -77,7 +78,6 @@ const pointLabelPlugin = {
  */
 export default function SpecsScatterView({ xPlot, yPlot, xCol, yCol, colorOf, units, scope = 'selection', presentationMode = false }) {
     const { isDark } = useTheme();
-    const [copiedUrl, setCopiedUrl] = useState(false);
 
     // A point needs both axes: the vehicles that have an X and a Y.
     const pairs = useMemo(() => {
@@ -236,18 +236,7 @@ export default function SpecsScatterView({ xPlot, yPlot, xCol, yCol, colorOf, un
             exportControls={!presentationMode && (
                 <>
                     <FeatureChartButton />
-                    <button
-                        onClick={() => {
-                            navigator.clipboard.writeText(window.location.href).then(() => {
-                                setCopiedUrl(true);
-                                setTimeout(() => setCopiedUrl(false), 2000);
-                            });
-                        }}
-                        className={`chart-copy-btn ${copiedUrl ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy link to this chart view"
-                    >
-                        {copiedUrl ? '✓ Copied' : 'URL'}
-                    </button>
+                    <CopyLinkButton />
                     <button
                         onClick={copyPng}
                         className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}

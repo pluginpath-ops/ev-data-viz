@@ -1738,7 +1738,7 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         const view = read('src/components/EpaCurvesView.jsx');
         expect(view, 'the extras travel in epaConfig').toMatch(/driven: presentationMode \? \(epaConfig\.extras/);
         expect(view, 'and are written there by the window that has the controls').toMatch(/extras: JSON\.parse\(extrasKey\)/);
-        expect(read('src/utils/chartUrlState.js'), 'the extras stay out of the link (#476 is the compact key)').not.toMatch(/windSpeed|gradeGain|extras/);
+        expect(read('src/utils/chartUrlState.js'), 'the extras stay out of the link, and so out of the short link (#476)').not.toMatch(/windSpeed|gradeGain|extras/);
     });
 
     it('reads the accessory load in the correction and takes a run’s own consumption to it (#449)', () => {
@@ -2525,7 +2525,20 @@ describe('a chart link is read and written in one module (#448 layer 1)', () => 
 
     it('every key the builder writes, the parser reads', () => {
         const written = [...buildSrc.matchAll(/p\.set\('([a-z0-9_]+)'/g)].map(m => m[1]);
-        expect(written.length).toBeGreaterThan(40);
+        expect(written.length).toBeGreaterThan(20);
+        // Charge Stop's and Road Trip's settings are tables (#476): one list
+        // that readParams and writeParams both walk, so a row is read and
+        // written or neither. Each table must be on both sides.
+        for (const table of ['COMPARE_PARAMS', 'ROAD_TRIP_PARAMS', 'OPTIMIZER_PARAMS', 'TOWING_PARAMS']) {
+            expect(parseSrc, `${table} is read`).toMatch(new RegExp(`readParams\\(p, ${table}\\)`));
+            expect(buildSrc, `${table} is written`).toMatch(new RegExp(`writeParams\\(p, ${table}`));
+        }
+        const tabled = [...parseSrc.matchAll(/\['((?:cmp|rt)_[a-z]+)', '/g)].map(m => m[1]);
+        expect(tabled.length).toBe(20);
+        // Trip Optimizer's chart is a table row for the write and read apart
+        // (an unknown chart is dropped).
+        expect(buildSrc).toMatch(/writeParams\(p, OPTIMIZER_CHART_PARAM/);
+        expect(parseSrc).toMatch(/p\.get\('rt_oc'\)/);
         // `tab` is read by App itself before the parse, `m` and `v` through
         // their own names — the check is on the quoted key appearing at all.
         const unread = written.filter(k => k !== 'tab' && !parseSrc.includes(`'${k}'`));
@@ -3223,6 +3236,54 @@ describe('the spec chart plots the vehicle table’s columns (#450)', () => {
 
     it('keeps the old chart keys alive in saved links', () => {
         expect(chart).toMatch(/currentFieldKey\(chartConfig\.specsField\)/);
+    });
+});
+
+// ── The short link (#476) ────────────────────────────────────────────────────
+// Built and unit-tested is not connected. Each seam: the URL button copies it,
+// the page opens it before anything reads the address, a bad one is said out
+// loud, and what it packs is the chart link's own state.
+describe('the short link is copied, opened and reported (#476)', () => {
+    const CHART_VIEWS = [
+        'src/components/ChargingView.jsx', 'src/components/RangeChartView.jsx',
+        'src/components/ChargeCompareView.jsx', 'src/components/RoadTripView.jsx',
+        'src/components/EpaCurvesView.jsx', 'src/components/SpecsChartView.jsx',
+        'src/components/SpecsScatterView.jsx', 'src/components/PerformanceCurveView.jsx',
+        'src/components/performance/PerformanceCompareChart.jsx',
+    ];
+
+    it.each(CHART_VIEWS)('%s: the URL button is the shared one, which copies a short link', (file) => {
+        const src = read(file);
+        expect(src).toMatch(/<CopyLinkButton\b/);
+        expect(src, 'no inline copy of the readable address').not.toMatch(/clipboard\.writeText\(window\.location\.href\)/);
+    });
+
+    it('the button packs the chart link through chartUrlState, defaults written out', () => {
+        const button = read('src/components/charts/CopyLinkButton.jsx');
+        expect(button).toMatch(/chartShortLink\(/);
+        expect(read('src/utils/chartUrlState.js'))
+            .toMatch(/chartShortLink = \(search\) => encodeShortLink\(withDefaultsWrittenOut\(search\)\)/);
+    });
+
+    it('main.jsx opens a short link before the app reads the address', () => {
+        const main = read('src/main.jsx');
+        expect(main).toMatch(/expandShortLink\(window\.location\.search\)/);
+        expect(main.indexOf('expandShortLink(')).toBeLessThan(main.indexOf("import('./renderApp')"));
+        expect(main).toMatch(/shortLinkError: error/);
+    });
+
+    it('App tells the reader when a short link could not be read', () => {
+        expect(read('src/App.jsx')).toMatch(/history\.state\?\.shortLinkError[\s\S]{0,80}showError\(error\)/);
+        expect(read('src/context/AppContext.jsx')).toMatch(/\n\s+showError,\n/);
+    });
+
+    it('the address bar writes the slim form, and a saved comparison the written-out one', () => {
+        expect(read('src/App.jsx')).toMatch(/history\.replaceState\(\{ view, chartMode \}, '', '\?' \+ chartQueryString\(p\)\)/);
+        expect(read('src/utils/featuredComparisons.js')).toMatch(/new URLSearchParams\(withDefaultsWrittenOut\(params\)\)/);
+    });
+
+    it('shortLink.js stays a leaf, since main.jsx imports it before the constants are seeded', () => {
+        expect(read('src/utils/shortLink.js')).not.toMatch(/^import /m);
     });
 });
 

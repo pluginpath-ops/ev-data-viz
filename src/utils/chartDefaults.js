@@ -14,7 +14,13 @@ import { DEFAULT_SERIES_PALETTE } from './colorUtils';
 import { NO_VEHICLE_BASES } from './vehicleBase';
 import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from './correctionSettings';
 import { DEFAULT_ASSUMPTIONS } from './vehicleTable';
-import { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION } from './chartUrlState';
+
+/** Range & Efficiency opens on range per vehicle, efficiency in mi/kWh. */
+export const DEFAULT_RANGE_CHART_TYPE = 'range-vehicle-bar';
+export const DEFAULT_EFFICIENCY_UNIT = 'mi_kwh';
+
+/** Charge Stop's bars lie down by default. */
+export const DEFAULT_COMPARE_ORIENTATION = 'horizontal';
 
 export function defaultChartConfig() {
     return {
