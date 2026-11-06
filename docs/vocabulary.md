@@ -2,16 +2,10 @@
 
 One name per thing, and where that thing lives.
 
-This exists because three words drifted. "Rail" was used for the chart sidebar,
-the sub-nav, *and* the colored left edge of a vehicle card. "Chrome" was used
-both as a category ("blue leads the chrome") and as the name of one specific
-region. A word with no fixed referent attracts whatever needs naming next, and
-by the time you notice, two people are describing different objects with the
-same sentence.
-
-Prefer the **standard** column. Where a term is established outside this repo,
-the source is named — the point is to use the industry word rather than invent
-a house one, so that a new reader already knows it.
+A word with no fixed meaning soaks up whatever needs naming next, until two
+people describe different things with the same sentence. Use the industry word
+where one exists (the **Established by** column) so a new reader already knows
+it.
 
 ---
 
@@ -22,414 +16,337 @@ a house one, so that a new reader already knows it.
 | Everything that is UI furniture rather than data | **chrome** | "browser chrome", Mozilla | a category, not a component |
 | The pinned block at the top of every page | **header** | HTML `<header>`; Material *top app bar* | `.app-nav`, [App.jsx](../src/App.jsx) |
 | Its measured height, published for CSS | **`--app-header-h`** | — | [useHeaderHeight.js](../src/hooks/useHeaderHeight.js) |
-| Row 1 — wordmark, section tabs, account | **nav bar** | Bootstrap *navbar* | `.app-nav-bar`, [AppNav.jsx](../src/components/shell/AppNav.jsx) |
+| Row 1 — wordmark, tabs, account | **nav bar** | Bootstrap *navbar* | `.app-nav-bar`, [AppNav.jsx](../src/components/shell/AppNav.jsx) |
 | The section buttons in the nav bar | **tabs** | WAI-ARIA `tablist` | `.btn-tab` |
-| Row 2 — Charging Curves / Range & Efficiency / … | **sub-nav** | common web | `.subtab-strip`, [SubTabStrip.jsx](../src/components/shell/SubTabStrip.jsx) |
-| Either row of tabs, collapsed below 1000px | **nav menu** | — | `.nav-menu`, [NavMenu.jsx](../src/components/shell/NavMenu.jsx) |
-| The mark before a collapsed bar's current name | **the menu icon** — three bars on the main nav, a bulleted list on the sub-nav | common web ("hamburger", "list") | `.nav-menu-icon`, [NavMenu.jsx](../src/components/shell/NavMenu.jsx) |
-| The first tab, and the landing: the featured comparison a curator chose, every chart of it drawn at once (#448) | **Home** — tab key `home`. Reads no selection, so the chips are not drawn on it. Not a landing "page" in prose when the tab is meant: say Home. It is also where a bare address lands (#448); every other tab is reached by its own `?tab=`, and one the app does not know lands here too | — | [HomeView.jsx](../src/components/home/HomeView.jsx), `?tab=home` |
-| The statement of what EVBench is, above the featured comparison on Home — and alone when nothing is featured | **the intro** — not "hero" (it has no photo) nor "banner". Its words are the owner's | — | [HomeIntro.jsx](../src/components/home/HomeIntro.jsx), `.home-intro` |
-| The vehicle table as a featured comparison shows it on Home — only the comparison's vehicles, in its order, under the columns and prices its curator saved (#448) | **a table panel**, full width. Read-only: no checkboxes, filters, pickers or sorting, and it touches neither the address nor the reader's remembered columns. Its Open chart opens the real vehicle table with the same vehicles selected at the top. Saved from the table's own control row, by Save as featured comparison; a saved table always names its preset (`vt_preset=overview` if nothing else), since an address that names none means "the columns you last used" | — | [PresentedVehicleTable.jsx](../src/components/vehicles/PresentedVehicleTable.jsx), [VehicleTableGrid.jsx](../src/components/vehicles/VehicleTableGrid.jsx) (the grid both tables draw), `explicitChartParams` |
-| What a reader did that the site counts — Home opened, a featured chart opened, the reset used, a chart tab opened (#448) | **a site event** — recorded under the anonymous browser token, never a user, email or IP; a curator's own clicks and the pop-out are not counted. Not "analytics" or "tracking", which promise more than this holds; not "logging" alone, which is `access_logs` (refused writes) | — | `site_events`, `log_site_event` (migration 090), [siteEvents.js](../src/utils/siteEvents.js), [useSiteEvents.js](../src/hooks/useSiteEvents.js) |
-| The Admin sub-tab that reads the site events as counts, to choose featured comparisons with what readers open in view (#477) | **Site Events** — its figures are counted in **browsers** (the token), never people; a row with fewer than 10 observations is marked **too few** and not ranked. A chart open is **from Home** when matched to an Open chart → click, else **other ways** | — | [SiteEventsPanel.jsx](../src/components/admin/SiteEventsPanel.jsx), [siteEventStats.js](../src/utils/siteEventStats.js) |
-| A curator's sentence or two under a panel's title on Home, one per chart (#448). Not the plot's own **subtitle**, the conditions line inside the frame, which the code sometimes calls a caption because it captions the PNG export | **a caption** — a panel's caption. Written as basic Markdown, like the featured comparison's **blurb** | — | `charts[].caption` in `featured_comparisons.charts`; [MarkdownText.jsx](../src/components/MarkdownText.jsx) |
-| The Markdown the blurb and a caption understand — bold, italics, headings (one modest size), bullets, `[text](url)` and bare https links; Enter is a line break, a blank line a paragraph | **basic Markdown** — its own small parser, not the explainers': that one is for articles (citations, footnotes, tables, directives) and sits behind the explainers boundary. The inline syntax is the same, so an author moves between them | — | [miniMarkdown.js](../src/utils/miniMarkdown.js); the explainers' is [parseExplainer.js](../src/explainers/parseExplainer.js) |
-| One chart of a featured comparison, drawn on Home from its saved settings, with its title and **Open chart →** | **a panel** — a shop window: the chart under it is the pop-out's view fed the comparison's own copy of the state, so the reader's selection and tweaks never reach it, and a click anywhere on it opens the chart on its tab | — | [FeaturedChartPanel.jsx](../src/components/home/FeaturedChartPanel.jsx), [PresentedChart.jsx](../src/components/PresentedChart.jsx), `.home-panel` |
-| What a curator does to put the chart on screen into a featured comparison | **Save as featured comparison** — a button in a chart's toolbar, curators only, labelled **★ Feature** to fit there (the tooltip gives the full name); it opens **the featured comparison editor**, which makes a new one from the chart or adds the chart to one that exists, and also edits, lists or unlists one. Admin only: Delete | — | [FeatureChartButton.jsx](../src/components/home/FeatureChartButton.jsx), [FeaturedComparisonEditor.jsx](../src/components/home/FeaturedComparisonEditor.jsx) |
-| The first tab: seeing and selecting vehicles, and comparing what they are | **Vehicles & Specs** — tab key `vehicles`. Its sub-nav has two **sections**: **Summary** (Cards · List) and **Specifications & Data** (Table · Chart) | — | [AppNav.jsx](../src/components/shell/AppNav.jsx), `VEHICLES_STRIP_ITEMS` (#338) |
-| One vehicle's tests, EPA configurations and performance, on a page of its own | **the vehicle's page** — under Vehicles & Specs, route `?tab=runs&vid=…`. What it shows is still called **Tests & Data** (its buttons say "View Tests & Data"); it is no longer a tab | — | [RunsView.jsx](../src/components/RunsView.jsx) (#338) |
-| The vehicle whose page was last opened, kept in the header until closed | **the opened vehicle** — "↳ name ×" under the Vehicles & Specs label, on every tab. Never a chip: it is not the selection, and one at a time | — | `.opened-vehicle`, [AppNav.jsx](../src/components/shell/AppNav.jsx); `activeVehicle` in App.jsx |
-| Taking it out of the header | **Close vehicle** — the large button on the vehicle's page, or × in the header. The breadcrumb only goes back; it keeps the vehicle open | — | `.vehicle-page-close`, `closeVehicle` |
-| The tab for what is true of every EV, selected or not | **Reference** — sub-tabs **Explainers** (#355) and **Platforms** (#354), in that order. A bare `?tab=reference` opens Explainers; Platforms is `sub=platforms`, or `pid=` for one platform's page (#444) | — | [ReferenceSection.jsx](../src/components/reference/ReferenceSection.jsx) (#338) |
-| Every platform, with what it provides and how many vehicles are on it | **the platform list** — Reference › Platforms | — | [PlatformList.jsx](../src/components/reference/PlatformList.jsx) (#354) |
-| One platform: what it is and provides, its notes, the vehicles on it | **the platform page** — `?tab=reference&pid=…`; where "from <platform>" leads, and a platform's name on a card | — | [PlatformPage.jsx](../src/components/reference/PlatformPage.jsx), `PlatformLink`, `openPlatform` |
-| A breadcrumb above a page's title | **the breadcrumb** | WAI-ARIA *breadcrumb* | `.page-crumb` — the vehicle's page and the platform page |
-| An article on how something works, with diagrams | **an explainer** — not "guide" (the Fuel Economy Guide) nor "glossary" (definitions, no diagrams) | — | #355 |
-| Vehicles & Specs' one-line-per-vehicle view | **List** — fixed columns under a **header row** that sorts on click (Vehicle, Battery, EPA range, Tested); the curators' and browsers' view, where the Table is for comparing any columns | — | `.vehicle-list`, `.vehicle-list-head`, [VehicleListHeader.jsx](../src/components/vehicles/VehicleListHeader.jsx) (#338) |
-| The ⋯ at the end of a List row, holding Specs, Edit, Copy, Variant and Delete | **the row menu** | — | [VehicleRowMenu.jsx](../src/components/vehicles/VehicleRowMenu.jsx) |
-| The one row of search and dropdowns above Cards, List and Table, and the chips beneath it | **the filter bar**; its dropdowns are **facets** (Make, Model, Year, Drive, Tags, Test data) and the line of chips is **Narrowed by**. One set of filters for all three views | EPA guide's filter strip | [VehicleFilterBar.jsx](../src/components/vehicles/VehicleFilterBar.jsx), [vehicleFilters.js](../src/utils/vehicleFilters.js) (#338) |
-| Leaving out every vehicle (or guide row) with a value | **exclude** — the value's **not** button; its chip reads "not Truck". Including clears an exclusion and the other way round | — | `GuideFacetMenu` `onExclude`, `.guide-facet-exclude`; `-` before a value in the URL (`tg=-Truck`) |
-| Whether a multi-valued facet needs any or every chosen value | **match any / all** — Tags default to any, Test data to all | — | `GuideFacetMenu` `onAllChange`, `<param>_all=1` |
-| A labelled group of items in a sub-nav | **a section** of the sub-nav — its label, then its items, with a rule between sections | — | `group` on an item; `.subtab-section-label`, `.subtab-section-rule`, `.nav-menu-section` |
-| The spec chart: a bar of one column or a scatter of two, over the selected vehicles, drawn from the vehicle table's columns | **Chart** inside Specifications & Data; **the spec chart** anywhere else, since "chart" alone means every chart on the site. Replaced the Spec Chart and Spec Scatter sub-tabs; the modes stay `specs` and `specscatter`. **Bar** and **Scatter** stay as the two kinds. It plots the table's own row values (so a calculated column is the number its cell shows). Its **Vehicles** control is **Selection** (the selected vehicles, the default) or **All** (every vehicle Vehicles & Specs' filters leave, with the same filter bar in the sidebar); `specScope` in chartConfig, `ss=all` in a link | — | [SpecChart.jsx](../src/components/SpecChart.jsx), [SpecChartKind.jsx](../src/components/SpecChartKind.jsx), `navAlias` in chartNav.js (#450) |
-| The list in the spec chart's sidebar that chooses which column(s) to plot: every column the table offers, grouped as the column picker groups them, with a text filter; opens on the columns the table is showing | **field picker** — in the UI its list is called **fields** ("Data · 83 fields", "Filter fields"), because "columns" reads as table furniture; the table's own menu stays **Columns**. **column picker** stays the table's own menu that chooses what to *show*. In a scatter it takes an X and a Y | Material *select* / *listbox* | [FieldPicker.jsx](../src/components/tables/FieldPicker.jsx) (#450) |
-| The list in Charging Curves' sidebar that chooses the X, Y and Y2 axes: grouped (Time, Charging speed, Range, Range added), with a text filter, a toggle per axis on each row | **axis picker** — the field picker's sibling for a chart with a Y2; its list is **axes** ("Filter axes"). Each axis has a full `label` ("Range Rate (mi/hr)", which titles the plot) and a short `name` under its group ("mi/hr") | — | [AxisPicker.jsx](../src/components/AxisPicker.jsx), [chargingAxes.js](../src/utils/chargingAxes.js) |
-| The small bar-chart icon beside a table column header's name; clicking it plots that column in the spec chart | **chart icon** (never "plot button"). Disabled, with "Select vehicles to plot", while nothing is selected. The header's own click still sorts and its drag still reorders. The EPA guide table has it only on columns that are the same figure as a vehicle-table column (`plotAs` in `GUIDE_COLUMNS`) | — | `.column-plot-button`, [SortHeader.jsx](../src/components/tables/SortHeader.jsx) (#450) |
-| The tab analysing EVBench's tested charging and range results | **Charging & Range** — the tab key stays `efficiency`. Not "Charging & Efficiency", its old name: efficiency is also the EPA tab's subject | — | [chartNav.js](../src/constants/chartNav.js) (#338) |
-| Charging & Range's sub-tabs | **Charging Curves** (mode `charging`) · Range & Efficiency · **Charge Stop** (mode `compare`: range added in X minutes, time to add M miles) · Road Trip · **Trip Optimizer** (mode `optimizer`: the best travel speed and charge per stop, searched together; Road Trip's view as its optimizer variant). On it, **Fastest legal** is the quickest plan within the reader's **legal range** (the speeds set under Your plan) and **Fastest** the quickest at any speed — not "best plan" in UI text, which hid that the legal range decides it; `BestPlanTable` keeps the old word as an internal name. Not "Charging" or "Charge Compare", their old names; not "sweeps" for the optimizer, which was what its charts were called while they hid in Road Trip's X menu | — | [chartNav.js](../src/constants/chartNav.js) (#338) |
-| EPA's efficiency against speed, modeled from its data | **Modeled Efficiency**, in either of the EPA sub-nav's two sections: **All EVs** (any configuration EPA rated, no vehicle, selection or tests; `?sub=curves`) and **Selected vehicles** (the selection, with EVBench's range tests laid over it; mode `epacurves`, category `epatested`). One model, two scopes; the section says which, and the page title adds "· selected vehicles". Never "curves" in UI text. Old names: Speed-Consumption Curves, EPA Curves, Modeled vs Tested | — | [EpaCurveExplorer.jsx](../src/components/epa/curves/EpaCurveExplorer.jsx) (#338) |
-| The one width at which the chrome collapses | **compact** | — | [useIsCompact.js](../src/hooks/useIsCompact.js) — the only breakpoint |
+| Row 2 — a tab's own sub-tabs | **sub-nav** | common web | `.subtab-strip`, [SubTabStrip.jsx](../src/components/shell/SubTabStrip.jsx) |
+| Either row, collapsed below 1000px | **nav menu** | — | `.nav-menu`, [NavMenu.jsx](../src/components/shell/NavMenu.jsx) |
+| The mark before a collapsed row's current name | **the menu icon** — three bars on the nav bar, a bulleted list on the sub-nav | common web ("hamburger", "list") | `.nav-menu-icon` |
+| A labeled group of items in a sub-nav | **a section** — its label, its items, a rule between sections | — | `group` on an item; `.subtab-section-label`, `.subtab-section-rule`, `.nav-menu-section` |
+| The one width at which the chrome collapses | **compact** — the only breakpoint | — | [useIsCompact.js](../src/hooks/useIsCompact.js) |
 | The circle at the right end, and what it opens | **account menu** | Material *account* | `.account-menu`, [AccountMenu.jsx](../src/components/shell/AccountMenu.jsx) |
 | A button stating its value, opening a panel | **menu button** | WAI-ARIA *menu button* | `.menu-button`, [MenuButton.jsx](../src/components/shell/MenuButton.jsx) |
 | Anything that floats above the page | **popover** | common web | `.popover` + one `.popover--<placement>` |
-| Where it opens relative to its anchor | **placement** | Floating UI *placement* | `--above`, `--below`, `--center`, `--right`, `--end`, `--stretch` |
-| A row of them above a table or chart | **controls strip** | — | `.controls-strip` — one class, shared |
-| One choice, always visible, of two or three — or more when every option is a short word and the row may scroll sideways (the preset picker's eight) | **segmented control** | Apple HIG *segmented control* | `.stats-segmented`, `.account-segmented`; `.preset-picker` wraps one |
-| Row 3 — the removable selected-vehicle pills; and a vehicle picker's chosen vehicle, closed | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip`; `.combobox-chip` ([VehicleCombobox.jsx](../src/components/VehicleCombobox.jsx)) — its name reopens the search, its × clears, and `.combobox-detail` beside it carries what tells lookalikes apart |
-| The capped box the chips scroll inside | **chip scroller** | — | `.selected-chip-scroll` — two rows, then it scrolls |
-| "＋ Add" at the right end of the chips row, and the search-and-tick list it opens to grow the selection from any tab | **the vehicle quick-add** — a checklist: a click toggles a vehicle at once, ✓ marks the selected, and the panel and its search stay put. Not "picker" alone, which is the run picker's | — | [VehicleQuickAdd.jsx](../src/components/VehicleQuickAdd.jsx), `.vehicle-quick-add` |
-| The centred max-width content column | **page container** | — | `.page-container` |
+| Where it opens relative to its anchor | **placement** | Floating UI | `--above`, `--below`, `--center`, `--right`, `--end`, `--stretch` |
+| A row of controls above a table or chart | **controls strip** | — | `.controls-strip` |
+| One always-visible choice of two or three — more if every option is a short word and the row may scroll | **segmented control** | Apple HIG | `.stats-segmented`, `.account-segmented`; `.preset-picker` wraps one |
+| Row 3 — the removable selected-vehicle pills; also a vehicle picker's chosen vehicle, closed | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip`; `.combobox-chip` in [VehicleCombobox.jsx](../src/components/VehicleCombobox.jsx) — name reopens search, × clears, `.combobox-detail` beside it tells lookalikes apart |
+| The capped box the chips scroll inside | **chip scroller** — two rows, then scrolls | — | `.selected-chip-scroll` |
+| "＋ Add" at the end of the chips row, and its search-and-tick list | **the vehicle quick-add** — a click toggles a vehicle at once; the panel stays open. Not "picker" alone, which is the run picker | — | [VehicleQuickAdd.jsx](../src/components/VehicleQuickAdd.jsx), `.vehicle-quick-add` |
+| The centered max-width content column | **page container** | — | `.page-container` |
+| A breadcrumb above a page's title | **the breadcrumb** | WAI-ARIA | `.page-crumb` |
 
-`.app-nav` is the header **and** its rows; the class predates this document.
-Renaming it is [tracked separately](#deferred-renames).
+`.app-nav` is the header **and** its rows; see [Deferred renames](#deferred-renames).
+
+### Tabs and pages
+
+| Thing | Call it | Lives in |
+|---|---|---|
+| The first tab and the landing: a featured comparison, every chart drawn at once | **Home** (`?tab=home`). Draws no chips. A bare or unknown address lands here. Say Home, not "landing page" | [HomeView.jsx](../src/components/home/HomeView.jsx) |
+| What EVBench is, above the featured comparison — alone when nothing is featured | **the intro**. Not "hero" (no photo) or "banner". The owner writes it | [HomeIntro.jsx](../src/components/home/HomeIntro.jsx), `.home-intro` |
+| Seeing and selecting vehicles, and comparing what they are | **Vehicles & Specs** (key `vehicles`). Sub-nav sections: **Summary** (Cards · List · Lineage) and **Specifications & Data** (Table · Chart) | [AppNav.jsx](../src/components/shell/AppNav.jsx), `VEHICLES_STRIP_ITEMS` |
+| One vehicle's tests, EPA configurations and performance | **the vehicle's page** (`?tab=runs&vid=…`). What it shows is **Tests & Data** ("View Tests & Data"). Not a tab | [RunsView.jsx](../src/components/RunsView.jsx) |
+| The vehicle whose page was last opened, kept in the header | **the opened vehicle** — "↳ name ×" under Vehicles & Specs. Never a chip: it isn't the selection | `.opened-vehicle`; `activeVehicle` in App.jsx |
+| Taking it out of the header | **Close vehicle** — the button on the page, or × in the header. The breadcrumb only goes back | `.vehicle-page-close`, `closeVehicle` |
+| Vehicles & Specs' one-line-per-vehicle view | **List** — fixed columns under a **header row** that sorts on click. Table is for comparing any columns | `.vehicle-list`, [VehicleListHeader.jsx](../src/components/vehicles/VehicleListHeader.jsx) |
+| The ⋯ at the end of a List row | **the row menu** | [VehicleRowMenu.jsx](../src/components/vehicles/VehicleRowMenu.jsx) |
+| Search and dropdowns above Cards, List and Table, and the chips under it | **the filter bar**; dropdowns are **facets** (Make, Model, Year, Drive, Tags, Test data); the chip line is **Narrowed by**. One filter set for all three views | [VehicleFilterBar.jsx](../src/components/vehicles/VehicleFilterBar.jsx), [vehicleFilters.js](../src/utils/vehicleFilters.js) |
+| Leaving out every row with a value | **exclude** — the value's **not** button; chip reads "not Truck" | `GuideFacetMenu` `onExclude`; `tg=-Truck` in the URL |
+| Whether a multi-value facet needs any or every chosen value | **match any / all** — Tags default any, Test data all | `onAllChange`, `<param>_all=1` |
+| Analysis of EVBench's tested charging and range | **Charging & Range** (key stays `efficiency`). Not "Charging & Efficiency" — efficiency is also EPA's subject | [chartNav.js](../src/constants/chartNav.js) |
+| Its sub-tabs | **Charging Curves** (`charging`) · **Range & Efficiency** · **Charge Stop** (`compare`: range added in X minutes, time to add M miles) · **Road Trip** · **Trip Optimizer** (`optimizer`: best speed and charge per stop, searched together). Not "Charging", "Charge Compare" or "sweeps" | chartNav.js |
+| On Trip Optimizer | **Fastest legal** — quickest plan within the reader's **legal range** (speeds under Your plan); **Fastest** — quickest at any speed. Not "best plan" in UI text (`BestPlanTable` keeps it internally) | |
+| EPA's efficiency against speed, modeled | **Modeled Efficiency**, in two EPA sub-nav sections: **All EVs** (`?sub=curves`) and **Selected vehicles** (with EVBench's range tests over it; mode `epacurves`, category `epatested`). Never "curves" in UI text | [EpaCurveExplorer.jsx](../src/components/epa/curves/EpaCurveExplorer.jsx) |
+| What is true of every EV, selected or not | **Reference** — **Explainers** then **Platforms**. Bare `?tab=reference` opens Explainers; `sub=platforms` the list, `pid=` one platform | [ReferenceSection.jsx](../src/components/reference/ReferenceSection.jsx) |
+| Every platform, what it provides, how many vehicles | **the platform list** | [PlatformList.jsx](../src/components/reference/PlatformList.jsx) |
+| One platform's page | **the platform page** — where "from <platform>" leads | [PlatformPage.jsx](../src/components/reference/PlatformPage.jsx), `PlatformLink`, `openPlatform` |
+| An article on how something works, with diagrams | **an explainer**. Not "guide" (the Fuel Economy Guide) or "glossary" | `src/explainers/` |
+
+### Home and featured comparisons
+
+| Thing | Call it | Lives in |
+|---|---|---|
+| A curator's answer to one question, told in several charts | **a featured comparison** (owner's pick). Parts: **title**, **blurb**, **vehicles** (one ordered set), **charts** (each a chart link). Listed/unlisted like a vehicle; Home shows the **newest listed**. Not "scenario", **preset** or "view" | `featured_comparisons`, [featuredComparisons.js](../src/utils/featuredComparisons.js); `?tab=home&fc=<slug>` |
+| One chart of it on Home, with title and **Open chart →** | **a panel** — a shop window: fed the comparison's own state, so the reader's selection never reaches it. A click opens the chart on its tab | [FeaturedChartPanel.jsx](../src/components/home/FeaturedChartPanel.jsx), [PresentedChart.jsx](../src/components/PresentedChart.jsx), `.home-panel` |
+| The vehicle table as a panel | **a table panel**, full width, read-only (no checkboxes, filters, sorting; touches neither the address nor the reader's columns). Always names its preset (`vt_preset=overview` by default), since no preset means "your last columns" | [PresentedVehicleTable.jsx](../src/components/vehicles/PresentedVehicleTable.jsx), [VehicleTableGrid.jsx](../src/components/vehicles/VehicleTableGrid.jsx), `explicitChartParams` |
+| A curator's line or two under a panel's title | **a caption**, in basic Markdown. Not the plot's **subtitle** (the conditions line inside the frame, which code sometimes calls a caption) | `charts[].caption`; [MarkdownText.jsx](../src/components/MarkdownText.jsx) |
+| The Markdown blurbs and captions understand | **basic Markdown** — its own small parser. Same inline syntax as the explainers' parser, which handles articles and sits behind the explainers boundary | [miniMarkdown.js](../src/utils/miniMarkdown.js) |
+| Putting the chart on screen into a featured comparison | **Save as featured comparison** — toolbar button **★ Feature**, curators only; opens **the featured comparison editor**. Delete is admin only | [FeatureChartButton.jsx](../src/components/home/FeatureChartButton.jsx), [FeaturedComparisonEditor.jsx](../src/components/home/FeaturedComparisonEditor.jsx) |
+| Putting the site back to a featured comparison: its vehicles and its first chart's correction; other settings at defaults, each chart's arriving when opened | **reset to the comparison** | `resetStateOf`, `resetToComparison` in App.jsx |
+| What a reader did that the site counts | **a site event** — under the anonymous browser token, never a user, email or IP; curators' clicks and the pop-out aren't counted. Not "analytics", "tracking" or "logging" (that's `access_logs`) | `site_events`, `log_site_event`, [siteEvents.js](../src/utils/siteEvents.js) |
+| The Admin sub-tab reading those counts | **Site Events** — counted in **browsers**, never people; under 10 observations is **too few** and unranked. A chart open is **from Home** or **other ways** | [SiteEventsPanel.jsx](../src/components/admin/SiteEventsPanel.jsx), [siteEventStats.js](../src/utils/siteEventStats.js) |
 
 ## Charts
 
 | Thing | Call it | Established by | Lives in |
 |---|---|---|---|
 | The 320px control column beside a plot | **sidebar** | HTML `<aside>` | `.chart-rail`, `.chart-main` |
-| The bordered box that a PNG export captures | **figure** | HTML `<figure>` / `<figcaption>` | [PlotFrame.jsx](../src/components/charts/PlotFrame.jsx), `.plot-frame` |
-| The small "Data: …" credit along the bottom of a figure | **source line** | data-visualisation convention (the *source line* under a chart) | [SourceLine.jsx](../src/components/charts/SourceLine.jsx), `.plot-frame-sources`, [useSourceLine.js](../src/hooks/useSourceLine.js) |
-| The box listing every series' value at the X under the cursor, on the line and scatter charts (#455). Hover shows it; a click fixes it | **readout** — the bar charts keep a per-bar **tooltip**, Chart.js's word; the readout is not one, because its rows carry links | instrument *readout*; Highcharts calls the same thing a *shared tooltip* | [ChartReadout.jsx](../src/components/charts/ChartReadout.jsx), [useChartReadout.jsx](../src/hooks/useChartReadout.jsx), `.chart-readout`, [readoutAtX.js](../src/utils/readoutAtX.js) |
-| The vertical line at that X, and the dot on each line | **crosshair** | Highcharts, Grafana *crosshair* | `.chart-crosshair`, `.chart-crosshair-dot` — a ring where the value was read off the line between two samples |
-| A readout held in place by a click, so its links can be clicked | **fixed** — to fix a readout, a fixed readout. Not "pinned": pin is spoken for (local to a table, below) | — | `chart-readout--fixed`; a second click on the chart, Esc or a click outside clears it. The PNG export redraws it onto the picture (#456): guide line, dots and a compact box ([drawFixedReadout.js](../src/utils/drawFixedReadout.js), [readoutBox.js](../src/utils/readoutBox.js)). The **Side readout** half of the [PNG | Side readout] button puts its values in a panel beside the plot instead. Local to the window: not in the URL, not in the pop-out; cleared when the chart is rebuilt |
-| The strip of PNG / URL buttons | **toolbar** — the Colors field, ★ Feature, URL and PNG, after a caption that truncates first | WAI-ARIA `toolbar` | `.chart-export-strip` |
-| The button that undoes a box-zoom: in the corner of the Axis Scale controls, drawn only while the chart is zoomed, outlined in orange; and the link "Reset zoom to restore" in the hint under the plot, which does the same | **Reset zoom** (the button) and **the zoom hint** (the line under the plot). Not in the toolbar, where it used to sit | — | [useChartZoom.js](../src/hooks/useChartZoom.js), [ZoomHint.jsx](../src/components/ZoomHint.jsx), `.zoom-reset` in [AxisScaleControls.jsx](../src/components/AxisScaleControls.jsx) |
-| The thumbnail of what PNG just copied | **export preview** | — | [useChartPng.js](../src/hooks/useChartPng.js), `.chart-png-preview` |
-| Canvas type sizes derived from `--fs-body` | **chart fonts** | — | [chartTheme.js](../src/utils/chartTheme.js) `chartFonts()` |
-| Canvas colors read from the tokens | **chart theme** | — | [chartTheme.js](../src/utils/chartTheme.js) `chartTheme()` |
-| The color one plotted series is drawn in | **series color** | — | [colorUtils.js](../src/utils/colorUtils.js) `resolveChartColors()` |
-| The small square REPORTING that color | **series swatch** | common web | `.series-swatch` — 10px, read-only |
-| The bigger one that CHANGES it | **series color picker** | — | [SeriesColorPicker.jsx](../src/components/SeriesColorPicker.jsx), `.series-swatch--button` |
-| The color a pick becomes slot 1 of | **the base** | — | the rest of the set is re-derived from it |
-| The base asked of one car for this session, without editing the car | **a session base** | — | `chartConfig.vehicleBases`, [vehicleBase.js](../src/utils/vehicleBase.js); applied to the vehicles the charts are given, so it travels to the pop-out window |
-| The control that sets a vehicle's base — a tiny swatch on a chip, or the hit area over a run group's accent border | **vehicle swatch** | — | [VehicleSwatch.jsx](../src/components/VehicleSwatch.jsx), `.vehicle-swatch`, `.vehicle-edge-button`. It opens the series color picker with no scope control: a base belongs to the car |
-| Re-ordering a palette to lead with the base | **rotation** | — | `rotatePaletteFrom()` — different hues, for unrelated tests |
-| One hue in lightness steps from the base | **the ramp**, or light→dark | — | `rampFrom()` — one vehicle's runs, handoff 3c |
-| How much of the plot a pick recolors | **scope** | — | this test · this vehicle · all tests |
-| The address that reopens a chart as it was left — tab, vehicles, plotted tests, settings and correction | **a chart link**; its parts are **parameters** (`r`, `rc`, `eff`, `cmp_sel` …). Read and written together in one module, so a parameter cannot be written and never read. A featured comparison (#448) stores one | — | [chartUrlState.js](../src/utils/chartUrlState.js) `parseChartUrl`, `buildChartParams` |
-| The same chart link packed into one parameter, `?k=1.…`, for pasting and sharing (#476) | **a short link**; the part after `k=` is its **key**. Owner's name, 2026-10-26, in place of the issue's working name "share key". The toolbar's URL button copies it; the address bar keeps the readable chart link. Not a second record of the chart: it packs the chart link's own query and unpacks back to it. The `1.` is its **version**, so an old key keeps opening the chart it was copied from. A key that cannot be read opens Home and says why. A readable chart link leaves out a setting at today's default (Charge Stop's and Road Trip's since #476); a short link writes the default out, so it does not change when a default does | URL shortener (but nothing is stored: the key *is* the state) | [shortLink.js](../src/utils/shortLink.js), [CopyLinkButton.jsx](../src/components/charts/CopyLinkButton.jsx), `chartShortLink`, `withDefaultsWrittenOut` in [chartUrlState.js](../src/utils/chartUrlState.js) |
-| The Min and Max a reader types under a chart to pin an axis (#478) | **axis limits** — six fields (`xMin xMax yMin yMax y2Min y2Max`), Auto when empty. Stored in `chartConfig.axisLimits`, keyed by chart, and written to a chart link as the one packed parameter `ax` (`ax=xn10_yx120`); the on-screen heading over the controls stays **Axis Scale**, so the controls are "the Axis Scale controls" and what they hold is the limits. Owner's name, 2026-10-25. Not "zoom" (the drag box on the plot, which sets none), not "bounds" | the Axis Scale controls; `xn xx yn yx y2n y2x` (links written before #478, still read) | [axisLimits.js](../src/utils/axisLimits.js), [useAxisLimits.jsx](../src/hooks/useAxisLimits.jsx) (the one door every chart goes through), [AxisScaleControls.jsx](../src/components/AxisScaleControls.jsx) |
+| The bordered box a PNG export captures | **figure** | HTML `<figure>` | [PlotFrame.jsx](../src/components/charts/PlotFrame.jsx), `.plot-frame` |
+| The "Data: …" credit along a figure's bottom | **source line** | dataviz convention | [SourceLine.jsx](../src/components/charts/SourceLine.jsx), [useSourceLine.js](../src/hooks/useSourceLine.js) |
+| The box listing every series' value at the cursor's X, on line and scatter charts | **readout**. Bar charts keep a per-bar **tooltip**; the readout isn't one because its rows carry links | Highcharts *shared tooltip* | [ChartReadout.jsx](../src/components/charts/ChartReadout.jsx), [useChartReadout.jsx](../src/hooks/useChartReadout.jsx), [readoutAtX.js](../src/utils/readoutAtX.js) |
+| The vertical line at that X, and a dot per line | **crosshair** — a ring where the value was interpolated | Highcharts, Grafana | `.chart-crosshair`, `.chart-crosshair-dot` |
+| A readout held by a click | **fixed**. Not "pinned" (see Tables). Cleared by a second click, Esc or a click outside; local to the window. PNG redraws it; **Side readout** puts it beside the plot instead | — | `chart-readout--fixed`, [drawFixedReadout.js](../src/utils/drawFixedReadout.js), [readoutBox.js](../src/utils/readoutBox.js) |
+| The strip of Colors, ★ Feature, URL and PNG | **toolbar** | WAI-ARIA `toolbar` | `.chart-export-strip` |
+| Undoing a box-zoom | **Reset zoom** (button in the Axis Scale controls, only while zoomed) and **the zoom hint** (line under the plot). Not in the toolbar | — | [useChartZoom.js](../src/hooks/useChartZoom.js), [ZoomHint.jsx](../src/components/ZoomHint.jsx) |
+| Min/Max a reader types to set an axis | **axis limits** — six fields, Auto when empty; link parameter `ax`. The heading stays **Axis Scale**. Not "zoom" or "bounds" | — | [axisLimits.js](../src/utils/axisLimits.js), [useAxisLimits.jsx](../src/hooks/useAxisLimits.jsx), [AxisScaleControls.jsx](../src/components/AxisScaleControls.jsx) |
+| The thumbnail of what PNG copied | **export preview** | — | [useChartPng.js](../src/hooks/useChartPng.js) |
+| Canvas type sizes from `--fs-body` | **chart fonts** | — | `chartFonts()` in [chartTheme.js](../src/utils/chartTheme.js) |
+| Canvas colors from the tokens | **chart theme** | — | `chartTheme()` |
+| The address that reopens a chart as left | **a chart link**; its parts are **parameters** (`r`, `rc`, `eff` …), read and written in one module | — | [chartUrlState.js](../src/utils/chartUrlState.js) |
+| The chart link packed into `?k=1.…` | **a short link**; after `k=` is its **key**, `1.` its **version**. Packs the chart link, stores nothing. Writes defaults out so it doesn't shift when a default does. An unreadable key opens Home and says why | URL shortener | [shortLink.js](../src/utils/shortLink.js), [CopyLinkButton.jsx](../src/components/charts/CopyLinkButton.jsx) |
+| Bar of one column or scatter of two, from the vehicle table's columns | **Chart** under Specifications & Data; **the spec chart** elsewhere. Kinds **Bar** and **Scatter** (modes `specs`, `specscatter`). Plots the table's own cell values. **Vehicles: Selection** (default) or **All** (what the filters leave; `ss=all`) | — | [SpecChart.jsx](../src/components/SpecChart.jsx), [SpecChartKind.jsx](../src/components/SpecChartKind.jsx) |
+| The spec chart's list for choosing columns to plot | **field picker** — its items are **fields** ("Filter fields"). The table's own menu stays **Columns** (the **column picker**) | Material *listbox* | [FieldPicker.jsx](../src/components/tables/FieldPicker.jsx) |
+| Charging Curves' list for choosing X, Y and Y2 | **axis picker** — items are **axes**. Each has a full `label` (titles the plot) and a short `name` | — | [AxisPicker.jsx](../src/components/AxisPicker.jsx), [chargingAxes.js](../src/utils/chargingAxes.js) |
+| The icon beside a column header that plots it | **chart icon** (not "plot button"). Disabled while nothing is selected. On the EPA guide table only where `plotAs` is set | — | `.column-plot-button`, [SortHeader.jsx](../src/components/tables/SortHeader.jsx) |
 
-A series color has two values that routinely differ and must not be called the
-same thing: the **stored** color is the durable preference — `vehicles.color`
-since #308, `runs.color` before it — and the **drawn** color is what is actually
-on the chart. The picker says both out loud; before it, nothing did.
+### Series color
 
-The rule that matters here is that the **swatch always reports the drawn color**.
-It exists because the two came apart once: the chip beside a vehicle showed one
-color while the chart drew another, and there was no way to tell which was
-lying. Anything that can change what is drawn has to change the swatch with it.
+| Thing | Call it | Lives in |
+|---|---|---|
+| The color one series is drawn in | **series color** | `resolveChartColors()` in [colorUtils.js](../src/utils/colorUtils.js) |
+| The small square reporting it | **series swatch** — 10px, read-only | `.series-swatch` |
+| The control that changes it | **series color picker** | [SeriesColorPicker.jsx](../src/components/SeriesColorPicker.jsx) |
+| The color a pick becomes slot 1 of | **the base** | the rest of the set derives from it |
+| A base asked of one car for this session | **a session base** — travels to the pop-out | `chartConfig.vehicleBases`, [vehicleBase.js](../src/utils/vehicleBase.js) |
+| The control that sets a vehicle's base | **vehicle swatch** — on a chip or a run group's accent border; no scope control | [VehicleSwatch.jsx](../src/components/VehicleSwatch.jsx) |
+| Reordering a palette to lead with the base | **rotation** — different hues for unrelated tests | `rotatePaletteFrom()` |
+| One hue in lightness steps | **the ramp** — one vehicle's runs | `rampFrom()` |
+| How much a pick recolors | **scope** — this test · this vehicle · **all tests** (never "all vehicles") | |
+| The base every un-picked series draws from | **the palette** — set in the **Colors field** (a palette, or Vehicle color). The run picker's **color source note** links to vehicle colors while a palette is on | |
+| A color set on one series this session | **a hand-set color**, or **a pick** — never saved | |
+| Picks applied over the palette | **hand-set mode** — "Hand-set (3) over EVBench", orange outline | |
+| Picks kept but not drawn | **parked** — choosing a palette parks them; Hand-set brings them back | |
 
-A parked hand-set color is the one thing a swatch says besides the drawn color,
-and it does not break that rule: the FACE stays the drawn color and the parked
-one peeks out behind it as a chip, so the swatch reads "this is what is on the
-chart, and there is another color under here". Never the other way round.
+Rules:
 
-What has the last say depends on the mode, and the two are named:
+- **Stored** color (`vehicles.color`) and **drawn** color often differ; don't call
+  them the same thing.
+- **The swatch always reports the drawn color.** A parked pick may peek out
+  behind it, never in front.
+- Layers, bottom to top: palette → base (curated or session) → shades across a
+  vehicle's tests → a test's pick. Setting a base keeps the picks.
+- Only **Back to auto** or **Clear picks** removes a pick; parking doesn't.
+- Nothing on a chart writes color to the database except a vehicle swatch's
+  **Save to vehicle**. The durable color is edited in Tests & Data.
 
-| The base every un-picked series is drawn from | **the palette** | the **Colors field**, in the chart's toolbar — a palette (EVBench by default), or Vehicle color. The run picker keeps one line about it, the **color source note**: a link to vehicle colors while a palette is in force |
-| A color a person set on one series this session | **a hand-set color**, or **a pick** | session-only; never reaches the database |
-| Hand-set colors applied over the palette | **hand-set mode** | `Hand-set (3) over EVBench` in the Colors field, outlined in orange with the applied dot; the color source note says the picks override it |
-| Hand-set colors kept but not drawn | **parked** | choosing a palette parks them; selecting Hand-set brings them back |
-
-In hand-set mode a pick has the last say, which is the older rule and still
-true. Choosing a palette turns the mode off, so the palette draws everything and
-the picks are parked — kept, invisible, and absent from the swatches too, because
-the swatch reports what is drawn. Parking is not discarding: only **Back to
-auto**, at whichever scope, or **Clear picks** in the color source note (all of
-them at once) removes a pick.
-
-A session base is the layer between the palette and the picks: palette → base
-(curated, or this) → shades across the vehicle's tests → a test's hand-set pick
-on top. Setting a base does not clear the vehicle's picks. It holds under any
-palette, where a curated color only does under Vehicle color. **Save to
-vehicle**, offered to whoever may edit the vehicle, is the one way a vehicle
-swatch reaches the database, and it is its own button so Apply stays a session
-action.
-
-Say **all tests**, never "all vehicles" — the widest scope reseeds every run
-currently ticked in the run picker, which is a set of tests and may be several
-per vehicle. Nothing at any scope writes to the database: the charting page has
-no durable color path, whatever role you hold, except a vehicle swatch's Save to
-vehicle. The durable preference is otherwise edited in Tests & Data, which is
-the screen that owns it.
-
-**Careful with "rail."** Material Design 3 has a *navigation rail* — a slim
-vertical strip of navigation icons. We do not have one. Our `.chart-rail` is a
-control **sidebar**, so prose should say sidebar even while the class still says
-rail.
+`.chart-rail` is a **sidebar**, not Material's *navigation rail*; say sidebar.
 
 ## Cards and rows
 
 | Thing | Call it | Established by | Lives in |
 |---|---|---|---|
-| The colored left edge encoding state | **accent border** | CSS `border-left`; common in design systems | `.vehicle-card`, `.vehicle-row`, `.vehicle-run-group`, `.routing-row` |
-| The ✓ on a selected card | **selected indicator** | ARIA `aria-selected` | `.vehicle-card.is-selected::before` |
-| The photo band with the title over a scrim | **media band** | Material *media* | [VehicleMedia.jsx](../src/components/vehicles/VehicleMedia.jsx), `.vehicle-media` |
-| The slice of a 16:9 photo that band actually shows | **the band window** | — | [cardBand.js](../src/utils/cardBand.js) `bandWindow()`, `.card-band-window` |
-| A point on the photo, 0 (top) to 100 (foot), the band holds at the middle of its visible part; null is centered | **focal point** | Cloudinary, Contentful, Drupal *Focal Point* | `vehicles.image_focal_y`, [cardBand.js](../src/utils/cardBand.js) `focalY()` |
-| Moving a photo up or down inside the band after it is uploaded | **repositioning** | — | [CardBandPreview.jsx](../src/components/vehicles/CardBandPreview.jsx), drag or arrow keys |
-| A full-width labelled divider inside the sidebar | **section band** — opens and closes the section below it; micro all-caps label, ▶/▼ caret, a count where it picks from a list | — | [SectionBand.jsx](../src/components/SectionBand.jsx), `.section-band` (was `.run-selector-header`); `.subgroup-header` is the smaller in-panel toggle |
-| The orange dot on a section band while something inside it is in force — a correction moving the figures | **applied dot** — accent orange, the "active / now" signal. Not a badge, which carries words | — | `.section-band-dot`, `SectionBand`'s `active` |
-| Small mono state labels inside a bar or row | **badges** | Material *badge* | `.badge-micro`, `.badge-default`, `.badge-status` |
-
-Accent-border colors carry meaning and are not decorative: orange = selected or
-overridden, red = queued for deletion, per-run color = series identity.
-
-**A focal point is vertical, and it is not a crop.** Cropping chooses the 16:9
-file and throws the rest away; the focal point chooses which part of that file
-the band window lands on, and throws nothing away. So a photo can be
-repositioned as often as you like and re-cropped never — the uncropped original
-is not kept ([#340](https://github.com/pluginpath-ops/ev-data-viz/issues/340)).
-Say **crop a little wide** for the habit that leaves room to reposition into.
-
-**The band window is not a fixed fraction.** The grid is fluid, so a card's
-band runs from 313px to 399px wide and shows between 79% and 62% of the photo's
-height; a one-column layout is wider still. Previews draw the tightest ordinary
-case — the desktop card — because every narrower card then shows more, never
-less. `cardBand.js` carries the table.
-
-**The focal point belongs to the photo, not to the vehicle.** Replacing a photo
-clears it, and a variant showing its source's photo is framed by the source's
-focal point and follows it. Never resolve one without the other.
+| The colored left edge encoding state | **accent border** — orange = selected or overridden, red = queued for deletion, run color = series | CSS `border-left` | `.vehicle-card`, `.vehicle-row`, `.vehicle-run-group`, `.routing-row` |
+| The ✓ on a selected card | **selected indicator** | ARIA | `.vehicle-card.is-selected::before` |
+| The photo band with the title over a scrim | **media band** | Material *media* | [VehicleMedia.jsx](../src/components/vehicles/VehicleMedia.jsx) |
+| The slice of the photo the band shows | **the band window** — not a fixed fraction (62–79% of height on desktop cards); previews draw the tightest case | — | `bandWindow()` in [cardBand.js](../src/utils/cardBand.js) |
+| The vertical point (0 top – 100 foot) the band centers on; null is centered | **focal point** — not a crop: nothing is thrown away, so reposition freely. Belongs to the photo: replacing it clears the point, and a variant showing its source's photo uses the source's point. Say **crop a little wide** | Cloudinary, Contentful | `vehicles.image_focal_y`, `focalY()` |
+| Moving a photo within the band | **repositioning** | — | [CardBandPreview.jsx](../src/components/vehicles/CardBandPreview.jsx) |
+| A full-width labeled divider in the sidebar that opens its section | **section band** — all-caps label, caret, a count when picking from a list. `.subgroup-header` is the smaller in-panel toggle | — | [SectionBand.jsx](../src/components/SectionBand.jsx) |
+| The orange dot on a section band while something inside is in force | **applied dot**. Not a badge (badges carry words) | — | `.section-band-dot` |
+| Small mono state labels in a bar or row | **badges** | Material | `.badge-micro`, `.badge-default`, `.badge-status` |
 
 ## Type and color
 
 | Thing | Call it | Lives in |
 |---|---|---|
 | The one type axis every size derives from | **the scale** — `--fs-body` × `--fs-step` | [index.css](../src/index.css) TYPOGRAPHY SYSTEM |
-| Named size + weight + color, picked as a set | **a role** — `.text-body`, `.text-micro`, `.text-nano`, `.text-caption` | same |
+| Size + weight + color, picked as a set | **a role** — `.text-body`, `.text-micro`, `.text-nano`, `.text-caption` | same |
 | The global size multiplier | **the UI scale** — `--ui-scale` | [typographyKnobs.js](../src/styles/typographyKnobs.js) |
-| Named color values | **tokens** — `--color-*` | [index.css](../src/index.css) Color Tokens |
-| Un-tokenised appearance, counted | **drift** | [driftProbes.js](../scripts/driftProbes.js), `npm run drift` |
-| A count asserted with `toBe` so a fall fails too | **a ratchet** | drift ledger, `KNOWN_OFFENDERS`, the dark-override cap |
+| Named color values | **tokens** — `--color-*` | index.css |
+| Appearance outside the theme, counted | **drift** | [driftProbes.js](../scripts/driftProbes.js) |
+| A count asserted exactly, so a fall fails too | **a ratchet** | drift, `KNOWN_OFFENDERS`, the dark-override cap |
 
-Color vocabulary, from the design handoff: **blue** leads the chrome, **orange**
-is the single active/now signal and means nothing else, **green** is data and
-status and is never chrome.
+**Blue** leads the chrome. **Orange** is the one active/now signal and means
+nothing else. **Green** is data and status, never chrome.
 
 ## Data
 
+### Tests
+
 | Thing | Call it | Lives in |
 |---|---|---|
-| One recorded test with its data points | **a run** | `runs`, `run_data_points` |
+| One recorded test with its points | **a run** in code; **a test** in UI text | `runs`, `run_data_points` |
 | A range run tied to a charging run | **a pairing** | [pairings.js](../src/utils/pairings.js) |
 | Several runs from one outing | **a session** | [testSessions.js](../src/utils/testSessions.js) |
-| The physical car EPA put in the lab, keyed by EPA's Vehicle ID, with its coefficients, tests and phases | **an EPA test vehicle** — "Test vehicle" in UI text, its identifier the **Vehicle ID**. Never a bare "vehicle", which is an EVBench vehicle. Not "test group" (see below) | `epa_test_vehicles`, `test_vehicle_id` (migration 081, #374) |
-| One EPA filing for one model year, named by EPA's **Test Group** (`RHYXV00.0301`; the first letter is the year) | **an EPA Certification** — "cert" where space is short; **certification record** where "certification" alone could mean the filing or its data. **Test Group** is always capitalised, so it never reads as our old name for the test vehicle | `epa_test_vehicles.test_group` (the last one imported); one row per certification from #374 step 2 |
-| What is read from a CSI document — the certification's identity and the test vehicles' lab results | **certification data** | [parseEpaCsiPdf.js](../src/utils/parseEpaCsiPdf.js) |
-| The figures EPA publishes for a configuration, as on its window sticker | **EPA Label** — capitalised, so it never reads as a form or nav label. "Window sticker" may gloss it once in an explainer. The **Fuel Economy Guide** is the file EPA Label data is imported from, not a second name for the data | `epa_fe_guide`, the `label_*` columns, [parseFeGuide.js](../src/utils/parseFeGuide.js) |
-| One test EPA ran on an EPA test vehicle, numbered by EPA's **test number** (the CSI's "Test #") | **an EPA test** — never "run", which is an EVBench test with data points. A test number belongs to one test vehicle in one setup, but EPA renumbers a test when it is filed again (Polestar's MY2027 filing moved every test from Volvo's code to Polestar's), so a test is also matched on its **fingerprint**: procedure, date, CD range and AC energy | `epa_tests`, `test_number`; `testFingerprint` in [epaTestVehicleIdentity.js](../src/utils/epaTestVehicleIdentity.js), `epa_test_fingerprint()` (migration 093) |
-| A Vehicle ID EPA used for two different cars (`NNGAA078`: a HUMMER EV SUT and a BrightDrop EV600) | the second is stored as **`<Vehicle ID>@<Test Group>`** — the Test Group of the file that named it. Only when the two share no test and differ in carline or by more than a quarter in test weight | `resolveTestVehicleIds` in [epaTestVehicleIdentity.js](../src/utils/epaTestVehicleIdentity.js) |
-| Which EPA test vehicles stand behind an EPA Label, worked out from their tests: 100 × AC recharge ÷ CD range against the Guide's unadjusted kWh/100mi, held to the precision the Guide printed | **Tested via** (owner's pick, 2026-10-31) — its values: **exact** (one test vehicle reproduces it), **near** (one, just past rounding), **blend** (between two or three; shown as the **span** of their figures, never an estimated weighting — the weights are sales mix and unpublished), **untested** (none of them; the nearest tested trim of the carline is offered as a suggestion, never linked on the numbers), **no lab data**. Not "basis", which already names two things, and not "configuration", which is the vehicle's link to a test vehicle. "Tested configurations" was the other candidate | [guideTestedVia.js](../src/utils/guideTestedVia.js) `testedVia`, `guideTestedViaPool` |
-| What an AC recharge costs between the wall and the pack: the onboard charger, the cable, and the car's draw while it sits plugged in for hours. EPA's MPGe carries it; the cert's DC energy ÷ AC recharge energy measures it | **charger efficiency** — the AC one, always. A fraction (0.885 assumed, the median of the 2025 certifications). Prices Cost/100 mi, home. Never the word for a DC session, which bypasses the onboard charger | `ASSUMED_CHARGER_EFF`, `deriveChargerEfficiency`, `facts.json` `epa-charger-efficiency-is-ac` (#506) |
-| What a DC fast session loses between the car's port and the pack's DC output (what the inverter draws): the cable and port, cooling and battery heating (the preconditioning on the way in too), auxiliary draw, and the pack's own losses charging and discharging. A share of the energy the station bills | **DC fast charging loss** — a fraction (0.09), one value for every car and charge power. Not the station's own conversion loss (about 3%, not billed), and not **charger efficiency**, which is the AC figure. The span is **port to pack output**; the **battery-side** efficiency is measured at the pack's output, the label's wall figure with the AC charging loss taken back out | `DC_FAST_LOSS` in [epa.js](../src/constants/epa.js), `facts.json` `dc-fast-round-trip-pairs`; prices `calc.costPer100Fast` (#506). "Terminals" was its working word: say port to pack output |
-| An EPA test vehicle as linked to a vehicle — one vehicle can link several | **a configuration**, or **EPA configuration** | `epa_vehicle_mappings` |
-| A Guide row as linked to a vehicle — the curator's judgement that the row is this car (carline, wheels, year) | the vehicle's **EPA Label** — "link an EPA Label". Its configurations come through the row's Tested via: an exact or near match links its one test vehicle, a blend links every member (the nearest is primary), an untested row links none. A configuration that came this way records the row (`via_guide_row_id`); unlinking the row removes what it brought | `vehicle_guide_rows` (migration 095), [vehicleGuideLinks.js](../src/utils/vehicleGuideLinks.js) |
-| How a configuration stands against the vehicle's EPA Label | its **standing** — **tested via label** (a linked row's Tested via names it), **other label** (another row of its certification names it, one the vehicle does not link — a wheel or trim), **not behind label** (a linked row names other test vehicles and no row of the certification names this one), **unconfirmed** (the rows say nothing: untested, no lab data, another year). Only "not behind label" is removed by the Admin move; the rest stay for a curator | `configurationStanding` in [vehicleGuideLinks.js](../src/utils/vehicleGuideLinks.js) |
-| How one test vehicle of a Guide row's certification matches the row, in the list under a vehicle's EPA Label | its **match** — **exact**, **near**, **blend** (with **nearest** on the one that stands for the vehicle) when the row's Tested via names it; **alternative** (another explanation as good uses it — the row is ambiguous), **possible** (it could be one end of a blend), **other label** (another row of the certification names it), **no match**, **no lab data**. Colored by what it means for this vehicle: quiet on a test vehicle nobody linked, a warning or danger on one the vehicle links. Not "standing", which is the vehicle's configuration against all its rows | `guideRowMatches` in [guideRowMatches.js](../src/utils/guideRowMatches.js), [GuideRowMatchList.jsx](../src/components/epa/GuideRowMatchList.jsx) |
-| An EPA test vehicle that no published Guide row stands on: every row of its certification is reproduced by other test vehicles, and it could not be behind any of them, even as one end of a blend — a retest, or a variant that never reached a label | **behind no EPA Label** (provisional — see Open names). Marked, never deleted: the Guide link sweep's skip with its own note, hidden from Admin → EPA Data's list unless asked for, its Guide and vehicle links removed. The mark is lifted when a row appears that it stands behind. Not "orphan" (no parent is missing), not "culled" (nothing is removed) | `NO_LABEL_NOTE`, `labelStanding`, `planBehindNoLabel` in [epaBehindNoLabel.js](../src/utils/epaBehindNoLabel.js) |
-| The linked configuration whose label range, EPA tested and test weight are the vehicle's | **the primary configuration** | `epa_vehicle_mappings.is_primary`, [epaConfiguration.js](../src/utils/epaConfiguration.js), [PrimaryConfigurationPicker.jsx](../src/components/epa/PrimaryConfigurationPicker.jsx) |
-| The person maintaining EPA records | **the curator** | admin + contributor |
-| Who published or recorded a performance result — a magazine, a channel, EVBench itself | **a source**; its other spellings are **aliases** | `sources`, `source_id`, [sources.js](../src/utils/sources.js), [SourcePicker.jsx](../src/components/SourcePicker.jsx) |
-| Whether a printed 0–60 counts the first foot | **the rollout basis** — *1-ft rollout omitted* or *standing start* | `ROLLOUT_BASES`, `sources.default_rollout_basis` |
-| The Admin sub-tab importing results in bulk beside the source list | **Published Results** | [PublishedResultsPanel.jsx](../src/components/admin/PublishedResultsPanel.jsx), [publishedResultsBatch.js](../src/utils/publishedResultsBatch.js) |
-| The manufacturer's usable and gross pack capacity | **Usable** / **Gross** | `specs.charging.battery_usable_kwh`, `specs.powertrain.battery_gross_kwh` |
-| The DC energy EPA measured on the multi-cycle depletion test | **EPA tested** | `epa_tests.total_dc_energy_kwh`, procedure 77 |
-| What a vehicle is built on: body, structure and suspension — what twins share | **the mechanical platform** (`mechanical_platform_id`) | common in the industry | [platforms.js](../src/utils/platforms.js), `platforms.kind = 'mechanical'` (migration 072, #318) |
-| What a vehicle is built on: pack, drive units and power electronics — what shapes the charging curve | **the electrical platform** (`electrical_platform_id`). Not "architecture" alone, which also means the 400/800 V class | common in the industry | `platforms.kind = 'electrical'` |
-| Both at once, or either when the kind is plain from context | **platform** — on a card, "Platform"; in an import file, a bare `platform` column names both kinds | — | [PlatformLine.jsx](../src/components/vehicles/PlatformLine.jsx) |
-| A pack's architecture: 400 or 800 V (the list is `VOLTAGE_CLASSES`; "900 V" is marketing for an 800 V class) | **voltage class** — the vehicle's, resolved: its electrical platform's, else worked out from its nominal voltage (under 475 V is 400 V class). Replaced the "800-volt" yes/no column. Not "voltage", which is the spec field's nominal voltage | — | `voltage_class_v`, `resolveVoltageClass`, `figures.voltageClass` |
-| How a vehicle takes DC from a 400 V charger | **400 V support**: native, DC booster, motor boost, split pack, not possible — the vehicle's spec field, provided by its electrical platform where the vehicle sets none. Set it on the vehicle when the car differs from its platform (a Taycan's booster was optional) | — | `specs.charging.dc_400v_charging`; the platform's `dc_400v_charging`. Replaced `resolveDc400Charging` and the `figures.dc400Charging` column (#352). Not "on a 400 V charger", its first name, nor "boost" or "conversion", which are wrong for a native pack. The answer says how; the label asks whether, and its hint says why it matters: older DC fast chargers and pre-V4 Superchargers. A 400 V class car with none recorded is a Data Checks gap whose fix is Native; an 800 V class car saying Native disagrees |
-| The class of charger a charging test was taken on | **charger voltage class** — the run's, 400 or 800 (`VOLTAGE_CLASSES`), null for "not recorded". On a form, "Charger: 400 V class". Not "charger type", which would mean the connector or the brand | — | `runs.charger_voltage_class` (migration 076), [runChargerClass.js](../src/utils/runChargerClass.js), [ChargerClassSelect.jsx](../src/components/ChargerClassSelect.jsx) (#366 layer 1) |
-| The most current the charger a charging test was taken on could supply — 350, 500, 600 or 700 A and over; chargers of one voltage still differ by a fifth or more (#313, migration 092) | **charger current class** — the run's, in amps, null for "not recorded", which the composite READS as 500 A (never stored as 500). On a form, "Charger current: 500 A class", beside the voltage class. A composite is split by it only when a lower class is seen limited against the classes above it, by the same charger-limited detection; otherwise every test stays in one. Named "on 500 A chargers", or "on 800 V, 500 A chargers" on a car split both ways. Not "charger rating" or "charger amperage", and not the voltage class | — | [chargerCurrentClass.js](../src/utils/chargerCurrentClass.js) `currentClassOf`; `runs.charger_current_class_a` (migration 092); `splitByCurrent` in [compositeCurve.js](../src/utils/compositeCurve.js); [ChargerCurrentSelect.jsx](../src/components/ChargerCurrentSelect.jsx) |
-| One line standing for a vehicle's charging behavior, aggregated from its charging tests — its own and those it **inherits**, scaled by each link's capacity factor | **composite curve** — a run in its own right: stored, synthetic, kind charging, italic in every list, "Composite (3 tests)" or, for an 800 V car, one per charger class, "Composite on 800 V chargers (2 tests)" and "Composite on 400 V chargers (2 tests)". The vehicle's **default charging curve** unless a curator marks a test DEF. Says how it was made: a mean, quoted with its conditions, not what the car "typically" does. Not "nominal curve" (see below), nor "typical", "representative" or "average curve" | — | [compositeCurve.js](../src/utils/compositeCurve.js); `runs.composite` (migration 077); `isCompositeRun`, `nativeComposite`, `defaultChargingRun` in [runUtils.js](../src/utils/runUtils.js) (#313) |
-| A vehicle's steady-state range tests, each corrected to one set of conditions and averaged — range from those wide enough to scale to a full pack, efficiency from all of them | **composite range** and **composite efficiency** — in the vehicle table, "Composite range, 70 mph", the speed in the header and "composite of 3 tests" beneath. A mean, like the composite curve, but never stored: the conditions are the reader's **correction target**, shared with every chart. Leaves out a mixed cycle, a test far from the target speed, and one outside the temperature band (0–100°F, a knob) — "left out", as a composite curve leaves out a charger-limited stretch. Not "corrected range" alone, which any one test can be | — | [compositeRange.js](../src/utils/compositeRange.js); `COMPOSITE_RANGE_TEMP_BAND`, `COMPOSITE_RANGE_SPEED_GAP_MPH` in [epa.js](../src/constants/epa.js) |
-| What a reader corrects range tests for, and the speed, temperature and altitude (in calm air) they are corrected to — one setting for every chart and the vehicle table | **correction** (the mode: "Correct:" on a chart) and **correction target** (the conditions: "Correct to 70 mph, 70°F, 0 ft, calm air", and an **accessory load** beneath, on **auto** until the reader sets it). The sliders reach 45–90 mph, 0–100°F and 0–8,000 ft. The target defaults to the **standard conditions**, the Admin knob, which is what it is called when nobody has moved it. Not "reference conditions": `REFERENCE_SPEED_MPH` is the speed the aero fraction is quoted at, a different thing | — | [correctionSettings.js](../src/utils/correctionSettings.js) (`corr`, `c_spd`, `c_tmp`, `c_alt`, `c_acc`); `runConditions` in [conditionCorrection.js](../src/utils/conditionCorrection.js); [CorrectionTargetFields.jsx](../src/components/CorrectionTargetFields.jsx) |
-| The heating, cooling and other non-traction draw that a range correction swaps: the test's, assumed from its temperature, for the target's (#449) | **accessory load** — in watts, "Accessory Load" in the UI. The test's is **assumed**, never measured: the base `DEFAULT_ACCESSORY_W` while the cabin holds itself (about 60–70°F), plus a straight line of watts per °F of heating below and of A/C above; one line for every car. It becomes range through the test's own consumption and speed (watts ÷ mph = Wh/mi). Not "aux" or "auxiliary load" (the owner's call, 2026-10-25: one word, the one the UI and `DEFAULT_ACCESSORY_W` already use), and not "HVAC load", which is only part of it (battery conditioning and lighting are in the base) | — | [accessoryLoad.js](../src/utils/accessoryLoad.js) `assumedAccessoryW`, `effectiveAccessoryW`, `accessoryFactor`; `ACCESSORY_COMFORT_BAND_F`, `ACCESSORY_HEAT_W_PER_F`, `ACCESSORY_COOL_W_PER_F`, `ASSUMED_TEST_CONSUMPTION_WH_MI` in [epa.js](../src/constants/epa.js) |
-| Whether the correction target's accessory load is following the temperature slider or the reader has taken it over (#449) | **auto** — the load is the one the temperature implies, moves with the Temp slider, and is never written to the link — and **set by you** — the reader dragged it, it stays put, and `c_acc` carries it. The slider is grey on auto and blue once set, and a line beneath says "set by you"; its **auto** action gives the load back, and the target's **reset** clears it with the rest. Owner's words (2026-10-21/22). Not "default" or "manual"/"override" in UI text (the code says `accessoryW: null` for auto) | — | [CorrectionTargetFields.jsx](../src/components/CorrectionTargetFields.jsx), `.assumption-slider.is-auto`; `effectiveAccessoryW` in [accessoryLoad.js](../src/utils/accessoryLoad.js) |
-| Modeled Efficiency's two controls that have no counterpart in the correction: a wind (speed and direction) and a net elevation gain or loss over a distance (#449) | **Wind & elevation change** — the heading over them, in both of its sections. The rest of what the curve is drawn under (altitude, temperature, accessory load) is the **correction target**, the same sliders as every chart and the vehicle table, without its speed (the x axis); the "Correct:" mode does not govern this chart, because a model has no measured figure to leave uncorrected. These two are never in the link, nor in the short link that packs it (they ride the pop-out sync). Retired in UI text: "viewing conditions", which named the whole set when altitude, temperature and accessory load were typed in here too (see Deferred renames) | — | [WindAndElevationFields.jsx](../src/components/epa/WindAndElevationFields.jsx), [useViewingConditions.js](../src/hooks/useViewingConditions.js) |
-| The composite range over the EPA label's highway range | **% of EPA hwy** — a reference point, not a pass mark: EPA's highway cycle averages about 48 mph before the label adjustment, so it is not a 70 mph figure | — | `calc.pctOfEpaHwy` in [vehicleTable.js](../src/utils/vehicleTable.js) |
-| The shading around a composite curve: from the best test at each SoC down to one standard deviation below the mean | **test spread** — on the chart, "Test spread". Lopsided on purpose: the top is what the car has done, the bottom how far a session ordinarily falls short. Not a **confidence band** (#314), which says where a repeat would land; not a bare "band". None where one test stands alone | — | `compositeCurve.js` `testSpread`; stored per point as `data_points.extra_data` `{ n, spreadHi, spreadLo }`; `chartConfig.compositeSpread`, `?cspread=0` (#313) |
-| A stretch of a test where a charger, not the car, set the rate | **charger-limited**, and a composite **leaves out** that stretch — "held back" in the code (`heldBack`). Inferred from a ceiling the test sat on while another test of the car drew more, unless the charger voltage class says so outright | — | `compositeCurve.js` `PLATEAU_SHARE`, `HELD_BACK_MARGIN`; `chargeWindows.js` `CHARGER_LIMITED_SHARE` |
-| The fastest DC rate a vehicle reaches on a 400 V charger | **max DC on 400 V** — the vehicle's, never the platform's: it changes by model year on one platform | — | `specs.charging.max_dc_400v_kw` (#352) |
-| What a platform does for a vehicle | **provides** values, never stands in for them: a value from a platform is shown with "from <platform>" beneath, as an inherited spec is. A vehicle's specs resolve **own → source vehicle → platform**; the platform comes last, and only the vehicle's own resolved platform, never its source's | — | [platforms.js](../src/utils/platforms.js) `PLATFORM_PROVIDES`; [specHelpers.js](../src/utils/specHelpers.js) `specProvenance`, `fromPlatform` |
-| The chemistries a platform's packs come in | **the platform's chemistries** — a possible set, never a vehicle's value. Offered in the spec editor as **suggestions** for the vehicle's **battery chemistry**, which is one of LFP, LMFP, NMC, NCA, NMCA | — | `platforms.chemistries`, `chemistrySuggestions()`; `specs.charging.battery_chemistry` |
-| What a car can do to warm its battery before a charging stop | **preconditioning** — None, Manual, Automatic (nav-triggered), Both. **None** is an answer; blank is "not recorded" | — | `specs.charging.preconditioning` |
-| Whether one charging test was preconditioned | **preconditioned** — yes, no, or not recorded, and "not preconditioned" is never written for "not recorded" | — | `runs.preconditioned` (migration 073), [runPreconditioning.js](../src/utils/runPreconditioning.js) |
-| The energy between the car's own 0% and 100% — what calculations turn %SoC into kWh with | **the SoC window**, `socWindowKwh` | [vehicleFigures.js](../src/utils/vehicleFigures.js): EPA tested, else Usable, else Gross, else unsorted |
-| Where a resolved figure came from | **its basis** — `socWindowBasis`, `epaRangeBasis` | `.stat-cell-basis` |
-| A vehicle's EPA range as the app reads it | **EPA range**, `epaRangeMi` | the primary configuration's label, else Expected EPA Range, else unsorted |
-| A curator's figure for a vehicle with no EPA label, with its basis (Manufacturer, Independent test) | **Expected EPA Range** | `specs.range.expected_epa_mi`, `expected_epa_basis` |
-| A value from `vehicles.battery` or `vehicles.range`, which no source confirms yet | **unsorted** | the last tier of each resolver, deleted with its column (#324, #325) |
-| The Admin sub-tab listing vehicles that disagree with their own sources | **Data Checks** | [DataChecksPanel.jsx](../src/components/admin/DataChecksPanel.jsx), [dataChecks.js](../src/utils/dataChecks.js) |
-| Two sources for one figure further apart than a limit | **disagrees**, a disagreement | `.data-check-finding.is-disagrees` |
-| Something missing that would let a figure be checked | **a gap** | `.data-check-finding.is-gap` |
-| A change a curator makes from a finding — a move out of a retiring column, a spec field, the primary | **a fix**; a column fix is **a move** | [dataCheckFixes.js](../src/utils/dataCheckFixes.js), `.data-check-fixes` |
-| A curator's recorded decision that something needs no action, still visible under a filter | **a skip** — skipped, un-skip | `epa_test_vehicles.fe_guide_skipped_at` (link sweep), `data_check_skips` (Data Checks), `.skip-ask` |
-| A vehicle whose specs, tests, color, photo and tags come from another vehicle until set on it — the same car with a stated difference (battery, weight, wheels) | **a variant**; it **inherits from** its source. Created with **＋ Variant** | `spec_source_vehicle_id`, [vehicleInheritance.js](../src/utils/vehicleInheritance.js), [NewVariantButton.jsx](../src/components/NewVariantButton.jsx) |
-| The vehicle a variant inherits from, chosen on Edit vehicle | **its source**, the **source vehicle** in full — "Inherits from" on the form; none makes it an origin. Not "parent". Not to be confused with **a source** of a performance result (above), which has its own picker, [SourcePicker.jsx](../src/components/SourcePicker.jsx) | `spec_source_vehicle_id`, [SourceVehiclePicker.jsx](../src/components/SourceVehiclePicker.jsx) |
-| A source's charging tests reaching its variants with no link, all the way down, including tests added later | they **come down the lineage** — "Charging tests come down from *source*". Charging only: range tests still come through a link | [lineageCharging.js](../src/utils/lineageCharging.js) `chargingLineage`, `lineageChargingTests` (migration 086) |
-| A variant whose pack differs from its source's in chemistry or construction, so no charging tests come down to it from its source or above; its own variants still inherit from it | **a battery revision** — the "Battery revision" box on Edit vehicle, and the BATTERY REVISION mark on the lineage tree. A cut on one edge of the lineage, not a branch. Not "disconnect", "detach" or "cut-off" | `vehicles.battery_revision` (migration 086), [BatteryRevisionNote.jsx](../src/components/vehicles/BatteryRevisionNote.jsx) |
-| How a variant's pack compares with its source's, when it is the same battery in a different size | its **capacity factor** — the same word as a link's, at a different reach: a vehicle's scales every charging test that comes down to it, multiplied down the chain; a link's scales one test and overrides the vehicle's for that test. 1 unless set: any other figure is a claim about the battery | `vehicles.capacity_factor` (086), `spec_links.capacity_factor` (055) |
-| A link on a test the lineage already brings, holding that test's own factors, color or DEF on this vehicle | **an override** — removed with "Reset", which puts the test back to the lineage's reading | `spec_links` row whose run comes down the lineage; `_viaLineage` on the inherited run |
-| What a variant shows that is not set on it | **inherited** — "Inherited from *source*" | `vehicle.inheritedFrom`, `.vehicle-tag.is-inherited` |
-| What deleting a source does to its variants: its own values are copied onto each variant that has none of its own, and the variant is re-pointed at the source's source, so nothing the variant shows changes | **passed down** — a deleted source's values are passed down to its variants, as an inheritance passes to its children. Not "orphaning" (what the old foreign key did) and not "push down" or "merge down", both considered and set aside as jargon with the wrong picture | `delete_vehicle_passing_down()` (migration 075), [vehicleDeletion.js](../src/utils/vehicleDeletion.js) `passDown` |
-| EPA configurations offered to a curator on a vehicle's EPA section — drawn from a variant's source, else from the vehicle's own make and model — each a one-click link | **suggested configurations** — "Suggested from *source*", "Suggested for *vehicle*" | [variantEpaSuggestions.js](../src/utils/variantEpaSuggestions.js), [VariantEpaSuggestions.jsx](../src/components/epa/VariantEpaSuggestions.jsx), `.config-suggestion` |
-| A vehicle's values as stored, before inheritance: what an editor reads and writes | **its own** color, photo, tags | `vehicle.own`, `ownValues()` |
-| A brand's default series color, below a vehicle's own and its source's: the color its vehicles are drawn in until one is set. Set in Admin › Brands by a curator | **brand color** — on a card "<brand> brand color". Not "manufacturer color": the registry is the Brands list, and **Make** is only the filter facet | — | `manufacturers.color` (migration 091), `brandRef` in [vehicleInheritance.js](../src/utils/vehicleInheritance.js), [BrandRegistry.jsx](../src/components/admin/BrandRegistry.jsx); `inheritedFrom.color.brand` |
-| The card's one-click set of a vehicle's own color from its photo (#311) — curators only, only where none is set; writes nothing for a white, black or silver car, and offers Undo | **Pull color** — and **Clear color** in the vehicle form to take an own color away | — | [PullColorButton.jsx](../src/components/vehicles/PullColorButton.jsx), [imageColor.js](../src/utils/imageColor.js) `dominantColor` |
-| A new vehicle holding its own duplicates of another's values and tests | **a copy** — "⧉ Copy" | `duplicateVehicle` |
-| Anyone's signal that data looks right or wrong, taken together | **accuracy signals** | `votes`, `vehicles.flagged_specs`, [VoteButtons.jsx](../src/components/VoteButtons.jsx) |
-| Saying a vehicle's specs, or a run, look accurate | **a vouch** — vouch, vouched, "Vouch for accuracy" | `votes.vote_type = 'vouch'`; `SpecVouchButton` (whole vehicle), `RunVoteButtons` (run) |
-| Saying one spec value, or a run, may be inaccurate | **a flag** — flag, flagged | spec field: `vehicles.flagged_specs`, `SpecFieldFlagButton`; run: `votes.vote_type = 'flag'` |
-| A spec flag made in View Specs but not yet saved (saved when the modal closes) | **a pending flag** | `pendingFlags` in [ViewSpecsModal.jsx](../src/components/ViewSpecsModal.jsx) |
-| An admin removing a spec flag | **clearing a flag** — "click to clear" | `unflagSpecField` / `unflag_spec_field` (the code's verb; the UI says clear) |
-| A table cell whose value carries a flag | **a flagged cell** — the corner mark, and a peek that always shows | `.guide-td.is-flagged`, `.guide-td-flag`, `TableCell` `flagged` |
-| Whether a test appears to viewers in the pickers, the charts and Tests & Data | **listed** / **unlisted** — "Unlist", "List". An unlisted test is still reachable, and still counts in the statistics unless it is excluded; it is only kept out of the lists. Replaced "hidden" in UI text in [#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394). Not "public" / "private" or "hidden": unlisted tests still reach viewers' browsers (the filter is client-side). Vehicles use the same word for the same thing — see the next row | `runs.is_hidden` (migration 034), narrowed to this by migration 079 — see Deferred renames; `isUnlisted`, `isListed` in [runListing.js](../src/utils/runListing.js) |
-| Whether a vehicle appears in the lists — the grid, List, Lineage, the pickers and every chart | **listed** / **unlisted**, as for tests — the card's badge reads LISTED / UNLISTED, "Click to list" / "Click to unlist". An unlisted vehicle is listed for curators and its creator only. Everyone else meets it only inside another vehicle's lineage, as **"Unlisted record"**; a curator sees it there by name with an orange UNLISTED note. It still lends its values to its variants. Not "private", "unpublished" or "public": since migration 085 every vehicle row is readable, so the flag is listing, not access control | `vehicles.visibility` ('public' = listed, 'private' = unlisted) — see Deferred renames; [vehicleListing.js](../src/utils/vehicleListing.js) `isListedVehicle`, `listedFor`; AppContext `vehicles` (listed) beside `fleet` (all); `.unlisted-note` |
-| A test left out of the statistics — composite curves, test spreads, best charge windows, and #314's error bars — whether listed or not | **excluded** — "Exclude from statistics", "Include". Counting is the default and has no word of its own. Not "verified", which means an EPA link confirmed against the certification document; not the filter chip's **exclude** above, which leaves rows out of a view, not out of a dataset | `runs.is_excluded` (migration 079); `isExcluded`, `countsInStatistics`, `statisticalRuns` in [runListing.js](../src/utils/runListing.js); "⊖ Exclude" on a test card's toggle, reading "⊖ Excluded" once set ([RunCurationToggle.jsx](../src/components/runs/RunCurationToggle.jsx)) |
-| A curator's answer to one question, told in several charts: the vehicles it is about and, per chart, the settings that make the point. Home draws every chart of the one it shows (#448) | **a featured comparison** — owner's name, 2026-10-23, in place of "scenario" and "hot cars of the week". Its parts: a **title** and **blurb**, its **vehicles** (one shared, ordered set) and its **charts** (each a chart link, with its own plotted tests and correction). Listed and unlisted as for a vehicle: Home shows the **newest listed** one, and listing an older one features it again. Not a **preset** (a column set for the table) and not a "view", which #338 uses for a tab's page | — | `featured_comparisons` (migration 089), [featuredComparisons.js](../src/utils/featuredComparisons.js), [useFeaturedComparisons.js](../src/hooks/useFeaturedComparisons.js); `fc` names the one Home shows: `?tab=home&fc=<slug>` |
-| Putting the live site back to a featured comparison: its vehicles and the correction its first chart used, everything else at a fresh visitor's defaults. The site has one chart state shared by every tab, so this cannot restore every chart's settings at once; each arrives when that chart is opened | **reset to the comparison** | — | `resetStateOf`, `resetToComparison` in [App.jsx](../src/App.jsx) |
-| A vehicle's tests that are unlisted but still count | **the pool** — pooled tests. Where `n` grows without cluttering the lists: a curator lists the tests that represent the vehicle (no cap) and pools the rest. An unlisted RANGE test joins the pool only with its speed and temperature recorded; one without says "Not counted: no speed" on its card. Counted after the listed ones in grey: "Charging (4/2)" | `vehicle.pooledRuns`, `poolOf`, `poolGateMissing`; `.test-count-pool`; [RunListingBadges.jsx](../src/components/runs/RunListingBadges.jsx) |
-| A curator's "I have looked; count it" on a test the automatic checks would keep out | **override quality checks** — on the card a toggle, "⚑ Override checks", reading "⚑ Checks overridden" once set; the badge of the same words appears only where the toggle does not. Overrides the range spread's pack-coverage rule and the pool's speed/temperature rule, nothing else: not missing data (no start/end SoC is still no range), not exclusion. Not **Data Checks**, the Admin panel's findings about a vehicle's figures | `runs.quality_override` (migration 080); `hasQualityOverride` in [runListing.js](../src/utils/runListing.js), `rangeCoverageOk` in [rangeTestSpread.js](../src/utils/rangeTestSpread.js) |
+| Whether viewers see a test in pickers, charts and Tests & Data | **listed** / **unlisted** ("List", "Unlist"). Unlisted is still reachable and still counts unless excluded. Not "hidden", "public" or "private" — the filter is client-side | `runs.is_hidden` (see Deferred renames); `isListed` in [runListing.js](../src/utils/runListing.js) |
+| A test left out of the statistics (composites, spreads, best windows, error bars) | **excluded** ("Exclude from statistics", "⊖ Excluded"). Counting is the default and has no word. Not "verified", and not the filter bar's **exclude** | `runs.is_excluded`; `statisticalRuns` in runListing.js; [RunCurationToggle.jsx](../src/components/runs/RunCurationToggle.jsx) |
+| A vehicle's tests that are unlisted but count | **the pool**. An unlisted range test joins only with speed and temperature recorded ("Not counted: no speed"). Shown after listed, in grey: "Charging (4/2)" | `vehicle.pooledRuns`, `poolOf`; [RunListingBadges.jsx](../src/components/runs/RunListingBadges.jsx) |
+| A curator's "I've looked; count it" | **override quality checks** ("⚑ Override checks"). Overrides only the range spread's pack-coverage rule and the pool's speed/temperature rule. Not **Data Checks** | `runs.quality_override`; `rangeCoverageOk` in [rangeTestSpread.js](../src/utils/rangeTestSpread.js) |
+| The test behind a tested figure — which, why, its conditions, where it lives | **a test reference**; its peek is **the test peek**; the card a link lands on is **the link target** | [testDetails.js](../src/utils/testDetails.js), [TestPeek.jsx](../src/components/TestPeek.jsx), `?tab=runs&run=` |
+| The range test a vehicle's tested figures come from | **the reported range test** — the default range test, else the newest full-pack one | `reportedRangeRun()` in [testedRange.js](../src/utils/testedRange.js) |
+| Charger class a charging test used | **charger voltage class** (400 or 800; null = not recorded). "Charger: 400 V class". Not "charger type" | `runs.charger_voltage_class`, [ChargerClassSelect.jsx](../src/components/ChargerClassSelect.jsx) |
+| The most current that charger could give (350, 500, 600, 700+ A) | **charger current class**. Null reads as 500 A but is never stored as 500. A composite splits by it only when a lower class is seen limited. Not "charger rating" or "amperage" | `runs.charger_current_class_a`, [chargerCurrentClass.js](../src/utils/chargerCurrentClass.js), [ChargerCurrentSelect.jsx](../src/components/ChargerCurrentSelect.jsx) |
+| A stretch where the charger, not the car, set the rate | **charger-limited**; a composite **leaves out** that stretch (`heldBack` in code) | `PLATEAU_SHARE`, `HELD_BACK_MARGIN` in [compositeCurve.js](../src/utils/compositeCurve.js); `CHARGER_LIMITED_SHARE` in [chargeWindows.js](../src/utils/chargeWindows.js) |
+| Whether one charging test was preconditioned | **preconditioned** — yes, no, or not recorded. Never write "not preconditioned" for "not recorded" | `runs.preconditioned`, [runPreconditioning.js](../src/utils/runPreconditioning.js) |
 
-**Three EPA sources, named for where the data comes from.** EPA Label (the
-Fuel Economy Guide: one row per configuration), EPA Certification (a CSI
-filing: one per Test Group, so one model year) and the EPA test vehicle inside
-a certification (one per Vehicle ID). Certification and test vehicle are
-many-to-many: one Test Group covers several test vehicles, and a test vehicle
-carried over appears in several years' Test Groups. A tab or heading names the
-source; its description names what one point is — so **Label Statistics**
-counts configurations and **Certification Statistics** counts EPA test
-vehicles, and neither name says "per".
+### Composites and correction
 
-**Why "test group" was retired for the record.** We called the Vehicle ID record
-a test group, and EPA's Test Group is the certification. The overlap is how a
-carryover certification came to look like an overwrite, and why the link sweep
-compared the Guide's Test Group with a Vehicle ID (#374). Names decided for
-#374 step 2, recorded here before the code that uses them: **Since MY2023** (a
-test vehicle's first year in a certification), **MY2023 to MY2025** (its years;
-a gap is written out, "MY2022, MY2024 to MY2025"), **From MY2024** (a figure or
-certification standing in from another year — like "from *platform*" for a
-provided value, and not "flag", which is the accuracy signal), **Basis** (how a
-certification record came to exist: a CSI file, the Test Car List, a Guide
-link, by hand — `epa_certifications.basis` csi / csv / guide / manual) and
-**Recertified** (the same Test Group filed again, changed or not). The
-certificate states it: EPA's own field is the **Certificate Revision Date**
-(`certificate_revision_date`, migration 082), and the UI word is Recertified
-because "revised" reads as "something changed", which a resubmission need not.
+| Thing | Call it | Lives in |
+|---|---|---|
+| One stored line standing for a vehicle's charging, from its own and inherited tests | **composite curve** — a real run, italic in lists: "Composite (3 tests)", or one per charger class ("Composite on 800 V chargers (2 tests)"). The **default charging curve** unless a test is marked DEF. A mean, quoted with its conditions. Not "nominal", "typical", "representative" or "average curve" | [compositeCurve.js](../src/utils/compositeCurve.js); `runs.composite`; `defaultChargingRun` in [runUtils.js](../src/utils/runUtils.js) |
+| Shading around a composite curve: best test at each SoC down to one SD below the mean | **test spread** — lopsided on purpose. None when one test stands alone. Not a **confidence band**, not a bare "band" | `testSpread`; `extra_data` `{ n, spreadHi, spreadLo }`; `?cspread=0` |
+| Range tests corrected to one set of conditions and averaged | **composite range** / **composite efficiency** — "Composite range, 70 mph", "composite of 3 tests". Never stored. Leaves out mixed cycles, tests far from the target speed, and tests outside the temperature band. Not "corrected range" alone | [compositeRange.js](../src/utils/compositeRange.js); `COMPOSITE_RANGE_TEMP_BAND`, `COMPOSITE_RANGE_SPEED_GAP_MPH` |
+| Correcting range tests, and the conditions corrected to — one setting for every chart and the table | **correction** (the mode: "Correct:") and **correction target** ("Correct to 70 mph, 70°F, 0 ft, calm air", with **accessory load** beneath). Default is the **standard conditions** (Admin knob). Not "reference conditions" (`REFERENCE_SPEED_MPH` is something else) | [correctionSettings.js](../src/utils/correctionSettings.js); [conditionCorrection.js](../src/utils/conditionCorrection.js); [CorrectionTargetFields.jsx](../src/components/CorrectionTargetFields.jsx) |
+| Heating, cooling and other non-traction draw a correction swaps | **accessory load** (watts). A test's is **assumed** from its temperature, never measured; one line for every car. Not "aux", "auxiliary load" or "HVAC load" | [accessoryLoad.js](../src/utils/accessoryLoad.js); `ACCESSORY_*` in [epa.js](../src/constants/epa.js) |
+| Whether that load follows temperature or the reader set it | **auto** (follows Temp, not in the link) / **set by you** (stays put, in `c_acc`). Not "default", "manual" or "override" in UI text | `.assumption-slider.is-auto`; `effectiveAccessoryW` |
+| Modeled Efficiency's two controls outside the correction | **Wind & elevation change**. Not in the link (they ride the pop-out sync). Retired in UI text: "viewing conditions" | [WindAndElevationFields.jsx](../src/components/epa/WindAndElevationFields.jsx) |
+| Composite range over the EPA label's highway range | **% of EPA hwy** — a reference point, not a pass mark: EPA's highway cycle averages about 48 mph | `calc.pctOfEpaHwy` in [vehicleTable.js](../src/utils/vehicleTable.js) |
+| Reported range test scaled to a new pack | **when-new range** — shown only where capacity retention is. Not "original", "nominal" or "degraded range" | `whenNewRange()` in testedRange.js |
+| Share of new-pack capacity the test delivered | **capacity retention** — shown only below 95%. Not "fade", "battery health" or "SoH" | `CAPACITY_RETENTION_SHOWN_BELOW` |
 
-**Unlisted and excluded are two questions, not one.** Listing asks whether
-viewers see a test; excluding asks whether it counts. All four answers are
-real: listed and counted (the representative tests), unlisted and counted (the
-pool), unlisted and excluded (disputed or incomplete — what "hidden" was made
-for, and where every hidden test started when migration 079 split the flag),
-and listed but excluded (shown for illustration, kept out of the figures: a
-towing run, a −10 °F test). A figure that AGGREGATES tests — a composite, a
-spread, a best — counts the pool; a figure that QUOTES one test — the reported
-range test, a default, an explainer's citation — quotes a listed one, so a
-reader can find it.
+### Vehicle figures and specs
 
-**A skip is a decision, not a deletion.** The same word in both places because
-it is the same act: someone looked, and nothing needs doing. A Data Checks skip
-holds only while the values it was judged on hold — change them and the finding
-comes back, marked as skipped before. Moving a limit does not bring it back.
+| Thing | Call it | Lives in |
+|---|---|---|
+| Maker's usable and gross pack capacity | **Usable** / **Gross** | `specs.charging.battery_usable_kwh`, `specs.powertrain.battery_gross_kwh` |
+| DC energy EPA measured on the multi-cycle test | **EPA tested** — never a bare "Tested", which is EVBench's range test on the card | `epa_tests.total_dc_energy_kwh` |
+| Energy between the car's 0% and 100% | **the SoC window** (`socWindowKwh`): EPA tested, else Usable, else Gross, else unsorted. Not the **charge window** | [vehicleFigures.js](../src/utils/vehicleFigures.js) |
+| Where a resolved figure came from | **its basis** | `socWindowBasis`, `epaRangeBasis`, `.stat-cell-basis` |
+| A vehicle's EPA range as read | **EPA range** — primary configuration's label, else Expected EPA Range, else unsorted | `epaRangeMi` |
+| A curator's figure for a car with no EPA label | **Expected EPA Range**, with a basis (Manufacturer, Independent test) | `specs.range.expected_epa_mi` |
+| A value from `vehicles.battery`/`vehicles.range` no source confirms | **unsorted** — last tier, deleted with its column | |
+| What a vehicle is built on: body, structure, suspension | **the mechanical platform** | [platforms.js](../src/utils/platforms.js), `platforms.kind = 'mechanical'` |
+| Pack, drive units, power electronics | **the electrical platform**. Not "architecture" alone | `platforms.kind = 'electrical'` |
+| Either, when clear from context | **platform** | [PlatformLine.jsx](../src/components/vehicles/PlatformLine.jsx) |
+| What a platform does for a vehicle | **provides** values ("from <platform>"). Specs resolve **own → source vehicle → platform**; only the vehicle's own platform | `PLATFORM_PROVIDES`; `specProvenance` in [specHelpers.js](../src/utils/specHelpers.js) |
+| 400 or 800 V architecture | **voltage class** — the platform's, else from nominal voltage (under 475 V = 400 V class). "900 V" is marketing for 800. Not "voltage" (the nominal field) | `resolveVoltageClass`, `VOLTAGE_CLASSES` |
+| How a car takes DC from a 400 V charger | **400 V support**: native, DC booster, motor boost, split pack, not possible. Vehicle's field, else its platform's. Not "boost" or "conversion" | `specs.charging.dc_400v_charging` |
+| Fastest DC rate on a 400 V charger | **max DC on 400 V** — the vehicle's, never the platform's | `specs.charging.max_dc_400v_kw` |
+| Chemistries a platform's packs come in | **the platform's chemistries** — suggestions for the vehicle's **battery chemistry** (LFP, LMFP, NMC, NCA, NMCA) | `platforms.chemistries` |
+| Warming the battery before a charging stop | **preconditioning** — None, Manual, Automatic, Both. None is an answer; blank is not recorded | `specs.charging.preconditioning` |
 
-**Say "EPA tested", never a bare "Tested", for capacity.** The vehicle card's
-*Tested* range is an EVBench range test set against EPA
-([TestedFigure.jsx](../src/components/vehicles/TestedFigure.jsx)). A bare
-"Tested capacity" beside it would use one word for two sources.
+### Variants and lineage
 
-**A variant is a vehicle record; a wheel or trim variant is not.** EPA prose
-uses "variant" loosely for the configurations one certification covers ("the
-20-inch variant"). That stays fine when qualified. Unqualified in UI text,
-"variant" means the vehicle record, so an EPA configuration is called a
-configuration.
+| Thing | Call it | Lives in |
+|---|---|---|
+| A vehicle whose specs, tests, color, photo and tags come from another until set | **a variant**; it **inherits from** its source. Made with **＋ Variant** | `spec_source_vehicle_id`, [vehicleInheritance.js](../src/utils/vehicleInheritance.js) |
+| The vehicle it inherits from | **its source** / **source vehicle** ("Inherits from"). None = an origin. Not "parent". Not a performance-result **source** | [SourceVehiclePicker.jsx](../src/components/SourceVehiclePicker.jsx) |
+| What a variant shows but doesn't set | **inherited** — "Inherited from *source*" | `vehicle.inheritedFrom` |
+| A vehicle's values before inheritance | **its own** — what editors read and write | `vehicle.own`, `ownValues()` |
+| A source's charging tests reaching its variants automatically | they **come down the lineage**. Charging only; range tests need a link | [lineageCharging.js](../src/utils/lineageCharging.js) |
+| A variant whose pack differs in chemistry or build, so nothing comes down to it | **a battery revision** — a cut on one edge, not a branch. Not "disconnect", "detach" or "cut-off" | `vehicles.battery_revision`, [BatteryRevisionNote.jsx](../src/components/vehicles/BatteryRevisionNote.jsx) |
+| Same battery, different size | **capacity factor** — a vehicle's scales every test coming down, multiplied down the chain; a link's scales one test. 1 unless set | `vehicles.capacity_factor`, `spec_links.capacity_factor` |
+| A link on a test the lineage already brings, holding its own factors, color or DEF | **an override** — "Reset" removes it | `spec_links`; `_viaLineage` |
+| Deleting a source | its values are **passed down** to variants with none of their own, and they re-point one level up. The database requires it. Its tests can't move. Not "orphaning", "push down" or "merge down" | `delete_vehicle_passing_down()`, [vehicleDeletion.js](../src/utils/vehicleDeletion.js) |
+| A new vehicle holding its own duplicates | **a copy** ("⧉ Copy"). A variant points; a copy duplicates | `duplicateVehicle` |
+| EPA configurations offered on a vehicle's EPA section | **suggested configurations** — from the source, else the vehicle's make and model. A variant never inherits EPA figures (they were wrong on live data) | [variantEpaSuggestions.js](../src/utils/variantEpaSuggestions.js) |
+| A brand's default series color | **brand color** — "<brand> brand color". Not "manufacturer color" | `manufacturers.color`, [BrandRegistry.jsx](../src/components/admin/BrandRegistry.jsx) |
+| Setting a vehicle's color from its photo | **Pull color** (curators, only where none is set; skips white, black, silver; offers Undo). **Clear color** removes one | [PullColorButton.jsx](../src/components/vehicles/PullColorButton.jsx), [imageColor.js](../src/utils/imageColor.js) |
+| Whether a vehicle appears in lists and charts | **listed** / **unlisted** (LISTED / UNLISTED badge). Unlisted shows to curators and its creator; others see it only as **"Unlisted record"** in a lineage. Still lends values to variants. Not "private" or "public" — every row is readable | `vehicles.visibility` (see Deferred renames); [vehicleListing.js](../src/utils/vehicleListing.js); `vehicles` vs `fleet` in AppContext |
 
-**A deleted source passes down.** Deleting a source copies its OWN values onto the variants that had none of their own and re-points them one level up, so a variant is never left showing an older figure, or none. The database refuses a delete that skips this (migration 075). Its tests cannot move: they are the deleted vehicle's own runs, and the variants stop showing them.
+Tags are one set: a variant with any tags of its own shows only those.
 
-**A variant points; a copy duplicates.** Change the source's photo, color,
-tags or a spec, and every variant that has not set its own shows the change.
-A copy never does. The difference is why both buttons exist. Tags are one set:
-a variant with any tags of its own shows only those.
+"Variant" unqualified means the vehicle record. An EPA wheel or trim variant is
+a **configuration**.
 
-**A variant never inherits its EPA configuration.** It inherits specs, tests,
-color, photo and tags, but a variant exists because something differs, and
-that almost always means a different certification: on the live data, every
-EPA range a variant would have borrowed was wrong for the car (#341). Its
-source only *suggests* where to look. EPA figures come from configurations
-linked to the vehicle itself, or are empty. A vehicle with no source to go on
-gets suggestions from its own make and model instead.
+### Accuracy signals and checks
 
-**Vouch and flag mean the same act on a spec and on a run, but they are not
-the same record.** A run's vouch and flag are *counted*, one per browser
-(`browser_token`), and a browser holds one or the other, never both. On specs
-the vouch is for the whole vehicle and counted the same way, but a flag is
-*per field* and is only on or off: `flagged_specs` holds the field's
-`category.field` key, with no count and no record of who. Say "flagged", not
-"flagged by N people", for a spec value.
+| Thing | Call it | Lives in |
+|---|---|---|
+| Anyone's signal that data looks right or wrong | **accuracy signals** | `votes`, `vehicles.flagged_specs`, [VoteButtons.jsx](../src/components/VoteButtons.jsx) |
+| Saying specs or a run look accurate | **a vouch** — "Vouch for accuracy" | `votes.vote_type = 'vouch'` |
+| Saying a spec value or a run may be wrong | **a flag** | `flagged_specs`; `votes.vote_type = 'flag'` |
+| A spec flag not yet saved | **a pending flag** | `pendingFlags` in [ViewSpecsModal.jsx](../src/components/ViewSpecsModal.jsx) |
+| An admin removing a spec flag | **clearing a flag** | `unflagSpecField` |
+| A table cell whose value is flagged | **a flagged cell** | `.guide-td.is-flagged` |
+| Admin sub-tab of vehicles disagreeing with their sources | **Data Checks** | [DataChecksPanel.jsx](../src/components/admin/DataChecksPanel.jsx), [dataChecks.js](../src/utils/dataChecks.js) |
+| Two sources further apart than a limit | **disagrees** | `.is-disagrees` |
+| Something missing that would let a figure be checked | **a gap** | `.is-gap` |
+| A change a curator makes from a finding | **a fix**; a column fix is **a move** | [dataCheckFixes.js](../src/utils/dataCheckFixes.js) |
+| A recorded decision that nothing needs doing | **a skip** — holds while the judged values hold; changing them brings the finding back. Moving a limit doesn't | `fe_guide_skipped_at`, `data_check_skips` |
+| Who published a performance result | **a source**; other spellings are **aliases** | `sources`, [SourcePicker.jsx](../src/components/SourcePicker.jsx) |
+| Whether a printed 0–60 counts the first foot | **the rollout basis** — *1-ft rollout omitted* or *standing start* | `ROLLOUT_BASES` |
+| Admin sub-tab importing results in bulk | **Published Results** | [PublishedResultsPanel.jsx](../src/components/admin/PublishedResultsPanel.jsx) |
 
-**A Data Checks finding is not a flag.** Community members *flag* suspect spec
-values (`flagged_specs`), which is a different act by different people. A
-finding *disagrees*, or is *a gap*.
+- A run's vouch and flag are counted, one per browser, one or the other. A spec
+  vouch is per vehicle and counted; a spec flag is per field, on or off, with
+  no count. Say "flagged", not "flagged by N people".
+- A Data Checks finding is not a flag.
+- **Checks, not integrity.** `epaIntegrity` asks if a record is possible
+  against itself; a check compares against another source.
 
-**Checks, not integrity.** `epaIntegrity` asks whether a record is possible
-against ITSELF; a check compares a figure against ANOTHER source, the sense
-`labelRangeCheck` and `epaDerivationCheck` already use. Data Checks are the
-second kind.
+### EPA
+
+Three sources, named for where the data comes from: **EPA Label** (the Fuel
+Economy Guide, one row per configuration), **EPA Certification** (one CSI filing
+per Test Group, so per model year), and the **EPA test vehicle** inside it (one
+per Vehicle ID). Certifications and test vehicles are many-to-many. A heading
+names the source and its description says what one point is — Label Statistics
+counts configurations, Certification Statistics counts test vehicles.
+
+| Thing | Call it | Lives in |
+|---|---|---|
+| The car EPA put in the lab, keyed by Vehicle ID | **an EPA test vehicle** — "Test vehicle" in UI text. Never a bare "vehicle". Not "test group" | `epa_test_vehicles`, `test_vehicle_id` |
+| One EPA filing for one model year, named by its **Test Group** | **an EPA Certification** ("cert" where short; **certification record** when ambiguous). Test Group is always capitalized | `epa_test_vehicles.test_group` |
+| What is read from a CSI document | **certification data** | [parseEpaCsiPdf.js](../src/utils/parseEpaCsiPdf.js) |
+| The figures on the window sticker | **EPA Label** — capitalized. The **Fuel Economy Guide** is the file it's imported from | `epa_fe_guide`, `label_*`, [parseFeGuide.js](../src/utils/parseFeGuide.js) |
+| One test EPA ran, numbered by **test number** | **an EPA test** — never "run". Also matched by **fingerprint** (procedure, date, CD range, AC energy) because EPA renumbers refiled tests | `epa_tests`; `testFingerprint` in [epaTestVehicleIdentity.js](../src/utils/epaTestVehicleIdentity.js) |
+| A Vehicle ID EPA reused for a different car | stored as **`<Vehicle ID>@<Test Group>`** — only when they share no test and differ in carline or by over a quarter in weight | `resolveTestVehicleIds` |
+| Which test vehicles stand behind an EPA Label | **Tested via** (owner's pick): **exact**, **near**, **blend** (shown as the **span**, never a weighting), **untested** (nearest tested trim suggested, not linked), **no lab data**. Not "basis" or "configuration" | [guideTestedVia.js](../src/utils/guideTestedVia.js) |
+| An EPA test vehicle linked to a vehicle | **a configuration** / **EPA configuration** | `epa_vehicle_mappings` |
+| The one whose label range, EPA tested and weight are the vehicle's | **the primary configuration** | `is_primary`, [PrimaryConfigurationPicker.jsx](../src/components/epa/PrimaryConfigurationPicker.jsx) |
+| A Guide row linked to a vehicle | the vehicle's **EPA Label** ("link an EPA Label"). Configurations come through its Tested via; unlinking removes what it brought | `vehicle_guide_rows`, [vehicleGuideLinks.js](../src/utils/vehicleGuideLinks.js) |
+| How a configuration stands against the vehicle's EPA Label | its **standing**: **tested via label**, **other label**, **not behind label** (the only one the Admin move removes), **unconfirmed** | `configurationStanding` |
+| How one test vehicle matches a Guide row | its **match**: **exact**, **near**, **blend** (with **nearest**), **alternative**, **possible**, **other label**, **no match**, **no lab data**. Not "standing" | [guideRowMatches.js](../src/utils/guideRowMatches.js), [GuideRowMatchList.jsx](../src/components/epa/GuideRowMatchList.jsx) |
+| A test vehicle no Guide row stands on | **behind no EPA Label** (provisional). Marked, never deleted; its links removed; lifted if a row appears. Not "orphan" or "culled" | [epaBehindNoLabel.js](../src/utils/epaBehindNoLabel.js) |
+| AC loss between wall and pack (charger, cable, idle draw) | **charger efficiency** — always AC; 0.885 assumed. Never for DC | `ASSUMED_CHARGER_EFF`, `deriveChargerEfficiency` |
+| DC fast loss from port to pack output | **DC fast charging loss** — 0.09, one value for all. Not the station's loss, not charger efficiency. Say **port to pack output**, not "terminals" | `DC_FAST_LOSS` in epa.js |
+| The person maintaining EPA records | **the curator** (admin or contributor) | |
+
+Years and filings: **Since MY2023** (first year in a certification),
+**MY2023 to MY2025** (gaps written out: "MY2022, MY2024 to MY2025"),
+**From MY2024** (a figure standing in from another year — not "flag"),
+**Basis** (how a certification record came to exist: `csi` / `csv` / `guide` /
+`manual`), and **Recertified** (same Test Group filed again; EPA's field is
+`certificate_revision_date`, but "revised" would imply a change).
+
+**`total_voltage_v` is not nominal.** Makers file different points on the
+voltage range (GM files full charge). Never compare it across makers or copy
+it into `battery_nominal_voltage_v` unchecked. Evidence:
+`epa-voltage-points-differ` in `src/explainers/facts.json`.
+
+### Listed, unlisted, excluded
+
+Two questions: does a viewer see it (listed), and does it count (excluded). All
+four answers are real — listed and counted, unlisted and counted (the pool),
+unlisted and excluded (disputed), listed but excluded (illustration only, like
+a towing run). A figure that **aggregates** tests counts the pool; a figure
+that **quotes** one test quotes a listed one, so readers can find it.
 
 ## Statistics and uncertainty
 
-| Thing | Call it | Established by | Lives in |
-|---|---|---|---|
-| A validity bound a derived EPA figure must fall inside | **a validity band** | this repo | [epa.js](../src/constants/epa.js) — `ETA_BAND`, `CHARGER_EFF_BAND`, `PACK_KWH_BAND`, `SS_SPEED_BAND` |
-| Falling outside one | **out of band** | same | flag strings `eta-out-of-band`, `charger-out-of-band`, `implied-ss-speed-out-of-band` |
-| The observed spread printed beside one, to inform the knob | **band evidence** | — | [epaBandEvidence.js](../src/utils/epaBandEvidence.js), Admin → Model Constants |
-| How far a repeat of a measurement would likely land | **a confidence band** (line) / **error bar** (bar) | standard statistics | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314) — not yet built |
+| Thing | Call it | Lives in |
+|---|---|---|
+| A bound a derived EPA figure must fall inside | **a validity band** | `ETA_BAND`, `CHARGER_EFF_BAND`, `PACK_KWH_BAND`, `SS_SPEED_BAND` in epa.js |
+| Falling outside one | **out of band** | `eta-out-of-band`, `charger-out-of-band`, `implied-ss-speed-out-of-band` |
+| The observed spread shown beside one | **band evidence** | [epaBandEvidence.js](../src/utils/epaBandEvidence.js) |
+| How far a repeat would likely land | **a confidence band** (line) / **error bar** (bar) | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314) — not built |
 
-**Never write a bare "band."** The word already means a validity bound, and that
-meaning is live in four places: `epaDerivations` raises the flags,
-`epaIntegrity` turns them into record issues, `EpaVehicleSection` and
-`EpaPdfImportModal` surface them to the curator, and `DerivedValues` draws the
-⚠. A confidence band is a completely different object — a validity band says
-*this figure is implausible*, a confidence band says *this measurement is
-uncertain* — and one of them is a data-integrity check while the other is a
-finding. Qualify both, every time.
-
-`HIGHWAY_BAND_MPH` is a third sense again — a speed range drawn on the EPA
-curve as a reference. It is not a validity check and nothing is flagged against
-it; read it as a *reference band* where it appears.
+**Never write a bare "band."** A validity band says *this figure is
+implausible*; a confidence band says *this measurement is uncertain*. Qualify
+both. `HIGHWAY_BAND_MPH` is a third sense — a **reference band** drawn on the
+EPA curve, nothing flagged against it.
 
 ## Tables
 
 | Thing | Call it | Established by | Lives in |
 |---|---|---|---|
-| A row kept at the top of one table, affecting only that table | **pinned** | common web | [GuideTable.jsx](../src/components/epa/guide/GuideTable.jsx), `.guide-pinned-head` |
-| The band those rows sit in | **the pinned band** | — | `.guide-pinned-head`, `.guide-pinned-spacer` |
-| A vehicle chosen for the whole app, driving every chart | **selected** | ARIA `aria-selected` | `selectedVehicles` in [App.jsx](../src/App.jsx), `toggleVehicleSelection`, the chips |
-| A proportional fill behind a value, scaled per column | **a bar cell** | — | `computeBarMaxima()` in [feGuideBrowse.js](../src/utils/feGuideBrowse.js) |
-| Choosing which columns show, and in what order | **the column picker** | — | [ColumnPicker.jsx](../src/components/tables/ColumnPicker.jsx), shared by both tables |
-| A named set of columns, in order, with a sort, answering one question (Road trips, Value, Efficiency) | **a preset** — on screen the row is labelled **"Compare for"** and the word appears only in its tooltip. Not "view": #338 makes the vehicle table the Table *view* of the Vehicles tab | common web | [vehicleTablePresets.js](../src/utils/vehicleTablePresets.js), [PresetPicker.jsx](../src/components/tables/PresetPicker.jsx) (**the preset picker**), `.preset-picker` |
-| A preset whose columns have since been changed | **modified** — "modified from Value" | — | `modifiedFrom`, `vt_preset` beside `vt_cols` |
-| A column worked out per row from other columns (efficiency, price ÷ range) | **a calculated column** | — | `CALCULATED_COLUMNS` in [vehicleTable.js](../src/utils/vehicleTable.js) |
-| An input the reader sets for calculated columns (the charge window, how far a charging stop should take them, electricity prices) | **an assumption**; the menu is **Assumptions**, and it offers only the ones a shown column reads | common in calculators | [VehicleTableAssumptions.jsx](../src/components/VehicleTableAssumptions.jsx), `DEFAULT_ASSUMPTIONS`, `vt_add`, `vt_win`, `vt_home`, `vt_fast` |
-| The span of state of charge a charging stop covers, 10→80% unless the reader sets another | **the charge window** — never "SoC window", which is the energy between the car's own 0% and 100% | — | `windowFrom`/`windowTo`, `tested.charge_window_min` in [vehicleTable.js](../src/utils/vehicleTable.js) |
-| The range test a vehicle's tested range and efficiency come from, on its card and in the vehicle table | **the reported range test** — the curator's default range test, else the newest full-pack one | — | `reportedRangeRun()` in [testedRange.js](../src/utils/testedRange.js) |
-| What the reported range test would reach on a new pack: its measured mi/kWh × the car's EPA tested (else Usable) capacity. Worked out when drawn, never stored; said only where capacity retention is | **when-new range** — never "original range", "nominal range" or "degraded range" | — | `whenNewRange()` in [testedRange.js](../src/utils/testedRange.js); the card's tested line; an asterisk on Tested range in the vehicle table, whose peek and the range bars' tooltip carry it; the `tested.when_new_range_mi` column, in no preset |
-| The share of that new-car capacity the pack delivered on the test: the energy the test implies for a full pack ÷ the new-car capacity. 93% for a car 7% down. Said only below 95% (`CAPACITY_RETENTION_SHOWN_BELOW`) — nearer than that is test scatter | **capacity retention** — not "fade" (that is the loss), "battery health" or "SoH" | *state of health* in the industry, which the site does not claim: one test, one set of conditions | `retention` in `whenNewRange()`; `tested.capacity_retention` |
-| A charging session whose peak stayed well under the car's own maximum: the charger held it back | **charger-limited** | common in EV testing | `CHARGER_LIMITED_SHARE` in [chargeWindows.js](../src/utils/chargeWindows.js) |
-| The test behind a tested figure — which one, why that one, its conditions, and where it lives — that the figure's note links to and its peek restates | **a test reference** (`TestReference`); the peek is **the test peek**, and the test card a link lands on is **the link target** | — | [testDetails.js](../src/utils/testDetails.js), [TestPeek.jsx](../src/components/TestPeek.jsx), `a.is-test-link`, `.card.is-link-target`, `?tab=runs&run=` |
-| The cell at the top of a table column — click sorts by it, drag moves it. Always qualified: "header" alone is the top of the page | **a column header** | HTML `<th>`; common web | [SortHeader.jsx](../src/components/tables/SortHeader.jsx); dragging goes through [useColumnDrag.js](../src/hooks/useColumnDrag.js), the same order the column picker drags |
-| What a figure is measured in, set beside the number in every cell that has one, so a header-less screenshot still reads | **the unit** — mixed case kept, because case carries meaning (`kWh`, `kW`, `MPGe`); a column states its own or says it has none (`unitless`), and the column header does not repeat it. Never read out of a column's name: "¼ mile" is seconds and mph | SI / common | `.stat-cell-unit` (also the cards'), [TableCell.jsx](../src/components/tables/TableCell.jsx) `unit`, `CANONICAL_UNITS` in [tableColumns.js](../src/utils/tableColumns.js) |
-| Every vehicle a row, any field a column, over the whole fleet | **the vehicle table** — "Table" under Vehicles & Specs › Specifications & Data (#338); it replaced Compare Specs (#315) | — | [VehicleTable.jsx](../src/components/VehicleTable.jsx), [vehicleTable.js](../src/utils/vehicleTable.js); mode key stays `specstable` |
-| The band of selected vehicles at the top of the vehicle table | **the selected band** | — | `.vehicle-table-band` — the pinned band's look, a selection's meaning |
+| Every vehicle a row, any field a column | **the vehicle table** — "Table" under Specifications & Data | — | [VehicleTable.jsx](../src/components/VehicleTable.jsx), [vehicleTable.js](../src/utils/vehicleTable.js); mode `specstable` |
+| A row kept at the top of one table only | **pinned**, in **the pinned band** | common web | [GuideTable.jsx](../src/components/epa/guide/GuideTable.jsx), `.guide-pinned-head` |
+| A vehicle chosen for the whole app | **selected** | ARIA | `selectedVehicles`, the chips |
+| The selected vehicles at the top of the vehicle table | **the selected band** — the pinned band's look, selection's meaning | — | `.vehicle-table-band` |
+| The cell at the top of a column — click sorts, drag moves | **a column header** — always qualified; "header" alone is the page header | HTML `<th>` | [SortHeader.jsx](../src/components/tables/SortHeader.jsx), [useColumnDrag.js](../src/hooks/useColumnDrag.js) |
+| A proportional fill behind a value | **a bar cell**. Not a sparkline | — | `computeBarMaxima()` |
+| Choosing which columns show, in what order | **the column picker** | — | [ColumnPicker.jsx](../src/components/tables/ColumnPicker.jsx) |
+| A named, ordered column set with a sort (Road trips, Value…) | **a preset** — labeled **"Compare for"** on screen. Not "view" | common web | [vehicleTablePresets.js](../src/utils/vehicleTablePresets.js), [PresetPicker.jsx](../src/components/tables/PresetPicker.jsx) |
+| A preset changed since chosen | **modified** — "modified from Value" | — | `modifiedFrom` |
+| A column worked out from others | **a calculated column** | — | `CALCULATED_COLUMNS` |
+| An input the reader sets for calculated columns | **an assumption**; menu **Assumptions**, showing only ones a shown column reads | calculators | [VehicleTableAssumptions.jsx](../src/components/VehicleTableAssumptions.jsx) |
+| The SoC span a charging stop covers (10→80% default) | **the charge window**. Never "SoC window" | — | `windowFrom`/`windowTo` |
+| What a figure is measured in, beside every number | **the unit** — case kept (`kWh`, `MPGe`); the header doesn't repeat it; never read from the column name | SI | `.stat-cell-unit`, `CANONICAL_UNITS` in [tableColumns.js](../src/utils/tableColumns.js) |
 
-**Pin is local, select is global**, and the difference is what a second click
-costs. Unpinning an FE Guide row rearranges one table. Deselecting a vehicle
-removes it from the chips and from every chart on the site.
-
-So a table whose rows are vehicles says **select**, never pin — even though it
-borrows the pinned band to show the selection at the top. The mechanism is
-shared; the word is not. In the specs table of
-[#315](https://github.com/pluginpath-ops/ev-data-viz/issues/315) the click reads
-*add to selection*, the band above reads as the vehicles you already have, and
-"pin" appears nowhere.
-
-Not a **sparkline**. A sparkline is a series drawn small; a bar cell encodes one
-number against the column's maximum. No spec field or guide column carries a
-series, so nothing here is a sparkline and the word should not appear.
+**Pin is local, select is global.** Unpinning rearranges one table; deselecting
+changes every chart. A table of vehicles says **select**, never pin, even though
+it borrows the pinned band.
 
 ---
 
@@ -437,90 +354,47 @@ series, so nothing here is a sparkline and the word should not appear.
 
 | Do not write | Write | Why |
 |---|---|---|
-| "the rail" for a card's left edge | accent border | collided with the chart sidebar |
-| "the rail" for the sub-nav | sub-nav | the class is `.subtab-strip` |
-| "chrome" for the header specifically | header | keep chrome as the category |
+| "the rail" for a card's left edge | accent border | collided with the sidebar |
+| "the rail" for the sub-nav | sub-nav | |
+| "chrome" for the header | header | chrome is the category |
 | "selection strip" | chips | collided with "selection bar" |
-| "Runs" in UI text | Tests / Tests & Data | pre-existing rule, see CLAUDE.md |
-| "pinning" for choosing vehicles in the specs table | selecting | pin is view-scoped; that click drives every chart |
-| "sparkline" for an in-cell magnitude bar | bar cell | nothing here is a series |
-| a bare "band" | validity band / confidence band | two live meanings, opposite jobs |
-| "test group", "certification group" or "cert group" for the Vehicle ID record | **EPA test vehicle** — and **Test Group**, capitalised, only for EPA's certification identifier | the record is the car; EPA's Test Group is the certification (#374) |
-| `epa_test_groups`, `test_group_id`, `testGroupId`, `epaGroup`, `epa_test_family_id` | `epa_test_vehicles`, `test_vehicle_id`, `testVehicleId`, `epaTestVehicle`, `test_group` | renamed through code and database in migration 081 (#374) |
-| "Hidden" / "Hide" for a test, in UI text | **Unlisted** / Unlist — or **Excluded**, if it is the statistics that are meant | one word carried two questions until #394 split them |
+| "Runs" in UI text | Tests / Tests & Data | the UI says tests |
+| "pinning" for choosing vehicles | selecting | pin is local; selection drives every chart |
+| "sparkline" | bar cell | nothing here is a series |
+| a bare "band" | validity band / confidence band | two meanings, opposite jobs |
+| "test group", "certification group", "cert group" for the Vehicle ID record | **EPA test vehicle**; **Test Group** only for EPA's identifier | the record is the car |
+| `epa_test_groups`, `test_group_id`, `testGroupId`, `epaGroup`, `epa_test_family_id` | `epa_test_vehicles`, `test_vehicle_id`, `testVehicleId`, `epaTestVehicle`, `test_group` | renamed in migration 081 |
+| "Hidden" / "Hide" for a test, in UI text | **Unlisted** / Unlist — or **Excluded** for statistics | one word carried two questions |
+| "nominal" for a measured curve | composite | *nominal* means rated, as filed |
 
 ## Open names
 
-Names the issues in flight need and this file cannot yet supply. Recorded rather
-than guessed at — a class name is the whole value of extracting one, and CLAUDE.md
-says to stop and ask when the right name is not obvious.
+Names not yet settled. Record them here rather than guess in code.
 
-| The thing | Where it lands | Candidates | Leaning |
+| The thing | Where | Candidates | Leaning |
 |---|---|---|---|
-| The shrinkage weight that trades a vehicle's own spread against the fleet's | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314) | — | undecided |
-| A column of figures whose header names the speed they are stated at ("Composite efficiency, 129 km/h") and whose note beneath is as long, so it needs the widest figure column | `holds: 'noted-figures'`, `.guide-th.noted-figures` ([vehicleTable.js](../src/utils/vehicleTable.js), index.css) | noted-figures · conditioned-figures · wide-figures · stated-figures | **noted-figures** (owner's pick). "Conditioned" was avoided: it collides with *preconditioned* (a charging test's state) and with the correction *conditions* (the speed, temperature and altitude under Assumptions). Its sibling `holds: 'long-figures'` (`.guide-th.long-figures`: MPGe to three decimals, a warranty's distance in km) is named in the same spirit and is still open |
-| One source above a vehicle's card on the Cards grid: year, friendly name, battery and range, and a gap when the filters removed a stretch of sources | [RolodexCard.jsx](../src/components/vehicles/RolodexCard.jsx), `.rolodex-card` | rolodex card · peek · spine | **rolodex card**, for now (owner's pick; "tab" already means navigation, "spine" was set aside) |
-| The one solid button a view may carry, for the action the view exists to take (Save, Save changes, Import N). Orange, the "now" hue. Every other button is tinted | `.btn-commit`, `--color-commit*` ([index.css](../src/index.css)) | commit · cta · key | **commit**, provisionally. "CTA" is marketing's word, and this is a form's Save, not a sales prompt |
-| A vehicle's card with its source chain above it as rolodex cards; clicking them fans the stack out in a popover | [VehicleStack.jsx](../src/components/vehicles/VehicleStack.jsx), `.vehicle-stack`, `vehicleStack()` | stack · variant stack | **stack** |
-| Vehicles & Specs › Summary's third view: every lineage with a match, from its origin down, each vehicle once, joined by connector lines; a source the filters removed is a "N filtered out" row that opens to name them | [LineageTree.jsx](../src/components/vehicles/LineageTree.jsx), `lineageTrees()`, sub-tab key `lineage` | lineage tree · Lineage (sub-tab) · family tree | **Lineage** as the sub-tab, **lineage tree** in prose |
-| Where a vehicle sits in its lineage, as an icon: where it starts, a variant with variants, a variant with none | [LineageIcon.jsx](../src/components/vehicles/LineageIcon.jsx), `lineageRole()` | origin · has variants · end variant | **origin**, **has variants**, **end variant** |
-| The spec chart's bar display for a text or yes/no column: every vehicle gets an equal-height bar with its value printed inside, because a word has no length | [SpecsChartView.jsx](../src/components/SpecsChartView.jsx) (`plot.kind === 'text'`; the internal id is `text`, chosen only because it is neutral) | Lineup · Labeled bars · Tiles | **Labeled bars** (internal) / **Lineup** (user-visible) — it says what the thing is (a bar, labeled) without a second noun to learn, "Bar" already names the kind it lives in, and the numeric/yes-no split reads naturally as "bars" vs "labeled bars". "Lineup" is the owner's lead and is vivid, but it reads as a roster or a vehicle lineup (a *model lineup*, which the site also deals in), so it risks colliding with vehicle vocabulary; "Tiles" drops the bar shape that the equal-height bars still have. **Owner decided (#450): internal and doc name is **labeled bars**; if the display is ever named in the UI, its user-visible name is **Lineup**. The UI names neither today** |
-| A test vehicle no Guide row of its certification stands on (layer 4 of the EPA identity work) | Admin → Data Checks section, the EPA Data list's toggle, the skip note ([epaBehindNoLabel.js](../src/utils/epaBehindNoLabel.js)) | behind no EPA Label · unlabeled · off-label · retest | **behind no EPA Label** — says what was checked, in the terms the reader already has (EPA Label, "behind" from Tested via). "Retest" is wrong for the unsold variants, which are most of them; "off-label" carries a medical meaning |
-| The mark showing how far apart a vehicle's range tests landed — every test's figure, not a summary of them | Range & Efficiency and Charge Stop bars, Road Trip ([rangeTestSpread.js](../src/utils/rangeTestSpread.js), [roadTripSpread.js](../src/utils/roadTripSpread.js)); labelled "Test spread" meanwhile | test spread (widened to cover both charts) · tested span · spread of tests | **test spread**, widened — see below |
-
-**Range tests and "test spread."** #313 defines test spread for a curve: the
-best test at each SoC down to one SD below the mean, lopsided on purpose. A range
-test is one figure, and at the n the fleet has (most vehicles 1, a handful 2–3)
-a mean and an SD say nothing a reader can use, so the range mark is every test
-itself — its extent is lowest to highest. Same idea for the reader ("how far
-apart this car's tests landed"), different construction. Widening the term to
-cover both keeps one word for one idea; a second word ("tested span") keeps one
-word per construction. Not "range" in any form — it already means distance — and
-never "error bar" or "confidence band", which #314 keeps for where a repeat
-would land.
-
-**Why not "nominal curve"** (settled for #313 as **composite curve**, in the table
-above). In this codebase *nominal* already means **rated**,
-as filed — `nominal_pack_kwh`, `battery_nominal_voltage_v`, `epa_fe_guide.total_voltage_v`.
-The charging curve in #313 is the opposite kind of thing: measured, aggregated,
-and typical rather than specified. Reusing the word would make "nominal" mean
-both *what the manufacturer claims* and *what we observed on average*, which is
-the exact failure this document was written about.
-
-**"As filed" is not one point on the voltage range.** A pack's voltage moves
-with its charge, and `epa_fe_guide.total_voltage_v` holds whichever point the
-maker filed. GM files full charge: its 80-cell Ultium cars show 336 V, which
-is 80 × 4.2 V, against about 288 V nominal. Lucid's 810 V for the Gravity
-looks nominal, where Lucid's own 926 V is near full. So never compare
-`total_voltage_v` across makers as if it were nominal, and never copy it into
-`battery_nominal_voltage_v` unchecked. The evidence is the explainers' facts
-ledger, `epa-voltage-points-differ` in `src/explainers/facts.json`.
-
+| Shrinkage weight trading a vehicle's spread against the fleet's | [#314](https://github.com/pluginpath-ops/ev-data-viz/issues/314) | — | undecided |
+| A figure column whose header names its speed and whose note is as long | `holds: 'noted-figures'`, `.guide-th.noted-figures` | noted · conditioned · wide · stated | **noted-figures** (owner's pick). Not "conditioned" (collides with preconditioned and correction conditions). Sibling `long-figures` still open |
+| One source above a card on the Cards grid | [RolodexCard.jsx](../src/components/vehicles/RolodexCard.jsx) | rolodex card · peek · spine | **rolodex card** for now (owner's pick) |
+| The one solid button a view may carry, for its main action | `.btn-commit`, `--color-commit*` | commit · cta · key | **commit**, provisionally. Not "CTA" |
+| A card with its source chain stacked above it | [VehicleStack.jsx](../src/components/vehicles/VehicleStack.jsx) | stack · variant stack | **stack** |
+| Summary's third view: every lineage from its origin down | [LineageTree.jsx](../src/components/vehicles/LineageTree.jsx), key `lineage` | lineage tree · family tree | **Lineage** (sub-tab), **lineage tree** (prose) |
+| A vehicle's place in its lineage, as an icon | [LineageIcon.jsx](../src/components/vehicles/LineageIcon.jsx) | | **origin**, **has variants**, **end variant** |
+| Spec chart bars for a text or yes/no column (equal height, value inside) | [SpecsChartView.jsx](../src/components/SpecsChartView.jsx), `plot.kind === 'text'` | Lineup · Labeled bars · Tiles | **Decided:** **labeled bars** internally; **Lineup** if ever shown in the UI (it isn't today) |
+| A test vehicle no Guide row stands on | [epaBehindNoLabel.js](../src/utils/epaBehindNoLabel.js) | behind no EPA Label · unlabeled · off-label · retest | **behind no EPA Label**. Not "retest" (most are unsold variants) or "off-label" |
+| How far apart a vehicle's range tests landed — every test shown | [rangeTestSpread.js](../src/utils/rangeTestSpread.js), [roadTripSpread.js](../src/utils/roadTripSpread.js); "Test spread" meanwhile | test spread (widened) · tested span | **test spread**, widened: same idea for the reader as the curve's, different construction. Never "range", "error bar" or "confidence band" |
 
 ## Deferred renames
 
-The FE Guide's table classes — `.guide-table`, `.guide-th`, `.guide-td`,
-`.guide-row`, `.guide-spark`, `.guide-filter-strip` and the rest — now also dress
-the vehicle table, which shares the mechanisms (#315). They describe a
-browse table, not the guide, and want a neutral prefix on their own branch.
+Kept on purpose. Each has a revisit date; past it, do the rename or record why
+not.
 
-`useViewingConditions`, `.chart-viewing-conditions`, `.viewing-row` and the
-"viewing condition" comments in epaDerivations.js keep the old name: they now
-serve only **Wind & elevation change** (#449), and want renaming together, on
-their own branch, rather than inside the correction work.
+| Old name | Means now | Revisit |
+|---|---|---|
+| `.guide-table`, `.guide-th`, `.guide-td`, `.guide-row`, `.guide-spark`, `.guide-filter-strip` … | a browse table, shared by the EPA guide and the vehicle table — wants a neutral prefix | 2027-02 |
+| `useViewingConditions`, `.chart-viewing-conditions`, `.viewing-row`, "viewing condition" comments in epaDerivations.js | **Wind & elevation change** only | 2027-02 |
+| `.chart-rail` → `.chart-sidebar`; `.app-nav` → `.app-header` | sidebar; header (~40 CSS references plus five views) | 2027-02 |
+| `vehicles.visibility` ('public'/'private'), `visibility_type` | **listed / unlisted** — renaming touches every policy and import path | 2027-02 |
+| `runs.is_hidden`, `isHidden`, `.badge-hidden` | **unlisted** | 2027-02 |
 
-`.chart-rail` → `.chart-sidebar` and `.app-nav` → `.app-header` are correct but
-touch ~40 CSS references plus JSX across five views. Worth doing on its own
-branch, not folded into unrelated work. Until then the classes keep the old
-names and the prose uses the new ones — a gap this file exists to record rather
-than hide.
-
-`vehicles.visibility` means **listed / unlisted** since migration 085 made every
-vehicle row readable: 'public' is listed, 'private' unlisted. The column, its
-`visibility_type` enum and its two values keep their names, since renaming them
-touches every policy and the import paths; the UI and prose say listed.
-
-`runs.is_hidden` means **unlisted** since migration 079 split out
-`is_excluded` ([#394](https://github.com/pluginpath-ops/ev-data-viz/issues/394)); the column, the `isHidden` key and the
-`.badge-hidden` class keep their names rather than churn every query and the
-client-side filter in `AppContext`. The UI says Unlisted.
+Until renamed, code keeps the old name and prose uses the new one.
