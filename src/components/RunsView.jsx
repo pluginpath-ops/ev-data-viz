@@ -13,7 +13,7 @@ import { toChargerCurrent, chargerCurrentFormValue } from '../utils/chargerCurre
 import { fmtSpeed, speedBasisNote, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, roundTo } from '../utils/unitConversions';
 import Papa from 'papaparse';
 import { parseCSV, parseCSVText } from '../utils/parseCSV';
-import { packKwh, vehicleDetailLabel, vehicleSearchText } from '../utils/specHelpers';
+import { packKwh, vehicleOption } from '../utils/specHelpers';
 import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from '../utils/vehicleFigures';
 import { fromYearNote } from '../utils/epaCertifications';
 import { dataService } from '../services/DataService';
@@ -2815,7 +2815,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             <div className="spec-link-add-form">
                                 <div className="flex gap-2 flex-wrap">
                                     <VehicleCombobox
-                                        options={sourceVehicles.map(v => ({ id: v.id, label: vehicleDetailLabel(v), search: vehicleSearchText(v) }))}
+                                        options={sourceVehicles.map(vehicleOption)}
                                         value={newLinkSourceId}
                                         noneLabel="Source vehicle…"
                                         onChange={id => { setNewLinkSourceId(id); setNewLinkEfficiency(''); setNewLinkCapacity(''); setNewLinkRunIds(null); setNewLinkKind('all'); }}

@@ -1042,6 +1042,55 @@ body {
     color: var(--color-primary-text);
 }
 
+/* What tells two lookalikes apart, one line under the name in a type-ahead list
+ * — make, trim, platforms. Micro, because it is the same vehicle said again,
+ * not a second thing to read. Wraps rather than truncating: the detail is the
+ * only reason the row exists. */
+.option-row-detail {
+    display: block;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    font-weight: 400;
+    color: var(--color-text-muted);
+}
+
+/* A picker's chosen vehicle, closed (VehicleCombobox): a chip to act on, and
+ * beside it the detail that tells lookalikes apart. The chip is the same kind
+ * of thing as .selected-vehicle-chip — a removable pill for a chosen vehicle —
+ * without that one's accent border, since no color has been chosen here. The
+ * row wraps: a long detail drops under the chip instead of being cut off. */
+.combobox-selected {
+    @apply flex flex-wrap items-center gap-x-2 gap-y-1;
+}
+.combobox-chip {
+    @apply inline-flex items-center;
+    max-width: 100%;
+    border-radius: var(--radius-chip);
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+/* Reopens the search. A button so it is reachable by keyboard; it carries no
+   chrome of its own, the chip is the pill. */
+.combobox-chip-label {
+    padding: 3px 4px 3px 9px;
+    text-align: left;
+    border-radius: var(--radius-chip) 0 0 var(--radius-chip);
+}
+.combobox-chip-label:hover { background-color: var(--color-hover-lift); }
+/* Clears the choice. */
+.combobox-chip-clear {
+    @apply flex items-center justify-center;
+    align-self: stretch;
+    padding: 0 8px 0 4px;
+    line-height: 1;
+    border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+}
+.combobox-chip-clear:hover { background-color: var(--color-hover-lift); }
+.combobox-detail {
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-muted);
+}
+
 /* Where a file is dropped. Two importers had the same rectangle, and both said
  * "active" with `bg-indigo-50/40` — a color the theme does not contain. */
 .drop-zone {

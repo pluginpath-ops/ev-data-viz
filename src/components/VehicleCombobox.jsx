@@ -7,10 +7,13 @@ import { useState } from 'react';
  * "Source vehicle" picker filters the same way instead of being a bare
  * `<select>` over 35+ vehicles.
  *
- *   options     — [{ id, label, search? }], already in display order. `search`
- *                 is the text matched against; it defaults to the label. Every
- *                 word typed must appear in it, in any order, so "rivian lr"
- *                 finds a Rivian whose trim is "LR".
+ *   options     — [{ id, label, detail?, search? }], already in display order;
+ *                 `vehicleOption` (specHelpers) builds them. `label` is the short
+ *                 name the chosen chip carries; `detail` is what tells lookalikes
+ *                 apart — beside the chip once chosen, under the name in the list.
+ *                 `search` is the text matched against; it defaults to label and
+ *                 detail. Every word typed must appear in it, in any order, so
+ *                 "rivian lr" finds a Rivian whose trim is "LR".
  *   value       — the selected id as a string, '' for none
  *   onChange    — (id: string) => void; '' when "— None —" is chosen
  *   noneLabel   — text for the empty choice, closed and in the list
@@ -30,22 +33,21 @@ export default function VehicleCombobox({
     const words = search.toLowerCase().split(/\s+/).filter(Boolean);
     const filtered = words.length
         ? options.filter(o => {
-            const hay = (o.search ?? o.label).toLowerCase();
+            const hay = (o.search ?? `${o.label} ${o.detail ?? ''}`).toLowerCase();
             return words.every(w => hay.includes(w));
         })
         : options;
-    const selectedLabel = value
-        ? options.find(o => String(o.id) === String(value))?.label ?? ''
-        : '';
+    const selected = value ? options.find(o => String(o.id) === String(value)) : null;
 
     const choose = (id) => {
         onChange(id);
         setOpen(false);
         setSearch('');
     };
+    const reopen = () => { setSearch(suggestedSearch ?? ''); setOpen(true); };
 
     return (
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
             {open ? (
                 <input
                     autoFocus
@@ -57,13 +59,36 @@ export default function VehicleCombobox({
                     placeholder={placeholder}
                     className="form-input w-full"
                 />
+            ) : selected ? (
+                <div className="combobox-selected">
+                    <span className="combobox-chip">
+                        <button
+                            type="button"
+                            onClick={reopen}
+                            className="combobox-chip-label"
+                            title="Choose a different vehicle"
+                        >
+                            {selected.label}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onChange('')}
+                            className="combobox-chip-clear"
+                            aria-label={`Clear ${selected.label}`}
+                            title="Clear"
+                        >
+                            &times;
+                        </button>
+                    </span>
+                    {selected.detail && <span className="combobox-detail">{selected.detail}</span>}
+                </div>
             ) : (
                 <button
                     type="button"
-                    onClick={() => { setSearch(suggestedSearch ?? ''); setOpen(true); }}
+                    onClick={reopen}
                     className="form-input w-full text-left truncate"
                 >
-                    {selectedLabel || <span className="text-meta">{noneLabel}</span>}
+                    <span className="text-meta">{noneLabel}</span>
                 </button>
             )}
             {open && (
@@ -81,6 +106,7 @@ export default function VehicleCombobox({
                             onMouseDown={() => choose(String(o.id))}
                         >
                             {o.label}
+                            {o.detail && <span className="option-row-detail">{o.detail}</span>}
                         </li>
                     ))}
                     {filtered.length === 0 && (
