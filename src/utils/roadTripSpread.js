@@ -15,40 +15,24 @@
  * left out. Road Trip's own line has always taken the same estimate.
  */
 import { countedRangeTests, spreadEfficiency } from './rangeTestSpread';
-import { correctionFactor, runConditions, speedCorrected } from './conditionCorrection';
-import { STANDARD_CONDITIONS, ASSUMED_TEST_CONDITIONS } from '../constants/epa';
+import { rangeTestBasis } from './tripEfficiency';
 
 /**
- * Every range test of a vehicle as a simulation input: { run, miPerKwh,
- * testSpeedMph }.
+ * Every range test of a vehicle as a trip basis: { run, basis, estimated }.
  *
- * With correction on, a test corrected for speed is already priced at the
- * target speed, so that is the speed handed to the simulation — which then
- * re-prices it to the travel speed exactly once. A test whose speed was not
- * corrected (a mixed cycle, or none recorded) keeps its own speed, as the
- * uncorrected path does.
+ * Uncorrected: each trip prices its test at its own travel speed, under the
+ * reader's correction, through tripEfficiency.efficiencyAtSpeed — the same
+ * path as the row's own line, so a test's trace and the line drawn from that
+ * same test cannot disagree.
  */
-export function spreadTestsFor(vehicle, { correctionMode = 'none', correctionTarget = STANDARD_CONDITIONS, sessionOf = () => null } = {}) {
+export function spreadTestsFor(vehicle, { sessionOf = () => null } = {}) {
     const out = [];
     // The tests that count, as on the bar charts: listed and pooled, less the
     // excluded (#394). A viewer and a contributor see the same spread.
     for (const run of countedRangeTests(vehicle)) {
         const e = spreadEfficiency(run, vehicle?.socWindowKwh);
-        if (!e) continue;
-        const { miPerKwh, estimated } = e;
-        // The simulation never prices a test without a speed; neither does this.
-        const ownSpeed = run.speed_mph || ASSUMED_TEST_CONDITIONS.speedMph;
-        if (correctionMode === 'none') {
-            out.push({ run, miPerKwh, estimated, testSpeedMph: ownSpeed });
-            continue;
-        }
-        const c = correctionFactor(runConditions(run, sessionOf(run)), { mode: correctionMode, target: correctionTarget });
-        out.push({
-            run,
-            miPerKwh: miPerKwh * c.factor,
-            estimated,
-            testSpeedMph: speedCorrected(c) ? correctionTarget.speedMph : ownSpeed,
-        });
+        const basis = e && rangeTestBasis(e.miPerKwh, run, sessionOf(run));
+        if (basis) out.push({ run, basis, estimated: e.estimated });
     }
     return out;
 }
