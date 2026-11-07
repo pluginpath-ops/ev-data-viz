@@ -68,7 +68,9 @@ export default function WeekPicker({ settings, onChange, compact = false }) {
                 return (
                     <label key={name} className={`week-planned${on ? ' is-on' : ''}`}>
                         <input type="checkbox" checked={on} aria-label={`Planned fast charge on ${name}`} onChange={() => togglePlanned(d)} />
-                        {on && <span>Fast charge</span>}
+                        {/* A glyph, not the words: "Fast charge" wrapped to two lines in a day's
+                            narrow column. The row's label and the checkbox's name say it. */}
+                        {on && <span aria-hidden="true">⚡</span>}
                     </label>
                 );
             })}
