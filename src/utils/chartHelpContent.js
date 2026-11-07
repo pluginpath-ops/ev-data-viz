@@ -256,7 +256,7 @@ export const CHART_HELP_DEFAULTS = {
     },
 
     drivecost: {
-        title: 'About Cost & Time',
+        title: 'About Compare',
         data_source:
             'Prices the week you set on Your Driving (or in the sidebar) for each selected ' +
             'vehicle, and the same week in your gas car. Highway miles are priced from ' +
@@ -283,7 +283,7 @@ export const CHART_HELP_DEFAULTS = {
             'of your charger and the car’s onboard charger, through the window you plug in, ' +
             'with charger losses. A stop’s minutes are the curve’s, plus the detour and the ' +
             'time to start and pay; fast energy is bought with its charging loss. A month is ' +
-            'a week × 52 ÷ 12.',
+            'the week × 52 ÷ 12.',
     },
 
     perfcompare: {

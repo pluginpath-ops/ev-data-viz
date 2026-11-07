@@ -104,7 +104,7 @@ are frozen once merged (chartNav.js says why):
 | Mode | Sub-tab | What it is |
 |---|---|---|
 | `drivesetup` | **Your Driving** | the landing: every setting on one page, presets (Commuter 40 mi, Road warrior 220 mi days, Reset), a live preview of the selected cars against the gas car, links on |
-| `drivecost` | **Cost & Time** | the selected vehicles against the gas car: everything per month (the week × 52 ÷ 12): $/month and extra minutes/month on the cards, stops a month; bars "Cost per month" and "Time per month"; a stop line per car |
+| `drivecost` | **Compare** ("Cost & Time" until the tab took the name, 2026-11-07) | cards below the charts (chart first); the selected vehicles against the gas car: everything per month (the week × 52 ÷ 12): $/month and extra minutes/month on the cards, stops a month; bars "Cost per month" and "Time per month"; a stop line per car |
 | `driveplan` | **Weekly Charging Plan** | one vehicle (a picker from the selection): range left over the week as a chart (range in miles, SoC on the right, 0–10% and 80–100% faded), stop markers and bands, a day strip with each day's stops, an optional comparison chart (another charger level or the other season) stacked below, the gas car's chart collapsed by default, and the day-by-day table |
 | `drivecharger` | **Home Charger** | each level against each selected vehicle: stops, fast minutes and fast $ a week, where "enough" begins, where the car's onboard charger caps it |
 

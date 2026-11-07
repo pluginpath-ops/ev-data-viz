@@ -1,5 +1,5 @@
 /**
- * Cost & Time — the selected vehicles against the reader's gas car (mode
+ * Compare — the selected vehicles against the reader's gas car (mode
  * `drivecost`, docs/cost-to-drive-plan.md).
  *
  * A card per car with the two answers (what it saves a month, the time it costs
@@ -218,11 +218,6 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
         <div className="chart-layout">
             {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} onOpenSetup={onOpenSetup} />}
             <div className="chart-main">
-                {!presentationMode && (
-                    <div className="drive-results">
-                        {shown.map(p => <CostTimeCard key={p.vehicle.id} entry={p} settings={settings} />)}
-                    </div>
-                )}
                 {missing.length > 0 && (
                     <p className="text-note drive-missing">
                         Can&rsquo;t price {missing.map(p => `${vehicleLabel(p.vehicle)} (${p.missing})`).join('; ')}.
@@ -257,6 +252,12 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
                             </PlotFrame>
                         </div>
                     </>
+                )}
+                {/* Chart first, then the cards (owner, 2026-11-07: "we're a chart-first site"). */}
+                {!presentationMode && shown.length > 0 && (
+                    <div className="drive-results mt-4">
+                        {shown.map(p => <CostTimeCard key={p.vehicle.id} entry={p} settings={settings} />)}
+                    </div>
                 )}
                 {!presentationMode && <ChartInfoBubble chartKey="drivecost" />}
             </div>

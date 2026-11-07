@@ -64,8 +64,8 @@ export default function CostToDriveSidebar({ settings, onChange, onOpenSetup }) 
     return (
         <aside className="chart-rail">
             {onOpenSetup && (
-                <button type="button" className="btn-toggle" onClick={onOpenSetup}>
-                    ← Your Driving: every setting on one page
+                <button type="button" className="btn btn-primary" onClick={onOpenSetup}>
+                    Your Driving: every setting on one page ↘
                 </button>
             )}
             {GROUPS.map(g => <SidebarGroup key={g.key} group={g} settings={settings} onChange={onChange} />)}

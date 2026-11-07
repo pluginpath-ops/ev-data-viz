@@ -9991,7 +9991,7 @@ a.is-test-link:focus-visible {
 }
 .day-type-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 
-/* Cost & Time: a card per car above the charts, the two answers large. */
+/* Compare: a card per car below the charts, the two answers large. */
 .drive-results {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
