@@ -13,7 +13,7 @@
 import {
     HOME_LEVELS, levelKw, WALL_OUTLET_CHARGER_EFF, ASSUMED_ONBOARD_AC_KW, DETOUR_MPH,
     MIN_STOP_ADD, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS,
-    SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, WEEKDAYS,
+    SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, WEEKDAYS, ENOUGH_MARGIN_MIN,
 } from '../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, HWFET_AVG_MPH, STANDARD_CONDITIONS } from '../constants/epa';
 import { correctionFactor } from './conditionCorrection';
@@ -175,7 +175,9 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
     const home = {
         kw: Math.min(chargerKw, onboardKw),
         chargerKw, onboardKw, onboardAssumed,
-        capped: onboardKw < chargerKw,
+        // A 48 A circuit is 11.52 kW at the wall against an 11.5 kW onboard
+        // charger: equal for any reader, so not "capped".
+        capped: onboardKw < chargerKw - CAPPED_TOLERANCE_KW,
         eff: level.volts < 200 ? WALL_OUTLET_CHARGER_EFF : ASSUMED_CHARGER_EFF,
     };
     if (!usableKwh) {
@@ -200,6 +202,9 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
     }
     return { usableKwh, missing: null, whPerMi, highwayFrom, cityFrom, home, fast: fastChargeOf(vehicle, specs, usableKwh) };
 }
+
+/** How far below the wall's kW an onboard charger must be before it is said to cap it. */
+const CAPPED_TOLERANCE_KW = 0.25;
 
 // ── The week ─────────────────────────────────────────────────────────────────
 
@@ -499,6 +504,22 @@ export function weekSummary(settings) {
         `${words[count('O')]} off`,
     ];
     return `${miles.toLocaleString('en-US')} mi per week · ${parts.join(', ')}`;
+}
+
+// ── Home Charger ────────────────────────────────────────────────────────────
+
+/**
+ * Where a bigger home charger stops helping: the index of the first level whose
+ * fast minutes a week are within ENOUGH_MARGIN_MIN of the least any level
+ * manages. Null when nothing could be priced.
+ *
+ * @param {Array<number|null>} fastMinutes  per level, in HOME_LEVELS order; null where unpriced
+ */
+export function enoughLevel(fastMinutes) {
+    const priced = fastMinutes.filter(m => m != null);
+    if (!priced.length) return null;
+    const best = Math.min(...priced);
+    return fastMinutes.findIndex(m => m != null && m <= best + ENOUGH_MARGIN_MIN);
 }
 
 // ── Against the gas car ──────────────────────────────────────────────────────

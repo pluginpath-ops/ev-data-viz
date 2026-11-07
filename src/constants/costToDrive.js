@@ -68,6 +68,13 @@ export const DAY_SPANS = {
 };
 
 
+/**
+ * Home Charger's "enough from here": the first level whose fast-charging time a
+ * week is within this many minutes of the best any level manages. Past it, a
+ * bigger charger buys nothing the reader would notice.
+ */
+export const ENOUGH_MARGIN_MIN = 5;
+
 /** The weeks simulated before the one reported, so Monday starts from a settled state. */
 export const SETTLE_WEEKS = 2;
 

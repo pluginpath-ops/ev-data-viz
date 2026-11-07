@@ -10,6 +10,7 @@ import PerformanceCurveView from './PerformanceCurveView';
 import { AxisLimitsProvider } from '../hooks/useAxisLimits';
 import CostTimeView from './costToDrive/CostTimeView';
 import WeeklyPlanView from './costToDrive/WeeklyPlanView';
+import HomeChargerView from './costToDrive/HomeChargerView';
 import { DEFAULT_COST_TO_DRIVE } from '../constants/costToDrive';
 
 /**
@@ -68,6 +69,15 @@ export default function PresentedChart({
 
         {selectedVehicles.length > 0 && chartMode === 'driveplan' && (
             <WeeklyPlanView
+                vehicles={vehicles}
+                selectedVehicleIds={selectedVehicles}
+                settings={costToDrive}
+                presentationMode
+            />
+        )}
+
+        {selectedVehicles.length > 0 && chartMode === 'drivecharger' && (
+            <HomeChargerView
                 vehicles={vehicles}
                 selectedVehicleIds={selectedVehicles}
                 settings={costToDrive}

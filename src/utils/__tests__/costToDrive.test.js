@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    simulateWeek, simulateGasWeek, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth,
+    simulateWeek, simulateGasWeek, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
 import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO } from '../../constants/costToDrive';
@@ -175,6 +175,8 @@ describe('a vehicle record', () => {
         const at80 = costToDriveVehicle(vehicle, settings({ level: 5 }));
         expect(at80.home.kw).toBe(11.5);
         expect(at80.home.capped).toBe(true);
+        // 48 A is 11.52 kW at the wall: the same as an 11.5 kW onboard charger, not capped by it.
+        expect(costToDriveVehicle(vehicle, settings({ level: 4 })).home.capped).toBe(false);
         const blank = costToDriveVehicle({ ...vehicle, specs: {} }, settings({ level: 0 }));
         expect(blank.home.onboardAssumed).toBe(true);
         expect(blank.home.kw).toBeCloseTo(1.44, 6);
@@ -202,5 +204,27 @@ describe('against the gas car', () => {
         const summerWeek = c.summer.fastCost + c.summer.homeCost;
         expect(c.yearly.ev).toBeCloseTo(perMonth(evWeek) * 4 + perMonth(summerWeek) * 8, 6);
         expect(c.extraMinutesPerWeek).toBeCloseTo(c.week.fastMinutes - c.gas.minutesPerWeek, 6);
+    });
+});
+
+describe('Home Charger: where a bigger charger stops helping', () => {
+    it('is the first level within a few minutes a week of the best', () => {
+        // 120 V needs four hours of fast charging, 240 V · 16 A one, the rest about none.
+        expect(enoughLevel([242, 68, 4, 2, 0, 0])).toBe(2);
+        expect(enoughLevel([242, 68, 9, 4, 0, 0]), "9 minutes is still a stop worth noticing").toBe(3);
+        expect(enoughLevel([0, 0, 0, 0, 0, 0])).toBe(0);
+    });
+
+    it('skips what could not be priced, and has no answer with nothing priced', () => {
+        expect(enoughLevel([null, 30, 3, 0])).toBe(2);
+        expect(enoughLevel([null, null])).toBeNull();
+    });
+});
+
+describe('a time in the week', () => {
+    it('is a weekday and a clock time', () => {
+        expect(weekTimeText(0)).toBe('Mon 12:00 am');
+        expect(weekTimeText(24 + 13 + 40 / 60)).toBe('Tue 1:40 pm');
+        expect(weekTimeText(6 * 24 + 12)).toBe('Sun 12:00 pm');
     });
 });

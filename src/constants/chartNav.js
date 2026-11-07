@@ -86,6 +86,7 @@ export const CHART_CATEGORIES = [
             { key: 'drivesetup', label: 'Your Driving' },
             { key: 'drivecost', label: 'Compare' },
             { key: 'driveplan', label: 'Weekly Charging Plan' },
+            { key: 'drivecharger', label: 'Home Charger' },
         ],
     },
     {

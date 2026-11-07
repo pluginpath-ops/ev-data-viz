@@ -326,6 +326,29 @@ export const CHART_HELP_DEFAULTS = {
             'miles is the week’s miles per percent of battery, detours in.',
     },
 
+    drivecharger: {
+        title: 'About Home Charger',
+        data_source:
+            'The week you set on Your Driving, priced for each selected vehicle at every ' +
+            'home charger level, everything else as you set it. Priced the same way as ' +
+            'Cost & Time.',
+        how_to_read:
+            'Each bar is the fast charging a car needs in a week with that charger at home: ' +
+            'the shorter, the more the night covers. The table gives the same minutes with ' +
+            'the stops and what they cost. “Enough from here” marks the smallest charger ' +
+            'past which a bigger one saves less than five minutes a week. “Capped at the ' +
+            'car’s … kW” means the car’s own onboard charger, not the wall, sets the pace, ' +
+            'so a bigger charger buys nothing.',
+        key_terms:
+            'Home charger — 120 V on a wall outlet, or 240 V at the amps the circuit allows.\n' +
+            'Onboard charger — the car’s own AC charger; it limits how fast any home charger can fill it.\n' +
+            'Enough from here — where a bigger charger stops making a difference you would notice.',
+        math_approach:
+            'Power at home is the lesser of volts × amps and the car’s onboard charger ' +
+            '(11.5 kW assumed when the spec is blank), with charger losses: more on a 120 V ' +
+            'outlet. Each level runs the whole week simulation again.',
+    },
+
     perfcompare: {
         title: 'About the Performance Compare chart',
         data_source:

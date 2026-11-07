@@ -15,6 +15,7 @@ import ChargeCompareView from './components/ChargeCompareView';
 import RoadTripView from './components/RoadTripView';
 import CostTimeView from './components/costToDrive/CostTimeView';
 import WeeklyPlanView from './components/costToDrive/WeeklyPlanView';
+import HomeChargerView from './components/costToDrive/HomeChargerView';
 import YourDrivingPage from './components/costToDrive/YourDrivingPage';
 import { DEFAULT_COST_TO_DRIVE } from './constants/costToDrive';
 import { decodeCostToDriveKey, normalizeCostToDrive } from './utils/costToDriveKey';
@@ -1227,7 +1228,7 @@ export default function App() {
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && chartMode !== 'drivesetup' && chartMode !== 'drivecost' && chartMode !== 'driveplan' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && chartMode !== 'drivesetup' && chartMode !== 'drivecost' && chartMode !== 'driveplan' && chartMode !== 'drivecharger' && (
                         <ChargingView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -1346,6 +1347,15 @@ export default function App() {
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'driveplan' && (
                         <WeeklyPlanView
+                            vehicles={chartVehicles}
+                            selectedVehicleIds={selectedVehicles}
+                            settings={costToDrive}
+                            onChange={updateCostToDrive}
+                            onOpenSetup={() => handleChartModeChange('drivesetup')}
+                        />
+                    )}
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'drivecharger' && (
+                        <HomeChargerView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
                             settings={costToDrive}

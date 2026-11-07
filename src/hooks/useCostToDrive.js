@@ -10,6 +10,7 @@ import { sessionFor } from '../utils/testSessions';
 import { specProvenance } from '../utils/specHelpers';
 import { costToDriveVehicle, costToDriveComparison } from '../utils/costToDrive';
 import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { HOME_LEVELS } from '../constants/costToDrive';
 
 /**
  * Color per vehicle, as Performance resolves it: the vehicle's own color, the
@@ -25,25 +26,45 @@ function vehicleColors(selected) {
     );
 }
 
+/** The selected vehicles priced for one set of settings (see useCostToDrive). */
+function priceVehicles(vehicles, selectedVehicleIds, settings, testSessions) {
+    const sessionOf = (r) => sessionFor(testSessions, r);
+    const selected = selectedVehicleIds
+        .map(id => vehicles.find(v => v.id === id))
+        .filter(Boolean);
+    const colors = vehicleColors(selected);
+    return selected.map(vehicle => {
+        const { specs } = specProvenance(vehicle, vehicles);
+        const profile = costToDriveVehicle(vehicle, settings, { specs, sessionOf });
+        return {
+            vehicle,
+            color: colors[vehicle.id],
+            profile,
+            missing: profile.missing,
+            comparison: profile.missing ? null : costToDriveComparison(profile, settings),
+        };
+    });
+}
+
 export function useCostToDrive(vehicles, selectedVehicleIds, settings) {
     const { testSessions } = useAppContext();
-    return useMemo(() => {
-        const sessionOf = (r) => sessionFor(testSessions, r);
-        const selected = selectedVehicleIds
-            .map(id => vehicles.find(v => v.id === id))
-            .filter(Boolean);
-        const colors = vehicleColors(selected);
-        return selected
-            .map(vehicle => {
-                const { specs } = specProvenance(vehicle, vehicles);
-                const profile = costToDriveVehicle(vehicle, settings, { specs, sessionOf });
-                return {
-                    vehicle,
-                    color: colors[vehicle.id],
-                    profile,
-                    missing: profile.missing,
-                    comparison: profile.missing ? null : costToDriveComparison(profile, settings),
-                };
-            });
-    }, [vehicles, selectedVehicleIds, settings, testSessions]);
+    return useMemo(
+        () => priceVehicles(vehicles, selectedVehicleIds, settings, testSessions),
+        [vehicles, selectedVehicleIds, settings, testSessions],
+    );
+}
+
+/**
+ * The same, once per home charger level (Home Charger): `[{ level, index,
+ * priced }]` in HOME_LEVELS order, every other setting as the reader set it.
+ */
+export function useCostToDriveByLevel(vehicles, selectedVehicleIds, settings) {
+    const { testSessions } = useAppContext();
+    return useMemo(
+        () => HOME_LEVELS.map((level, index) => ({
+            level, index,
+            priced: priceVehicles(vehicles, selectedVehicleIds, { ...settings, level: index }, testSessions),
+        })),
+        [vehicles, selectedVehicleIds, settings, testSessions],
+    );
 }
