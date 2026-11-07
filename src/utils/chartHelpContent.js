@@ -268,7 +268,7 @@ export const CHART_HELP_DEFAULTS = {
             'Each card gives a car’s two answers against your gas car: what it saves (or ' +
             'costs) a month, and the time it adds (or saves) a week. The first chart stacks ' +
             'home and fast charging per car beside the gas bill; the second sets fast-charging ' +
-            'minutes against fill-up minutes. Months are for the season shown; the card’s ' +
+            'minutes against fill-up minutes, both a month (the week × 52 ÷ 12). Months are for the season shown; the card’s ' +
             'year line blends winter months with summer ones. Winter is a floor: denser air ' +
             'and cabin heat are priced, battery warming and cold tires are not.',
         key_terms:

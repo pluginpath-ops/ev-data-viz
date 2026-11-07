@@ -3,8 +3,8 @@
  * `drivecost`, docs/cost-to-drive-plan.md).
  *
  * A card per car with the two answers (what it saves a month, the time it costs
- * a week) and the stops behind them, then the same two as bar charts: cost a
- * month, home and fast charging stacked, and time a week, fast charging against
+ * a week) and the stops behind them, then the same two as bar charts: cost per
+ * month, home and fast charging stacked, and time per month, fast charging against
  * fill-ups. Both charts are Chart.js in a PlotFrame, so the PNG capture, the
  * copy-link button (which carries the Cost to Drive key) and the source line
  * work here exactly as on every other chart.
@@ -130,7 +130,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
     const { isDark } = useTheme();
     const redraw = `${signature}|${shown.map(p => p.color).join(',')}|${isDark}`;
 
-    // Cost a month: home and fast charging stacked per car, the gas car beside.
+    // Cost per month: home and fast charging stacked per car, the gas car beside.
     const costTotals = [...shown.map(p => p.comparison.monthly.ev), gas ? perMonth(gas.cost) : null];
     useBarChart(costRef, costChart, () => {
         if (!shown.length) return null;
@@ -147,14 +147,15 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
             },
             plugins: [totalLabels(costTotals, dollars)],
             options: barOptions({
-                stacked: true, xTitle: '$ a month', totals: costTotals,
+                stacked: true, xTitle: '$ per month', totals: costTotals,
                 tooltipLabel: (ctx) => ctx.raw == null ? null : `${ctx.dataset.label}: ${dollars(ctx.raw)}/mo`,
             }),
         };
     }, [redraw]);
 
-    // Time a week: fast-charging minutes per car against fill-ups.
-    const timeTotals = [...shown.map(p => p.comparison.week.fastMinutes), gas ? gas.minutesPerWeek : null];
+    // Time per month: fast-charging minutes per car against fill-ups, the
+    // simulated week scaled to a month like the cost (owner, 2026-11-07).
+    const timeTotals = [...shown.map(p => perMonth(p.comparison.week.fastMinutes)), gas ? perMonth(gas.minutesPerWeek) : null];
     useBarChart(timeRef, timeChart, () => {
         if (!shown.length) return null;
         return {
@@ -162,18 +163,18 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
             data: {
                 labels,
                 datasets: [{
-                    label: 'Minutes a week',
+                    label: 'Minutes per month',
                     data: timeTotals,
                     backgroundColor: [...shown.map(p => p.color), SERIES_NEUTRAL],
                 }],
             },
             plugins: [totalLabels(timeTotals, minutesText)],
             options: barOptions({
-                stacked: false, xTitle: 'Minutes a week', totals: timeTotals,
+                stacked: false, xTitle: 'Minutes per month', totals: timeTotals,
                 tooltipLabel: (ctx) => {
                     const p = shown[ctx.dataIndex];
-                    if (!p) return `${gas.fillsPerWeek.toFixed(1)} fill-ups a week · ${minutesText(ctx.raw)}`;
-                    return `${p.comparison.week.stopCount} fast stops · ${minutesText(ctx.raw)}`;
+                    if (!p) return `${perMonth(gas.fillsPerWeek).toFixed(1)} fill-ups a month · ${minutesText(ctx.raw)}`;
+                    return `${perMonth(p.comparison.week.stopCount).toFixed(1)} fast stops a month · ${minutesText(ctx.raw)}`;
                 },
             }),
         };
@@ -191,8 +192,8 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
 
     const season = settings.season === 'winter' ? `Winter, ${settings.winterF}°F` : `Summer, ${settings.summerF}°F`;
     const subtitle = `${weekSummary(settings)} · ${season} · home ${levelLabel(HOME_LEVELS[settings.level])}`;
-    const costTitle = 'Cost a month, against your gas car';
-    const timeTitle = 'Time a week: fast charging against fill-ups';
+    const costTitle = 'Cost per month, against your gas car';
+    const timeTitle = 'Time per month: fast charging against fill-ups';
     const costPng = useChartPng(costChart, { title: costTitle, subtitle, sources: sourceLine.text, signature });
     const timePng = useChartPng(timeChart, { title: timeTitle, subtitle, sources: sourceLine.text, signature });
 
