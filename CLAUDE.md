@@ -1,76 +1,141 @@
 # Project Guidelines
 
+## How to Work
+
+Think like a principal engineer: know what must be built carefully for the
+future and what should stay simple. Over-generalizing bites as hard as
+over-fitting to today's case.
+
+- **Survey before you start.** Look around the site for related appearance
+  and behavior, then:
+  1. **Reuse** what already exists — a component, class, hook or pattern.
+  2. **Think it through.** Does this change how other features should work?
+     What follow-on work does it shake out? Say so. This widens the thinking,
+     not the build.
+  3. **Ask about conflicts** — if the request clashes with how the site
+     already works, or with an earlier decision, ask before building.
+- **Decide how to build it; ask about intent.** Implementation is your call —
+  make it and say why. What the feature is for and where it is going is the
+  owner's; ask when it isn't clear.
+- **Look for knock-on effects.** What else reads this data, shares this
+  component, or assumes this behavior? Check before you change it, and say what
+  you found.
+- **Delete ruthlessly.** Old, dead, confusing, or slow code goes — in the same
+  change that makes it dead. Don't leave a second path "just in case". Code
+  kept on purpose (a tripwire, a deferred rename) says so in a comment with a
+  revisit date a few months out; past that date, it is a candidate to delete.
+- **Don't optimize early, but write down where you didn't.** When you take the
+  simple path over the fast one, add a line to `docs/optimization-ledger.md`.
+  It is a judgment call, not a checklist — the point is a list of likely
+  targets when things get slow.
+- **Design for** modularity, fast round trips (fewer, smaller queries; no
+  waterfalls), and consistent data (one source of truth; writes that can't
+  leave things half-done). Generalize when a second real case appears, not
+  before.
+- **Clear and responsive for the user beats clever.**
+- **Fewer words, simpler words** — in UI text, comments, commits, and replies.
+
+## Site Overview
+
+EVBench compares real-world EV charging, range and performance across
+vehicles. It combines tested data (CSV/Tableau uploads, published results),
+EPA data (the Fuel Economy Guide and certification test sheets) and structured
+vehicle specs.
+
+### Tabs
+
+The nav is `src/components/shell/AppNav.jsx`; chart sub-tabs are
+`src/constants/chartNav.js`. `docs/vocabulary.md` has every tab and sub-tab
+name — this is only the map.
+
+- **Home** — a curator's featured comparison.
+- **Vehicles & Specs** — browse and select vehicles; the vehicle table and spec
+  chart. Each vehicle also has its own page (tests, EPA, performance), reached
+  from a card or row, not a tab.
+- **Performance**, **Charging & Range** — charts of the selected vehicles'
+  tests.
+- **EPA** — every EV EPA has rated.
+- **Reference** — explainers (`src/explainers/`, own CLAUDE.md) and platforms.
+- **Admin** — imports, data checks, model constants, site settings.
+
+Every chart has a pop-out window, a link that reopens it as left
+(`utils/chartUrlState.js`), and a help bubble. **Mode keys in `chartNav.js`
+are frozen** — all three depend on them. Rename labels, not keys.
+
+### Data model, in brief
+
+- **Vehicles** carry `specs` (JSONB, schema in `utils/vehicleSpecSchema.js`),
+  a color, and a lineage: variants inherit from a source by pointer
+  (`utils/vehicleInheritance.js`), and charging tests come down the lineage.
+- **Runs** (tests) have one `kind`, `'charging'` or `'range'`, plus time-series
+  points. A vehicle may have one `is_default` run per kind
+  (`utils/rangeSource.js`).
+- **Composites** — a stored composite charging curve, and a read-time composite
+  range corrected to the reader's correction target.
+- Migrations live in `supabase/migrations/`, numbered.
+
+### Tech Stack
+- React 19 + Vite + Tailwind CSS v4 (`@tailwindcss/vite`, CSS-first, no `tailwind.config.js`)
+- Supabase for auth and data (roles: `admin`, `contributor`, `viewer`)
+
 ## Architecture & Code Style
 
 ### Modularity and Reusability
-Strive for modular, reusable components. When a piece of UI or logic is used in more than one place — or is likely to be reused in the future — extract it into its own component file rather than duplicating it inline.
+Extract UI or logic used in more than one place — or likely to be — into its
+own file rather than duplicating it.
 
-**Example:** `EditVehicleForm` was extracted from `VehiclesView` into `src/components/EditVehicleForm.jsx` so it could be shared with `RunsView` without duplication.
-
-Prefer:
 - One component per file for anything beyond a trivial helper
-- Module-level (not inline) component definitions to avoid React remounting on every render
-- Shared hooks in `src/hooks/`, shared utilities in `src/utils/`
+- Module-level (not inline) component definitions, so React doesn't remount
+- Shared hooks in `src/hooks/`, utilities in `src/utils/`, constants in
+  `src/constants/`
+- Number fields use `NumberInput`
 
 ### CSS
-- Use semantic class names defined in `src/index.css` via Tailwind's `@apply` directive
-- Class names should describe *what* an element is, not *how* it looks (e.g. `.vehicle-grid`, `.modal-overlay`)
 
-**Tokenise appearance; keep Tailwind for layout.** The line is not "Tailwind
-bad" — a one-off `flex items-center gap-2` is fine inline and extracting it
-would buy nothing. The rule is about *appearance that repeats*:
+**Tokenize appearance; keep Tailwind for layout.** A one-off
+`flex items-center gap-2` inline is fine. Appearance is not:
 
-- **Colour and size never go inline.** Colours come from tokens, sizes derive
-  from `--fs-body` through `--fs-step`. A raw `bg-blue-50` or `text-[11px]` is
-  outside the theme and outside the scale, wherever it is written.
-- **A cluster that describes what something IS wants a name.** When you touch
-  markup carrying one, convert it to a semantic class in `src/index.css` rather
-  than restyling it in place. Reuse an existing class before inventing one.
-
-Why it matters concretely: the Range & Efficiency run rows drew seven badges in
-seven different inline clusters (`bg-amber-50`/`bg-orange-50`/`bg-cyan-50`/
-`bg-green-50`/`bg-blue-50`) — a rainbow where no hue meant anything. When the
-re-skin re-valued the tokens, every semantic class moved for free and every
-inline cluster kept painting the old palette.
-
-- **`npm run drift` is the ledger of what is left** — 699 things across ten
-  probes, each with a count, what the number means, and where the drift is
-  supposed to go. `npm run drift <probe>` lists the sites. It is asserted in
-  `src/__tests__/drift.test.js` and **fails on a fall as well as a rise**:
-  clearing some is not silently absorbed, you lower the count in
-  `scripts/driftProbes.js`. A rise needs a reason in the PR.
-- Two ratchets predate it and stay in their own suites: `KNOWN_OFFENDERS`
-  (`contrast.test.js`, light surfaces with no dark counterpart) and the
-  dark-override cap (`playground.test.js`). Lower those the same way.
+- **Color and size never go inline.** Colors come from tokens; sizes derive
+  from `--fs-body` through `--fs-step`. No raw `bg-blue-50` or `text-[11px]`.
+- Why: when tokens change, semantic classes follow; inline clusters keep
+  painting the old palette.
+- **A cluster that describes what something IS wants a name.** Give it a
+  semantic class in `src/index.css` (via `@apply`) named for what it is, not
+  how it looks (`.vehicle-grid`, not `.blue-box`). Reuse an existing class
+  first. When you touch markup carrying such a cluster, convert it.
 - Never add a `[data-theme="dark"] .foo` rule — it cannot follow a themed
   subtree.
+
+Three ratchets track what is left. Each fails on a fall as well as a rise, so
+when you clear something, lower the count; a rise needs a reason in the PR. (A
+cap alone would hide cleanups, and nobody could tell progress from a broken
+probe.)
+
+- `npm run drift` — appearance outside the theme, by probe
+  (`scripts/driftProbes.js`). `npm run drift <probe>` lists the sites.
+  Genuinely un-tokenizable code goes in `EXEMPT` with a reason.
+- `KNOWN_OFFENDERS` in `contrast.test.js` — light surfaces with no dark
+  counterpart.
+- The dark-override cap in `playground.test.js`.
 
 ### Naming
 
 **One name per thing — `docs/vocabulary.md` is the list.** Read it before
-naming anything new, and use the standard term it gives rather than inventing a
-house one. `docs/design-tokens.md` is the same for colour, and
-`docs/typography.md` for type: both name every value and say which rule owns it.
-
-It exists because three words drifted: "rail" meant the chart sidebar, the
-sub-nav AND a card's coloured left edge; "chrome" meant both a category and one
-specific region. A word with no fixed referent attracts whatever needs naming
-next. The short version — **chrome** is the category (furniture, not data),
-**header** is the pinned block at the top, **sidebar** is the chart's control
-column, **accent border** is a card's coloured left edge, **chips** are the
+naming anything, and use its term rather than inventing one. A word with no
+fixed meaning soaks up whatever needs naming next.
+`docs/design-tokens.md` does the same for color, `docs/typography.md` for type.
+Common ones: **chrome** is the category (furniture, not data), **header** is
+the pinned block at the top, **sidebar** is the chart's control column,
+**accent border** is a card's colored left edge, **chips** are the
 selected-vehicle pills.
 
-**Naming is worth stopping for.** A class name is the whole value of extracting
-one, and a bad name is worse than the cluster it replaced. If the right name
-isn't obvious, say so and ask rather than guessing.
-
-### Tech Stack
-- React 19 + Vite + Tailwind CSS v4 (`@tailwindcss/vite`, CSS-first, no `tailwind.config.js`)
-- Supabase for auth and data
+**Naming is worth stopping for.** If the right name isn't obvious, ask rather
+than guess. A name still being argued over goes in **Open names**, not into
+the code. American spelling.
 
 ## Git Workflow
 
-Always start a new feature branch from `main` for each distinct feature or fix. Never stack unrelated work on an open branch.
+One branch from `main` per feature or fix; never stack unrelated work.
 
 ```
 git checkout main && git pull
@@ -79,23 +144,18 @@ git checkout -b feature/my-feature
 gh pr create --base main
 ```
 
-After a PR merges, pull `main` and delete the local branch before starting the next feature.
+After a PR merges, pull `main` and delete the local branch.
 
-**Stacked PRs are allowed for one plan's dependent layers**, not for unrelated
-work. Use `gh stack` and follow `.claude/skills/stacked-prs/SKILL.md`, which
-adds this repo's rules to GitHub's gh-stack skill.
+**Stacked PRs are for one plan's dependent layers only.** Use `gh stack` and
+follow `.claude/skills/stacked-prs/SKILL.md`.
 
 ### The docs check, and the pledge
 
 **Before every commit, and again on the PR title and description**, check what
-you wrote against the docs — `docs/vocabulary.md` above all, then
-`docs/design-tokens.md` and `docs/typography.md` for anything that names a
-color or a size.
+you wrote against `docs/vocabulary.md`, and `docs/design-tokens.md` /
+`docs/typography.md` for anything naming a color or size.
 
-`npm run vocab` does the mechanical half. It reads the **Retired** table and
-scans only the lines you added, so it is fast and it never nags about the
-retired words the tree keeps on purpose (see "Deferred renames"). Point it at
-prose too, which is the half that otherwise goes unchecked:
+`npm run vocab` checks the Retired words on the lines you added:
 
 ```
 npm run vocab                                    # changed lines vs main
@@ -103,119 +163,44 @@ npm run vocab -- --staged                        # just what is staged
 npm run vocab -- --text "$(gh pr view --json body -q .body)"
 ```
 
-**It only covers five of the eleven Retired rows, and it cannot be made to cover
-the rest** — `"chrome"` for the header, `"Runs"` in UI text, `"pinning"`, a
-bare `"band"`, `"Hidden"` for a test, and `"test group"` for the EPA test
-vehicle record (EPA's own Test Group is correct) are all right in their right
-place, so only a reader can tell. That is what the pledge is for.
+It can't catch the Retired words that are right in some places — "chrome" for
+the header, "Runs" in UI text, "pinning", a bare "band", "Hidden" for a test,
+"test group" for the EPA test vehicle record. Only a reader can — so the
+pledge exists to make sure the file actually gets opened.
 
-**The pledge: say in the commit or PR body that you checked, and what you
-checked against.** One line. Not a ritual — a forcing function, because the
-failure it prevents is not writing the wrong word, it is never opening the file
-at all:
+**The pledge: one line in the commit or PR body saying what you checked:**
 
 > Vocabulary: checked against docs/vocabulary.md — "series color" and "the
 > ramp" are its terms. `npm run vocab` clean. New name `plottedIds` has no
 > entry; it is not user-facing so it does not need one.
 
-Naming something the vocabulary has no word for is the case that matters most.
-CLAUDE.md already says to stop and ask rather than guess; the other half of that
-is to write the answer down. A name still being argued over goes in **Open
-names** rather than into the code under a guess.
-
-And if you touched a comment that turns out to contradict the schema or a
-migration, fix it in the same commit. A stale comment is worse than no comment:
-it stops the next reader looking. `rangeSource.js` claimed `is_default` was
-charging-only for three migrations after that stopped being true, and it was
-believed.
-
-## Site Overview
-
-EVBench is a tool for comparing real-world EV charging and range performance across vehicles. It combines raw test data (uploaded from CSV/Tableau exports) with crowd-sourced accuracy signals (votes, flags) and structured vehicle specs.
-
-### Tabs
-
-**Vehicles**
-The home view. Shows a card/list grid of all vehicles in the database. Users select one or more vehicles here to drive the Charts and Compare Specs tabs. Admins and contributors can add, edit, reorder, duplicate, and delete vehicles. Each card shows battery size, EPA range, test count, and tags.
-
-**Tests & Data**
-Per-vehicle view of charging and range test runs. Each run has metadata (date, tester, speed, temperature, notes) and an attached dataset of time-series data points (`soc`, `time`, `range`, `charge_rate`, `temperature`). Users upload data via CSV or Tableau export. Each run has a single `kind` (`'charging'` or `'range'`) that drives chart routing — migration 046 split the last rows that had carried both roles at once and dropped the `has_charging`/`has_range` boolean pair `kind` replaced. A vehicle can have `is_default` set on one run PER KIND — a default charging run (the fallback curve for Charge Stop) and a default range test (rank 2 of the range-source resolution order, see `utils/rangeSource.js`) are independent and can both be set at once (migration 049/050; before that, a DB trigger bug cleared one kind's default whenever the other was set).
-
-**Charts**
-Visualizations for selected vehicles. Three sub-tabs:
-- *Charging Curves* — interactive line/scatter chart of any two axes (SoC, time, charge rate, range, temperature, C-rate, etc.) across selected runs. Supports dual Y-axis, race mode (normalize all runs to a common SoC start), and axis scale overrides.
-- *Range & Efficiency* — bar charts comparing range and efficiency across vehicles/runs (EPA miles, tested miles, Wh/mi, mi/kWh). Bars have inside-bar pill badges showing key metadata.
-- *Charge Stop* — bar charts comparing charging performance: (1) range added in X minutes from ~Y% SoC, and (2) time to add M miles from ~Y% SoC. Uses linear interpolation on the charging data. Bars have inside-bar pill badges.
-
-All chart tabs support a **"Open Chart in New Window"** button that opens a fullscreen presentation-mode window synced live to the main tab via `BroadcastChannel`.
-
-**Compare Specs**
-Side-by-side structured spec comparison for selected vehicles. Specs are stored as a JSONB column (`specs`) on the vehicle record, keyed by a schema defined in `src/utils/vehicleSpecSchema.js`. Custom (free-form) fields are also supported. Community members can vouch for accuracy or flag suspect values. Admins can remove flags. Specs can be exported as JSON (including blank fields as a template) and imported back.
-
-**Admin** *(admin role only)*
-User management — view registered users, assign roles (`admin`, `contributor`, `viewer`).
+If you name something the vocabulary lacks, add it. If a comment you touch
+contradicts the schema or a migration, fix it in the same commit — a stale
+comment is worse than none.
 
 ## Linting
 
-`npm run lint` (ESLint 9, flat config in `eslint.config.js`). **Zero errors is the
-bar**; warnings are a visible backlog.
-
-It exists for one bug in particular: a helper used in JSX without being imported
-is a runtime `ReferenceError` that no build step catches, because Vite
-transpiles rather than resolves. That blanked the app three times in one day.
-`no-undef` catches it before the page renders.
-
-The React Compiler rules shipped with eslint-plugin-react-hooks v6 are set to
-`warn`, not `off` — 33 places would need a refactor, and a lint that fails on
-arrival is one nobody runs. `react-hooks/set-state-in-effect` in particular is
-worth working through; it is the shape of a bug this project has already hit.
+`npm run lint` (ESLint 9, `eslint.config.js`). **Zero errors**; warnings are
+backlog. `no-undef` matters most: a helper used in JSX without an import is a
+runtime crash Vite won't catch. The React Compiler rules are `warn` —
+`react-hooks/set-state-in-effect` is worth working down.
 
 ## Testing
 
-`npm test` (vitest, `npm run test:watch` to iterate). Suites live in
-`src/utils/__tests__/` for pure modules, plus `src/__tests__/wiring.test.js`.
+`npm test` (vitest; `npm run test:watch` to iterate). Pure-module suites live in
+`src/utils/__tests__/`; app-wide guards in `src/__tests__/`.
 
-The wiring suite is the unusual one and worth keeping. Every other test checks
-that a function returns the right answer; none of them can tell you **nobody
-calls it**. That is the failure mode this project keeps hitting — three defects
-found by hand in one week were all "built, unit-tested, never connected". The
-wiring suite reads source text to assert the seams hold: that a note written to
-every run is read somewhere, that every chart showing a test speed also marks a
-mixed cycle, that a tunable constant reaches the Admin knobs.
+**The wiring suite** (`src/__tests__/wiring.test.js`) checks that code is
+actually connected — that what is written is read, and what is built is
+called. Unit tests can't catch code that works but nothing uses, and that is
+this project's most common defect. Expect it to fail on a new utility until something uses it. If it is
+deliberately unused, add it to `ALLOWED_UNUSED` with the reason.
 
-### Database and privileged work: test against the local mirror first
+### Database and privileged work: local mirror first
 
-Anything that changes the database (a migration, a backfill, a new write path)
-or needs a privileged role (admin or contributor UI) is tested against the
-newest backup before it reaches production: `scripts/localdb.sh up`, `migrate`
-the migrations under test, then `serve`, which puts PostgREST and a local
-sign-in in front of it and writes `.env.local` so the app and the browser
-preview read it. Signing in offers the three seeded users, and the real RLS
-policies apply. Leave it running between sessions unless the owner says
-otherwise. Details in [scripts/README.md](scripts/README.md).
-
-### The drift ledger
-
-`npm run drift` prints what the codebase still paints outside the theme —
-palette utilities by property, `text-[Npx]` literals, raw hex and rgb, canvas
-font shorthands, `@apply` lines reaching for a palette colour, off-scale
-`font-size`. `npm run drift
-<probe>` lists the sites behind one number.
-
-The probes and their counts live together in `scripts/driftProbes.js`, so
-adding a probe, recording its count and writing down why a match is legitimate
-are one edit. `drift.test.js` asserts each count with `toBe` — **a fall fails
-too**, because a cap absorbs cleanups silently and six months later nobody can
-tell whether the backlog shrank or the probe broke.
-
-Two probes were deliberately NOT built, and the reasoning is the useful part: a
-ledger that counts correct code teaches people to ignore it. Literal colours in
-inline `style={{…}}` measured at zero — all 91 blocks hold runtime values like
-`backgroundColor: run.color`, which can never be a class. Three-digit hex was
-half issue references in comments (`#221`). Anything genuinely un-tokenisable
-goes in `EXEMPT` with a reason, and a test fails when an exemption stops
-matching anything.
-
-When adding a utility for the UI, expect the wiring suite to fail until
-something consumes it. If it is deliberately unused, add it to `ALLOWED_UNUSED`
-with the reason — an entry there is a decision on record, not an oversight.
+Anything that changes the database (migration, backfill, new write path) or
+needs a privileged role is tested against the newest backup first:
+`scripts/localdb.sh up`, `migrate` the migrations under test, then `serve`
+(PostgREST + local sign-in, writes `.env.local`). Sign in as a seeded user;
+real RLS applies. Leave it running between sessions unless told otherwise.
+Details in [scripts/README.md](scripts/README.md).
