@@ -7,7 +7,7 @@
  */
 import { DETOUR_MPH, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS } from '../../constants/epa';
-import { DriveNumberField, DriveSlider, DriveChoice, DriveCheckbox, PlugWindow } from './DriveFields';
+import { DriveNumberField, DriveSlider, DriveChoice, DriveCheckbox, PlugWindow, HourSelect } from './DriveFields';
 import HomeLevelPicker from './HomeLevelPicker';
 import WeekPicker from './WeekPicker';
 
@@ -53,10 +53,15 @@ export function WeekFields({ settings, onChange, compact }) {
     return (
         <>
             <WeekPicker {...props} compact={compact} />
+            <label className="drive-field is-wide">
+                <span className="text-label">Planned fast charge at</span>
+                <HourSelect {...props} field="plannedHour" label="Planned fast charge at" disabled={!settings.planned} />
+            </label>
             {!compact && (
                 <span className="text-note">
                     Click a day to cycle Daily → Long day → Off. A planned fast charge tops up to the
-                    fast-charging cap, and is skipped when the car is already above it.
+                    fast-charging cap, and is skipped when the car is already above it. On a driving
+                    day it happens between drives, as near that time as the day allows.
                 </span>
             )}
             <div className="day-types">

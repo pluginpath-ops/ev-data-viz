@@ -86,19 +86,25 @@ export function DriveCheckbox({ settings, onChange, field, label }) {
 /** An hour of the day as a reader reads one: "10 pm", "7 am". */
 export const hourText = (h) => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'am' : 'pm'}`;
 
-/** The plug-in window as a sentence: Plugged in [10 pm] to [7 am] · 9 hours. */
-export function PlugWindow({ settings, onChange }) {
-    const hours = ((settings.plugUntil - settings.plugFrom + 24) % 24) || 24;
-    const select = (field, label) => (
+/** An hour-of-the-day setting as a select: 12 am … 11 pm. */
+export function HourSelect({ field, label, settings, onChange, disabled = false }) {
+    return (
         <select
             aria-label={label}
             className="form-input"
             value={settings[field]}
+            disabled={disabled}
             onChange={e => onChange({ [field]: Number(e.target.value) })}
         >
             {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{hourText(h)}</option>)}
         </select>
     );
+}
+
+/** The plug-in window as a sentence: Plugged in [10 pm] to [7 am] · 9 hours. */
+export function PlugWindow({ settings, onChange }) {
+    const hours = ((settings.plugUntil - settings.plugFrom + 24) % 24) || 24;
+    const select = (field, label) => <HourSelect field={field} label={label} settings={settings} onChange={onChange} />;
     return (
         <div className="flex flex-wrap items-center gap-2">
             <span className="text-label">Plugged in</span>
