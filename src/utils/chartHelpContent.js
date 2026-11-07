@@ -290,7 +290,7 @@ export const CHART_HELP_DEFAULTS = {
         title: 'About the Weekly Charging Plan',
         data_source:
             'One selected vehicle through the week you set on Your Driving (or in the ' +
-            'sidebar), priced the same way as Cost & Time: highway miles from EVBench’s ' +
+            'sidebar), priced the same way as Compare: highway miles from EVBench’s ' +
             'range tests, city miles from the EPA highway figure, both corrected to your ' +
             'speed, season and elevation; fast-stop minutes from the car’s own charging ' +
             'curve where EVBench has one.',
@@ -331,14 +331,15 @@ export const CHART_HELP_DEFAULTS = {
         data_source:
             'The week you set on Your Driving, priced for each selected vehicle at every ' +
             'home charger level, everything else as you set it. Priced the same way as ' +
-            'Cost & Time.',
+            'the Compare sub-tab.',
         how_to_read:
-            'Each bar is the fast charging a car needs in a week with that charger at home: ' +
-            'the shorter, the more the night covers. Over each bar, that car’s total cost ' +
-            'a week at that charger, home and fast. The table has a column a charger ' +
-            'and, for each car, the same minutes and the total cost a week, home and fast. ' +
-            'The bold orange cell is “enough from here”: the smallest charger past which a ' +
-            'bigger one saves less than five minutes a week. A ^ means the car’s own ' +
+            'Each column is what a car’s week costs with that charger at home: home ' +
+            'charging underneath in a muted shade of its color, fast charging on top in ' +
+            'the full color, the total over it, and the home figure on the home part when there is fast charging too. The faster the charger, the more the night ' +
+            'covers and the smaller the fast part. The table has a column a charger and, ' +
+            'for each car, its minutes of fast charging and its home, fast and total cost ' +
+            'per week. The bold orange cell is “enough from here”: the smallest charger past ' +
+            'which a bigger one saves less than five minutes per week. A ^ means the car’s own ' +
             'onboard charger, not the wall, sets the pace, so a bigger charger buys nothing.',
         key_terms:
             'Home charger — 120 V on a wall outlet, or 240 V at the amps the circuit allows.\n' +
