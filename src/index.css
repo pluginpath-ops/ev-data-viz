@@ -10054,17 +10054,18 @@ a.is-test-link:focus-visible {
     border-radius: var(--radius-control);
 }
 .day-strip-head { display: flex; flex-direction: column; }
-/* One fast stop: when, from → to, how long. Orange is the chart's stop band. */
-.stop-chip {
+/* A day's charging, fast and home in one style: a head with the cost, then a
+   line a stop (or the night). Orange edge for fast, the chart's stop color. */
+.day-charge {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0 6px;
-    padding: 3px 6px;
+    flex-direction: column;
+    padding: 1px 4px;
     font-family: var(--font-mono);
     font-size: calc(var(--fs-body) * var(--fs-step));
     font-variant-numeric: tabular-nums;
     color: var(--color-text-primary);
-    border: 1px solid var(--color-accent-orange);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-control);
 }
-.stop-chip.is-planned { border-style: dashed; }
+.day-charge.is-fast { border-color: var(--color-accent-orange); }
+.day-charge-head { font-weight: 600; }

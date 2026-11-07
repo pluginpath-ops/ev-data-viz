@@ -308,7 +308,9 @@ export const CHART_HELP_DEFAULTS = {
             'at home overnight. Each orange band is a fast stop, labelled with its minutes ' +
             '(detour and time to start and pay in); a lighter one is a planned fast charge. ' +
             'The bottom 10% and top 20% are faded: you rarely live there. Under the chart, ' +
-            'each day’s stops and what the night at home put back. Compare with the other ' +
+            'each day’s charging: Home, with its cost, from where the car got home to ' +
+            'where the night left it, and when — full, or the end of your plug-in window; ' +
+            'then Fast, with its cost and what each stop added in how long. Compare with the other ' +
             'season or another home charger in a second chart below, and open your gas ' +
             'car’s week to see its fill-ups.',
         key_terms:
