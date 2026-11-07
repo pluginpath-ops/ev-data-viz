@@ -58,7 +58,8 @@ function CostTimeCard({ entry, settings }) {
             </div>
             <div className="drive-result-figures">
                 <span className={`drive-figure ${c.monthly.saved >= 0 ? 'is-saving' : 'is-costing'}`}>{savedText(c.monthly.saved)}</span>
-                <span className="drive-figure is-time">{extraMonthText(c.extraMinutesPerWeek)}</span>
+                {/* Less time than the gas car is a saving, green like money saved. */}
+                <span className={`drive-figure ${c.extraMinutesPerWeek < 0 ? 'is-saving' : 'is-time'}`}>{extraMonthText(c.extraMinutesPerWeek)}</span>
             </div>
             <span className="text-secondary">{stopLine(c.week)}</span>
             <span className="text-note">
