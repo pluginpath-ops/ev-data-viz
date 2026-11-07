@@ -150,6 +150,19 @@ vertical strip of navigation icons. We do not have one. Our `.chart-rail` is a
 control **sidebar**, so prose should say sidebar even while the class still says
 rail.
 
+## Cost to Drive
+
+The tab that prices a reader's own week of driving against their gas car
+(plan: [cost-to-drive-plan.md](cost-to-drive-plan.md)). Owner's names, 2026-11-07.
+
+| Thing | Call it | Established by | Lives in |
+|---|---|---|---|
+| The tab | **Cost to Drive** — tab key `cost`. Its sub-tabs: **Your Driving** (`drivesetup`, the landing, every setting on one page), **Cost & Time** (`drivecost`), **Weekly Charging Plan** (`driveplan`), **Home Charger** (`drivecharger`). Mode keys frozen like every chart mode's | — | [chartNav.js](../src/constants/chartNav.js) |
+| Every Cost to Drive setting packed into one address parameter, `cd=1.…` | **the Cost to Drive key** — a **key**, as the short link's part after `k=` is: packed on purpose, not meant to be read (owner: "encoded = key"). Only the vehicles (`v`) stay readable beside it. `1.` is its version; its defaults are frozen with it | — | [costToDriveKey.js](../src/utils/costToDriveKey.js) |
+| The reader's week: seven days, each **Daily**, **Long day** or **Off** | **Your week**; a day's kind is its **day type**. A **planned fast charge** is a day the reader always stops (a grocery run), topped up to the cap and skipped when already above it | — | `week`, `planned` in [costToDrive.js](../src/constants/costToDrive.js) |
+| The fast-stop settings | **Stop to charge by** (the SoC the car stops at), **Charge no higher than** (the cap), **Keep battery above** (a floor that holds all day, not only on arrival home — so not "get home with"), **Time to start and pay** (minutes per stop beyond charging; not "plug in and pay"), **Detour to a charger** (minutes off the route and back) | — | `stopBy`, `capTo`, `keepAbove`, `startMin`, `detourMin` |
+| The reader's own car, priced against | **your gas car** — with a cost, mpg and fill-ups. Not Road Trip's **ICE Reference**, a time-only line that stops every three hours; the two are different things and keep different names | — | `simulateGasWeek` |
+
 ## Cards and rows
 
 | Thing | Call it | Established by | Lives in |
