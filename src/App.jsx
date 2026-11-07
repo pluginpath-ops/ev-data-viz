@@ -13,6 +13,9 @@ import RunsView, { RUNS_SUBTAB_IDS, DEFAULT_RUNS_SUBTAB } from './components/Run
 import ChargingView from './components/ChargingView';
 import ChargeCompareView from './components/ChargeCompareView';
 import RoadTripView from './components/RoadTripView';
+import YourDrivingPage from './components/costToDrive/YourDrivingPage';
+import { DEFAULT_COST_TO_DRIVE } from './constants/costToDrive';
+import { decodeCostToDriveKey, normalizeCostToDrive } from './utils/costToDriveKey';
 import PopoutView from './components/PopoutView';
 import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
@@ -216,6 +219,13 @@ export default function App() {
     });
     const [epaConfig, setEpaConfig] = useState(defaultEpaConfig);
     const [roadTripConfig, setRoadTripConfig] = useState(defaultRoadTripConfig);
+    // Cost to Drive's settings: one state for all its sub-tabs, kept when
+    // switching between them, carried in the link as the `cd` key. A key a
+    // link carried that could not be read leaves the defaults and says why.
+    const [costToDrive, setCostToDrive] = useState(DEFAULT_COST_TO_DRIVE);
+    const [costToDriveLinkError, setCostToDriveLinkError] = useState(null);
+    const updateCostToDrive = useCallback(
+        (patch) => setCostToDrive(prev => normalizeCostToDrive({ ...prev, ...patch })), []);
     // The vehicle table's assumptions live in chartConfig, not in the table, so
     // the spec chart's sidebar and the table read and write the same ones (#450).
     // Read once from the address, else from what the table remembered.
@@ -627,6 +637,11 @@ export default function App() {
         if (parsed.pairings) setPairings(parsed.pairings);
         if (parsed.roadTrip) setRoadTripConfig(prev => ({ ...prev, ...parsed.roadTrip }));
         if (parsed.epa)      setEpaConfig(prev => ({ ...prev, ...parsed.epa }));
+        if (parsed.costToDrive) {
+            const { settings, error } = decodeCostToDriveKey(parsed.costToDrive);
+            setCostToDrive(settings);
+            setCostToDriveLinkError(error);
+        }
     }, []);
 
     // ── Handle browser back/forward ─────────────────────────────────────────
@@ -718,10 +733,10 @@ export default function App() {
         const p = buildChartParams({
             view, chartMode, chartConfig, selectedVehicles, vehicles,
             compareConfig, roadTripConfig, epaConfig, pairings,
-            vehicleFilters, currentSearch: window.location.search,
+            vehicleFilters, currentSearch: window.location.search, costToDrive,
         });
         history.replaceState({ view, chartMode }, '', '?' + chartQueryString(p));
-    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings, vehicleFilters]);
+    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings, vehicleFilters, costToDrive]);
 
     // ── Keep URL in sync while on the Runs tab ──────────────────────────────
     // Mirrors the chart-tab sync above: a refresh or shared link on ?tab=runs
@@ -1202,14 +1217,14 @@ export default function App() {
                       * With none, it says so and points at ＋ Add rather than
                       * being unreachable; the views below draw only once
                       * there is something to plot. */}
-                    {activeChartCategory && chartMode !== 'specstable' && selectedVehicles.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && (
+                    {activeChartCategory && chartMode !== 'specstable' && selectedVehicles.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && chartMode !== 'drivesetup' && (
                         <SelectionEmptyState chart={labelForMode(chartMode)} />
                     )}
                     {/* ChargingView is the fall-through: it renders for any mode NOT
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && chartMode !== 'drivesetup' && (
                         <ChargingView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -1303,6 +1318,17 @@ export default function App() {
                         <PerformanceCurveView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
+                        />
+                    )}
+                    {/* Your Driving needs no selection: it is where the week is set,
+                        and its preview asks for vehicles when there are none. */}
+                    {activeChartCategory && chartMode === 'drivesetup' && (
+                        <YourDrivingPage
+                            vehicles={chartVehicles}
+                            selectedVehicleIds={selectedVehicles}
+                            settings={costToDrive}
+                            onChange={updateCostToDrive}
+                            linkError={costToDriveLinkError}
                         />
                     )}
                     {/* No selection gate: the vehicle table is where a selection is

@@ -45,7 +45,7 @@
  *   the short link    `?k=1.…`, the toolbar's URL button (`chartShortLink`,
  *                     utils/shortLink.js) — the written-out form, packed.
  */
-import { ALL_CHART_MODES, DEFAULT_CHART_MODE } from '../constants/chartNav';
+import { ALL_CHART_MODES, DEFAULT_CHART_MODE, categoryForMode } from '../constants/chartNav';
 import { decodeCorrection, encodeCorrection } from './correctionSettings';
 import { encodePairings, decodePairings } from './pairings';
 import { isChargingAxis } from './chargingAxes';
@@ -59,6 +59,7 @@ import {
     defaultCompareConfig, defaultRoadTripConfig,
 } from './chartDefaults';
 import { encodeShortLink } from './shortLink';
+import { COST_TO_DRIVE_PARAM, encodeCostToDriveKey } from './costToDriveKey';
 
 // The defaults live with the rest of a fresh page's settings (chartDefaults.js);
 // re-exported because the views have always found them here.
@@ -227,6 +228,9 @@ export function parseChartUrl(search) {
     const some = o => Object.keys(o).length > 0;
     return {
         chart,
+        // Cost to Drive's key, still packed: App decodes it (costToDriveKey.js),
+        // so a key that cannot be read can say so where the reader sees it.
+        costToDrive: p.get(COST_TO_DRIVE_PARAM),
         compare:  some(compare) ? compare : null,
         pairings: pairsParam ? decodePairings(pairsParam) : null,
         roadTrip: some(roadTrip) ? roadTrip : null,
@@ -314,7 +318,7 @@ export function vehicleIdsOfLink(chart, vehicles) {
 export function buildChartParams({
     view, chartMode, chartConfig, selectedVehicles, vehicles,
     compareConfig, roadTripConfig, epaConfig, pairings,
-    vehicleFilters, currentSearch = '',
+    vehicleFilters, currentSearch = '', costToDrive = null,
 }) {
     const p = new URLSearchParams();
     p.set('tab', view);
@@ -422,6 +426,13 @@ export function buildChartParams({
             p.set('ss', 'all');
             for (const [key, value] of encodeVehicleFilters(vehicleFilters)) p.set(key, value);
         }
+    }
+
+    // Cost to Drive: every setting in one key, written on each of its sub-tabs
+    // so switching between them keeps the week (and an untouched week, none).
+    if (categoryForMode(chartMode).key === 'cost' && costToDrive) {
+        const key = encodeCostToDriveKey(costToDrive);
+        if (key) p.set(COST_TO_DRIVE_PARAM, key);
     }
 
     // The vehicle table writes its own columns, sort and filters (vt_*);

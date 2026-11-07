@@ -1147,7 +1147,7 @@ describe('the seams that broke before', () => {
         expect(app).not.toMatch(/Select a vehicle first/);
         expect(app).toMatch(/entryModeFor\(/);
         expect(app, 'an empty chart must show the shared empty state')
-            .toMatch(/chartMode !== 'specstable' && selectedVehicles\.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && \(\s*<SelectionEmptyState/);
+            .toMatch(/chartMode !== 'specstable' && selectedVehicles\.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && chartMode !== 'drivesetup' && \(\s*<SelectionEmptyState/);
         // The spec chart can plot every filtered vehicle, so it shows the same
         // empty state itself, with its way out, instead of vanishing.
         expect(read('src/components/SpecChart.jsx')).toMatch(/<SelectionEmptyState chart="Chart"/);
