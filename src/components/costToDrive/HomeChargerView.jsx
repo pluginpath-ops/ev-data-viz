@@ -79,8 +79,10 @@ const totalLabels = (totalOf) => ({
  * group of rows a vehicle — its fast charging a week, then its total cost a
  * week (home and fast). Every cell is one plain line; what used to be notes
  * are marks, explained under the table:
- *  - "enough from here" is the cell in bold;
- *  - a level the car's onboard charger caps carries a †.
+ *  - "enough from here" is the cell in bold orange: "No further time or cost
+ *    savings with a faster home charger" (owner's wording, 2026-11-07);
+ *  - a level the car's onboard charger caps carries a ^, "Limited by vehicle
+ *    charger", each car's onboard kW in the line's tooltip.
  */
 const weekOf = (entry) => (entry && !entry.missing ? entry.comparison.week : null);
 const fastText = (w) => (!w ? DASH : w.fastMinutes < 0.5 ? '0 min' : minutesText(w.fastMinutes));
@@ -168,7 +170,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
         { key: 'figure', label: '', holds: 'noted-figures' },
         ...byLevel.map(l => ({ key: String(l.index), label: `${levelLabel(l.level)}${l.index === settings.level ? ' (yours)' : ''}`, numeric: true })),
     ];
-    // The onboard chargers that cap a level, for the † footnote.
+    // The onboard chargers that cap a level, for the ^ footnote's tooltip.
     const cappedBy = columns
         .map(c => byLevel.map(l => at(l.index, c.vehicle.id)).find(e => e && !e.missing && e.profile.home.capped))
         .filter(Boolean)
@@ -220,7 +222,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                                             const capped = e && !e.missing && e.profile.home.capped;
                                                             return (
                                                                 <TableCell key={l.index} numeric text={text(weekOf(e))}
-                                                                           mark={capped ? '†' : ''}
+                                                                           mark={capped ? '^' : ''}
                                                                            className={enough[c.vehicle.id] === l.index ? 'is-enough' : ''} />
                                                             );
                                                         })}
@@ -230,8 +232,10 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                         ))}
                                     </table>
                                     <p className="text-note plan-table-footnote">
-                                        <b>Bold</b>: enough from here — a bigger charger saves less than five minutes of fast charging a week.
-                                        {cappedBy.length > 0 && <> † Capped by the car&rsquo;s onboard charger: {cappedBy.join(', ')}.</>}
+                                        <span className="is-enough">Bold</span> — No further time or cost savings with a faster home charger.
+                                        {cappedBy.length > 0 && (
+                                            <><br /><span title={`Onboard chargers: ${cappedBy.join(', ')}`}>^ — Limited by vehicle charger</span></>
+                                        )}
                                     </p>
                                 </div>
                             </div>
