@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { vehicleLabel } from '../../utils/specHelpers';
 import { filterRangeRuns } from '../../utils/runUtils';
-import { chartTheme, applyChartDefaults } from '../../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
 import { dollars, minutesText, weekSummary, enoughLevel } from '../../utils/costToDrive';
 import { useCostToDriveByLevel } from '../../hooks/useCostToDrive';
@@ -31,6 +31,48 @@ import { hourText } from './DriveFields';
 
 const DASH = '—';
 const kwText = (kw) => `${Math.round(kw * 10) / 10} kW`;
+
+/**
+ * The total cost a week (home + fast) over each bar (owner, 2026-11-07), so
+ * the chart answers what the bigger charger saves in money as well as time.
+ * `totalOf(level, dataset)` gives the figure; null draws nothing.
+ */
+const totalLabels = (totalOf) => ({
+    id: 'totalLabels',
+    afterDatasetsDraw(chart) {
+        const { ctx, chartArea: a } = chart;
+        const { ink } = chartTheme();
+        const fonts = chartFonts();
+        ctx.save();
+        ctx.font = `600 ${fonts.badge}px ${fonts.mono}`;
+        ctx.fillStyle = ink;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        chart.data.datasets.forEach((_, di) => {
+            const meta = chart.getDatasetMeta(di);
+            if (meta.hidden) return;
+            meta.data.forEach((bar, li) => {
+                const total = totalOf(li, di);
+                if (total == null || !Number.isFinite(bar.x)) return;
+                const text = dollars(total);
+                const y = Math.max(a.top + fonts.badge, Math.min(bar.y, a.bottom) - 3);
+                // Too wide for its bar (many vehicles at once): stand it on end.
+                if (ctx.measureText(text).width > bar.width + 2) {
+                    ctx.save();
+                    ctx.translate(bar.x, y);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(text, 0, 0);
+                    ctx.restore();
+                    return;
+                }
+                ctx.fillText(text, bar.x, y);
+            });
+        });
+        ctx.restore();
+    },
+});
 
 /**
  * The table, transposed (owner, 2026-11-07): a column a home charger level, a
@@ -78,7 +120,13 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                     backgroundColor: c.color,
                 })),
             },
+            plugins: [totalLabels((li, di) => {
+                const w = at(li, columns[di].vehicle.id)?.comparison?.week;
+                return w ? w.fastCost + w.homeCost : null;
+            })],
             options: {
+                // Room over the tallest bar for its label.
+                layout: { padding: { top: 18 } },
                 animation: false,
                 responsive: true,
                 maintainAspectRatio: false,
@@ -89,7 +137,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                             label: (ctx) => {
                                 const e = at(ctx.dataIndex, columns[ctx.datasetIndex].vehicle.id);
                                 const w = e?.comparison?.week;
-                                return w ? `${ctx.dataset.label}: ${minutesText(w.fastMinutes)}, ${w.stopCount} stops, ${dollars(w.fastCost)} fast a week` : null;
+                                return w ? `${ctx.dataset.label}: ${minutesText(w.fastMinutes)}, ${w.stopCount} stops, ${dollars(w.fastCost)} fast, ${dollars(w.fastCost + w.homeCost)} total a week` : null;
                             },
                         },
                     },

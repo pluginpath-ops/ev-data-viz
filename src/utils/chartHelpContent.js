@@ -334,7 +334,8 @@ export const CHART_HELP_DEFAULTS = {
             'Cost & Time.',
         how_to_read:
             'Each bar is the fast charging a car needs in a week with that charger at home: ' +
-            'the shorter, the more the night covers. The table has a column a charger ' +
+            'the shorter, the more the night covers. Over each bar, that car’s total cost ' +
+            'a week at that charger, home and fast. The table has a column a charger ' +
             'and, for each car, the same minutes and the total cost a week, home and fast. ' +
             'The bold cell is “enough from here”: the smallest charger past which a bigger ' +
             'one saves less than five minutes a week. A † means the car’s own onboard ' +
