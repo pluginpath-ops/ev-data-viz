@@ -9949,13 +9949,11 @@ a.is-test-link:focus-visible {
     border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-control);
 }
-.week-day.is-L,
-.day-strip-day.is-L {
+.week-day.is-L {
     background-color: var(--color-primary-surface);
     border-color: var(--color-primary-border);
 }
-.week-day.is-O,
-.day-strip-day.is-O { background-color: var(--color-surface-sunken); }
+.week-day.is-O { background-color: var(--color-surface-sunken); }
 .week-day-type { font-weight: 600; white-space: nowrap; }
 .week-planned {
     height: 32px;
@@ -10032,40 +10030,11 @@ a.is-test-link:focus-visible {
 /* One labelled dropdown in the plan's controls: Vehicle, Chart. */
 .plan-control { display: inline-flex; align-items: center; gap: 8px; }
 .plan-control .form-input { width: auto; max-width: 22rem; }
-/* The day strip: a column a day under the chart, its stops as chips. Long days
-   carry the week picker's tint, so the two read as one week. */
-.day-strip {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 6px;
-    margin-top: 10px;
-}
-@media (max-width: 900px) {
-    .day-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-.day-strip-day {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-    padding: 8px;
-    background-color: var(--color-surface-muted);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-control);
-}
-.day-strip-head { display: flex; flex-direction: column; }
-/* A day's charging, fast and home in one style: a head with the cost, then a
-   line a stop (or the night). Orange edge for fast, the chart's stop color. */
-.day-charge {
-    display: flex;
-    flex-direction: column;
-    padding: 1px 4px;
-    font-family: var(--font-mono);
-    font-size: calc(var(--fs-body) * var(--fs-step));
-    font-variant-numeric: tabular-nums;
-    color: var(--color-text-primary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-control);
-}
-.day-charge.is-fast { border-color: var(--color-accent-orange); }
-.day-charge-head { font-weight: 600; }
+/* The Weekly Charging Plan's table, transposed: a column a day, a row a
+   figure. The fast-charging rows are outlined in the chart's stop color. */
+.plan-table .plan-table-label { font-weight: 600; }
+.plan-table tr.is-fast > td { background-color: color-mix(in srgb, var(--color-accent-orange) 8%, transparent); }
+.plan-table tr.is-fast > td:first-child { border-left: 1px solid var(--color-accent-orange); }
+.plan-table tr.is-fast > td:last-child { border-right: 1px solid var(--color-accent-orange); }
+.plan-table tr.is-fast-first > td { border-top: 1px solid var(--color-accent-orange); }
+.plan-table tr.is-fast-last > td { border-bottom: 1px solid var(--color-accent-orange); }

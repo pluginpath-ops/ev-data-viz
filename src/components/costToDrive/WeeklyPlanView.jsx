@@ -2,9 +2,9 @@
  * Weekly Charging Plan — one vehicle's week (mode `driveplan`,
  * docs/cost-to-drive-plan.md): the week day by day as bars (DayBarsChart),
  * or as a line of range left with every fast stop where it happens
- * (WeekLineChart); the day strip under it, an optional comparison stacked
- * below (another charger level, or the other season), the gas car's week
- * collapsed by default, and the week as a table.
+ * (WeekLineChart); the week as a table under it, a column a day; an optional
+ * comparison stacked below (another charger level, or the other season), and
+ * the gas car's week collapsed by default.
  *
  * Owner, 2026-11-07: the bars day by day in time order first (mockup A3), the
  * bars as charge in and used behind the same picker, the line kept as the third. The
@@ -28,7 +28,6 @@ import ChartInfoBubble from '../ChartInfoBubble';
 import CostToDriveSidebar from './CostToDriveSidebar';
 import WeekLineChart from './WeekLineChart';
 import DayBarsChart from './DayBarsChart';
-import DayStrip from './DayStrip';
 import PlanTable from './PlanTable';
 import { levelLabel } from './HomeLevelPicker';
 
@@ -165,7 +164,11 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                                 height={height}
                                 linkButton
                             />
-                            {!presentationMode && <DayStrip week={week} settings={settings} />}
+                            {!presentationMode && (
+                                <div className="mt-3">
+                                    <PlanTable week={week} settings={settings} />
+                                </div>
+                            )}
 
                             {!presentationMode && (
                                 <div className="plan-compare">
@@ -228,12 +231,6 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                                 </div>
                             )}
 
-                            {!presentationMode && (
-                                <div className="mt-4">
-                                    <h3 className="section-title mb-2">{name}, day by day</h3>
-                                    <PlanTable week={week} />
-                                </div>
-                            )}
                         </>
                     );
                 })()}
