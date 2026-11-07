@@ -439,7 +439,7 @@ export function simulateGasWeek(settings) {
                 const rate = left / (span.to - span.from);
                 let hour = span.from;
                 while (left > 1e-9) {
-                    if (gal - left >= floor) { hour += left / rate; gal -= left; left = 0; if (rec) points.push([base + hour, gal]); break; }
+                    if (gal - left >= floor) { hour += left / rate; gal -= left; if (rec) points.push([base + hour, gal]); break; }
                     const run = gal - floor;
                     hour += run / rate; gal -= run; left -= run;
                     if (rec) {
@@ -479,6 +479,19 @@ export const savedText = (saved) => `${dollars(saved)}/mo ${saved >= 0 ? 'less' 
 
 /** Extra time a week against the gas car: "+41 min/wk", "−12 min/wk". */
 export const extraTimeText = (extra) => `${extra >= 0 ? '+' : '−'}${minutesText(extra)}/wk`;
+
+/** The week in one line: "795 mi per week · three long days, three daily, one off". */
+export function weekSummary(settings) {
+    const count = (t) => [...settings.week].filter(c => c === t).length;
+    const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+    const miles = count('L') * settings.longMi + count('D') * settings.dailyMi;
+    const parts = [
+        `${words[count('L')]} long day${count('L') === 1 ? '' : 's'}`,
+        `${words[count('D')]} daily`,
+        `${words[count('O')]} off`,
+    ];
+    return `${miles.toLocaleString('en-US')} mi per week · ${parts.join(', ')}`;
+}
 
 // ── Against the gas car ──────────────────────────────────────────────────────
 

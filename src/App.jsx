@@ -13,6 +13,7 @@ import RunsView, { RUNS_SUBTAB_IDS, DEFAULT_RUNS_SUBTAB } from './components/Run
 import ChargingView from './components/ChargingView';
 import ChargeCompareView from './components/ChargeCompareView';
 import RoadTripView from './components/RoadTripView';
+import CostTimeView from './components/costToDrive/CostTimeView';
 import YourDrivingPage from './components/costToDrive/YourDrivingPage';
 import { DEFAULT_COST_TO_DRIVE } from './constants/costToDrive';
 import { decodeCostToDriveKey, normalizeCostToDrive } from './utils/costToDriveKey';
@@ -335,8 +336,8 @@ export default function App() {
     };
 
     const { isPopout, sendState } = useChartSync({
-        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer,
-        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer,
+        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, costToDrive,
+        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer, setCostToDrive,
     });
 
     // The featured comparisons (#448), loaded once here so Home and the editor
@@ -860,7 +861,7 @@ export default function App() {
     // ── Broadcast chart state to any open pop-out windows ───────────────────
     useEffect(() => {
         sendState();
-    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, sendState]);
+    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, costToDrive, sendState]);
 
     // The header tab a view is shown under (#338): a vehicle's page (the
     // `runs` view) is under Vehicles & Specs; a chart category drawn under
@@ -919,6 +920,7 @@ export default function App() {
                 epaConfig={epaConfig}
                 pairings={pairings}
                 epaExplorer={epaExplorer}
+                costToDrive={costToDrive}
             />
             </AxisLimitsProvider>
         );
@@ -1224,7 +1226,7 @@ export default function App() {
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && chartMode !== 'drivesetup' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && chartMode !== 'drivesetup' && chartMode !== 'drivecost' && (
                         <ChargingView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -1329,6 +1331,15 @@ export default function App() {
                             settings={costToDrive}
                             onChange={updateCostToDrive}
                             linkError={costToDriveLinkError}
+                        />
+                    )}
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'drivecost' && (
+                        <CostTimeView
+                            vehicles={chartVehicles}
+                            selectedVehicleIds={selectedVehicles}
+                            settings={costToDrive}
+                            onChange={updateCostToDrive}
+                            onOpenSetup={() => handleChartModeChange('drivesetup')}
                         />
                     )}
                     {/* No selection gate: the vehicle table is where a selection is

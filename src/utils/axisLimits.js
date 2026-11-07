@@ -83,6 +83,7 @@ export const NO_AXIS_LIMITS = {
     specscatter:  'The Spec scatter fits its axes to the two columns chosen; it has no Axis Scale controls',
     specstable:   'The vehicle table is not a plot',
     drivesetup:   'Your Driving is a page of settings, not a plot',
+    drivecost:    'Cost & Time draws dollars and minutes from zero; its scales follow the figures',
 };
 
 export const hasAxisLimits = chart => Object.prototype.hasOwnProperty.call(AXIS_LIMIT_CHARTS, chart);

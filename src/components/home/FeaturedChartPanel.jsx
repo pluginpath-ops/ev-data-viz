@@ -76,6 +76,7 @@ export default function FeaturedChartPanel({ comparison, index, onOpen }) {
                         epaConfig={epaConfig}
                         setEpaConfig={setEpaConfig}
                         pairings={seed.pairings}
+                        costToDrive={seed.costToDrive}
                     />
                 )}
                 {near && !isTable && shown.length === 0 && (

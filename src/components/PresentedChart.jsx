@@ -8,6 +8,8 @@ import EpaCurvesView from './EpaCurvesView';
 import PerformanceCompareView from './PerformanceCompareView';
 import PerformanceCurveView from './PerformanceCurveView';
 import { AxisLimitsProvider } from '../hooks/useAxisLimits';
+import CostTimeView from './costToDrive/CostTimeView';
+import { DEFAULT_COST_TO_DRIVE } from '../constants/costToDrive';
 
 /**
  * One chart, drawn from a bundle of state with no controls around it.
@@ -36,6 +38,7 @@ export default function PresentedChart({
     vehicles, selectedVehicles, chartMode, chartConfig,
     setChartConfig, compareConfig, roadTripConfig, epaConfig, pairings,
     setCompareConfig = null, setRoadTripConfig = null, setEpaConfig = null,
+    costToDrive = DEFAULT_COST_TO_DRIVE,
 }) {
     return (
         <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
@@ -47,6 +50,17 @@ export default function PresentedChart({
                 setChartConfig={setChartConfig ?? (() => {})}
                 correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
                 correctionTarget={chartConfig?.correctionTarget}
+                presentationMode
+            />
+        )}
+
+        {/* Cost to Drive is priced from the reader's week, which travels as
+            its own state (the `cd` key), not in chartConfig. */}
+        {selectedVehicles.length > 0 && chartMode === 'drivecost' && (
+            <CostTimeView
+                vehicles={vehicles}
+                selectedVehicleIds={selectedVehicles}
+                settings={costToDrive}
                 presentationMode
             />
         )}

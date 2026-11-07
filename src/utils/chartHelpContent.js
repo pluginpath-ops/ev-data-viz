@@ -255,6 +255,37 @@ export const CHART_HELP_DEFAULTS = {
             'to 95% can use: past it every plan is blank or the same trip as the row below.',
     },
 
+    drivecost: {
+        title: 'About Cost & Time',
+        data_source:
+            'Prices the week you set on Your Driving (or in the sidebar) for each selected ' +
+            'vehicle, and the same week in your gas car. Highway miles are priced from ' +
+            'EVBench’s range tests, corrected to your speed, season and elevation; city ' +
+            'miles from the EPA highway figure, corrected the same way. A car with no ' +
+            'range test is priced from EPA for both, and says so. Fast-stop minutes come ' +
+            'from the car’s own charging curve where EVBench has one.',
+        how_to_read:
+            'Each card gives a car’s two answers against your gas car: what it saves (or ' +
+            'costs) a month, and the time it adds (or saves) a week. The first chart stacks ' +
+            'home and fast charging per car beside the gas bill; the second sets fast-charging ' +
+            'minutes against fill-up minutes. Months are for the season shown; the card’s ' +
+            'year line blends winter months with summer ones. Winter is a floor: denser air ' +
+            'and cabin heat are priced, battery warming and cold tires are not.',
+        key_terms:
+            'Fast stop — a stop on the route, when a day runs short of home charging.\n' +
+            'Stop to charge by — the battery level a stop is made at.\n' +
+            'Charge no higher than — where a stop ends, stretched to 80% when that saves a second stop.\n' +
+            'Keep battery above — the floor the whole day stays over.\n' +
+            'Planned fast charge — a day you fast charge anyway, topping up to the cap.',
+        math_approach:
+            'The week is simulated hour by hour, three times over so Monday starts from a ' +
+            'settled battery, and the third week is reported. Home charging is the lesser ' +
+            'of your charger and the car’s onboard charger, through the window you plug in, ' +
+            'with charger losses. A stop’s minutes are the curve’s, plus the detour and the ' +
+            'time to start and pay; fast energy is bought with its charging loss. A month is ' +
+            'a week × 52 ÷ 12.',
+    },
+
     perfcompare: {
         title: 'About the Performance Compare chart',
         data_source:

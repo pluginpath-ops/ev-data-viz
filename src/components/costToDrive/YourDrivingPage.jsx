@@ -10,7 +10,7 @@
  */
 import { COST_TO_DRIVE_PRESETS, DEFAULT_COST_TO_DRIVE } from '../../constants/costToDrive';
 import { vehicleLabel } from '../../utils/specHelpers';
-import { savedText, extraTimeText } from '../../utils/costToDrive';
+import { savedText, extraTimeText, weekSummary } from '../../utils/costToDrive';
 import { useCostToDrive } from '../../hooks/useCostToDrive';
 import {
     HomeChargingFields, WeekFields, FastChargingFields, SeasonFields, GasCarFields, EfficiencyFields,
@@ -29,19 +29,6 @@ function DriveCard({ title, aside, children, className = '' }) {
     );
 }
 
-/** The week in one line: "795 mi per week · three long days, three daily, one off". */
-function weekSummary(settings) {
-    const count = (t) => [...settings.week].filter(c => c === t).length;
-    const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
-    const miles = count('L') * settings.longMi + count('D') * settings.dailyMi;
-    const parts = [
-        `${words[count('L')]} long day${count('L') === 1 ? '' : 's'}`,
-        `${words[count('D')]} daily`,
-        `${words[count('O')]} off`,
-    ];
-    return `${miles.toLocaleString('en-US')} mi per week · ${parts.join(', ')}`;
-}
-
 /** The selected vehicles against the gas car, as the settings stand. */
 function DrivePreview({ priced, settings }) {
     return (
@@ -52,22 +39,22 @@ function DrivePreview({ priced, settings }) {
             {priced.length === 0 && (
                 <span className="text-note">Add vehicles with ＋ Add above to see them priced.</span>
             )}
-            {priced.map(({ vehicle, comparison, missing }) => (
+            {priced.map(({ vehicle, color, comparison, missing }) => (
                 <div key={vehicle.id} className="drive-preview-row">
                     <span className="flex items-center gap-2 min-w-0">
                         {/* The vehicle's own series color: a runtime value, so inline. */}
-                        <span className="drive-dot" style={{ backgroundColor: vehicle.color }} aria-hidden="true" />
+                        <span className="drive-dot" style={{ backgroundColor: color }} aria-hidden="true" />
                         <span className="text-body truncate">{vehicleLabel(vehicle)}</span>
                     </span>
                     {missing
                         ? <span className="text-note drive-preview-missing">Can&rsquo;t price: {missing}</span>
                         : (
                             <>
-                                <span className={`text-data ${comparison.monthly.saved >= 0 ? 'is-saving' : 'is-costing'}`}>
+                                <span className={`text-data drive-figure ${comparison.monthly.saved >= 0 ? 'is-saving' : 'is-costing'}`}>
                                     {savedText(comparison.monthly.saved)}
                                 </span>
                                 {/* Less time than the gas car is a saving, green like money saved (owner, 2026-11-07). */}
-                                <span className={`text-data ${comparison.extraMinutesPerWeek < 0 ? 'is-saving' : 'is-time'}`}>
+                                <span className={`text-data drive-figure ${comparison.extraMinutesPerWeek < 0 ? 'is-saving' : 'is-time'}`}>
                                     {extraTimeText(comparison.extraMinutesPerWeek)}
                                 </span>
                             </>
