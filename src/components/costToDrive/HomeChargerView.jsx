@@ -1,0 +1,304 @@
+/**
+ * Home Charger — each home charger level against each selected vehicle (mode
+ * `drivecharger`, docs/cost-to-drive-plan.md): what the reader's week costs at
+ * every level, home and fast charging stacked in one column a car (owner,
+ * 2026-11-07), and how many minutes of fast charging it takes, where a bigger charger stops helping ("enough
+ * from here"), and where the car's own onboard charger caps it.
+ *
+ * Every other setting is the reader's; only the level moves. The chart is
+ * Chart.js in a PlotFrame (PNG capture, URL button, source line), the table the
+ * shared table parts.
+ */
+import { useEffect, useMemo, useRef } from 'react';
+import Chart from 'chart.js/auto';
+import { vehicleLabel } from '../../utils/specHelpers';
+import { desaturate } from '../../utils/colorUtils';
+import { filterRangeRuns } from '../../utils/runUtils';
+import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
+import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
+import { dollars, minutesText, weekSummary, enoughLevel } from '../../utils/costToDrive';
+import { useCostToDriveByLevel } from '../../hooks/useCostToDrive';
+import { useChartPng } from '../../hooks/useChartPng';
+import { useSourceLine } from '../../hooks/useSourceLine';
+import { useTheme } from '../../hooks/useTheme';
+import PlotFrame from '../charts/PlotFrame';
+import CopyLinkButton from '../charts/CopyLinkButton';
+import PngButton from '../charts/PngButton';
+import ChartInfoBubble from '../ChartInfoBubble';
+import SortHeader from '../tables/SortHeader';
+import TableCell from '../tables/TableCell';
+import CostToDriveSidebar from './CostToDriveSidebar';
+import { levelLabel } from './HomeLevelPicker';
+import { hourText } from './DriveFields';
+
+const DASH = '—';
+const kwText = (kw) => `${Math.round(kw * 10) / 10} kW`;
+
+/**
+ * The total cost per week over each car's column (owner, 2026-11-07). The
+ * column is two bars stacked, home under fast, so the label goes over the
+ * top one: `isTop(dataset)` picks it, `totalOf(level, dataset)` gives the
+ * figure, null draws nothing. Where the column has fast charging, the home
+ * part carries its own figure too (`homeOf`, null where there is no fast
+ * charging): one label for a column that is all home, two where it is split.
+ */
+const totalLabels = (isTop, totalOf, homeOf) => ({
+    id: 'totalLabels',
+    afterDatasetsDraw(chart) {
+        const { ctx, chartArea: a } = chart;
+        const { ink } = chartTheme();
+        const fonts = chartFonts();
+        ctx.save();
+        ctx.font = `600 ${fonts.badge}px ${fonts.mono}`;
+        ctx.fillStyle = ink;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        chart.data.datasets.forEach((ds, di) => {
+            const meta = chart.getDatasetMeta(di);
+            if (meta.hidden || !isTop(ds)) return;
+            meta.data.forEach((bar, li) => {
+                const total = totalOf(li, ds);
+                if (total == null || !Number.isFinite(bar.x)) return;
+                const text = dollars(total);
+                const y = Math.max(a.top + fonts.badge, Math.min(bar.y, a.bottom) - 3);
+                // Too wide for its bar (many vehicles at once): stand it on end.
+                if (ctx.measureText(text).width > bar.width + 2) {
+                    ctx.save();
+                    ctx.translate(bar.x, y);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(text, 0, 0);
+                    ctx.restore();
+                    return;
+                }
+                ctx.fillText(text, bar.x, y);
+            });
+        });
+        // The home part's own figure, only where fast charging sits on it:
+        // with no fast charging the total over the column is the home cost.
+        chart.data.datasets.forEach((ds, di) => {
+            const meta = chart.getDatasetMeta(di);
+            if (meta.hidden || ds.part !== 'home') return;
+            meta.data.forEach((bar, li) => {
+                const home = homeOf(li, ds);
+                if (home == null || !Number.isFinite(bar.x)) return;
+                const text = dollars(home);
+                if (ctx.measureText(text).width > bar.width + 2) return;
+                const room = Math.abs(bar.base - bar.y);
+                // Inside the home part under its top; above it when too short.
+                if (room >= fonts.badge + 6) {
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(text, bar.x, bar.y + 3);
+                } else {
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(text, bar.x, bar.y - 3);
+                }
+            });
+        });
+        ctx.restore();
+    },
+});
+
+/**
+ * The table, transposed (owner, 2026-11-07): a column a home charger level, a
+ * group of rows a vehicle — its fast charging per week, then its cost per
+ * week: home, fast and the total. Every cell is one plain line; what used to be notes
+ * are marks, explained under the table:
+ *  - "enough from here" is the cell in bold orange: "No further time or cost
+ *    savings with a faster home charger" (owner's wording, 2026-11-07);
+ *  - a level the car's onboard charger caps carries a ^, "Limited by vehicle
+ *    charger", each car's onboard kW in the line's tooltip.
+ */
+const weekOf = (entry) => (entry && !entry.missing ? entry.comparison.week : null);
+const fastText = (w) => (!w ? DASH : w.fastMinutes < 0.5 ? '0 min' : minutesText(w.fastMinutes));
+const homeCostText = (w) => (!w ? DASH : dollars(w.homeCost));
+const fastCostText = (w) => (!w ? DASH : dollars(w.fastCost));
+const totalText = (w) => (!w ? DASH : dollars(w.fastCost + w.homeCost));
+
+export default function HomeChargerView({ vehicles, selectedVehicleIds, settings, onChange, onOpenSetup, presentationMode = false }) {
+    const byLevel = useCostToDriveByLevel(vehicles, selectedVehicleIds, settings);
+    // The vehicles as priced at the reader's own level: the columns, and what the
+    // source line credits.
+    const columns = useMemo(() => (byLevel[settings.level]?.priced ?? []).filter(p => !p.missing), [byLevel, settings.level]);
+    const missing = (byLevel[settings.level]?.priced ?? []).filter(p => p.missing);
+    const at = (levelIndex, vehicleId) => byLevel[levelIndex].priced.find(p => p.vehicle.id === vehicleId);
+    const enough = useMemo(() => Object.fromEntries(columns.map(c => [
+        c.vehicle.id,
+        enoughLevel(byLevel.map(l => {
+            const e = l.priced.find(p => p.vehicle.id === c.vehicle.id);
+            return e && !e.missing ? e.comparison.week.fastMinutes : null;
+        })),
+    ])), [byLevel, columns]);
+
+    const canvasRef = useRef(null), chartRef = useRef(null);
+    const { isDark } = useTheme();
+    const signature = `${columns.map(c => c.vehicle.id).join(',')}|${JSON.stringify(settings)}`;
+    const redraw = `${signature}|${columns.map(c => c.color).join(',')}|${isDark}`;
+
+    useEffect(() => {
+        if (!canvasRef.current || !columns.length) return undefined;
+        applyChartDefaults(Chart);
+        const { tick, grid, legend } = chartTheme();
+        chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: byLevel.map(l => levelLabel(l.level)),
+                // Two bars a car, stacked on the car's own stack: home cost
+                // underneath, desaturated, fast cost on top in the full color —
+                // the Compare cost chart's style.
+                datasets: columns.flatMap((c, ci) => ['home', 'fast'].map(part => ({
+                    label: vehicleLabel(c.vehicle),
+                    part,
+                    vehicleIndex: ci,
+                    stack: String(c.vehicle.id),
+                    data: byLevel.map(l => {
+                        const w = at(l.index, c.vehicle.id)?.comparison?.week;
+                        return w ? (part === 'home' ? w.homeCost : w.fastCost) : null;
+                    }),
+                    backgroundColor: part === 'home' ? desaturate(c.color) : c.color,
+                }))),
+            },
+            plugins: [totalLabels(ds => ds.part === 'fast', (li, ds) => {
+                const w = at(li, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week;
+                return w ? w.fastCost + w.homeCost : null;
+            }, (li, ds) => {
+                const w = at(li, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week;
+                return w && w.fastCost >= 0.5 ? w.homeCost : null;
+            })],
+            options: {
+                // Room over the tallest column for its label.
+                layout: { padding: { top: 18 } },
+                animation: false,
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        // A car once, by its fast bar's full color.
+                        labels: { color: legend, boxWidth: 12, filter: (item, data) => data.datasets[item.datasetIndex].part === 'fast' },
+                        // Hiding a car hides both its bars.
+                        onClick: (e, item, leg) => {
+                            const ch = leg.chart;
+                            const vi = ch.data.datasets[item.datasetIndex].vehicleIndex;
+                            const show = !ch.isDatasetVisible(item.datasetIndex);
+                            ch.data.datasets.forEach((d, i) => { if (d.vehicleIndex === vi) ch.setDatasetVisibility(i, show); });
+                            ch.update();
+                        },
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const ds = ctx.dataset;
+                                const w = at(ctx.dataIndex, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week;
+                                if (!w) return null;
+                                return ds.part === 'home'
+                                    ? `${ds.label}: ${dollars(w.homeCost)} home`
+                                    : `${ds.label}: ${dollars(w.fastCost)} fast (${minutesText(w.fastMinutes)}, ${w.stopCount} stops), ${dollars(w.fastCost + w.homeCost)} total per week`;
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: { stacked: true, grid: { display: false }, ticks: { color: tick } },
+                    y: { stacked: true, beginAtZero: true, title: { display: true, text: '$ per week, home + fast', color: legend }, ticks: { color: tick, callback: (v) => dollars(v) }, grid: { color: grid } },
+                },
+            },
+        });
+        return () => { chartRef.current?.destroy(); chartRef.current = null; };
+    }, [redraw]); // eslint-disable-line react-hooks/exhaustive-deps -- `redraw` names everything the chart is built from
+
+    const allRuns = useMemo(() => vehicles.flatMap(v => v.runs ?? []), [vehicles]);
+    const sourceRuns = useMemo(() => columns.flatMap(p => [
+        ...(p.profile.highwayFrom === 'tested' ? filterRangeRuns(p.vehicle.runs ?? []) : []),
+        ...(p.profile.fast?.run ? [p.profile.fast.run] : []),
+    ]), [columns]);
+    const usesEpa = columns.some(p => p.profile.highwayFrom === 'epa' || p.profile.cityFrom === 'epa');
+    const sourceLine = useSourceLine({ runs: sourceRuns, allRuns, epa: { label: usesEpa } });
+
+    const season = settings.season === 'winter' ? `Winter, ${settings.winterF}°F` : `Summer, ${settings.summerF}°F`;
+    const title = 'Charging cost per week, by home charger';
+    const subtitle = `${weekSummary(settings)} · ${season} · plugged in ${hourText(settings.plugFrom)} to ${hourText(settings.plugUntil)}`;
+    const png = useChartPng(chartRef, { title, subtitle, sources: sourceLine.text, signature });
+
+    const tableCols = [
+        { key: 'figure', label: '', holds: 'noted-figures' },
+        ...byLevel.map(l => ({ key: String(l.index), label: `${levelLabel(l.level)}${l.index === settings.level ? ' (yours)' : ''}`, numeric: true })),
+    ];
+    // The onboard chargers that cap a level, for the ^ footnote's tooltip.
+    const cappedBy = columns
+        .map(c => byLevel.map(l => at(l.index, c.vehicle.id)).find(e => e && !e.missing && e.profile.home.capped))
+        .filter(Boolean)
+        .map(e => `${vehicleLabel(e.vehicle)} ${kwText(e.profile.home.onboardKw)}${e.profile.home.onboardAssumed ? ' (assumed)' : ''}`);
+
+    return (
+        <div className="chart-layout">
+            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} onOpenSetup={onOpenSetup} />}
+            <div className="chart-main">
+                {missing.length > 0 && (
+                    <p className="text-note drive-missing">
+                        Can&rsquo;t price {missing.map(p => `${vehicleLabel(p.vehicle)} (${p.missing})`).join('; ')}.
+                    </p>
+                )}
+                {columns.length > 0 && (
+                    <>
+                        <PlotFrame
+                            title={title}
+                            subtitle={subtitle}
+                            sourceLine={sourceLine}
+                            preview={png.preview}
+                            onDismissPreview={png.dismissPreview}
+                            exportControls={!presentationMode && (<><CopyLinkButton /><PngButton png={png} /></>)}
+                        >
+                            <div style={{ height: presentationMode ? PRESENTED_HALF_HEIGHT : '360px', position: 'relative' }}>
+                                <canvas ref={canvasRef} />
+                            </div>
+                        </PlotFrame>
+                        {!presentationMode && (
+                            <div className="mt-4">
+                                <p className="text-secondary mb-2">
+                                    Fast charging and cost per week at each home charger, everything else as you set it.
+                                </p>
+                                <div className="guide-table-container">
+                                    <table className="guide-table plan-table">
+                                        <thead>
+                                            <tr>{tableCols.map(c => <SortHeader key={c.key} col={c} />)}</tr>
+                                        </thead>
+                                        {columns.map(c => (
+                                            <tbody key={c.vehicle.id}>
+                                                <tr className="plan-table-group">
+                                                    <td colSpan={tableCols.length}>{vehicleLabel(c.vehicle)}</td>
+                                                </tr>
+                                                {[['Fast charging per week', fastText], ['Home cost per week', homeCostText], ['Fast cost per week', fastCostText], ['Total cost per week', totalText]].map(([label, text]) => (
+                                                    <tr key={label}>
+                                                        <TableCell text={label} className="plan-table-label" />
+                                                        {byLevel.map(l => {
+                                                            const e = at(l.index, c.vehicle.id);
+                                                            const capped = e && !e.missing && e.profile.home.capped;
+                                                            return (
+                                                                <TableCell key={l.index} numeric text={text(weekOf(e))}
+                                                                           mark={capped ? '^' : ''}
+                                                                           className={enough[c.vehicle.id] === l.index ? 'is-enough' : ''} />
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        ))}
+                                    </table>
+                                    <p className="text-note plan-table-footnote">
+                                        <span className="is-enough">Bold</span> — No further time or cost savings with a faster home charger.
+                                        {cappedBy.length > 0 && (
+                                            <><br /><span title={`Onboard chargers: ${cappedBy.join(', ')}`}>^ — Limited by vehicle charger</span></>
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+                {!presentationMode && <ChartInfoBubble chartKey="drivecharger" />}
+            </div>
+        </div>
+    );
+}

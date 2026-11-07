@@ -1147,7 +1147,7 @@ describe('the seams that broke before', () => {
         expect(app).not.toMatch(/Select a vehicle first/);
         expect(app).toMatch(/entryModeFor\(/);
         expect(app, 'an empty chart must show the shared empty state')
-            .toMatch(/chartMode !== 'specstable' && selectedVehicles\.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && \(\s*<SelectionEmptyState/);
+            .toMatch(/chartMode !== 'specstable' && selectedVehicles\.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && chartMode !== 'drivesetup' && \(\s*<SelectionEmptyState/);
         // The spec chart can plot every filtered vehicle, so it shows the same
         // empty state itself, with its way out, instead of vanishing.
         expect(read('src/components/SpecChart.jsx')).toMatch(/<SelectionEmptyState chart="Chart"/);
@@ -2043,7 +2043,7 @@ describe('the EPA curve explorer follows the pop-out channel (#259)', () => {
     it('the explorer reports its state up, and App broadcasts it', () => {
         expect(read('src/components/epa/EpaSection.jsx')).toMatch(/<EpaCurveExplorer onStateChange=\{onExplorerState\}/);
         expect(app).toMatch(/<EpaSection subtab=\{epaSubtab\} onPlotColumn=\{plotColumn\} onExplorerState=\{setEpaExplorer\}/);
-        expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, sendState\]/);
+        expect(app, 'a change must re-broadcast').toMatch(/pairings, epaExplorer, costToDrive, sendState\]/);
     });
 
     it('the channel carries it both ways, null included', () => {
@@ -2123,7 +2123,7 @@ describe('every chart\'s axis limits go through one door (#478)', () => {
         expect(sync).toMatch(/setChartConfig\(data\.chartConfig\)/);
         expect((sync.match(/^\s+chartConfig,$/gm) || []).length, 'the main tab posts chartConfig on request and on change').toBeGreaterThanOrEqual(2);
         expect(sync, 'no side channel for limits any more').not.toMatch(/viewScale|ScaleSync/);
-        expect(read('src/App.jsx')).toMatch(/\[chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, sendState\]/);
+        expect(read('src/App.jsx')).toMatch(/\[chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, costToDrive, sendState\]/);
     });
 
     it('Modeled Efficiency · All EVs writes them to its own address and App reads them back', () => {
@@ -3372,5 +3372,24 @@ describe('the Colors field lives in the toolbar', () => {
     it('charts open on the house palette', () => {
         expect(read('src/utils/chartDefaults.js')).toMatch(/seriesPalette: DEFAULT_SERIES_PALETTE/);
         expect(read('src/utils/colorUtils.js')).toMatch(/DEFAULT_SERIES_PALETTE = 'evbench'/);
+    });
+});
+
+describe('the reader\'s week reaches every place Cost to Drive is drawn', () => {
+    // The week travels as its own state (the `cd` key), not in chartConfig, so
+    // nothing that carries chartConfig carries it for free. A pop-out or Home
+    // panel that missed it would price the defaults, with nothing saying so.
+    it('the pop-out channel sends it and applies it', () => {
+        const sync = read('src/hooks/useChartSync.js');
+        expect((sync.match(/^\s+costToDrive,$/gm) || []).length, 'posted on request and on change').toBeGreaterThanOrEqual(2);
+        expect(sync).toMatch(/setCostToDrive\(data\.costToDrive\)/);
+        expect(read('src/App.jsx')).toMatch(/<PopoutView[\s\S]{0,600}costToDrive=\{costToDrive\}/);
+        expect(read('src/components/PopoutView.jsx')).toMatch(/costToDrive=\{costToDrive\}/);
+    });
+
+    it('PresentedChart draws Cost & Time from it, and a Home panel decodes its own', () => {
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/<CostTimeView[\s\S]{0,200}settings=\{costToDrive\}/);
+        expect(read('src/utils/featuredComparisons.js')).toMatch(/costToDrive:\s+decodeCostToDriveKey\(parsed\.costToDrive\)\.settings/);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/costToDrive=\{seed\.costToDrive\}/);
     });
 });
