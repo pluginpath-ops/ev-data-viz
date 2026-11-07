@@ -10033,6 +10033,7 @@ a.is-test-link:focus-visible {
 /* The Weekly Charging Plan's table, transposed: a column a day, a row a
    figure. The fast-charging rows are outlined in the chart's stop color. */
 .plan-table .plan-table-label { font-weight: 600; }
+.plan-table-footnote { padding: 6px 10px; }
 .plan-table tr.is-fast > td { background-color: color-mix(in srgb, var(--color-accent-orange) 8%, transparent); }
 .plan-table tr.is-fast > td:first-child { border-left: 1px solid var(--color-accent-orange); }
 .plan-table tr.is-fast > td:last-child { border-right: 1px solid var(--color-accent-orange); }

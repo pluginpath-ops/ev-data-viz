@@ -19,18 +19,21 @@ const clockText = (h) => weekTimeText(h % 24).slice(4);
 
 /**
  * A row a figure: its name, each day's cell, and whether it is a fast-charging
- * row. Owner, 2026-11-07: home first, then fast; the unit in the row's name
- * rather than beside each figure, and no notes under the cells, so every cell
- * is one plain line.
+ * row. Owner, 2026-11-07: home first, then fast; the % written in the figure,
+ * not beside it in the unit style, and no notes under the cells, so every cell
+ * is one plain line. A night the plug-in window cut short is marked with an
+ * asterisk on its time, explained under the table.
  */
 const ROWS = [
     { key: 'type', label: 'Day type', cell: (d) => ({ text: TYPE_NAMES[d.type] }) },
-    { key: 'home', label: 'Home adds (%)', cell: (d) => ({ text: d.night.added >= 0.5 ? `+${Math.round(d.night.added)}` : DASH }) },
-    { key: 'start', label: 'Starts at (%)', cell: (d) => ({ text: String(Math.round(d.startSoc)) }) },
+    { key: 'home', label: 'Home adds', cell: (d) => ({ text: d.night.added >= 0.5 ? `+${Math.round(d.night.added)}%` : DASH }) },
+    { key: 'start', label: 'Starts at', cell: (d) => ({ text: `${Math.round(d.startSoc)}%` }) },
     {
         // When the night ends: the battery full, or the plug-in window over.
         key: 'ready', label: 'Ready at',
-        cell: (d, s) => ({ text: d.night.added >= 0.5 ? clockText(d.night.ranOut ? s.plugUntil : d.night.fullAt) : DASH }),
+        cell: (d, s) => (d.night.added >= 0.5
+            ? { text: clockText(d.night.ranOut ? s.plugUntil : d.night.fullAt), mark: d.night.ranOut ? '*' : '' }
+            : { text: DASH }),
     },
     { key: 'homeCost', label: 'Home cost', cell: (d, s, homeCost) => ({ text: d.night.added >= 0.5 ? dollars(homeCost(d.night)) : DASH }) },
     {
@@ -78,6 +81,11 @@ export default function PlanTable({ week, settings }) {
                     })}
                 </tbody>
             </table>
+            {week.days.some(d => d.night.ranOut) && (
+                <p className="text-note plan-table-footnote">
+                    * Stopped by your plug-in schedule ({clockText(settings.plugFrom)} to {clockText(settings.plugUntil)}) before reaching its limit.
+                </p>
+            )}
         </div>
     );
 }
