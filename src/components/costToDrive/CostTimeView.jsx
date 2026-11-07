@@ -3,7 +3,7 @@
  * `drivecost`, docs/cost-to-drive-plan.md).
  *
  * A card per car with the two answers (what it saves a month, the time it costs
- * a week) and the stops behind them, then the same two as bar charts: cost per
+ * a month) and the stops behind them, then the same two as bar charts: cost per
  * month, home and fast charging stacked, and time per month, fast charging against
  * fill-ups. Both charts are Chart.js in a PlotFrame, so the PNG capture, the
  * copy-link button (which carries the Cost to Drive key) and the source line
@@ -17,7 +17,7 @@ import { withAlpha, SERIES_NEUTRAL } from '../../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
 import {
-    dollars, minutesText, savedText, extraTimeText, perMonth, weekSummary,
+    dollars, minutesText, savedText, perMonth, weekSummary,
 } from '../../utils/costToDrive';
 import { HOME_LEVELS } from '../../constants/costToDrive';
 import { useCostToDrive } from '../../hooks/useCostToDrive';
@@ -32,12 +32,19 @@ import { levelLabel } from './HomeLevelPicker';
 
 const GAS_LABEL = 'Your gas car';
 
-/** "3 fast stops a week, 1 h 8 min", or that home charging covers it. */
+/**
+ * Everything on this tab is a month (owner, 2026-11-07): the simulated week ×
+ * 52 ÷ 12, as the cost always was. Stops round to whole ones.
+ */
+/** "13 fast stops a month · 4 h 51 min · $100 fast", or that home charging covers it. */
 function stopLine(week) {
-    if (week.stopCount === 0) return 'No fast stops: home charging covers the week';
-    const n = week.stopCount;
-    return `${n} fast stop${n === 1 ? '' : 's'} a week · ${minutesText(week.fastMinutes)} · ${dollars(week.fastCost)} a week fast`;
+    if (week.stopCount === 0) return 'No fast stops: home charging covers the month';
+    const n = Math.max(1, Math.round(perMonth(week.stopCount)));
+    return `About ${n} fast stop${n === 1 ? '' : 's'} a month · ${minutesText(perMonth(week.fastMinutes))} · ${dollars(perMonth(week.fastCost))} fast`;
 }
+
+/** Extra time a month against the gas car: "+2 h 58 min/mo", "−52 min/mo". */
+const extraMonthText = (extraPerWeek) => `${extraPerWeek >= 0 ? '+' : '−'}${minutesText(perMonth(extraPerWeek))}/mo`;
 
 /** One car's answer, above the charts. */
 function CostTimeCard({ entry, settings }) {
@@ -51,11 +58,11 @@ function CostTimeCard({ entry, settings }) {
             </div>
             <div className="drive-result-figures">
                 <span className={`drive-figure ${c.monthly.saved >= 0 ? 'is-saving' : 'is-costing'}`}>{savedText(c.monthly.saved)}</span>
-                <span className="drive-figure is-time">{extraTimeText(c.extraMinutesPerWeek)}</span>
+                <span className="drive-figure is-time">{extraMonthText(c.extraMinutesPerWeek)}</span>
             </div>
             <span className="text-secondary">{stopLine(c.week)}</span>
             <span className="text-note">
-                {dollars(c.monthly.ev)}/mo to charge against {dollars(c.monthly.gas)}/mo in gas, in a {settings.season} week.
+                {dollars(c.monthly.ev)}/mo to charge against {dollars(c.monthly.gas)}/mo in gas, in {settings.season}.
                 Over a year, {dollars(c.yearly.saved)} {c.yearly.saved >= 0 ? 'less' : 'more'}.
             </span>
         </section>
