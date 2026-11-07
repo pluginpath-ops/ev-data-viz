@@ -5,7 +5,7 @@
  *
  * Transposed (owner, 2026-11-07): a column a day, so it sits under the chart
  * with the days in the chart's order, and a row a figure. The three fast-
- * charging rows are outlined in orange, the chart's stop color. It replaced
+ * charging rows are outlined in orange, the chart’s stop color. It replaced
  * the day strip, whose boxes said the same things again.
  */
 import { dollars, minutesText, weekTimeText } from '../../utils/costToDrive';
@@ -17,41 +17,44 @@ const DASH = '—';
 /** A clock time from an hour of the day, fractional: "4:10 am". */
 const clockText = (h) => weekTimeText(h % 24).slice(4);
 
-/** A row a figure: its name, each day's cell, and whether it is a fast-charging row. */
+/**
+ * A row a figure: its name, each day's cell, and whether it is a fast-charging
+ * row. Owner, 2026-11-07: home first, then fast; the unit in the row's name
+ * rather than beside each figure, and no notes under the cells, so every cell
+ * is one plain line.
+ */
 const ROWS = [
     { key: 'type', label: 'Day type', cell: (d) => ({ text: TYPE_NAMES[d.type] }) },
-    { key: 'miles', label: 'Miles', cell: (d) => (d.miles ? { text: String(d.miles), unit: 'mi', numeric: true } : { text: DASH, numeric: true }) },
-    { key: 'start', label: 'Starts at', cell: (d) => ({ text: String(Math.round(d.startSoc)), unit: '%', numeric: true }) },
+    { key: 'home', label: 'Home adds (%)', cell: (d) => ({ text: d.night.added >= 0.5 ? `+${Math.round(d.night.added)}` : DASH }) },
+    { key: 'start', label: 'Starts at (%)', cell: (d) => ({ text: String(Math.round(d.startSoc)) }) },
+    {
+        // When the night ends: the battery full, or the plug-in window over.
+        key: 'ready', label: 'Ready at',
+        cell: (d, s) => ({ text: d.night.added >= 0.5 ? clockText(d.night.ranOut ? s.plugUntil : d.night.fullAt) : DASH }),
+    },
+    { key: 'homeCost', label: 'Home cost', cell: (d, s, homeCost) => ({ text: d.night.added >= 0.5 ? dollars(homeCost(d.night)) : DASH }) },
     {
         key: 'stops', label: 'Fast stops', fast: true,
-        cell: (d) => ({ text: d.stops.length ? String(d.stops.length) : DASH, numeric: true, note: d.plannedSkipped ? 'planned, skipped' : (d.stops.some(s => s.planned) ? 'planned' : null) }),
+        cell: (d) => ({ text: d.stops.length ? `${d.stops.length}${d.stops.some(x => x.planned) ? ' planned' : ''}` : (d.plannedSkipped ? 'skipped' : DASH) }),
     },
     {
         key: 'fastMin', label: 'Fast time', fast: true,
-        cell: (d) => { const m = d.stops.reduce((t, s) => t + s.minutes, 0); return { text: m ? minutesText(m) : DASH, numeric: true }; },
+        cell: (d) => { const m = d.stops.reduce((t, x) => t + x.minutes, 0); return { text: m ? minutesText(m) : DASH }; },
     },
     {
         key: 'fastCost', label: 'Fast cost', fast: true,
-        cell: (d) => { const c = d.stops.reduce((t, s) => t + s.cost, 0); return { text: c ? dollars(c) : DASH, numeric: true }; },
-    },
-    {
-        key: 'home', label: 'Home adds',
-        cell: (d) => (d.night.added >= 0.5 ? { text: `+${Math.round(d.night.added)}`, unit: '%', numeric: true } : { text: DASH, numeric: true }),
-    },
-    {
-        key: 'end', label: 'Ready at',
-        // When: full, or the end of the plug-in window when the night ran out.
-        cell: (d, s) => ({
-            text: String(Math.round(d.night.endSoc)), unit: '%', numeric: true,
-            note: d.night.added >= 0.5 ? clockText(d.night.ranOut ? s.plugUntil : d.night.fullAt) : null,
-        }),
+        cell: (d) => { const c = d.stops.reduce((t, x) => t + x.cost, 0); return { text: c ? dollars(c) : DASH }; },
     },
 ];
 const FAST_KEYS = ROWS.filter(r => r.fast).map(r => r.key);
 
 export default function PlanTable({ week, settings }) {
+    // A night's cost: the week's home cost by its share of what the nights
+    // added, since every night is bought at one price through one charger.
+    const nightsAdded = week.days.reduce((t, d) => t + d.night.added, 0);
+    const homeCost = (night) => (nightsAdded > 0 ? week.homeCost * night.added / nightsAdded : 0);
     const cols = [
-        { key: 'figure', label: '', holds: 'short-values' },
+        { key: 'figure', label: '', holds: 'noted-figures' },
         ...week.days.map(d => ({ key: d.day, label: d.day, numeric: true })),
     ];
     return (
@@ -67,8 +70,8 @@ export default function PlanTable({ week, settings }) {
                             <tr key={r.key} className={r.fast ? `is-fast${edge}` : undefined}>
                                 <TableCell text={r.label} className="plan-table-label" />
                                 {week.days.map(d => {
-                                    const c = r.cell(d, settings);
-                                    return <TableCell key={d.day} {...c} />;
+                                    const c = r.cell(d, settings, homeCost);
+                                    return <TableCell key={d.day} numeric {...c} />;
                                 })}
                             </tr>
                         );
