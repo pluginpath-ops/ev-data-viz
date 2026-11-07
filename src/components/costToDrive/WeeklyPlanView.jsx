@@ -31,14 +31,15 @@ import DayBarsChart from './DayBarsChart';
 import PlanTable from './PlanTable';
 import { levelLabel } from './HomeLevelPicker';
 
-const FADES_PCT = [[0, 10], [80, 100]];
+/** Where the everyday battery range ends, drawn dashed on the week's line. */
+const GUIDES_PCT = [10, 80];
 
-/** "3 fast stops · 1 h 8 min · $23 fast + $49 home a week". */
+/** "3 fast stops · 1 h 8 min · $23 fast + $49 home per week". */
 function weekLine(week) {
     const stops = week.stopCount === 0
         ? 'No fast stops'
         : `${week.stopCount} fast stop${week.stopCount === 1 ? '' : 's'} · ${minutesText(week.fastMinutes)}`;
-    return `${stops} · ${dollars(week.fastCost)} fast + ${dollars(week.homeCost)} home a week`;
+    return `${stops} · ${dollars(week.fastCost)} fast + ${dollars(week.homeCost)} home per week`;
 }
 
 /** What one week of a car draws: its points in miles, its stops as bands. */
@@ -50,7 +51,7 @@ function chartOf(week, profile) {
         max: 100 * miPerPct,
         format: (v) => `${Math.round(v)} mi left`,
         right: (v) => `${Math.round(v / miPerPct)}%`,
-        fades: FADES_PCT.map(([lo, hi]) => [lo * miPerPct, hi * miPerPct]),
+        guides: GUIDES_PCT.map(p => p * miPerPct),
         stops: week.stops.map(s => ({ from: s.hour, to: s.endHour, planned: s.planned, label: `${Math.round(s.minutes)}m` })),
     };
 }

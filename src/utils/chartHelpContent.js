@@ -307,7 +307,7 @@ export const CHART_HELP_DEFAULTS = {
             'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +
             'at home overnight. Each orange band is a fast stop, labelled with its minutes ' +
             '(detour and time to start and pay in); a lighter one is a planned fast charge. ' +
-            'The bottom 10% and top 20% are faded: you rarely live there. Under the chart, ' +
+            'The dashed lines at 10% and 80% mark the everyday range. Under the chart, ' +
             'the week as a table, a column a day: the fast-charging rows (stops, time, ' +
             'cost) are outlined in orange, and "Ready at" gives the time the night filled ' +
             'the battery, or the end of your plug-in window when it ran out. Compare with the other ' +

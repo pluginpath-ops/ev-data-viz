@@ -6,7 +6,9 @@
  * PlotFrame, with the PNG capture and source line every chart here has.
  *
  * Owner, 2026-11-07: range in miles on the left, the battery's percent on the
- * right, 0–10% and 80–100% faded rather than a highlighted band.
+ * right, and a dashed line at 10% and at 80% where the battery's everyday
+ * range ends. Those two were fades over 0–10% and 80–100% until the owner
+ * found them distracting (2026-11-07).
  */
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
@@ -26,11 +28,11 @@ const WEEK_HOURS = 7 * 24;
 const NO_SOURCES = {};
 
 /**
- * Bands over the plot: stops (vertical, over their minutes) and faded ranges
- * (horizontal, over the plot's top and bottom). Drawn after the line, so a
- * fade fades the line too.
+ * Marks over the plot: stops (vertical bands, over their minutes) and guides
+ * (horizontal dashed lines at left-axis values), the guides drawn after the
+ * line so they read across it.
  */
-const weekMarks = ({ stops, fades }) => ({
+const weekMarks = ({ stops, guides }) => ({
     id: 'weekMarks',
     beforeDatasetsDraw(chart) {
         const { ctx, chartArea: a, scales: { x } } = chart;
@@ -56,13 +58,17 @@ const weekMarks = ({ stops, fades }) => ({
     },
     afterDatasetsDraw(chart) {
         const { ctx, chartArea: a, scales: { y } } = chart;
-        const { background } = chartTheme();
+        const { tick } = chartTheme();
         ctx.save();
-        ctx.globalAlpha = 0.6;
-        ctx.fillStyle = background;
-        for (const [lo, hi] of fades) {
-            const top = y.getPixelForValue(hi), bottom = y.getPixelForValue(lo);
-            ctx.fillRect(a.left, top, a.right - a.left, bottom - top);
+        ctx.strokeStyle = tick;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        for (const v of guides) {
+            const py = Math.round(y.getPixelForValue(v)) + 0.5;
+            ctx.beginPath();
+            ctx.moveTo(a.left, py);
+            ctx.lineTo(a.right, py);
+            ctx.stroke();
         }
         ctx.restore();
     },
@@ -75,12 +81,12 @@ const weekMarks = ({ stops, fades }) => ({
  * @param {(v: number) => string} format    a left-axis value as the tooltip says it
  * @param {(v: number) => string} [right]   a left-axis value on the right axis ("46%")
  * @param {Array<{from, to, label?, planned?}>} [stops]  bands, in hours of the week
- * @param {Array<[number, number]>} [fades] left-axis ranges drawn faded
+ * @param {number[]} [guides]             left-axis values drawn as dashed lines
  * @param {string} color                    the series color
  * @param {{runs, allRuns, epa}} [sources]  what the line was priced from, for its source line (useSourceLine)
  */
 export default function WeekLineChart({
-    points, max, yLabel, format, right = null, stops = [], fades = [], color,
+    points, max, yLabel, format, right = null, stops = [], guides = [], color,
     title, subtitle, sources = NO_SOURCES, signature, presentationMode = false, height = '340px', linkButton = false,
 }) {
     const sourceLine = useSourceLine(sources);
@@ -106,7 +112,7 @@ export default function WeekLineChart({
                     tension: 0,
                 }],
             },
-            plugins: [weekMarks({ stops, fades })],
+            plugins: [weekMarks({ stops, guides })],
             options: {
                 animation: false,
                 responsive: true,

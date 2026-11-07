@@ -63,8 +63,8 @@ function DrivePreview({ priced, settings, onOpenMode }) {
             ))}
             {onOpenMode && priced.some(p => !p.missing) && (
                 <div className="drive-presets">
-                    <button type="button" className="btn-toggle" onClick={() => onOpenMode('drivecost')}>See Cost &amp; Time →</button>
-                    <button type="button" className="btn-toggle" onClick={() => onOpenMode('driveplan')}>See the week →</button>
+                    <button type="button" className="btn btn-primary" onClick={() => onOpenMode('drivecost')}>Compare ↘</button>
+                    <button type="button" className="btn btn-primary" onClick={() => onOpenMode('driveplan')}>Weekly Charging Plan ↘</button>
                 </div>
             )}
         </aside>
