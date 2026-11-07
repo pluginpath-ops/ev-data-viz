@@ -1,12 +1,18 @@
 /**
  * Weekly Charging Plan — one vehicle's week (mode `driveplan`,
- * docs/cost-to-drive-plan.md): range left over the week with every fast stop
- * where it happens, the day strip under it, an optional comparison stacked
+ * docs/cost-to-drive-plan.md): the week day by day as bars (DayBarsChart),
+ * or as a line of range left with every fast stop where it happens
+ * (WeekLineChart); the day strip under it, an optional comparison stacked
  * below (another charger level, or the other season), the gas car's week
  * collapsed by default, and the week as a table.
  *
- * The vehicle and the comparison are picked here and are not in the link: the
- * key holds the reader's week, and every vehicle selected is in `v` already.
+ * Owner, 2026-11-07: the bars from the morning's level first, the bars as
+ * charge in and used behind the same picker, the line kept as the third. The
+ * vehicle is a dropdown, which holds any number of them.
+ *
+ * The vehicle, the chart and the comparison are picked here and are not in
+ * the link: the key holds the reader's week, and every vehicle selected is in
+ * `v` already.
  */
 import { useMemo, useState } from 'react';
 import { vehicleLabel } from '../../utils/specHelpers';
@@ -21,6 +27,7 @@ import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
 import ChartInfoBubble from '../ChartInfoBubble';
 import CostToDriveSidebar from './CostToDriveSidebar';
 import WeekLineChart from './WeekLineChart';
+import DayBarsChart from './DayBarsChart';
 import DayStrip from './DayStrip';
 import PlanTable from './PlanTable';
 import { levelLabel } from './HomeLevelPicker';
@@ -49,12 +56,26 @@ function chartOf(week, profile) {
     };
 }
 
+/** The plan's charts, first the default. */
+const PLAN_CHARTS = [
+    ['morning', 'Day by day, from the morning'],
+    ['balance', 'Day by day, charge in and used'],
+    ['line', 'The week as a line'],
+];
+
 const seasonText = (s, season) => season === 'winter' ? `Winter, ${s.winterF}°F` : `Summer, ${s.summerF}°F`;
+
+/** The week as the picked chart: bars (either reading) or the line. */
+function PlanChart({ kind, week, profile, ...chart }) {
+    if (kind === 'line') return <WeekLineChart {...chartOf(week, profile)} yLabel="Range left (mi)" {...chart} />;
+    return <DayBarsChart week={week} view={kind} {...chart} />;
+}
 
 export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings, onChange, onOpenSetup, presentationMode = false }) {
     const priced = useCostToDrive(vehicles, selectedVehicleIds, settings);
     const shown = priced.filter(p => !p.missing);
     const [pickedId, setPickedId] = useState(null);
+    const [chartKind, setChartKind] = useState('morning');
     const entry = shown.find(p => p.vehicle.id === pickedId) ?? shown[0] ?? null;
 
     // The comparison: none, the other season, or another charger level.
@@ -89,7 +110,6 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                 )}
                 {entry && (() => {
                     const week = entry.comparison.week;
-                    const main = chartOf(week, entry.profile);
                     const name = vehicleLabel(entry.vehicle);
                     const level = levelLabel(HOME_LEVELS[settings.level]);
                     const subtitle = `${weekSummary(settings)} · ${seasonText(settings, settings.season)} · home ${level}`;
@@ -113,23 +133,30 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                             {!presentationMode && (
                                 <div className="plan-controls">
                                     {shown.length > 1 && (
-                                        <div className="stats-segmented" role="group" aria-label="Vehicle">
-                                            {shown.map(p => (
-                                                <button key={p.vehicle.id} type="button"
-                                                        aria-pressed={p === entry} className={p === entry ? 'active' : undefined}
-                                                        onClick={() => setPickedId(p.vehicle.id)}>
-                                                    {vehicleLabel(p.vehicle)}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        <label className="plan-control">
+                                            <span className="text-label">Vehicle</span>
+                                            <select className="form-input" value={entry.vehicle.id}
+                                                    onChange={e => setPickedId(Number(e.target.value))}>
+                                                {shown.map(p => (
+                                                    <option key={p.vehicle.id} value={p.vehicle.id}>{vehicleLabel(p.vehicle)}</option>
+                                                ))}
+                                            </select>
+                                        </label>
                                     )}
+                                    <label className="plan-control">
+                                        <span className="text-label">Chart</span>
+                                        <select className="form-input" value={chartKind} onChange={e => setChartKind(e.target.value)}>
+                                            {PLAN_CHARTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                                        </select>
+                                    </label>
                                     <span className="text-secondary">{weekLine(week)}</span>
                                 </div>
                             )}
-                            <WeekLineChart
-                                {...main}
+                            <PlanChart
+                                kind={chartKind}
+                                week={week}
+                                profile={entry.profile}
                                 color={entry.color}
-                                yLabel="Range left (mi)"
                                 title={`${name}: a week of charging`}
                                 subtitle={subtitle}
                                 sources={sources}
@@ -161,10 +188,11 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                             {cmp && (
                                 <div className="mt-4">
                                     <span className="text-secondary">{weekLine(cmp.week)}</span>
-                                    <WeekLineChart
-                                        {...chartOf(cmp.week, cmp.profile)}
+                                    <PlanChart
+                                        kind={chartKind}
+                                        week={cmp.week}
+                                        profile={cmp.profile}
                                         color={entry.color}
-                                        yLabel="Range left (mi)"
                                         title={cmp.title}
                                         subtitle={cmp.subtitle}
                                         sources={sources}

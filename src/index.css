@@ -10029,6 +10029,9 @@ a.is-test-link:focus-visible {
     margin-bottom: 12px;
 }
 .plan-compare { margin: 16px 0 0; }
+/* One labelled dropdown in the plan's controls: Vehicle, Chart. */
+.plan-control { display: inline-flex; align-items: center; gap: 8px; }
+.plan-control .form-input { width: auto; max-width: 22rem; }
 /* The day strip: a column a day under the chart, its stops as chips. Long days
    carry the week picker's tint, so the two read as one week. */
 .day-strip {
