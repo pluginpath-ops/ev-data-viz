@@ -87,6 +87,27 @@ describe('the week', () => {
     });
 });
 
+describe('the week as a line', () => {
+    // A big pack on a modest charger: Sunday night's charge to 100% for
+    // Monday's long day runs past midnight, into the next week.
+    const bigPack = profile({ usableKwh: 135, home: { kw: 3.84, eff: 0.885 } });
+
+    it('runs forward in time, inside the week, even when Sunday night runs past midnight', () => {
+        for (const p of [profile(), bigPack, profile(wallOutlet)]) {
+            const { points } = simulateWeek(p, settings());
+            for (let i = 1; i < points.length; i++) expect(points[i][0]).toBeGreaterThanOrEqual(points[i - 1][0]);
+            expect(points[0][0]).toBe(0);
+            expect(points.at(-1)[0]).toBe(7 * 24);
+        }
+    });
+
+    it('wraps: Monday 0:00 is where Sunday midnight left the battery, mid-charge', () => {
+        const { points, days } = simulateWeek(bigPack, settings());
+        expect(points[0][1]).toBeCloseTo(points.at(-1)[1], 6);
+        expect(points[0][1]).toBeLessThan(days[6].night.endSoc);
+    });
+});
+
 describe('the gas car', () => {
     it('averages fill-ups a week from the gallons, since one sample week is lumpy', () => {
         const g = simulateGasWeek(settings());

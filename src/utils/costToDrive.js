@@ -243,6 +243,7 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
     })();
 
     let soc = s.chargeTo;
+    let sundayNight = null;
     const out = { points: [], stops: [], days: [], miles: 0, usedKwh: 0, fastPackKwh: 0, homePackKwh: 0, fastMinutes: 0 };
 
     for (let w = 0; w <= SETTLE_WEEKS; w++) {
@@ -295,8 +296,11 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
             if (type === 'O' && planned(d)) plannedStop(PLANNED_STOP_HOUR);
             let threshold = soc < s.stopBy ? s.keepAbove + detPct + LATE_STOP_MARGIN : s.stopBy;
             const spans = DAY_SPANS[type];
+            // The day's clock: a stop that runs past a span's end pushes the
+            // next span later, rather than the line stepping back in time.
+            let clock = 0;
             spans.forEach((span, i) => {
-                let hour = span.from;
+                let hour = Math.max(span.from, clock);
                 if (i > 0 && planned(d)) hour = plannedStop(hour);
                 if (rec && i > 0) out.points.push([base + hour, soc]);
                 let left = usePct * span.share;
@@ -321,13 +325,15 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
                     hour = stopAt(hour, to, false);
                     threshold = s.stopBy;
                 }
+                clock = hour;
             });
 
             // The night: plugged in from plugFrom to plugUntil, to the limit.
             const homeSoc = soc;
             const limit = s.fullBeforeLong && s.week[(d + 1) % 7] === 'L' ? 100 : s.chargeTo;
             const night = { added: 0, endSoc: soc, fullAt: null, ranOut: false };
-            if (rec) out.points.push([base + s.plugFrom, soc]);
+            const plugIn = Math.max(s.plugFrom, clock);
+            if (rec) out.points.push([base + plugIn, soc]);
             if (soc < limit - 1e-9) {
                 const add = Math.min(limit - soc, nightKwh.addPct);
                 night.added = add;
@@ -336,15 +342,27 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
                 night.fullAt = night.ranOut ? null : (s.plugFrom + hours) % 24;
                 soc += add;
                 if (rec) {
-                    out.points.push([base + s.plugFrom + hours, soc]);
+                    out.points.push([base + plugIn + hours, soc]);
                     out.homePackKwh += add / 100 * usable;
+                    if (d === 6) sundayNight = { from: base + plugIn, hours, startSoc: soc - add, add };
                 }
             }
             night.endSoc = soc;
             if (rec) out.days.push({ ...day, homeSoc, night });
         }
     }
-    out.points.push([7 * 24, soc]);
+    // The week wraps. A Sunday night that charges past midnight is, on the
+    // line, Monday morning: cut it at the week's end and carry the rest to
+    // Monday 0:00, which (the week being settled) starts where this one ends.
+    const WEEK = 7 * 24;
+    const n = sundayNight;
+    if (n && n.from + n.hours > WEEK) {
+        const atMidnight = n.startSoc + n.add * (WEEK - n.from) / n.hours;
+        out.points[out.points.length - 1] = [WEEK, atMidnight];
+        out.points.splice(0, 1, [0, atMidnight], [n.from + n.hours - WEEK, soc]);
+    } else {
+        out.points.push([WEEK, soc]);
+    }
 
     const fastKwh = out.fastPackKwh / (1 - DC_FAST_LOSS);
     const homeKwh = out.homePackKwh / profile.home.eff;
