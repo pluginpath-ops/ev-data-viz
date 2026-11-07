@@ -66,7 +66,10 @@ function DrivePreview({ priced, settings }) {
                                 <span className={`text-data ${comparison.monthly.saved >= 0 ? 'is-saving' : 'is-costing'}`}>
                                     {savedText(comparison.monthly.saved)}
                                 </span>
-                                <span className="text-data is-time">{extraTimeText(comparison.extraMinutesPerWeek)}</span>
+                                {/* Less time than the gas car is a saving, green like money saved (owner, 2026-11-07). */}
+                                <span className={`text-data ${comparison.extraMinutesPerWeek < 0 ? 'is-saving' : 'is-time'}`}>
+                                    {extraTimeText(comparison.extraMinutesPerWeek)}
+                                </span>
                             </>
                         )}
                 </div>
