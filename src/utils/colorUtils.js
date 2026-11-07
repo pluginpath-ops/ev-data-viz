@@ -746,9 +746,10 @@ export function hslToHex({ h, s, l }) {
 
 /**
  * A series color with most of its saturation taken out, its lightness kept:
- * the same car, quieter. Cost & Time draws a car's home charging this way under
- * its fast charging in the full color (owner, 2026-11-07), so the part a faster
- * charger can shrink is the part that stands out. Not a hex color: returned as is.
+ * the same car, quieter. The Cost & Time charts draw a car's fast charging this
+ * way on top of its home charging in the full color (owner, 2026-11-07: the
+ * other way round left every chart muted, home being most of the cost). Not a
+ * hex color: returned as is.
  */
 export function desaturate(color, keep = 0.3) {
     if (!/^#[0-9a-f]{6}$/i.test(color ?? '')) return color;

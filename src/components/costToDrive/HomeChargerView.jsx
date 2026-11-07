@@ -145,7 +145,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
             data: {
                 labels: byLevel.map(l => levelLabel(l.level)),
                 // Two bars a car, stacked on the car's own stack: home cost
-                // underneath, desaturated, fast cost on top in the full color —
+                // underneath in the full color, fast cost on top desaturated —
                 // the Compare cost chart's style.
                 datasets: columns.flatMap((c, ci) => ['home', 'fast'].map(part => ({
                     label: vehicleLabel(c.vehicle),
@@ -156,7 +156,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                         const w = at(l.index, c.vehicle.id)?.comparison?.week;
                         return w ? (part === 'home' ? w.homeCost : w.fastCost) : null;
                     }),
-                    backgroundColor: part === 'home' ? desaturate(c.color) : c.color,
+                    backgroundColor: part === 'home' ? c.color : desaturate(c.color),
                 }))),
             },
             plugins: [totalLabels(ds => ds.part === 'fast', (li, ds) => {
@@ -175,8 +175,8 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        // A car once, by its fast bar's full color.
-                        labels: { color: legend, boxWidth: 12, filter: (item, data) => data.datasets[item.datasetIndex].part === 'fast' },
+                        // A car once, by its home bar's full color.
+                        labels: { color: legend, boxWidth: 12, filter: (item, data) => data.datasets[item.datasetIndex].part === 'home' },
                         // Hiding a car hides both its bars.
                         onClick: (e, item, leg) => {
                             const ch = leg.chart;

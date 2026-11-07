@@ -334,8 +334,8 @@ export const CHART_HELP_DEFAULTS = {
             'the Compare sub-tab.',
         how_to_read:
             'Each column is what a car’s week costs with that charger at home: home ' +
-            'charging underneath in a muted shade of its color, fast charging on top in ' +
-            'the full color, the total over it, and the home figure on the home part when there is fast charging too. The faster the charger, the more the night ' +
+            'charging underneath in its color, fast charging on top in a muted shade of ' +
+            'it, the total over it, and the home figure on the home part when there is fast charging too. The faster the charger, the more the night ' +
             'covers and the smaller the fast part. The table has a column a charger and, ' +
             'for each car, its minutes of fast charging and its home, fast and total cost ' +
             'per week. The bold orange cell is “enough from here”: the smallest charger past ' +
