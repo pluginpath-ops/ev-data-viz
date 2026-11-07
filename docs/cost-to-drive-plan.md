@@ -61,8 +61,10 @@ The window is the plug-in hours; a night that runs out says so.
   pick as every chart's default curve), else the spec's 10→80% time, else a
   generic taper from `max_dc_kw`. Detour minutes and time to start and pay are
   added. Energy bought = added ÷ (1 − `DC_FAST_LOSS`).
-- A **planned fast charge** tops up to the cap at midday and is skipped when
-  the car is already above it.
+- A **planned fast charge** tops up to the cap and is skipped when the car is
+  already above it. It happens at **5 pm** by default (`plannedHour`, a
+  setting): at that hour on a day off, and on a driving day in the gap between
+  drives nearest it — before the drive home on a Daily, after a Long day.
 
 **The week.** Days drive in two spans (Long day 7–12 and 12–18; Daily 7–8 and
 17–18) so a stop has a time and a mile. The sim runs three weeks and reports the

@@ -30,7 +30,7 @@ export const COST_TO_DRIVE_PARAM = 'cd';
 export const COST_TO_DRIVE_KEY_VERSION = '1';
 
 /** Version 1's fields, in order. The constants list is append-only, so this is its prefix. */
-const FIELDS_V1 = COST_TO_DRIVE_FIELDS.slice(0, 32);
+const FIELDS_V1 = COST_TO_DRIVE_FIELDS.slice(0, 33);
 
 /** Version 1's defaults, frozen: what a key written now leaves out. */
 const V1_DEFAULTS = Object.freeze({
@@ -40,7 +40,7 @@ const V1_DEFAULTS = Object.freeze({
     detourMin: 10, stopBy: 30, capTo: 70, keepAbove: 10, startMin: 5, fastPrice: 0.48,
     season: 'winter', summerF: 75, winterF: 15, winterMonths: 4, elevationFt: 800,
     gasCity: 18, gasHwy: 24, gasPrice: 3.20, gasTank: 26, gasFillAt: 15, gasFillMin: 8,
-    efficiencyFrom: 'tested',
+    efficiencyFrom: 'tested', plannedHour: 17,
 });
 
 const decimalsOf = (step) => String(step).split('.')[1]?.length ?? 0;

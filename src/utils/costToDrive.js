@@ -12,7 +12,7 @@
  */
 import {
     HOME_LEVELS, levelKw, WALL_OUTLET_CHARGER_EFF, ASSUMED_ONBOARD_AC_KW, DETOUR_MPH,
-    MIN_STOP_ADD, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS, PLANNED_STOP_HOUR,
+    MIN_STOP_ADD, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS,
     SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, WEEKDAYS,
 } from '../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, HWFET_AVG_MPH, STANDARD_CONDITIONS } from '../constants/epa';
@@ -207,6 +207,24 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
 const dayMiles = (type, s) => (type === 'L' ? s.longMi : type === 'D' ? s.dailyMi : 0);
 
 /**
+ * Where a planned fast charge sits in a day: the gap between drives nearest
+ * `hour` — before the first, between two, or after the last — and the hour in
+ * it. A day off is one gap, the whole day.
+ * @returns {{ gap: number, hour: number }}  gap i is before span i; spans.length is after the last
+ */
+export function plannedSlot(spans, hour) {
+    const gaps = spans.length
+        ? spans.map((sp, i) => [i === 0 ? 0 : spans[i - 1].to, sp.from]).concat([[spans.at(-1).to, 24]])
+        : [[0, 24]];
+    let best = null;
+    gaps.forEach(([lo, hi], gap) => {
+        const at = Math.min(hi, Math.max(lo, hour));
+        if (!best || Math.abs(at - hour) < Math.abs(best.hour - hour)) best = { gap, hour: at };
+    });
+    return best;
+}
+
+/**
  * Drive a week. Three weeks are driven and the last reported, so Monday starts
  * from whatever Sunday night left, not from a guess.
  *
@@ -215,7 +233,8 @@ const dayMiles = (type, s) => (type === 'L' ? s.longMi : type === 'D' ? s.dailyM
  * at keepAbove + the detour + LATE_STOP_MARGIN, if the day started below it —
  * and charges enough to finish the day above `keepAbove`, at least MIN_STOP_ADD,
  * under `capTo`, stretching to STRETCH_CAP_TO when that saves a second stop.
- * A planned day tops up to `capTo` at midday unless already above it.
+ * A planned day tops up to `capTo` unless already above it, at `plannedHour`
+ * on a day off and in the gap between drives nearest it on a driving day.
  *
  * @param {Object} profile   costToDriveVehicle's answer (missing must be null)
  * @param {Object} settings  normalized settings
@@ -244,6 +263,8 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
 
     let soc = s.chargeTo;
     let sundayNight = null;
+    // Hours into today the last night's charging ran: the day starts no earlier.
+    let morning = 0;
     const out = { points: [], stops: [], days: [], miles: 0, usedKwh: 0, fastPackKwh: 0, homePackKwh: 0, fastMinutes: 0 };
 
     for (let w = 0; w <= SETTLE_WEEKS; w++) {
@@ -258,7 +279,6 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
             const day = { day: WEEKDAYS[d], type, miles, kwhUsed: miles * wh / 1000, startSoc: soc, plannedSkipped: false, stops: [] };
             if (rec) {
                 if (d === 0) out.points.push([0, soc]);
-                out.points.push([base + 7, soc]);
                 out.miles += miles;
                 out.usedKwh += day.kwhUsed;
             }
@@ -293,16 +313,17 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
                 return hour;
             };
 
-            if (type === 'O' && planned(d)) plannedStop(PLANNED_STOP_HOUR);
-            let threshold = soc < s.stopBy ? s.keepAbove + detPct + LATE_STOP_MARGIN : s.stopBy;
             const spans = DAY_SPANS[type];
+            const plan = planned(d) ? plannedSlot(spans, s.plannedHour) : null;
             // The day's clock: a stop that runs past a span's end pushes the
             // next span later, rather than the line stepping back in time.
-            let clock = 0;
+            let clock = morning;
+            if (plan?.gap === 0) clock = plannedStop(Math.max(plan.hour, clock));
+            let threshold = soc < s.stopBy ? s.keepAbove + detPct + LATE_STOP_MARGIN : s.stopBy;
             spans.forEach((span, i) => {
                 let hour = Math.max(span.from, clock);
-                if (i > 0 && planned(d)) hour = plannedStop(hour);
-                if (rec && i > 0) out.points.push([base + hour, soc]);
+                if (i > 0 && plan?.gap === i) hour = plannedStop(Math.max(plan.hour, clock));
+                if (rec) out.points.push([base + hour, soc]);
                 let left = usePct * span.share;
                 const rate = left / (span.to - span.from);
                 const later = spans.slice(i + 1).reduce((a, x) => a + usePct * x.share, 0);
@@ -327,6 +348,7 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
                 }
                 clock = hour;
             });
+            if (spans.length && plan?.gap === spans.length) clock = plannedStop(Math.max(plan.hour, clock));
 
             // The night: plugged in from plugFrom to plugUntil, to the limit.
             const homeSoc = soc;
@@ -348,6 +370,7 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
                 }
             }
             night.endSoc = soc;
+            morning = Math.max(0, plugIn + (night.added ? night.added / nightKwh.addPct * nightKwh.hours : 0) - 24);
             if (rec) out.days.push({ ...day, homeSoc, night });
         }
     }

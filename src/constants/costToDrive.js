@@ -67,8 +67,6 @@ export const DAY_SPANS = {
     O: [],
 };
 
-/** When a planned fast charge happens on a day off. */
-export const PLANNED_STOP_HOUR = 12;
 
 /** The weeks simulated before the one reported, so Monday starts from a settled state. */
 export const SETTLE_WEEKS = 2;
@@ -129,6 +127,10 @@ export const COST_TO_DRIVE_FIELDS = [
     { key: 'gasFillAt',      kind: 'num',  min: 5,    max: 50,   step: 5,    def: 15 },
     { key: 'gasFillMin',     kind: 'num',  min: 2,    max: 30,   step: 1,    def: 8 },
     { key: 'efficiencyFrom', kind: 'enum', values: ['tested', 'epa'], def: 'tested' },
+    // When a planned fast charge happens: at this hour on a day off; on a
+    // driving day, in the gap between drives nearest it (owner, 2026-11-07:
+    // "~5pm, or perhaps configurable").
+    { key: 'plannedHour',    kind: 'num',  min: 0,    max: 23,   step: 1,    def: 17 },
 ];
 
 /** The settings an untouched page shows. */

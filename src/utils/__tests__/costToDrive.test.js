@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    simulateWeek, simulateGasWeek, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth,
+    simulateWeek, simulateGasWeek, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
 import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO } from '../../constants/costToDrive';
@@ -84,6 +84,34 @@ describe('the week', () => {
         expect(w.homeCost).toBeCloseTo(w.homeKwh * 0.17, 6);
         expect(w.fastShare).toBeGreaterThan(0);
         expect(w.fastShare).toBeLessThan(0.25);
+    });
+});
+
+describe('when a planned fast charge happens', () => {
+    const at = (week, d) => simulateWeek(profile(wallOutlet), settings({ week, planned: 1 << d })).stops.find(x => x.planned);
+
+    it('at 5 pm on a day off by default, and at the hour set', () => {
+        expect(at('LDLDLDO', 6).hour).toBe(6 * 24 + 17);
+        expect(simulateWeek(profile(wallOutlet), settings({ plannedHour: 10 })).stops.find(x => x.planned).hour).toBe(6 * 24 + 10);
+    });
+
+    it('on a driving day, in the gap between drives nearest the hour', () => {
+        // A Daily drives 7–8 and 17–18: 5 pm is the gap before the drive home.
+        expect(plannedSlot([{ from: 7, to: 8 }, { from: 17, to: 18 }], 17)).toEqual({ gap: 1, hour: 17 });
+        expect(plannedSlot([{ from: 7, to: 8 }, { from: 17, to: 18 }], 12)).toEqual({ gap: 1, hour: 12 });
+        // A Long day drives 7–12 and 12–18: 5 pm is nearest the end of it.
+        expect(plannedSlot([{ from: 7, to: 12 }, { from: 12, to: 18 }], 17)).toEqual({ gap: 2, hour: 18 });
+        expect(plannedSlot([{ from: 7, to: 12 }, { from: 12, to: 18 }], 6)).toEqual({ gap: 0, hour: 6 });
+        expect(plannedSlot([], 17)).toEqual({ gap: 0, hour: 17 });
+    });
+
+    it('keeps the line running forward wherever the stop lands', () => {
+        for (const plannedHour of [0, 6, 12, 17, 23]) {
+            for (const p of [profile(), profile(wallOutlet)]) {
+                const { points } = simulateWeek(p, settings({ planned: 0b1111111, plannedHour }));
+                for (let i = 1; i < points.length; i++) expect(points[i][0]).toBeGreaterThanOrEqual(points[i - 1][0]);
+            }
+        }
     });
 });
 
