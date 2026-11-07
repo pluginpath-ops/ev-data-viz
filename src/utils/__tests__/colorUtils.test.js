@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+    desaturate,
     resolvePairColors, seriesColorNote, DEFAULT_RUN_COLOR, OKABE_ITO_SET,
     hexToHsl, hslToHex, rotatePaletteFrom, paletteSlotOf, rampFrom, seedPreview,
     seriesRowsOf, expandPalette, OKABE_ITO, SERIES_NEUTRAL, resolveChartColors, seedPlot,
@@ -618,5 +619,18 @@ describe('withAlpha', () => {
     it('leaves anything it cannot read unchanged', () => {
         expect(withAlpha('rebeccapurple', 0.2)).toBe('rebeccapurple');
         expect(withAlpha(null, 0.2)).toBeNull();
+    });
+});
+
+describe('desaturate', () => {
+    it('takes out saturation and keeps hue and lightness', () => {
+        const before = hexToHsl('#db0606'), after = hexToHsl(desaturate('#db0606'));
+        expect(after.s).toBeCloseTo(before.s * 0.3, 0);
+        expect(after.l).toBeCloseTo(before.l, 0);
+        expect(after.h).toBeCloseTo(before.h, 0);
+    });
+    it('leaves anything it cannot read unchanged', () => {
+        expect(desaturate('rgba(1, 2, 3, 0.5)')).toBe('rgba(1, 2, 3, 0.5)');
+        expect(desaturate(null)).toBeNull();
     });
 });
