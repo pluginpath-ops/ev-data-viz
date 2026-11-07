@@ -200,6 +200,6 @@ export function decodeCostToDriveKey(key) {
         if (at.i !== bytes.length) throw new Error('trailing bytes');
         return { settings: normalizeCostToDrive(out), error: null };
     } catch {
-        return { settings: defaults, error: 'This link\'s Cost to Drive settings could not be read, so the defaults are shown.' };
+        return { settings: defaults, error: 'This link\'s Cost & Time settings could not be read, so the defaults are shown.' };
     }
 }

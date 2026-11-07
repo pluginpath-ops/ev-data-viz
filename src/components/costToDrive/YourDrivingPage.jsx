@@ -29,7 +29,7 @@ function DriveCard({ title, aside, children, className = '' }) {
     );
 }
 
-/** The week in one line: "795 mi a week · three long days, three daily, one off". */
+/** The week in one line: "795 mi per week · three long days, three daily, one off". */
 function weekSummary(settings) {
     const count = (t) => [...settings.week].filter(c => c === t).length;
     const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
@@ -39,7 +39,7 @@ function weekSummary(settings) {
         `${words[count('D')]} daily`,
         `${words[count('O')]} off`,
     ];
-    return `${miles.toLocaleString('en-US')} mi a week · ${parts.join(', ')}`;
+    return `${miles.toLocaleString('en-US')} mi per week · ${parts.join(', ')}`;
 }
 
 /** The selected vehicles against the gas car, as the settings stand. */
@@ -89,16 +89,16 @@ export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings
                     <h2 className="page-title">Your driving</h2>
                     <p className="text-secondary">
                         How you charge, how far you drive, and what you&rsquo;d otherwise fill up with.
-                        Set these once and every Cost to Drive view reads them. They travel in the link,
+                        Set these once and every chart on this tab reads them. They travel in the link,
                         so a friend sees your week as you set it.
                     </p>
                     <div className="drive-presets">
                         {COST_TO_DRIVE_PRESETS.map((p, i) => (
-                            <button key={p.key} type="button" className="btn-toggle" onClick={() => onChange(p.settings)}>
+                            <button key={p.key} type="button" className="btn btn-secondary" onClick={() => onChange(p.settings)}>
                                 {i === 0 ? `Start from: ${p.label}` : p.label}
                             </button>
                         ))}
-                        <button type="button" className="btn-toggle" onClick={() => onChange(DEFAULT_COST_TO_DRIVE)}>
+                        <button type="button" className="btn btn-secondary" onClick={() => onChange(DEFAULT_COST_TO_DRIVE)}>
                             Reset to defaults
                         </button>
                     </div>

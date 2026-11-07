@@ -79,7 +79,9 @@ export const CHART_CATEGORIES = [
         // driving priced against their gas car. Each layer of the build adds its
         // sub-tab here; Your Driving, the landing, is every setting on one page.
         key: 'cost',
-        label: 'Cost to Drive',
+        // Its label was "Cost to Drive" through the build; renamed by the owner
+        // before merging (2026-11-07). The key, `cost`, never changed.
+        label: 'Cost & Time',
         modes: [
             { key: 'drivesetup', label: 'Your Driving' },
         ],
