@@ -32,20 +32,17 @@ import { hourText } from './DriveFields';
 const DASH = '—';
 const kwText = (kw) => `${Math.round(kw * 10) / 10} kW`;
 
-/** One vehicle at one level: the cell's figure and the note beneath it. */
-function cellOf(entry, { enough, current }) {
-    if (!entry || entry.missing) return { text: DASH, note: null };
-    const week = entry.comparison.week;
-    const notes = [
-        week.stopCount === 0 ? 'no stops' : `${week.stopCount} stop${week.stopCount === 1 ? '' : 's'} · ${dollars(week.fastCost)}`,
-        entry.profile.home.capped
-            ? `capped at the car's ${kwText(entry.profile.home.onboardKw)}${entry.profile.home.onboardAssumed ? ' (assumed)' : ''}`
-            : null,
-        enough ? 'enough from here' : null,
-        current ? 'yours' : null,
-    ].filter(Boolean);
-    return { text: week.fastMinutes < 0.5 ? '0 min' : minutesText(week.fastMinutes), note: notes.join(' · ') };
-}
+/**
+ * The table, transposed (owner, 2026-11-07): a column a home charger level, a
+ * group of rows a vehicle — its fast charging a week, then its total cost a
+ * week (home and fast). Every cell is one plain line; what used to be notes
+ * are marks, explained under the table:
+ *  - "enough from here" is the cell in bold;
+ *  - a level the car's onboard charger caps carries a †.
+ */
+const weekOf = (entry) => (entry && !entry.missing ? entry.comparison.week : null);
+const fastText = (w) => (!w ? DASH : w.fastMinutes < 0.5 ? '0 min' : minutesText(w.fastMinutes));
+const totalText = (w) => (!w ? DASH : dollars(w.fastCost + w.homeCost));
 
 export default function HomeChargerView({ vehicles, selectedVehicleIds, settings, onChange, onOpenSetup, presentationMode = false }) {
     const byLevel = useCostToDriveByLevel(vehicles, selectedVehicleIds, settings);
@@ -120,9 +117,14 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
     const png = useChartPng(chartRef, { title, subtitle, sources: sourceLine.text, signature });
 
     const tableCols = [
-        { key: 'level', label: 'Home charger', holds: 'short-values' },
-        ...columns.map(c => ({ key: String(c.vehicle.id), label: vehicleLabel(c.vehicle), fullLabel: vehicleLabel(c.vehicle), numeric: true, holds: 'noted-figures' })),
+        { key: 'figure', label: '', holds: 'noted-figures' },
+        ...byLevel.map(l => ({ key: String(l.index), label: `${levelLabel(l.level)}${l.index === settings.level ? ' (yours)' : ''}`, numeric: true })),
     ];
+    // The onboard chargers that cap a level, for the † footnote.
+    const cappedBy = columns
+        .map(c => byLevel.map(l => at(l.index, c.vehicle.id)).find(e => e && !e.missing && e.profile.home.capped))
+        .filter(Boolean)
+        .map(e => `${vehicleLabel(e.vehicle)} ${kwText(e.profile.home.onboardKw)}${e.profile.home.onboardAssumed ? ' (assumed)' : ''}`);
 
     return (
         <div className="chart-layout">
@@ -150,29 +152,39 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                         {!presentationMode && (
                             <div className="mt-4">
                                 <p className="text-secondary mb-2">
-                                    Fast charging a week at each home charger, everything else as you set it.
-                                    &ldquo;Enough from here&rdquo; is where a bigger charger saves less than five minutes a week.
+                                    Fast charging and total cost a week (home and fast) at each home charger, everything else as you set it.
                                 </p>
                                 <div className="guide-table-container">
-                                    <table className="guide-table">
+                                    <table className="guide-table plan-table">
                                         <thead>
                                             <tr>{tableCols.map(c => <SortHeader key={c.key} col={c} />)}</tr>
                                         </thead>
-                                        <tbody>
-                                            {byLevel.map(l => (
-                                                <tr key={l.index}>
-                                                    <TableCell text={levelLabel(l.level)} />
-                                                    {columns.map(c => {
-                                                        const cell = cellOf(at(l.index, c.vehicle.id), {
-                                                            enough: enough[c.vehicle.id] === l.index,
-                                                            current: l.index === settings.level,
-                                                        });
-                                                        return <TableCell key={c.vehicle.id} numeric text={cell.text} note={cell.note} />;
-                                                    })}
+                                        {columns.map(c => (
+                                            <tbody key={c.vehicle.id}>
+                                                <tr className="plan-table-group">
+                                                    <td colSpan={tableCols.length}>{vehicleLabel(c.vehicle)}</td>
                                                 </tr>
-                                            ))}
-                                        </tbody>
+                                                {[['Fast charging a week', fastText], ['Total cost a week', totalText]].map(([label, text]) => (
+                                                    <tr key={label}>
+                                                        <TableCell text={label} className="plan-table-label" />
+                                                        {byLevel.map(l => {
+                                                            const e = at(l.index, c.vehicle.id);
+                                                            const capped = e && !e.missing && e.profile.home.capped;
+                                                            return (
+                                                                <TableCell key={l.index} numeric text={text(weekOf(e))}
+                                                                           mark={capped ? '†' : ''}
+                                                                           className={enough[c.vehicle.id] === l.index ? 'is-enough' : ''} />
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        ))}
                                     </table>
+                                    <p className="text-note plan-table-footnote">
+                                        <b>Bold</b>: enough from here — a bigger charger saves less than five minutes of fast charging a week.
+                                        {cappedBy.length > 0 && <> † Capped by the car&rsquo;s onboard charger: {cappedBy.join(', ')}.</>}
+                                    </p>
                                 </div>
                             </div>
                         )}

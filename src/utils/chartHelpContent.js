@@ -334,11 +334,11 @@ export const CHART_HELP_DEFAULTS = {
             'Cost & Time.',
         how_to_read:
             'Each bar is the fast charging a car needs in a week with that charger at home: ' +
-            'the shorter, the more the night covers. The table gives the same minutes with ' +
-            'the stops and what they cost. “Enough from here” marks the smallest charger ' +
-            'past which a bigger one saves less than five minutes a week. “Capped at the ' +
-            'car’s … kW” means the car’s own onboard charger, not the wall, sets the pace, ' +
-            'so a bigger charger buys nothing.',
+            'the shorter, the more the night covers. The table has a column a charger ' +
+            'and, for each car, the same minutes and the total cost a week, home and fast. ' +
+            'The bold cell is “enough from here”: the smallest charger past which a bigger ' +
+            'one saves less than five minutes a week. A † means the car’s own onboard ' +
+            'charger, not the wall, sets the pace, so a bigger charger buys nothing.',
         key_terms:
             'Home charger — 120 V on a wall outlet, or 240 V at the amps the circuit allows.\n' +
             'Onboard charger — the car’s own AC charger; it limits how fast any home charger can fill it.\n' +

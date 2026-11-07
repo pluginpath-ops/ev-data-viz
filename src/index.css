@@ -10034,6 +10034,10 @@ a.is-test-link:focus-visible {
    figure. The fast-charging rows are outlined in the chart's stop color. */
 .plan-table .plan-table-label { font-weight: 600; }
 .plan-table-footnote { padding: 6px 10px; }
+/* A vehicle's rows in a transposed table (Home Charger): its name on a row of its own. */
+.plan-table .plan-table-group > td { font-weight: 600; background-color: var(--color-surface-muted); }
+/* Home Charger: the level where a bigger charger stops helping. */
+.plan-table td.is-enough { font-weight: 700; }
 .plan-table tr.is-fast > td { background-color: color-mix(in srgb, var(--color-accent-orange) 8%, transparent); }
 .plan-table tr.is-fast > td:first-child { border-left: 1px solid var(--color-accent-orange); }
 .plan-table tr.is-fast > td:last-child { border-right: 1px solid var(--color-accent-orange); }
