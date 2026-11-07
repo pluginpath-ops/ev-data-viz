@@ -15,9 +15,9 @@ const settings = normalizeCostToDrive({ ...DEFAULT_COST_TO_DRIVE, dailyMi: 45, l
 const weeks = [{ kw: 11.5, eff: 0.885 }, { kw: 1.44, eff: 0.80 }].map(h => simulateWeek(profile(h), settings));
 
 describe('the day by day as bars', () => {
-    it('each day ends where the next morning starts: top − used = next', () => {
+    it('each day ends where the next morning starts', () => {
         for (const w of weeks) {
-            for (const b of dayBars(w)) expect(b.top - b.used).toBeCloseTo(b.next, 6);
+            for (const b of dayBars(w)) expect(b.start + b.fast + b.planned + b.home - b.used).toBeCloseTo(b.next, 6);
         }
     });
 
@@ -30,6 +30,17 @@ describe('the day by day as bars', () => {
         const fastAll = w.stops.reduce((t, s) => t + s.toSoc - s.fromSoc, 0);
         expect(bars.reduce((t, b) => t + b.fast + b.planned, 0)).toBeCloseTo(fastAll, 6);
         expect(bars.reduce((t, b) => t + b.minutes, 0)).toBeCloseTo(w.fastMinutes, 6);
+    });
+
+    it('in time order: the night at home runs from where the car got home to the next morning', () => {
+        for (const w of weeks) {
+            for (const b of dayBars(w)) {
+                expect(b.next - b.arrive).toBeCloseTo(b.home, 6);
+                // The day out: the morning, less the driving, plus the stops.
+                expect(b.start - b.used + b.fast + b.planned).toBeCloseTo(b.arrive, 6);
+                for (const st of b.stopBands) expect(st.to).toBeGreaterThan(st.from);
+            }
+        }
     });
 
     it('a settled week balances: what goes in comes out', () => {

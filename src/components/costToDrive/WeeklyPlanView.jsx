@@ -6,8 +6,8 @@
  * below (another charger level, or the other season), the gas car's week
  * collapsed by default, and the week as a table.
  *
- * Owner, 2026-11-07: the bars from the morning's level first, the bars as
- * charge in and used behind the same picker, the line kept as the third. The
+ * Owner, 2026-11-07: the bars day by day in time order first (mockup A3), the
+ * bars as charge in and used behind the same picker, the line kept as the third. The
  * vehicle is a dropdown, which holds any number of them.
  *
  * The vehicle, the chart and the comparison are picked here and are not in
@@ -58,7 +58,7 @@ function chartOf(week, profile) {
 
 /** The plan's charts, first the default. */
 const PLAN_CHARTS = [
-    ['morning', 'Day by day, from the morning'],
+    ['day', 'Day by day'],
     ['balance', 'Day by day, charge in and used'],
     ['line', 'The week as a line'],
 ];
@@ -75,7 +75,7 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
     const priced = useCostToDrive(vehicles, selectedVehicleIds, settings);
     const shown = priced.filter(p => !p.missing);
     const [pickedId, setPickedId] = useState(null);
-    const [chartKind, setChartKind] = useState('morning');
+    const [chartKind, setChartKind] = useState('day');
     const entry = shown.find(p => p.vehicle.id === pickedId) ?? shown[0] ?? null;
 
     // The comparison: none, the other season, or another charger level.

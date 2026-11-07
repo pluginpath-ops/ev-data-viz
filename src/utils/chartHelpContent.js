@@ -295,14 +295,14 @@ export const CHART_HELP_DEFAULTS = {
             'speed, season and elevation; fast-stop minutes from the car’s own charging ' +
             'curve where EVBench has one.',
         how_to_read:
-            'Pick the chart above it. "Day by day, from the morning" starts each day at that ' +
-            'morning’s battery (the white tick): the day’s charge rises from it — fast stops ' +
-            'in orange, a planned fast charge lighter, the night at home in the car’s color — ' +
-            'and the grey bar is the day’s driving, falling to the next morning’s level, where ' +
-            'a dashed line hands over to the next day. The charge is stacked before the ' +
-            'driving it came during or after, so a column can pass 100%; that part is faded. ' +
-            '"Charge in and used" draws the same figures from zero: charge in above, driving ' +
-            'below.\n' +
+            'Pick the chart above it. "Day by day" goes in time order. Each day’s grey bar ' +
+            'is the day out, from that morning’s battery (the tick) to where the car ' +
+            'gets home. A fast stop on the route sits inside it, striped orange, at the ' +
+            'levels it charged between; a planned fast charge is solid orange. The bar in ' +
+            'the car’s color is the night at home, up to the next morning, where a dashed ' +
+            'line hands over to the next day. The grey bar is how far the battery fell, so ' +
+            'a day with a stop used more than it shows; hover a day for both. "Charge in and ' +
+            'used" draws the same figures from zero: charge in above, driving below.\n' +
             '"The week as a line" is range left, in miles on the left and the battery’s percent on the ' +
             'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +
             'at home overnight. Each orange band is a fast stop, labelled with its minutes ' +
