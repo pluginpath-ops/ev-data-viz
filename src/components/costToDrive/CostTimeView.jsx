@@ -26,6 +26,7 @@ import { useChartPng } from '../../hooks/useChartPng';
 import { useSourceLine } from '../../hooks/useSourceLine';
 import PlotFrame from '../charts/PlotFrame';
 import CopyLinkButton from '../charts/CopyLinkButton';
+import PngButton from '../charts/PngButton';
 import ChartInfoBubble from '../ChartInfoBubble';
 import CostToDriveSidebar from './CostToDriveSidebar';
 import { levelLabel } from './HomeLevelPicker';
@@ -207,13 +208,6 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
     const timePng = useChartPng(timeChart, { title: timeTitle, subtitle, sources: sourceLine.text, signature });
 
     const height = presentationMode ? PRESENTED_HALF_HEIGHT : `${Math.max(180, labels.length * 52 + 70)}px`;
-    const pngButton = (png) => (
-        <button type="button" onClick={png.copyPng}
-                className={`chart-copy-btn ${png.copied ? 'chart-copy-btn-active' : ''}`}
-                title="Copy the framed chart as a PNG">
-            {png.copied ? '✓ Copied' : 'PNG'}
-        </button>
-    );
 
     return (
         <div className="chart-layout">
@@ -232,7 +226,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
                             sourceLine={sourceLine}
                             preview={costPng.preview}
                             onDismissPreview={costPng.dismissPreview}
-                            exportControls={!presentationMode && (<><CopyLinkButton />{pngButton(costPng)}</>)}
+                            exportControls={!presentationMode && (<><CopyLinkButton /><PngButton png={costPng} /></>)}
                         >
                             <div style={{ height, position: 'relative' }}>
                                 <canvas ref={costRef} />
@@ -245,7 +239,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
                                 sourceLine={sourceLine}
                                 preview={timePng.preview}
                                 onDismissPreview={timePng.dismissPreview}
-                                exportControls={!presentationMode && pngButton(timePng)}
+                                exportControls={!presentationMode && <PngButton png={timePng} />}
                             >
                                 <div style={{ height, position: 'relative' }}>
                                     <canvas ref={timeRef} />

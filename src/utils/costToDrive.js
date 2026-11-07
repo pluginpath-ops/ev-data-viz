@@ -480,6 +480,14 @@ export const savedText = (saved) => `${dollars(saved)}/mo ${saved >= 0 ? 'less' 
 /** Extra time a week against the gas car: "+41 min/wk", "−12 min/wk". */
 export const extraTimeText = (extra) => `${extra >= 0 ? '+' : '−'}${minutesText(extra)}/wk`;
 
+/** An hour of the week as a weekday and a clock time: "Tue 1:40 pm". */
+export function weekTimeText(weekHour) {
+    const day = WEEKDAYS[Math.floor(weekHour / 24) % 7];
+    const total = Math.round((weekHour % 24) * 60);
+    const h = Math.floor(total / 60) % 24, m = total % 60;
+    return `${day} ${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+}
+
 /** The week in one line: "795 mi per week · three long days, three daily, one off". */
 export function weekSummary(settings) {
     const count = (t) => [...settings.week].filter(c => c === t).length;

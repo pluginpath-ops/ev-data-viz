@@ -286,6 +286,36 @@ export const CHART_HELP_DEFAULTS = {
             'the week × 52 ÷ 12.',
     },
 
+    driveplan: {
+        title: 'About the Weekly Charging Plan',
+        data_source:
+            'One selected vehicle through the week you set on Your Driving (or in the ' +
+            'sidebar), priced the same way as Cost & Time: highway miles from EVBench’s ' +
+            'range tests, city miles from the EPA highway figure, both corrected to your ' +
+            'speed, season and elevation; fast-stop minutes from the car’s own charging ' +
+            'curve where EVBench has one.',
+        how_to_read:
+            'The line is range left, in miles on the left and the battery’s percent on the ' +
+            'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +
+            'at home overnight. Each orange band is a fast stop, labelled with its minutes ' +
+            '(detour and time to start and pay in); a lighter one is a planned fast charge. ' +
+            'The bottom 10% and top 20% are faded: you rarely live there. Under the chart, ' +
+            'each day’s stops and what the night at home put back. Compare with the other ' +
+            'season or another home charger in a second chart below, and open your gas ' +
+            'car’s week to see its fill-ups.',
+        key_terms:
+            'Fast stop — a stop on the route, when a day runs short of home charging.\n' +
+            'Planned fast charge — a day you fast charge anyway; skipped when already above the cap.\n' +
+            'Home adds — what the night’s window put back, through your charger and the car’s onboard charger.\n' +
+            'Ready at — where the battery stands when the next day starts.',
+        math_approach:
+            'Three weeks are simulated and the third shown, so Monday starts from what ' +
+            'Sunday night left. Long days drive 7 am to 6 pm, ordinary days an hour each ' +
+            'way. A stop is made at “stop to charge by” (later, when the day starts below ' +
+            'it) and adds enough to finish the day above “keep battery above”. Range in ' +
+            'miles is the week’s miles per percent of battery, detours in.',
+    },
+
     perfcompare: {
         title: 'About the Performance Compare chart',
         data_source:

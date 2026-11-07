@@ -30,7 +30,7 @@ function DriveCard({ title, aside, children, className = '' }) {
 }
 
 /** The selected vehicles against the gas car, as the settings stand. */
-function DrivePreview({ priced, settings }) {
+function DrivePreview({ priced, settings, onOpenMode }) {
     return (
         <aside className="drive-preview" aria-label="With these settings">
             <span className="text-secondary">
@@ -61,11 +61,17 @@ function DrivePreview({ priced, settings }) {
                         )}
                 </div>
             ))}
+            {onOpenMode && priced.some(p => !p.missing) && (
+                <div className="drive-presets">
+                    <button type="button" className="btn-toggle" onClick={() => onOpenMode('drivecost')}>See Cost &amp; Time →</button>
+                    <button type="button" className="btn-toggle" onClick={() => onOpenMode('driveplan')}>See the week →</button>
+                </div>
+            )}
         </aside>
     );
 }
 
-export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings, onChange, linkError = null }) {
+export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings, onChange, onOpenMode = null, linkError = null }) {
     const priced = useCostToDrive(vehicles, selectedVehicleIds, settings);
     const props = { settings, onChange };
     return (
@@ -90,7 +96,7 @@ export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings
                         </button>
                     </div>
                 </div>
-                <DrivePreview priced={priced} settings={settings} />
+                <DrivePreview priced={priced} settings={settings} onOpenMode={onOpenMode} />
             </div>
 
             <div className="drive-row is-week">
