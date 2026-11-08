@@ -3,7 +3,7 @@
  * constants/setupWizard.js; answers are held in miles, mph and °F and shown in
  * the reader's units.
  */
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import VehicleCombobox from '../VehicleCombobox';
 import { vehicleOption } from '../../utils/specHelpers';
 import { MI_TO_KM } from '../../constants/units';
@@ -33,6 +33,12 @@ export function CarsStep({ answers, onChange, vehicles, selectedIds, names }) {
         () => (how === 'set' && cars.set ? starterSetIds(cars.set, vehicles) : []),
         [how, cars, vehicles]);
     const W = C.cars.ways;
+    // Picking by name opens a search whose list drops below the field: bring
+    // the field to the top of the step so the list has room to open.
+    const searchRef = useRef(null);
+    useEffect(() => {
+        if (how === 'pick') searchRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }, [how]);
 
     const hows = [
         ...(selectedIds.length ? [{ key: 'keep', label: fill(W.keep.label, { n: selectedIds.length }), detail: selectedIds.slice(0, 3).map(id => names[id]).join(', ') }] : []),
@@ -45,7 +51,7 @@ export function CarsStep({ answers, onChange, vehicles, selectedIds, names }) {
         <div className="setup-step-body">
             <ChoiceCards options={hows} value={how} onChange={setHow} columns={1} />
             {how === 'pick' && (
-                <div className="setup-field">
+                <div ref={searchRef} className="setup-field setup-car-search">
                     <VehicleCombobox
                         options={options.filter(o => !picked.includes(o.id))}
                         value=""

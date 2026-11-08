@@ -10128,6 +10128,13 @@ a.is-test-link:focus-visible {
     @apply flex flex-col gap-1;
 }
 .setup-field .stats-segmented { align-self: flex-start; flex-wrap: wrap; }
+/* The car search's list is absolutely placed under the field (max-h-52, 13rem)
+   and the modal body scrolls, so the field keeps that much room below it —
+   otherwise the list opens under the footer. */
+.setup-car-search {
+    min-height: 16rem;
+    scroll-margin-top: 8px;
+}
 .setup-number {
     @apply flex items-center gap-2;
 }
