@@ -160,9 +160,10 @@ export const SETUP_WIZARD = {
     money: {
         home: {
             options: [
-                { key: 'charger', label: 'Charger at home',  detail: '240 V, 32 A',          level: 3 },
-                { key: 'outlet',  label: 'Wall outlet',      detail: '120 V only',           level: 0 },
-                { key: 'none',    label: 'No home charging', detail: 'Public chargers only', level: 6 },
+                { key: 'wall48',    label: 'Wall charger',      detail: '240 V, 48 A',          level: 4 },
+                { key: 'outlet240', label: '240 V outlet',      detail: '240 V, 32 A',          level: 3 },
+                { key: 'outlet120', label: 'Normal outlet',     detail: '120 V, 12 A',          level: 0 },
+                { key: 'none',      label: 'No home charging',  detail: 'Public chargers only', level: 6 },
             ],
         },
         homePrice: { label: 'Electricity at home',    min: 0.05, max: 0.60, step: 0.01, hint: 0.17, prefix: '$', unit: '/ kWh' },

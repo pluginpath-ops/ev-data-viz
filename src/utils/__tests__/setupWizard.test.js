@@ -276,7 +276,7 @@ describe('planFromAnswers', () => {
     it('writes driving, weather and money through to each setting', () => {
         const plan = planFromAnswers({
             goals: ['cost', 'range', 'roadtrip'], dailyMi: 40, highway: 'highway', speedMph: 75, climate: 'extreme', mountains: true,
-            home: 'charger', homePrice: 0.15, gasMpg: 28, gasPrice: 3.5, tripMi: 700,
+            home: 'outlet240', homePrice: 0.15, gasMpg: 28, gasPrice: 3.5, tripMi: 700,
         }, { vehicles: fleet, selectedIds: [1] });
         expect(plan.correction).toEqual({ speedMph: 75, temperatureF: 15, altitudeFt: 5000 });
         expect(plan.costToDrive).toMatchObject({
@@ -288,6 +288,11 @@ describe('planFromAnswers', () => {
         expect(plan.assumptions).toEqual({ homePrice: 0.15 });
         expect(plan.roadTrip).toEqual({ speed: 75, totalDistance: 700, optimizerDistance: 700 });
         expect(plan.season).toMatchObject({ season: 'winter', tempF: 15, other: { season: 'summer', tempF: 95 } });
+    });
+
+    it('each home charging answer sets its Cost & Time level: 48 A, 32 A, 120 V, none', () => {
+        const levelOf = (home) => planFromAnswers({ goals: ['cost'], home }, { vehicles: fleet }).costToDrive.level;
+        expect(['wall48', 'outlet240', 'outlet120', 'none'].map(levelOf)).toEqual([4, 3, 0, NO_HOME_LEVEL]);
     });
 
     it('no home charging is a real setting now, not a gap', () => {
@@ -340,7 +345,7 @@ describe('questions follow the goals', () => {
     });
 
     it('an answer to a question no longer asked is kept but not applied, and not summarized', () => {
-        const answers = { ...EMPTY_ANSWERS, goals: ['range'], speedMph: 75, gasPrice: 4, home: 'charger', tripMi: 700 };
+        const answers = { ...EMPTY_ANSWERS, goals: ['range'], speedMph: 75, gasPrice: 4, home: 'outlet240', tripMi: 700 };
         expect(askedAnswers(answers)).toMatchObject({ speedMph: 75, gasPrice: null, home: null, tripMi: null });
         const plan = planFromAnswers(answers, { vehicles: [car(1)], selectedIds: [1] });
         expect(plan.correction).toEqual({ speedMph: 75 });
@@ -348,9 +353,9 @@ describe('questions follow the goals', () => {
         expect(plan.costToDrive).toEqual({ dailyMph: 75, longMph: 75 });
         expect(plan.roadTrip).toEqual({ speed: 75 });
         const text = planSummary(plan, answers, {}).map(l => l.label + ' ' + l.text).join(' ');
-        expect(text).not.toMatch(/\$4|charger|700/i);
+        expect(text).not.toMatch(/\$4|outlet|700/i);
         // still remembered for the next run
-        expect(sanitizeAnswers(answers)).toMatchObject({ gasPrice: 4, home: 'charger', tripMi: 700 });
+        expect(sanitizeAnswers(answers)).toMatchObject({ gasPrice: 4, home: 'outlet240', tripMi: 700 });
     });
 });
 
