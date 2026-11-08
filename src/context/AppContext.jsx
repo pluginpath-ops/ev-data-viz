@@ -39,6 +39,7 @@ export function AppProvider({ children }) {
     const [tags, setTags] = useState([]);
     const [user, setUser] = useState(null);
     const [userRole, setUserRole] = useState(null); // 'admin'|'contributor'|'user'|null
+    const [emailOptIn, setEmailOptInState] = useState(null); // boolean, or null when unknown
     const [loading, setLoading] = useState(true);
     const [headerImageUrl, setHeaderImageUrl] = useState('');
     const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success', action?: { label, onClick } }
@@ -103,6 +104,7 @@ export function AppProvider({ children }) {
         await dataService.initialize();
         setUser(dataService.user);
         setUserRole(dataService.role);
+        setEmailOptInState(dataService.emailOptIn ?? null);
 
         // These queries are independent of one another. Awaiting them in sequence
         // cost ~900ms of round-trip latency on a warm load — six of the seven
@@ -2150,6 +2152,18 @@ export function AppProvider({ children }) {
         }
     };
 
+    // Optimistic: the box flips at once and flips back if the write fails.
+    const setEmailOptIn = async (value) => {
+        const previous = emailOptIn;
+        setEmailOptInState(value);
+        try {
+            setEmailOptInState(await dataService.setEmailOptIn(value));
+        } catch (error) {
+            setEmailOptInState(previous);
+            showError('Could not save your email choice: ' + error.message);
+        }
+    };
+
     const signOut = async () => {
         await dataService.signOut();
         window.location.reload();
@@ -2204,6 +2218,8 @@ export function AppProvider({ children }) {
         selectedVehicles,
         user,
         userRole,
+        emailOptIn,
+        setEmailOptIn,
         isAdmin,
         isContributor,
         canCreate,

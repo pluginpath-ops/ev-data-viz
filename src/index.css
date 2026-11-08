@@ -1476,6 +1476,18 @@ body {
     color: var(--color-primary-text, #fff);
 }
 .account-action { width: 100%; justify-content: center; }
+/* The email opt-in: a checkbox with a one-line promise under its label. */
+.account-opt-in {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+}
+.account-opt-in input { margin-top: 2px; }
+.account-opt-in-label {
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-primary);
+}
 
 /* ── Modals ─────────────────────────────────────────────────────────────────── */
 
@@ -5303,6 +5315,23 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: #1f1f1f;
 }
 .auth-provider-btn.is-google:hover { background-color: #f8f9fa; }
+
+/* What we keep and what we promise, under the sign-in buttons. */
+.auth-privacy {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+}
+.auth-privacy ul {
+    @apply list-disc;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+    padding-left: 1.1em;
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+}
 
 
 /* ── Import Tableau Modal ───────────────────────────────────────────────────── */

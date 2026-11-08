@@ -96,6 +96,8 @@ export default function App() {
         selectedVehicles,
         user,
         userRole,
+        emailOptIn,
+        setEmailOptIn,
         isAdmin,
         isContributor,
         canCreate,
@@ -958,6 +960,8 @@ export default function App() {
                         isAdmin={isAdmin}
                         user={user}
                         userRole={userRole}
+                        emailOptIn={emailOptIn}
+                        onEmailOptInChange={setEmailOptIn}
                         units={units}
                         onToggleUnits={toggleUnits}
                         onNavigate={navigateToTab}

@@ -185,7 +185,7 @@ export const SECTIONS = [
             { cls: 'account-btn signed-in', as: 'button', label: 'G',
               note: 'Signed in reads differently from signed out at a glance: filled and lettered vs outlined and generic.' },
             { composite: 'account-menu', label: 'Account menu, open',
-              covers: ['account-menu', 'account-panel', 'account-identity', 'account-email', 'account-row', 'account-segmented', 'account-action'],
+              covers: ['account-menu', 'account-panel', 'account-identity', 'account-email', 'account-row', 'account-segmented', 'account-opt-in', 'account-opt-in-label', 'account-action'],
               note: 'What used to sit beside it in the nav bar: the signed-in email, the role, and the unit system. The Sign In button it replaced cost 111px of a 375px phone bar.' },
             { cls: 'info-icon-glyph', as: 'button', label: 'ⓘ',
               note: 'A real button, not a glyph in a span: before the popover pass there was no keyboard route to any of the 21 of them, and the four carrying a reference table had no accessible name at all.' },

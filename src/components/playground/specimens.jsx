@@ -199,6 +199,13 @@ export const COMPOSITES = {
                         <button type="button">Metric</button>
                     </div>
                 </div>
+                <label className="account-opt-in">
+                    <input type="checkbox" />
+                    <span className="flex flex-col gap-0.5">
+                        <span className="account-opt-in-label">Email me</span>
+                        <span className="text-caption">Rare emails about major changes, at most once a quarter.</span>
+                    </span>
+                </label>
                 <button type="button" className="btn btn-secondary account-action">Sign out</button>
             </div>
         </div>
