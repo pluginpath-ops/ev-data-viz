@@ -28,6 +28,7 @@ import PlotFrame from '../charts/PlotFrame';
 import CopyLinkButton from '../charts/CopyLinkButton';
 import PngButton from '../charts/PngButton';
 import ChartInfoBubble from '../ChartInfoBubble';
+import CostMath from '../calcTrace/CostMath';
 import CostToDriveSidebar from './CostToDriveSidebar';
 import { levelLabel } from './HomeLevelPicker';
 
@@ -254,6 +255,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
                         {shown.map(p => <CostTimeCard key={p.vehicle.id} entry={p} settings={settings} />)}
                     </div>
                 )}
+                {!presentationMode && shown.length > 0 && <CostMath vehicles={vehicles} shown={shown} settings={settings} />}
                 {!presentationMode && <ChartInfoBubble chartKey="drivecost" />}
             </div>
         </div>

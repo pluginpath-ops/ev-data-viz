@@ -1543,8 +1543,15 @@ describe('one correction, everywhere it is applied', () => {
     // and corrects to the reader's target (utils/correctionSettings.js).
     const sources = () => [
         'src/utils/rangeSource.js', 'src/utils/roadTripSpread.js', 'src/utils/compositeRange.js',
-        'src/components/RangeChartView.jsx', 'src/components/ChargingView.jsx',
+        'src/components/ChargingView.jsx',
+        // The Range chart corrects through correctRunDistance, which "Show the
+        // math" also calls, so the conditions are built there (2026-11-08).
+        'src/utils/conditionCorrection.js',
     ];
+
+    it('has the Range chart correct through correctRunDistance', () => {
+        expect(read('src/components/RangeChartView.jsx')).toMatch(/correctRunDistance\(/);
+    });
 
     it('builds every correction\'s conditions in one place', () => {
         for (const file of sources()) {

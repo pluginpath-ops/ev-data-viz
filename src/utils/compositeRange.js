@@ -48,6 +48,7 @@ import { correctionFactor, runConditions } from './conditionCorrection';
 import { countedRangeTests, rangeCoverageOk, spreadEfficiency } from './rangeTestSpread';
 import { socWindow } from './testedRange';
 import { isCompositeRun } from './runUtils';
+import { val } from './calcTrace';
 import {
     STANDARD_CONDITIONS, COMPOSITE_RANGE_TEMP_BAND, COMPOSITE_RANGE_SPEED_GAP_MPH,
 } from '../constants/epa';
@@ -93,9 +94,12 @@ export function compositeRange(vehicle, {
     sessionOf = () => null,
     tempBand = COMPOSITE_RANGE_TEMP_BAND,
     speedGapMph = COMPOSITE_RANGE_SPEED_GAP_MPH,
+    trace = null,
 } = {}) {
     const counted = countedRangeTests(vehicle).filter(r => !isCompositeRun(r) && r.distance_miles > 0);
+    trace?.note(`${counted.length} counted range test${counted.length === 1 ? '' : 's'}; each is corrected for everything the model can (mode "Speed, altitude, temp & wind") to ${target.speedMph} mph, whatever the charts' mode`);
     if (!counted.length) return null;
+    const testName = (run) => `${run.name ?? `Test ${run.id}`} (${run.speed_mph ?? '?'} mph, ${run.temperature_f ?? '?'}°F)`;
 
     const tests = [];
     const leftOut = [];
@@ -105,13 +109,27 @@ export function compositeRange(vehicle, {
         const temperatureF = present(run.temperature_f) ? Number(run.temperature_f)
             : present(session?.temperature_f) ? Number(session.temperature_f) : null;
         const reason = leftOutReason(run, temperatureF, target, { tempBand, speedGapMph });
-        if (reason) { leftOut.push({ run, reason }); continue; }
+        if (reason) {
+            trace?.note(`Left out: ${testName(run)}, ${COMPOSITE_RANGE_LEFT_OUT[reason]}`);
+            leftOut.push({ run, reason });
+            continue;
+        }
 
-        const { factor } = correctionFactor(runConditions(run, session), { mode: 'aero_wind', target });
+        // The first test in carries its whole correction, as the example; the
+        // rest give their factor alone, since the steps are the same.
+        const { factor } = correctionFactor(runConditions(run, session), {
+            mode: 'aero_wind', target, trace: tests.length === 0 ? trace?.group(`Correction, worked for ${testName(run)}`) : null,
+        });
 
         const window = socWindow(run);
         const rangeMi = rangeCoverageOk(run) && window ? (run.distance_miles * 100 / window) * factor : null;
         const eff = spreadEfficiency(run, vehicle?.socWindowKwh);
+        trace?.step(testName(run), {
+            formula: 'mi/kWh = e_test × k',
+            values: { e_test: val(eff?.miPerKwh ?? null, 'mi/kWh', 'data'), k: factor },
+            result: eff ? eff.miPerKwh * factor : null, unit: 'mi/kWh', assumed: !!eff?.estimated,
+            note: eff?.estimated ? eff.note : (eff ? 'measured energy ÷ distance' : 'no efficiency: not in the mean'),
+        });
         tests.push({
             run,
             factor,
@@ -123,6 +141,10 @@ export function compositeRange(vehicle, {
 
     const ranges = tests.map(t => t.rangeMi).filter(v => v != null);
     const effs = tests.filter(t => t.miPerKwh != null);
+    trace?.step('Composite efficiency', {
+        formula: 'mean of the corrected tests', values: Object.fromEntries(effs.map((t, i) => [`e${i + 1}`, val(t.miPerKwh, 'mi/kWh')])),
+        result: mean(effs.map(t => t.miPerKwh)), unit: 'mi/kWh',
+    });
     return {
         rangeMi: mean(ranges),
         nRange: ranges.length,

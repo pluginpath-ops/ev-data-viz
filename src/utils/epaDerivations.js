@@ -51,6 +51,7 @@ import {
     DEFAULT_ACCESSORY_W, ASSUMED_CHARGER_EFF, HWFET_TO_SS_ETA_RATIO, STANDARD_CONDITIONS,
 } from '../constants/epa';
 import { assumedAccessoryW } from './accessoryLoad';
+import { val } from './calcTrace';
 
 export {
     PROC_MCT, PROC_CD_HWY, PROC_CD_UDDS, PROC_FTP75,
@@ -600,11 +601,16 @@ export function kwh100miToMpge(kwh100mi) {
  * @param {number} elevationFt
  * @returns {number} density ratio (1.0 at sea level)
  */
-export function airDensityRatio(elevationFt) {
+export function airDensityRatio(elevationFt, trace = null) {
     const hM = (elevationFt || 0) * 0.3048;
     const base = 1 - 2.25577e-5 * hM;
     if (base <= 0) return 0; // far above the troposphere; guard the fractional power
-    return Math.pow(base, 4.2559);
+    const ratio = Math.pow(base, 4.2559);
+    trace?.step('Air density from altitude', {
+        formula: 'ρ_alt = (1 − 2.25577e-5 × h_m)^4.2559', values: { h_m: val(hM, 'm') },
+        result: ratio, note: 'standard barometric approximation; h in metres',
+    });
+    return ratio;
 }
 
 /** Standard-condition ambient temperature (°F), matching the ISA sea-level
@@ -620,12 +626,17 @@ export const STANDARD_TEMP_F = 59;
  * @param {number|null} tempF  ambient temperature in °F; null/undefined ⇒ 1 (no adjustment)
  * @returns {number} density ratio (1.0 at the standard temperature)
  */
-export function temperatureDensityRatio(tempF) {
+export function temperatureDensityRatio(tempF, trace = null) {
     if (tempF == null || tempF === '') return 1;
     const actualRankine   = Number(tempF) + 459.67;
     const standardRankine = STANDARD_TEMP_F + 459.67;
     if (actualRankine <= 0) return 1; // guard absolute-zero-adjacent nonsense input
-    return standardRankine / actualRankine;
+    const ratio = standardRankine / actualRankine;
+    trace?.step('Air density from temperature', {
+        formula: 'ρ_T = T_std / T', values: { T_std: val(standardRankine, '°R'), T: val(actualRankine, '°R') },
+        result: ratio, note: 'ideal gas at constant pressure; T_std is the ISA 59°F',
+    });
+    return ratio;
 }
 
 // ── Side wind ────────────────────────────────────────────────────────────────
