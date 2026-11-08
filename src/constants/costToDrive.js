@@ -33,13 +33,27 @@ export const NO_HOME_LEVEL = HOME_LEVELS.findIndex(l => l.none);
 export const levelKw = (level) => (level.volts * level.amps) / 1000;
 
 /**
- * What reaches the pack from a 120 V wall outlet. Lower than a 240 V charger's
- * (ASSUMED_CHARGER_EFF, from the certifications): the car's own electronics and
- * pack heating draw a fixed few hundred watts whatever the rate, and at 1.4 kW
- * that fixed draw is a large share. A round figure, not a measurement; the
- * page says it is assumed.
+ * What reaches the pack from a 120 V wall outlet, for a car at the site-wide
+ * 240 V figure (ASSUMED_CHARGER_EFF). Lower: the car's own electronics draw a
+ * fixed few hundred watts whatever the rate, and at 1.4 kW that is a large
+ * share. A round figure, not a measurement; the page says it is assumed.
+ *
+ * A car with its own EPA 240 V figure gets this scaled by it — its figure ×
+ * this ÷ the site-wide one (owner, 2026-11-08): the same charger and battery
+ * do the work on either outlet, so a car that does well on one does well on
+ * the other. Ratio or a fixed gap differ by under half a point across the
+ * real range.
  */
 export const WALL_OUTLET_CHARGER_EFF = 0.80;
+
+/**
+ * Below this, parked outside, a car warms its battery before it charges and
+ * before it drives — energy not priced here. Above it, or in a garage, the
+ * battery warms itself as it charges and the cost is small. The owner's own
+ * experience (2026-11-08), not a measurement; it only decides when the page
+ * warns.
+ */
+export const PACK_WARMING_BELOW_F = 40;
 
 /** The onboard charger assumed when a car's `max_ac_kw` is blank, kW; said so where used. */
 export const ASSUMED_ONBOARD_AC_KW = 11.5;
@@ -95,6 +109,21 @@ export const FALLBACK_DC_KW = 50;
  */
 export const EPA_LAB_TEMP_F = 75;
 
+/**
+ * The gas car's cold loss: the share of its EPA mpg lost at GAS_COLD_AT_F,
+ * against EPA_LAB_TEMP_F, by kind of driving. Taken as a straight line between
+ * the two, so half the loss at about 47°F, more below 20°F, and none at or
+ * above the lab's temperature (summer A/C is not priced).
+ *
+ * City: fueleconomy.gov's cold-weather page, from Oak Ridge's comparison of
+ * EPA city tests at 20°F and 77°F — about 15% for a conventional gas car
+ * (10–20%; short trips 15–33%). Highway: no study gives one; 7% is denser air
+ * on drag plus thicker oil and tires, about half the city loss. Owner asked
+ * for "a small hit" (2026-11-08).
+ */
+export const GAS_COLD_AT_F = 20;
+export const GAS_COLD_LOSS = Object.freeze({ city: 0.15, hwy: 0.07 });
+
 /** Days of the week, Monday first, as the week setting stores them. */
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -108,6 +137,12 @@ export const DAY_TYPES = ['D', 'L', 'O'];
  *
  * kinds: 'num' (min, max, step), 'bool', 'enum' (values), 'week' (7 day
  * types), 'mask' (7 days, Monday the low bit).
+ *
+ * `step` is what a value is stored to; `spin`, where given, is what the
+ * field's spinner moves by. The two miles fields take any whole mile but spin
+ * in fives (owner, 2026-11-07: "allow any value"); they were stored in fives
+ * until key version 2, so a version-1 key reads them in fives
+ * (costToDriveKey.js).
  */
 export const COST_TO_DRIVE_FIELDS = [
     { key: 'level',          kind: 'num',  min: 0,    max: HOME_LEVELS.length - 1, step: 1, def: 4 },
@@ -118,10 +153,10 @@ export const COST_TO_DRIVE_FIELDS = [
     { key: 'homePrice',      kind: 'num',  min: 0.05, max: 0.60, step: 0.01, def: 0.17 },
     { key: 'week',           kind: 'week', def: 'LDLDLDO' },
     { key: 'planned',        kind: 'mask', def: 0b1000000 },
-    { key: 'dailyMi',        kind: 'num',  min: 5,    max: 400,  step: 5,    def: 45 },
+    { key: 'dailyMi',        kind: 'num',  min: 5,    max: 400,  step: 1,    def: 45, spin: 5 },
     { key: 'dailyMph',       kind: 'num',  min: 45,   max: 85,   step: 5,    def: 70 },
     { key: 'dailyCity',      kind: 'num',  min: 0,    max: 100,  step: 5,    def: 40 },
-    { key: 'longMi',         kind: 'num',  min: 5,    max: 400,  step: 5,    def: 220 },
+    { key: 'longMi',         kind: 'num',  min: 5,    max: 400,  step: 1,    def: 220, spin: 5 },
     { key: 'longMph',        kind: 'num',  min: 45,   max: 85,   step: 5,    def: 70 },
     { key: 'longCity',       kind: 'num',  min: 0,    max: 100,  step: 5,    def: 15 },
     { key: 'detourMin',      kind: 'num',  min: 5,    max: 30,   step: 1,    def: 10 },
@@ -137,10 +172,14 @@ export const COST_TO_DRIVE_FIELDS = [
     { key: 'elevationFt',    kind: 'num',  min: 0,    max: 8000, step: 100,  def: 800 },
     { key: 'gasCity',        kind: 'num',  min: 5,    max: 60,   step: 1,    def: 18 },
     { key: 'gasHwy',         kind: 'num',  min: 5,    max: 60,   step: 1,    def: 24 },
-    { key: 'gasPrice',       kind: 'num',  min: 1.00, max: 8.00, step: 0.01, def: 3.20 },
+    // $4 (owner, 2026-11-08): nearer the national average than $3.20 was
+    // (AAA, about $4.17 on 2026-11-01). A round figure, not a live feed.
+    { key: 'gasPrice',       kind: 'num',  min: 1.00, max: 8.00, step: 0.01, def: 4.00 },
     { key: 'gasTank',        kind: 'num',  min: 5,    max: 40,   step: 1,    def: 26 },
     { key: 'gasFillAt',      kind: 'num',  min: 5,    max: 50,   step: 5,    def: 15 },
-    { key: 'gasFillMin',     kind: 'num',  min: 2,    max: 30,   step: 1,    def: 8 },
+    // 5 min (owner, 2026-11-08): about a minute to get out and start the pump,
+    // 2–3 to fill, half a minute to two to pay. Was 8 with a detour in it.
+    { key: 'gasFillMin',     kind: 'num',  min: 2,    max: 30,   step: 1,    def: 5 },
     { key: 'efficiencyFrom', kind: 'enum', values: ['tested', 'epa'], def: 'tested' },
     // When a planned fast charge happens: at this hour on a day off; on a
     // driving day, in the gap between drives nearest it (owner, 2026-11-07:
@@ -162,4 +201,17 @@ export const costToDriveField = (key) => COST_TO_DRIVE_FIELDS.find(f => f.key ==
 export const COST_TO_DRIVE_PRESETS = [
     { key: 'commuter', label: 'Commuter, 40 mi', settings: { week: 'DDDDDOO', dailyMi: 40, dailyCity: 40, planned: 0 } },
     { key: 'roadWarrior', label: 'Road warrior, 220 mi days', settings: { week: 'LLDLLDO', longMi: 220, longCity: 15, dailyMi: 45, planned: 0b1000000 } },
+];
+
+/**
+ * Your gas car's one-click cars: EPA city and highway mpg (2025 models) and the
+ * tank, rounded to the gallon the field takes. A starting point, not a
+ * comparison of these cars; each says which version it is.
+ */
+export const GAS_CAR_PRESETS = [
+    { key: 'f150',  label: 'F-150', title: 'Ford F-150 2.7 L EcoBoost 4WD', settings: { gasCity: 18, gasHwy: 23, gasTank: 23 } },
+    { key: 'civic', label: 'Civic', title: 'Honda Civic sedan 2.0 L', settings: { gasCity: 32, gasHwy: 41, gasTank: 12 } },
+    { key: 'rav4',  label: 'RAV4',  title: 'Toyota RAV4 2.5 L AWD', settings: { gasCity: 27, gasHwy: 33, gasTank: 15 } },
+    { key: 'x3',    label: 'X3',    title: 'BMW X3 30 xDrive', settings: { gasCity: 27, gasHwy: 33, gasTank: 17 } },
+    { key: 'pilot', label: 'Pilot', title: 'Honda Pilot 3.5 L AWD', settings: { gasCity: 19, gasHwy: 25, gasTank: 19 } },
 ];

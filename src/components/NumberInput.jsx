@@ -15,15 +15,16 @@ import { parseNumberInput } from '../utils/numberInput';
  *
  * `value` and `onChange` speak numbers; `onChange` is called only with a valid
  * one (or null, when `allowEmpty` and the box is cleared). `integer` rounds
- * what is committed. Everything else passes through to the input.
+ * what is committed; `onStep` (a step size) commits only values on that grid,
+ * for settings stored on it. Everything else passes through to the input.
  */
 export default function NumberInput({
-    value, onChange, min, max, integer = false, allowEmpty = false, onBlur, ...rest
+    value, onChange, min, max, integer = false, allowEmpty = false, onStep = null, onBlur, ...rest
 }) {
     // null while not being edited: the box shows the committed value.
     const [draft, setDraft] = useState(null);
 
-    const parse = (text) => parseNumberInput(text, { min, max, integer, allowEmpty });
+    const parse = (text) => parseNumberInput(text, { min, max, integer, allowEmpty, onStep });
 
     const shown = value == null || Number.isNaN(value) ? '' : String(value);
     const text = draft ?? shown;
