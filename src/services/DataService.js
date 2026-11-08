@@ -386,8 +386,12 @@ class DataService {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       this.user = user;
-      const { data: profile } = await getSupabase().from('profiles').select('role').eq('id', user.id).single();
+      // A wildcard, not a column list: naming email_opt_in before migration 097
+      // lands would fail the read and drop the role with it.
+      const { data: profile } = await getSupabase().from('profiles').select('*').eq('id', user.id).single();
       this.role = profile?.role || 'user';
+      // null = the column does not exist yet, so the account menu hides the box.
+      this.emailOptIn = profile?.email_opt_in ?? null;
     }
   }
 
@@ -2300,6 +2304,20 @@ class DataService {
       new_role: newRole,
     });
     if (error) throw error;
+  }
+
+  // The only profile field a user may write (migration 097). `.single()` makes a
+  // write RLS filtered out an error rather than a silent success.
+  async setEmailOptIn(value) {
+    const { data, error } = await getSupabase()
+      .from('profiles')
+      .update({ email_opt_in: value })
+      .eq('id', this.user.id)
+      .select('email_opt_in')
+      .single();
+    if (error) throw error;
+    this.emailOptIn = data.email_opt_in;
+    return data.email_opt_in;
   }
 
   // ── Voting ─────────────────────────────────────────────────────────────────

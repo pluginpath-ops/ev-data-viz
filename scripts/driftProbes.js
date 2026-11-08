@@ -181,7 +181,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-bg',
-        count: 34,
+        count: 32,
         scope: 'src/**/*.jsx',
         what: 'Background fills written as palette utilities. The subset of these that '
             + 'are LIGHT fills with no dark counterpart is separately ratcheted as '

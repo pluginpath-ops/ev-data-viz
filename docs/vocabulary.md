@@ -24,6 +24,8 @@ it.
 | A labeled group of items in a sub-nav | **a section** — its label, its items, a rule between sections | — | `group` on an item; `.subtab-section-label`, `.subtab-section-rule`, `.nav-menu-section` |
 | The one width at which the chrome collapses | **compact** — the only breakpoint | — | [useIsCompact.js](../src/hooks/useIsCompact.js) |
 | The circle at the right end, and what it opens | **account menu** | Material *account* | `.account-menu`, [AccountMenu.jsx](../src/components/shell/AccountMenu.jsx) |
+| A signed-in user's yes to rare emails about major changes | **email opt-in** — off until they tick it; in the account menu. Not "newsletter", "subscribe" or "marketing" | — | `profiles.email_opt_in`, `.account-opt-in` |
+| What sign-in keeps and promises, under the sign-in buttons | **privacy note** | — | `.auth-privacy`, [AuthModal.jsx](../src/components/AuthModal.jsx) |
 | A button stating its value, opening a panel | **menu button** | WAI-ARIA *menu button* | `.menu-button`, [MenuButton.jsx](../src/components/shell/MenuButton.jsx) |
 | Anything that floats above the page | **popover** | common web | `.popover` + one `.popover--<placement>` |
 | Where it opens relative to its anchor | **placement** | Floating UI | `--above`, `--below`, `--center`, `--right`, `--end`, `--stretch` |

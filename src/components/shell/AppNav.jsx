@@ -39,6 +39,8 @@ export default function AppNav({
     isAdmin,
     user,
     userRole,
+    emailOptIn,
+    onEmailOptInChange,
     units,
     onToggleUnits,
     onNavigate,
@@ -159,6 +161,8 @@ export default function AppNav({
                 <AccountMenu
                     user={user}
                     userRole={userRole}
+                    emailOptIn={emailOptIn}
+                    onEmailOptInChange={onEmailOptInChange}
                     units={units}
                     onToggleUnits={onToggleUnits}
                     onSignIn={onSignIn}
