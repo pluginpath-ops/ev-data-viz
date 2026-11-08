@@ -272,7 +272,7 @@ describe('the seams that broke before', () => {
     });
 
     it('routes every chart that resolves a range basis through the correction', () => {
-        const resolvers = ALL.filter(x => /resolveRangeSource\(/.test(x.text) && /\.jsx$/.test(x.file));
+        const resolvers = ALL.filter(x => /(resolveRangeSource|pairRangeSource)\(/.test(x.text) && /\.jsx$/.test(x.file));
         expect(resolvers.length).toBeGreaterThan(0);
         for (const { file, text } of resolvers) {
             expect(text, `${file} resolves a range basis but never corrects it`)

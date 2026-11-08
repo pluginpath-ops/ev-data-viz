@@ -70,8 +70,8 @@ export function rangeCoverageOk(run) {
  *
  * @returns {{ miPerKwh: number, estimated: boolean, note: string|null } | null}
  */
-export function spreadEfficiency(run, socWindowKwh) {
-    const { miPerKwh, method } = miPerKwhFrom(run, socWindowKwh);
+export function spreadEfficiency(run, socWindowKwh, trace = null) {
+    const { miPerKwh, method } = miPerKwhFrom(run, socWindowKwh, trace);
     if (!(miPerKwh > 0) || !Number.isFinite(miPerKwh)) return null;
     const estimated = method === 'soc-delta-estimate';
     return {

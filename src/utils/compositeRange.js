@@ -63,6 +63,8 @@ export const COMPOSITE_RANGE_LEFT_OUT = {
 };
 
 const present = (v) => v != null && v !== '';
+/** A test as "Show the math" names it. */
+const testName = (run) => `${run.name ?? `Test ${run.id}`} (${run.speed_mph ?? '?'} mph, ${run.temperature_f ?? '?'}°F)`;
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 
 /** Why this test cannot be corrected into the composite, or null when it can. */
@@ -99,7 +101,6 @@ export function compositeRange(vehicle, {
     const counted = countedRangeTests(vehicle).filter(r => !isCompositeRun(r) && r.distance_miles > 0);
     trace?.note(`${counted.length} counted range test${counted.length === 1 ? '' : 's'}; each is corrected for everything the model can (mode "Speed, altitude, temp & wind") to ${target.speedMph} mph, whatever the charts' mode`);
     if (!counted.length) return null;
-    const testName = (run) => `${run.name ?? `Test ${run.id}`} (${run.speed_mph ?? '?'} mph, ${run.temperature_f ?? '?'}°F)`;
 
     const tests = [];
     const leftOut = [];
@@ -115,20 +116,33 @@ export function compositeRange(vehicle, {
             continue;
         }
 
-        // The first test in carries its whole correction, as the example; the
-        // rest give their factor alone, since the steps are the same.
+        // Each test in has its own group; the first carries its whole
+        // correction, as the example, since the steps are the same for all.
+        const t = trace?.group(testName(run));
         const { factor } = correctionFactor(runConditions(run, session), {
-            mode: 'aero_wind', target, trace: tests.length === 0 ? trace?.group(`Correction, worked for ${testName(run)}`) : null,
+            mode: 'aero_wind', target, trace: tests.length === 0 ? t?.group('Correction factor') : null,
         });
+        if (tests.length > 0) t?.step('Correction factor', { values: { k: factor }, result: factor, note: 'worked in full for the first test' });
 
         const window = socWindow(run);
         const rangeMi = rangeCoverageOk(run) && window ? (run.distance_miles * 100 / window) * factor : null;
-        const eff = spreadEfficiency(run, vehicle?.socWindowKwh);
-        trace?.step(testName(run), {
-            formula: 'mi/kWh = e_test × k',
-            values: { e_test: val(eff?.miPerKwh ?? null, 'mi/kWh', 'data'), k: factor },
+        if (t) {
+            if (rangeMi != null) {
+                t.step('Corrected full-pack range', {
+                    formula: 'R = d × 100 / ΔSoC × k',
+                    values: { d: val(run.distance_miles, 'mi', 'data'), ΔSoC: val(window, '%', 'data'), k: factor },
+                    result: rangeMi, unit: 'mi',
+                });
+            } else {
+                t.note('Not in the range mean: the test did not cover enough of the pack to scale', { assumed: false });
+            }
+        }
+        const eff = spreadEfficiency(run, vehicle?.socWindowKwh, t);
+        t?.step('Corrected efficiency', {
+            formula: 'e = e_test × k',
+            values: { e_test: val(eff?.miPerKwh ?? null, 'mi/kWh'), k: factor },
             result: eff ? eff.miPerKwh * factor : null, unit: 'mi/kWh', assumed: !!eff?.estimated,
-            note: eff?.estimated ? eff.note : (eff ? 'measured energy ÷ distance' : 'no efficiency: not in the mean'),
+            note: eff ? null : 'no efficiency: not in the mean',
         });
         tests.push({
             run,
@@ -141,10 +155,16 @@ export function compositeRange(vehicle, {
 
     const ranges = tests.map(t => t.rangeMi).filter(v => v != null);
     const effs = tests.filter(t => t.miPerKwh != null);
-    trace?.step('Composite efficiency', {
-        formula: 'mean of the corrected tests', values: Object.fromEntries(effs.map((t, i) => [`e${i + 1}`, val(t.miPerKwh, 'mi/kWh')])),
-        result: mean(effs.map(t => t.miPerKwh)), unit: 'mi/kWh',
-    });
+    if (trace) {
+        trace.step('Composite range', {
+            formula: 'mean of the corrected ranges', values: Object.fromEntries(ranges.map((r, i) => [`R${i + 1}`, val(r, 'mi')])),
+            result: mean(ranges), unit: 'mi',
+        });
+        trace.step('Composite efficiency', {
+            formula: 'mean of the corrected efficiencies', values: Object.fromEntries(effs.map((x, i) => [`e${i + 1}`, val(x.miPerKwh, 'mi/kWh')])),
+            result: mean(effs.map(x => x.miPerKwh)), unit: 'mi/kWh',
+        });
+    }
     return {
         rangeMi: mean(ranges),
         nRange: ranges.length,

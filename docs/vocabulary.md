@@ -99,6 +99,7 @@ it.
 | The spec chart's list for choosing columns to plot | **field picker** — its items are **fields** ("Filter fields"). The table's own menu stays **Columns** (the **column picker**) | Material *listbox* | [FieldPicker.jsx](../src/components/tables/FieldPicker.jsx) |
 | Charging Curves' list for choosing X, Y and Y2 | **axis picker** — items are **axes**. Each has a full `label` (titles the plot) and a short `name` | — | [AxisPicker.jsx](../src/components/AxisPicker.jsx), [chargingAxes.js](../src/utils/chargingAxes.js) |
 | The icon beside a column header that plots it | **chart icon** (not "plot button"). Disabled while nothing is selected. On the EPA guide table only where `plotAs` is set | — | `.column-plot-button`, [SortHeader.jsx](../src/components/tables/SortHeader.jsx) |
+| A closed section, above the help bubble, that works one figure through by the page's own code with the reader's settings — each step's formula, the values filled in, and where each value came from | **Show the math** in UI text; **calculation trace** (`trace`) in code. Closed by default; closed costs nothing. On the Range, Charge Stop, Cost & Time and Performance › Compare pages, and under the vehicle table. Not "debug" or "audit" (Data Checks is the audit) | — | [calcTrace.js](../src/utils/calcTrace.js), [components/calcTrace/](../src/components/calcTrace/) |
 
 ### Series color
 
@@ -397,7 +398,6 @@ Names not yet settled. Record them here rather than guess in code.
 | A vehicle's place in its lineage, as an icon | [LineageIcon.jsx](../src/components/vehicles/LineageIcon.jsx) | | **origin**, **has variants**, **end variant** |
 | Spec chart bars for a text or yes/no column (equal height, value inside) | [SpecsChartView.jsx](../src/components/SpecsChartView.jsx), `plot.kind === 'text'` | Lineup · Labeled bars · Tiles | **Decided:** **labeled bars** internally; **Lineup** if ever shown in the UI (it isn't today) |
 | A test vehicle no Guide row stands on | [epaBehindNoLabel.js](../src/utils/epaBehindNoLabel.js) | behind no EPA Label · unlabeled · off-label · retest | **behind no EPA Label**. Not "retest" (most are unsold variants) or "off-label" |
-| One pass of a page's own math, written down step by step by the code that did it (PROTOTYPE, 2026-11-08) | [calcTrace.js](../src/utils/calcTrace.js), [components/calcTrace/](../src/components/calcTrace/) | Show the math · How the numbers are made · the working | **Show the math** in UI text; **calculation trace** (`trace`) in code. Not "debug" or "audit" (Data Checks is the audit) |
 | How far apart a vehicle's range tests landed — every test shown | [rangeTestSpread.js](../src/utils/rangeTestSpread.js), [roadTripSpread.js](../src/utils/roadTripSpread.js); "Test spread" meanwhile | test spread (widened) · tested span | **test spread**, widened: same idea for the reader as the curve's, different construction. Never "range", "error bar" or "confidence band" |
 
 ## Deferred renames

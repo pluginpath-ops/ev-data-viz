@@ -5,20 +5,19 @@ import { fullPackRange } from '../../utils/fullPackRange';
 import { correctionCaption } from '../../utils/correctionSettings';
 import { sessionFor } from '../../utils/testSessions';
 import ShowTheMath from './ShowTheMath';
+import MathPass from './MathPass';
 
 /**
  * "Show the math" for the Range chart: one plotted test, corrected and turned
  * into its bar, by the same two calls the chart makes (correctRunDistance,
  * then fullPackRange on the corrected test), with the reader's correction.
  *
- * PROTOTYPE (2026-11-08).
- *
  * Props:
  *   plotted   the chart's plotted runs (each carries `vehicle` and `vehicleName`)
  *   mode, target  the reader's correction
  *   testSessions  for the conditions a run leaves to its session
  */
-export default function RangeMath({ plotted, mode, target, testSessions }) {
+function RangeMathBody({ plotted, mode, target, testSessions }) {
     const options = plotted.map(p => ({
         id: p.id,
         label: `${p.vehicleName} · ${p.name ?? `test ${p.id}`}${p.speed_mph != null ? ` · ${p.speed_mph} mph` : ''}${p.temperature_f != null ? ` · ${p.temperature_f}°F` : ''}`,
@@ -38,10 +37,14 @@ export default function RangeMath({ plotted, mode, target, testSessions }) {
         };
     }, [plotted, mode, target, testSessions]);
     return (
-        <ShowTheMath
+        <MathPass
             intro="Range and efficiency both scale with the corrected distance, so one factor moves every chart type. Figures in miles; the chart converts to your units after."
             options={options}
             buildTrace={buildTrace}
         />
     );
+}
+
+export default function RangeMath(props) {
+    return <ShowTheMath Body={RangeMathBody} {...props} />;
 }

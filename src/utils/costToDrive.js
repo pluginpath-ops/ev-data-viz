@@ -690,9 +690,9 @@ export const perMonth = (weekly) => weekly * WEEKS_PER_MONTH;
  *   less fill-up time; negative when the EV costs less time
  */
 export function costToDriveComparison(profile, settings, { trace = null } = {}) {
-    const shown = (season) => (season === settings.season ? trace?.group(`The ${season} week, simulated`) : null);
-    const summer = simulateWeek(profile, settings, { season: 'summer', trace: shown('summer') });
-    const winter = simulateWeek(profile, settings, { season: 'winter', trace: shown('winter') });
+    // The season on the page is traced; the other runs the same steps.
+    const summer = simulateWeek(profile, settings, { season: 'summer', trace: settings.season === 'summer' ? trace?.group('The summer week, simulated') : null });
+    const winter = simulateWeek(profile, settings, { season: 'winter', trace: settings.season === 'winter' ? trace?.group('The winter week, simulated') : null });
     const week = settings.season === 'summer' ? summer : winter;
     const gas = simulateGasWeek(settings, { trace: trace?.group('Your gas car, the same week') });
     const evWeek = (w) => w.fastCost + w.homeCost;

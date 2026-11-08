@@ -6,15 +6,14 @@ import { vehicleLabel } from '../../utils/specHelpers';
 import { dollars, minutesText, perMonth, savedText } from '../../utils/costToDrive';
 import { priceVehicle } from '../../hooks/useCostToDrive';
 import ShowTheMath from './ShowTheMath';
+import MathPass from './MathPass';
 
 /**
  * "Show the math" for Cost & Time › Compare: one vehicle priced by the same
  * call the page makes (useCostToDrive's priceVehicle), with the reader's
  * settings and a trace on.
- *
- * PROTOTYPE (2026-11-08).
  */
-export default function CostMath({ vehicles, shown, settings }) {
+function CostMathBody({ vehicles, shown, settings }) {
     const { testSessions } = useAppContext();
     const options = shown.map(p => ({ id: p.vehicle.id, label: vehicleLabel(p.vehicle) }));
     const buildTrace = useCallback((id) => {
@@ -27,10 +26,14 @@ export default function CostMath({ vehicles, shown, settings }) {
         };
     }, [vehicles, settings, testSessions]);
     return (
-        <ShowTheMath
+        <MathPass
             intro={`The ${settings.season} week as the page simulates it, for one car. The other season runs the same steps at its own temperature.`}
             options={options}
             buildTrace={buildTrace}
         />
     );
+}
+
+export default function CostMath(props) {
+    return <ShowTheMath Body={CostMathBody} {...props} />;
 }
