@@ -10075,7 +10075,7 @@ a.is-test-link:focus-visible {
 .plan-table tr.is-fast-first > td { border-top: 1px solid var(--color-accent-orange); }
 .plan-table tr.is-fast-last > td { border-bottom: 1px solid var(--color-accent-orange); }
 
-/* ── Show the math (calculation trace, PROTOTYPE 2026-11-08) ──────────────
+/* ── Show the math (calculation trace) ────────────────────────────────────
    One pass of a page's own math, written down by the code that did it
    (utils/calcTrace.js, components/calcTrace/). A nested chain is indented
    behind a rule; a formula is mono; the result sits at the end of its line. */

@@ -1,7 +1,9 @@
 /**
  * Calculation trace — the math a page did, step by step, written down by the
- * code that did it ("Show the math"). PROTOTYPE (2026-11-08): two chains, the
- * range correction and Cost & Time; the rest are listed in the PR.
+ * code that did it ("Show the math"). Traced so far: the range correction,
+ * Cost & Time, the Charge Stop range basis, the vehicle table's worked-out
+ * columns and Performance › Compare. Not yet: the road trip, the composite
+ * charging curve, the Trip Optimizer, the EPA derivations.
  *
  * A pure function that wants to be traceable takes an optional `trace`
  * (default null) and, beside each line of math, records it:

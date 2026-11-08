@@ -8,8 +8,6 @@ import { KNOB_KEYS } from '../../constants/knobs';
  * value came from; assumptions marked. Nested chains (a function the pass
  * called) are disclosures, open at the top level. Below, every model constant
  * the pass touched, with its value and its layer.
- *
- * PROTOTYPE (2026-11-08).
  */
 
 const SOURCE_TEXT = { setting: 'your setting', data: 'data', assumed: 'assumed' };
