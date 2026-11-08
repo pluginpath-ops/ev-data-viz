@@ -16,7 +16,10 @@ export default function SetupInvite({ from, centered = false }) {
     return (
         <div className={`setup-invite${centered ? ' is-centered' : ''}`}>
             <span className="text-secondary">{text}</span>
-            <button type="button" className="btn btn-primary" onClick={() => openSetup(from)}>{SETUP_WIZARD.entry.button}</button>
+            <span className="inline-flex items-center gap-2">
+                <button type="button" className="btn btn-primary" onClick={() => openSetup(from)}>{SETUP_WIZARD.entry.button}</button>
+                {from === 'home' && SETUP_WIZARD.entry.beta && <span className="badge-micro is-warning">{SETUP_WIZARD.entry.beta}</span>}
+            </span>
         </div>
     );
 }

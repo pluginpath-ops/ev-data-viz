@@ -9,7 +9,8 @@
  * Sections:
  *   steps         which screens exist, in order, and each one's title. Keys:
  *                 goal, cars, driving, weather, money, summary (summary last).
- *   entry         the "Set up for me" button text: Home, an empty chart, the nav.
+ *   entry         the button text: Home and an empty chart ("Set up for me",
+ *                 Home's with a Beta badge), and the nav's button ("Guide me").
  *   goals         "What do you want to know?" — the reader may pick several.
  *                 Each opens one chart `mode` (a mode key from
  *                 constants/chartNav.js) and `asks` only the questions that
@@ -68,9 +69,10 @@ export const SETUP_WIZARD = {
 
     entry: {
         button: 'Set up for me',
+        beta: 'Beta',            // the badge beside Home's button while the wizard is new; '' hides it
         home: 'New here? Answer a few questions and we’ll set up the charts for you.',
         emptyChart: 'Not sure what to pick?',
-        nav: 'Set up for me',
+        nav: 'Guide me',
     },
 
     goals: {

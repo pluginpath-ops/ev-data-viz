@@ -723,6 +723,14 @@
     color: var(--color-text-on-nav);
     font-weight: 600;
 }
+/* "Guide me" in the last nav slot (the setup wizard): an outlined button among
+   the tabs, because it opens a modal rather than a page. */
+.nav-guide {
+    align-self: center;
+    margin-left: 8px;
+    flex: none;
+    white-space: nowrap;
+}
 .btn-tab:disabled {
     opacity: 0.5;
     cursor: not-allowed;

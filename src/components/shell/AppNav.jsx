@@ -119,7 +119,15 @@ export default function AppNav({
                 <NavMenu items={menuItems} activeKey={openedActive ? OPENED : view} onSelect={select} level="main" />
             ) : (
                 <div className="nav-tab-group">
-                    {items.map(({ key, label }) => {
+                    {items.map(({ key, label, action }) => {
+                        // The wizard opens a modal, not a page: a button, not a tab.
+                        if (action) {
+                            return (
+                                <button key={key} type="button" onClick={() => select(key)} className="btn btn-secondary nav-guide">
+                                    {label}
+                                </button>
+                            );
+                        }
                         const tab = (
                             <button
                                 key={key}
