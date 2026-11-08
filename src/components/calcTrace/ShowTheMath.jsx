@@ -15,7 +15,10 @@ import CollapsibleSection from '../CollapsibleSection';
 export default function ShowTheMath({ Body, ...props }) {
     return (
         <div className="card mt-4">
-            <CollapsibleSection title="Show the math" subtitle="one pass, worked from the live code">
+            <CollapsibleSection
+                title={<span className="inline-flex items-center gap-2">Show the math <span className="badge-micro is-warning">Beta</span></span>}
+                subtitle="one pass, worked from the live code"
+            >
                 <Body {...props} />
             </CollapsibleSection>
         </div>
