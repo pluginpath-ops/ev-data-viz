@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-    simulateWeek, simulateGasWeek, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
+    simulateWeek, simulateGasWeek, gasColdLoss, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
-import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO } from '../../constants/costToDrive';
+import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
+import { ASSUMED_CHARGER_EFF } from '../../constants/epa';
 
 // A Model Y-ish profile with fixed numbers, so the rule is tested apart from
 // how a vehicle record resolves: 75 kWh, 340 Wh/mi on a long day in winter.
@@ -141,8 +142,20 @@ describe('the gas car', () => {
         const g = simulateGasWeek(settings());
         expect(g.gallons).toBeGreaterThan(30);
         expect(g.fillsPerWeek).toBeCloseTo(g.gallons / (26 * 0.85), 6);
-        expect(g.minutesPerWeek).toBeCloseTo(g.fillsPerWeek * 8, 6);
-        expect(g.cost).toBeCloseTo(g.gallons * 3.2, 6);
+        expect(g.minutesPerWeek).toBeCloseTo(g.fillsPerWeek * 5, 6);
+        expect(g.cost).toBeCloseTo(g.gallons * 4, 6);
+    });
+
+    it('loses mpg in the cold, none from the lab temperature up', () => {
+        expect(gasColdLoss(20)).toEqual({ city: 0.15, hwy: 0.07 });
+        expect(gasColdLoss(75)).toEqual({ city: 0, hwy: 0 });
+        expect(gasColdLoss(95)).toEqual({ city: 0, hwy: 0 });
+        expect(gasColdLoss(47.5).city).toBeCloseTo(0.075, 9);
+        const summer = simulateGasWeek(settings(), { season: 'summer' });
+        const winter = simulateGasWeek(settings(), { season: 'winter' });
+        expect(summer.cityMpg).toBe(18);
+        expect(winter.cityMpg).toBeLessThan(18 * 0.85);
+        expect(winter.gallons).toBeGreaterThan(summer.gallons);
     });
 });
 
@@ -169,6 +182,18 @@ describe('a vehicle record', () => {
         expect(p.whPerMi.summer.L / label).toBeGreaterThan(0.95);
         expect(p.whPerMi.summer.L / label).toBeLessThan(1.05);
         expect(costToDriveVehicle(vehicle, settings({ longMph: 80 })).whPerMi.summer.L).toBe(p.whPerMi.summer.L);
+    });
+
+    it("uses the car's own EPA 240 V figure, and scales 120 V by it", () => {
+        const own = { ...vehicle, epaRange: { ...vehicle.epaRange, chargerEfficiency: 0.91 } };
+        const at240 = costToDriveVehicle(own, settings({ level: 4 })).home;
+        expect(at240.eff).toBe(0.91);
+        expect(at240.effFrom).toBe('epa');
+        expect(costToDriveVehicle(own, settings({ level: 0 })).home.eff).toBeCloseTo(0.91 * WALL_OUTLET_CHARGER_EFF / ASSUMED_CHARGER_EFF, 9);
+        const site = costToDriveVehicle(vehicle, settings({ level: 4 })).home;
+        expect(site.eff).toBe(ASSUMED_CHARGER_EFF);
+        expect(site.effFrom).toBe('assumed');
+        expect(costToDriveVehicle(vehicle, settings({ level: 0 })).home.eff).toBeCloseTo(WALL_OUTLET_CHARGER_EFF, 9);
     });
 
     it('takes the lesser of the charger and the onboard charger, and an assumed one when the spec is blank', () => {

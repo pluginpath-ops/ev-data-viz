@@ -18,7 +18,18 @@ export function DriveNumberField({ settings, onChange, field, label, unit, integ
                 value={settings[field]}
                 min={f.min}
                 max={f.max}
-                step={f.step}
+                // The spinner moves by `spin` where a field has one (the miles,
+                // in fives); a typed figure only has to be on the stored step.
+                step={f.spin ?? f.step}
+                // Settings are stored on their step's grid (the key packs them
+                // that way), so an off-grid figure is refused like an
+                // out-of-range one rather than shown while the next one along
+                // is used: an iPad reader typed 8 mi and was priced for 10,
+                // which is why the miles are now stored to the mile.
+                onStep={f.step}
+                // Named by its label; the title is only the range hint.
+                aria-label={label}
+                title={f.step === 1 || f.spin ? `${f.min} to ${f.max}` : `${f.min} to ${f.max}, in steps of ${f.step}`}
                 integer={integer ?? Number.isInteger(f.step)}
                 onChange={n => onChange({ [field]: n })}
             />

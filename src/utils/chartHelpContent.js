@@ -270,7 +270,8 @@ export const CHART_HELP_DEFAULTS = {
             'home and fast charging per car beside the gas bill; the second sets fast-charging ' +
             'minutes against fill-up minutes. Months are for the season shown; the card’s ' +
             'year line blends winter months with summer ones. Winter is a floor: denser air ' +
-            'and cabin heat are priced, battery warming and cold tires are not.',
+            'and cabin heat are priced, battery warming and cold tires are not. The gas car ' +
+            'loses mpg in the cold too: about 15% city and 7% highway at 20°F, none from 75°F up.',
         key_terms:
             'Fast stop — a stop on the route, when a day runs short of home charging.\n' +
             'Stop to charge by — the battery level a stop is made at.\n' +
@@ -333,13 +334,13 @@ export const CHART_HELP_DEFAULTS = {
             'home charger level, everything else as you set it. Priced the same way as ' +
             'the Compare sub-tab.',
         how_to_read:
-            'Each column is what a car’s week costs with that charger at home: home ' +
+            'Each column is what a car costs a month with that charger at home (the week × 52 ÷ 12, as on Compare): home ' +
             'charging underneath in its color, fast charging on top in a muted shade of ' +
             'it, the total over it, and the home figure on the home part when there is fast charging too. The faster the charger, the more the night ' +
             'covers and the smaller the fast part. The table has a column a charger and, ' +
             'for each car, its minutes of fast charging and its home, fast and total cost ' +
-            'per week. The bold orange cell is “enough from here”: the smallest charger past ' +
-            'which a bigger one saves less than five minutes per week. A ^ means the car’s own ' +
+            'per month. The bold orange cell is “enough from here”: the smallest charger past ' +
+            'which a bigger one saves less than five minutes a week (about 20 a month). A ^ means the car’s own ' +
             'onboard charger, not the wall, sets the pace, so a bigger charger buys nothing.',
         key_terms:
             'Home charger — 120 V on a wall outlet, or 240 V at the amps the circuit allows.\n' +
@@ -347,8 +348,11 @@ export const CHART_HELP_DEFAULTS = {
             'Enough from here — where a bigger charger stops making a difference you would notice.',
         math_approach:
             'Power at home is the lesser of volts × amps and the car’s onboard charger ' +
-            '(11.5 kW assumed when the spec is blank), with charger losses: more on a 120 V ' +
-            'outlet. Each level runs the whole week simulation again.',
+            '(11.5 kW assumed when the spec is blank), with charger losses: at 240 V the car’s ' +
+            'own EPA certification figure where it has one, else the site-wide one; on a 120 V ' +
+            'outlet that scaled down to 80% for a car at the site-wide figure. Each level runs ' +
+            'the whole week simulation again. Winter below 40°F, parked outside, costs more than ' +
+            'shown: the car warms its battery before it charges, which is not priced.',
     },
 
     perfcompare: {

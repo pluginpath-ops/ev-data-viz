@@ -5,13 +5,14 @@
  * so the two ways in cannot drift apart. Names: docs/vocabulary.md, Cost to
  * Drive.
  */
-import { DETOUR_MPH, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
+import { DETOUR_MPH, GAS_CAR_PRESETS, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS } from '../../constants/epa';
+import { percentText } from '../../utils/costToDrive';
 import { DriveNumberField, DriveSlider, DriveChoice, DriveCheckbox, PlugWindow, HourSelect } from './DriveFields';
 import HomeLevelPicker from './HomeLevelPicker';
 import WeekPicker from './WeekPicker';
+import PackWarmingNote from './PackWarmingNote';
 
-const pct = (x) => `${Math.round(x * 1000) / 10}%`;
 
 export function HomeChargingFields({ settings, onChange, compact }) {
     const props = { settings, onChange };
@@ -112,6 +113,7 @@ export function SeasonFields({ settings, onChange }) {
                 Priced as denser air plus cabin heating or cooling. Battery warming and cold tires are
                 not, so winter is a floor.
             </span>
+            <PackWarmingNote settings={settings} />
         </>
     );
 }
@@ -120,6 +122,15 @@ export function GasCarFields({ settings, onChange }) {
     const props = { settings, onChange };
     return (
         <>
+            <div className="drive-presets" role="group" aria-label="Fill in a gas car">
+                {GAS_CAR_PRESETS.map(p => (
+                    <button key={p.key} type="button" className="btn btn-secondary" title={`${p.title}: ${p.settings.gasCity} city / ${p.settings.gasHwy} hwy mpg, ${p.settings.gasTank} gal`}
+                        aria-pressed={Object.entries(p.settings).every(([k, v]) => settings[k] === v)}
+                        onClick={() => onChange(p.settings)}>
+                        {p.label}
+                    </button>
+                ))}
+            </div>
             <div className="flex flex-col gap-2">
                 <DriveNumberField {...props} field="gasCity" label="City" unit="mpg" />
                 <DriveNumberField {...props} field="gasHwy" label="Highway" unit="mpg" />
@@ -128,7 +139,7 @@ export function GasCarFields({ settings, onChange }) {
                 <DriveNumberField {...props} field="gasFillAt" label="Fill up at" unit="% left" />
                 <DriveNumberField {...props} field="gasFillMin" label="Each fill-up" unit="min" />
             </div>
-            <span className="text-note">The same week, city share and miles. A fill-up&rsquo;s minutes include its own short detour. Winter mpg loss is not modeled.</span>
+            <span className="text-note">The cars fill in their EPA mpg and tank. The same week, city share and miles. A fill-up&rsquo;s minutes are at the pump: the station is taken to be on the way. Cold costs mpg: about 15% city and 7% highway at 20°F, none from 75°F up.</span>
         </>
     );
 }
@@ -144,8 +155,9 @@ export function EfficiencyFields({ settings, onChange }) {
                 your speed, temperature and elevation. A car with no range test uses EPA for both, and says so.
             </span>
             <span className="text-meta">
-                Charging losses, site-wide: 240 V {pct(ASSUMED_CHARGER_EFF)} reaches the pack · 120 V {pct(WALL_OUTLET_CHARGER_EFF)} ·
-                DC fast {pct(DC_FAST_LOSS)} lost after the port
+                Charging losses: at 240 V, each car&rsquo;s own EPA figure, else {percentText(ASSUMED_CHARGER_EFF)} reaches the pack ·
+                120 V that × {percentText(WALL_OUTLET_CHARGER_EFF)} ÷ {percentText(ASSUMED_CHARGER_EFF)} ·
+                DC fast {percentText(DC_FAST_LOSS)} lost after the port
             </span>
         </>
     );
