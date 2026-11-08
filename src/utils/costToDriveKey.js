@@ -20,6 +20,13 @@
  * read from today's: a key shared now opens the same week after a default
  * moves. A change to the format is a new version, decoded beside this one.
  *
+ * Version 2 (2026-11-07): the same fields and packing, with the two miles
+ * fields stored to the mile rather than in fives, so a reader can enter 8 mi,
+ * gas at $4.00 by default rather than $3.20, and a fill-up at 5 min rather than
+ * 8 (V2_DEFAULTS). Keys are written as version 2; a version-1 key still reads,
+ * its miles in fives (V1_STEPS) and its gas price and fill-up at version 1's
+ * defaults when it left them out.
+ *
  * Pure leaf: imports only the constants leaf, so the short link can carry it.
  */
 import { COST_TO_DRIVE_FIELDS, DAY_TYPES } from '../constants/costToDrive';
@@ -27,12 +34,18 @@ import { COST_TO_DRIVE_FIELDS, DAY_TYPES } from '../constants/costToDrive';
 /** The address parameter that carries the key. */
 export const COST_TO_DRIVE_PARAM = 'cd';
 
-export const COST_TO_DRIVE_KEY_VERSION = '1';
+export const COST_TO_DRIVE_KEY_VERSION = '2';
 
-/** Version 1's fields, in order. The constants list is append-only, so this is its prefix. */
-const FIELDS_V1 = COST_TO_DRIVE_FIELDS.slice(0, 33);
+/** Version 2's fields, in order. The constants list is append-only, so this is its prefix. */
+const FIELDS_V2 = COST_TO_DRIVE_FIELDS.slice(0, 33);
 
-/** Version 1's defaults, frozen: what a key written now leaves out. */
+/** The steps version 1 stored a field in, where they differ from today's. FROZEN. */
+const V1_STEPS = Object.freeze({ dailyMi: 5, longMi: 5 });
+
+/** Version 1's fields: version 2's, with version 1's steps. */
+const FIELDS_V1 = FIELDS_V2.map(f => (V1_STEPS[f.key] ? { ...f, step: V1_STEPS[f.key] } : f));
+
+/** Version 1's defaults, frozen: what a version-1 key leaves out. */
 const V1_DEFAULTS = Object.freeze({
     level: 4, plugFrom: 22, plugUntil: 7, chargeTo: 80, fullBeforeLong: true, homePrice: 0.17,
     week: 'LDLDLDO', planned: 0b1000000,
@@ -42,6 +55,9 @@ const V1_DEFAULTS = Object.freeze({
     gasCity: 18, gasHwy: 24, gasPrice: 3.20, gasTank: 26, gasFillAt: 15, gasFillMin: 8,
     efficiencyFrom: 'tested', plannedHour: 17,
 });
+
+/** Version 2's defaults, frozen: version 1's with gas at $4 and a 5-minute fill-up. */
+const V2_DEFAULTS = Object.freeze({ ...V1_DEFAULTS, gasPrice: 4.00, gasFillMin: 5 });
 
 const decimalsOf = (step) => String(step).split('.')[1]?.length ?? 0;
 
@@ -149,15 +165,15 @@ function fromBase64Url(text) {
 }
 
 /**
- * The key for a set of settings, or null when every one is at its version-1
+ * The key for a set of settings, or null when every one is at its version-2
  * default (the address then carries no `cd` at all).
  */
 export function encodeCostToDriveKey(settings) {
     const s = normalizeCostToDrive(settings);
     let mask = 0;
     const values = [];
-    FIELDS_V1.forEach((f, i) => {
-        if (s[f.key] === V1_DEFAULTS[f.key]) return;
+    FIELDS_V2.forEach((f, i) => {
+        if (s[f.key] === V2_DEFAULTS[f.key]) return;
         mask += 2 ** i;
         values.push(toIndex(f, s[f.key]));
     });
@@ -176,22 +192,23 @@ export function encodeCostToDriveKey(settings) {
  * @returns {{ settings: Object, error: string|null }}
  */
 export function decodeCostToDriveKey(key) {
-    const defaults = normalizeCostToDrive(V1_DEFAULTS);
+    const defaults = normalizeCostToDrive(V2_DEFAULTS);
     if (key == null || key === '') return { settings: defaults, error: null };
     const dot = String(key).indexOf('.');
     const version = dot < 0 ? '' : key.slice(0, dot);
-    if (version !== COST_TO_DRIVE_KEY_VERSION) {
+    const [fields, frozen] = version === '1' ? [FIELDS_V1, V1_DEFAULTS] : version === '2' ? [FIELDS_V2, V2_DEFAULTS] : [];
+    if (!fields) {
         return { settings: defaults, error: `This link's settings were made by a newer version of the site (key version ${version || '?'}).` };
     }
     try {
         const bytes = fromBase64Url(key.slice(dot + 1));
         const at = { i: 0 };
         const mask = readVarint(bytes, at);
-        const out = { ...V1_DEFAULTS };
+        const out = { ...frozen };
         let rest = mask;
         for (let i = 0; rest > 0; i++, rest = Math.floor(rest / 2)) {
             if (rest % 2 === 0) continue;
-            const f = FIELDS_V1[i];
+            const f = fields[i];
             if (!f) throw new Error('unknown field');
             const v = fromIndex(f, readVarint(bytes, at));
             if (v === undefined) throw new Error(`bad ${f.key}`);

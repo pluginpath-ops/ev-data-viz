@@ -1,4 +1,5 @@
 import NewVariantButton from './NewVariantButton';
+import { compareCuratedOrder } from '../utils/vehicleOrder';
 import { ownValues, lineageIndex, lineageRole, vehicleStack, lineageTrees } from '../utils/vehicleInheritance';
 import VehicleStack from './vehicles/VehicleStack';
 import LineageTree from './vehicles/LineageTree';
@@ -231,15 +232,9 @@ export default function VehiclesView({
     // Stage 3: sort
     const sortedFilteredVehicles = [...shownVehicles].sort((a, b) => {
         switch (sortBy) {
-            case 'default': {
-                // Use pending sort_order when available (instant visual feedback before DB save)
-                const aOrder = pendingOrder?.find(u => u.id === a.id)?.sort_order ?? a.sort_order;
-                const bOrder = pendingOrder?.find(u => u.id === b.id)?.sort_order ?? b.sort_order;
-                const aN = aOrder == null, bN = bOrder == null;
-                if (!aN && !bN) return aOrder - bOrder;
-                if (!aN) return -1; if (!bN) return 1;
-                return new Date(b.created_at) - new Date(a.created_at);
-            }
+            // Use pending sort_order when available (instant visual feedback before DB save)
+            case 'default': return compareCuratedOrder(a, b,
+                v => pendingOrder?.find(u => u.id === v.id)?.sort_order ?? v.sort_order);
             case 'date_newest': return new Date(b.created_at) - new Date(a.created_at);
             case 'date_oldest': return new Date(a.created_at) - new Date(b.created_at);
             case 'brand_az':    return (a.make  || '').localeCompare(b.make  || '');

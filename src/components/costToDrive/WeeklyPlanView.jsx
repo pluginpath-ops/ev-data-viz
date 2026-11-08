@@ -224,7 +224,7 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                                             color={SERIES_NEUTRAL}
                                             yLabel="Range left (mi)"
                                             title="Your gas car: the same week"
-                                            subtitle={`${weekSummary(settings)} · ${settings.gasCity} city / ${settings.gasHwy} hwy mpg, ${settings.gasTank} gal`}
+                                            subtitle={`${weekSummary(settings)} · ${Math.round(gas.cityMpg)} city / ${Math.round(gas.hwyMpg)} hwy mpg in ${settings.season}, ${settings.gasTank} gal`}
                                             signature={`gas|${JSON.stringify(settings)}`}
                                             height={height}
                                         />

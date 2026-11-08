@@ -1,12 +1,12 @@
 /**
  * The home charger level: a grid of radio cards on Your Driving, a select in
  * the sidebar (`compact`). Each names its volts and amps and the power they
- * make, a wall outlet saying so.
+ * make, a wall outlet saying so. The last is no home charging.
  */
 import { HOME_LEVELS, levelKw } from '../../constants/costToDrive';
 
-export const levelLabel = (level) => `${level.volts} V · ${level.amps} A`;
-const powerText = (level) => `${levelKw(level).toFixed(1)} kW${level.volts < 200 ? ' · wall outlet' : ''}`;
+export const levelLabel = (level) => (level.none ? 'No home charging' : `${level.volts} V · ${level.amps} A`);
+const powerText = (level) => (level.none ? 'fast chargers only' : `${levelKw(level).toFixed(1)} kW${level.volts < 200 ? ' · wall outlet' : ''}`);
 
 export default function HomeLevelPicker({ settings, onChange, compact = false }) {
     if (compact) {
@@ -17,7 +17,7 @@ export default function HomeLevelPicker({ settings, onChange, compact = false })
                 value={settings.level}
                 onChange={e => onChange({ level: Number(e.target.value) })}
             >
-                {HOME_LEVELS.map((l, i) => <option key={i} value={i}>{levelLabel(l)} ({levelKw(l).toFixed(1)} kW)</option>)}
+                {HOME_LEVELS.map((l, i) => <option key={i} value={i}>{levelLabel(l)} ({powerText(l)})</option>)}
             </select>
         );
     }

@@ -1,3 +1,5 @@
+import SetupInvite from './setup/SetupInvite';
+
 /**
  * What a chart shows with nothing selected: that there is nothing to plot, and
  * where to get something — the vehicle quick-add's "＋ Add" in the chips row
@@ -19,6 +21,7 @@ export default function SelectionEmptyState({ chart, extra = null }) {
             <p className="text-secondary mt-2">
                 Use ＋ Add above to pick vehicles, or choose them on Vehicles &amp; Specs.{extra && ` ${extra}`}
             </p>
+            <SetupInvite from="empty" centered />
         </div>
     );
 }
