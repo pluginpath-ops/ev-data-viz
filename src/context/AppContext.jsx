@@ -2215,6 +2215,7 @@ export function AppProvider({ children }) {
         appNotification,
         clearNotification,
         showUndoable,
+        showSuccess,
         showError,
         uploadHeaderImage,
         publishModelConstant,

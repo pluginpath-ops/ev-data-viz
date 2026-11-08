@@ -1987,7 +1987,6 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* The label and Clear keep their width: squeezed by the chips at 375px,
    what was "Clear all" wrapped to two lines and made the strip taller than the chips it
    was there to remove. */
-.selected-strip-row > .text-micro,
 .selected-strip-actions > .btn {
     flex: none;
     white-space: nowrap;
@@ -2023,7 +2022,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * third of a phone viewport.
  *
  * The cap is two chip rows exactly: 2 × 26px of chip plus the 8px between
- * them. `Selected` and `Clear` stay OUTSIDE this box, so the way out of a
+ * them. The label (Selected ▾) and `Clear` stay OUTSIDE this box, so the way out of a
  * large selection is never the thing that scrolled away. */
 .selected-chip-scroll {
     display: flex;
@@ -2048,14 +2047,16 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * appears beside it rather than pushing it along. */
 /* The list scrolls; the search above it does not, so the field you are typing
    in never scrolls away from the rows it is narrowing. */
-.vehicle-quick-add-list {
+.vehicle-quick-add-list,
+.saved-selections-list {
     max-height: 18rem;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
     margin: 0 -12px;
 }
-.vehicle-quick-add-row {
+.vehicle-quick-add-row,
+.saved-selections-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -2066,7 +2067,8 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     text-align: left;
 }
 /* A fixed column, so names line up whether or not a row is ticked. */
-.vehicle-quick-add-check {
+.vehicle-quick-add-check,
+.saved-selections-mark {
     flex: none;
     width: 1em;
     text-align: center;
@@ -2077,6 +2079,78 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 }
 .vehicle-quick-add-empty {
     @apply px-3 py-2 italic;
+}
+
+/* ── Saved selections ────────────────────────────────────────────────────────
+ *
+ * "Selected ▾", the chips row's label, and its panel: the reader's named
+ * vehicle sets (SavedSelectionsMenu.jsx). Its list, rows and ✓ column are the
+ * quick-add's, grouped into those rules above. */
+.saved-selections-actions {
+    margin: 0 -12px;
+    border-bottom: 1px solid var(--color-border);
+}
+.saved-selections-item {
+    display: flex;
+    align-items: center;
+}
+.saved-selections-item > .saved-selections-row {
+    flex: 1 1 auto;
+}
+.saved-selections-count {
+    margin-left: auto;
+    padding-left: 8px;
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-muted);
+}
+/* Rename and delete: quiet until approached, so the name is what reads. */
+.saved-selections-tool {
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-right: 4px;
+    color: var(--color-text-meta);
+}
+.saved-selections-tool:not(.btn-icon-danger):hover {
+    color: var(--color-text-primary);
+}
+.saved-selections-problem {
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-danger-text);
+}
+.saved-selections-note {
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+}
+/* The trigger IS the chips row's label. Keeps its width like Clear does, but
+   caps a long name so the chips keep theirs. */
+.saved-selections {
+    flex: none;
+}
+.saved-selections-trigger {
+    display: inline-flex;
+    align-items: center;
+    max-width: 14rem;
+    white-space: nowrap;
+}
+/* The name, and under it "modified" once the chips change: a second line
+   rather than a wider button, since two lines fit inside the chips' two rows. */
+.saved-selections-trigger-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.15;
+    text-align: left;
+}
+.saved-selections-modified {
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-meta);
+}
+/* One step above body, where the facets' caret is micro: the ▾ glyph is small
+   for its size, and at micro it read as a dot beside a two-line label. */
+.saved-selections-caret {
+    --caret-size: calc(var(--fs-body) / var(--fs-step));
+    margin-left: 0.35em;
 }
 
 /* ── Tested figure ──────────────────────────────────────────────────────────
@@ -3509,12 +3583,14 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .color-source-note > .applied-dot {
     align-self: center;
 }
-.color-source-link {
+.color-source-link,
+.saved-selections-sign-in {
     color: var(--color-primary);
     text-decoration: underline;
     cursor: pointer;
 }
-.color-source-link:hover { color: var(--color-text-primary); }
+.color-source-link:hover,
+.saved-selections-sign-in:hover { color: var(--color-text-primary); }
 
 /* The export receipt. A quarter width, because its job is to say "this is what
    you got" and to be right-clickable — not to be a second copy of the chart
