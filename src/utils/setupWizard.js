@@ -35,9 +35,13 @@ const byKey = (list, key) => list.find(x => x.key === key) ?? null;
 
 // ── Answers ─────────────────────────────────────────────────────────────────
 
-/** Every question unanswered. Which answers each step holds is STEP_ANSWERS. */
+/**
+ * Every question unanswered. Which answers each step holds is STEP_ANSWERS.
+ * `goals` is the chosen goal keys, [] for none; every other key is a question
+ * key a goal's `asks` can name.
+ */
 export const EMPTY_ANSWERS = Object.freeze({
-    goal: null,
+    goals: [],
     cars: null,        // { how: 'keep' } | { how: 'pick', ids: [] } | { how: 'set', set: key }
     dailyMi: null,
     highway: null,
@@ -54,7 +58,7 @@ export const EMPTY_ANSWERS = Object.freeze({
 
 /** The answers each step asks, so Skip clears just those. */
 export const STEP_ANSWERS = {
-    goal: ['goal'],
+    goal: ['goals'],
     cars: ['cars'],
     driving: ['dailyMi', 'highway', 'speedMph', 'trips', 'tripMi'],
     weather: ['climate', 'mountains'],
@@ -71,7 +75,9 @@ export function sanitizeAnswers(raw, config = SETUP_WIZARD) {
     if (!raw || typeof raw !== 'object') return out;
     const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
     const keyIn = (list, v) => (list.some(o => o.key === v) ? v : null);
-    out.goal = keyIn(config.goals.options, raw.goal);
+    // `goal` (one) is how the first version stored it.
+    const goals = Array.isArray(raw.goals) ? raw.goals : raw.goal ? [raw.goal] : [];
+    out.goals = [...new Set(goals.filter(g => keyIn(config.goals.options, g)))];
     const c = raw.cars;
     if (c?.how === 'keep') out.cars = { how: 'keep' };
     if (c?.how === 'pick' && Array.isArray(c.ids)) out.cars = { how: 'pick', ids: c.ids.filter(id => typeof id === 'number' || typeof id === 'string') };
@@ -90,9 +96,37 @@ export function sanitizeAnswers(raw, config = SETUP_WIZARD) {
     return out;
 }
 
-/** How many questions were left unanswered — for the site event, never the answers. */
-export function skippedCount(answers) {
-    return Object.keys(EMPTY_ANSWERS).filter(k => answers?.[k] == null).length;
+/** The goals in force: those chosen, in config order, else the default. */
+export function chosenGoals(answers, config = SETUP_WIZARD) {
+    const picked = config.goals.options.filter(g => answers?.goals?.includes(g.key));
+    return picked.length ? picked : [config.goals.options.find(g => g.key === config.goals.default)];
+}
+
+/** The questions the chosen goals ask: every goal's `asks` together. */
+export function askedQuestions(answers, config = SETUP_WIZARD) {
+    return new Set(chosenGoals(answers, config).flatMap(g => g.asks));
+}
+
+/**
+ * The steps to show, in config order: goal and summary always, any other
+ * step only while one of its questions is asked.
+ */
+export function visibleSteps(answers, config = SETUP_WIZARD) {
+    const asked = askedQuestions(answers, config);
+    return config.steps.filter(s => s.key === 'goal' || s.key === 'summary' || STEP_ANSWERS[s.key].some(q => asked.has(q)));
+}
+
+/** Answers kept to the questions asked; the rest stay remembered but are not applied. */
+export function askedAnswers(answers, config = SETUP_WIZARD) {
+    const asked = askedQuestions(answers, config);
+    return Object.fromEntries(Object.entries({ ...EMPTY_ANSWERS, ...answers })
+        .map(([k, v]) => [k, k === 'goals' || asked.has(k) ? v : EMPTY_ANSWERS[k]]));
+}
+
+/** How many asked questions were left unanswered — for the site event, never the answers. */
+export function skippedCount(answers, config = SETUP_WIZARD) {
+    const asked = [...askedQuestions(answers, config)];
+    return asked.filter(k => answers?.[k] == null).length + (answers?.goals?.length ? 0 : 1);
 }
 
 // ── Starter sets ────────────────────────────────────────────────────────────
@@ -194,15 +228,22 @@ export function harderSeason(climate, speedMph = STANDARD_CONDITIONS.speedMph) {
 }
 
 /**
- * The notice after Apply: "Showing winter, 15°F — your harder season." and
- * its toggle. `shown.harder` false is the other season, after the toggle.
+ * The review bar's season line: "Winter, 15°F — your harder season" and its
+ * toggle. `shown.harder` false is the other season, after the toggle.
  */
-export function seasonNoteText(shown, units = 'imperial', config = SETUP_WIZARD) {
+export function seasonText(shown, units = 'imperial', config = SETUP_WIZARD) {
+    const B = config.reviewBar;
+    const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
     return {
-        message: fill(shown.harder ? config.seasonNote.message : config.seasonNote.messageOther, { season: shown.season, temp: tempWords(shown.tempF, units) }),
-        toggle: fill(config.seasonNote.toggle, { other: `${shown.other.season}, ${tempWords(shown.other.tempF, units)}` }),
+        line: fill(shown.harder ? B.season : B.seasonOther, { season: cap(shown.season), temp: tempWords(shown.tempF, units) }),
+        toggle: fill(B.toggle, { other: `${shown.other.season}, ${tempWords(shown.other.tempF, units)}` }),
     };
 }
+
+/** The season shown flipped to the other — what the review bar's toggle does. */
+export const flipSeason = (shown) => ({
+    ...shown.other, harder: !shown.harder, other: { season: shown.season, tempF: shown.tempF },
+});
 
 // ── Answers → plan ──────────────────────────────────────────────────────────
 
@@ -217,7 +258,8 @@ function resolveCars(cars, selectedIds, liveIds, config) {
 /**
  * What the answers set. Each patch holds only what was answered.
  *
- *   mode         the chart mode to open
+ *   mode         the chart mode to open: the first chosen goal's
+ *   modes        every chosen goal's chart mode, in config order (the review bar)
  *   vehicleIds   the new selection, or null to keep the reader's
  *   carsFrom     'pick' | 'set' | 'keep'; setKey the starter set used
  *   correction   patch for chartConfig.correctionTarget
@@ -228,10 +270,11 @@ function resolveCars(cars, selectedIds, liveIds, config) {
  *   unset        answers the site has no setting for, in words
  */
 export function planFromAnswers(answers = EMPTY_ANSWERS, { vehicles = [], selectedIds = [] } = {}, config = SETUP_WIZARD) {
-    const a = { ...EMPTY_ANSWERS, ...answers };
-    const goal = byKey(config.goals.options, a.goal) ?? byKey(config.goals.options, config.goals.default);
+    const goals = chosenGoals(answers, config);
+    // A question no chosen goal asks is remembered, but not applied.
+    const a = askedAnswers(answers, config);
     const plan = {
-        mode: goal.mode, goal: goal.key,
+        mode: goals[0].mode, modes: goals.map(g => g.mode), goals: goals.map(g => g.key),
         vehicleIds: null, carsFrom: 'keep', setKey: null,
         correction: {}, assumptions: {}, costToDrive: {}, roadTrip: {}, season: null, unset: [],
     };
@@ -320,10 +363,14 @@ export const tempWords = (f, units = 'imperial') => (units === 'metric' ? `${Mat
  * The plan as the summary step says it: `[{ label, text }]`, only what will
  * change, in the reader's units. `names` maps a vehicle id to its name.
  */
+/** A chart mode as the reader finds it: "Cost & Time › Compare". */
+export const chartName = (mode) => `${categoryForMode(mode).label} › ${labelForMode(mode)}`;
+
 export function planSummary(plan, answers = EMPTY_ANSWERS, names = {}, units = 'imperial', config = SETUP_WIZARD) {
-    const a = { ...EMPTY_ANSWERS, ...answers };
+    // Only what is applied: an answer to a question no chosen goal asks is left out.
+    const a = askedAnswers(answers, config);
     const S = config.summary;
-    const lines = [{ label: S.opens, text: `${categoryForMode(plan.mode).label} › ${labelForMode(plan.mode)}` }];
+    const lines = [{ label: S.opens, text: plan.modes.map(chartName).join(', ') }];
 
     if (plan.vehicleIds) {
         const kind = byKey(config.cars.kinds, plan.setKey);

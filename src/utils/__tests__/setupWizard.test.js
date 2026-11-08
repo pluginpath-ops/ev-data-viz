@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
     planFromAnswers, planSummary, starterSetIds, isCompleteVehicle, matchesRule, harderSeason,
-    sanitizeAnswers, skippedCount, seasonNoteText, fill, EMPTY_ANSWERS, STEP_ANSWERS, RULE_FIELDS, RULE_OPS,
+    sanitizeAnswers, skippedCount, seasonText, flipSeason, fill, EMPTY_ANSWERS, STEP_ANSWERS, RULE_FIELDS, RULE_OPS,
+    visibleSteps, askedQuestions, askedAnswers,
 } from '../setupWizard';
+import { sanitizeReview } from '../setupWizardStorage';
 import { compareCuratedOrder } from '../vehicleOrder';
 import { SETUP_WIZARD } from '../../constants/setupWizard';
 import { ALL_CHART_MODES } from '../../constants/chartNav';
@@ -49,6 +51,16 @@ describe('the setup wizard config (constants/setupWizard.js)', () => {
         }
         unique(C.goals.options, 'goals');
         expect(C.goals.options.map(g => g.key), `goals.default "${C.goals.default}" is not a goal`).toContain(C.goals.default);
+    });
+
+    it('every goal asks only real questions, the cars always among them', () => {
+        const questions = Object.values(STEP_ANSWERS).flat().filter(k => k !== 'goals');
+        for (const g of C.goals.options) {
+            expect(Array.isArray(g.asks), `goals "${g.key}": asks must be a list`).toBe(true);
+            for (const q of g.asks) expect(questions, `goals "${g.key}": asks unknown question "${q}" (known: ${questions.join(', ')})`).toContain(q);
+            expect(new Set(g.asks).size, `goals "${g.key}": a question is repeated in asks`).toBe(g.asks.length);
+            expect(g.asks, `goals "${g.key}": every goal needs cars`).toContain('cars');
+        }
     });
 
     it('car kinds: valid rules, numeric curated ids, a known default, a size of 4–6', () => {
@@ -191,18 +203,19 @@ describe('the harder season', () => {
         expect(harderSeason({ winterF: 70, summerF: 105 }, 70).season).toBe('summer');
     });
 
-    it('after the toggle, does not call the easier season the harder one', () => {
+    it('after the toggle, does not call the easier season the harder one, and flips back', () => {
         const shown = harderSeason({ winterF: 15, summerF: 95 }, 70);
-        const flipped = { ...shown.other, harder: false, other: { season: shown.season, tempF: shown.tempF } };
-        expect(seasonNoteText(flipped).message).toBe('Showing summer, 95°F.');
-        expect(seasonNoteText(flipped).toggle).toMatch(/winter, 15°F/);
+        const flipped = flipSeason(shown);
+        expect(seasonText(flipped).line).toBe('Summer, 95°F');
+        expect(seasonText(flipped).toggle).toMatch(/winter, 15°F/);
+        expect(flipSeason(flipped)).toMatchObject({ season: 'winter', tempF: 15, harder: true });
     });
 
-    it('the note names the season and offers the other, in the reader units', () => {
+    it('the bar names the season and offers the other, in the reader units', () => {
         const shown = harderSeason({ winterF: 15, summerF: 95 }, 70);
-        expect(seasonNoteText(shown).message).toMatch(/winter, 15°F/);
-        expect(seasonNoteText(shown).toggle).toMatch(/summer, 95°F/);
-        expect(seasonNoteText(shown, 'metric').message).toMatch(/°C/);
+        expect(seasonText(shown).line).toMatch(/Winter, 15°F.*harder/);
+        expect(seasonText(shown).toggle).toMatch(/summer, 95°F/);
+        expect(seasonText(shown, 'metric').line).toMatch(/°C/);
     });
 });
 
@@ -214,6 +227,7 @@ describe('planFromAnswers', () => {
     it('opens the default goal and the default set when everything is skipped', () => {
         const plan = planFromAnswers(EMPTY_ANSWERS, { vehicles: fleet, selectedIds: [] });
         expect(plan.mode).toBe('drivecost');
+        expect(plan.modes).toEqual(['drivecost']);
         expect(plan.setKey).toBe(SETUP_WIZARD.cars.default);
         expect(plan.vehicleIds).toEqual([1, 2, 3]);
         expect(plan.correction).toEqual({});
@@ -222,7 +236,7 @@ describe('planFromAnswers', () => {
     });
 
     it('keeps the selection when cars are skipped and something is selected', () => {
-        const plan = planFromAnswers({ goal: 'charging' }, { vehicles: fleet, selectedIds: [2] });
+        const plan = planFromAnswers({ goals: ['charging'] }, { vehicles: fleet, selectedIds: [2] });
         expect(plan.vehicleIds).toBeNull();
         expect(plan.mode).toBe('charging');
     });
@@ -233,7 +247,7 @@ describe('planFromAnswers', () => {
 
     it('writes driving, weather and money through to each setting', () => {
         const plan = planFromAnswers({
-            dailyMi: 40, highway: 'highway', speedMph: 75, climate: 'extreme', mountains: true,
+            goals: ['cost', 'range', 'roadtrip'], dailyMi: 40, highway: 'highway', speedMph: 75, climate: 'extreme', mountains: true,
             home: 'charger', homePrice: 0.15, gasMpg: 28, gasPrice: 3.5, trips: 'weekly', tripMi: 700,
         }, { vehicles: fleet, selectedIds: [1] });
         expect(plan.correction).toEqual({ speedMph: 75, temperatureF: 15, altitudeFt: 5000 });
@@ -248,33 +262,86 @@ describe('planFromAnswers', () => {
     });
 
     it('no home charging is a real setting now, not a gap', () => {
-        const plan = planFromAnswers({ home: 'none' }, { vehicles: fleet });
+        const plan = planFromAnswers({ goals: ['cost'], home: 'none' }, { vehicles: fleet });
         expect(plan.costToDrive.level).toBe(NO_HOME_LEVEL);
         expect(plan.unset).toEqual([]);
     });
 
     it('says what a road-trip frequency cannot set', () => {
-        expect(planFromAnswers({ trips: 'few' }, { vehicles: fleet }).unset.join(' ')).toMatch(/road trips/);
+        expect(planFromAnswers({ goals: ['cost'], trips: 'few' }, { vehicles: fleet }).unset.join(' ')).toMatch(/road trips/);
+    });
+
+    it('opens every chosen chart, in the config order, starting with the first', () => {
+        const plan = planFromAnswers({ goals: ['specs', 'charging'] }, { vehicles: fleet, selectedIds: [1] });
+        expect(plan.modes).toEqual(['charging', 'specstable']);
+        expect(plan.mode).toBe('charging');
+    });
+});
+
+describe('questions follow the goals', () => {
+    const keysOf = (goals) => visibleSteps({ goals }).map(s => s.key);
+
+    it('specs and charging ask only the cars', () => {
+        expect(keysOf(['specs'])).toEqual(['goal', 'cars', 'summary']);
+        expect(keysOf(['charging'])).toEqual(['goal', 'cars', 'summary']);
+    });
+
+    it('range and road trips skip the money step; cost asks everything', () => {
+        expect(keysOf(['range'])).toEqual(['goal', 'cars', 'driving', 'weather', 'summary']);
+        expect(keysOf(['roadtrip'])).toEqual(['goal', 'cars', 'driving', 'weather', 'summary']);
+        expect(keysOf(['cost'])).toEqual(SETUP_WIZARD.steps.map(s => s.key));
+        expect(keysOf([])).toEqual(keysOf([SETUP_WIZARD.goals.default]));
+    });
+
+    it('several goals ask the union of their questions', () => {
+        const asked = askedQuestions({ goals: ['range', 'roadtrip'] });
+        expect([...asked].sort()).toEqual(['cars', 'climate', 'mountains', 'speedMph', 'tripMi']);
+    });
+
+    it('an answer to a question no longer asked is kept but not applied, and not summarized', () => {
+        const answers = { ...EMPTY_ANSWERS, goals: ['range'], speedMph: 75, gasPrice: 4, home: 'charger', tripMi: 700 };
+        expect(askedAnswers(answers)).toMatchObject({ speedMph: 75, gasPrice: null, home: null, tripMi: null });
+        const plan = planFromAnswers(answers, { vehicles: [car(1)], selectedIds: [1] });
+        expect(plan.correction).toEqual({ speedMph: 75 });
+        // An asked answer reaches every setting that reads it, so the site agrees with itself.
+        expect(plan.costToDrive).toEqual({ dailyMph: 75, longMph: 75 });
+        expect(plan.roadTrip).toEqual({ speed: 75 });
+        const text = planSummary(plan, answers, {}).map(l => l.label + ' ' + l.text).join(' ');
+        expect(text).not.toMatch(/\$4|charger|700/i);
+        // still remembered for the next run
+        expect(sanitizeAnswers(answers)).toMatchObject({ gasPrice: 4, home: 'charger', tripMi: 700 });
     });
 });
 
 describe('remembered answers', () => {
     it('keeps known answers and drops what the config no longer offers', () => {
-        const a = sanitizeAnswers({ goal: 'range', climate: 'gone', speedMph: 72, dailyMi: 40, cars: { how: 'set', set: 'pickup' }, junk: 1 });
-        expect(a).toMatchObject({ goal: 'range', climate: null, speedMph: null, dailyMi: 40, cars: { how: 'set', set: 'pickup' } });
+        const a = sanitizeAnswers({ goals: ['range', 'gone'], climate: 'gone', speedMph: 72, dailyMi: 40, cars: { how: 'set', set: 'pickup' }, junk: 1 });
+        expect(a).toMatchObject({ goals: ['range'], climate: null, speedMph: null, dailyMi: 40, cars: { how: 'set', set: 'pickup' } });
         expect(a.junk).toBeUndefined();
         expect(sanitizeAnswers('nonsense')).toEqual(EMPTY_ANSWERS);
     });
 
-    it('counts the skipped questions, never their values', () => {
-        expect(skippedCount(EMPTY_ANSWERS)).toBe(Object.keys(EMPTY_ANSWERS).length);
-        expect(skippedCount({ ...EMPTY_ANSWERS, goal: 'cost' })).toBe(Object.keys(EMPTY_ANSWERS).length - 1);
+    it('reads the first version\'s single goal as a list of one', () => {
+        expect(sanitizeAnswers({ goal: 'range' }).goals).toEqual(['range']);
+    });
+
+    it('counts the skipped questions that were asked, never their values', () => {
+        const all = Object.keys(EMPTY_ANSWERS).length;   // the cost goal asks every question, plus goals itself
+        expect(skippedCount(EMPTY_ANSWERS)).toBe(all);
+        expect(skippedCount({ ...EMPTY_ANSWERS, goals: ['cost'] })).toBe(all - 1);
+        expect(skippedCount({ ...EMPTY_ANSWERS, goals: ['specs'] })).toBe(1);   // only the cars
+    });
+
+    it('the review bar keeps only real charts, and a season or none', () => {
+        expect(sanitizeReview({ modes: ['range', 'nope', 'charging'], season: null })).toEqual({ modes: ['range', 'charging'], season: null });
+        expect(sanitizeReview({ modes: [] })).toBeNull();
+        expect(sanitizeReview('x')).toBeNull();
     });
 });
 
 describe('planSummary', () => {
     it('names the chart, the cars and only what was answered', () => {
-        const answers = { goal: 'range', speedMph: 70 };
+        const answers = { goals: ['range'], speedMph: 70 };
         const plan = planFromAnswers(answers, { vehicles: [car(1)], selectedIds: [] });
         const lines = planSummary(plan, answers, { 1: 'Ioniq 5' });
         expect(lines.map(l => l.label)).toEqual(['Opens', 'Cars', 'Driving']);
@@ -283,7 +350,7 @@ describe('planSummary', () => {
     });
 
     it('speaks metric when the reader does', () => {
-        const answers = { dailyMi: 40, speedMph: 70, climate: 'cold' };
+        const answers = { goals: ['cost'], dailyMi: 40, speedMph: 70, climate: 'cold' };
         const plan = planFromAnswers(answers, { vehicles: [car(1)], selectedIds: [1] });
         const text = planSummary(plan, answers, {}, 'metric').map(l => l.text).join(' ');
         expect(text).toMatch(/64 km a day/);

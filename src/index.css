@@ -10150,3 +10150,17 @@ a.is-test-link:focus-visible {
 @media (max-width: 480px) {
     .setup-choices { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* The setup wizard's review bar: the chosen charts at the foot of the window
+   (SetupReviewBar.jsx). A .fixed-action-bar, so it overlays rather than moves
+   the page; below the notice bar (z-60) when both show. */
+.review-bar { z-index: 50; }
+.review-bar-row {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-2 py-2;
+}
+.review-bar-season {
+    @apply flex flex-wrap items-center gap-2;
+}
+.review-bar-end {
+    @apply flex items-center gap-2 ml-auto;
+}

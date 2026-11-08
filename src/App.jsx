@@ -34,7 +34,9 @@ import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext
 import HomeView from './components/home/HomeView';
 import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
 import SetupWizard from './components/setup/SetupWizard';
-import { seasonNoteText, skippedCount } from './utils/setupWizard';
+import SetupReviewBar from './components/setup/SetupReviewBar';
+import { flipSeason, skippedCount } from './utils/setupWizard';
+import { readSetupReview, writeSetupReview } from './utils/setupWizardStorage';
 import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink, chartQueryString } from './utils/chartUrlState';
 import SpecChart from './components/SpecChart';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -136,7 +138,6 @@ export default function App() {
         appNotification,
         clearNotification,
         showError,
-        showNotice,
         updateVehicleSpecs,
         specCustomFieldSuggestions,
         copyRunToVehicle,
@@ -154,7 +155,7 @@ export default function App() {
     // Auto-dismiss notifications after 6 s
     useEffect(() => {
         if (!appNotification) return;
-        const t = setTimeout(clearNotification, appNotification.durationMs ?? 6000);
+        const t = setTimeout(clearNotification, 6000);
         return () => clearTimeout(t);
     }, [appNotification, clearNotification]);
     // Measured, not hardcoded — see hooks/useHeaderHeight.
@@ -500,24 +501,32 @@ export default function App() {
     }, [recordEvent]);
 
     /**
-     * The season note: the charts show the harder season; one click shows the
-     * other, through the same setters, flipping the correction temperature and
-     * Cost & Time's season together. The note then offers the way back.
+     * The review bar (SetupReviewBar): the charts Apply chose and the season
+     * shown, kept in browser storage until × or the next Apply. Its season
+     * toggle flips the correction temperature and Cost & Time's season
+     * together, through the same setters.
      */
-    const showSeasonNote = (shown) => {
-        const { message, toggle } = seasonNoteText(shown, units);
-        showNotice(message, toggle, () => {
-            const next = { ...shown.other, harder: !shown.harder, other: { season: shown.season, tempF: shown.tempF } };
-            recordEvent(SITE_EVENTS.SEASON_TOGGLE, { detail: { to: next.season } });
-            setChartConfig(prev => ({ ...prev, correctionTarget: { ...prev.correctionTarget, temperatureF: next.tempF } }));
-            updateCostToDrive({ season: next.season });
-            showSeasonNote(next);
-        });
+    const [setupReview, setSetupReviewState] = useState(readSetupReview);
+    const setSetupReview = (review) => {
+        setSetupReviewState(review);
+        writeSetupReview(review);
+    };
+    const openReviewChart = (mode, index) => {
+        recordEvent(SITE_EVENTS.SETUP_JUMP, { detail: { mode, index } });
+        handleChartModeChange(mode);
+        window.scrollTo(0, 0);
+    };
+    const toggleReviewSeason = () => {
+        const next = flipSeason(setupReview.season);
+        recordEvent(SITE_EVENTS.SEASON_TOGGLE, { detail: { to: next.season } });
+        setChartConfig(prev => ({ ...prev, correctionTarget: { ...prev.correctionTarget, temperatureF: next.tempF } }));
+        updateCostToDrive({ season: next.season });
+        setSetupReview({ ...setupReview, season: next });
     };
 
     const applySetup = (plan, answers) => {
         recordEvent(SITE_EVENTS.SETUP_APPLY, {
-            detail: { goal: plan.goal, cars: plan.carsFrom === 'set' ? plan.setKey : plan.carsFrom, skipped: skippedCount(answers) },
+            detail: { goals: plan.goals.join(','), cars: plan.carsFrom === 'set' ? plan.setKey : plan.carsFrom, skipped: skippedCount(answers) },
         });
         if (plan.vehicleIds) setVehicleSelection(plan.vehicleIds);
         setChartConfig(prev => ({
@@ -529,7 +538,7 @@ export default function App() {
         setRoadTripConfig(prev => ({ ...prev, ...plan.roadTrip }));
         handleChartModeChange(plan.mode);
         setSetupOpen(false);
-        if (plan.season) showSeasonNote(plan.season);
+        setSetupReview({ modes: plan.modes, season: plan.season ?? null });
         window.scrollTo(0, 0);
     };
 
@@ -1488,6 +1497,18 @@ export default function App() {
                     <SetupWizard onApply={applySetup} onClose={closeSetup} />
                 )}
 
+                {setupReview && (
+                    <SetupReviewBar
+                        review={setupReview}
+                        currentMode={isChartCategory(view) ? chartMode : null}
+                        units={units}
+                        onOpen={openReviewChart}
+                        onToggleSeason={toggleReviewSeason}
+                        onChangeAnswers={() => openSetup('review')}
+                        onClose={() => setSetupReview(null)}
+                    />
+                )}
+
                 {featuredEditor && (
                     <FeaturedComparisonEditor
                         request={featuredEditor}
@@ -1519,27 +1540,26 @@ export default function App() {
 
             {/* ── Global notification banner ──────────────────────────────── */}
             {appNotification && (
-                <div className={`fixed-action-bar z-[60] ${{ error: 'is-danger', info: 'is-info' }[appNotification.type] ?? 'is-good'}`}>
+                <div className={`fixed-action-bar z-[60] ${appNotification.type === 'error' ? 'is-danger' : 'is-good'}`}>
                     <div className="page-container py-3 flex items-center gap-4">
-                        <span className="text-xl">{{ error: '⚠', info: 'ℹ' }[appNotification.type] ?? '✓'}</span>
+                        <span className="text-xl">{appNotification.type === 'error' ? '⚠' : '✓'}</span>
                         <p className={`flex-1 text-sm font-medium ${
-                            appNotification.type === 'error' ? 'text-red-900' : appNotification.type === 'info' ? '' : 'text-green-900'
+                            appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
                         }`}>
                             {appNotification.message}
                         </p>
                         {appNotification.action && (
                             <button
-                                // Cleared first, so an action may show a notice of its own.
-                                onClick={() => { const { onClick } = appNotification.action; clearNotification(); onClick(); }}
+                                onClick={() => { appNotification.action.onClick(); clearNotification(); }}
                                 className="btn btn-secondary text-sm"
                             >
-                                {appNotification.type === 'info' ? '' : '↩ '}{appNotification.action.label}
+                                ↩ {appNotification.action.label}
                             </button>
                         )}
                         <button
                             onClick={clearNotification}
                             className={`text-lg leading-none opacity-50 hover:opacity-100 transition ${
-                                appNotification.type === 'error' ? 'text-red-900' : appNotification.type === 'info' ? '' : 'text-green-900'
+                                appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
                             }`}
                             aria-label="Dismiss"
                         >×</button>

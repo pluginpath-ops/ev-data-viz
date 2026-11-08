@@ -13,19 +13,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { buildVehicleLabels } from '../../utils/seriesLabel';
-import { STEP_ANSWERS, planFromAnswers, planSummary } from '../../utils/setupWizard';
+import { STEP_ANSWERS, planFromAnswers, planSummary, visibleSteps, askedQuestions } from '../../utils/setupWizard';
 import { readSetupAnswers, writeSetupAnswers } from '../../utils/setupWizardStorage';
-import { SETUP_WIZARD } from '../../constants/setupWizard';
 import { GoalStep, CarsStep, DrivingStep, WeatherStep, MoneyStep, SummaryStep } from './SetupSteps';
 
-/** Each step key's screen; the order and titles are the config's. */
+/**
+ * Each step key's screen; the order and titles are the config's, and a step
+ * none of the chosen goals asks anything on is left out (visibleSteps).
+ */
 const BODIES = { goal: GoalStep, cars: CarsStep, driving: DrivingStep, weather: WeatherStep, money: MoneyStep, summary: null };
 
 export default function SetupWizard({ onApply, onClose }) {
     const { vehicles, selectedVehicles, units } = useAppContext();
-    const steps = SETUP_WIZARD.steps;
     const [step, setStep] = useState(0);
     const [answers, setAnswers] = useState(readSetupAnswers);
+    const steps = visibleSteps(answers);
+    const asked = askedQuestions(answers);
     const patch = (p) => setAnswers(prev => ({ ...prev, ...p }));
 
     const current = steps[step];
@@ -46,11 +49,12 @@ export default function SetupWizard({ onApply, onClose }) {
     const plan = useMemo(
         () => (isSummary ? planFromAnswers(answers, { vehicles, selectedIds: selectedVehicles }) : null),
         [isSummary, answers, vehicles, selectedVehicles]);
-    const keys = STEP_ANSWERS[current.key];
-    const answered = keys.some(k => answers[k] != null);
+    // This step's questions that a chosen goal asks; goals are always asked.
+    const keys = STEP_ANSWERS[current.key].filter(k => k === 'goals' || asked.has(k));
+    const answered = keys.some(k => (k === 'goals' ? answers.goals.length > 0 : answers[k] != null));
 
     const skip = () => {
-        patch(Object.fromEntries(keys.map(k => [k, null])));
+        patch(Object.fromEntries(keys.map(k => [k, k === 'goals' ? [] : null])));
         setStep(s => s + 1);
     };
     const apply = () => {
@@ -77,7 +81,7 @@ export default function SetupWizard({ onApply, onClose }) {
                 <div className="modal-body">
                     {isSummary
                         ? <SummaryStep lines={planSummary(plan, answers, names, units)} unset={plan.unset} />
-                        : <Body answers={answers} onChange={patch} vehicles={vehicles} selectedIds={selectedVehicles} names={names} units={units} />}
+                        : <Body answers={answers} onChange={patch} vehicles={vehicles} selectedIds={selectedVehicles} names={names} units={units} asked={asked} />}
                 </div>
                 <div className="modal-footer setup-footer">
                     {step > 0 && <button type="button" className="btn btn-secondary" onClick={() => setStep(s => s - 1)}>Back</button>}

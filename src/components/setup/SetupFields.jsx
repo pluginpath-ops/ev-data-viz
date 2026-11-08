@@ -5,20 +5,29 @@
  */
 import NumberInput from '../NumberInput';
 
-/** A pick-one grid of cards, each a label and an optional line under it. */
-export function ChoiceCards({ legend, options, value, onChange, columns = 2 }) {
+/**
+ * A grid of cards, each a label and an optional line under it. Pick-one, or
+ * with `multiple` pick-any: then `value` is a list of keys and `onChange` gets
+ * the new list.
+ */
+export function ChoiceCards({ legend, options, value, onChange, columns = 2, multiple = false }) {
+    const isOn = (key) => (multiple ? (value ?? []).includes(key) : value === key);
+    const toggle = (key) => {
+        if (!multiple) return onChange(isOn(key) ? null : key);
+        return onChange(isOn(key) ? value.filter(k => k !== key) : [...(value ?? []), key]);
+    };
     return (
         <fieldset className={`setup-choices${columns === 1 ? ' is-single' : ''}`}>
             {legend && <legend className="text-label">{legend}</legend>}
             {options.map(o => {
-                const on = value === o.key;
+                const on = isOn(o.key);
                 return (
                     <button
                         key={o.key}
                         type="button"
                         aria-pressed={on}
                         className={`setup-choice${on ? ' is-on' : ''}`}
-                        onClick={() => onChange(on ? null : o.key)}
+                        onClick={() => toggle(o.key)}
                     >
                         <span className="text-body">{o.label}</span>
                         {o.detail && <span className="text-meta">{o.detail}</span>}

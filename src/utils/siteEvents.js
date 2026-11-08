@@ -21,14 +21,16 @@ export const SITE_EVENTS = {
     /** A chart tab or mode was opened, however the reader got there. detail { mode }. */
     CHART_VIEW:     'chart_view',
     // The setup wizard (migration 098). Never the answers themselves.
-    /** The wizard was opened. detail { from: 'home' | 'empty' | 'nav' }. */
+    /** The wizard was opened. detail { from: 'home' | 'empty' | 'nav' | 'review' }. */
     SETUP_OPEN:     'setup_open',
-    /** Apply was pressed. detail { goal, cars: a kind key | 'pick' | 'keep', skipped: questions left blank }. */
+    /** Apply was pressed. detail { goals: comma-joined keys, cars: a kind key | 'pick' | 'keep', skipped: questions left blank }. */
     SETUP_APPLY:    'setup_apply',
     /** Closed without applying. detail { step }. */
     SETUP_CLOSE:    'setup_close',
-    /** The season note's toggle. detail { to: 'summer' | 'winter' }. */
+    /** The review bar's season toggle. detail { to: 'summer' | 'winter' }. */
     SEASON_TOGGLE:  'season_toggle',
+    /** A chart opened from the review bar (a chart button or Next). detail { mode, index }. */
+    SETUP_JUMP:     'setup_jump',
 };
 
 /**

@@ -10,9 +10,15 @@
  *   steps         which screens exist, in order, and each one's title. Keys:
  *                 goal, cars, driving, weather, money, summary (summary last).
  *   entry         the "Set up for me" button text: Home, an empty chart, the nav.
- *   goals         "What do you want to know?" — each option opens one chart
- *                 `mode` (a mode key from constants/chartNav.js). `default` is
- *                 where a reader who skips lands.
+ *   goals         "What do you want to know?" — the reader may pick several.
+ *                 Each opens one chart `mode` (a mode key from
+ *                 constants/chartNav.js) and `asks` only the questions that
+ *                 chart reads. The questions asked are every chosen goal's
+ *                 `asks` together, in step order; a step left with no
+ *                 question is skipped. `default` is the goal of a reader who
+ *                 skips. Question keys: cars, dailyMi, highway, speedMph,
+ *                 trips, tripMi, climate, mountains, home, homePrice, gasMpg,
+ *                 gasPrice.
  *   cars          the "Which cars?" step and the starter sets ("kinds of car").
  *                 `size` caps how many a set selects. `requireData` — a vehicle
  *                 needs all of these (from utils/vehicleDataCategories.js) to be
@@ -38,10 +44,10 @@
  *                 HOME_LEVELS in constants/costToDrive.js; 6 = no home charging)
  *                 and the number fields' limits and hints.
  *   summary       the labels on the last screen.
- *   seasonNote    the notice shown after Apply (`message`), and after its
- *                 toggle shows the easier season (`messageOther`). {season}
- *                 {temp} {other} are
- *                 filled in.
+ *   reviewBar     the bar after Apply that lists the chosen charts, with
+ *                 Next, Change answers and a close ×. Its season line says
+ *                 the harder season (`season`) or, after its toggle, the
+ *                 other (`seasonOther`). {season} {temp} {other} are filled in.
  *
  * Check a change:  npx vitest run src/utils/__tests__/setupWizard.test.js
  * (it validates this file and says what is wrong).
@@ -66,13 +72,24 @@ export const SETUP_WIZARD = {
     },
 
     goals: {
+        question: 'Pick one or more.',
         default: 'cost',
         options: [
-            { key: 'cost',     label: 'What it costs to run', detail: 'Per month, against a gas car', mode: 'drivecost' },
-            { key: 'range',    label: 'How far it goes',      detail: 'Real highway range',           mode: 'range' },
-            { key: 'charging', label: 'How fast it charges',  detail: 'On a fast charger',            mode: 'charging' },
-            { key: 'roadtrip', label: 'Road trips',           detail: 'Total time, stops and all',    mode: 'roadtrip' },
-            { key: 'specs',    label: 'Specs side by side',   detail: 'Price, size, battery…',        mode: 'specstable' },
+            // Cost & Time prices a whole week: every driving, weather and money answer feeds it.
+            { key: 'cost',     label: 'What it costs to run', detail: 'Per month, against a gas car', mode: 'drivecost',
+              asks: ['cars', 'dailyMi', 'highway', 'speedMph', 'trips', 'tripMi', 'climate', 'mountains', 'home', 'homePrice', 'gasMpg', 'gasPrice'] },
+            // Range & Efficiency corrects every test to a speed, temperature and altitude.
+            { key: 'range',    label: 'How far it goes',      detail: 'Real highway range',           mode: 'range',
+              asks: ['cars', 'speedMph', 'climate', 'mountains'] },
+            // Charging Curves on its opening axes (SoC, kW) reads nothing but the cars.
+            { key: 'charging', label: 'How fast it charges',  detail: 'On a fast charger',            mode: 'charging',
+              asks: ['cars'] },
+            // Road Trip drives its own speed and distance, corrected to the weather.
+            { key: 'roadtrip', label: 'Road trips',           detail: 'Total time, stops and all',    mode: 'roadtrip',
+              asks: ['cars', 'speedMph', 'tripMi', 'climate', 'mountains'] },
+            // The table's opening columns (Overview) hold no corrected or priced figure.
+            { key: 'specs',    label: 'Specs side by side',   detail: 'Price, size, battery…',        mode: 'specstable',
+              asks: ['cars'] },
         ],
     },
 
@@ -171,9 +188,13 @@ export const SETUP_WIZARD = {
         footer: 'Anything you skipped stays as it is. You can change it all later.',
     },
 
-    seasonNote: {
-        message: 'Showing {season}, {temp} — your harder season.',
-        messageOther: 'Showing {season}, {temp}.',
+    reviewBar: {
+        title: 'Your charts',
+        next: 'Next ›',
+        change: 'Change answers',
+        close: 'Close',
+        season: '{season}, {temp} — your harder season',
+        seasonOther: '{season}, {temp}',
         toggle: 'Show {other}',
     },
 };

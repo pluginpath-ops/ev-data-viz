@@ -1,11 +1,12 @@
 -- 098: site events for the setup wizard
 --
--- Four more events on the list 090 started (utils/siteEvents.js holds the same
+-- Five more events on the list 090 started (utils/siteEvents.js holds the same
 -- list; the wiring suite keeps the three in step):
---   setup_open     the wizard was opened        detail { from: home | empty | nav }
---   setup_apply    Apply was pressed            detail { goal, cars, skipped }
+--   setup_open     the wizard was opened        detail { from: home | empty | nav | review }
+--   setup_apply    Apply was pressed            detail { goals, cars, skipped }
 --   setup_close    closed without applying      detail { step }
---   season_toggle  the season note's toggle     detail { to: summer | winter }
+--   season_toggle  the review bar's season      detail { to: summer | winter }
+--   setup_jump     a chart opened from the bar  detail { mode, index }
 -- Never the answers themselves: no miles, prices, places or picked vehicles.
 --
 -- Same table, same function, same guards (fixed list, 60 a minute per token,
@@ -18,7 +19,7 @@
 ALTER TABLE public.site_events DROP CONSTRAINT IF EXISTS site_events_event_check;
 ALTER TABLE public.site_events ADD CONSTRAINT site_events_event_check
     CHECK (event IN ('home_view', 'featured_open', 'featured_reset', 'chart_view',
-                     'setup_open', 'setup_apply', 'setup_close', 'season_toggle'));
+                     'setup_open', 'setup_apply', 'setup_close', 'season_toggle', 'setup_jump'));
 
 CREATE OR REPLACE FUNCTION public.log_site_event(
     p_event         text,
@@ -35,7 +36,7 @@ DECLARE
 BEGIN
     IF p_browser_token IS NULL
        OR p_event NOT IN ('home_view', 'featured_open', 'featured_reset', 'chart_view',
-                          'setup_open', 'setup_apply', 'setup_close', 'season_toggle') THEN
+                          'setup_open', 'setup_apply', 'setup_close', 'season_toggle', 'setup_jump') THEN
         RETURN false;
     END IF;
 

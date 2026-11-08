@@ -2764,7 +2764,7 @@ describe('site events are counted without knowing who (#448 layer 4)', () => {
     it('the client, the table and the function agree on the events', () => {
         const client = [...events.matchAll(/:\s+'([a-z_]+)',/g)].map(m => m[1]).sort();
         expect(client).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view',
-            'season_toggle', 'setup_apply', 'setup_close', 'setup_open']);
+            'season_toggle', 'setup_apply', 'setup_close', 'setup_jump', 'setup_open']);
         const quoted = (src) => [...src.matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
         // The latest migration to set the list (098, the setup wizard) is the one in force.
         const latest = read('supabase/migrations/098_site_events_setup_wizard.sql');
@@ -2804,7 +2804,7 @@ describe('site events are counted without knowing who (#448 layer 4)', () => {
         expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_OPEN/);
         expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_RESET/);
         expect(read('src/App.jsx')).toMatch(/recordEvent\(SITE_EVENTS\.CHART_VIEW/);
-        for (const e of ['SETUP_OPEN', 'SETUP_APPLY', 'SETUP_CLOSE', 'SEASON_TOGGLE']) {
+        for (const e of ['SETUP_OPEN', 'SETUP_APPLY', 'SETUP_CLOSE', 'SEASON_TOGGLE', 'SETUP_JUMP']) {
             expect(read('src/App.jsx')).toMatch(new RegExp(`recordEvent\\(SITE_EVENTS\\.${e}`));
         }
         const hook = read('src/hooks/useSiteEvents.js');

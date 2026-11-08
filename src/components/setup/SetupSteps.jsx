@@ -12,7 +12,15 @@ import { starterSetIds, fill, speedWords, distanceWords, tempWords, altitudeWord
 import { ChoiceCards, SegmentedChoice, NumberAnswer } from './SetupFields';
 
 export function GoalStep({ answers, onChange }) {
-    return <ChoiceCards options={C.goals.options} value={answers.goal} onChange={goal => onChange({ goal })} />;
+    return (
+        <ChoiceCards
+            legend={C.goals.question}
+            options={C.goals.options}
+            value={answers.goals}
+            onChange={goals => onChange({ goals })}
+            multiple
+        />
+    );
 }
 
 /** Which cars: keep the selection, pick some, or let us suggest some of a kind. */
@@ -103,40 +111,44 @@ function DailyDistance({ answers, onChange, units }) {
     );
 }
 
-export function DrivingStep({ answers, onChange, units }) {
+/*
+ * Driving, weather and money show only the questions `asked` holds: the ones
+ * a chosen goal's chart reads (constants/setupWizard.js, goals[].asks).
+ */
+export function DrivingStep({ answers, onChange, units, asked }) {
     const D = C.driving;
     return (
         <div className="setup-step-body">
-            <DailyDistance answers={answers} onChange={onChange} units={units} />
-            <SegmentedChoice
+            {asked.has('dailyMi') && <DailyDistance answers={answers} onChange={onChange} units={units} />}
+            {asked.has('highway') && <SegmentedChoice
                 label={D.highway.label}
                 options={D.highway.options.map(h => [h.key, h.label])}
                 value={answers.highway}
                 onChange={highway => onChange({ highway })}
-            />
-            <SegmentedChoice
+            />}
+            {asked.has('speedMph') && <SegmentedChoice
                 label={D.speed.label}
                 options={D.speed.mph.map(s => [s, speedWords(s, units)])}
                 value={answers.speedMph}
                 onChange={speedMph => onChange({ speedMph })}
-            />
-            <SegmentedChoice
+            />}
+            {asked.has('trips') && <SegmentedChoice
                 label={D.trips.label}
                 options={D.trips.options.map(t => [t.key, t.label])}
                 value={answers.trips}
                 onChange={trips => onChange({ trips })}
-            />
-            <SegmentedChoice
+            />}
+            {asked.has('tripMi') && <SegmentedChoice
                 label={D.tripMi.label}
                 options={D.tripMi.miles.map(d => [d, distanceWords(d, units)])}
                 value={answers.tripMi}
                 onChange={tripMi => onChange({ tripMi })}
-            />
+            />}
         </div>
     );
 }
 
-export function WeatherStep({ answers, onChange, units }) {
+export function WeatherStep({ answers, onChange, units, asked }) {
     const W = C.weather;
     const climates = W.climates.map(c => ({
         key: c.key,
@@ -145,20 +157,21 @@ export function WeatherStep({ answers, onChange, units }) {
     }));
     return (
         <div className="setup-step-body">
-            <ChoiceCards options={climates} value={answers.climate} onChange={climate => onChange({ climate })} columns={1} />
-            <SegmentedChoice
+            {asked.has('climate') && <ChoiceCards options={climates} value={answers.climate} onChange={climate => onChange({ climate })} columns={1} />}
+            {asked.has('mountains') && <SegmentedChoice
                 label={W.mountains.label}
                 options={[[false, W.mountains.low], [true, fill(W.mountains.high, { alt: altitudeWords(W.mountains.ft, units) })]]}
                 value={answers.mountains}
                 onChange={mountains => onChange({ mountains })}
-            />
+            />}
         </div>
     );
 }
 
-export function MoneyStep({ answers, onChange }) {
+export function MoneyStep({ answers, onChange, asked }) {
     const M = C.money;
     const field = (key) => {
+        if (!asked.has(key)) return null;
         const f = M[key];
         return (
             <NumberAnswer
@@ -176,7 +189,7 @@ export function MoneyStep({ answers, onChange }) {
     };
     return (
         <div className="setup-step-body">
-            <ChoiceCards options={M.home.options} value={answers.home} onChange={home => onChange({ home })} columns={1} />
+            {asked.has('home') && <ChoiceCards options={M.home.options} value={answers.home} onChange={home => onChange({ home })} columns={1} />}
             {answers.home !== 'none' && field('homePrice')}
             {field('gasMpg')}
             {field('gasPrice')}
