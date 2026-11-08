@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { vehicleLabel } from '../../utils/specHelpers';
-import { desaturate } from '../../utils/colorUtils';
+import { fastChargingFill } from '../../utils/stripedFill';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
@@ -159,8 +159,8 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
             data: {
                 labels: byLevel.map(l => levelLabel(l.level)),
                 // Two bars a car, stacked on the car's own stack: home cost
-                // underneath in the full color, fast cost on top desaturated —
-                // the Compare cost chart's style.
+                // underneath in the full color, fast cost on top striped in it
+                // over its desaturated shade — the Compare cost chart's style.
                 datasets: columns.flatMap((c, ci) => ['home', 'fast'].map(part => ({
                     label: vehicleLabel(c.vehicle),
                     part,
@@ -170,7 +170,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                         const w = monthOf(at(l.index, c.vehicle.id)?.comparison?.week);
                         return w ? (part === 'home' ? w.homeCost : w.fastCost) : null;
                     }),
-                    backgroundColor: part === 'home' ? c.color : desaturate(c.color),
+                    backgroundColor: part === 'home' ? c.color : fastChargingFill(c.color),
                 }))),
             },
             plugins: [totalLabels(ds => ds.part === 'fast', (li, ds) => {

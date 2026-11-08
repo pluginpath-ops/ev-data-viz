@@ -267,7 +267,7 @@ export const CHART_HELP_DEFAULTS = {
         how_to_read:
             'Each card gives a car’s two answers against your gas car: what it saves (or ' +
             'costs) a month, and the time it adds (or saves) a month, with its fast stops. Everything here is a month: the simulated week × 52 ÷ 12. The first chart stacks ' +
-            'home and fast charging per car beside the gas bill; the second sets fast-charging ' +
+            'home charging (solid) and fast charging (striped) per car beside the gas bill; the second sets fast-charging ' +
             'minutes against fill-up minutes. Months are for the season shown; the card’s ' +
             'year line blends winter months with summer ones. Winter is a floor: denser air ' +
             'and cabin heat are priced, battery warming and cold tires are not. The gas car ' +
@@ -335,8 +335,8 @@ export const CHART_HELP_DEFAULTS = {
             'the Compare sub-tab.',
         how_to_read:
             'Each column is what a car costs a month with that charger at home (the week × 52 ÷ 12, as on Compare): home ' +
-            'charging underneath in its color, fast charging on top in a muted shade of ' +
-            'it, the total over it, and the home figure on the home part when there is fast charging too. The faster the charger, the more the night ' +
+            'charging underneath in its color, fast charging on top striped in it over a muted ' +
+            'shade, the total over it, and the home figure on the home part when there is fast charging too. The faster the charger, the more the night ' +
             'covers and the smaller the fast part. The table has a column a charger and, ' +
             'for each car, its minutes of fast charging and its home, fast and total cost ' +
             'per month. The bold orange cell is “enough from here”: the smallest charger past ' +
