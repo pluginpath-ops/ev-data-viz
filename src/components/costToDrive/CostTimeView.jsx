@@ -13,7 +13,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { vehicleLabel } from '../../utils/specHelpers';
 import { filterRangeRuns } from '../../utils/runUtils';
-import { desaturate, SERIES_NEUTRAL } from '../../utils/colorUtils';
+import { SERIES_NEUTRAL } from '../../utils/colorUtils';
+import { fastChargingFill } from '../../utils/stripedFill';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
 import {
@@ -140,7 +141,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
     const redraw = `${signature}|${shown.map(p => p.color).join(',')}|${isDark}`;
 
     // Cost per month: home charging (the full color) under fast charging
-    // (desaturated) per car, the gas car beside. Home Charger draws its columns the same way.
+    // (the full color striped over its desaturated shade) per car, the gas car beside. Home Charger draws its columns the same way.
     const costTotals = [...shown.map(p => p.comparison.monthly.ev), gas ? perMonth(gas.cost) : null];
     useBarChart(costRef, costChart, () => {
         if (!shown.length) return null;
@@ -151,7 +152,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
                 labels,
                 datasets: [
                     { label: 'Home charging', data: pad(shown.map(p => perMonth(p.comparison.week.homeCost))), backgroundColor: pad(shown.map(p => p.color)) },
-                    { label: 'Fast charging', data: pad(shown.map(p => perMonth(p.comparison.week.fastCost))), backgroundColor: pad(shown.map(p => desaturate(p.color))) },
+                    { label: 'Fast charging', data: pad(shown.map(p => perMonth(p.comparison.week.fastCost))), backgroundColor: pad(shown.map(p => fastChargingFill(p.color))) },
                     { label: 'Gas', data: [...shown.map(() => null), perMonth(gas.cost)], backgroundColor: SERIES_NEUTRAL },
                 ],
             },

@@ -27,6 +27,7 @@ import { useSourceLine } from '../../hooks/useSourceLine';
 import PlotFrame from '../charts/PlotFrame';
 import CopyLinkButton from '../charts/CopyLinkButton';
 import PngButton from '../charts/PngButton';
+import { stripedFill } from '../../utils/stripedFill';
 
 const TYPE_NAMES = { D: 'Daily', L: 'Long day', O: 'Off' };
 const NO_SOURCES = {};
@@ -34,20 +35,7 @@ const pctText = (v) => `${Math.round(v)}%`;
 const DRIVE = withAlpha(SERIES_NEUTRAL, 0.75);
 
 /** A fast stop on the route: orange stripes over the driving's grey. */
-function routeStopFill(callout) {
-    if (typeof document === 'undefined') return callout;
-    const c = document.createElement('canvas');
-    c.width = c.height = 8;
-    const g = c.getContext('2d');
-    g.fillStyle = DRIVE;
-    g.fillRect(0, 0, 8, 8);
-    g.strokeStyle = callout;
-    g.lineWidth = 3;
-    g.beginPath();
-    for (const o of [-8, 0, 8]) { g.moveTo(o, 8); g.lineTo(o + 8, 0); }
-    g.stroke();
-    return g.createPattern(c, 'repeat') ?? callout;
-}
+const routeStopFill = (callout) => stripedFill(DRIVE, callout);
 
 /** The datasets, [low, high] per day. `legendOnly` ones carry no bars: the plugin draws them. */
 function datasetsOf(bars, view, { color, callout, striped }) {
