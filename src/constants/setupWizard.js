@@ -18,7 +18,8 @@
  *                 question is skipped. `default` is the goal of a reader who
  *                 skips. Question keys: cars, dailyMi, highway, speedMph,
  *                 trips, tripMi, climate, mountains, home, homePrice, gasMpg,
- *                 gasPrice.
+ *                 gasPrice. An optional `chart` sets that chart's axes and
+ *                 limits on Apply (see the charging goal).
  *   cars          the "Which cars?" step and the starter sets ("kinds of car").
  *                 `size` caps how many a set selects. `requireData` — a vehicle
  *                 needs all of these (from utils/vehicleDataCategories.js) to be
@@ -45,9 +46,10 @@
  *                 and the number fields' limits and hints.
  *   summary       the labels on the last screen.
  *   reviewBar     the bar after Apply that lists the chosen charts, with
- *                 Next, Change answers and a close ×. Its season line says
- *                 the harder season (`season`) or, after its toggle, the
- *                 other (`seasonOther`). {season} {temp} {other} are filled in.
+ *                 Next, Change answers and a close ×. Its season switch is
+ *                 `season` (the label) and one option per season, `option`
+ *                 with {season} {temp} filled in, winter first; `harder` is
+ *                 the hover note on the harder one.
  *
  * Check a change:  npx vitest run src/utils/__tests__/setupWizard.test.js
  * (it validates this file and says what is wrong).
@@ -81,9 +83,15 @@ export const SETUP_WIZARD = {
             // Range & Efficiency corrects every test to a speed, temperature and altitude.
             { key: 'range',    label: 'How far it goes',      detail: 'Real highway range',           mode: 'range',
               asks: ['cars', 'speedMph', 'climate', 'mountains'] },
-            // Charging Curves on its opening axes (SoC, kW) reads nothing but the cars.
+            // Charging Curves opens on time from 10% against range, capped at an
+            // hour; the range axis is corrected to the speed and weather.
+            // `chart` sets the chart itself: xAxis / yAxis / y2Axis are axis keys
+            // from utils/chargingAxes.js (y2Axis: 'chargeRate' adds kW on a second
+            // axis — left off as too much for a newcomer), raceThreshold the SoC
+            // the time axis starts from, axisLimits any of xMin xMax yMin yMax.
             { key: 'charging', label: 'How fast it charges',  detail: 'On a fast charger',            mode: 'charging',
-              asks: ['cars'] },
+              asks: ['cars', 'speedMph', 'climate', 'mountains'],
+              chart: { xAxis: 'time', yAxis: 'range', y2Axis: null, raceThreshold: 10, axisLimits: { xMax: 60 } } },
             // Road Trip drives its own speed and distance, corrected to the weather.
             { key: 'roadtrip', label: 'Road trips',           detail: 'Total time, stops and all',    mode: 'roadtrip',
               asks: ['cars', 'speedMph', 'tripMi', 'climate', 'mountains'] },
@@ -99,7 +107,7 @@ export const SETUP_WIZARD = {
         requireData: ['epa', 'charging', 'range'],
         onePerModel: true,
         ways: {
-            keep: { label: 'Keep my {n} selected' },
+            keep: { label: 'Keep my {n} selected', addLabel: '＋ Add another car…' },
             pick: { label: 'I know which cars', detail: 'Search by name', addLabel: '＋ Add a car…' },
             set:  { label: 'Suggest some', detail: 'Pick a kind of car' },
         },
@@ -172,6 +180,7 @@ export const SETUP_WIZARD = {
         opens: 'Opens',
         cars: 'Cars',
         carsKept: 'the ones you have selected',
+        carsKeptPlus: 'your {n}, plus {added} added',
         carsPicked: '{n} you picked',
         carsSuggested: '{kind}, {n} suggested',
         carsNone: 'none match — pick some yourself',
@@ -193,8 +202,8 @@ export const SETUP_WIZARD = {
         next: 'Next ›',
         change: 'Change answers',
         close: 'Close',
-        season: '{season}, {temp} — your harder season',
-        seasonOther: '{season}, {temp}',
-        toggle: 'Show {other}',
+        season: 'Season',
+        option: '{season} {temp}',
+        harder: 'Your harder season — the charts start here',
     },
 };

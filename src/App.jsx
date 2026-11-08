@@ -3,7 +3,7 @@ import { DEFAULT_SERIES_PALETTE } from './utils/colorUtils';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
 import { AxisLimitsProvider } from './hooks/useAxisLimits';
-import { AXIS_LIMITS_PARAM, decodeAxisLimits, withAxisLimits } from './utils/axisLimits';
+import { AXIS_LIMITS_PARAM, axisLimitsOf, decodeAxisLimits, withAxisLimits } from './utils/axisLimits';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import AppNav from './components/shell/AppNav';
 import SubTabStrip from './components/shell/SubTabStrip';
@@ -529,11 +529,23 @@ export default function App() {
             detail: { goals: plan.goals.join(','), cars: plan.carsFrom === 'set' ? plan.setKey : plan.carsFrom, skipped: skippedCount(answers) },
         });
         if (plan.vehicleIds) setVehicleSelection(plan.vehicleIds);
-        setChartConfig(prev => ({
-            ...prev,
-            correctionTarget: { ...prev.correctionTarget, ...plan.correction },
-            assumptions: { ...prev.assumptions, ...plan.assumptions },
-        }));
+        setChartConfig(prev => {
+            // A goal's own chart settings (constants/setupWizard.js `chart`). The
+            // axes live at the top of chartConfig and belong to Charging Curves.
+            let axisLimits = prev.axisLimits;
+            let axes = {};
+            for (const [mode, { axisLimits: limits, ...rest }] of Object.entries(plan.charts ?? {})) {
+                if (limits) axisLimits = withAxisLimits(axisLimits, mode, { ...axisLimitsOf(axisLimits, mode), ...limits });
+                axes = { ...axes, ...rest, ...(rest.raceThreshold != null && { alignRaw: false }) };
+            }
+            return {
+                ...prev,
+                ...axes,
+                axisLimits,
+                correctionTarget: { ...prev.correctionTarget, ...plan.correction },
+                assumptions: { ...prev.assumptions, ...plan.assumptions },
+            };
+        });
         updateCostToDrive(plan.costToDrive);
         setRoadTripConfig(prev => ({ ...prev, ...plan.roadTrip }));
         handleChartModeChange(plan.mode);

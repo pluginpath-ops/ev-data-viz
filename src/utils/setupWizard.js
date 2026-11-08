@@ -42,7 +42,7 @@ const byKey = (list, key) => list.find(x => x.key === key) ?? null;
  */
 export const EMPTY_ANSWERS = Object.freeze({
     goals: [],
-    cars: null,        // { how: 'keep' } | { how: 'pick', ids: [] } | { how: 'set', set: key }
+    cars: null,        // { how: 'keep', add: [] } | { how: 'pick', ids: [] } | { how: 'set', set: key }
     dailyMi: null,
     highway: null,
     speedMph: null,
@@ -79,7 +79,7 @@ export function sanitizeAnswers(raw, config = SETUP_WIZARD) {
     const goals = Array.isArray(raw.goals) ? raw.goals : raw.goal ? [raw.goal] : [];
     out.goals = [...new Set(goals.filter(g => keyIn(config.goals.options, g)))];
     const c = raw.cars;
-    if (c?.how === 'keep') out.cars = { how: 'keep' };
+    if (c?.how === 'keep') out.cars = { how: 'keep', add: Array.isArray(c.add) ? c.add.filter(id => typeof id === 'number' || typeof id === 'string') : [] };
     if (c?.how === 'pick' && Array.isArray(c.ids)) out.cars = { how: 'pick', ids: c.ids.filter(id => typeof id === 'number' || typeof id === 'string') };
     if (c?.how === 'set') out.cars = { how: 'set', set: keyIn(config.cars.kinds, c.set) };
     out.dailyMi = num(raw.dailyMi);
@@ -228,15 +228,25 @@ export function harderSeason(climate, speedMph = STANDARD_CONDITIONS.speedMph) {
 }
 
 /**
- * The review bar's season line: "Winter, 15°F — your harder season" and its
- * toggle. `shown.harder` false is the other season, after the toggle.
+ * The review bar's season switch: a label and both seasons, winter first
+ * whichever is shown, so clicking moves only the highlight — never the
+ * buttons. `active` is the one on the charts; `harder` the one that costs
+ * more range.
  */
 export function seasonText(shown, units = 'imperial', config = SETUP_WIZARD) {
     const B = config.reviewBar;
     const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+    const both = [
+        { season: shown.season, tempF: shown.tempF, active: true, harder: shown.harder },
+        { season: shown.other.season, tempF: shown.other.tempF, active: false, harder: !shown.harder },
+    ].sort((a, b) => (a.season === 'winter' ? -1 : 1) - (b.season === 'winter' ? -1 : 1));
     return {
-        line: fill(shown.harder ? B.season : B.seasonOther, { season: cap(shown.season), temp: tempWords(shown.tempF, units) }),
-        toggle: fill(B.toggle, { other: `${shown.other.season}, ${tempWords(shown.other.tempF, units)}` }),
+        label: B.season,
+        options: both.map(o => ({
+            ...o,
+            text: fill(B.option, { season: cap(o.season), temp: tempWords(o.tempF, units) }),
+            hint: o.harder ? B.harder : null,
+        })),
     };
 }
 
@@ -251,7 +261,11 @@ function resolveCars(cars, selectedIds, liveIds, config) {
     const ids = (cars?.ids ?? []).filter(id => liveIds.has(String(id)));
     if (cars?.how === 'pick' && ids.length) return { how: 'pick', ids };
     if (cars?.how === 'set' && cars.set) return cars;
-    if (selectedIds.length && (!cars || cars.how === 'keep')) return { how: 'keep' };
+    if (selectedIds.length && (!cars || cars.how === 'keep')) {
+        const kept = new Set(selectedIds.map(String));
+        const add = (cars?.add ?? []).filter(id => liveIds.has(String(id)) && !kept.has(String(id)));
+        return { how: 'keep', add };
+    }
     return { how: 'set', set: config.cars.default };
 }
 
@@ -275,14 +289,19 @@ export function planFromAnswers(answers = EMPTY_ANSWERS, { vehicles = [], select
     const a = askedAnswers(answers, config);
     const plan = {
         mode: goals[0].mode, modes: goals.map(g => g.mode), goals: goals.map(g => g.key),
-        vehicleIds: null, carsFrom: 'keep', setKey: null,
+        vehicleIds: null, carsFrom: 'keep', setKey: null, addedIds: [],
         correction: {}, assumptions: {}, costToDrive: {}, roadTrip: {}, season: null, unset: [],
+        // Each chosen goal's own chart settings, by mode: { charging: { xAxis, … } }.
+        charts: Object.fromEntries(goals.filter(g => g.chart).map(g => [g.mode, g.chart])),
     };
 
     // Cars. Never an empty selection: anything short of a real choice falls to
     // a starter set.
     const cars = resolveCars(a.cars, selectedIds, new Set(vehicles.map(v => String(v.id))), config);
-    if (cars.how === 'pick') {
+    if (cars.how === 'keep' && cars.add.length) {
+        plan.vehicleIds = [...selectedIds, ...cars.add];
+        plan.addedIds = [...cars.add];
+    } else if (cars.how === 'pick') {
         plan.vehicleIds = [...cars.ids];
         plan.carsFrom = 'pick';
     } else if (cars.how === 'set') {
@@ -365,6 +384,8 @@ export const tempWords = (f, units = 'imperial') => (units === 'metric' ? `${Mat
  */
 /** A chart mode as the reader finds it: "Cost & Time › Compare". */
 export const chartName = (mode) => `${categoryForMode(mode).label} › ${labelForMode(mode)}`;
+/** The short form, for the review bar's buttons: "Compare". Long names wrapped the bar. */
+export const chartShortName = (mode) => labelForMode(mode);
 
 export function planSummary(plan, answers = EMPTY_ANSWERS, names = {}, units = 'imperial', config = SETUP_WIZARD) {
     // Only what is applied: an answer to a question no chosen goal asks is left out.
@@ -375,7 +396,9 @@ export function planSummary(plan, answers = EMPTY_ANSWERS, names = {}, units = '
     if (plan.vehicleIds) {
         const kind = byKey(config.cars.kinds, plan.setKey);
         const n = plan.vehicleIds.length;
-        const which = plan.carsFrom === 'set' && kind ? fill(S.carsSuggested, { kind: kind.label, n }) : fill(S.carsPicked, { n });
+        const which = plan.carsFrom === 'set' && kind ? fill(S.carsSuggested, { kind: kind.label, n })
+            : plan.carsFrom === 'keep' ? fill(S.carsKeptPlus, { n: n - plan.addedIds.length, added: plan.addedIds.length })
+            : fill(S.carsPicked, { n });
         const list = plan.vehicleIds.map(id => names[id] ?? `#${id}`).join(', ');
         lines.push({ label: S.cars, text: n ? `${which}: ${list}` : S.carsNone });
     } else {

@@ -10168,6 +10168,9 @@ a.is-test-link:focus-visible {
 .review-bar-season {
     @apply flex flex-wrap items-center gap-2;
 }
+/* The fill marks the season on the charts; bold as well would widen it and
+   nudge its neighbour on every click. */
+.review-bar-season .stats-segmented button.active { font-weight: inherit; }
 .review-bar-end {
     @apply flex items-center gap-2 ml-auto;
 }

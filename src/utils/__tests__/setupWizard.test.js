@@ -1,3 +1,5 @@
+import { isChargingAxis } from '../chargingAxes';
+import { AXIS_LIMIT_FIELDS } from '../axisLimits';
 import { describe, it, expect } from 'vitest';
 import {
     planFromAnswers, planSummary, starterSetIds, isCompleteVehicle, matchesRule, harderSeason,
@@ -51,6 +53,17 @@ describe('the setup wizard config (constants/setupWizard.js)', () => {
         }
         unique(C.goals.options, 'goals');
         expect(C.goals.options.map(g => g.key), `goals.default "${C.goals.default}" is not a goal`).toContain(C.goals.default);
+    });
+
+    it("a goal's chart settings name real axes and limits", () => {
+        const fields = ['xAxis', 'yAxis', 'y2Axis', 'raceThreshold', 'alignRaw', 'axisLimits'];
+        for (const g of C.goals.options.filter(o => o.chart)) {
+            for (const k of Object.keys(g.chart)) expect(fields, `goals "${g.key}": chart.${k} is not a chart setting (known: ${fields.join(', ')})`).toContain(k);
+            for (const k of ['xAxis', 'yAxis', 'y2Axis']) {
+                if (g.chart[k] != null) expect(isChargingAxis(g.chart[k]), `goals "${g.key}": chart.${k} "${g.chart[k]}" is not an axis in utils/chargingAxes.js`).toBe(true);
+            }
+            for (const k of Object.keys(g.chart.axisLimits ?? {})) expect(AXIS_LIMIT_FIELDS, `goals "${g.key}": chart.axisLimits.${k} is not a limit`).toContain(k);
+        }
     });
 
     it('every goal asks only real questions, the cars always among them', () => {
@@ -206,16 +219,19 @@ describe('the harder season', () => {
     it('after the toggle, does not call the easier season the harder one, and flips back', () => {
         const shown = harderSeason({ winterF: 15, summerF: 95 }, 70);
         const flipped = flipSeason(shown);
-        expect(seasonText(flipped).line).toBe('Summer, 95°F');
-        expect(seasonText(flipped).toggle).toMatch(/winter, 15°F/);
+        const after = seasonText(flipped).options;
+        expect(after.find(o => o.active).text).toBe('Summer 95°F');
+        expect(after.find(o => o.harder).season).toBe('winter');
         expect(flipSeason(flipped)).toMatchObject({ season: 'winter', tempF: 15, harder: true });
     });
 
-    it('the bar names the season and offers the other, in the reader units', () => {
+    it('the switch keeps both seasons in one order, so a click moves only the highlight', () => {
         const shown = harderSeason({ winterF: 15, summerF: 95 }, 70);
-        expect(seasonText(shown).line).toMatch(/Winter, 15°F.*harder/);
-        expect(seasonText(shown).toggle).toMatch(/summer, 95°F/);
-        expect(seasonText(shown, 'metric').line).toMatch(/°C/);
+        const texts = (s) => seasonText(s).options.map(o => o.text);
+        expect(texts(shown)).toEqual(['Winter 15°F', 'Summer 95°F']);
+        expect(texts(flipSeason(shown))).toEqual(texts(shown));
+        expect(seasonText(shown).options[0]).toMatchObject({ active: true, harder: true });
+        expect(seasonText(shown, 'metric').options[0].text).toMatch(/°C/);
     });
 });
 
@@ -239,6 +255,19 @@ describe('planFromAnswers', () => {
         const plan = planFromAnswers({ goals: ['charging'] }, { vehicles: fleet, selectedIds: [2] });
         expect(plan.vehicleIds).toBeNull();
         expect(plan.mode).toBe('charging');
+    });
+
+    it('adds to a kept selection, skipping unlisted and already-selected cars', () => {
+        const answers = { cars: { how: 'keep', add: [3, 99, 2] } };
+        const plan = planFromAnswers(answers, { vehicles: fleet, selectedIds: [2] });
+        expect(plan.vehicleIds).toEqual([2, 3]);
+        expect(plan.addedIds).toEqual([3]);
+        const cars = planSummary(plan, answers, { 2: 'Two', 3: 'Three' }).find(l => l.label === 'Cars').text;
+        expect(cars).toBe('your 1, plus 1 added: Two, Three');
+    });
+
+    it('keeps the selection untouched when nothing is added', () => {
+        expect(planFromAnswers({ cars: { how: 'keep', add: [] } }, { vehicles: fleet, selectedIds: [2] }).vehicleIds).toBeNull();
     });
 
     it('uses picked cars, dropping any no longer listed', () => {
@@ -281,9 +310,14 @@ describe('planFromAnswers', () => {
 describe('questions follow the goals', () => {
     const keysOf = (goals) => visibleSteps({ goals }).map(s => s.key);
 
-    it('specs and charging ask only the cars', () => {
+    it('specs asks only the cars', () => {
         expect(keysOf(['specs'])).toEqual(['goal', 'cars', 'summary']);
-        expect(keysOf(['charging'])).toEqual(['goal', 'cars', 'summary']);
+    });
+
+    it('charging asks the speed and weather its corrected range axis reads', () => {
+        expect(keysOf(['charging'])).toEqual(['goal', 'cars', 'driving', 'weather', 'summary']);
+        const plan = planFromAnswers({ goals: ['charging'] }, { vehicles: [car(1)], selectedIds: [1] });
+        expect(plan.charts.charging).toMatchObject({ xAxis: 'time', yAxis: 'range', raceThreshold: 10, axisLimits: { xMax: 60 } });
     });
 
     it('range and road trips skip the money step; cost asks everything', () => {

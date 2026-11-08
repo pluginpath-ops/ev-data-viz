@@ -23,59 +23,78 @@ export function GoalStep({ answers, onChange }) {
     );
 }
 
-/** Which cars: keep the selection, pick some, or let us suggest some of a kind. */
+/**
+ * A search that adds cars, and the added ones as removable chips. Used for
+ * "I know which cars" and to add to a kept selection. The list drops below the
+ * field, so choosing a way that shows it brings it to the top of the step.
+ */
+function CarSearch({ options, ids, names, addLabel, onIds, vehicles }) {
+    const ref = useRef(null);
+    useEffect(() => { ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, []);
+    return (
+        <div ref={ref} className="setup-field setup-car-search">
+            <VehicleCombobox
+                options={options.filter(o => !ids.includes(o.id))}
+                value=""
+                noneLabel={addLabel}
+                onChange={id => id && onIds([...ids, vehicles.find(v => String(v.id) === id)?.id ?? id])}
+            />
+            {ids.length > 0 && (
+                <ul className="flex flex-wrap gap-2 list-none m-0 p-0">
+                    {ids.map(id => (
+                        <li key={id} className="combobox-chip">
+                            <span className="combobox-chip-label">{names[id]}</span>
+                            <button
+                                type="button"
+                                className="combobox-chip-clear"
+                                aria-label={`Remove ${names[id]}`}
+                                onClick={() => onIds(ids.filter(x => x !== id))}
+                            >
+                                &times;
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+/** Which cars: keep the selection (and add to it), pick some, or let us suggest some of a kind. */
 export function CarsStep({ answers, onChange, vehicles, selectedIds, names }) {
     const cars = answers.cars;
     const how = cars?.how ?? null;
     const options = useMemo(() => vehicles.map(vehicleOption), [vehicles]);
     const picked = how === 'pick' ? (cars.ids ?? []).filter(id => names[id]) : [];
+    const added = how === 'keep' ? (cars.add ?? []).filter(id => names[id]) : [];
     const preview = useMemo(
         () => (how === 'set' && cars.set ? starterSetIds(cars.set, vehicles) : []),
         [how, cars, vehicles]);
     const W = C.cars.ways;
-    // Picking by name opens a search whose list drops below the field: bring
-    // the field to the top of the step so the list has room to open.
-    const searchRef = useRef(null);
-    useEffect(() => {
-        if (how === 'pick') searchRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    }, [how]);
 
     const hows = [
         ...(selectedIds.length ? [{ key: 'keep', label: fill(W.keep.label, { n: selectedIds.length }), detail: selectedIds.slice(0, 3).map(id => names[id]).join(', ') }] : []),
         { key: 'pick', label: W.pick.label, detail: W.pick.detail },
         { key: 'set',  label: W.set.label, detail: W.set.detail },
     ];
-    const setHow = (key) => onChange({ cars: key ? { how: key, ids: [], set: null } : null });
+    const setHow = (key) => onChange({ cars: key ? { how: key, ids: [], add: [], set: null } : null });
 
     return (
         <div className="setup-step-body">
             <ChoiceCards options={hows} value={how} onChange={setHow} columns={1} />
+            {how === 'keep' && (
+                <CarSearch
+                    options={options.filter(o => !selectedIds.includes(o.id))}
+                    ids={added} names={names} vehicles={vehicles} addLabel={W.keep.addLabel}
+                    onIds={ids => onChange({ cars: { how: 'keep', add: ids } })}
+                />
+            )}
             {how === 'pick' && (
-                <div ref={searchRef} className="setup-field setup-car-search">
-                    <VehicleCombobox
-                        options={options.filter(o => !picked.includes(o.id))}
-                        value=""
-                        noneLabel={W.pick.addLabel}
-                        onChange={id => id && onChange({ cars: { how: 'pick', ids: [...picked, vehicles.find(v => String(v.id) === id)?.id ?? id] } })}
-                    />
-                    {picked.length > 0 && (
-                        <ul className="flex flex-wrap gap-2 list-none m-0 p-0">
-                            {picked.map(id => (
-                                <li key={id} className="combobox-chip">
-                                    <span className="combobox-chip-label">{names[id]}</span>
-                                    <button
-                                        type="button"
-                                        className="combobox-chip-clear"
-                                        aria-label={`Remove ${names[id]}`}
-                                        onClick={() => onChange({ cars: { how: 'pick', ids: picked.filter(x => x !== id) } })}
-                                    >
-                                        &times;
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
+                <CarSearch
+                    options={options}
+                    ids={picked} names={names} vehicles={vehicles} addLabel={W.pick.addLabel}
+                    onIds={ids => onChange({ cars: { how: 'pick', ids } })}
+                />
             )}
             {how === 'set' && (
                 <>
