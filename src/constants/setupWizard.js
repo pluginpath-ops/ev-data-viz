@@ -18,7 +18,7 @@
  *                 `asks` together, in step order; a step left with no
  *                 question is skipped. `default` is the goal of a reader who
  *                 skips. Question keys: cars, dailyMi, highway, speedMph,
- *                 trips, tripMi, climate, mountains, home, homePrice, gasMpg,
+ *                 tripMi, climate, mountains, home, homePrice, gasMpg,
  *                 gasPrice. An optional `chart` sets that chart's axes and
  *                 limits on Apply (see the charging goal).
  *   cars          the "Which cars?" step and the starter sets ("kinds of car").
@@ -34,9 +34,10 @@
  *                        ops: '<', '<=', '>', '>=' (a blank field never matches)
  *                   { any: [rule, …] }  { all: [rule, …] }  { not: rule }
  *   driving       daily miles, town/highway share, highway speeds (mph, on a
- *                 5 mph grid), road-trip frequency and distance (miles).
- *                 `commuterWeek` is the Cost & Time week a reader who gives
- *                 daily miles gets; a trip frequency's `week` replaces it.
+ *                 5 mph grid), road-trip distance (miles, for Road Trip only).
+ *                 `commuterWeek` is the Cost & Time week the cost goal always
+ *                 sets: Cost & Time prices one typical week, so a road trip a
+ *                 few times a year has no place in it.
  *                 Week letters: D daily, L long day, O off; Monday first.
  *   weather       climates: winter and summer °F and how many months are
  *                 winter. The charts are corrected to the HARDER of the two
@@ -81,7 +82,7 @@ export const SETUP_WIZARD = {
         options: [
             // Cost & Time prices a whole week: every driving, weather and money answer feeds it.
             { key: 'cost',     label: 'What it costs to run', detail: 'Per month, against a gas car', mode: 'drivecost',
-              asks: ['cars', 'dailyMi', 'highway', 'speedMph', 'trips', 'tripMi', 'climate', 'mountains', 'home', 'homePrice', 'gasMpg', 'gasPrice'] },
+              asks: ['cars', 'dailyMi', 'highway', 'speedMph', 'climate', 'mountains', 'home', 'homePrice', 'gasMpg', 'gasPrice'] },
             // Range & Efficiency corrects every test to a speed, temperature and altitude.
             { key: 'range',    label: 'How far it goes',      detail: 'Real highway range',           mode: 'range',
               asks: ['cars', 'speedMph', 'climate', 'mountains'] },
@@ -142,15 +143,6 @@ export const SETUP_WIZARD = {
             ],
         },
         speed: { label: 'Highway speed', mph: [65, 70, 75, 80] },
-        trips: {
-            label: 'Road trips',
-            options: [
-                // `unset`: said on the summary when the answer changes nothing.
-                { key: 'rarely', label: 'Rarely',       week: null, unset: 'how often you take road trips (Cost & Time prices one typical week)' },
-                { key: 'few',    label: 'A few a year', week: null, unset: 'how often you take road trips (Cost & Time prices one typical week)' },
-                { key: 'weekly', label: 'Most weeks',   week: 'DDDDDLO' },
-            ],
-        },
         tripMi: { label: 'A typical road trip', miles: [200, 400, 700] },
     },
 
@@ -190,7 +182,6 @@ export const SETUP_WIZARD = {
         perDay: '{d} a day',
         highwaySpeed: '{s} on the highway',
         tripLength: 'road trips of ~{d}',
-        longDay: 'one long day a week',
         weather: 'Weather',
         season: '{season}, {temp} (your harder season)',
         charging: 'Charging',

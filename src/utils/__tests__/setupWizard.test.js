@@ -105,10 +105,8 @@ describe('the setup wizard config (constants/setupWizard.js)', () => {
         for (const s of C.driving.speed.mph) expect(s % 5, `driving.speed: ${s} is not on the 5 mph grid`).toBe(0);
         const isWeek = (w) => /^[DLO]{7}$/.test(w);
         expect(isWeek(C.driving.commuterWeek), 'driving.commuterWeek must be 7 of D/L/O').toBe(true);
-        for (const t of C.driving.trips.options) if (t.week) expect(isWeek(t.week), `driving.trips "${t.key}": week must be 7 of D/L/O`).toBe(true);
         for (const d of C.driving.tripMi.miles) expect(d).toBeGreaterThan(0);
         unique(C.driving.highway.options, 'driving.highway');
-        unique(C.driving.trips.options, 'driving.trips');
     });
 
     it('climates: winter colder than summer, months 0–12; home levels are real', () => {
@@ -247,7 +245,8 @@ describe('planFromAnswers', () => {
         expect(plan.setKey).toBe(SETUP_WIZARD.cars.default);
         expect(plan.vehicleIds).toEqual([1, 2, 3]);
         expect(plan.correction).toEqual({});
-        expect(plan.costToDrive).toEqual({});
+        // The default goal is cost, which always gets a commuter week.
+        expect(plan.costToDrive).toEqual({ week: SETUP_WIZARD.driving.commuterWeek, planned: 0 });
         expect(plan.season).toBeNull();
     });
 
@@ -277,14 +276,15 @@ describe('planFromAnswers', () => {
     it('writes driving, weather and money through to each setting', () => {
         const plan = planFromAnswers({
             goals: ['cost', 'range', 'roadtrip'], dailyMi: 40, highway: 'highway', speedMph: 75, climate: 'extreme', mountains: true,
-            home: 'charger', homePrice: 0.15, gasMpg: 28, gasPrice: 3.5, trips: 'weekly', tripMi: 700,
+            home: 'charger', homePrice: 0.15, gasMpg: 28, gasPrice: 3.5, tripMi: 700,
         }, { vehicles: fleet, selectedIds: [1] });
         expect(plan.correction).toEqual({ speedMph: 75, temperatureF: 15, altitudeFt: 5000 });
         expect(plan.costToDrive).toMatchObject({
-            dailyMi: 40, dailyCity: 20, dailyMph: 75, longMph: 75, week: 'DDDDDLO',
+            dailyMi: 40, dailyCity: 20, dailyMph: 75, longMph: 75, week: 'DDDDDOO', planned: 0,
             winterF: 15, summerF: 95, winterMonths: 4, season: 'winter', elevationFt: 5000, level: 3,
-            homePrice: 0.15, gasCity: 28, gasHwy: 28, gasPrice: 3.5, longMi: 400,
+            homePrice: 0.15, gasCity: 28, gasHwy: 28, gasPrice: 3.5,
         });
+        expect(plan.costToDrive).not.toHaveProperty('longMi');
         expect(plan.assumptions).toEqual({ homePrice: 0.15 });
         expect(plan.roadTrip).toEqual({ speed: 75, totalDistance: 700, optimizerDistance: 700 });
         expect(plan.season).toMatchObject({ season: 'winter', tempF: 15, other: { season: 'summer', tempF: 95 } });
@@ -296,8 +296,15 @@ describe('planFromAnswers', () => {
         expect(plan.unset).toEqual([]);
     });
 
-    it('says what a road-trip frequency cannot set', () => {
-        expect(planFromAnswers({ goals: ['cost'], trips: 'few' }, { vehicles: fleet }).unset.join(' ')).toMatch(/road trips/);
+    it('cost always gets a commuter week — never the default\'s three long days — even with the miles skipped', () => {
+        const plan = planFromAnswers({ goals: ['cost'] }, { vehicles: fleet });
+        expect(plan.costToDrive).toMatchObject({ week: SETUP_WIZARD.driving.commuterWeek, planned: 0 });
+        expect(plan.costToDrive.week).not.toMatch(/L/);
+        expect(plan.costToDrive).not.toHaveProperty('dailyMi');
+        // A road-trip distance is Road Trip's, and never becomes a long day in Cost & Time.
+        const both = planFromAnswers({ goals: ['cost', 'roadtrip'], tripMi: 700 }, { vehicles: fleet });
+        expect(both.costToDrive.week).not.toMatch(/L/);
+        expect(both.roadTrip.totalDistance).toBe(700);
     });
 
     it('opens every chosen chart, in the config order, starting with the first', () => {
@@ -360,7 +367,8 @@ describe('remembered answers', () => {
     });
 
     it('counts the skipped questions that were asked, never their values', () => {
-        const all = Object.keys(EMPTY_ANSWERS).length;   // the cost goal asks every question, plus goals itself
+        // Skipping everything lands on the cost goal: its questions, plus goals itself.
+        const all = 1 + SETUP_WIZARD.goals.options.find(g => g.key === 'cost').asks.length;
         expect(skippedCount(EMPTY_ANSWERS)).toBe(all);
         expect(skippedCount({ ...EMPTY_ANSWERS, goals: ['cost'] })).toBe(all - 1);
         expect(skippedCount({ ...EMPTY_ANSWERS, goals: ['specs'] })).toBe(1);   // only the cars

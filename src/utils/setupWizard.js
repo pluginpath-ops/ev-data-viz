@@ -17,7 +17,6 @@
  * Pure module — no React, no data access.
  */
 import { SETUP_WIZARD } from '../constants/setupWizard';
-import { costToDriveField } from '../constants/costToDrive';
 import { STANDARD_CONDITIONS } from '../constants/epa';
 import { categoryForMode, labelForMode } from '../constants/chartNav';
 import { specProvenance } from './specHelpers';
@@ -46,7 +45,6 @@ export const EMPTY_ANSWERS = Object.freeze({
     dailyMi: null,
     highway: null,
     speedMph: null,
-    trips: null,
     tripMi: null,
     climate: null,
     mountains: null,   // true | false | null
@@ -60,7 +58,7 @@ export const EMPTY_ANSWERS = Object.freeze({
 export const STEP_ANSWERS = {
     goal: ['goals'],
     cars: ['cars'],
-    driving: ['dailyMi', 'highway', 'speedMph', 'trips', 'tripMi'],
+    driving: ['dailyMi', 'highway', 'speedMph', 'tripMi'],
     weather: ['climate', 'mountains'],
     money: ['home', 'homePrice', 'gasMpg', 'gasPrice'],
     summary: [],
@@ -85,7 +83,6 @@ export function sanitizeAnswers(raw, config = SETUP_WIZARD) {
     out.dailyMi = num(raw.dailyMi);
     out.highway = keyIn(config.driving.highway.options, raw.highway);
     out.speedMph = config.driving.speed.mph.includes(raw.speedMph) ? raw.speedMph : null;
-    out.trips = keyIn(config.driving.trips.options, raw.trips);
     out.tripMi = config.driving.tripMi.miles.includes(raw.tripMi) ? raw.tripMi : null;
     out.climate = keyIn(config.weather.climates, raw.climate);
     out.mountains = typeof raw.mountains === 'boolean' ? raw.mountains : null;
@@ -312,7 +309,11 @@ export function planFromAnswers(answers = EMPTY_ANSWERS, { vehicles = [], select
 
     // Driving.
     const { driving } = config;
-    if (a.dailyMi != null) Object.assign(plan.costToDrive, { dailyMi: a.dailyMi, week: driving.commuterWeek, planned: 0 });
+    // Cost & Time prices one typical week. Its default week has three long
+    // days; a reader setting up for cost gets a commute instead, whether or
+    // not they gave the miles — the wizard never asks about long days.
+    if (askedQuestions(answers, config).has('dailyMi')) Object.assign(plan.costToDrive, { week: driving.commuterWeek, planned: 0 });
+    if (a.dailyMi != null) plan.costToDrive.dailyMi = a.dailyMi;
     const share = byKey(driving.highway.options, a.highway);
     if (share) plan.costToDrive.dailyCity = 100 - share.highwayPct;
     if (a.speedMph != null) {
@@ -320,13 +321,9 @@ export function planFromAnswers(answers = EMPTY_ANSWERS, { vehicles = [], select
         Object.assign(plan.costToDrive, { dailyMph: a.speedMph, longMph: a.speedMph });
         plan.roadTrip.speed = a.speedMph;
     }
-    const trips = byKey(driving.trips.options, a.trips);
-    if (trips?.week) plan.costToDrive.week = trips.week;
-    if (trips?.unset) plan.unset.push(trips.unset);
     if (a.tripMi != null) {
         plan.roadTrip.totalDistance = a.tripMi;
         plan.roadTrip.optimizerDistance = a.tripMi;
-        plan.costToDrive.longMi = Math.min(costToDriveField('longMi').max, a.tripMi);
     }
 
     // Weather. The charts show the harder season; Cost & Time prices both.
@@ -412,7 +409,6 @@ export function planSummary(plan, answers = EMPTY_ANSWERS, names = {}, units = '
     if (share) drive.push(share.label.toLowerCase());
     if (a.speedMph != null) drive.push(fill(S.highwaySpeed, { s: speedWords(a.speedMph, units) }));
     if (a.tripMi != null) drive.push(fill(S.tripLength, { d: distanceWords(a.tripMi, units) }));
-    if (byKey(driving.trips.options, a.trips)?.week) drive.push(S.longDay);
     if (drive.length) lines.push({ label: S.driving, text: drive.join(' · ') });
 
     const weather = [];

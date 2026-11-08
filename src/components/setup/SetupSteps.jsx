@@ -157,12 +157,6 @@ export function DrivingStep({ answers, onChange, units, asked }) {
                 value={answers.speedMph}
                 onChange={speedMph => onChange({ speedMph })}
             />}
-            {asked.has('trips') && <SegmentedChoice
-                label={D.trips.label}
-                options={D.trips.options.map(t => [t.key, t.label])}
-                value={answers.trips}
-                onChange={trips => onChange({ trips })}
-            />}
             {asked.has('tripMi') && <SegmentedChoice
                 label={D.tripMi.label}
                 options={D.tripMi.miles.map(d => [d, distanceWords(d, units)])}
