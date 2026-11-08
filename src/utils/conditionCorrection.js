@@ -74,6 +74,7 @@ import {
 } from '../constants/epa';
 import { airDensityRatio, temperatureDensityRatio, apparentAirspeed } from './epaDerivations';
 import { assumedAccessoryW, effectiveAccessoryW, accessoryFactor } from './accessoryLoad';
+import { val } from './calcTrace';
 
 /**
  * Correction modes, in the order they appear in the picker. Each names what it
@@ -136,9 +137,20 @@ function consumptionWhPerMile(run) {
  * when given, is the mean square of the speed through the AIR — the ground
  * speed with the wind added — and replaces the ground speed's square.
  */
-function loadTerm(speedMph, densityRatio, aeroFraction, airSpeedSq = null) {
+function loadTerm(speedMph, densityRatio, aeroFraction, airSpeedSq = null, trace = null, label = 'Road load') {
     const vSq = (airSpeedSq ?? (speedMph ?? REFERENCE_SPEED_MPH) ** 2) / REFERENCE_SPEED_MPH ** 2;
-    return aeroFraction * vSq * densityRatio + (1 - aeroFraction);
+    const load = aeroFraction * vSq * densityRatio + (1 - aeroFraction);
+    trace?.step(label, {
+        formula: airSpeedSq != null ? 'L = f × (v_air² / v_ref²) × ρ + (1 − f)' : 'L = f × (v / v_ref)² × ρ + (1 − f)',
+        values: {
+            f: val(aeroFraction, null, aeroFraction === AERO_FRACTION ? 'knob:AERO_FRACTION' : null),
+            ...(airSpeedSq != null ? { 'v_air²': val(airSpeedSq, 'mph²') } : { v: val(speedMph ?? REFERENCE_SPEED_MPH, 'mph') }),
+            v_ref: val(REFERENCE_SPEED_MPH, 'mph', 'knob:REFERENCE_SPEED_MPH'),
+            ρ: densityRatio,
+        },
+        result: load, note: 'relative to the load at the reference speed in standard air',
+    });
+    return load;
 }
 
 /**
@@ -203,8 +215,12 @@ export function correctionFactor(conditions, {
     target = STANDARD_CONDITIONS,
     aeroFraction = AERO_FRACTION,
     assumed: assumedConditions = ASSUMED_TEST_CONDITIONS,
+    trace = null,
 } = {}) {
     const axes = modeAxes(mode);
+    trace?.note(axes.length
+        ? `Mode "${CORRECTION_MODES.find(m => m.key === mode)?.label}": corrects ${axes.join(', ')}`
+        : 'Mode "No correction": the factor is 1 and nothing below applies');
     if (!axes.length) return { factor: 1, applied: [], missing: [], skipped: [], assumed: [], assumedConsumptionWhMi: null };
 
     const applied = [];
@@ -262,18 +278,46 @@ export function correctionFactor(conditions, {
         : mixedCycle ? target.speedMph : assume('speed', 'speedMph');
     const runAlt     = useAlt  ? Number(conditions.altitudeFt)   : assume('altitude', 'altitudeFt');
     const runTemp    = useTemp ? Number(conditions.temperatureF) : assume('temperature', 'temperatureF');
-    const runDensity = airDensityRatio(runAlt) * temperatureDensityRatio(runTemp);
+    if (trace) {
+        const srcOf = (used, axis) => (used ? 'data' : assumed.some(a => a.axis === axis) ? 'assumed' : 'setting');
+        trace.step('The test\'s conditions', {
+            values: {
+                v_run: val(runSpeed, 'mph', mixedCycle ? 'setting' : srcOf(useSpeed, 'speed')),
+                h_run: val(runAlt, 'ft', srcOf(useAlt, 'altitude')),
+                T_run: val(runTemp, '°F', srcOf(useTemp, 'temperature')),
+                ...(useWind ? { wind: val(Number(conditions.windMph), 'mph', 'data') } : {}),
+            },
+            assumed: assumed.length > 0,
+            note: [
+                ...assumed.map(a => `${a.axis} not recorded: assumed`),
+                ...skipped.map(x => `${x.axis} not corrected (${x.reason})`),
+            ].join(' · ') || null,
+        });
+        trace.step('The correction target', {
+            values: {
+                v_target: val(target.speedMph, 'mph', 'setting'),
+                h_target: val(target.altitudeFt, 'ft', 'setting'),
+                T_target: val(target.temperatureF, '°F', 'setting'),
+            },
+        });
+    }
+    const runAir = trace?.group('Air density at the test');
+    const runDensity = airDensityRatio(runAlt, runAir) * temperatureDensityRatio(runTemp, runAir);
+    runAir?.step('Air density ratio at the test', { formula: 'ρ_run = ρ_alt × ρ_T', values: { ρ_alt: airDensityRatio(runAlt), ρ_T: temperatureDensityRatio(runTemp) }, result: runDensity });
 
-    const targetDensity = airDensityRatio(target.altitudeFt) * temperatureDensityRatio(target.temperatureF);
+    const targetAir = trace?.group('Air density at the target');
+    const targetDensity = airDensityRatio(target.altitudeFt, targetAir) * temperatureDensityRatio(target.temperatureF, targetAir);
+    targetAir?.step('Air density ratio at the target', { formula: 'ρ_target = ρ_alt × ρ_T', values: { ρ_alt: airDensityRatio(target.altitudeFt), ρ_T: temperatureDensityRatio(target.temperatureF) }, result: targetDensity });
 
     const airSq    = useWind ? airSpeedSquared(runSpeed, Number(conditions.windMph), conditions.windDirDeg) : null;
-    const atRun    = loadTerm(runSpeed,        runDensity,    aeroFraction, airSq);
-    const atTarget = loadTerm(target.speedMph, targetDensity, aeroFraction);
+    const atRun    = loadTerm(runSpeed,        runDensity,    aeroFraction, airSq, trace, 'Road load at the test');
+    const atTarget = loadTerm(target.speedMph, targetDensity, aeroFraction, null,  trace, 'Road load at the target');
     if (!atRun || atRun <= 0) return { factor: 1, applied: [], missing, skipped, assumed: [], assumedConsumptionWhMi: null };
 
     // Consumption ratio inverted: a harder test (higher load) means the car
     // deserves a BETTER corrected efficiency than it measured.
     let factor = atRun / atTarget;
+    trace?.step('Aero-only factor', { formula: 'k_aero = L_run / L_target', values: { L_run: atRun, L_target: atTarget }, result: factor });
     let assumedConsumptionWhMi = null;
 
     // The heater or A/C the test is assumed to have run, swapped for the
@@ -281,15 +325,18 @@ export function correctionFactor(conditions, {
     // cycle — whose speed the aero axis cannot use — still has one to give.
     if (axes.includes('accessory')) {
         const heldSpeed = Number(conditions?.speedMph);
+        const acc = trace?.group('Swap the accessory load (heating, cooling, base draw)');
         const accessory = accessoryFactor({
             consumptionWhMi: conditions?.whPerMile,
-            runW:            assumedAccessoryW(runTemp),
+            runW:            assumedAccessoryW(runTemp, { trace: acc?.group('At the test') }),
             runSpeedMph:     heldSpeed > 0 ? heldSpeed : runSpeed,
-            targetW:         effectiveAccessoryW(target),
+            targetW:         effectiveAccessoryW(target, { trace: acc?.group('At the target') }),
             targetSpeedMph:  target.speedMph,
             tractionScale:   atTarget / atRun,
+            trace:           acc,
         });
         if (accessory.factor == null) {
+            trace?.note(`Accessory load not swapped (${accessory.skipped}): the aero-only factor stands`, { assumed: true });
             skipped.push({ axis: 'accessory', reason: accessory.skipped });
         } else {
             factor = accessory.factor;
@@ -299,6 +346,21 @@ export function correctionFactor(conditions, {
     }
 
     return { factor, applied, missing, skipped, assumed, assumedConsumptionWhMi };
+}
+
+/**
+ * One range test corrected, as the Range chart draws it: the factor, and the
+ * distance it scales. Correcting the distance corrects range AND efficiency in
+ * every unit, since both are linear in it, so the chart corrects nothing else.
+ */
+export function correctRunDistance(run, session, { mode, target } = {}, trace = null) {
+    const result = correctionFactor(runConditions(run, session), { mode, target, trace: trace?.group('Correction factor') });
+    const distanceMiles = run?.distance_miles != null ? run.distance_miles * result.factor : null;
+    trace?.step('Corrected distance', {
+        formula: 'd = d_test × k', values: { d_test: val(run?.distance_miles, 'mi', 'data'), k: result.factor },
+        result: distanceMiles, unit: 'mi',
+    });
+    return { result, distanceMiles };
 }
 
 /**

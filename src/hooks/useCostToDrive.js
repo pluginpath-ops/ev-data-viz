@@ -33,17 +33,26 @@ function priceVehicles(vehicles, selectedVehicleIds, settings, testSessions) {
         .map(id => vehicles.find(v => v.id === id))
         .filter(Boolean);
     const colors = vehicleColors(selected);
-    return selected.map(vehicle => {
-        const { specs } = specProvenance(vehicle, vehicles);
-        const profile = costToDriveVehicle(vehicle, settings, { specs, sessionOf });
-        return {
-            vehicle,
-            color: colors[vehicle.id],
-            profile,
-            missing: profile.missing,
-            comparison: profile.missing ? null : costToDriveComparison(profile, settings),
-        };
-    });
+    return selected.map(vehicle => ({
+        ...priceVehicle(vehicle, vehicles, settings, sessionOf),
+        color: colors[vehicle.id],
+    }));
+}
+
+/**
+ * One vehicle priced: its profile and its comparison with the gas car. With a
+ * `trace` (utils/calcTrace.js), the same call writes down its math — "Show the
+ * math" calls exactly this, so its figures are the page's.
+ */
+export function priceVehicle(vehicle, vehicles, settings, sessionOf, trace = null) {
+    const { specs } = specProvenance(vehicle, vehicles);
+    const profile = costToDriveVehicle(vehicle, settings, { specs, sessionOf, trace: trace?.group('What the week needs from the vehicle') });
+    return {
+        vehicle,
+        profile,
+        missing: profile.missing,
+        comparison: profile.missing ? null : costToDriveComparison(profile, settings, { trace }),
+    };
 }
 
 export function useCostToDrive(vehicles, selectedVehicleIds, settings) {

@@ -39,6 +39,7 @@ import VehicleFilterBar from './vehicles/VehicleFilterBar';
 import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { decodeVehicleFilters } from '../utils/vehicleFilters';
 import ViewSpecsModal from './ViewSpecsModal';
+import TableMath from './calcTrace/TableMath';
 import VehicleCardPopover from './vehicles/VehicleCardPopover';
 import { reorderSelectionBySort } from '../utils/sortSelection';
 import {
@@ -229,6 +230,11 @@ export default function VehicleTable({
                 peekProps={peekProps}
                 peek={cellPeek}
                 emptyText={rows.length ? 'No vehicles match these filters.' : 'No vehicles yet.'}
+            />
+
+            <TableMath
+                selectedRows={selectedRows} bodyRows={bodyRows} columns={columns} selectedIds={selectedVehicles}
+                performance={performance} assumptions={assumptions} correctionTarget={correctionTarget} correctionMode={correctionMode}
             />
 
             {viewing && <ViewSpecsModal vehicle={viewing} onClose={() => setViewing(null)} />}

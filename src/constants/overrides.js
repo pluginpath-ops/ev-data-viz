@@ -49,6 +49,18 @@ export function resolve(key, defaultValue) {
     return defaultValue;
 }
 
+/**
+ * Which layer a constant's value comes from, as resolve() picks it: 'local',
+ * 'site' or 'default'. For "Show the math", which names the layer beside
+ * every knob a calculation used.
+ */
+export function constantLayer(key) {
+    const ov = load();
+    if (key in ov && ov[key] != null) return 'local';
+    if (key in site && site[key] != null) return 'site';
+    return 'default';
+}
+
 /** Current LOCAL overrides map (copy). Empty object means "no local sandbox". */
 export function getOverrides() {
     return { ...load() };

@@ -104,6 +104,7 @@ it.
 | The spec chart's list for choosing columns to plot | **field picker** — its items are **fields** ("Filter fields"). The table's own menu stays **Columns** (the **column picker**) | Material *listbox* | [FieldPicker.jsx](../src/components/tables/FieldPicker.jsx) |
 | Charging Curves' list for choosing X, Y and Y2 | **axis picker** — items are **axes**. Each has a full `label` (titles the plot) and a short `name` | — | [AxisPicker.jsx](../src/components/AxisPicker.jsx), [chargingAxes.js](../src/utils/chargingAxes.js) |
 | The icon beside a column header that plots it | **chart icon** (not "plot button"). Disabled while nothing is selected. On the EPA guide table only where `plotAs` is set | — | `.column-plot-button`, [SortHeader.jsx](../src/components/tables/SortHeader.jsx) |
+| A closed section, above the help bubble, that works one figure through by the page's own code with the reader's settings — each step's formula, the values filled in, and where each value came from | **Show the math** in UI text; **calculation trace** (`trace`) in code. Closed by default; closed costs nothing. Carries a **Beta** badge (`.badge-micro.is-warning`, orange in the dark theme) while it is new. On the Range, Charge Stop, Cost & Time and Performance › Compare pages, and under the vehicle table. Not "debug" or "audit" (Data Checks is the audit) | — | [calcTrace.js](../src/utils/calcTrace.js), [components/calcTrace/](../src/components/calcTrace/) |
 
 ### Series color
 

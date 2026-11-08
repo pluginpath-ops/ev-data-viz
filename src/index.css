@@ -10083,6 +10083,69 @@ a.is-test-link:focus-visible {
 .plan-table tr.is-fast-first > td { border-top: 1px solid var(--color-accent-orange); }
 .plan-table tr.is-fast-last > td { border-bottom: 1px solid var(--color-accent-orange); }
 
+/* ── Show the math (calculation trace) ────────────────────────────────────
+   One pass of a page's own math, written down by the code that did it
+   (utils/calcTrace.js, components/calcTrace/). A nested chain is indented
+   behind a rule; a formula is mono; the result sits at the end of its line. */
+.calc-trace-body { @apply flex flex-col gap-3; }
+.calc-trace-pick { @apply flex items-center gap-2; }
+.calc-trace-summary {
+    @apply font-mono;
+    font-size: var(--fs-data, var(--fs-body));
+    color: var(--color-text-primary);
+}
+.calc-trace-list { display: grid; row-gap: 0.5rem; list-style: none; padding: 0; margin: 0; }
+.calc-trace-group { @apply mt-1; }
+.calc-trace-group > .calc-trace-list {
+    @apply mt-2 pl-3;
+    border-left: 1px solid var(--color-border-strong);
+}
+.calc-trace-group-title {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: var(--fs-body);
+    color: var(--color-text-secondary);
+}
+.calc-trace-step { @apply flex flex-col gap-0.5; }
+.calc-trace-step-head { @apply flex flex-wrap items-baseline gap-2; }
+.calc-trace-label { font-size: var(--fs-body); color: var(--color-text-primary); }
+.calc-trace-result {
+    @apply font-mono tabular-nums ml-auto;
+    font-size: var(--fs-data, var(--fs-body));
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+.calc-trace-formula {
+    @apply font-mono;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    color: var(--color-text-secondary);
+}
+.calc-trace-formula.is-filled { color: var(--color-text-meta); }
+.calc-trace-values {
+    @apply flex flex-wrap gap-x-4 gap-y-1 font-mono tabular-nums;
+    list-style: none; padding: 0; margin: 0;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    color: var(--color-text-secondary);
+}
+.calc-trace-name { @apply font-mono; color: var(--color-text-primary); }
+.calc-trace-note { font-size: calc(var(--fs-body) * var(--fs-step)); color: var(--color-text-secondary); }
+.calc-trace-constants {
+    @apply w-full mt-2 font-mono tabular-nums;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    border-collapse: collapse;
+}
+.calc-trace-constants th {
+    @apply text-left py-1 pr-3;
+    font-family: var(--font-mono);
+    color: var(--color-text-meta);
+    border-bottom: 1px solid var(--color-border);
+}
+.calc-trace-constants td {
+    @apply py-1 pr-3;
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--color-border-subtle);
+}
+
 /* ── Setup wizard ─────────────────────────────────────────────────────────
    A few skippable questions that set the site up for a new reader
    (components/setup/). The choice card is the Home Charger picker's radio card

@@ -19,6 +19,7 @@ import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, HWFET_AVG_MPH, STANDARD_CONDITIONS }
 import { correctionFactor } from './conditionCorrection';
 import { compositeRange } from './compositeRange';
 import { chargeTimeSession } from './chargeWindows';
+import { val } from './calcTrace';
 
 const WEEKS_PER_MONTH = 52 / 12;
 const finite = (v) => v != null && v !== '' && Number.isFinite(Number(v)) && Number(v) > 0;
@@ -68,7 +69,7 @@ function curveMinutes(summary, from, to) {
  * that curve, else to the spec's 10→80% time, else at `max_dc_kw`, else at
  * FALLBACK_DC_KW.
  */
-function fastChargeOf(vehicle, specs, usableKwh) {
+function fastChargeOf(vehicle, specs, usableKwh, trace = null) {
     const maxDcKw = finite(specs?.charging?.max_dc_kw) ? Number(specs.charging.max_dc_kw) : null;
     const tested = chargeTimeSession(vehicle?.runs ?? [], { from: 20, to: 70, maxDcKw });
     const ref = (peak) => taperMinutes(usableKwh, peak, 20, 70);
@@ -86,6 +87,24 @@ function fastChargeOf(vehicle, specs, usableKwh) {
     } else {
         basis = 'assumed';
         peak = FALLBACK_DC_KW;
+    }
+    if (trace) {
+        const basisNote = {
+            tested: `the car's own curve where it reaches (${tested.run?.name ?? 'its default charging test'}); outside it, the taper scaled to match its 20→70% time of ${tested.minutes?.toFixed(1)} min`,
+            spec: 'the stand-in taper, scaled to the spec\'s 10→80% time',
+            maxDc: 'the stand-in taper at the spec\'s max DC kW',
+            assumed: 'no test, no 10→80% time and no max DC: an assumed peak',
+        }[basis];
+        const [from, to, tMin] = basis === 'tested' ? [20, 70, tested.minutes]
+            : basis === 'spec' ? [10, 80, Number(specs.charging.charge_time_10_to_80_pct_min)] : [];
+        trace.step('Peak of the stand-in taper', {
+            formula: tMin ? 'P_peak = t_1kW / t_ref' : 'P_peak = P_dc',
+            values: tMin
+                ? { t_1kW: val(taperMinutes(usableKwh, 1, from, to), 'min'), t_ref: val(tMin, 'min', 'data') }
+                : { P_dc: val(peak, 'kW', basis === 'assumed' ? 'code:FALLBACK_DC_KW' : 'data') },
+            result: peak, unit: 'kW', assumed: basis !== 'tested',
+            note: `${basisNote}${tMin ? `. t_1kW is the taper's ${from}→${to}% time at a 1 kW peak; the taper's time goes as 1/peak` : ''}`,
+        });
     }
     const minutes = (from, to) => {
         if (!(to > from)) return 0;
@@ -114,10 +133,17 @@ const target = (speedMph, temperatureF, altitudeFt) => ({ speedMph, temperatureF
  * Re-pricing for speed properly wants Modeled Efficiency's curve (an EPA test
  * record per car); see the plan's open items.
  */
-function epaMiPerKwh(vehicle, usableKwh, { temperatureF, altitudeFt }) {
+function epaMiPerKwh(vehicle, usableKwh, { temperatureF, altitudeFt }, trace = null) {
     const hwyMi = Number(vehicle?.epaRange?.hwyMi);
-    if (!(hwyMi > 0) || !(usableKwh > 0)) return null;
+    if (!(hwyMi > 0) || !(usableKwh > 0)) {
+        trace?.note('No EPA highway range: no EPA figure');
+        return null;
+    }
     const base = hwyMi / usableKwh;
+    trace?.step('EPA highway efficiency', {
+        formula: 'e_EPA = R_hwy / E_usable', values: { R_hwy: val(hwyMi, 'mi', 'data'), E_usable: val(usableKwh, 'kWh', 'data') },
+        result: base, unit: 'mi/kWh', note: 'the label\'s highway range over the usable pack',
+    });
     const lab = {
         speedMph: HWFET_AVG_MPH,
         speedBasis: 'mixed',
@@ -125,7 +151,11 @@ function epaMiPerKwh(vehicle, usableKwh, { temperatureF, altitudeFt }) {
         altitudeFt: STANDARD_CONDITIONS.altitudeFt,
         whPerMile: 1000 / base,
     };
-    const { factor } = correctionFactor(lab, { mode: 'aero', target: target(HWFET_AVG_MPH, temperatureF, altitudeFt) });
+    const { factor } = correctionFactor(lab, {
+        mode: 'aero', target: target(HWFET_AVG_MPH, temperatureF, altitudeFt),
+        trace: trace?.group(`Re-priced from the lab's ${EPA_LAB_TEMP_F}°F to ${temperatureF}°F and ${altitudeFt} ft (speed left alone: the label is a mixed cycle)`),
+    });
+    trace?.step('EPA efficiency, re-priced', { formula: 'e = e_EPA × k', values: { e_EPA: val(base, 'mi/kWh'), k: factor }, result: base * factor, unit: 'mi/kWh' });
     return base * factor;
 }
 
@@ -134,15 +164,26 @@ function epaMiPerKwh(vehicle, usableKwh, { temperatureF, altitudeFt }) {
  * the tested composite (or EPA, per `efficiencyFrom`), all corrected to the
  * season and elevation.
  */
-function dayWhPerMi(vehicle, usableKwh, { mph, cityShare, temperatureF, altitudeFt, efficiencyFrom, sessionOf }) {
+function dayWhPerMi(vehicle, usableKwh, { mph, cityShare, temperatureF, altitudeFt, efficiencyFrom, sessionOf }, trace = null) {
     const tested = efficiencyFrom === 'tested'
-        ? compositeRange(vehicle, { target: target(mph, temperatureF, altitudeFt), sessionOf })?.miPerKwh ?? null
+        ? compositeRange(vehicle, { target: target(mph, temperatureF, altitudeFt), sessionOf, trace: trace?.group(`Tested: composite efficiency at ${mph} mph, ${temperatureF}°F, ${altitudeFt} ft`) })?.miPerKwh ?? null
         : null;
-    const epa = epaMiPerKwh(vehicle, usableKwh, { temperatureF, altitudeFt });
+    if (efficiencyFrom !== 'tested') trace?.note('Efficiency from: EPA (your setting), so no tested composite');
+    const epa = epaMiPerKwh(vehicle, usableKwh, { temperatureF, altitudeFt }, trace?.group('EPA: the label\'s highway figure'));
     const highway = tested ?? epa;
     const city = epa ?? highway;
     if (!(highway > 0) || !(city > 0)) return { whPerMi: null, highwayFrom: null, cityFrom: null };
     const share = cityShare / 100;
+    trace?.step('Energy per mile', {
+        formula: 'Wh/mi = c × 1000 / e_city + (1 − c) × 1000 / e_hwy',
+        values: {
+            c: val(share, null, 'setting'),
+            e_city: val(city, 'mi/kWh', epa ? null : 'assumed'),
+            e_hwy: val(highway, 'mi/kWh'),
+        },
+        result: share * 1000 / city + (1 - share) * 1000 / highway, unit: 'Wh/mi',
+        note: `highway miles at the ${tested ? 'tested composite' : 'EPA figure'}; city miles at the EPA highway figure${epa ? '' : ' (none, so the highway one)'}, on purpose: EPA's city cycle flatters regen`,
+    });
     return {
         whPerMi: share * 1000 / city + (1 - share) * 1000 / highway,
         highwayFrom: tested ? 'tested' : 'epa',
@@ -169,8 +210,12 @@ function dayWhPerMi(vehicle, usableKwh, { mph, cityShare, temperatureF, altitude
  *   is what reaches the pack at this level; `eff240` the car's 240 V figure,
  *   from its EPA certification (measured or pinned) or the site-wide one.
  */
-export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, sessionOf = () => null } = {}) {
+export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, sessionOf = () => null, trace = null } = {}) {
     const usableKwh = finite(vehicle?.socWindowKwh) ? Number(vehicle.socWindowKwh) : null;
+    trace?.step('Usable battery', {
+        values: { E_usable: val(usableKwh, 'kWh', 'data') }, result: usableKwh, unit: 'kWh',
+        note: 'the vehicle\'s SoC window: EPA tested, else Usable, else Gross',
+    });
     const level = HOME_LEVELS[settings.level] ?? HOME_LEVELS[4];
     const onboardAssumed = !finite(specs?.charging?.max_ac_kw);
     const onboardKw = onboardAssumed ? ASSUMED_ONBOARD_AC_KW : Number(specs.charging.max_ac_kw);
@@ -190,6 +235,27 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
         effFrom: epaEff != null ? 'epa' : 'assumed',
         none: !!level.none,
     };
+    if (trace) {
+        const h = trace.group('Home charging');
+        h.step('Charger at the wall', { formula: 'P_wall = V × A / 1000', values: { V: val(level.volts, 'V', 'setting'), A: val(level.amps, 'A', 'setting') }, result: chargerKw, unit: 'kW' });
+        h.step('Home charging power', {
+            formula: 'P_home = min(P_wall, P_onboard)',
+            values: { P_wall: val(chargerKw, 'kW'), P_onboard: val(onboardKw, 'kW', onboardAssumed ? 'code:ASSUMED_ONBOARD_AC_KW' : 'data') },
+            result: home.kw, unit: 'kW', assumed: onboardAssumed,
+            note: onboardAssumed ? 'no max AC kW in the specs: the onboard charger is assumed' : null,
+        });
+        const η240 = val(eff240, null, epaEff != null ? 'data' : 'knob:ASSUMED_CHARGER_EFF');
+        const outlet = level.volts < 200 && !level.none;
+        h.step('Wall-to-pack efficiency', {
+            formula: outlet ? 'η_home = η_240 × η_outlet / η_site' : 'η_home = η_240',
+            values: outlet
+                ? { η_240: η240, η_outlet: val(WALL_OUTLET_CHARGER_EFF, null, 'code:WALL_OUTLET_CHARGER_EFF'), η_site: val(ASSUMED_CHARGER_EFF, null, 'knob:ASSUMED_CHARGER_EFF') }
+                : { η_240: η240 },
+            result: home.eff, assumed: epaEff == null,
+            note: level.none ? 'no home charging: nothing is bought at home'
+                : `${outlet ? 'a 120 V outlet, scaled from ' : ''}${epaEff != null ? "the car's EPA certification" : 'the site-wide figure (no EPA certification)'}`,
+        });
+    }
     if (!usableKwh) {
         return { usableKwh: null, missing: 'no usable battery capacity', whPerMi: null, highwayFrom: null, cityFrom: null, home, fast: null };
     }
@@ -198,10 +264,15 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
     for (const season of ['summer', 'winter']) {
         const temperatureF = season === 'summer' ? settings.summerF : settings.winterF;
         for (const [type, mph, city] of [['D', settings.dailyMph, settings.dailyCity], ['L', settings.longMph, settings.longCity]]) {
+            // One season is traced, the one the page shows; the other runs the
+            // same steps with its own temperature.
+            const dayTrace = season === settings.season
+                ? trace?.group(`Energy per mile: ${type === 'L' ? 'Long day' : 'Daily'}, ${season} (${temperatureF}°F, ${mph} mph, ${city}% city)`)
+                : null;
             const day = dayWhPerMi(vehicle, usableKwh, {
                 mph, cityShare: city, temperatureF, altitudeFt: settings.elevationFt,
                 efficiencyFrom: settings.efficiencyFrom, sessionOf,
-            });
+            }, dayTrace);
             whPerMi[season][type] = day.whPerMi;
             highwayFrom ??= day.highwayFrom;
             cityFrom ??= day.cityFrom;
@@ -210,7 +281,7 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
     if (!(whPerMi.winter.L > 0)) {
         return { usableKwh, missing: 'no range test and no EPA highway figure', whPerMi: null, highwayFrom: null, cityFrom: null, home, fast: null };
     }
-    return { usableKwh, missing: null, whPerMi, highwayFrom, cityFrom, home, fast: fastChargeOf(vehicle, specs, usableKwh) };
+    return { usableKwh, missing: null, whPerMi, highwayFrom, cityFrom, home, fast: fastChargeOf(vehicle, specs, usableKwh, trace?.group('Fast charging')) };
 }
 
 /** How far below the wall's kW an onboard charger must be before it is said to cap it. */
@@ -264,17 +335,33 @@ export function plannedSlot(spans, hour) {
  * }}  `fastKwh`/`homeKwh` are what was bought (losses in); `fastShare` the share of
  *     the pack energy used that came from fast chargers
  */
-export function simulateWeek(profile, settings, { season = settings.season } = {}) {
+export function simulateWeek(profile, settings, { season = settings.season, trace = null } = {}) {
     const s = settings;
     const usable = profile.usableKwh;
     const whPerMi = profile.whPerMi[season];
     const pct = (kwh) => kwh / usable * 100;
     const detourMi = s.detourMin / 60 * DETOUR_MPH;
+    trace?.step('A detour, in miles', {
+        formula: 'd_detour = t_detour / 60 × v_detour',
+        values: { t_detour: val(s.detourMin, 'min', 'setting'), v_detour: val(DETOUR_MPH, 'mph', 'code:DETOUR_MPH') },
+        result: detourMi, unit: 'mi', assumed: true,
+    });
     const planned = (d) => (s.planned & (1 << d)) !== 0;
     const nightKwh = (() => {
         const hours = ((s.plugUntil - s.plugFrom + 24) % 24) || 24;
         return { hours, addPct: pct(profile.home.kw * hours * profile.home.eff) };
     })();
+    trace?.step('Most a night can add', {
+        formula: 'ΔSoC_night = P_home × h × η_home / E_usable × 100',
+        values: {
+            P_home: val(profile.home.kw, 'kW'), h: val(nightKwh.hours, 'h', 'setting'),
+            η_home: val(profile.home.eff, null), E_usable: val(usable, 'kWh'),
+        },
+        result: nightKwh.addPct, unit: '%', note: `plugged in ${s.plugFrom}:00 to ${s.plugUntil}:00, to ${s.chargeTo}% (100% before a Long day: ${s.fullBeforeLong ? 'yes' : 'no'})`,
+    });
+    trace?.note(`Three weeks are driven (SETTLE_WEEKS = ${SETTLE_WEEKS} to settle) and the last reported, so Monday starts from what Sunday night left`);
+    // The first stop of the reported week is written out as the example.
+    let exampleStop = trace;
 
     let soc = s.chargeTo;
     let sundayNight = null;
@@ -305,6 +392,33 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
                 const minutes = chargeMinutes + (isPlanned ? 0 : s.detourMin) + s.startMin;
                 const packKwh = (toSoc - fromSoc) / 100 * usable;
                 const detourPct = isPlanned ? 0 : detPct;
+                if (rec && exampleStop) {
+                    const t = exampleStop.group(`Example fast stop: ${WEEKDAYS[d]}, ${isPlanned ? 'planned' : 'on the road'}, ${fromSoc.toFixed(1)}% → ${toSoc.toFixed(1)}%`);
+                    exampleStop = null;
+                    t.step('Charging time', {
+                        values: { t_charge: val(chargeMinutes, 'min') }, result: chargeMinutes, unit: 'min',
+                        note: `from the fast-charging speed above (${profile.fast.basis})`,
+                    });
+                    t.step('Time for the stop', {
+                        formula: isPlanned ? 't_stop = t_charge + t_start' : 't_stop = t_charge + t_detour + t_start',
+                        values: { t_charge: val(chargeMinutes, 'min'), t_detour: val(s.detourMin, 'min', 'setting'), t_start: val(s.startMin, 'min', 'setting') },
+                        result: minutes, unit: 'min',
+                    });
+                    t.step('Energy into the pack', {
+                        formula: 'E_pack = (SoC_to − SoC_from) / 100 × E_usable',
+                        values: { SoC_to: val(toSoc, '%'), SoC_from: val(fromSoc, '%'), E_usable: val(usable, 'kWh') },
+                        result: packKwh, unit: 'kWh',
+                    });
+                    t.step('Energy billed', {
+                        formula: 'E_billed = E_pack / (1 − loss)',
+                        values: { E_pack: val(packKwh, 'kWh'), loss: val(DC_FAST_LOSS, null, 'knob:DC_FAST_LOSS') },
+                        result: packKwh / (1 - DC_FAST_LOSS), unit: 'kWh', assumed: true,
+                    });
+                    t.step('Cost of the stop', {
+                        formula: 'cost = E_billed × price', values: { E_billed: val(packKwh / (1 - DC_FAST_LOSS), 'kWh'), price: val(s.fastPrice, '$/kWh', 'setting') },
+                        result: packKwh / (1 - DC_FAST_LOSS) * s.fastPrice, unit: '$',
+                    });
+                }
                 if (rec) {
                     const kwh = packKwh / (1 - DC_FAST_LOSS);
                     const stop = {
@@ -358,6 +472,17 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
                     // else the cap, and the day stops again.
                     const ceiling = Math.max(STRETCH_CAP_TO, s.capTo);
                     const to = Math.min(ceiling, Math.max(need <= ceiling ? need : s.capTo, soc + MIN_STOP_ADD));
+                    if (rec && exampleStop) {
+                        exampleStop.step('How far the first road stop charges', {
+                            formula: need <= ceiling ? 'SoC_to = min(ceiling, max(need, SoC + add_min))' : 'SoC_to = min(ceiling, max(cap, SoC + add_min))',
+                            values: {
+                                need: val(need, '%'), cap: val(s.capTo, '%', 'setting'), SoC: val(soc, '%'),
+                                add_min: val(MIN_STOP_ADD, '%', 'code:MIN_STOP_ADD'), ceiling: val(ceiling, '%', 'code:STRETCH_CAP_TO'),
+                            },
+                            result: to, unit: '%',
+                            note: 'need = the rest of the day + the detour + Keep battery above; past the ceiling it charges to the cap and stops again later',
+                        });
+                    }
                     hour = stopAt(hour, to, false);
                     threshold = s.stopBy;
                 }
@@ -406,6 +531,22 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
 
     const fastKwh = out.fastPackKwh / (1 - DC_FAST_LOSS);
     const homeKwh = out.homePackKwh / profile.home.eff;
+    if (trace) {
+        const days = trace.group('The reported week, day by day');
+        for (const day of out.days) {
+            days.step(`${day.day} (${day.type === 'L' ? 'Long day' : day.type === 'D' ? 'Daily' : 'Off'})`, {
+                formula: day.miles ? 'E_day = miles × e / 1000' : null,
+                values: day.miles ? { miles: val(day.miles, 'mi', 'setting'), e: val(day.kwhUsed * 1000 / day.miles, 'Wh/mi') } : {},
+                result: day.kwhUsed, unit: 'kWh',
+                note: `starts ${day.startSoc.toFixed(1)}%, ${day.stops.length} fast stop${day.stops.length === 1 ? '' : 's'}, home at ${day.homeSoc.toFixed(1)}%, night adds ${day.night.added.toFixed(1)}%${day.night.ranOut ? ' (ran out of night)' : ''}`,
+            });
+        }
+        trace.step('Fast charging bought', { formula: 'E_fast = E_pack_all / (1 − loss)', values: { E_pack_all: val(out.fastPackKwh, 'kWh'), loss: val(DC_FAST_LOSS, null, 'knob:DC_FAST_LOSS') }, result: fastKwh, unit: 'kWh' });
+        trace.step('Home charging bought', { formula: 'E_home = E_pack_all / η_home', values: { E_pack_all: val(out.homePackKwh, 'kWh'), η_home: val(profile.home.eff) }, result: homeKwh, unit: 'kWh' });
+        trace.step('Fast cost a week', { formula: 'cost_fast = E_fast × price_fast', values: { E_fast: val(fastKwh, 'kWh'), price_fast: val(s.fastPrice, '$/kWh', 'setting') }, result: fastKwh * s.fastPrice, unit: '$' });
+        trace.step('Home cost a week', { formula: 'cost_home = E_home × price_home', values: { E_home: val(homeKwh, 'kWh'), price_home: val(s.homePrice, '$/kWh', 'setting') }, result: homeKwh * s.homePrice, unit: '$' });
+        trace.step('Fast-charging time a week', { formula: 'the sum of every t_stop', result: out.fastMinutes, unit: 'min', note: `${out.stops.length} stop${out.stops.length === 1 ? '' : 's'}` });
+    }
     return {
         points: out.points, stops: out.stops, days: out.days, miles: out.miles,
         stopCount: out.stops.length,
@@ -444,7 +585,7 @@ export function gasColdLoss(temperatureF) {
  *             gallons, cost, fillsPerWeek, minutesPerWeek, rangeMi, cityMpg, hwyMpg }}
  *   `cityMpg`/`hwyMpg` — the EPA figures after the cold loss
  */
-export function simulateGasWeek(settings, { season = settings.season } = {}) {
+export function simulateGasWeek(settings, { season = settings.season, trace = null } = {}) {
     const s = settings;
     const loss = gasColdLoss(season === 'summer' ? s.summerF : s.winterF);
     const cityMpg = s.gasCity * (1 - loss.city), hwyMpg = s.gasHwy * (1 - loss.hwy);
@@ -452,6 +593,33 @@ export function simulateGasWeek(settings, { season = settings.season } = {}) {
         const city = (type === 'L' ? s.longCity : s.dailyCity) / 100;
         return 1 / (city / cityMpg + (1 - city) / hwyMpg);
     };
+    if (trace) {
+        const tempF = season === 'summer' ? s.summerF : s.winterF;
+        const t = Math.max(0, (EPA_LAB_TEMP_F - tempF) / (EPA_LAB_TEMP_F - GAS_COLD_AT_F));
+        trace.step('Cold loss', {
+            formula: 't = max(0, (T_lab − T) / (T_lab − T_cold))',
+            values: { T_lab: val(EPA_LAB_TEMP_F, '°F', 'code:EPA_LAB_TEMP_F'), T: val(tempF, '°F', 'setting'), T_cold: val(GAS_COLD_AT_F, '°F', 'code:GAS_COLD_AT_F') },
+            result: t, note: `the ${season}; at T_cold the loss is the full GAS_COLD_LOSS, at the lab's none`,
+        });
+        trace.step('City mpg after the cold', {
+            formula: 'mpg_city′ = mpg_city × (1 − loss_city × t)',
+            values: { mpg_city: val(s.gasCity, 'mpg', 'setting'), loss_city: val(GAS_COLD_LOSS.city, null, 'code:GAS_COLD_LOSS'), t: val(t) },
+            result: cityMpg, unit: 'mpg',
+        });
+        trace.step('Highway mpg after the cold', {
+            formula: 'mpg_hwy′ = mpg_hwy × (1 − loss_hwy × t)',
+            values: { mpg_hwy: val(s.gasHwy, 'mpg', 'setting'), loss_hwy: val(GAS_COLD_LOSS.hwy, null, 'code:GAS_COLD_LOSS'), t: val(t) },
+            result: hwyMpg, unit: 'mpg',
+        });
+        for (const type of ['D', 'L']) {
+            const c = (type === 'L' ? s.longCity : s.dailyCity) / 100;
+            trace.step(`mpg on a ${type === 'L' ? 'Long day' : 'Daily'}`, {
+                formula: "mpg = 1 / (c / mpg_city′ + (1 − c) / mpg_hwy′)",
+                values: { c: val(c, null, 'setting'), "mpg_city′": val(cityMpg, 'mpg'), "mpg_hwy′": val(hwyMpg, 'mpg') },
+                result: mpgOf(type), unit: 'mpg', note: 'gallons add, so the two blend as a harmonic mean',
+            });
+        }
+    }
     const floor = s.gasTank * s.gasFillAt / 100;
     let gal = s.gasTank;
     let gallons = 0, miles = 0;
@@ -490,6 +658,16 @@ export function simulateGasWeek(settings, { season = settings.season } = {}) {
     points.push([7 * 24, gal]);
     const perFill = s.gasTank - floor;
     const fillsPerWeek = perFill > 0 ? gallons / perFill : 0;
+    if (trace) {
+        trace.step('Gallons a week', { formula: 'the sum of each day\'s miles / mpg', result: gallons, unit: 'gal' });
+        trace.step('Gas cost a week', { formula: 'cost_gas = gal × price', values: { gal: val(gallons, 'gal'), price: val(s.gasPrice, '$/gal', 'setting') }, result: gallons * s.gasPrice, unit: '$' });
+        trace.step('Fill-ups a week', {
+            formula: 'fills = gal / (tank × (1 − fill_at))',
+            values: { gal: val(gallons, 'gal'), tank: val(s.gasTank, 'gal', 'setting'), fill_at: val(s.gasFillAt / 100, null, 'setting') },
+            result: fillsPerWeek, note: 'an average, since one week is lumpy',
+        });
+        trace.step('Fill-up time a week', { formula: 't = fills × t_fill', values: { fills: fillsPerWeek, t_fill: val(s.gasFillMin, 'min', 'setting') }, result: fillsPerWeek * s.gasFillMin, unit: 'min' });
+    }
     return {
         points, fills, gallons, cost: gallons * s.gasPrice,
         fillsPerWeek, minutesPerWeek: fillsPerWeek * s.gasFillMin,
@@ -568,17 +746,40 @@ export const perMonth = (weekly) => weekly * WEEKS_PER_MONTH;
  *             extraMinutesPerWeek: number }}  `extraMinutesPerWeek` — fast-charging time
  *   less fill-up time; negative when the EV costs less time
  */
-export function costToDriveComparison(profile, settings) {
-    const summer = simulateWeek(profile, settings, { season: 'summer' });
-    const winter = simulateWeek(profile, settings, { season: 'winter' });
+export function costToDriveComparison(profile, settings, { trace = null } = {}) {
+    // The season on the page is traced; the other runs the same steps.
+    const summer = simulateWeek(profile, settings, { season: 'summer', trace: settings.season === 'summer' ? trace?.group('The summer week, simulated') : null });
+    const winter = simulateWeek(profile, settings, { season: 'winter', trace: settings.season === 'winter' ? trace?.group('The winter week, simulated') : null });
     const week = settings.season === 'summer' ? summer : winter;
-    const gasSummer = simulateGasWeek(settings, { season: 'summer' });
-    const gasWinter = simulateGasWeek(settings, { season: 'winter' });
-    const gas = settings.season === 'summer' ? gasSummer : gasWinter;
+    // The season on screen is the one the trace works through; the other runs untraced.
+    const shownSeason = settings.season === 'summer' ? 'summer' : 'winter';
+    const gasOf = (season) => simulateGasWeek(settings, { season, trace: season === shownSeason ? trace?.group(`Your gas car, the same week (${season})`) : null });
+    const gasSummer = gasOf('summer');
+    const gasWinter = gasOf('winter');
+    const gas = shownSeason === 'summer' ? gasSummer : gasWinter;
     const evWeek = (w) => w.fastCost + w.homeCost;
     const months = settings.winterMonths;
     const evYear = perMonth(evWeek(winter)) * months + perMonth(evWeek(summer)) * (12 - months);
     const gasYear = perMonth(gasWinter.cost) * months + perMonth(gasSummer.cost) * (12 - months);
+    if (trace) {
+        const m = trace.group('As a month, against the gas car');
+        m.step('EV cost a month', { formula: 'ev_mo = (cost_fast + cost_home) × 52 / 12', values: { cost_fast: val(week.fastCost, '$'), cost_home: val(week.homeCost, '$') }, result: perMonth(evWeek(week)), unit: '$/mo' });
+        m.step('Gas cost a month', { formula: 'gas_mo = cost_gas × 52 / 12', values: { cost_gas: val(gas.cost, '$') }, result: perMonth(gas.cost), unit: '$/mo' });
+        m.step('Saved a month', { formula: 'saved = gas_mo − ev_mo', values: { gas_mo: val(perMonth(gas.cost), '$/mo'), ev_mo: val(perMonth(evWeek(week)), '$/mo') }, result: perMonth(gas.cost - evWeek(week)), unit: '$/mo' });
+        m.step('Extra time a month', {
+            formula: 'Δt = (t_fast − t_fill) × 52 / 12', values: { t_fast: val(week.fastMinutes, 'min/wk'), t_fill: val(gas.minutesPerWeek, 'min/wk') },
+            result: perMonth(week.fastMinutes - gas.minutesPerWeek), unit: 'min/mo',
+        });
+        m.step('Saved a year', {
+            formula: 'saved_yr = (gas_w − ev_w) × n_w + (gas_s − ev_s) × (12 − n_w)',
+            values: {
+                gas_w: val(perMonth(gasWinter.cost), '$/mo'), ev_w: val(perMonth(evWeek(winter)), '$/mo'),
+                gas_s: val(perMonth(gasSummer.cost), '$/mo'), ev_s: val(perMonth(evWeek(summer)), '$/mo'),
+                n_w: val(months, 'months', 'setting'),
+            },
+            result: gasYear - evYear, unit: '$/yr', note: 'the other season runs the same steps with its own temperature',
+        });
+    }
     return {
         week, summer, winter, gas,
         monthly: { ev: perMonth(evWeek(week)), gas: perMonth(gas.cost), saved: perMonth(gas.cost - evWeek(week)) },
