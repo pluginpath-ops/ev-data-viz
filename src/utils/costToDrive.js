@@ -13,7 +13,7 @@
 import {
     HOME_LEVELS, levelKw, WALL_OUTLET_CHARGER_EFF, ASSUMED_ONBOARD_AC_KW, DETOUR_MPH,
     MIN_STOP_ADD, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS,
-    SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, WEEKDAYS, ENOUGH_MARGIN_MIN,
+    SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, GAS_COLD_AT_F, GAS_COLD_LOSS, WEEKDAYS, ENOUGH_MARGIN_MIN,
 } from '../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, HWFET_AVG_MPH, STANDARD_CONDITIONS } from '../constants/epa';
 import { correctionFactor } from './conditionCorrection';
@@ -162,9 +162,12 @@ function dayWhPerMi(vehicle, usableKwh, { mph, cityShare, temperatureF, altitude
  *   usableKwh: number|null, missing: string|null,
  *   whPerMi: { summer: {D, L}, winter: {D, L} },
  *   highwayFrom: 'tested'|'epa'|null, cityFrom: 'epa'|'highway'|null,
- *   home: { kw: number, chargerKw: number, onboardKw: number, onboardAssumed: boolean, capped: boolean, eff: number },
+ *   home: { kw: number, chargerKw: number, onboardKw: number, onboardAssumed: boolean, capped: boolean,
+ *           eff: number, eff240: number, effFrom: 'epa'|'assumed' },
  *   fast: { basis: string, run: Object|null, minutes: Function },
- * }}  `missing` says why the vehicle cannot be priced, when it cannot
+ * }}  `missing` says why the vehicle cannot be priced, when it cannot. `home.eff`
+ *   is what reaches the pack at this level; `eff240` the car's 240 V figure,
+ *   from its EPA certification (measured or pinned) or the site-wide one.
  */
 export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, sessionOf = () => null } = {}) {
     const usableKwh = finite(vehicle?.socWindowKwh) ? Number(vehicle.socWindowKwh) : null;
@@ -172,13 +175,17 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
     const onboardAssumed = !finite(specs?.charging?.max_ac_kw);
     const onboardKw = onboardAssumed ? ASSUMED_ONBOARD_AC_KW : Number(specs.charging.max_ac_kw);
     const chargerKw = levelKw(level);
+    const epaEff = finite(vehicle?.epaRange?.chargerEfficiency) ? Number(vehicle.epaRange.chargerEfficiency) : null;
+    const eff240 = epaEff ?? ASSUMED_CHARGER_EFF;
     const home = {
         kw: Math.min(chargerKw, onboardKw),
         chargerKw, onboardKw, onboardAssumed,
         // A 48 A circuit is 11.52 kW at the wall against an 11.5 kW onboard
         // charger: equal for any reader, so not "capped".
         capped: onboardKw < chargerKw - CAPPED_TOLERANCE_KW,
-        eff: level.volts < 200 ? WALL_OUTLET_CHARGER_EFF : ASSUMED_CHARGER_EFF,
+        eff: level.volts < 200 ? eff240 * WALL_OUTLET_CHARGER_EFF / ASSUMED_CHARGER_EFF : eff240,
+        eff240,
+        effFrom: epaEff != null ? 'epa' : 'assumed',
     };
     if (!usableKwh) {
         return { usableKwh: null, missing: 'no usable battery capacity', whPerMi: null, highwayFrom: null, cityFrom: null, home, fast: null };
@@ -409,19 +416,36 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
 // ── The gas car ──────────────────────────────────────────────────────────────
 
 /**
+ * The share of the gas car's EPA city and highway mpg lost at a temperature:
+ * GAS_COLD_LOSS at GAS_COLD_AT_F, a straight line to none at the lab's.
+ */
+export function gasColdLoss(temperatureF) {
+    const t = Math.max(0, (EPA_LAB_TEMP_F - temperatureF) / (EPA_LAB_TEMP_F - GAS_COLD_AT_F));
+    return { city: GAS_COLD_LOSS.city * t, hwy: GAS_COLD_LOSS.hwy * t };
+}
+
+/**
  * The same week in the reader's gas car: the same miles and city share, the
- * gallons and fill-ups they take. Fill-ups are reported both for the sample
- * week (what the chart draws) and as the average a week, since one week is
- * lumpy — 1 one week, 2 the next. Winter mpg loss is not modeled.
+ * gallons and fill-ups they take, its mpg cut for the season's temperature
+ * (gasColdLoss). Fill-ups are reported both for the sample week (what the
+ * chart draws) and as the average a week, since one week is lumpy — 1 one
+ * week, 2 the next.
+ *
+ * @param {Object} settings
+ * @param {Object} [opts]
+ * @param {'summer'|'winter'} [opts.season]  default settings.season
  *
  * @returns {{ points: Array<[number, number]>, fills: Array<{ day, hour, gallons, cost }>,
- *             gallons, cost, fillsPerWeek, minutesPerWeek, rangeMi }}
+ *             gallons, cost, fillsPerWeek, minutesPerWeek, rangeMi, cityMpg, hwyMpg }}
+ *   `cityMpg`/`hwyMpg` — the EPA figures after the cold loss
  */
-export function simulateGasWeek(settings) {
+export function simulateGasWeek(settings, { season = settings.season } = {}) {
     const s = settings;
+    const loss = gasColdLoss(season === 'summer' ? s.summerF : s.winterF);
+    const cityMpg = s.gasCity * (1 - loss.city), hwyMpg = s.gasHwy * (1 - loss.hwy);
     const mpgOf = (type) => {
         const city = (type === 'L' ? s.longCity : s.dailyCity) / 100;
-        return 1 / (city / s.gasCity + (1 - city) / s.gasHwy);
+        return 1 / (city / cityMpg + (1 - city) / hwyMpg);
     };
     const floor = s.gasTank * s.gasFillAt / 100;
     let gal = s.gasTank;
@@ -465,10 +489,14 @@ export function simulateGasWeek(settings) {
         points, fills, gallons, cost: gallons * s.gasPrice,
         fillsPerWeek, minutesPerWeek: fillsPerWeek * s.gasFillMin,
         rangeMi: miles > 0 ? s.gasTank * miles / gallons : 0,
+        cityMpg, hwyMpg,
     };
 }
 
 // ── As a reader reads them ───────────────────────────────────────────────────
+
+/** A share as a percent to a tenth: 0.885 → "88.5%". */
+export const percentText = (x) => `${Math.round(x * 1000) / 10}%`;
 
 /** Whole dollars: "$231". */
 export const dollars = (n) => `$${Math.round(Math.abs(n)).toLocaleString('en-US')}`;
@@ -539,11 +567,13 @@ export function costToDriveComparison(profile, settings) {
     const summer = simulateWeek(profile, settings, { season: 'summer' });
     const winter = simulateWeek(profile, settings, { season: 'winter' });
     const week = settings.season === 'summer' ? summer : winter;
-    const gas = simulateGasWeek(settings);
+    const gasSummer = simulateGasWeek(settings, { season: 'summer' });
+    const gasWinter = simulateGasWeek(settings, { season: 'winter' });
+    const gas = settings.season === 'summer' ? gasSummer : gasWinter;
     const evWeek = (w) => w.fastCost + w.homeCost;
     const months = settings.winterMonths;
     const evYear = perMonth(evWeek(winter)) * months + perMonth(evWeek(summer)) * (12 - months);
-    const gasYear = perMonth(gas.cost) * 12;
+    const gasYear = perMonth(gasWinter.cost) * months + perMonth(gasSummer.cost) * (12 - months);
     return {
         week, summer, winter, gas,
         monthly: { ev: perMonth(evWeek(week)), gas: perMonth(gas.cost), saved: perMonth(gas.cost - evWeek(week)) },

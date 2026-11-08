@@ -32,4 +32,13 @@ describe('parseNumberInput — what a number field commits', () => {
         expect(parseNumberInput('-', {})).toEqual({ ok: false });
         expect(parseNumberInput('1e', {})).toEqual({ ok: false });
     });
+
+    it('commits nothing off the step grid when asked to hold to it', () => {
+        const miles = { min: 5, max: 400, onStep: 5 };
+        expect(parseNumberInput('8', miles)).toEqual({ ok: false });
+        expect(parseNumberInput('10', miles)).toEqual({ ok: true, n: 10 });
+        const price = { min: 0.05, max: 0.6, onStep: 0.01 };
+        expect(parseNumberInput('0.17', price)).toEqual({ ok: true, n: 0.17 });
+        expect(parseNumberInput('0.175', price)).toEqual({ ok: false });
+    });
 });

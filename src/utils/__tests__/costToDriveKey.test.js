@@ -37,9 +37,31 @@ describe('the Cost to Drive key', () => {
     // Golden keys: if one of these changes, a field moved and every shared
     // link now says something else. Append fields; never reorder them.
     it('golden keys', () => {
-        expect(encodeCostToDriveKey(settings({ level: 0 }))).toBe('1.AQA');
-        expect(encodeCostToDriveKey(settings({ season: 'summer' }))).toBe('1.gIBAAQ');
-        expect(encodeCostToDriveKey(settings({ week: 'LLLLLLL', longMi: 250 }))).toBe('1.wBDFCDE');
+        expect(encodeCostToDriveKey(settings({ level: 0 }))).toBe('2.AQA');
+        expect(encodeCostToDriveKey(settings({ season: 'summer' }))).toBe('2.gIBAAQ');
+        expect(encodeCostToDriveKey(settings({ week: 'LLLLLLL', longMi: 250 }))).toBe('2.wBDFCPUB');
+    });
+
+    // Version 1 keys were shared before the miles went to the mile: they
+    // must still open the same week, their miles read in fives.
+    it('still reads version-1 keys, with their own defaults', () => {
+        // Version 1 left $3.20 gas and an 8-minute fill-up out of the key, so its links keep them.
+        const v1 = (over) => settings({ gasPrice: 3.2, gasFillMin: 8, ...over });
+        expect(decodeCostToDriveKey('1.AQA')).toEqual({ settings: v1({ level: 0 }), error: null });
+        expect(decodeCostToDriveKey('1.gIBAAQ')).toEqual({ settings: v1({ season: 'summer' }), error: null });
+        expect(decodeCostToDriveKey('1.wBDFCDE')).toEqual({ settings: v1({ week: 'LLLLLLL', longMi: 250 }), error: null });
+    });
+
+    it('leaves $4 gas and a 5-minute fill-up out of a version-2 key', () => {
+        expect(encodeCostToDriveKey(settings({ gasPrice: 4, gasFillMin: 5 }))).toBe(null);
+        const s = settings({ gasPrice: 3.2, gasFillMin: 8 });
+        expect(decodeCostToDriveKey(encodeCostToDriveKey(s)).settings).toEqual(s);
+    });
+
+    it('keeps any whole number of miles', () => {
+        const s = settings({ dailyMi: 8, longMi: 137 });
+        expect(s.dailyMi).toBe(8);
+        expect(decodeCostToDriveKey(encodeCostToDriveKey(s)).settings).toEqual(s);
     });
 
     it('holds values to their sliders', () => {
@@ -55,6 +77,6 @@ describe('the Cost to Drive key', () => {
             expect(r.settings, bad).toEqual(settings());
             expect(r.error, bad).toBeTruthy();
         }
-        expect(decodeCostToDriveKey('2.AQA').error).toMatch(/newer version/);
+        expect(decodeCostToDriveKey('3.AQA').error).toMatch(/newer version/);
     });
 });
