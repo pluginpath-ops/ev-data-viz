@@ -10074,3 +10074,75 @@ a.is-test-link:focus-visible {
 .plan-table tr.is-fast > td:last-child { border-right: 1px solid var(--color-accent-orange); }
 .plan-table tr.is-fast-first > td { border-top: 1px solid var(--color-accent-orange); }
 .plan-table tr.is-fast-last > td { border-bottom: 1px solid var(--color-accent-orange); }
+
+/* ── Setup wizard (PROTOTYPE) ───────────────────────────────────────────────
+   A few skippable questions that set the site up for a new reader
+   (components/setup/). The choice card is the Home Charger picker's radio card
+   (.home-level) as a button; if the wizard stays, the two want one class. */
+
+.setup-invite {
+    @apply flex flex-wrap items-center gap-3;
+}
+.setup-panel {
+    @apply mx-4 flex flex-col;
+    max-width: min(94vw, 560px);
+    max-height: 90vh;
+}
+.setup-header {
+    @apply px-6 py-4;
+    border-bottom: 1px solid var(--color-border);
+}
+.setup-step-body {
+    @apply flex flex-col gap-4;
+}
+.setup-choices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    border: 0;
+    padding: 0;
+    margin: 0;
+}
+.setup-choices.is-single { grid-template-columns: minmax(0, 1fr); }
+.setup-choices legend { margin-bottom: 6px; }
+.setup-choice {
+    @apply flex flex-col items-start text-left;
+    gap: 2px;
+    min-height: 44px;
+    padding: 8px 12px;
+    cursor: pointer;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+}
+.setup-choice:hover { border-color: var(--color-border-strong); }
+.setup-choice.is-on {
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
+}
+.setup-field {
+    @apply flex flex-col gap-1;
+}
+.setup-field .stats-segmented { align-self: flex-start; flex-wrap: wrap; }
+.setup-number {
+    @apply flex items-center gap-2;
+}
+.setup-number-input {
+    width: 6.5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.setup-summary {
+    @apply flex flex-col gap-2;
+    margin: 0;
+}
+.setup-summary-row {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: 12px;
+}
+.setup-summary-row dd { margin: 0; }
+.setup-footer-gap { flex: 1 1 auto; }
+@media (max-width: 480px) {
+    .setup-choices { grid-template-columns: minmax(0, 1fr); }
+}

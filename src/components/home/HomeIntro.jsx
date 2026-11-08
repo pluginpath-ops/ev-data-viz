@@ -1,3 +1,5 @@
+import SetupInvite from '../setup/SetupInvite';
+
 /**
  * What EVBench is, in two sentences, at the top of Home (#448).
  *
@@ -15,6 +17,7 @@ export default function HomeIntro() {
                 <em>your</em> use case: adjust for speed, altitude and temperature, and compare any class of car, from
                 commuters to trucks, on the same footing.
             </p>
+            <SetupInvite />
         </section>
     );
 }

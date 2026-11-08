@@ -33,6 +33,7 @@ import { SITE_EVENTS } from './utils/siteEvents';
 import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext';
 import HomeView from './components/home/HomeView';
 import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
+import SetupWizard from './components/setup/SetupWizard';
 import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink, chartQueryString } from './utils/chartUrlState';
 import SpecChart from './components/SpecChart';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -478,6 +479,29 @@ export default function App() {
         setEpaConfig(state.epaConfig);
         setPairings(state.pairings);
     }, [vehicles, setVehicleSelection]);
+
+    /**
+     * The setup wizard (PROTOTYPE): open it from anywhere (Home, an empty
+     * chart), and apply its plan (utils/setupWizard.js). Applying lays each
+     * patch over the reader's current settings through the same setters the
+     * sidebars use, then opens the plan's chart like a sub-tab click — so the
+     * URL, the pop-out and the history entry follow as they always do.
+     */
+    const [setupOpen, setSetupOpen] = useState(false);
+    const openSetup = useCallback(() => setSetupOpen(true), []);
+    const applySetup = (plan) => {
+        if (plan.vehicleIds) setVehicleSelection(plan.vehicleIds);
+        setChartConfig(prev => ({
+            ...prev,
+            correctionTarget: { ...prev.correctionTarget, ...plan.correction },
+            assumptions: { ...prev.assumptions, ...plan.assumptions },
+        }));
+        updateCostToDrive(plan.costToDrive);
+        setRoadTripConfig(prev => ({ ...prev, ...plan.roadTrip }));
+        handleChartModeChange(plan.mode);
+        setSetupOpen(false);
+        window.scrollTo(0, 0);
+    };
 
     /**
      * A platform's page, from anywhere a platform is named (#354). A history
@@ -932,7 +956,7 @@ export default function App() {
 
     return (
         <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
-        <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison }}>
+        <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison, openSetup }}>
         <FeaturedComparisonsContext.Provider value={featuredContext}>
         <VehicleBaseContext.Provider value={vehicleBaseApi}>
             {showAuthModal && (
@@ -1428,6 +1452,10 @@ export default function App() {
                         />
                     )}
                 </main>
+
+                {setupOpen && (
+                    <SetupWizard onApply={applySetup} onClose={() => setSetupOpen(false)} />
+                )}
 
                 {featuredEditor && (
                     <FeaturedComparisonEditor
