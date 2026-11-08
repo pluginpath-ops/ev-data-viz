@@ -183,9 +183,12 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
         // A 48 A circuit is 11.52 kW at the wall against an 11.5 kW onboard
         // charger: equal for any reader, so not "capped".
         capped: onboardKw < chargerKw - CAPPED_TOLERANCE_KW,
-        eff: level.volts < 200 ? eff240 * WALL_OUTLET_CHARGER_EFF / ASSUMED_CHARGER_EFF : eff240,
+        // No home charging has no charger and buys nothing at home; it takes
+        // the 240 V efficiency only so nothing divides by an outlet's.
+        eff: level.volts < 200 && !level.none ? eff240 * WALL_OUTLET_CHARGER_EFF / ASSUMED_CHARGER_EFF : eff240,
         eff240,
         effFrom: epaEff != null ? 'epa' : 'assumed',
+        none: !!level.none,
     };
     if (!usableKwh) {
         return { usableKwh: null, missing: 'no usable battery capacity', whPerMi: null, highwayFrom: null, cityFrom: null, home, fast: null };
@@ -368,7 +371,9 @@ export function simulateWeek(profile, settings, { season = settings.season } = {
             const night = { added: 0, endSoc: soc, fullAt: null, ranOut: false };
             const plugIn = Math.max(s.plugFrom, clock);
             if (rec) out.points.push([base + plugIn, soc]);
-            if (soc < limit - 1e-9) {
+            // No home charging: nothing is added overnight, so every kWh comes
+            // from the fast-stop rule above, at the fast price.
+            if (nightKwh.addPct > 0 && soc < limit - 1e-9) {
                 const add = Math.min(limit - soc, nightKwh.addPct);
                 night.added = add;
                 night.ranOut = add < limit - soc - 1e-9;

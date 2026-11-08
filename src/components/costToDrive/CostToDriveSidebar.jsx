@@ -25,7 +25,9 @@ const GROUPS = [
     },
     {
         key: 'home', label: 'Home charging', open: true, Fields: HomeChargingFields,
-        note: (s) => `${levelLabel(HOME_LEVELS[s.level])} · ${hourText(s.plugFrom)} to ${hourText(s.plugUntil)} · $${s.homePrice.toFixed(2)}/kWh`,
+        note: (s) => (HOME_LEVELS[s.level]?.none
+            ? levelLabel(HOME_LEVELS[s.level])
+            : `${levelLabel(HOME_LEVELS[s.level])} · ${hourText(s.plugFrom)} to ${hourText(s.plugUntil)} · $${s.homePrice.toFixed(2)}/kWh`),
     },
     {
         key: 'fast', label: 'Fast charging', open: false, Fields: FastChargingFields,

@@ -223,7 +223,7 @@ export const LEDGER = [
     },
     {
         key: 'near-identical',
-        count: 36,  // 43 → 36: the 18 unreferenced classes went, and seven pairs with them (button and pill pass)
+        count: 37,  // 43 → 36: the 18 unreferenced classes went, and seven pairs with them (button and pill pass). 36 → 37: .setup-choices ≈ .home-levels — the setup wizard choice cards and the Home Charger picker want one shared radio-card class, name still open (revisit 2027-02)
         what: `pairs of classes at least ${NEAR_THRESHOLD * 100}% identical by declaration. `
             + 'Two names for one idea is how a 639-class stylesheet stops being holdable.',
         fix: 'one class, and a modifier for whatever genuinely differs.',
