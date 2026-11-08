@@ -10075,13 +10075,17 @@ a.is-test-link:focus-visible {
 .plan-table tr.is-fast-first > td { border-top: 1px solid var(--color-accent-orange); }
 .plan-table tr.is-fast-last > td { border-bottom: 1px solid var(--color-accent-orange); }
 
-/* ── Setup wizard (PROTOTYPE) ───────────────────────────────────────────────
+/* ── Setup wizard ─────────────────────────────────────────────────────────
    A few skippable questions that set the site up for a new reader
    (components/setup/). The choice card is the Home Charger picker's radio card
    (.home-level) as a button; if the wizard stays, the two want one class. */
 
 .setup-invite {
     @apply flex flex-wrap items-center gap-3;
+}
+/* Under an empty chart's line, centered with it. */
+.setup-invite.is-centered {
+    @apply flex-col justify-center gap-2 mt-4;
 }
 .setup-panel {
     @apply mx-4 flex flex-col;

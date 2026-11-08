@@ -17,7 +17,7 @@ export default function HomeIntro() {
                 <em>your</em> use case: adjust for speed, altitude and temperature, and compare any class of car, from
                 commuters to trucks, on the same footing.
             </p>
-            <SetupInvite />
+            <SetupInvite from="home" />
         </section>
     );
 }

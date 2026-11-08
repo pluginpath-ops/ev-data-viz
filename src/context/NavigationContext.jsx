@@ -12,7 +12,7 @@ import { createContext, useContext } from 'react';
  *   openExplainer(slug)  show an explainer under Reference › Explainers (#355)
  *   openFeaturedChart(comparison, index)  put one chart of a featured comparison on screen (#448)
  *   resetToComparison(comparison)         put the site back to a featured comparison's vehicles and correction
- *   openSetup()          open the setup wizard (PROTOTYPE)
+ *   openSetup(from)      open the setup wizard; `from` (home, empty, nav) is counted
  */
 export const NavigationContext = createContext({ openPlatform: null, openExplainer: null, openFeaturedChart: null, resetToComparison: null, openSetup: null });
 

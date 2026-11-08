@@ -34,6 +34,7 @@ import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext
 import HomeView from './components/home/HomeView';
 import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
 import SetupWizard from './components/setup/SetupWizard';
+import { seasonNoteText, skippedCount } from './utils/setupWizard';
 import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink, chartQueryString } from './utils/chartUrlState';
 import SpecChart from './components/SpecChart';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -135,6 +136,7 @@ export default function App() {
         appNotification,
         clearNotification,
         showError,
+        showNotice,
         updateVehicleSpecs,
         specCustomFieldSuggestions,
         copyRunToVehicle,
@@ -152,7 +154,7 @@ export default function App() {
     // Auto-dismiss notifications after 6 s
     useEffect(() => {
         if (!appNotification) return;
-        const t = setTimeout(clearNotification, 6000);
+        const t = setTimeout(clearNotification, appNotification.durationMs ?? 6000);
         return () => clearTimeout(t);
     }, [appNotification, clearNotification]);
     // Measured, not hardcoded — see hooks/useHeaderHeight.
@@ -481,15 +483,42 @@ export default function App() {
     }, [vehicles, setVehicleSelection]);
 
     /**
-     * The setup wizard (PROTOTYPE): open it from anywhere (Home, an empty
-     * chart), and apply its plan (utils/setupWizard.js). Applying lays each
-     * patch over the reader's current settings through the same setters the
-     * sidebars use, then opens the plan's chart like a sub-tab click — so the
-     * URL, the pop-out and the history entry follow as they always do.
+     * The setup wizard: open it from Home, an empty chart or the nav, and
+     * apply its plan (utils/setupWizard.js). Applying lays each patch over the
+     * reader's current settings through the same setters the sidebars use,
+     * then opens the plan's chart like a sub-tab click — so the URL, the
+     * pop-out and the history entry follow as they always do.
      */
     const [setupOpen, setSetupOpen] = useState(false);
-    const openSetup = useCallback(() => setSetupOpen(true), []);
-    const applySetup = (plan) => {
+    const openSetup = useCallback((from) => {
+        recordEvent(SITE_EVENTS.SETUP_OPEN, { detail: { from } });
+        setSetupOpen(true);
+    }, [recordEvent]);
+    const closeSetup = useCallback((step) => {
+        recordEvent(SITE_EVENTS.SETUP_CLOSE, { detail: { step } });
+        setSetupOpen(false);
+    }, [recordEvent]);
+
+    /**
+     * The season note: the charts show the harder season; one click shows the
+     * other, through the same setters, flipping the correction temperature and
+     * Cost & Time's season together. The note then offers the way back.
+     */
+    const showSeasonNote = (shown) => {
+        const { message, toggle } = seasonNoteText(shown, units);
+        showNotice(message, toggle, () => {
+            const next = { ...shown.other, harder: !shown.harder, other: { season: shown.season, tempF: shown.tempF } };
+            recordEvent(SITE_EVENTS.SEASON_TOGGLE, { detail: { to: next.season } });
+            setChartConfig(prev => ({ ...prev, correctionTarget: { ...prev.correctionTarget, temperatureF: next.tempF } }));
+            updateCostToDrive({ season: next.season });
+            showSeasonNote(next);
+        });
+    };
+
+    const applySetup = (plan, answers) => {
+        recordEvent(SITE_EVENTS.SETUP_APPLY, {
+            detail: { goal: plan.goal, cars: plan.carsFrom === 'set' ? plan.setKey : plan.carsFrom, skipped: skippedCount(answers) },
+        });
         if (plan.vehicleIds) setVehicleSelection(plan.vehicleIds);
         setChartConfig(prev => ({
             ...prev,
@@ -500,6 +529,7 @@ export default function App() {
         setRoadTripConfig(prev => ({ ...prev, ...plan.roadTrip }));
         handleChartModeChange(plan.mode);
         setSetupOpen(false);
+        if (plan.season) showSeasonNote(plan.season);
         window.scrollTo(0, 0);
     };
 
@@ -992,6 +1022,7 @@ export default function App() {
                         onNavigateChartCategory={navigateToChartCategory}
                         onSignIn={() => setShowAuthModal(true)}
                         onSignOut={signOut}
+                        onOpenSetup={() => openSetup('nav')}
                     />
 
                     {/* Sub-nav for whichever section has one. Every section's
@@ -1454,7 +1485,7 @@ export default function App() {
                 </main>
 
                 {setupOpen && (
-                    <SetupWizard onApply={applySetup} onClose={() => setSetupOpen(false)} />
+                    <SetupWizard onApply={applySetup} onClose={closeSetup} />
                 )}
 
                 {featuredEditor && (
@@ -1488,26 +1519,27 @@ export default function App() {
 
             {/* ── Global notification banner ──────────────────────────────── */}
             {appNotification && (
-                <div className={`fixed-action-bar z-[60] ${appNotification.type === 'error' ? 'is-danger' : 'is-good'}`}>
+                <div className={`fixed-action-bar z-[60] ${{ error: 'is-danger', info: 'is-info' }[appNotification.type] ?? 'is-good'}`}>
                     <div className="page-container py-3 flex items-center gap-4">
-                        <span className="text-xl">{appNotification.type === 'error' ? '⚠' : '✓'}</span>
+                        <span className="text-xl">{{ error: '⚠', info: 'ℹ' }[appNotification.type] ?? '✓'}</span>
                         <p className={`flex-1 text-sm font-medium ${
-                            appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
+                            appNotification.type === 'error' ? 'text-red-900' : appNotification.type === 'info' ? '' : 'text-green-900'
                         }`}>
                             {appNotification.message}
                         </p>
                         {appNotification.action && (
                             <button
-                                onClick={() => { appNotification.action.onClick(); clearNotification(); }}
+                                // Cleared first, so an action may show a notice of its own.
+                                onClick={() => { const { onClick } = appNotification.action; clearNotification(); onClick(); }}
                                 className="btn btn-secondary text-sm"
                             >
-                                ↩ {appNotification.action.label}
+                                {appNotification.type === 'info' ? '' : '↩ '}{appNotification.action.label}
                             </button>
                         )}
                         <button
                             onClick={clearNotification}
                             className={`text-lg leading-none opacity-50 hover:opacity-100 transition ${
-                                appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
+                                appNotification.type === 'error' ? 'text-red-900' : appNotification.type === 'info' ? '' : 'text-green-900'
                             }`}
                             aria-label="Dismiss"
                         >×</button>

@@ -1,6 +1,7 @@
 import { useIsCompact } from '../../hooks/useIsCompact';
 import NavMenu from './NavMenu';
 import AccountMenu from './AccountMenu';
+import { SETUP_WIZARD } from '../../constants/setupWizard';
 
 /**
  * The 50px chrome bar: wordmark, top-level tabs, account block.
@@ -47,6 +48,7 @@ export default function AppNav({
     onNavigateChartCategory,
     onSignIn,
     onSignOut,
+    onOpenSetup,
 }) {
     const compact = useIsCompact();
 
@@ -78,7 +80,12 @@ export default function AppNav({
         // Reference (#338): what is true of every EV, selected or not —
         // platforms and explainers.
         { key: 'reference', label: 'Reference' },
-        ...(isAdmin ? [{ key: 'admin', label: 'Admin' }] : []),
+        // The last slot is Admin for those who can see it, and the setup
+        // wizard for everyone else (owner, 2026-11-08). The wizard is a modal,
+        // not a page: `action` opens it, and it is never the active tab.
+        isAdmin
+            ? { key: 'admin', label: 'Admin' }
+            : { key: 'setup', label: SETUP_WIZARD.entry.nav, action: true },
     ];
 
     // Collapsed, the opened vehicle is a menu item of its own, after its tab.
@@ -91,7 +98,8 @@ export default function AppNav({
         if (key === OPENED) { onOpenVehicle?.(); return; }
         const item = items.find(i => i.key === key);
         if (!item) return;
-        if (item.chart) onNavigateChartCategory(key);
+        if (item.action) onOpenSetup?.();
+        else if (item.chart) onNavigateChartCategory(key);
         else onNavigate(key);
     };
 

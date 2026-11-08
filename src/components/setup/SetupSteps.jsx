@@ -1,40 +1,35 @@
 /**
- * The setup wizard's steps (PROTOTYPE), one per screen. Each reads the answers
- * and patches them; the questions → settings rules are utils/setupWizard.js.
+ * The setup wizard's steps, one per screen. Every word comes from
+ * constants/setupWizard.js; answers are held in miles, mph and °F and shown in
+ * the reader's units.
  */
 import { useMemo } from 'react';
 import VehicleCombobox from '../VehicleCombobox';
 import { vehicleOption } from '../../utils/specHelpers';
-import {
-    SETUP_GOALS, STARTER_SETS, starterSetIds, HIGHWAY_SHARES, HIGHWAY_SPEEDS,
-    CLIMATES, MOUNTAIN_FT, TRIP_FREQUENCIES, TRIP_DISTANCES, HOME_CHARGING, NUMBER_LIMITS,
-} from '../../utils/setupWizard';
+import { MI_TO_KM } from '../../constants/units';
+import { SETUP_WIZARD as C } from '../../constants/setupWizard';
+import { starterSetIds, fill, speedWords, distanceWords, tempWords, altitudeWords } from '../../utils/setupWizard';
 import { ChoiceCards, SegmentedChoice, NumberAnswer } from './SetupFields';
 
 export function GoalStep({ answers, onChange }) {
-    return (
-        <ChoiceCards
-            options={SETUP_GOALS}
-            value={answers.goal}
-            onChange={goal => onChange({ goal })}
-        />
-    );
+    return <ChoiceCards options={C.goals.options} value={answers.goal} onChange={goal => onChange({ goal })} />;
 }
 
-/** Which cars: keep the selection, pick some, or let us pick from a kind of car. */
+/** Which cars: keep the selection, pick some, or let us suggest some of a kind. */
 export function CarsStep({ answers, onChange, vehicles, selectedIds, names }) {
     const cars = answers.cars;
     const how = cars?.how ?? null;
     const options = useMemo(() => vehicles.map(vehicleOption), [vehicles]);
-    const picked = how === 'pick' ? cars.ids ?? [] : [];
+    const picked = how === 'pick' ? (cars.ids ?? []).filter(id => names[id]) : [];
     const preview = useMemo(
         () => (how === 'set' && cars.set ? starterSetIds(cars.set, vehicles) : []),
         [how, cars, vehicles]);
+    const W = C.cars.ways;
 
     const hows = [
-        ...(selectedIds.length ? [{ key: 'keep', label: `Keep my ${selectedIds.length} selected`, detail: selectedIds.slice(0, 3).map(id => names[id]).join(', ') }] : []),
-        { key: 'pick', label: 'I know which cars', detail: 'Search by name' },
-        { key: 'set',  label: 'Suggest some', detail: 'Pick a kind of car' },
+        ...(selectedIds.length ? [{ key: 'keep', label: fill(W.keep.label, { n: selectedIds.length }), detail: selectedIds.slice(0, 3).map(id => names[id]).join(', ') }] : []),
+        { key: 'pick', label: W.pick.label, detail: W.pick.detail },
+        { key: 'set',  label: W.set.label, detail: W.set.detail },
     ];
     const setHow = (key) => onChange({ cars: key ? { how: key, ids: [], set: null } : null });
 
@@ -46,18 +41,18 @@ export function CarsStep({ answers, onChange, vehicles, selectedIds, names }) {
                     <VehicleCombobox
                         options={options.filter(o => !picked.includes(o.id))}
                         value=""
-                        noneLabel="＋ Add a car…"
+                        noneLabel={W.pick.addLabel}
                         onChange={id => id && onChange({ cars: { how: 'pick', ids: [...picked, vehicles.find(v => String(v.id) === id)?.id ?? id] } })}
                     />
                     {picked.length > 0 && (
                         <ul className="flex flex-wrap gap-2 list-none m-0 p-0">
                             {picked.map(id => (
                                 <li key={id} className="combobox-chip">
-                                    <span className="combobox-chip-label">{names[id] ?? id}</span>
+                                    <span className="combobox-chip-label">{names[id]}</span>
                                     <button
                                         type="button"
                                         className="combobox-chip-clear"
-                                        aria-label={`Remove ${names[id] ?? id}`}
+                                        aria-label={`Remove ${names[id]}`}
                                         onClick={() => onChange({ cars: { how: 'pick', ids: picked.filter(x => x !== id) } })}
                                     >
                                         &times;
@@ -71,16 +66,16 @@ export function CarsStep({ answers, onChange, vehicles, selectedIds, names }) {
             {how === 'set' && (
                 <>
                     <ChoiceCards
-                        legend="What kind of car?"
-                        options={STARTER_SETS}
+                        legend={C.cars.kindsQuestion}
+                        options={C.cars.kinds}
                         value={cars.set}
                         onChange={set => onChange({ cars: { how: 'set', set } })}
                     />
                     {cars.set && (
                         <p className="text-note">
                             {preview.length
-                                ? `We'd pick: ${preview.map(id => names[id] ?? id).join(', ')}`
-                                : 'None of these have charging, range and EPA data yet.'}
+                                ? fill(C.cars.preview, { names: preview.map(id => names[id] ?? id).join(', ') })
+                                : C.cars.previewEmpty}
                         </p>
                     )}
                 </>
@@ -89,39 +84,51 @@ export function CarsStep({ answers, onChange, vehicles, selectedIds, names }) {
     );
 }
 
-export function DrivingStep({ answers, onChange }) {
+/** Daily distance in the reader's units, held in miles. */
+function DailyDistance({ answers, onChange, units }) {
+    const f = C.driving.dailyMi;
+    const metric = units === 'metric';
+    const toShown = (mi) => (mi == null ? null : metric ? Math.round(mi * MI_TO_KM) : mi);
+    return (
+        <NumberAnswer
+            label={metric ? f.labelMetric : f.label}
+            value={toShown(answers.dailyMi)}
+            onChange={v => onChange({ dailyMi: v == null ? null : metric ? v / MI_TO_KM : v })}
+            min={toShown(f.min)}
+            max={toShown(f.max)}
+            step={metric ? 5 : f.step}
+            unit={metric ? 'km' : 'mi'}
+            placeholder={String(toShown(f.hint))}
+        />
+    );
+}
+
+export function DrivingStep({ answers, onChange, units }) {
+    const D = C.driving;
     return (
         <div className="setup-step-body">
-            <NumberAnswer
-                label="Miles on a normal day"
-                value={answers.dailyMi}
-                onChange={dailyMi => onChange({ dailyMi })}
-                {...NUMBER_LIMITS.dailyMi}
-                step={5}
-                unit="mi"
-                placeholder="40"
-            />
+            <DailyDistance answers={answers} onChange={onChange} units={units} />
             <SegmentedChoice
-                label="Where"
-                options={HIGHWAY_SHARES.map(h => [h.key, h.label])}
+                label={D.highway.label}
+                options={D.highway.options.map(h => [h.key, h.label])}
                 value={answers.highway}
                 onChange={highway => onChange({ highway })}
             />
             <SegmentedChoice
-                label="Highway speed"
-                options={HIGHWAY_SPEEDS.map(s => [s, `${s} mph`])}
+                label={D.speed.label}
+                options={D.speed.mph.map(s => [s, speedWords(s, units)])}
                 value={answers.speedMph}
                 onChange={speedMph => onChange({ speedMph })}
             />
             <SegmentedChoice
-                label="Road trips"
-                options={TRIP_FREQUENCIES.map(t => [t.key, t.label])}
+                label={D.trips.label}
+                options={D.trips.options.map(t => [t.key, t.label])}
                 value={answers.trips}
                 onChange={trips => onChange({ trips })}
             />
             <SegmentedChoice
-                label="A typical road trip"
-                options={TRIP_DISTANCES.map(d => [d, `${d} mi`])}
+                label={D.tripMi.label}
+                options={D.tripMi.miles.map(d => [d, distanceWords(d, units)])}
                 value={answers.tripMi}
                 onChange={tripMi => onChange({ tripMi })}
             />
@@ -129,13 +136,19 @@ export function DrivingStep({ answers, onChange }) {
     );
 }
 
-export function WeatherStep({ answers, onChange }) {
+export function WeatherStep({ answers, onChange, units }) {
+    const W = C.weather;
+    const climates = W.climates.map(c => ({
+        key: c.key,
+        label: `${c.label} — ${c.region}`,
+        detail: fill(W.climateDetail, { winter: tempWords(c.winterF, units), summer: tempWords(c.summerF, units) }),
+    }));
     return (
         <div className="setup-step-body">
-            <ChoiceCards options={CLIMATES} value={answers.climate} onChange={climate => onChange({ climate })} />
+            <ChoiceCards options={climates} value={answers.climate} onChange={climate => onChange({ climate })} columns={1} />
             <SegmentedChoice
-                label="Altitude"
-                options={[[false, 'Near sea level'], [true, `Mountains (~${MOUNTAIN_FT.toLocaleString('en-US')} ft)`]]}
+                label={W.mountains.label}
+                options={[[false, W.mountains.low], [true, fill(W.mountains.high, { alt: altitudeWords(W.mountains.ft, units) })]]}
                 value={answers.mountains}
                 onChange={mountains => onChange({ mountains })}
             />
@@ -144,38 +157,29 @@ export function WeatherStep({ answers, onChange }) {
 }
 
 export function MoneyStep({ answers, onChange }) {
+    const M = C.money;
+    const field = (key) => {
+        const f = M[key];
+        return (
+            <NumberAnswer
+                label={f.label}
+                value={answers[key]}
+                onChange={v => onChange({ [key]: v })}
+                min={f.min}
+                max={f.max}
+                step={f.step}
+                prefix={f.prefix}
+                unit={f.unit}
+                placeholder={String(f.hint)}
+            />
+        );
+    };
     return (
         <div className="setup-step-body">
-            <ChoiceCards options={HOME_CHARGING} value={answers.home} onChange={home => onChange({ home })} columns={1} />
-            <NumberAnswer
-                label="Electricity at home"
-                value={answers.homePrice}
-                onChange={homePrice => onChange({ homePrice })}
-                {...NUMBER_LIMITS.homePrice}
-                step={0.01}
-                prefix="$"
-                unit="/ kWh"
-                placeholder="0.17"
-            />
-            <NumberAnswer
-                label="Your gas car's mileage"
-                value={answers.gasMpg}
-                onChange={gasMpg => onChange({ gasMpg })}
-                {...NUMBER_LIMITS.gasMpg}
-                step={1}
-                unit="mpg"
-                placeholder="25"
-            />
-            <NumberAnswer
-                label="Gas price"
-                value={answers.gasPrice}
-                onChange={gasPrice => onChange({ gasPrice })}
-                {...NUMBER_LIMITS.gasPrice}
-                step={0.01}
-                prefix="$"
-                unit="/ gal"
-                placeholder="3.20"
-            />
+            <ChoiceCards options={M.home.options} value={answers.home} onChange={home => onChange({ home })} columns={1} />
+            {answers.home !== 'none' && field('homePrice')}
+            {field('gasMpg')}
+            {field('gasPrice')}
         </div>
     );
 }
@@ -192,10 +196,8 @@ export function SummaryStep({ lines, unset }) {
                     </div>
                 ))}
             </dl>
-            {unset.length > 0 && (
-                <p className="text-note">Not set (no setting for it yet): {unset.join('; ')}.</p>
-            )}
-            <p className="text-note">Anything you skipped stays as it is. You can change it all later.</p>
+            {unset.length > 0 && <p className="text-note">{fill(C.summary.unset, { list: [...new Set(unset)].join('; ') })}</p>}
+            <p className="text-note">{C.summary.footer}</p>
         </div>
     );
 }

@@ -1,19 +1,22 @@
 /**
- * The way into the setup wizard (PROTOTYPE): one line and a button, for a
- * reader who would rather answer questions than learn the controls. Renders
- * nothing where no one can open the wizard (the pop-out).
+ * A way into the setup wizard: one line and a button, for a reader who would
+ * rather answer questions than learn the controls. Renders nothing where no
+ * one can open the wizard (the pop-out).
  *
- *   text  the line before the button
+ *   from     where it sits, for the site event: 'home' | 'empty'
+ *   centered stacks the line over the button, centered (an empty chart)
  */
 import { useNavigation } from '../../context/NavigationContext';
+import { SETUP_WIZARD } from '../../constants/setupWizard';
 
-export default function SetupInvite({ text = 'New here? Answer a few questions and we’ll set up the charts for you.' }) {
+export default function SetupInvite({ from, centered = false }) {
     const { openSetup } = useNavigation();
     if (!openSetup) return null;
+    const text = from === 'empty' ? SETUP_WIZARD.entry.emptyChart : SETUP_WIZARD.entry.home;
     return (
-        <div className="setup-invite">
+        <div className={`setup-invite${centered ? ' is-centered' : ''}`}>
             <span className="text-secondary">{text}</span>
-            <button type="button" className="btn btn-primary" onClick={openSetup}>Set up for me</button>
+            <button type="button" className="btn btn-primary" onClick={() => openSetup(from)}>{SETUP_WIZARD.entry.button}</button>
         </div>
     );
 }

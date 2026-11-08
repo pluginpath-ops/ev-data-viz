@@ -21,7 +21,7 @@ export default function SelectionEmptyState({ chart, extra = null }) {
             <p className="text-secondary mt-2">
                 Use ＋ Add above to pick vehicles, or choose them on Vehicles &amp; Specs.{extra && ` ${extra}`}
             </p>
-            <div className="mt-3"><SetupInvite text="Not sure what to pick?" /></div>
+            <SetupInvite from="empty" centered />
         </div>
     );
 }

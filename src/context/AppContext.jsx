@@ -42,7 +42,7 @@ export function AppProvider({ children }) {
     const [emailOptIn, setEmailOptInState] = useState(null); // boolean, or null when unknown
     const [loading, setLoading] = useState(true);
     const [headerImageUrl, setHeaderImageUrl] = useState('');
-    const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success', action?: { label, onClick } }
+    const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success'|'info', action?: { label, onClick }, durationMs? }
     const [specCustomFieldSuggestions, setSpecCustomFieldSuggestions] = useState({}); // { [category]: Set<normalizedKey> }
     const [specVouches, setSpecVouches] = useState({});   // { [vehicleId]: { count, myVouch } }
     const [runVotes, setRunVotes] = useState({});          // { [runId]: { vouch, flag, myVote } }
@@ -66,6 +66,9 @@ export function AppProvider({ children }) {
     const showSuccess = (message) => setAppNotification({ message, type: 'success' });
     // A success with one thing to take back: the banner draws `action` as a button.
     const showUndoable = (message, label, onClick) => setAppNotification({ message, type: 'success', action: { label, onClick } });
+    // A note with one thing to do about it (the setup wizard's season note):
+    // the banner's info color, no undo glyph, and longer to read.
+    const showNotice = (message, label, onClick) => setAppNotification({ message, type: 'info', durationMs: 15000, action: { label, onClick } });
     const clearNotification = () => setAppNotification(null);
 
     // ── Access logging helpers ────────────────────────────────────────────────
@@ -2231,6 +2234,7 @@ export function AppProvider({ children }) {
         appNotification,
         clearNotification,
         showUndoable,
+        showNotice,
         showError,
         uploadHeaderImage,
         publishModelConstant,

@@ -2763,12 +2763,17 @@ describe('site events are counted without knowing who (#448 layer 4)', () => {
 
     it('the client, the table and the function agree on the events', () => {
         const client = [...events.matchAll(/:\s+'([a-z_]+)',/g)].map(m => m[1]).sort();
-        expect(client).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view']);
+        expect(client).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view',
+            'season_toggle', 'setup_apply', 'setup_close', 'setup_open']);
         const quoted = (src) => [...src.matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
-        const check = migration.match(/CHECK \(event IN \(([^)]*)\)/)[1];
-        const fn = migration.match(/p_event NOT IN \(([^)]*)\)/)[1];
+        // The latest migration to set the list (098, the setup wizard) is the one in force.
+        const latest = read('supabase/migrations/098_site_events_setup_wizard.sql');
+        const check = latest.match(/CHECK \(event IN \(([^)]*)\)/)[1];
+        const fn = latest.match(/p_event NOT IN \(([^)]*)\)/)[1];
         expect(quoted(check).sort()).toEqual(client);
         expect(quoted(fn).sort()).toEqual(client);
+        expect(latest).toMatch(/EXCEPTION WHEN OTHERS THEN\s+RETURN false/);
+        expect(latest).toMatch(/>= 60 THEN/);
     });
 
     it('only the function writes, and only an admin reads', () => {
@@ -2799,6 +2804,9 @@ describe('site events are counted without knowing who (#448 layer 4)', () => {
         expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_OPEN/);
         expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_RESET/);
         expect(read('src/App.jsx')).toMatch(/recordEvent\(SITE_EVENTS\.CHART_VIEW/);
+        for (const e of ['SETUP_OPEN', 'SETUP_APPLY', 'SETUP_CLOSE', 'SEASON_TOGGLE']) {
+            expect(read('src/App.jsx')).toMatch(new RegExp(`recordEvent\\(SITE_EVENTS\\.${e}`));
+        }
         const hook = read('src/hooks/useSiteEvents.js');
         expect(hook).toMatch(/shouldRecord\(\{ role: userRole, popout \}\)/);
         // Nobody else calls the service directly, or the curator skip is bypassable.

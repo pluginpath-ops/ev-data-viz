@@ -19,9 +19,17 @@ export const HOME_LEVELS = [
     { volts: 240, amps: 32 },
     { volts: 240, amps: 48 },
     { volts: 240, amps: 80 },
+    // No home charging (owner, 2026-11-08): every kWh is bought on the road,
+    // at the fast-charging price, through the same fast-stop rule. Last, so the
+    // level indexes every shared key already holds keep their meaning — the
+    // key stores the index. No public Level 2 price exists to use instead.
+    { volts: 0, amps: 0, none: true },
 ];
 
-/** A level's power at the wall, kW. */
+/** The level index for no home charging. */
+export const NO_HOME_LEVEL = HOME_LEVELS.findIndex(l => l.none);
+
+/** A level's power at the wall, kW. 0 for no home charging. */
 export const levelKw = (level) => (level.volts * level.amps) / 1000;
 
 /**

@@ -1,0 +1,179 @@
+/**
+ * THE SETUP WIZARD'S CONTENT — every word, option, cut-off and default it uses.
+ * Edit this file to tailor the wizard; the logic (utils/setupWizard.js) and the
+ * screens (components/setup/) read it and hold no content of their own.
+ *
+ * Units are canonical everywhere here: miles, mph, °F, feet, US dollars. The
+ * wizard converts for a reader on metric; never write km or °C in this file.
+ *
+ * Sections:
+ *   steps         which screens exist, in order, and each one's title. Keys:
+ *                 goal, cars, driving, weather, money, summary (summary last).
+ *   entry         the "Set up for me" button text: Home, an empty chart, the nav.
+ *   goals         "What do you want to know?" — each option opens one chart
+ *                 `mode` (a mode key from constants/chartNav.js). `default` is
+ *                 where a reader who skips lands.
+ *   cars          the "Which cars?" step and the starter sets ("kinds of car").
+ *                 `size` caps how many a set selects. `requireData` — a vehicle
+ *                 needs all of these (from utils/vehicleDataCategories.js) to be
+ *                 suggested. `curated` is an optional list of vehicle ids (numbers)
+ *                 that go first, in that order; the Vehicles & Specs order fills
+ *                 the rest. `match` is a rule, as data:
+ *                   {}                                   every vehicle
+ *                   { tag: ['SUV', 'CUV'] }              has any of these tags
+ *                   { field: 'priceUsd', op: '<=', value: 45000 }
+ *                        fields: priceUsd (base price, $), lengthIn (length, in)
+ *                        ops: '<', '<=', '>', '>=' (a blank field never matches)
+ *                   { any: [rule, …] }  { all: [rule, …] }  { not: rule }
+ *   driving       daily miles, town/highway share, highway speeds (mph, on a
+ *                 5 mph grid), road-trip frequency and distance (miles).
+ *                 `commuterWeek` is the Cost & Time week a reader who gives
+ *                 daily miles gets; a trip frequency's `week` replaces it.
+ *                 Week letters: D daily, L long day, O off; Monday first.
+ *   weather       climates: winter and summer °F and how many months are
+ *                 winter. The charts are corrected to the HARDER of the two
+ *                 seasons, worked out from the correction model, not set here.
+ *                 `mountains.ft` is the altitude "Mountains" means.
+ *   money         home charging (each option's `level` is an index into
+ *                 HOME_LEVELS in constants/costToDrive.js; 6 = no home charging)
+ *                 and the number fields' limits and hints.
+ *   summary       the labels on the last screen.
+ *   seasonNote    the notice shown after Apply (`message`), and after its
+ *                 toggle shows the easier season (`messageOther`). {season}
+ *                 {temp} {other} are
+ *                 filled in.
+ *
+ * Check a change:  npx vitest run src/utils/__tests__/setupWizard.test.js
+ * (it validates this file and says what is wrong).
+ *
+ * Plain data only — no functions.
+ */
+export const SETUP_WIZARD = {
+    steps: [
+        { key: 'goal',    title: 'What do you want to know?' },
+        { key: 'cars',    title: 'Which cars?' },
+        { key: 'driving', title: 'How do you drive?' },
+        { key: 'weather', title: "What's the weather like?" },
+        { key: 'money',   title: 'Charging and costs' },
+        { key: 'summary', title: "Here's what we'll set" },
+    ],
+
+    entry: {
+        button: 'Set up for me',
+        home: 'New here? Answer a few questions and we’ll set up the charts for you.',
+        emptyChart: 'Not sure what to pick?',
+        nav: 'Set up for me',
+    },
+
+    goals: {
+        default: 'cost',
+        options: [
+            { key: 'cost',     label: 'What it costs to run', detail: 'Per month, against a gas car', mode: 'drivecost' },
+            { key: 'range',    label: 'How far it goes',      detail: 'Real highway range',           mode: 'range' },
+            { key: 'charging', label: 'How fast it charges',  detail: 'On a fast charger',            mode: 'charging' },
+            { key: 'roadtrip', label: 'Road trips',           detail: 'Total time, stops and all',    mode: 'roadtrip' },
+            { key: 'specs',    label: 'Specs side by side',   detail: 'Price, size, battery…',        mode: 'specstable' },
+        ],
+    },
+
+    cars: {
+        size: 5,
+        default: 'popular',
+        requireData: ['epa', 'charging', 'range'],
+        onePerModel: true,
+        ways: {
+            keep: { label: 'Keep my {n} selected' },
+            pick: { label: 'I know which cars', detail: 'Search by name', addLabel: '＋ Add a car…' },
+            set:  { label: 'Suggest some', detail: 'Pick a kind of car' },
+        },
+        kindsQuestion: 'What kind of car?',
+        preview: "We'd pick: {names}",
+        previewEmpty: 'None of these have charging, range and EPA data yet.',
+        kinds: [
+            { key: 'small-suv', label: 'Small SUV', curated: [],
+              match: { any: [{ tag: ['CUV', 'Crossover'] }, { all: [{ tag: ['SUV'] }, { field: 'lengthIn', op: '<', value: 186 }] }] } },
+            { key: 'suv', label: 'Family SUV', curated: [],
+              match: { all: [{ tag: ['SUV'] }, { not: { tag: ['CUV', 'Crossover'] } }, { not: { field: 'lengthIn', op: '<', value: 186 } }] } },
+            { key: 'sedan',      label: 'Sedan',        curated: [], match: { tag: ['Sedan', '4-door'] } },
+            { key: 'small-car',  label: 'Small car',    curated: [], match: { tag: ['Hatch'] } },
+            { key: 'pickup',     label: 'Pickup',       curated: [], match: { tag: ['Truck'] } },
+            { key: 'luxury',     label: 'Luxury',       curated: [], match: { field: 'priceUsd', op: '>=', value: 70000 } },
+            { key: 'affordable', label: 'Under $45k',   curated: [], match: { field: 'priceUsd', op: '<=', value: 45000 } },
+            { key: 'popular',    label: 'Most popular', curated: [], match: {} },
+        ],
+    },
+
+    driving: {
+        dailyMi: { label: 'Miles on a normal day', labelMetric: 'Kilometers on a normal day', min: 5, max: 400, step: 5, hint: 40 },
+        commuterWeek: 'DDDDDOO',
+        highway: {
+            label: 'Where',
+            options: [
+                { key: 'town',    label: 'Mostly town',    highwayPct: 20 },
+                { key: 'mix',     label: 'A mix',          highwayPct: 50 },
+                { key: 'highway', label: 'Mostly highway', highwayPct: 80 },
+            ],
+        },
+        speed: { label: 'Highway speed', mph: [65, 70, 75, 80] },
+        trips: {
+            label: 'Road trips',
+            options: [
+                // `unset`: said on the summary when the answer changes nothing.
+                { key: 'rarely', label: 'Rarely',       week: null, unset: 'how often you take road trips (Cost & Time prices one typical week)' },
+                { key: 'few',    label: 'A few a year', week: null, unset: 'how often you take road trips (Cost & Time prices one typical week)' },
+                { key: 'weekly', label: 'Most weeks',   week: 'DDDDDLO' },
+            ],
+        },
+        tripMi: { label: 'A typical road trip', miles: [200, 400, 700] },
+    },
+
+    weather: {
+        climates: [
+            { key: 'mild',    label: 'Mild',    region: 'Pacific Northwest',       winterF: 40, summerF: 80, winterMonths: 4 },
+            { key: 'hot',     label: 'Hot',     region: 'South',                   winterF: 45, summerF: 95, winterMonths: 2 },
+            { key: 'cold',    label: 'Cold',    region: 'Northern Plains, Canada', winterF: 0,  summerF: 80, winterMonths: 6 },
+            { key: 'extreme', label: 'Extreme', region: 'Midwest, Northeast',      winterF: 15, summerF: 95, winterMonths: 4 },
+        ],
+        climateDetail: '{winter} winter · {summer} summer',
+        mountains: { label: 'Altitude', low: 'Near sea level', high: 'Mountains (~{alt})', ft: 5000 },
+    },
+
+    money: {
+        home: {
+            options: [
+                { key: 'charger', label: 'Charger at home',  detail: '240 V, 32 A',          level: 3 },
+                { key: 'outlet',  label: 'Wall outlet',      detail: '120 V only',           level: 0 },
+                { key: 'none',    label: 'No home charging', detail: 'Public chargers only', level: 6 },
+            ],
+        },
+        homePrice: { label: 'Electricity at home',    min: 0.05, max: 0.60, step: 0.01, hint: 0.17, prefix: '$', unit: '/ kWh' },
+        gasMpg:    { label: "Your gas car's mileage", min: 5,    max: 60,   step: 1,    hint: 25,   unit: 'mpg' },
+        gasPrice:  { label: 'Gas price',              min: 1,    max: 8,    step: 0.01, hint: 3.20, prefix: '$', unit: '/ gal' },
+    },
+
+    summary: {
+        opens: 'Opens',
+        cars: 'Cars',
+        carsKept: 'the ones you have selected',
+        carsPicked: '{n} you picked',
+        carsSuggested: '{kind}, {n} suggested',
+        carsNone: 'none match — pick some yourself',
+        driving: 'Driving',
+        perDay: '{d} a day',
+        highwaySpeed: '{s} on the highway',
+        tripLength: 'road trips of ~{d}',
+        longDay: 'one long day a week',
+        weather: 'Weather',
+        season: '{season}, {temp} (your harder season)',
+        charging: 'Charging',
+        gas: 'Gas car',
+        unset: 'Not set (no setting for it yet): {list}.',
+        footer: 'Anything you skipped stays as it is. You can change it all later.',
+    },
+
+    seasonNote: {
+        message: 'Showing {season}, {temp} — your harder season.',
+        messageOther: 'Showing {season}, {temp}.',
+        toggle: 'Show {other}',
+    },
+};

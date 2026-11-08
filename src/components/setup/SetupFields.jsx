@@ -1,5 +1,5 @@
 /**
- * The setup wizard's answer controls (PROTOTYPE). Each answer can be cleared:
+ * The setup wizard's answer controls. Each answer can be cleared:
  * clicking the chosen card again un-picks it, which is "skip" for that one
  * question.
  */
