@@ -744,6 +744,21 @@ export function hslToHex({ h, s, l }) {
     return `#${to2(r1)}${to2(g1)}${to2(b1)}`;
 }
 
+/**
+ * A series color with most of its saturation taken out, its lightness kept:
+ * the same car, quieter. The Cost & Time charts draw a car's fast charging as
+ * the full color striped over this (stripedFill), on top of its home charging
+ * in the full color (owner, 2026-11-07: the other way round left every chart
+ * muted, home being most of the cost; 2026-11-08: the shade alone read as a
+ * faded copy, so stripes). Not a
+ * hex color: returned as is.
+ */
+export function desaturate(color, keep = 0.3) {
+    if (!/^#[0-9a-f]{6}$/i.test(color ?? '')) return color;
+    const hsl = hexToHsl(color);
+    return hslToHex({ ...hsl, s: hsl.s * keep });
+}
+
 // ── Deriving the rest of the set from the base ───────────────────────────────
 
 /**

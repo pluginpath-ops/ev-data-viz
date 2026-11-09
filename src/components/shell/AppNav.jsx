@@ -1,6 +1,7 @@
 import { useIsCompact } from '../../hooks/useIsCompact';
 import NavMenu from './NavMenu';
 import AccountMenu from './AccountMenu';
+import { SETUP_WIZARD } from '../../constants/setupWizard';
 
 /**
  * The 50px chrome bar: wordmark, top-level tabs, account block.
@@ -39,12 +40,15 @@ export default function AppNav({
     isAdmin,
     user,
     userRole,
+    emailOptIn,
+    onEmailOptInChange,
     units,
     onToggleUnits,
     onNavigate,
     onNavigateChartCategory,
     onSignIn,
     onSignOut,
+    onOpenSetup,
 }) {
     const compact = useIsCompact();
 
@@ -76,7 +80,12 @@ export default function AppNav({
         // Reference (#338): what is true of every EV, selected or not —
         // platforms and explainers.
         { key: 'reference', label: 'Reference' },
-        ...(isAdmin ? [{ key: 'admin', label: 'Admin' }] : []),
+        // The last slot is Admin for those who can see it, and the setup
+        // wizard for everyone else (owner, 2026-11-08). The wizard is a modal,
+        // not a page: `action` opens it, and it is never the active tab.
+        isAdmin
+            ? { key: 'admin', label: 'Admin' }
+            : { key: 'setup', label: SETUP_WIZARD.entry.nav, action: true },
     ];
 
     // Collapsed, the opened vehicle is a menu item of its own, after its tab.
@@ -89,7 +98,8 @@ export default function AppNav({
         if (key === OPENED) { onOpenVehicle?.(); return; }
         const item = items.find(i => i.key === key);
         if (!item) return;
-        if (item.chart) onNavigateChartCategory(key);
+        if (item.action) onOpenSetup?.();
+        else if (item.chart) onNavigateChartCategory(key);
         else onNavigate(key);
     };
 
@@ -109,7 +119,15 @@ export default function AppNav({
                 <NavMenu items={menuItems} activeKey={openedActive ? OPENED : view} onSelect={select} level="main" />
             ) : (
                 <div className="nav-tab-group">
-                    {items.map(({ key, label }) => {
+                    {items.map(({ key, label, action }) => {
+                        // The wizard opens a modal, not a page: a button, not a tab.
+                        if (action) {
+                            return (
+                                <button key={key} type="button" onClick={() => select(key)} className="btn btn-secondary nav-guide">
+                                    {label}
+                                </button>
+                            );
+                        }
                         const tab = (
                             <button
                                 key={key}
@@ -159,6 +177,8 @@ export default function AppNav({
                 <AccountMenu
                     user={user}
                     userRole={userRole}
+                    emailOptIn={emailOptIn}
+                    onEmailOptInChange={onEmailOptInChange}
                     units={units}
                     onToggleUnits={onToggleUnits}
                     onSignIn={onSignIn}

@@ -3,7 +3,7 @@ import { DEFAULT_SERIES_PALETTE } from './utils/colorUtils';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
 import { AxisLimitsProvider } from './hooks/useAxisLimits';
-import { AXIS_LIMITS_PARAM, decodeAxisLimits, withAxisLimits } from './utils/axisLimits';
+import { AXIS_LIMITS_PARAM, axisLimitsOf, decodeAxisLimits, withAxisLimits } from './utils/axisLimits';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import AppNav from './components/shell/AppNav';
 import SubTabStrip from './components/shell/SubTabStrip';
@@ -13,6 +13,12 @@ import RunsView, { RUNS_SUBTAB_IDS, DEFAULT_RUNS_SUBTAB } from './components/Run
 import ChargingView from './components/ChargingView';
 import ChargeCompareView from './components/ChargeCompareView';
 import RoadTripView from './components/RoadTripView';
+import CostTimeView from './components/costToDrive/CostTimeView';
+import WeeklyPlanView from './components/costToDrive/WeeklyPlanView';
+import HomeChargerView from './components/costToDrive/HomeChargerView';
+import YourDrivingPage from './components/costToDrive/YourDrivingPage';
+import { DEFAULT_COST_TO_DRIVE } from './constants/costToDrive';
+import { decodeCostToDriveKey, normalizeCostToDrive } from './utils/costToDriveKey';
 import PopoutView from './components/PopoutView';
 import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
@@ -27,6 +33,10 @@ import { SITE_EVENTS } from './utils/siteEvents';
 import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext';
 import HomeView from './components/home/HomeView';
 import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
+import SetupWizard from './components/setup/SetupWizard';
+import SetupReviewBar from './components/setup/SetupReviewBar';
+import { flipSeason, skippedCount } from './utils/setupWizard';
+import { readSetupReview, writeSetupReview } from './utils/setupWizardStorage';
 import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink, chartQueryString } from './utils/chartUrlState';
 import SpecChart from './components/SpecChart';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -90,6 +100,8 @@ export default function App() {
         selectedVehicles,
         user,
         userRole,
+        emailOptIn,
+        setEmailOptIn,
         isAdmin,
         isContributor,
         canCreate,
@@ -216,6 +228,13 @@ export default function App() {
     });
     const [epaConfig, setEpaConfig] = useState(defaultEpaConfig);
     const [roadTripConfig, setRoadTripConfig] = useState(defaultRoadTripConfig);
+    // Cost to Drive's settings: one state for all its sub-tabs, kept when
+    // switching between them, carried in the link as the `cd` key. A key a
+    // link carried that could not be read leaves the defaults and says why.
+    const [costToDrive, setCostToDrive] = useState(DEFAULT_COST_TO_DRIVE);
+    const [costToDriveLinkError, setCostToDriveLinkError] = useState(null);
+    const updateCostToDrive = useCallback(
+        (patch) => setCostToDrive(prev => normalizeCostToDrive({ ...prev, ...patch })), []);
     // The vehicle table's assumptions live in chartConfig, not in the table, so
     // the spec chart's sidebar and the table read and write the same ones (#450).
     // Read once from the address, else from what the table remembered.
@@ -325,8 +344,8 @@ export default function App() {
     };
 
     const { isPopout, sendState } = useChartSync({
-        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer,
-        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer,
+        chartMode, chartConfig, selectedVehicles, compareConfig, roadTripConfig, epaConfig, pairings, epaExplorer, costToDrive,
+        setChartMode, setChartConfig, setVehicleSelection, setCompareConfig, setRoadTripConfig, setEpaConfig, setPairings, setEpaExplorer, setCostToDrive,
     });
 
     // The featured comparisons (#448), loaded once here so Home and the editor
@@ -463,6 +482,77 @@ export default function App() {
         setEpaConfig(state.epaConfig);
         setPairings(state.pairings);
     }, [vehicles, setVehicleSelection]);
+
+    /**
+     * The setup wizard: open it from Home, an empty chart or the nav, and
+     * apply its plan (utils/setupWizard.js). Applying lays each patch over the
+     * reader's current settings through the same setters the sidebars use,
+     * then opens the plan's chart like a sub-tab click — so the URL, the
+     * pop-out and the history entry follow as they always do.
+     */
+    const [setupOpen, setSetupOpen] = useState(false);
+    const openSetup = useCallback((from) => {
+        recordEvent(SITE_EVENTS.SETUP_OPEN, { detail: { from } });
+        setSetupOpen(true);
+    }, [recordEvent]);
+    const closeSetup = useCallback((step) => {
+        recordEvent(SITE_EVENTS.SETUP_CLOSE, { detail: { step } });
+        setSetupOpen(false);
+    }, [recordEvent]);
+
+    /**
+     * The review bar (SetupReviewBar): the charts Apply chose and the season
+     * shown, kept in browser storage until × or the next Apply. Its season
+     * toggle flips the correction temperature and Cost & Time's season
+     * together, through the same setters.
+     */
+    const [setupReview, setSetupReviewState] = useState(readSetupReview);
+    const setSetupReview = (review) => {
+        setSetupReviewState(review);
+        writeSetupReview(review);
+    };
+    const openReviewChart = (mode, index) => {
+        recordEvent(SITE_EVENTS.SETUP_JUMP, { detail: { mode, index } });
+        handleChartModeChange(mode);
+        window.scrollTo(0, 0);
+    };
+    const toggleReviewSeason = () => {
+        const next = flipSeason(setupReview.season);
+        recordEvent(SITE_EVENTS.SEASON_TOGGLE, { detail: { to: next.season } });
+        setChartConfig(prev => ({ ...prev, correctionTarget: { ...prev.correctionTarget, temperatureF: next.tempF } }));
+        updateCostToDrive({ season: next.season });
+        setSetupReview({ ...setupReview, season: next });
+    };
+
+    const applySetup = (plan, answers) => {
+        recordEvent(SITE_EVENTS.SETUP_APPLY, {
+            detail: { goals: plan.goals.join(','), cars: plan.carsFrom === 'set' ? plan.setKey : plan.carsFrom, skipped: skippedCount(answers) },
+        });
+        if (plan.vehicleIds) setVehicleSelection(plan.vehicleIds);
+        setChartConfig(prev => {
+            // A goal's own chart settings (constants/setupWizard.js `chart`). The
+            // axes live at the top of chartConfig and belong to Charging Curves.
+            let axisLimits = prev.axisLimits;
+            let axes = {};
+            for (const [mode, { axisLimits: limits, ...rest }] of Object.entries(plan.charts ?? {})) {
+                if (limits) axisLimits = withAxisLimits(axisLimits, mode, { ...axisLimitsOf(axisLimits, mode), ...limits });
+                axes = { ...axes, ...rest, ...(rest.raceThreshold != null && { alignRaw: false }) };
+            }
+            return {
+                ...prev,
+                ...axes,
+                axisLimits,
+                correctionTarget: { ...prev.correctionTarget, ...plan.correction },
+                assumptions: { ...prev.assumptions, ...plan.assumptions },
+            };
+        });
+        updateCostToDrive(plan.costToDrive);
+        setRoadTripConfig(prev => ({ ...prev, ...plan.roadTrip }));
+        handleChartModeChange(plan.mode);
+        setSetupOpen(false);
+        setSetupReview({ modes: plan.modes, season: plan.season ?? null });
+        window.scrollTo(0, 0);
+    };
 
     /**
      * A platform's page, from anywhere a platform is named (#354). A history
@@ -627,6 +717,11 @@ export default function App() {
         if (parsed.pairings) setPairings(parsed.pairings);
         if (parsed.roadTrip) setRoadTripConfig(prev => ({ ...prev, ...parsed.roadTrip }));
         if (parsed.epa)      setEpaConfig(prev => ({ ...prev, ...parsed.epa }));
+        if (parsed.costToDrive) {
+            const { settings, error } = decodeCostToDriveKey(parsed.costToDrive);
+            setCostToDrive(settings);
+            setCostToDriveLinkError(error);
+        }
     }, []);
 
     // ── Handle browser back/forward ─────────────────────────────────────────
@@ -718,10 +813,10 @@ export default function App() {
         const p = buildChartParams({
             view, chartMode, chartConfig, selectedVehicles, vehicles,
             compareConfig, roadTripConfig, epaConfig, pairings,
-            vehicleFilters, currentSearch: window.location.search,
+            vehicleFilters, currentSearch: window.location.search, costToDrive,
         });
         history.replaceState({ view, chartMode }, '', '?' + chartQueryString(p));
-    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings, vehicleFilters]);
+    }, [view, chartConfig, selectedVehicles, chartMode, vehicles, compareConfig, roadTripConfig, epaConfig, pairings, vehicleFilters, costToDrive]);
 
     // ── Keep URL in sync while on the Runs tab ──────────────────────────────
     // Mirrors the chart-tab sync above: a refresh or shared link on ?tab=runs
@@ -845,7 +940,7 @@ export default function App() {
     // ── Broadcast chart state to any open pop-out windows ───────────────────
     useEffect(() => {
         sendState();
-    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, sendState]);
+    }, [chartMode, chartConfig, selectedVehicles, compareConfig, epaConfig, pairings, epaExplorer, costToDrive, sendState]);
 
     // The header tab a view is shown under (#338): a vehicle's page (the
     // `runs` view) is under Vehicles & Specs; a chart category drawn under
@@ -904,6 +999,7 @@ export default function App() {
                 epaConfig={epaConfig}
                 pairings={pairings}
                 epaExplorer={epaExplorer}
+                costToDrive={costToDrive}
             />
             </AxisLimitsProvider>
         );
@@ -911,7 +1007,7 @@ export default function App() {
 
     return (
         <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
-        <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison }}>
+        <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison, openSetup }}>
         <FeaturedComparisonsContext.Provider value={featuredContext}>
         <VehicleBaseContext.Provider value={vehicleBaseApi}>
             {showAuthModal && (
@@ -939,12 +1035,15 @@ export default function App() {
                         isAdmin={isAdmin}
                         user={user}
                         userRole={userRole}
+                        emailOptIn={emailOptIn}
+                        onEmailOptInChange={setEmailOptIn}
                         units={units}
                         onToggleUnits={toggleUnits}
                         onNavigate={navigateToTab}
                         onNavigateChartCategory={navigateToChartCategory}
                         onSignIn={() => setShowAuthModal(true)}
                         onSignOut={signOut}
+                        onOpenSetup={() => openSetup('nav')}
                     />
 
                     {/* Sub-nav for whichever section has one. Every section's
@@ -1202,14 +1301,14 @@ export default function App() {
                       * With none, it says so and points at ＋ Add rather than
                       * being unreachable; the views below draw only once
                       * there is something to plot. */}
-                    {activeChartCategory && chartMode !== 'specstable' && selectedVehicles.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && (
+                    {activeChartCategory && chartMode !== 'specstable' && selectedVehicles.length === 0 && chartMode !== 'specs' && chartMode !== 'specscatter' && chartMode !== 'drivesetup' && (
                         <SelectionEmptyState chart={labelForMode(chartMode)} />
                     )}
                     {/* ChargingView is the fall-through: it renders for any mode NOT
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && chartMode !== 'drivesetup' && chartMode !== 'drivecost' && chartMode !== 'driveplan' && chartMode !== 'drivecharger' && (
                         <ChargingView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -1305,6 +1404,45 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                         />
                     )}
+                    {/* Your Driving needs no selection: it is where the week is set,
+                        and its preview asks for vehicles when there are none. */}
+                    {activeChartCategory && chartMode === 'drivesetup' && (
+                        <YourDrivingPage
+                            vehicles={chartVehicles}
+                            selectedVehicleIds={selectedVehicles}
+                            settings={costToDrive}
+                            onChange={updateCostToDrive}
+                            onOpenMode={handleChartModeChange}
+                            linkError={costToDriveLinkError}
+                        />
+                    )}
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'drivecost' && (
+                        <CostTimeView
+                            vehicles={chartVehicles}
+                            selectedVehicleIds={selectedVehicles}
+                            settings={costToDrive}
+                            onChange={updateCostToDrive}
+                            onOpenSetup={() => handleChartModeChange('drivesetup')}
+                        />
+                    )}
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'driveplan' && (
+                        <WeeklyPlanView
+                            vehicles={chartVehicles}
+                            selectedVehicleIds={selectedVehicles}
+                            settings={costToDrive}
+                            onChange={updateCostToDrive}
+                            onOpenSetup={() => handleChartModeChange('drivesetup')}
+                        />
+                    )}
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'drivecharger' && (
+                        <HomeChargerView
+                            vehicles={chartVehicles}
+                            selectedVehicleIds={selectedVehicles}
+                            settings={costToDrive}
+                            onChange={updateCostToDrive}
+                            onOpenSetup={() => handleChartModeChange('drivesetup')}
+                        />
+                    )}
                     {/* No selection gate: the vehicle table is where a selection is
                         made, over the whole fleet (#315). */}
                     {activeChartCategory && chartMode === 'specstable' && (
@@ -1366,6 +1504,22 @@ export default function App() {
                         />
                     )}
                 </main>
+
+                {setupOpen && (
+                    <SetupWizard onApply={applySetup} onClose={closeSetup} />
+                )}
+
+                {setupReview && (
+                    <SetupReviewBar
+                        review={setupReview}
+                        currentMode={isChartCategory(view) ? chartMode : null}
+                        units={units}
+                        onOpen={openReviewChart}
+                        onToggleSeason={toggleReviewSeason}
+                        onChangeAnswers={() => openSetup('review')}
+                        onClose={() => setSetupReview(null)}
+                    />
+                )}
 
                 {featuredEditor && (
                     <FeaturedComparisonEditor

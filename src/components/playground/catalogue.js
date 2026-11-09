@@ -65,6 +65,10 @@ export const NOT_CATALOGUED = {
     'tag-filter-bar':    'Layout wrapper for the filter row.',
     'tag-filter-legend': 'The "AND / OR / NOT" key beside the bar, not a control.',
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
+    'combobox-chip-label': 'The name button inside .combobox-chip, which reopens the search; '
+        + 'it has no pill of its own, so shown as part of that specimen.',
+    'combobox-chip-clear': 'The × button inside .combobox-chip, which clears the choice; '
+        + 'shown as part of that specimen.',
     'guide-chip-count':  'The count suffix inside .guide-chip; shown as part of that specimen.',
     'text-control': 'A size, not a role — the one step down that control surfaces run at. '
         + 'It has no color of its own, so a specimen would be body text at 12px.',
@@ -181,7 +185,7 @@ export const SECTIONS = [
             { cls: 'account-btn signed-in', as: 'button', label: 'G',
               note: 'Signed in reads differently from signed out at a glance: filled and lettered vs outlined and generic.' },
             { composite: 'account-menu', label: 'Account menu, open',
-              covers: ['account-menu', 'account-panel', 'account-identity', 'account-email', 'account-row', 'account-segmented', 'account-action'],
+              covers: ['account-menu', 'account-panel', 'account-identity', 'account-email', 'account-row', 'account-segmented', 'account-opt-in', 'account-opt-in-label', 'account-action'],
               note: 'What used to sit beside it in the nav bar: the signed-in email, the role, and the unit system. The Sign In button it replaced cost 111px of a 375px phone bar.' },
             { cls: 'info-icon-glyph', as: 'button', label: 'ⓘ',
               note: 'A real button, not a glyph in a span: before the popover pass there was no keyboard route to any of the 21 of them, and the four carrying a reference table had no accessible name at all.' },
@@ -285,6 +289,8 @@ export const SECTIONS = [
             { cls: 'tag-filter-btn tag-filter-or',  as: 'button', label: 'Tag filter · OR',   note: 'Success tint.' },
             { cls: 'tag-filter-btn tag-filter-not', as: 'button', label: 'Tag filter · NOT',  note: 'Danger tint — the exclusion.' },
             { cls: 'selected-vehicle-chip', as: 'span', label: 'Selected vehicle', note: 'Persistent selection row. No border — "blue on blue".' },
+            { cls: 'combobox-chip', as: 'span', label: 'Model Y LR · 2021',
+              note: 'A vehicle picker\'s chosen vehicle: the name button reopens the search, the × beside it clears. Shown without them — the specimen is the pill.' },
             { cls: 'session-vehicle-chip',  as: 'span', label: 'Session vehicle' },
             { cls: 'tag-pill',        as: 'span', label: 'Tag' },
             { cls: 'path-chip',       as: 'span', label: 'Path' },

@@ -15,6 +15,7 @@
  *
  * Pure module — no React, no `window`.
  */
+import { decodeCostToDriveKey } from './costToDriveKey';
 import { parseChartUrl, chartConfigFromParsed, vehicleIdsOfLink, withDefaultsWrittenOut } from './chartUrlState';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig, defaultEpaConfig } from './chartDefaults';
 import { DEFAULT_READER_MODE, DEFAULT_CORRECTION_TARGET } from './correctionSettings';
@@ -265,6 +266,7 @@ export function chartStateOf(comparison, index, vehicles) {
         roadTripConfig: { ...defaultRoadTripConfig(), ...(parsed.roadTrip ?? {}) },
         epaConfig:      { ...defaultEpaConfig(), ...(parsed.epa ?? {}) },
         pairings:       parsed.pairings ?? {},
+        costToDrive:    decodeCostToDriveKey(parsed.costToDrive).settings,
         vehicleIds,
     };
 }

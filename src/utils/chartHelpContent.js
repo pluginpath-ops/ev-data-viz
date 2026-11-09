@@ -255,6 +255,106 @@ export const CHART_HELP_DEFAULTS = {
             'to 95% can use: past it every plan is blank or the same trip as the row below.',
     },
 
+    drivecost: {
+        title: 'About Compare',
+        data_source:
+            'Prices the week you set on Your Driving (or in the sidebar) for each selected ' +
+            'vehicle, and the same week in your gas car. Highway miles are priced from ' +
+            'EVBench’s range tests, corrected to your speed, season and elevation; city ' +
+            'miles from the EPA highway figure, corrected the same way. A car with no ' +
+            'range test is priced from EPA for both, and says so. Fast-stop minutes come ' +
+            'from the car’s own charging curve where EVBench has one.',
+        how_to_read:
+            'Each card gives a car’s two answers against your gas car: what it saves (or ' +
+            'costs) a month, and the time it adds (or saves) a month, with its fast stops. Everything here is a month: the simulated week × 52 ÷ 12. The first chart stacks ' +
+            'home charging (solid) and fast charging (striped) per car beside the gas bill; the second sets fast-charging ' +
+            'minutes against fill-up minutes. Months are for the season shown; the card’s ' +
+            'year line blends winter months with summer ones. Winter is a floor: denser air ' +
+            'and cabin heat are priced, battery warming and cold tires are not. The gas car ' +
+            'loses mpg in the cold too: about 15% city and 7% highway at 20°F, none from 75°F up.',
+        key_terms:
+            'Fast stop — a stop on the route, when a day runs short of home charging.\n' +
+            'Stop to charge by — the battery level a stop is made at.\n' +
+            'Charge no higher than — where a stop ends, stretched to 80% when that saves a second stop.\n' +
+            'Keep battery above — the floor the whole day stays over.\n' +
+            'Planned fast charge — a day you fast charge anyway, topping up to the cap.',
+        math_approach:
+            'The week is simulated hour by hour, three times over so Monday starts from a ' +
+            'settled battery, and the third week is reported. Home charging is the lesser ' +
+            'of your charger and the car’s onboard charger, through the window you plug in, ' +
+            'with charger losses. A stop’s minutes are the curve’s, plus the detour and the ' +
+            'time to start and pay; fast energy is bought with its charging loss. A month is ' +
+            'the week × 52 ÷ 12.',
+    },
+
+    driveplan: {
+        title: 'About the Weekly Charging Plan',
+        data_source:
+            'One selected vehicle through the week you set on Your Driving (or in the ' +
+            'sidebar), priced the same way as Compare: highway miles from EVBench’s ' +
+            'range tests, city miles from the EPA highway figure, both corrected to your ' +
+            'speed, season and elevation; fast-stop minutes from the car’s own charging ' +
+            'curve where EVBench has one.',
+        how_to_read:
+            'Pick the chart above it. "Day by day" goes in time order. Each day’s grey bar ' +
+            'is the day out, from that morning’s battery (the tick) to where the car ' +
+            'gets home. A fast stop on the route sits inside it, striped orange, at the ' +
+            'levels it charged between; a planned fast charge is solid orange. The bar in ' +
+            'the car’s color is the night at home, up to the next morning, where a dashed ' +
+            'line hands over to the next day. The grey bar is how far the battery fell, so ' +
+            'a day with a stop used more than it shows; hover a day for both. "Charge in and ' +
+            'used" draws the same figures from zero: charge in above, driving below.\n' +
+            '"The week as a line" is range left, in miles on the left and the battery’s percent on the ' +
+            'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +
+            'at home overnight. Each orange band is a fast stop, labelled with its minutes ' +
+            '(detour and time to start and pay in); a lighter one is a planned fast charge. ' +
+            'The dashed lines at 10% and 80% mark the everyday range. Under the chart, ' +
+            'the week as a table, a column a day: the fast-charging rows (stops, time, ' +
+            'cost) are outlined in orange, and "Ready at" gives the time the night filled ' +
+            'the battery, or the end of your plug-in window when it ran out. Compare with the other ' +
+            'season or another home charger in a second chart below, and open your gas ' +
+            'car’s week to see its fill-ups.',
+        key_terms:
+            'Fast stop — a stop on the route, when a day runs short of home charging.\n' +
+            'Planned fast charge — a day you fast charge anyway; skipped when already above the cap.\n' +
+            'Home adds — what the night’s window put back, through your charger and the car’s onboard charger.\n' +
+            'Ready at — where the battery stands when the next day starts.',
+        math_approach:
+            'Three weeks are simulated and the third shown, so Monday starts from what ' +
+            'Sunday night left. Long days drive 7 am to 6 pm, ordinary days an hour each ' +
+            'way. A stop is made at “stop to charge by” (later, when the day starts below ' +
+            'it) and adds enough to finish the day above “keep battery above”. Range in ' +
+            'miles is the week’s miles per percent of battery, detours in.',
+    },
+
+    drivecharger: {
+        title: 'About Home Charger',
+        data_source:
+            'The week you set on Your Driving, priced for each selected vehicle at every ' +
+            'home charger level, everything else as you set it. Priced the same way as ' +
+            'the Compare sub-tab.',
+        how_to_read:
+            'Each column is what a car costs a month with that charger at home (the week × 52 ÷ 12, as on Compare): home ' +
+            'charging underneath in its color, fast charging on top striped in it over a muted ' +
+            'shade, the total over it, and the home figure on the home part when there is fast charging too. The faster the charger, the more the night ' +
+            'covers and the smaller the fast part. The table has a column a charger and, ' +
+            'for each car, its minutes of fast charging and its home, fast and total cost ' +
+            'per month. The bold orange cell is “enough from here”: the smallest charger past ' +
+            'which a bigger one saves less than five minutes a week (about 20 a month). A ^ means the car’s own ' +
+            'onboard charger, not the wall, sets the pace, so a bigger charger buys nothing.',
+        key_terms:
+            'Home charger — 120 V on a wall outlet, or 240 V at the amps the circuit allows.\n' +
+            'Onboard charger — the car’s own AC charger; it limits how fast any home charger can fill it.\n' +
+            'Enough from here — where a bigger charger stops making a difference you would notice.',
+        math_approach:
+            'Power at home is the lesser of volts × amps and the car’s onboard charger ' +
+            '(11.5 kW assumed when the spec is blank), with charger losses: at 240 V the car’s ' +
+            'own EPA certification figure where it has one, else the site-wide one; on a 120 V ' +
+            'outlet that scaled down to 80% for a car at the site-wide figure. Each level runs ' +
+            'the whole week simulation again. Winter below 40°F, parked outside, costs more than ' +
+            'shown: the car warms its battery before it charges, which is not priced.',
+    },
+
     perfcompare: {
         title: 'About the Performance Compare chart',
         data_source:

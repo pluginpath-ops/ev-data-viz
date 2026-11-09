@@ -62,6 +62,8 @@ const NAMES_V1 = [
     'sf', 'ss', 'scx', 'scy', 'epa_ya', 'epa_m', 'epa_ov',
     'vt_preset', 'vt_cols', 'vt_sort', 'vt_dir', 'vt_win', 'vt_add', 'vt_home', 'vt_fast', 'vt_basis',
     'q', 'rt_otd', 'rt_oc', 'rt_bp', 'rt_osn', 'rt_osx',
+    // Cost to Drive: its key (costToDriveKey.js), carried as a string.
+    'cd',
 ];
 
 // Values that recur: tabs, modes, axes, chart types, units, presets, and the
@@ -120,6 +122,9 @@ const WORDS_V1 = [
     'interior.front_ventilated_seats', 'interior.rear_heated_seats', 'interior.heated_steering_wheel',
     'interior.sound_system_speakers', 'interior.sound_system_watts',
     'optimizer', 'map', 'avgSpeed',
+    // Cost to Drive's tab and its sub-tabs, all four appended at once so the
+    // later layers of the stack need not touch this table.
+    'cost', 'drivesetup', 'drivecost', 'driveplan', 'drivecharger',
 ];
 
 /**

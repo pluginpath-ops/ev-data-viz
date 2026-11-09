@@ -723,6 +723,14 @@
     color: var(--color-text-on-nav);
     font-weight: 600;
 }
+/* "Guide me" in the last nav slot (the setup wizard): an outlined button among
+   the tabs, because it opens a modal rather than a page. */
+.nav-guide {
+    align-self: center;
+    margin-left: 8px;
+    flex: none;
+    white-space: nowrap;
+}
 .btn-tab:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -1040,6 +1048,55 @@ body {
     font-weight: 600;
     background-color: var(--color-primary-surface);
     color: var(--color-primary-text);
+}
+
+/* What tells two lookalikes apart, one line under the name in a type-ahead list
+ * — make, trim, platforms. Micro, because it is the same vehicle said again,
+ * not a second thing to read. Wraps rather than truncating: the detail is the
+ * only reason the row exists. */
+.option-row-detail {
+    display: block;
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    font-weight: 400;
+    color: var(--color-text-muted);
+}
+
+/* A picker's chosen vehicle, closed (VehicleCombobox): a chip to act on, and
+ * beside it the detail that tells lookalikes apart. The chip is the same kind
+ * of thing as .selected-vehicle-chip — a removable pill for a chosen vehicle —
+ * without that one's accent border, since no color has been chosen here. The
+ * row wraps: a long detail drops under the chip instead of being cut off. */
+.combobox-selected {
+    @apply flex flex-wrap items-center gap-x-2 gap-y-1;
+}
+.combobox-chip {
+    @apply inline-flex items-center;
+    max-width: 100%;
+    border-radius: var(--radius-chip);
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+/* Reopens the search. A button so it is reachable by keyboard; it carries no
+   chrome of its own, the chip is the pill. */
+.combobox-chip-label {
+    padding: 3px 4px 3px 9px;
+    text-align: left;
+    border-radius: var(--radius-chip) 0 0 var(--radius-chip);
+}
+.combobox-chip-label:hover { background-color: var(--color-hover-lift); }
+/* Clears the choice. */
+.combobox-chip-clear {
+    @apply flex items-center justify-center;
+    align-self: stretch;
+    padding: 0 8px 0 4px;
+    line-height: 1;
+    border-radius: 0 var(--radius-chip) var(--radius-chip) 0;
+}
+.combobox-chip-clear:hover { background-color: var(--color-hover-lift); }
+.combobox-detail {
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-muted);
 }
 
 /* Where a file is dropped. Two importers had the same rectangle, and both said
@@ -1427,6 +1484,18 @@ body {
     color: var(--color-primary-text, #fff);
 }
 .account-action { width: 100%; justify-content: center; }
+/* The email opt-in: a checkbox with a one-line promise under its label. */
+.account-opt-in {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+}
+.account-opt-in input { margin-top: 2px; }
+.account-opt-in-label {
+    font-size: var(--fs-control, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-primary);
+}
 
 /* ── Modals ─────────────────────────────────────────────────────────────────── */
 
@@ -5254,6 +5323,23 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: #1f1f1f;
 }
 .auth-provider-btn.is-google:hover { background-color: #f8f9fa; }
+
+/* What we keep and what we promise, under the sign-in buttons. */
+.auth-privacy {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+}
+.auth-privacy ul {
+    @apply list-disc;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+    padding-left: 1.1em;
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-secondary);
+}
 
 
 /* ── Import Tableau Modal ───────────────────────────────────────────────────── */
@@ -9709,4 +9795,453 @@ a.is-test-link:focus-visible {
 .events-bar {
     height: 100%;
     background-color: var(--color-primary);
+}
+
+
+/* ── Cost to Drive (docs/cost-to-drive-plan.md) ──────────────────────────────
+   Your Driving's cards, and the fields it shares with the sidebar. Every
+   number is one row — label, a narrow box, its unit — so the boxes line up
+   down a card (owner, 2026-11-07). Rows of cards stretch to one height. */
+.drive-page {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 80rem;
+    margin: 0 auto;
+}
+/* A link whose key could not be read: the defaults are shown, and this says so. */
+.drive-link-error {
+    padding: 8px 12px;
+    color: var(--color-warning-text);
+    background-color: var(--color-warning-surface);
+    border: 1px solid var(--color-warning-border);
+    border-radius: var(--radius-control);
+}
+.drive-intro {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: stretch;
+}
+.drive-intro-text {
+    flex: 1 1 26rem;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+}
+.drive-intro-text p { max-width: 40rem; }
+.drive-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+/* Wide enough for a full vehicle name beside its two figures: it shares the
+   row evenly with the intro rather than taking only what the intro leaves. */
+.drive-preview {
+    flex: 1 1 30rem;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+}
+.drive-preview-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 12px;
+    align-items: center;
+}
+.drive-preview-missing { grid-column: span 2; }
+/* The two answers against the gas car: money saved (or not) and time spent.
+   Saving is good news in the success role, costing more in the danger role;
+   time is a cost the reader weighs, in the warning role. */
+.drive-figure {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.drive-figure.is-saving { color: var(--color-success-text); }
+.drive-figure.is-costing { color: var(--color-danger-text); }
+.drive-figure.is-time { color: var(--color-warning-text); }
+/* A vehicle's series color as a dot; the color itself is the vehicle's, set inline. */
+.drive-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: none;
+}
+
+.drive-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 16px;
+    align-items: stretch;
+}
+/* The week beside fast charging: a stop is part of the week. */
+.drive-row.is-week { grid-template-columns: minmax(0, 1.75fr) minmax(22rem, 1fr); }
+@media (max-width: 68.75rem) {
+    .drive-row.is-week { grid-template-columns: minmax(0, 1fr); }
+}
+.drive-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+}
+.drive-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    padding: 12px 16px;
+    background-color: var(--color-surface-muted);
+    border-bottom: 1px solid var(--color-border);
+}
+.drive-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex-grow: 1;
+    padding: 16px;
+}
+/* A note at the foot of a card sits at the bottom, whatever the card beside it holds. */
+.drive-card-body > .text-note:last-child { margin-top: auto; }
+/* Efficiency from: one strip, its parts side by side. */
+.drive-card.is-strip .drive-card-body {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 20px;
+}
+.drive-card.is-strip .drive-choice { flex: 0 0 16rem; }
+.drive-card.is-strip .text-note { flex: 1 1 24rem; margin-top: 0; }
+
+.drive-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 4.75rem 2.75rem;
+    gap: 8px;
+    align-items: center;
+}
+.drive-field.is-wide { grid-template-columns: minmax(0, 1fr) auto; }
+.drive-field-input {
+    width: 100%;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.drive-slider { display: flex; flex-direction: column; gap: 4px; }
+.drive-slider-head,
+.drive-slider-ends { display: flex; justify-content: space-between; gap: 8px; }
+.drive-choice { align-self: stretch; }
+.drive-choice button { flex: 1; padding-block: 9px; }
+
+.home-levels {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    border: 0;
+    padding: 0;
+    margin: 0;
+}
+.home-levels legend { margin-bottom: 6px; }
+.home-level {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 6px 10px;
+    cursor: pointer;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+}
+.home-level input { accent-color: var(--color-primary); }
+.home-level.is-on {
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
+}
+.home-level-text { display: flex; flex-direction: column; }
+
+.week-picker {
+    display: grid;
+    grid-template-columns: 8.25rem repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    align-items: center;
+}
+.week-picker-label { display: flex; flex-direction: column; line-height: 1.3; }
+.week-day {
+    height: 64px;
+    padding: 0 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-muted);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+}
+.week-day.is-L {
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
+}
+.week-day.is-O { background-color: var(--color-surface-sunken); }
+.week-day-type { font-weight: 600; white-space: nowrap; }
+.week-planned {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    color: var(--color-text-meta);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+}
+.week-planned input { accent-color: var(--color-accent-orange); }
+.week-planned.is-on {
+    color: var(--color-warning-text);
+    background-color: var(--color-accent-orange-surface);
+    border-color: var(--color-accent-orange);
+}
+/* The sidebar's: seven one-letter days, the planned day a select. */
+.week-picker.is-compact { display: flex; flex-direction: column; gap: 8px; }
+.week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.week-picker.is-compact .week-day { height: 48px; }
+.day-types {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17.5rem, 1fr));
+    gap: 12px;
+}
+.day-type {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-control);
+}
+.day-type-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+
+/* Compare: a card per car below the charts, the two answers large. */
+.drive-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.drive-result {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px;
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+}
+.drive-result-figures {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 16px;
+    font-size: calc(var(--fs-body) * 1.2857);
+}
+.drive-missing { margin-bottom: 12px; }
+
+/* Weekly Charging Plan: the vehicle and the week's line above the chart, the
+   comparison picker below it. */
+.plan-controls,
+.plan-compare {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-bottom: 12px;
+}
+.plan-compare { margin: 16px 0 0; }
+/* One labelled dropdown in the plan's controls: Vehicle, Chart. */
+.plan-control { display: inline-flex; align-items: center; gap: 8px; }
+.plan-control .form-input { width: auto; max-width: 22rem; }
+/* The Weekly Charging Plan's table, transposed: a column a day, a row a
+   figure. The fast-charging rows are outlined in the chart's stop color. */
+.plan-table .plan-table-label { font-weight: 600; }
+.plan-table-footnote { padding: 6px 10px; }
+/* A vehicle's rows in a transposed table (Home Charger): its name on a row of its own. */
+.plan-table .plan-table-group > td { font-weight: 600; background-color: var(--color-surface-muted); }
+/* Home Charger: the level where a bigger charger stops helping, in the
+   chart's stop orange so it stands out; the footnote's key uses the same class. */
+.plan-table td.is-enough,
+.plan-table-footnote .is-enough { font-weight: 700; color: var(--color-accent-orange); }
+.plan-table tr.is-fast > td { background-color: color-mix(in srgb, var(--color-accent-orange) 8%, transparent); }
+.plan-table tr.is-fast > td:first-child { border-left: 1px solid var(--color-accent-orange); }
+.plan-table tr.is-fast > td:last-child { border-right: 1px solid var(--color-accent-orange); }
+.plan-table tr.is-fast-first > td { border-top: 1px solid var(--color-accent-orange); }
+.plan-table tr.is-fast-last > td { border-bottom: 1px solid var(--color-accent-orange); }
+
+/* ── Show the math (calculation trace) ────────────────────────────────────
+   One pass of a page's own math, written down by the code that did it
+   (utils/calcTrace.js, components/calcTrace/). A nested chain is indented
+   behind a rule; a formula is mono; the result sits at the end of its line. */
+.calc-trace-body { @apply flex flex-col gap-3; }
+.calc-trace-pick { @apply flex items-center gap-2; }
+.calc-trace-summary {
+    @apply font-mono;
+    font-size: var(--fs-data, var(--fs-body));
+    color: var(--color-text-primary);
+}
+.calc-trace-list { display: grid; row-gap: 0.5rem; list-style: none; padding: 0; margin: 0; }
+.calc-trace-group { @apply mt-1; }
+.calc-trace-group > .calc-trace-list {
+    @apply mt-2 pl-3;
+    border-left: 1px solid var(--color-border-strong);
+}
+.calc-trace-group-title {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: var(--fs-body);
+    color: var(--color-text-secondary);
+}
+.calc-trace-step { @apply flex flex-col gap-0.5; }
+.calc-trace-step-head { @apply flex flex-wrap items-baseline gap-2; }
+.calc-trace-label { font-size: var(--fs-body); color: var(--color-text-primary); }
+.calc-trace-result {
+    @apply font-mono tabular-nums ml-auto;
+    font-size: var(--fs-data, var(--fs-body));
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+.calc-trace-formula {
+    @apply font-mono;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    color: var(--color-text-secondary);
+}
+.calc-trace-formula.is-filled { color: var(--color-text-meta); }
+.calc-trace-values {
+    @apply flex flex-wrap gap-x-4 gap-y-1 font-mono tabular-nums;
+    list-style: none; padding: 0; margin: 0;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    color: var(--color-text-secondary);
+}
+.calc-trace-name { @apply font-mono; color: var(--color-text-primary); }
+.calc-trace-note { font-size: calc(var(--fs-body) * var(--fs-step)); color: var(--color-text-secondary); }
+.calc-trace-constants {
+    @apply w-full mt-2 font-mono tabular-nums;
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    border-collapse: collapse;
+}
+.calc-trace-constants th {
+    @apply text-left py-1 pr-3;
+    font-family: var(--font-mono);
+    color: var(--color-text-meta);
+    border-bottom: 1px solid var(--color-border);
+}
+.calc-trace-constants td {
+    @apply py-1 pr-3;
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* ── Setup wizard ─────────────────────────────────────────────────────────
+   A few skippable questions that set the site up for a new reader
+   (components/setup/). The choice card is the Home Charger picker's radio card
+   (.home-level) as a button; if the wizard stays, the two want one class. */
+
+.setup-invite {
+    @apply flex flex-wrap items-center gap-3;
+}
+/* Under an empty chart's line, centered with it. */
+.setup-invite.is-centered {
+    @apply flex-col justify-center gap-2 mt-4;
+}
+.setup-panel {
+    @apply mx-4 flex flex-col;
+    max-width: min(94vw, 560px);
+    max-height: 90vh;
+}
+.setup-header {
+    @apply px-6 py-4;
+    border-bottom: 1px solid var(--color-border);
+}
+.setup-step-body {
+    @apply flex flex-col gap-4;
+}
+.setup-choices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    border: 0;
+    padding: 0;
+    margin: 0;
+}
+.setup-choices.is-single { grid-template-columns: minmax(0, 1fr); }
+.setup-choices legend { margin-bottom: 6px; }
+.setup-choice {
+    @apply flex flex-col items-start text-left;
+    gap: 2px;
+    min-height: 44px;
+    padding: 8px 12px;
+    cursor: pointer;
+    background-color: var(--color-surface-input);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+}
+.setup-choice:hover { border-color: var(--color-border-strong); }
+.setup-choice.is-on {
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
+}
+.setup-field {
+    @apply flex flex-col gap-1;
+}
+.setup-field .stats-segmented { align-self: flex-start; flex-wrap: wrap; }
+/* The car search's list is absolutely placed under the field (max-h-52, 13rem)
+   and the modal body scrolls, so the field keeps that much room below it —
+   otherwise the list opens under the footer. */
+.setup-car-search {
+    min-height: 16rem;
+    scroll-margin-top: 8px;
+}
+.setup-number {
+    @apply flex items-center gap-2;
+}
+.setup-number-input {
+    width: 6.5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.setup-summary {
+    @apply flex flex-col gap-2;
+    margin: 0;
+}
+.setup-summary-row {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    gap: 12px;
+}
+.setup-summary-row dd { margin: 0; }
+.setup-footer-gap { flex: 1 1 auto; }
+@media (max-width: 480px) {
+    .setup-choices { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The setup wizard's review bar: the chosen charts at the foot of the window
+   (SetupReviewBar.jsx). A .fixed-action-bar, so it overlays rather than moves
+   the page; below the notice bar (z-60) when both show. */
+.review-bar { z-index: 50; }
+.review-bar-row {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-2 py-2;
+}
+.review-bar-season {
+    @apply flex flex-wrap items-center gap-2;
+}
+/* The fill marks the season on the charts; bold as well would widen it and
+   nudge its neighbour on every click. */
+.review-bar-season .stats-segmented button.active { font-weight: inherit; }
+.review-bar-end {
+    @apply flex items-center gap-2 ml-auto;
 }

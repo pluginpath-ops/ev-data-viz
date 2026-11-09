@@ -53,6 +53,7 @@
 import { isListed, isExcluded } from './runListing';
 import { correctionFactor, applyCorrection, correctionNote, runConditions } from './conditionCorrection';
 import { isRangeRun } from './runUtils';
+import { val } from './calcTrace';
 
 /**
  * Sentinel partner id for "use the vehicle's EPA range".
@@ -115,12 +116,17 @@ export function epaRangeOption(vehicle) {
  * Guards the degenerate cases: no distance, missing SoC bounds, and
  * start === end (which would divide by zero and yield Infinity miles/%).
  */
-export function miPerSocFrom(run) {
+export function miPerSocFrom(run, trace = null) {
     if (!run?.distance_miles) return null;
     const { start_soc: start, end_soc: end } = run;
     if (start == null || end == null) return null;
     const socDelta = start - end;
     if (!(socDelta > 0)) return null;
+    trace?.step('Miles per % SoC', {
+        formula: 'mi/% = d / (SoC_start − SoC_end)',
+        values: { d: val(run.distance_miles, 'mi', 'data'), SoC_start: val(start, '%', 'data'), SoC_end: val(end, '%', 'data') },
+        result: run.distance_miles / socDelta, unit: 'mi/%',
+    });
     return run.distance_miles / socDelta;
 }
 
@@ -132,10 +138,14 @@ export function miPerSocFrom(run) {
  *
  * Returns { miPerKwh, method } so callers can label an estimate as one.
  */
-export function miPerKwhFrom(run, batteryKwh) {
+export function miPerKwhFrom(run, batteryKwh, trace = null) {
     if (!run?.distance_miles) return { miPerKwh: null, method: null };
 
     if (run.energy_kwh) {
+        trace?.step('Efficiency, measured', {
+            formula: 'mi/kWh = d / E', values: { d: val(run.distance_miles, 'mi', 'data'), E: val(run.energy_kwh, 'kWh', 'data') },
+            result: run.distance_miles / run.energy_kwh, unit: 'mi/kWh',
+        });
         return { miPerKwh: run.distance_miles / run.energy_kwh, method: 'measured-energy' };
     }
 
@@ -145,10 +155,17 @@ export function miPerKwhFrom(run, batteryKwh) {
     if (socDelta > 0 && batteryKwh > 0) {
         const energyEst = (socDelta / 100) * batteryKwh;
         if (energyEst > 0) {
+            trace?.step('Efficiency, estimated from SoC', {
+                formula: 'mi/kWh = d / (ΔSoC / 100 × E_pack)',
+                values: { d: val(run.distance_miles, 'mi', 'data'), ΔSoC: val(socDelta, '%', 'data'), E_pack: val(batteryKwh, 'kWh', 'data') },
+                result: run.distance_miles / energyEst, unit: 'mi/kWh', assumed: true,
+                note: 'no energy recorded: the SoC used is priced at the vehicle\'s capacity',
+            });
             return { miPerKwh: run.distance_miles / energyEst, method: 'soc-delta-estimate' };
         }
     }
 
+    trace?.note('No energy and no SoC window: no efficiency');
     return { miPerKwh: null, method: null };
 }
 
@@ -228,13 +245,20 @@ function buildNote(source, sourceRun, energyMethod) {
  * The conditions come from conditionCorrection.runConditions, which says whose
  * reading wins when the run and its session both have one.
  */
-function correctBasis(basis, run, correction, session) {
+function correctBasis(basis, run, correction, session, trace = null) {
     if (!correction || correction.mode === 'none' || !correction.mode) {
+        trace?.note('Correction off: the test\'s figures as measured');
         return { ...basis, correction: null };
     }
-    const result = correctionFactor(runConditions(run, session), correction);
+    const result = correctionFactor(runConditions(run, session), trace ? { ...correction, trace: trace.group('Correction factor') } : correction);
+    const corrected = applyCorrection(basis, result.factor);
+    trace?.step('Corrected basis', {
+        formula: 'mi/% = mi/%_test × k',
+        values: { 'mi/%_test': val(basis.miPerSoc, 'mi/%'), k: result.factor },
+        result: corrected.miPerSoc, unit: 'mi/%', note: 'mi/kWh takes the same factor',
+    });
     return {
-        ...applyCorrection(basis, result.factor),
+        ...corrected,
         correction: { ...result, note: correctionNote(result) },
     };
 }
@@ -253,6 +277,7 @@ export function resolveRangeSource(chargingRun, {
     // (tripEfficiency.js): a trip has a speed of its own.
     correction = null,          // { mode, target, aeroFraction } | null
     session = null,             // supplies altitude/temperature the run omits
+    trace = null,               // calcTrace.js, for "Show the math"
 } = {}) {
     const none = {
         source: 'none', sourceRun: null,
@@ -266,6 +291,10 @@ export function resolveRangeSource(chargingRun, {
     // measured test on this vehicle is always the better default.
     const wantsEpa = isEpaPartnerId(explicitPairing) || isEpaPartnerId(explicitPairing?.id);
     if (wantsEpa && vehicle?.epaRangeMi > 0) {
+        trace?.step('EPA range, chosen as the basis', {
+            formula: 'mi/% = R_EPA / 100', values: { R_EPA: val(vehicle.epaRangeMi, 'mi', 'data') },
+            result: vehicle.epaRangeMi / 100, unit: 'mi/%', note: 'rated range is a full-pack figure; never corrected',
+        });
         return {
             source: 'epa',
             sourceRun: epaRangeOption(vehicle),
@@ -290,10 +319,11 @@ export function resolveRangeSource(chargingRun, {
         // 'same-run' label rather than reading as inherited from elsewhere.
         if (source === 'default-range' && run.id === chargingRun.id) continue;
 
-        const { miPerKwh, method } = miPerKwhFrom(run, batteryKwh);
+        trace?.note(`Basis: ${{ paired: 'the range test paired with this charging test', 'default-range': 'the vehicle\'s default range test', 'same-run': 'this test\'s own range data' }[source]}, ${run.name ?? `test ${run.id}`}`);
+        const { miPerKwh, method } = miPerKwhFrom(run, batteryKwh, trace);
         // The conditions belong to the RANGE test, which is what measured the
         // miles — not to the charging run being priced.
-        const corrected = correctBasis({ miPerSoc: miPerSocFrom(run), miPerKwh }, run, correction, session);
+        const corrected = correctBasis({ miPerSoc: miPerSocFrom(run, trace), miPerKwh }, run, correction, session, trace);
         return {
             source,
             sourceRun: run,
@@ -309,6 +339,7 @@ export function resolveRangeSource(chargingRun, {
     // the miles come from interpolating the caller's data points, not from a
     // scalar, so there is nothing to return but the provenance.
     if (hasRecordedRange) {
+        trace?.note('No range test: the charging test\'s own recorded range column, read point by point');
         return {
             source: 'recorded', sourceRun: null,
             miPerSoc: null, miPerKwh: null, energyMethod: null,
@@ -317,4 +348,18 @@ export function resolveRangeSource(chargingRun, {
     }
 
     return none;
+}
+
+/**
+ * The range basis of one Charge Stop row: its range test (or the EPA row) as
+ * the explicit pairing. Charge Stop and its "Show the math" both call this.
+ */
+export function pairRangeSource(chargingRun, rangeRun, { vehicle, correction = null, session = null, trace = null } = {}) {
+    return resolveRangeSource(chargingRun, {
+        vehicle,
+        explicitPairing: isEpaPartnerId(rangeRun?.id) ? EPA_PARTNER_ID : rangeRun,
+        correction,
+        session,
+        trace,
+    });
 }

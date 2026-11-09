@@ -2,7 +2,7 @@ import VehicleCombobox from './VehicleCombobox';
 import NumberInput from './NumberInput';
 import InfoIcon from './InfoIcon';
 import { descendantIds } from '../utils/vehicleInheritance';
-import { packKwh, vehicleDetailLabel, vehicleLabel, vehicleSearchText } from '../utils/specHelpers';
+import { packKwh, vehicleLabel, vehicleOption } from '../utils/specHelpers';
 
 /* Two packs "differ" past this, in either direction. Usable figures for one
    pack are often quoted a percent apart (the R2s: 87.9 and 88.7 kWh); a pack of
@@ -41,7 +41,7 @@ export default function SourceVehiclePicker({ vehicle, vehicles = [], value, onC
     const options = vehicles
         .filter(v => v.id !== vehicle?.id && !excluded.has(v.id))
         .sort((a, b) => vehicleLabel(a).localeCompare(vehicleLabel(b)))
-        .map(v => ({ id: v.id, label: vehicleDetailLabel(v), search: vehicleSearchText(v) }));
+        .map(vehicleOption);
 
     const sourceId = value.spec_source_vehicle_id;
     const source = sourceId != null ? vehicles.find(v => String(v.id) === String(sourceId)) : null;

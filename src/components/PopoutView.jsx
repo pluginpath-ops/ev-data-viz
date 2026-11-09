@@ -10,7 +10,7 @@ import EpaCurveExplorer from './epa/curves/EpaCurveExplorer';
  */
 export default function PopoutView({
     vehicles, selectedVehicles, chartMode, chartConfig,
-    setChartConfig, compareConfig, roadTripConfig, epaConfig, pairings, onUpdateRunColor, epaExplorer,
+    setChartConfig, compareConfig, roadTripConfig, epaConfig, pairings, onUpdateRunColor, epaExplorer, costToDrive,
 }) {
     // The EPA curve explorer is not a chart mode and needs no vehicle selection,
     // so when the main tab is on it nothing below applies (#259).
@@ -47,6 +47,7 @@ export default function PopoutView({
                 roadTripConfig={roadTripConfig}
                 epaConfig={epaConfig}
                 pairings={pairings}
+                costToDrive={costToDrive}
             />
         </div>
     );

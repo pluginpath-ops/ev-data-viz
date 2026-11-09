@@ -7,7 +7,9 @@ import { useLightDismiss } from '../../hooks/useLightDismiss';
  * It replaces a `Sign In` button that cost 111px of a 375px bar — a quarter of
  * the width, spent on the one action a returning reader has already taken. It
  * is one 30px circle now, at every width, and what used to sit beside it in the
- * bar sits inside it: the signed-in email, the role, and the unit system.
+ * bar sits inside it: the signed-in email, the role, and the unit system. The
+ * email opt-in (migration 097) lives here too: it is the one place a signed-in user's
+ * own settings gather.
  *
  * The units toggle MOVED here rather than being copied. It lived in the
  * selection strip, which is a strip about vehicles; a preference that repaints
@@ -25,7 +27,7 @@ function PersonIcon() {
     );
 }
 
-export default function AccountMenu({ user, userRole, units, onToggleUnits, onSignIn, onSignOut }) {
+export default function AccountMenu({ user, userRole, emailOptIn, onEmailOptInChange, units, onToggleUnits, onSignIn, onSignOut }) {
     const [open, setOpen] = useState(false);
     const ref = useLightDismiss(open, () => setOpen(false));
 
@@ -82,6 +84,22 @@ export default function AccountMenu({ user, userRole, units, onToggleUnits, onSi
                             ))}
                         </div>
                     </div>
+
+                    {/* Off until the user ticks it (migration 097). Hidden, not
+                        disabled, while the column does not exist yet. */}
+                    {user && emailOptIn !== null && (
+                        <label className="account-opt-in">
+                            <input
+                                type="checkbox"
+                                checked={emailOptIn}
+                                onChange={e => onEmailOptInChange(e.target.checked)}
+                            />
+                            <span className="flex flex-col gap-0.5">
+                                <span className="account-opt-in-label">Email me</span>
+                                <span className="text-caption">Rare emails about major changes, at most once a quarter.</span>
+                            </span>
+                        </label>
+                    )}
 
                     <button
                         type="button"
