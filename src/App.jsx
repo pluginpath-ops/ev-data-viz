@@ -57,6 +57,8 @@ import { applyVehicleBases, withVehicleBase, NO_VEHICLE_BASES } from './utils/ve
 import { VehicleBaseContext } from './context/VehicleBaseContext';
 import VehicleSwatch from './components/VehicleSwatch';
 import VehicleQuickAdd from './components/VehicleQuickAdd';
+import SavedSelectionsMenu from './components/SavedSelectionsMenu';
+import { useSavedSelections } from './hooks/useSavedSelections';
 import SelectionEmptyState from './components/SelectionEmptyState';
 import { useStackedStripActions } from './hooks/useStackedStripActions';
 import { buildVehicleLabels } from './utils/seriesLabel';
@@ -138,6 +140,7 @@ export default function App() {
         appNotification,
         clearNotification,
         showError,
+        showSuccess,
         updateVehicleSpecs,
         specCustomFieldSuggestions,
         copyRunToVehicle,
@@ -253,6 +256,13 @@ export default function App() {
         [selectedVehicles, vehicles]);
     // Keyed on the chips' names, so a name that widens re-measures too.
     const stackStripActions = useStackedStripActions(stripRowRef, chipScrollRef, stripActionsRef, chipNames);
+    // Held here, not in the menu, so the list and the one last loaded outlive
+    // the chips row hiding on Home, EPA and the rest.
+    const savedSelections = useSavedSelections({
+        userId: user?.id ?? null,
+        onMoved: (count) => showSuccess(
+            `${count} saved selection${count === 1 ? '' : 's'} moved from this browser to your account.`),
+    });
     const chartVehicles = useMemo(
         () => applyVehicleBases(vehicles, vehicleBases), [vehicles, vehicleBases]);
     const vehicleBaseApi = useMemo(() => ({
@@ -1101,7 +1111,15 @@ export default function App() {
                           * and Clear sit outside the scroller so the way
                           * out of a large selection never scrolls away. */}
                         <div className="selected-strip-row" ref={stripRowRef}>
-                            <span className="text-micro">Selected</span>
+                            {/* The label: "Selected ▾", or the saved
+                              * selection's name when the chips are one. */}
+                            <SavedSelectionsMenu
+                                store={savedSelections}
+                                selection={selectedVehicles}
+                                vehicles={chartVehicles}
+                                onSelect={setVehicleSelection}
+                                onSignIn={user ? undefined : () => setShowAuthModal(true)}
+                            />
                             {selectedVehicles.length === 0 ? (
                                 <span className="text-meta">None</span>
                             ) : (

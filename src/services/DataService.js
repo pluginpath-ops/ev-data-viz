@@ -876,6 +876,77 @@ class DataService {
     }
   }
 
+  // ── Saved selections (096) ────────────────────────────────────────────────
+  //
+  // The signed-in reader's own named vehicle sets; RLS shows each user only
+  // theirs. Signed out, useSavedSelections keeps them in the browser instead.
+  // Raw rows; utils/savedSelections.js normalizes them.
+
+  /**
+   * Resilient like getFeaturedComparisons: a missing table (096 not yet
+   * applied) is null and a console note, so the menu can fall back to the
+   * browser rather than break the chips row.
+   */
+  async getSavedSelections() {
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .select('id, name, vehicle_ids')
+      .order('name');
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205') {
+        console.warn('saved_selections unavailable — is migration 096 applied?', error.message);
+        return null;
+      }
+      throw error;
+    }
+    return data || [];
+  }
+
+  /** Insert one or more { name, vehicleIds }. Returns the saved rows. */
+  async addSavedSelections(entries) {
+    if (!entries.length) return [];
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .insert(entries.map(e => ({ name: e.name, vehicle_ids: e.vehicleIds })))
+      .select('id, name, vehicle_ids');
+    if (error) {
+      if (error.code === '23505') throw new Error('You already have a saved selection with that name.');
+      throw error;
+    }
+    return data;
+  }
+
+  /**
+   * Change one: `fields` is { name?, vehicleIds? }. Raises on 0 rows, as every
+   * RLS-filtered update must (the lesson of 087).
+   */
+  async updateSavedSelection(id, fields) {
+    const row = { updated_at: new Date().toISOString() };
+    if (fields.name != null) row.name = fields.name;
+    if (fields.vehicleIds != null) row.vehicle_ids = fields.vehicleIds;
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .update(row)
+      .eq('id', id)
+      .select('id, name, vehicle_ids');
+    if (error) {
+      if (error.code === '23505') throw new Error('You already have a saved selection with that name.');
+      throw error;
+    }
+    if (!data?.length) throw new Error('The saved selection was not changed: it no longer exists.');
+    return data[0];
+  }
+
+  async deleteSavedSelection(id) {
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .delete()
+      .eq('id', id)
+      .select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('The saved selection was not deleted: it no longer exists.');
+  }
+
   // ── Spec links ────────────────────────────────────────────────────────────
 
   async addSpecLink({ targetVehicleId, sourceRunId, efficiencyFactor, capacityFactor, notes }) {
