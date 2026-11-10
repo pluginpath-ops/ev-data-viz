@@ -77,7 +77,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
         if (!vehicle?.id) { setSessions([]); setSummaries([]); setLoaded(true); return; }
         // Guards against a slow response for a previous vehicle landing after a
         // faster one for the vehicle now on screen.
-        let cancelled = false;
+        let canceled = false;
         setLoaded(false);
         (async () => {
             try {
@@ -85,12 +85,12 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                     fetchersRef.current.getPerformanceSessions(vehicle.id),
                     fetchersRef.current.getPerformanceSummaries(vehicle.id),
                 ]);
-                if (!cancelled) { setSessions(s); setSummaries(sum); }
+                if (!canceled) { setSessions(s); setSummaries(sum); }
             } finally {
-                if (!cancelled) setLoaded(true);
+                if (!canceled) setLoaded(true);
             }
         })();
-        return () => { cancelled = true; };
+        return () => { canceled = true; };
     }, [vehicle?.id, reloadToken]);
 
     /** Re-run the fetch effect. Every mutation below routes through this, since

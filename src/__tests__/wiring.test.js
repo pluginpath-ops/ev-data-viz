@@ -117,7 +117,7 @@ describe('utilities built for the UI are reached by the UI', () => {
         'socAlignment.trimRamp':
             'Called by alignSeries and minimumCommonSoc, both of which the chart calls. Exported so the trim can be asserted on its own.',
         'socAlignment.rampLength':
-            'The ramp detector. Called by extrapolationSlope; exported so its behaviour is pinned directly against real R2 data.',
+            'The ramp detector. Called by extrapolationSlope; exported so its behavior is pinned directly against real R2 data.',
         'feGuidePlausibility.HWY_CITY_RATIO_MIN':
             'The bound itself, consumed inside the module by rangePlausibility and asserted by name against the observed real spread.',
         'feGuidePlausibility.HWY_CITY_RATIO_MAX':
@@ -130,11 +130,11 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The band itself, consumed inside the module by statusFor and asserted by name so moving it is a deliberate edit.',
         'epaDerivationCheck.DIVERGENCE_TOLERANCE':
             'As above — the boundary beyond which a difference is larger than any plausible rounding.',
-        'phaseTypes.SS_NEIGHBOUR_MULTIPLE':
+        'phaseTypes.SS_NEIGHBOR_MULTIPLE':
             'The multiple itself, consumed inside the module by suggestPhaseType and asserted by name so changing it is deliberate.',
         'socAlignment.extrapolationSlope':
             'Called by alignSeries, which the chart calls. Exported so the slope basis can be asserted without going through alignment.',
-        'feGuideMatch.normaliseMake':
+        'feGuideMatch.normalizeMake':
             'The make comparison, consumed inside the module by sameMake. Exported so the abbreviation and punctuation rules can be asserted directly.',
         'feGuideMatch.sameMake':
             'The candidate filter, consumed inside the module by rankFeCandidates. Exported so "same manufacturer" is testable without ranking.',
@@ -1003,7 +1003,7 @@ describe('the seams that broke before', () => {
         expect(read('src/components/SpecChart.jsx'), 'the bar/scatter switch lives in the spec chart sidebar').toMatch(/<SpecChartKind mode=\{mode\} onChange=\{onModeChange\} \/>/);
         expect(app, 'a header tab returns to the chart mode last shown under it').toMatch(/onNavigate=\{navigateToTab\}/);
         expect(read('src/components/VehiclesView.jsx'), 'the in-page toggle is gone').not.toMatch(/setViewMode/);
-        expect(read('src/components/shell/SubTabStrip.jsx'), 'sections are labelled').toMatch(/subtab-section-label/);
+        expect(read('src/components/shell/SubTabStrip.jsx'), 'sections are labeled').toMatch(/subtab-section-label/);
         expect(read('src/components/shell/NavMenu.jsx'), 'and survive the collapse').toMatch(/nav-menu-section/);
     });
 
@@ -1297,7 +1297,7 @@ describe('the seams that broke before', () => {
         expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }')), 'getVehicles must read EPA_TEST_VEHICLE_FIELDS')
             .toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
         expect(read('src/utils/epaRecordFromTestVehicle.js'),
-            'the derivation must honour the selection')
+            'the derivation must honor the selection')
             .toMatch(/preferred_test_number/);
     });
 
@@ -1334,7 +1334,7 @@ describe('the seams that broke before', () => {
 
         // One copy of the default's rule. The picker labels a row "Automatic";
         // if that label and the derivation disagreed the control would be
-        // describing behaviour it does not have.
+        // describing behavior it does not have.
         const picker = read('src/components/epa/PreferredTestPicker.jsx');
         expect(picker, 'the picker must use the shared default, not its own copy')
             .toMatch(/defaultMctTest/);
@@ -1399,7 +1399,7 @@ describe('the seams that broke before', () => {
         }
     });
 
-    it('makes no judgement the per-vehicle card does not', () => {
+    it('makes no judgment the per-vehicle card does not', () => {
         // A finding shown in the sweep and not on the vehicle's own card would
         // mean the sweep had grown a second opinion. It calls the four checks
         // and must not define thresholds of its own.
@@ -1526,7 +1526,7 @@ describe('the seams that broke before', () => {
             .toEqual([]);
     });
 
-    it('keeps vehicleLabel out of graph labelling', () => {
+    it('keeps vehicleLabel out of graph labeling', () => {
         // The vehicle's free-text name is a SELECTION label. Charts must compose
         // from atoms instead — see #170.
         const roadTrip = read('src/components/RoadTripView.jsx');
@@ -1584,7 +1584,7 @@ describe('one correction, everywhere it is applied', () => {
 });
 
 describe('the charger current class (#313, migration 092)', () => {
-    it('is written by the form, normalised on the way in and out, and read by the composite', () => {
+    it('is written by the form, normalized on the way in and out, and read by the composite', () => {
         const runs = read('src/components/RunsView.jsx');
         expect(runs, 'both forms offer it').toMatch(/<ChargerCurrentSelect[\s\S]+<ChargerCurrentSelect/);
         expect(runs, 'an edit sends it only when it changed').toMatch(/toChargerCurrent\(chargerCurrentClass\) !== toChargerCurrent\(storedRun\?\.charger_current_class_a\)/);
@@ -1883,7 +1883,7 @@ describe('run color is retired, not merely unused', () => {
  *
  * `PickerPanel` falls back to its own `useState` when no `onChartPaletteChange`
  * reaches it, which is correct for the pickers with no plot behind them — the
- * vehicle form and the vehicle card edit one durable colour.
+ * vehicle form and the vehicle card edit one durable color.
  *
  * That fallback is also how this silently regresses. A chart that renders
  * `RunSelector` without the setter keeps working, keeps looking right, and
@@ -1891,7 +1891,7 @@ describe('run color is retired, not merely unused', () => {
  * the picker, read Okabe-Ito. Nothing throws and no test of the picker itself
  * would notice, because the picker is behaving exactly as designed.
  */
-describe('every chart hands the colour panel its palette', () => {
+describe('every chart hands the color panel its palette', () => {
     const CHART_VIEWS = [
         'src/components/ChargingView.jsx',
         'src/components/RangeChartView.jsx',
@@ -1908,7 +1908,7 @@ describe('every chart hands the colour panel its palette', () => {
 
     it('RunSelector forwards it all the way to the picker', () => {
         const sel = ALL.find(x => x.file === 'src/components/RunSelector.jsx').text;
-        // Named in the props, handed to the colour control, and handed on from
+        // Named in the props, handed to the color control, and handed on from
         // there to SeriesColorPicker — a break at any link is a silent fallback.
         expect(sel).toMatch(/onChartPaletteChange = null/);
         expect((sel.match(/onChartPaletteChange=\{onChartPaletteChange\}/g) || []).length)

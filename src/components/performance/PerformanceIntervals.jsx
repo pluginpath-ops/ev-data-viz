@@ -9,7 +9,7 @@
  * read against each other.
  */
 import { useState } from 'react';
-import { normaliseInterval } from '../../utils/performanceDerivations';
+import { normalizeInterval } from '../../utils/performanceDerivations';
 
 const BLANK = {
     kind: 'braking',
@@ -23,7 +23,7 @@ const BLANK = {
 
 /** Rate cell — braking is trustworthy across windows, timed windows are not. */
 function RateCell({ row }) {
-    const n = normaliseInterval(row);
+    const n = normalizeInterval(row);
     if (n.rateG == null) return <span className="text-meta">—</span>;
     return (
         <span
@@ -89,7 +89,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                 <table className="w-full text-xs">
                     <tbody>
                         {intervals.map(iv => {
-                            const n = normaliseInterval(iv);
+                            const n = normalizeInterval(iv);
                             return (
                                 <tr key={iv.id} className="border-b border-[var(--color-border)] last:border-0">
                                     <td className="py-0.5 pr-2 text-secondary">{n.label}</td>

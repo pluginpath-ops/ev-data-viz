@@ -36,10 +36,10 @@ describe('reading a batch', () => {
     });
 
     it('reads CSV, including a block line that holds a comma', () => {
-        const out = readBatch('vehicle,source,zero_to_60_rollout_sec,colour\nMacan 4S,Car and Driver,4.0,red\n');
+        const out = readBatch('vehicle,source,zero_to_60_rollout_sec,color\nMacan 4S,Car and Driver,4.0,red\n');
         expect(out.format).toBe('csv');
         expect(out.items[0]).toMatchObject({ kind: 'table', line: 2, vehicleText: 'Macan 4S', tableFields: { zero_to_60_rollout_sec: 4 } });
-        expect(out.issues[0]).toMatch(/Ignored column: colour/);
+        expect(out.issues[0]).toMatch(/Ignored column: color/);
         expect(readBatch('## R1S\nRolling Start, 5-60 mph: 3.1 sec').format).toBe('blocks');
     });
 

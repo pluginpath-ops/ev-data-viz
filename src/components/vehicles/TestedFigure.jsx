@@ -6,7 +6,7 @@
  * another's is 65 mph at 34 °F, so a grid of percentages would invite exactly
  * the comparison those conditions forbid.
  *
- * A partial state-of-charge window is labelled as the distance it is, never
+ * A partial state-of-charge window is labeled as the distance it is, never
  * extrapolated to a range. The arithmetic would be trivial and the result would
  * be invented: consumption is not flat across a pack, and the tail below 20% is
  * where it stops being flat.

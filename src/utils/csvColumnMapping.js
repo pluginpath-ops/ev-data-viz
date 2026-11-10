@@ -1,7 +1,7 @@
 /**
  * Which CSV column holds which field, guessed from the headers (#16).
  *
- * The upload's mapping step used to recognise a charge-rate column only when
+ * The upload's mapping step used to recognize a charge-rate column only when
  * its header held both "charge" and "rate", so every export that said
  * "Power (kW)", "kW" or "ChargePower" needed choosing by hand. Headers are now
  * read as WORDS — "ChargeKW" is charge + kw, "Power_kW" is power + kw — and

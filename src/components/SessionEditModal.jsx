@@ -84,7 +84,7 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
     };
 
     // Bulk-fill runs.source_url from the session's own URL — a one-paste
-    // labour-saver for an outing with several tests, rather than typing the
+    // labor-saver for an outing with several tests, rather than typing the
     // same link onto every row (#208). Reads session.url, the SAVED value, not
     // the unsaved draft: the session must be saved first, so this never writes
     // a URL the session record doesn't actually have.

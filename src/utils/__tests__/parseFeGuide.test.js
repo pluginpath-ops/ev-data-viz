@@ -194,7 +194,7 @@ describe('parseFeGuide — the natural key', () => {
 
     it('keeps the model type index, because carline alone is not unique', () => {
         // Audi lists "Q6 e-tron quattro" three times in MY27 at 325, 301 and
-        // 301 miles — wheel and tyre variants it does not name, where BMW writes
+        // 301 miles — wheel and tire variants it does not name, where BMW writes
         // them out. Keying on (year, division, carline) silently kept the last
         // row of each group: 9 configurations lost across the two guide years,
         // with nothing in the import report to show it.
@@ -296,7 +296,7 @@ describe('parseFeGuide — surviving a rename (#214)', () => {
         expect(byCarline(out.rows, 'R2 Performance AWD (20in AT)').labelCombRangeMi).toBe(307);
         // Said, not absorbed.
         expect(out.renamed).toEqual([
-            { column: REQUIRED, header: 'comb range as shown on FE label  (Miles)', how: 'normalised' },
+            { column: REQUIRED, header: 'comb range as shown on FE label  (Miles)', how: 'normalized' },
         ]);
     });
 
@@ -307,7 +307,7 @@ describe('parseFeGuide — surviving a rename (#214)', () => {
         expect(raw[REQUIRED]).toBeUndefined();
     });
 
-    it('still refuses a relabelled required column, but names the closest header', () => {
+    it('still refuses a relabeled required column, but names the closest header', () => {
         const out = parseFeGuide(CSV.replace(REQUIRED, 'Comb Range as shown on the FE Label (miles)'));
         expect(out.rows).toEqual([]);
         expect(out.missingColumns).toEqual([REQUIRED]);

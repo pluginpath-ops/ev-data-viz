@@ -79,7 +79,7 @@ const hasDataForType = (run, type) => {
 // `selectedRuns` and `toggleRun` both come from ChargingView, which owns this
 // view's selection through the shared useRunSelection hook (#176). This file
 // used to roll its own toggle against chartConfig — one more copy of the
-// behaviour, and the reason a run could be switched off here and come back.
+// behavior, and the reason a run could be switched off here and come back.
 export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = DEFAULT_SERIES_PALETTE,
     chartType = DEFAULT_RANGE_CHART_TYPE, effUnit = DEFAULT_EFFICIENCY_UNIT,
     handSet = false, verboseLabels = false, correctionMode = 'none', correctionTarget = undefined, testSpread = true }) {
@@ -688,7 +688,7 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 {/* ── MEASURE ──
                   * What the bars are OF, and in which unit. The chart-type row
                   * was five buttons in an accent fill that read as five primary
-                  * actions; as a labelled group of toggles it reads as the one
+                  * actions; as a labeled group of toggles it reads as the one
                   * choice it is. */}
                 <div className="chart-rail-group">
                     <span className="text-micro">Measure</span>

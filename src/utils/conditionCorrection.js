@@ -60,7 +60,7 @@
  * temperature alone, as one line for every car. A heat pump draws about half a
  * resistive heater; the line is one answer for both. It is steady state: the
  * pull-down of a hot-soaked cabin is not in it, and neither are the battery
- * conditioning (folded into the line, not modelled apart), cold tyres, the
+ * conditioning (folded into the line, not modeled apart), cold tires, the
  * regen a cold pack refuses, or the extra cell resistance. Time spent stopped
  * is not counted, and the ramps are straight lines. Below freezing the error
  * in the assumed load is comparable to the effect, so a figure corrected from
@@ -164,7 +164,7 @@ function loadTerm(speedMph, densityRatio, aeroFraction, airSpeedSq = null, trace
  * headwind leg's (v + w)² and the tailwind leg's (v − w)² average to v² + w².
  * So a wind that "turns into a tailwind on the return" is recorded as its
  * speed with no direction, and it costs the test a little rather than
- * cancelling, because drag goes as the square of air speed.
+ * canceling, because drag goes as the square of air speed.
  *
  * Under THIS law that holds for an out-and-back in any wind, quartering
  * included: the legs face θ and θ + 180°, and the −2vw·cos θ term of one
@@ -173,7 +173,7 @@ function loadTerm(speedMph, densityRatio, aeroFraction, airSpeedSq = null, trace
  * The law is a simplification, and the simplification is the reason. Drag
  * acts along the apparent wind, and the battery pays only for its component
  * along the road, |V_rel|·(v − w·cos θ), not |V_rel|²; the sideways part is
- * carried by the tyres. On that basis an out-and-back costs w² of the aero
+ * carried by the tires. On that basis an out-and-back costs w² of the aero
  * term in a head/tail wind but about w²/2 in a crosswind (70 mph, 10 mph wind:
  * 5000 / 4975 / 4950 at 0° / 45° / 90°, against 4900 calm), so a direction
  * WOULD matter on an out-and-back, and an out-and-back flag would be needed
@@ -231,7 +231,7 @@ export function correctionFactor(conditions, {
     // Correcting for speed assumes the test held one. Aero energy goes as the
     // MEAN OF v², while an average speed supplies the SQUARE OF THE MEAN, and
     // ⟨v²⟩ > ⟨v⟩² for any varying speed — so a mixed cycle reads as a gentle
-    // steady cruise and gets over-penalised on the way to the reference speed.
+    // steady cruise and gets over-penalized on the way to the reference speed.
     // Air density does not care what the speed trace looked like, so altitude
     // and temperature still apply.
     const mixedCycle = conditions?.speedBasis === 'mixed';

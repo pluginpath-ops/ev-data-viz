@@ -198,7 +198,7 @@ describe('scaling to a full pack', () => {
         expect(s.isScaled).toBe(true);
     });
 
-    it('does NOT scale a window too narrow to characterise the pack', () => {
+    it('does NOT scale a window too narrow to characterize the pack', () => {
         // 99.2 / 0.46 = 215.7 — not a measurement with a caveat, a guess with a
         // decimal point. Reported as measured instead.
         const s = testedRangeSummary(vehicle([rangeRun({ start_soc: 56, end_soc: 10, distance_miles: 99.2 })]));
@@ -231,7 +231,7 @@ describe('scaling to a full pack', () => {
 
 describe('testedRangeSummary extras', () => {
     it('separates "worth reporting" from "is a full-pack range"', () => {
-        // 80→10 is an adequate characterisation whose distance is still not the
+        // 80→10 is an adequate characterization whose distance is still not the
         // whole pack. Conflating the two is what the single old threshold did.
         const s = testedRangeSummary(vehicle([rangeRun({ start_soc: 80, end_soc: 10, distance_miles: 220 })]));
         expect(s.isRepresentative).toBe(true);

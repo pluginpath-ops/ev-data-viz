@@ -99,7 +99,7 @@ describe('deriveSteadyStateEta — the same quantity, a different operating poin
         expect(r.certain).toBe(true);
     });
 
-    it('does check physics, which is not a matter of judgement', () => {
+    it('does check physics, which is not a matter of judgment', () => {
         // At 70 mph the road load exceeds the energy the phase actually spent,
         // so η comes out above 1 — a drivetrain returning more than it is
         // given. That means the inputs contradict each other, whatever any

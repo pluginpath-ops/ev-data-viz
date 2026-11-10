@@ -1,7 +1,7 @@
 /**
  * Parse a pasted published test-result block (Car and Driver and similar).
  *
- * These blocks have a consistent shape — one labelled figure per line — so
+ * These blocks have a consistent shape — one labeled figure per line — so
  * pasting one is far less work than typing a dozen fields by hand:
  *
  *   60 mph: 3.9 sec
@@ -15,7 +15,7 @@
  *
  * Lines are matched by shape, not position, and the set of lines is NOT fixed —
  * one car gets a `130 mph:` line another doesn't, and braking may appear twice.
- * Anything unrecognised is reported back rather than silently dropped, so a
+ * Anything unrecognized is reported back rather than silently dropped, so a
  * source with a line shape we've never seen is visible instead of invisible.
  *
  * Pure — no DB calls, no side effects, same contract as parsePerformanceCSV.js
@@ -30,8 +30,8 @@
  * function that looks purely mechanical.
  */
 
-/** Sources mix en-dashes, minus signs and hyphens; normalise to ASCII "-". */
-const normaliseDashes = (s) => s.replace(/[‐-―−–—]/g, '-');
+/** Sources mix en-dashes, minus signs and hyphens; normalize to ASCII "-". */
+const normalizeDashes = (s) => s.replace(/[‐-―−–—]/g, '-');
 
 /** Leading bullets/dashes on list-style lines. */
 const stripBullet = (s) => s.replace(/^[\s•*·]+/, '');
@@ -117,7 +117,7 @@ function parseRolloutFootnote(line) {
 export function parsePublishedResults(text) {
     const lines = String(text || '')
         .split(/\r?\n/)
-        .map(l => stripBullet(normaliseDashes(l)).trim())
+        .map(l => stripBullet(normalizeDashes(l)).trim())
         .filter(Boolean);
 
     // Rest-to-speed windows, kept neutral: which column a 0-60 lands in depends
@@ -242,7 +242,7 @@ export function parsePublishedResults(text) {
     }
 
     if (matched === 0) {
-        warn('error', 'Nothing recognisable in that paste. Expected lines like "60 mph: 3.9 sec" or "Braking, 70-0 mph: 174 ft".');
+        warn('error', 'Nothing recognizable in that paste. Expected lines like "60 mph: 3.9 sec" or "Braking, 70-0 mph: 174 ft".');
     }
 
     validate({ accelWindows, drag, intervals, rollout, warn });

@@ -43,7 +43,7 @@ function tokensFor(theme) {
     // Line 4 declares `@variant dark (&:where([data-theme="dark"], …))`, so a
     // pattern that may skip any characters up to the next `{` matches THERE and
     // then runs on into the light block — handing back the light palette
-    // labelled as dark. The selector list itself is matched loosely, since
+    // labeled as dark. The selector list itself is matched loosely, since
     // light is `:root, [data-theme="light"]` and pinning the exact text broke
     // twenty assertions when that gained a second selector.
     // The FIRST matching block is not reliably the palette. `:root` is declared
@@ -114,7 +114,7 @@ const PAIRINGS = [
     ['--color-success-text', '--color-card'],
 
     // ── The re-skin's tiers ────────────────────────────────────────────────
-    // The design handoff runs eight greys where the palette ran four. Each new
+    // The design handoff runs eight grays where the palette ran four. Each new
     // one is listed against the surfaces its screens actually paint it on.
     //
     // The handoff's own ninth value — a #5a6474 micro-label — is deliberately

@@ -138,8 +138,8 @@ export function applyChartDefaults(Chart) {
 
 /** The dark palette, for when no stylesheet can be read. */
 const FALLBACK = {
-    tick:       'rgb(139, 149, 165)',
-    legend:     'rgb(168, 178, 193)',
+    tick:       'rgb(156, 166, 181)',
+    legend:     'rgb(192, 201, 214)',
     ink:        'rgb(242, 245, 249)',
     grid:       'rgb(26, 33, 44)',
     axis:       'rgb(61, 74, 90)',

@@ -41,7 +41,7 @@ issue for what is outstanding.
 |---|---|---|---:|
 | `accent-blue` | `rgb(37, 99, 235)` | `rgb(45, 127, 249)` | 10 |
 | `accent-green` | `rgb(5, 150, 105)` | `rgb(35, 180, 126)` | 2 |
-| `accent-grey` | `rgb(107, 114, 128)` | `rgb(107, 122, 143)` | 3 |
+| `accent-gray` | `rgb(107, 114, 128)` | `rgb(107, 122, 143)` | 3 |
 | `accent-orange` | `rgb(217, 119, 6)` | `rgb(242, 139, 60)` | 41 |
 | `accent-orange-muted` | `rgba(217, 119, 6, 0.45)` | `rgba(242, 139, 60, 0.45)` | 3 |
 | `accent-orange-surface` | `rgba(217, 119, 6, 0.10)` | `rgba(242, 139, 60, 0.10)` | 8 |
@@ -146,7 +146,7 @@ since the button and pill pass (dark was a shade apart). Two names for one idea,
 uses — worth collapsing to one.
 
 **`primary-light` and `primary-surface` are identical in light**, and differ
-only in dark (0.25 vs 0.15 alpha). `-light` is the older spelling; prefer
+only in dark (0.25 vs 0.18 alpha). `-light` is the older spelling; prefer
 `-surface`, and prefer `-border` over a full-strength `--color-primary` on a
 pale fill.
 
@@ -161,7 +161,7 @@ the wordmark, the selected sub-tab, the median tick, the live charging pair, and
 **Hue roles.** Blue is location and selection: the nav, links, selected chips,
 the AND filter, and `.btn-primary`, which is now only a button that takes you
 somewhere. Actions are neutral (`.btn-secondary`). Green, amber and red are
-success, caution and destructive. Violet and grey are data series, plus the
+success, caution and destructive. Violet and gray are data series, plus the
 explainer hub edges.
 
 **Status is a triad, not a color.** Each of warning / danger / success carries

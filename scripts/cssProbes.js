@@ -16,7 +16,7 @@
  *
  *   - `.run-pair` and `.note-panel` were each shipped TWICE, 99 lines of
  *     identical declarations, because a script failed partway and its retry
- *     re-inserted the block. Behaviourally harmless and completely invisible.
+ *     re-inserted the block. Behaviorally harmless and completely invisible.
  *
  * Neither the linter, the compiler, the tests nor the build says anything about
  * a stylesheet defining the same name twice. At 6,000 lines and 639 classes,

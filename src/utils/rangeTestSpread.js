@@ -117,7 +117,7 @@ export function rangeBasesFor(chargingRun, vehicle, { correctionMode = 'none', c
  *
  * @param {CanvasRenderingContext2D} ctx
  * @param {Object} o
- * @param {number}   o.at          the bar's centre, across the bars
+ * @param {number}   o.at          the bar's center, across the bars
  * @param {number[]} o.px          each test's position along the value axis, in pixels
  * @param {boolean}  o.horizontal  bars run along x
  * @param {string}   o.ink         line and dot outline (chartTheme().ink)

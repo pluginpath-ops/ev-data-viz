@@ -189,11 +189,11 @@ export const CHART_HELP_DEFAULTS = {
             'directly (distance ÷ energy) or estimated from the SoC drop × battery size. ' +
             'You set the trip: total distance, travel speed, miles between charging stops ' +
             '(or a target charge time), start/min SoC, and a per-stop overhead. A dashed ' +
-            'grey “ICE Reference” line models a gas car for comparison.',
+            'gray “ICE Reference” line models a gas car for comparison.',
         how_to_read:
             'Read it as a race against the clock (and against gas). The default view plots ' +
             'distance covered vs elapsed time; flat steps are charging stops, and each ' +
-            'car’s total trip time — and how it compares to ICE — is labelled at the ' +
+            'car’s total trip time — and how it compares to ICE — is labeled at the ' +
             'finish. You can also chart cumulative charge time or per-car SoC “lanes”; the ' +
             'Trip Optimizer tab searches travel speed and stop plan for the sweet spot. Because ' +
             'charging follows each car’s actual curve, a faster-charging car can win a long ' +
@@ -205,7 +205,7 @@ export const CHART_HELP_DEFAULTS = {
             'Leg / distance between charges — how far you drive before each stop.\n' +
             'Overhead — fixed minutes added per stop (park, plug in, break).\n' +
             'ICE Reference — a gas car driving 3-hour legs with the same per-stop overhead.\n' +
-            'Charge stop — modelled from the real charging curve between your start and minimum SoC.',
+            'Charge stop — modeled from the real charging curve between your start and minimum SoC.',
         math_approach:
             'For each car it steps through drive legs and charge stops: a leg drains the ' +
             'battery at the speed-corrected efficiency; a stop adds energy by following the ' +
@@ -232,7 +232,7 @@ export const CHART_HELP_DEFAULTS = {
             'setting, so the lowest point of a line is that car’s best trip; off, the other ' +
             'setting is held at what you entered. On a fast charger the fastest plan is ' +
             'often a speed nobody should drive, so the fastest legal plan keeps to the legal range ' +
-            'you set under Your plan (55–80 mph to start) and the fastest is shown apart, labelled as such. ' +
+            'you set under Your plan (55–80 mph to start) and the fastest is shown apart, labeled as such. ' +
             'The table names each car’s fastest legal plan, the charge window it implies (arrive ' +
             'at, leave with), what it saves over your own plan, and every plan within 2% ' +
             'of its trip time — the optimum is usually broad, and the span is the useful ' +
@@ -296,17 +296,17 @@ export const CHART_HELP_DEFAULTS = {
             'speed, season and elevation; fast-stop minutes from the car’s own charging ' +
             'curve where EVBench has one.',
         how_to_read:
-            'Pick the chart above it. "Day by day" goes in time order. Each day’s grey bar ' +
+            'Pick the chart above it. "Day by day" goes in time order. Each day’s gray bar ' +
             'is the day out, from that morning’s battery (the tick) to where the car ' +
             'gets home. A fast stop on the route sits inside it, striped orange, at the ' +
             'levels it charged between; a planned fast charge is solid orange. The bar in ' +
             'the car’s color is the night at home, up to the next morning, where a dashed ' +
-            'line hands over to the next day. The grey bar is how far the battery fell, so ' +
+            'line hands over to the next day. The gray bar is how far the battery fell, so ' +
             'a day with a stop used more than it shows; hover a day for both. "Charge in and ' +
             'used" draws the same figures from zero: charge in above, driving below.\n' +
             '"The week as a line" is range left, in miles on the left and the battery’s percent on the ' +
             'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +
-            'at home overnight. Each orange band is a fast stop, labelled with its minutes ' +
+            'at home overnight. Each orange band is a fast stop, labeled with its minutes ' +
             '(detour and time to start and pay in); a lighter one is a planned fast charge. ' +
             'The dashed lines at 10% and 80% mark the everyday range. Under the chart, ' +
             'the week as a table, a column a day: the fast-charging rows (stops, time, ' +
@@ -464,7 +464,7 @@ export const CHART_HELP_DEFAULTS = {
             'selected vehicle — to reveal relationships (e.g. battery size vs range, power vs ' +
             'price). Both axes are the table’s own figures; only numeric fields are offered.',
         how_to_read:
-            'Each dot is a vehicle (X = one field, Y = another); the dashed grey line is a ' +
+            'Each dot is a vehicle (X = one field, Y = another); the dashed gray line is a ' +
             'best-fit trend across all plotted vehicles. Use it to spot correlations and ' +
             'outliers — a car well above the line is doing better than its peers on the Y ' +
             'field for its X value. Vehicles missing either value aren’t plotted; a note ' +
@@ -477,7 +477,7 @@ export const CHART_HELP_DEFAULTS = {
         math_approach:
             'Dots are the table’s values (unit-converted for display). The trend line ' +
             'is an ordinary least-squares regression (the slope and intercept that ' +
-            'minimise squared vertical error), drawn from the lowest to the highest X. ' +
+            'minimize squared vertical error), drawn from the lowest to the highest X. ' +
             'It’s descriptive only — it doesn’t imply causation, and a few vehicles can ' +
             'swing the slope.',
     },

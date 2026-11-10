@@ -7,7 +7,7 @@ import {
 /**
  * Observations are the shape `certObservations` produces — one object per
  * test vehicle with the measured quantities on it. Built directly rather
- * than through a test vehicle fixture, because what is under test is the summarising
+ * than through a test vehicle fixture, because what is under test is the summarizing
  * and the verdict, not the derivation that feeds them.
  */
 const obs = (etas) => etas.map(eta => ({ eta, charger_eff: null, usable_kwh: null }));
@@ -17,7 +17,7 @@ const spread = (n, lo, hi) =>
     obs(Array.from({ length: n }, (_, i) => lo + ((hi - lo) * i) / (n - 1)));
 
 describe('bandEvidence', () => {
-    it('summarises the measured spread, and says how much of the corpus that is', () => {
+    it('summarizes the measured spread, and says how much of the corpus that is', () => {
         // "median 0.87 (n=61 of 204)" says something a bare median does not.
         const e = bandEvidence(spread(101, 0.80, 0.90), 'ETA_BAND');
         expect(e.enough).toBe(true);
@@ -123,7 +123,7 @@ describe('a scalar knob asks a different question of the corpus', () => {
         ({ ss_eta_ratio: lo + ((hi - lo) * i) / (n - 1) }));
     const e = bandEvidence(ratios(101, 1.05, 1.25), 'HWFET_TO_SS_ETA_RATIO');
 
-    it('summarises the ratio like any other measure', () => {
+    it('summarizes the ratio like any other measure', () => {
         expect(e.enough).toBe(true);
         expect(e.median).toBeCloseTo(1.15, 3);
     });

@@ -32,11 +32,11 @@ export default function FeGuideImport() {
     const inputRef = useRef(null);
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         getFeGuideSummary()
-            .then(s => { if (!cancelled) setSummary(s); })
+            .then(s => { if (!canceled) setSummary(s); })
             .catch(() => { /* summary is informational; its absence is not an error */ });
-        return () => { cancelled = true; };
+        return () => { canceled = true; };
     }, [getFeGuideSummary, result]);
 
     async function handleFile(file) {

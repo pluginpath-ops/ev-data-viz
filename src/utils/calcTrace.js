@@ -18,7 +18,7 @@
  * returns exactly what an untraced one does (calcTrace.test.js checks).
  *
  * The formula text sits on the line beside the math it names, so a change to
- * one is in the same diff as the other. That is the whole defence against
+ * one is in the same diff as the other. That is the whole defense against
  * drift: nothing here re-derives a number.
  *
  * A value is a number, or `{ v, unit, src }` where `src` says where it came

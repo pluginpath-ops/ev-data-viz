@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
  * Load something asynchronous once per key, with cancellation.
  *
  * The shape this replaces appears all over the app: an effect calls a service,
- * a `.then` sets state, and a `cancelled` flag guards the unmount. Written
+ * a `.then` sets state, and a `canceled` flag guards the unmount. Written
  * inline it is four pieces of bookkeeping that are easy to get subtly wrong —
  * the common bug being a stale response from a previous key overwriting a newer
  * one, since the flag only guards unmount and not a key change.
@@ -24,13 +24,13 @@ export function useAsyncResource(loader, deps = []) {
     const reload = useCallback(() => setNonce(n => n + 1), []);
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         setState(prev => ({ ...prev, loading: true, error: null }));
         Promise.resolve()
             .then(loader)
-            .then(data => { if (!cancelled) setState({ data, loading: false, error: null }); })
-            .catch(error => { if (!cancelled) setState({ data: null, loading: false, error }); });
-        return () => { cancelled = true; };
+            .then(data => { if (!canceled) setState({ data, loading: false, error: null }); })
+            .catch(error => { if (!canceled) setState({ data: null, loading: false, error }); });
+        return () => { canceled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [...deps, nonce]);
 

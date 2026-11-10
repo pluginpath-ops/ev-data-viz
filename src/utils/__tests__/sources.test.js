@@ -31,18 +31,18 @@ describe('domainOf', () => {
 });
 
 describe('findSource', () => {
-    it('recognises a name, an alias and a spelling', () => {
+    it('recognizes a name, an alias and a spelling', () => {
         expect(findSource(SOURCES, { name: 'car and driver' })).toMatchObject({ source: { id: 1 }, by: 'name' });
         expect(findSource(SOURCES, { name: 'oos' })).toMatchObject({ source: { id: 2 }, by: 'alias' });
         expect(findSource(SOURCES, { name: 'Motor Trend' })).toMatchObject({ source: { id: 3 }, by: 'spelling' });
     });
 
-    it('recognises a link, subdomains included, when no name is given', () => {
+    it('recognizes a link, subdomains included, when no name is given', () => {
         expect(findSource(SOURCES, { url: 'https://www.caranddriver.com/x' })).toMatchObject({ source: { id: 1 }, by: 'domain' });
         expect(findSource(SOURCES, { url: 'https://amp.motortrend.com/x' })).toMatchObject({ source: { id: 3 }, by: 'domain' });
     });
 
-    it('lets a recognised name win over a link to another source', () => {
+    it('lets a recognized name win over a link to another source', () => {
         expect(findSource(SOURCES, { name: 'MotorTrend', url: 'https://www.caranddriver.com/x' })).toMatchObject({ source: { id: 3 }, by: 'name' });
     });
 

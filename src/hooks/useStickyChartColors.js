@@ -103,7 +103,7 @@ export function useStickyChartColors(runs, {
     // What actually reaches the chart. Parked picks are stored, not drawn — and
     // because the swatch beside a run reads this same map, a parked pick does
     // not show there either. That is the point: the swatch has to report the
-    // DRAWN colour, or it recreates the chip-vs-chart disconnect the colour
+    // DRAWN color, or it recreates the chip-vs-chart disconnect the color
     // vocabulary was written to stop.
     const overrides = handSet ? picks : EMPTY;
 
@@ -113,7 +113,7 @@ export function useStickyChartColors(runs, {
     // run would fall through to its stored color instead — the same outcome by
     // accident in manual mode, and the wrong one in auto.
     const setColorOverride = (runId, color) => {
-        // Setting a colour by hand IS the gesture that turns hand-set on; there
+        // Setting a color by hand IS the gesture that turns hand-set on; there
         // is no separate "apply my picks" step. Clearing one is not, or "Back to
         // auto" on the last pick would switch the mode on as it emptied it.
         if (color != null) onHandSet?.(true);
@@ -150,7 +150,7 @@ export function useStickyChartColors(runs, {
             assignedKey.current = sessionKey;
         }
 
-        // Vehicle-color mode already honours each vehicle's curated color, so
+        // Vehicle-color mode already honors each vehicle's curated color, so
         // there is nothing to hold still — but an override still wins, since
         // the user asked for it in this session.
         const assigning = palette !== VEHICLE_PALETTE;
@@ -203,7 +203,7 @@ export function useStickyChartColors(runs, {
         // How many picks are being held — in force or parked. The dropdown says
         // it out loud ("Hand-set (3)"), because a parked pick is otherwise
         // invisible: park three, work for an hour, come back and selecting
-        // Hand-set repaints three series in colours you no longer remember
+        // Hand-set repaints three series in colors you no longer remember
         // choosing. It is also what makes the option disappear at zero, so a
         // mode that would do nothing is never offered.
         handSetCount: Object.keys(picks).length,

@@ -428,7 +428,7 @@ const PALETTE = [
 // Dedicated collapsible section listing the selected rows with per-row overrides
 // of the charging strategy: en-route Charger Arrival SoC (minSoc) and the
 // mode-dependent charge amount (leg distance / charge time). Blank shows the
-// global value greyed as a placeholder; typing overrides just that run.
+// global value grayed as a placeholder; typing overrides just that run.
 function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, dl, onChange, onReset }) {
     const [open, setOpen] = useState(false);
     if (!entries.length) return null;
@@ -739,7 +739,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             // ── Pass 3: conflict-group spread + draw with leader lines ────
             if (!finishLabels.length) return;
 
-            const LABEL_H = 16; // minimum px between label centres
+            const LABEL_H = 16; // minimum px between label centers
 
             // Sort by natural Y position; break ties by finish time (faster → top)
             finishLabels.sort((a, b) => a.y - b.y || a.x - b.x);
@@ -747,7 +747,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             const { top, bottom } = chart.chartArea;
 
             // Build adjusted Y positions by finding conflict groups and spreading
-            // only within each group. Labels with no close neighbours stay put.
+            // only within each group. Labels with no close neighbors stay put.
             const adjYs = finishLabels.map(l => l.y); // start at natural positions
             let gi = 0;
             while (gi < finishLabels.length) {
@@ -885,7 +885,7 @@ export default function RoadTripView({
     // ── One entry per (range test × charging test) pair — structure only ──────
     // Range-primary, matching Charge Compare: a charging curve is a property of
     // the car and varies little, while a range test is a property of the day —
-    // wind, temperature, HVAC, tyres, elevation, load. Each pair is its own trip
+    // wind, temperature, HVAC, tires, elevation, load. Each pair is its own trip
     // simulation, so the same car under two conditions is two comparable rows.
     //
     // A Map, not an object: insertion order is the display order, and the keys
@@ -2610,7 +2610,7 @@ export default function RoadTripView({
                                         setting, and a knob per end would double the
                                         sidebar's weight for it. */}
                                     <div className="scenario-row is-range"
-                                        title="Your legal range: the slowest and fastest speeds the Fastest legal plan may use. The map still shows faster plans, labelled Fastest, and dims them; Fastest legal and the table keep to this range.">
+                                        title="Your legal range: the slowest and fastest speeds the Fastest legal plan may use. The map still shows faster plans, labeled Fastest, and dims them; Fastest legal and the table keep to this range.">
                                         <span className="scenario-key">Legal</span>
                                         <NumberInput className="form-input" min={1} aria-label="Slowest speed for the fastest legal plan"
                                             value={units === 'metric' ? Math.round((roadTripConfig.optimizerSpeedMin ?? DEFAULT_SPEED_RANGE[0]) * MI_TO_KM) : (roadTripConfig.optimizerSpeedMin ?? DEFAULT_SPEED_RANGE[0])}

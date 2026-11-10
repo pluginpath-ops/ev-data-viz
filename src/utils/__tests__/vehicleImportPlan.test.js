@@ -80,7 +80,7 @@ describe('same name, different model year', () => {
         expect(out[0].warnings.join(' ')).toMatch(/add the model year/);
     });
 
-    it('resolves the labelled form to the one vehicle', () => {
+    it('resolves the labeled form to the one vehicle', () => {
         const existing = [
             { id: 1, name: 'Model 3 LR', year: '2021', specs: {} },
             { id: 2, name: 'Model 3 LR', year: '2022-2023', specs: {} },

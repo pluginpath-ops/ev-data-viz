@@ -36,7 +36,7 @@ So for a round trip the angle carries no information, and EVBench reads a blank 
 The angle does matter for a test that held one heading, like a long straight highway drive one way. There, a
 tailwind helps, a headwind hurts, and a crosswind sits in between. EVBench calls the angle 0° for a pure
 tailwind, 180° for a pure headwind, and 90° or 270° for a crosswind (measured from the direction the car is
-travelling).
+traveling).
 
 ## How EVBench records and assesses wind
 
@@ -91,7 +91,7 @@ the angle is a refinement. The wind speed is what matters, and a test with an ho
 angle is better than a test with a guessed angle.
 
 ::: engineers
-For a car travelling at speed v with wind speed w at angle θ (0° a tailwind), the air-relative speed
+For a car traveling at speed v with wind speed w at angle θ (0° a tailwind), the air-relative speed
 satisfies |V_rel|² = v² + w² − 2vw·cos θ. On a leg that is reversed, θ becomes θ + 180° and the cosine flips
 sign, so the mean over the two legs is v² + w² [[fact:evbench-wind-simplified-law]]. This is the apparent-wind law
 in `apparentAirspeed()` in `src/utils/epaDerivations.js`, applied to the aerodynamic share of road load only.

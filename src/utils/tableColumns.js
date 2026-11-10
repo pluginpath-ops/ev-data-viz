@@ -17,7 +17,7 @@ export const isBlank = (v) => v == null || v === '';
  *
  * Case carries meaning in a unit (`kWh` is energy and `KWH` is a typo; `mW` is
  * a thousandth of a watt and `MW` is a million), so a unit is never upper- or
- * lower-cased to match its neighbours. A column states its unit by one of
+ * lower-cased to match its neighbors. A column states its unit by one of
  * these strings, or says it has none (`unitless: true`); the test in
  * tableColumns.test.js fails a column that does neither, and a unit that is
  * not in this list.

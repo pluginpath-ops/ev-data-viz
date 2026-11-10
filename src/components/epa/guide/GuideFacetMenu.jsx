@@ -16,13 +16,13 @@ import MenuButton from '../../shell/MenuButton';
  * By count, the first three rows of the menu are the three makes that matter,
  * and the long tail sorts itself out at the bottom where it belongs.
  *
- * ── Two behaviours carried over deliberately ────────────────────────────────
+ * ── Two behaviors carried over deliberately ────────────────────────────────
  *
  * The counts are computed with this facet's OWN selection removed — see
  * GuideFilterBar — so a value's number says what clicking it would leave, not
  * what the unfiltered corpus holds. And a value that would leave nothing is
  * DISABLED rather than hidden: a make vanishing from the list reads as a bug,
- * where a greyed one reads as an answer.
+ * where a grayed one reads as an answer.
  *
  * ── Exclude, and any / all (#338) ───────────────────────────────────────────
  *

@@ -51,7 +51,7 @@ export const GUIDE_FIELD_MAP = {
     total_voltage_v:            'total_voltage',
     batt_specific_energy_wh_kg: 'battery_specific_energy',
     // GROSS pack energy. Never useable_kwh — that is what the pack delivers
-    // after its buffer, a curator judgement, and a different quantity.
+    // after its buffer, a curator judgment, and a different quantity.
     nominal_pack_kwh:           'nominal_pack_kwh',
 };
 

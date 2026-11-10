@@ -16,7 +16,7 @@
  * and one reason not to remains: `body_class` is derived by `splitCarlineClass`,
  * so grouping by it in SQL would mean a second implementation of the class
  * rollup in a second language, free to drift from the one the browser shows.
- * The catalogue's own rule 3 says derivations get exactly one implementation.
+ * The catalog's own rule 3 says derivations get exactly one implementation.
  *
  * `ROW_BUDGET` in `feGuideBrowse` marks where loading the whole corpus stops
  * being reasonable. Past it, the browser and these statistics move server-side
@@ -88,7 +88,7 @@ const UNIT_KEYS = {
  *
  * Motors is not here either. `# Drive Motor Gen` is a union wherever EPA folded
  * several configurations into one row — nine motors on a Taycan — so a bucket
- * labelled "6" is a mixture of real six-motor cars and rows that are not one
+ * labeled "6" is a mixture of real six-motor cars and rows that are not one
  * car at all. See #241.
  */
 export const DIMENSIONS = [
@@ -211,12 +211,12 @@ export function describe(values) {
     };
 }
 
-// ── Cluster, then summarise ──────────────────────────────────────────────────
+// ── Cluster, then summarize ──────────────────────────────────────────────────
 
 /**
  * Collapse rows to one observation per unit.
  *
- * Cluster-then-summarise: summarise within the cluster first, then across
+ * Cluster-then-summarize: summarize within the cluster first, then across
  * clusters. Standard for clustered data, needs no inputs we do not have, and
  * does not pretend to a sales weighting nobody has.
  *
@@ -254,12 +254,12 @@ export function toObservations(rows, unit = DEFAULT_UNIT) {
  * dropped. A make vanishing from a ranking reads as an error; a make shown as
  * "n too small" is an answer.
  */
-export function summarise(rows, { unit = DEFAULT_UNIT, dimension, measure, minN = 3, sort } = {}) {
-    return bucketise(toObservations(rows, unit), { dimension, measure, minN, sort });
+export function summarize(rows, { unit = DEFAULT_UNIT, dimension, measure, minN = 3, sort } = {}) {
+    return bucketize(toObservations(rows, unit), { dimension, measure, minN, sort });
 }
 
 /**
- * Bucket already-flat observations. The half of `summarise` that does not care
+ * Bucket already-flat observations. The half of `summarize` that does not care
  * where an observation came from.
  *
  * Split out so the certification statistics can reuse it: those are one
@@ -300,7 +300,7 @@ function compareRows(a, b, key, dir) {
     return (x - y) * flip || String(a.bucket).localeCompare(String(b.bucket));
 }
 
-export function bucketise(observations, { dimension, measure, minN = 3, sort } = {}) {
+export function bucketize(observations, { dimension, measure, minN = 3, sort } = {}) {
     const buckets = new Map();
     for (const o of observations) {
         const v = o[dimension];
@@ -318,7 +318,7 @@ export function bucketise(observations, { dimension, measure, minN = 3, sort } =
     }
     // Two sections, not one list. Suppressed buckets sink to the bottom so they
     // read as a footnote rather than as part of the ranking — a bucket already
-    // labelled "n too small" should not be crowned by the control that is meant
+    // labeled "n too small" should not be crowned by the control that is meant
     // to help you read the ranking. Within each section the chosen order
     // applies, so the footnote is sorted too rather than being an arbitrary
     // pile.
@@ -377,7 +377,7 @@ export function histogramOf(observations, { measure, bins = 20 } = {}) {
 /**
  * The extremes of one measure, named.
  *
- * The shareable artefact: "most efficient highway car of its class" is a fact
+ * The shareable artifact: "most efficient highway car of its class" is a fact
  * about a specific vehicle, and a distribution alone never names one.
  */
 export function extremes(rows, { unit = DEFAULT_UNIT, measure, count = 5 } = {}) {

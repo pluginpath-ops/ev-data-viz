@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { SECTIONS, OWNED_FAMILIES, hasDarkOverride } from './catalogue';
+import { SECTIONS, OWNED_FAMILIES, hasDarkOverride } from './catalog';
 import { COMPOSITES } from './specimens';
 import { parseColor, compositeStack, contrastRatio, AA_NORMAL, AA_LARGE } from '../../utils/contrast';
 
@@ -61,7 +61,7 @@ function Specimen({ spec }) {
     const ref = useRef(null);
     const [reading, setReading] = useState(null);
 
-    // `minRatio` lets the catalogue record a DELIBERATE lower bar — text meant
+    // `minRatio` lets the catalog record a DELIBERATE lower bar — text meant
     // to recede, held to the 3:1 large-text floor. Without it those two
     // specimens sit permanently red, and a badge that is always red for a
     // decision someone already made teaches people to stop reading badges.
@@ -101,7 +101,7 @@ function Specimen({ spec }) {
         : spec.as === 'select' ? 'select' : spec.as === 'textarea' ? 'textarea' : 'span';
 
     const common = { ref, className: spec.cls };
-    /* A composite: a popover, a plot frame, a bar. Rendered by the catalogue
+    /* A composite: a popover, a plot frame, a bar. Rendered by the catalog
        rather than assembled from `as` + `label`, because these are only
        meaningful put together — a `.guide-facet-panel` on its own is an empty
        rounded box, and the thing worth checking is the option rows inside it.
@@ -222,7 +222,7 @@ export default function Playground() {
         <div className="pg-root">
             <div className="pg-intro">
                 <p className="text-body">
-                    Every catalogued control, live and interactive. Hover, focus and type
+                    Every cataloged control, live and interactive. Hover, focus and type
                     into them — the states are the point. The number beside each is its
                     measured contrast against what it actually sits on, in the theme you
                     are currently in; it turns red below the WCAG AA floor for that size.

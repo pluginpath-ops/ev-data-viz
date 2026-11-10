@@ -131,7 +131,7 @@ export function isUnsetColor(color) {
 
 /**
  * Greedy max-min-ΔE selection: pick the candidate from `orderedCandidates`
- * that maximises the minimum perceptual distance to all already-placed colors.
+ * that maximizes the minimum perceptual distance to all already-placed colors.
  * `orderedCandidates` controls the priority when distances are tied (first
  * element wins ties), which is used in auto mode to express hue preference.
  */
@@ -189,11 +189,11 @@ const ACHROMATIC_S = 20;
  * Clamped away from pure white and black, which are not series colors at all —
  * invisible on one theme or the other.
  *
- * A near-grey is skipped entirely after the first pass. Measured: the worst
+ * A near-gray is skipped entirely after the first pass. Measured: the worst
  * pair in a 16-series set was #dccfd6 against #d3d7de at ΔE 6.3, and BOTH were
  * pale variants of the neutral slot. Varying a color with no hue only produces
  * more colors with no hue, and they then collide with every other pale variant
- * in the set. The grey stays available as itself; it just stops breeding.
+ * in the set. The gray stays available as itself; it just stops breeding.
  */
 function passVariant(hex, pass, skipAchromatic = true) {
     if (pass === 0) return hex;
@@ -222,7 +222,7 @@ function passVariant(hex, pass, skipAchromatic = true) {
  * same hex twice would hand two series one color by construction.
  */
 export function expandPalette(colors, count) {
-    // Whether skipping the greys is affordable. In a palette that is ALL grey —
+    // Whether skipping the grays is affordable. In a palette that is ALL gray —
     // a monochrome one — refusing to vary them would return fewer colors than
     // asked for, and the caller would fall back to a modulo and repeat.
     const hasChromatic = colors.some(c => hexToHsl(c).s >= ACHROMATIC_S);
@@ -291,7 +291,7 @@ function pickBestSlot(orderedCandidates, placed) {
  *
  * Step 2 read `run.color` until #308. Color is a property of the CAR now: per
  * run it did not survive hundreds of vehicles at two to ten tests each, and it
- * was never what a reader was trying to recognise. Passing `vehicles` is what
+ * was never what a reader was trying to recognize. Passing `vehicles` is what
  * turns step 2 on; without it every run falls through to the palette, which is
  * what the callers that do not know their vehicles get.
  *
@@ -300,7 +300,7 @@ function pickBestSlot(orderedCandidates, placed) {
  *
  * @param {Array}  runs             — run objects with { id, created_at }
  * @param {object} sessionOverrides — { [runId]: hexColor }, default {}
- * @param {string} [palette]        — VEHICLE_PALETTE (default) to honour curated
+ * @param {string} [palette]        — VEHICLE_PALETTE (default) to honor curated
  *                                    vehicle colors, or a SERIES_PALETTES id to
  *                                    assign from that set instead
  * @param {Array}  [vehicles]       — the runs' vehicles, each with .runs and
@@ -408,8 +408,8 @@ export function resolveChartColors(runs, sessionOverrides = {}, palette = VEHICL
             // 2. The vehicle's curated color, or the base set for it this session,
             //    shaded across its tests.
             //
-            //    Honoured EXACTLY, with no clash nudge — which is the one place
-            //    this departs from the per-run behaviour it replaces. A stored
+            //    Honored EXACTLY, with no clash nudge — which is the one place
+            //    this departs from the per-run behavior it replaces. A stored
             //    run color was often incidental, so two runs sharing a hex was
             //    usually an accident worth correcting; a curated vehicle color
             //    is a deliberate statement that this car is always drawn this
@@ -543,7 +543,7 @@ export function seriesColorNote(stored, plotted) {
  * The neutral eighth slot.
  *
  * Canonical Okabe-Ito is eight including black. Black is invisible on a dark
- * plot, so the slot carries a mid grey instead — the same grey a spec-linked
+ * plot, so the slot carries a mid gray instead — the same gray a spec-linked
  * run already falls back to, rather than a ninth color nobody chose.
  */
 export const SERIES_NEUTRAL = '#9ca3af';
@@ -557,12 +557,12 @@ export const OKABE_ITO_SET = [...OKABE_ITO, SERIES_NEUTRAL];
  * It is matplotlib / seaborn's `tab10`. The constant keeps that name because
  * that is what the ten values ARE and where to go to check them; the id and the
  * label are what a curator picks, and "tab10" names a library rather than
- * anything about the colours.
+ * anything about the colors.
  *
  * It replaced Okabe-Ito in that role by request. The trade is explicit and worth
  * stating rather than discovering: Okabe-Ito was chosen for being separable by a
- * colourblind reader, and tab10 is not — it is the set most readers of technical
- * charts already recognise, and ten hues where Okabe-Ito has seven, which is the
+ * colorblind reader, and tab10 is not — it is the set most readers of technical
+ * charts already recognize, and ten hues where Okabe-Ito has seven, which is the
  * difference between running out at eight series and at eleven.
  *
  * Okabe-Ito is still offered and still marked safe, so the accessible answer is
@@ -604,7 +604,7 @@ export const LEGACY_PALETTE = [
  * The house accents, as a series palette.
  *
  * Values are the dark theme's own `--color-accent-*` tokens, not new colors:
- * blue #2d7ff9, orange #f28b3c, green #23b47e, violet #9b8cf0, grey #6b7a8f.
+ * blue #2d7ff9, orange #f28b3c, green #23b47e, violet #9b8cf0, gray #6b7a8f.
  * "White" is `--color-text-primary`, #f2f5f9, which is an extremely faint blue
  * rather than a true white — a real white on a dark plot is a glare, and this
  * one already belongs to the theme.
@@ -625,7 +625,7 @@ export const HOUSE_PALETTE = [
     '#23b47e', // accent-green
     '#F0E442', // Okabe-Ito yellow; the theme has none
     '#9b8cf0', // accent-violet
-    '#6b7a8f', // accent-grey
+    '#6b7a8f', // accent-gray
 ];
 
 /**
@@ -648,7 +648,7 @@ function monochrome(hex, count, from = 84, to = 24) {
  * Adding one is a data edit, which is the point — it is also where the
  * "everything in one hue" look went when it stopped being a fourth radio. A
  * monochrome palette IS that look, and says so by its name rather than by a
- * derivation nobody could tell from its neighbour.
+ * derivation nobody could tell from its neighbor.
  *
  * `safe` marks a palette a colorblind reader can separate. The monochromes
  * qualify for a different reason from Okabe-Ito: they carry no hue information
@@ -767,7 +767,7 @@ export function desaturate(color, keep = 0.3) {
  * A pick is a BASE, not just one series' color: it becomes slot 1 and
  * everything else is re-derived from where it landed. Rotating rather than
  * re-sorting keeps the palette's own spacing — Okabe-Ito's order is already
- * chosen so that neighbours are far apart, and sorting by distance from the
+ * chosen so that neighbors are far apart, and sorting by distance from the
  * base would throw that away to solve a problem the palette has already solved.
  *
  * A base that is not in the palette simply leads it, because there is no slot

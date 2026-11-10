@@ -30,10 +30,10 @@ describe('buildGuideRowSweep', () => {
         expect(items[0].matches.map(m => m.state)).toEqual(['here', 'skipped']);
     });
 
-    it('needs judgement where nothing it names awaits — the Lyriq charger rows', () => {
+    it('needs judgment where nothing it names awaits — the Lyriq charger rows', () => {
         const { items } = buildGuideRowSweep([row(1, 'G1', 24.1, 29.6)], [member('L', 'G1', 26.4, 32.0)]);
         expect(items[0].via.verdict).toBe('untested');
-        expect(items[0].status).toBe('judgement');
+        expect(items[0].status).toBe('judgment');
     });
 
     it('names the year of a test vehicle carried in from another certification — R1S0396R20-1', () => {

@@ -52,7 +52,7 @@ The same rule silently merges different cars when a Vehicle ID is reused:
 
 | Key | What it holds | Evidence |
 |---|---|---|
-| `NNGAA078` | GMC Hummer EV SUT (config 0, NGMXD…0003) **and** BrightDrop EV600 (config 1, NGMXD…0004) | different carlines, different road load. Backup: 4 tests, labelled EV600 |
+| `NNGAA078` | GMC Hummer EV SUT (config 0, NGMXD…0003) **and** BrightDrop EV600 (config 1, NGMXD…0004) | different carlines, different road load. Backup: 4 tests, labeled EV600 |
 | `Mullen THREE` | test weight 5,500 lb (2024) and 10,500 lb (2025) | different cars |
 | `NLNC2EML6L1008051` | Karsan e-JEST, 8,500 lb (2022) then 9,500 lb (2024/26) | probably a retest at a new weight, owner to judge |
 | `FE-Y1ATH-25`, `FE-Y1ASCUV-25` | Porsche, config 1 (2025) vs config 0 (2026), different tests and road load | ambiguous |
@@ -198,7 +198,7 @@ phases, which many files lack.
    Physics (coefficients, test weight, DC energy, η):
    * from the one EPA test vehicle when exact or near;
    * from the blend's members, as a span, when blend;
-   * from a similar tested trim only when a curator linked it, and labelled so.
+   * from a similar tested trim only when a curator linked it, and labeled so.
 4. **Cross-carline matches** (`otherCarline`, 45 rows) are never auto-applied.
    Porsche's generic "Taycan" carline is a legitimate case; VinFast's VF 9
    landing between VF 8 configurations is not.

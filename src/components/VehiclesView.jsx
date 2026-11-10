@@ -305,7 +305,7 @@ export default function VehiclesView({
                         swatch is a bordered solid chip that reads over
                         anything, and its caption takes the name's
                         shadow. Editing in place is still the point:
-                        coloring a catalogue this size is a
+                        coloring a catalog this size is a
                         scroll-and-click pass. */}
                     {canEdit(vehicle) && (
                         <div className="vehicle-media-color" onClick={e => e.stopPropagation()}>

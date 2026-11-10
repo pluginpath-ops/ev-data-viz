@@ -6,7 +6,7 @@
  * unadjusted MPGe, the label range — so they only run where a Fuel Economy
  * Guide row has been linked, and a disagreement is a question about which side
  * is right. These compare a record against ITSELF. No external source, no
- * judgement: recharging a pack with less energy than was drawn out of it is not
+ * judgment: recharging a pack with less energy than was drawn out of it is not
  * a disagreement, it is impossible, and it means an import read a field wrong.
  *
  * Written after a bulk import of every MY2026 BEV certification produced
@@ -19,7 +19,7 @@
  *
  * Pure module: no data access, no React, no network. Runs against a parsed
  * test vehicle (`parseEpaCsiText` output, at import) or a stored one (the shape
- * `getEpaTestVehicleFull` returns, afterwards) — see `normaliseGroup`.
+ * `getEpaTestVehicleFull` returns, afterwards) — see `normalizeGroup`.
  */
 
 import {
@@ -52,7 +52,7 @@ const pct = (a, b) => (b > 0 ? ((a - b) / b) * 100 : null);
  * parse is refused before it lands, and afterwards because the records that
  * prompted this were already in the database.
  */
-function normaliseTestVehicle(testVehicle) {
+function normalizeTestVehicle(testVehicle) {
     if (!testVehicle) return null;
     const tests = testVehicle.epa_tests ?? testVehicle.tests ?? [];
     return {
@@ -85,13 +85,13 @@ const finding = (code, severity, label, detail, values = {}) =>
  * Severity is about CERTAINTY, not importance. 'error' means the numbers
  * contradict each other and one of them is definitely wrong. 'warning' means a
  * figure is outside what has ever been observed, which is strong evidence and
- * not proof — a band is a curation judgement and every one of them is a knob.
+ * not proof — a band is a curation judgment and every one of them is a knob.
  *
  * @param {Object} testVehicle  parsed or stored EPA test vehicle
  * @returns {{ checked: boolean, findings: Array, worst: 'error'|'warning'|null }}
  */
 export function checkRecordIntegrity(testVehicle) {
-    const g = normaliseTestVehicle(testVehicle);
+    const g = normalizeTestVehicle(testVehicle);
     if (!g || !g.tests.length) return { checked: false, findings: [], worst: null };
 
     const findings = [];

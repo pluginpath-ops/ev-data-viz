@@ -19,7 +19,7 @@ export const US06_AVG_MPH     = 48.4;
 export const HIGHWAY_BAND_MPH = [65, 75];    // reference band drawn on the curve
 // The single speed the curve screens call out: the midpoint of the band above,
 // and the one number a reader compares vehicles at. Named because it is drawn,
-// labelled AND read back in the legend — three places that must agree.
+// labeled AND read back in the legend — three places that must agree.
 export const CURVE_REFERENCE_MPH = 70;
 
 // EPA label arithmetic (#206). Regulatory definitions, so they live up here with
@@ -167,7 +167,7 @@ export const EPA_DEFAULTS = {
     // 9.4%, median 9.3%, as the owner read them from the videos. The only
     // measurement that stops at the battery (ADAC, four cars) is 1–6%
     // preconditioned, which leaves the pack's internal losses out. 9% is the
-    // round number at the centre; it is one value on purpose, since the spread
+    // round number at the center; it is one value on purpose, since the spread
     // does not follow maker or platform in any way the unlogged conditions
     // do not also explain. Sources and the gaps: explainers/facts.json,
     // `dc-fast-round-trip-pairs`.
@@ -225,7 +225,7 @@ export const EPA_DEFAULTS = {
     // Temperature is corrected for air density and for the assumed heating and
     // cooling load (ACCESSORY_*), so the band can be wide. Its edges still
     // matter: below freezing the error in that load (battery conditioning, cold
-    // tyres, heat pump against resistive heater) is comparable to the effect
+    // tires, heat pump against resistive heater) is comparable to the effect
     // itself, and hot-soak A/C pull-down is not in the line either. The owner
     // chose [0, 100] on 2026-10-25 knowing that. Speed is corrected fully,
     // but the further a test is from the target the more the single
@@ -236,14 +236,14 @@ export const EPA_DEFAULTS = {
 
     // How far the EPA label range may sit from the vehicle's spec range before
     // the curator form flags it. NOT a tie between the fields: one vehicle trim
-    // legitimately maps to several EPA configurations — different wheels, tyres
+    // legitimately maps to several EPA configurations — different wheels, tires
     // or a carry-over year — and those differ by a few miles without either
     // number being wrong.
     //
     // 5% tolerates that (a few miles on a 300-mile car) while still catching the
     // failure worth catching: a link to the wrong pack or a mistyped figure,
     // which are usually tens of miles out. Tunable because the right threshold
-    // is a curation judgement, not a fact.
+    // is a curation judgment, not a fact.
     LABEL_RANGE_TOLERANCE_PCT: 5,
 
     // sanity bands (Section-8 flags) + curve extent
@@ -306,7 +306,7 @@ export const EPA_DEFAULTS = {
 
     // ── Data Checks (#321) ──────────────────────────────────────────────────
     // The limits Admin → Data Checks measures each vehicle against. Curation
-    // judgements rather than facts, set from the 2026-09-10 corpus, and tried
+    // judgments rather than facts, set from the 2026-09-10 corpus, and tried
     // live on that panel before anything is kept.
 
     // How far apart one vehicle's linked EPA configurations may read on range

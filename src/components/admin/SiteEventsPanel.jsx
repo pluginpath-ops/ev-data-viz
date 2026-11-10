@@ -119,7 +119,7 @@ export default function SiteEventsPanel() {
                         <StatCell label="Events" value={total.events.toLocaleString()} />
                         <StatCell label="Browsers" value={total.browsers.toLocaleString()} title="Distinct browser tokens. A browser, not a person." />
                         <StatCell label="Home views" value={total.homeViews.toLocaleString()} title="Home opened, once per browser tab per comparison" />
-                        <StatCell label="Opened from Home" value={total.featuredOpens.toLocaleString()} title="A featured chart's Open chart → clicked" />
+                        <StatCell label="Opened from Home" value={total.featuredOpens.toLocaleString()} title="A featured chart's Open chart ↘ clicked" />
                         <StatCell label="Resets" value={total.resets.toLocaleString()} title="The reset to a featured comparison used" />
                         <StatCell label="Chart opens" value={total.chartViews.toLocaleString()} title="A chart tab or mode opened, from anywhere" />
                     </div>
@@ -128,7 +128,7 @@ export default function SiteEventsPanel() {
                         <h3 className="section-title mb-1">Featured comparisons</h3>
                         <p className="text-note mb-2">
                             Home views is the n for each row: how often the comparison was the one shown. Opens are clicks on its
-                            charts' Open chart →. Opens per view is shown only where there are {MIN_N_TO_RANK} or more views.
+                            charts' Open chart ↘. Opens per view is shown only where there are {MIN_N_TO_RANK} or more views.
                         </p>
                         {byComparison.length === 0 ? (
                             <p className="text-note">There are no featured comparisons and no events for one.</p>
@@ -189,7 +189,7 @@ export default function SiteEventsPanel() {
                     <section className="card">
                         <h3 className="section-title mb-1">Chart types</h3>
                         <p className="text-note mb-2">
-                            Every time a chart tab or mode was opened. <strong>From Home</strong> is the opens matched to an Open chart →
+                            Every time a chart tab or mode was opened. <strong>From Home</strong> is the opens matched to an Open chart ↘
                             click by the same browser within {HOME_PAIR_SECONDS} seconds; <strong>other ways</strong> is everything else
                             — the navigation, a shared link, the back button. It is a match, not a record: a click whose chart open was
                             refused or lost is not matched.

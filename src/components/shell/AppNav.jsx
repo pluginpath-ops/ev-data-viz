@@ -15,7 +15,7 @@ import { SETUP_WIZARD } from '../../constants/setupWizard';
  * went back to the content.
  *
  * The bar is full-bleed rather than held to the page column: it is chrome, and
- * chrome runs to the edge of the window. Only the content below it is centred.
+ * chrome runs to the edge of the window. Only the content below it is centerd.
  *
  * ── The tabs are DATA now, and below 1000px they are a menu ──────────────────
  *

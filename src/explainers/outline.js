@@ -4,7 +4,7 @@
  * its frontmatter. Titles here are for topics not yet written; a written
  * page's own title wins (topics.js).
  *
- * The roots are hubs: pages that summarise the ones under them, written
+ * The roots are hubs: pages that summarize the ones under them, written
  * last (build step 6). "Hub" is a word for code and these notes only; the
  * page shows a hub by its title.
  */

@@ -568,7 +568,7 @@ export default function ChargeCompareView({
     });
 
     // Name each bar by what distinguishes it from the OTHER BARS ON SCREEN, so
-    // the labels answer the comparison you are actually looking at. Minimising
+    // the labels answer the comparison you are actually looking at. Minimizing
     // over every resolved pair instead would let a deselected run lengthen the
     // labels of the ones you kept.
     //
@@ -954,7 +954,7 @@ export default function ChargeCompareView({
                                 {/* ── SCENARIO ──
                   * The three numbers that define the question both charts
                   * answer. They were a wrapping row of "Label: [input]" pairs
-                  * that read as a form; as a labelled group of short rows they
+                  * that read as a form; as a labeled group of short rows they
                   * read as the parameters they are. */}
                 <div className="chart-rail-group">
                     <span className="text-micro">Scenario</span>

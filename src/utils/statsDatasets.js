@@ -1,7 +1,7 @@
 import {
     UNITS, MEASURES, measureByKey,
-    summarise, overall, histogram, extremes,
-    describe, bucketise, histogramOf, extremesOf,
+    summarize, overall, histogram, extremes,
+    describe, bucketize, histogramOf, extremesOf,
 } from './epaGuideStats';
 import {
     CERT_MEASURES, certMeasureByKey, certObservations,
@@ -56,8 +56,8 @@ export const STATS_DATASETS = {
         observations: ({ guideRows }) => guideRows,
         plotted: asPlotted,
         coverage: () => null,
-        summarise: (rows, { unit, dimension, measure, minN, sort }) =>
-            summarise(rows, { unit, dimension, measure, minN, sort }),
+        summarize: (rows, { unit, dimension, measure, minN, sort }) =>
+            summarize(rows, { unit, dimension, measure, minN, sort }),
         corpus: (rows, { unit, measure }) => overall(rows, { unit, measure }),
         histogram: (rows, { unit, measure, bins }) => histogram(rows, { unit, measure, bins }),
         extremes: (rows, { unit, measure, count }) => extremes(rows, { unit, measure, count }),
@@ -88,8 +88,8 @@ export const STATS_DATASETS = {
         // population padded with a fallback constant looks exactly like one
         // over 73 real derivations.
         coverage: (rows, measure) => coverageFor(rows, measure),
-        summarise: (rows, { dimension, measure, minN, sort }) =>
-            bucketise(rows, { dimension, measure, minN, sort }),
+        summarize: (rows, { dimension, measure, minN, sort }) =>
+            bucketize(rows, { dimension, measure, minN, sort }),
         corpus: (rows, { measure }) => describe(rows.map(o => o[measure])),
         histogram: (rows, { measure, bins }) => histogramOf(rows, { measure, bins }),
         extremes: (rows, { measure, count }) => extremesOf(rows, { measure, count }),
@@ -107,7 +107,7 @@ export function datasetByKey(key) {
 /**
  * Every measure key either dataset knows, for validating one out of a URL.
  *
- * Checked against BOTH catalogues, because only the guide's used to be: a
+ * Checked against BOTH catalogs, because only the guide's used to be: a
  * certification measure in a shared link failed validation, reverted to the
  * guide default, and the cert tab then swapped that for charger efficiency —
  * so every link to a certification measure opened on the wrong one.

@@ -52,7 +52,7 @@ export const DEFAULT_SPEED_RANGE = [55, 80];
 /**
  * The speed indices a range allows: the first speed at or above `min` to the
  * last at or below `max`, either way round. The grid outside them is not
- * dropped — the chart still draws the fastest plan, labelled as such — only
+ * dropped — the chart still draws the fastest plan, labeled as such — only
  * the BEST plan is held to what a driver would actually do.
  */
 export function speedIndexRange(min, max) {
