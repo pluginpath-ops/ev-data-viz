@@ -122,7 +122,7 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                             subtitle: `${weekSummary(settings)} · ${seasonText(settings, otherSeason)} · ${charging}` };
                     } else if (compare === 'level' && atLevel && !atLevel.missing) {
                         const w = simulateWeek(atLevel.profile, levelSettings);
-                        cmp = { week: w, profile: atLevel.profile, title: `${name}: the same week on ${chargerText(HOME_LEVELS[compareLevel])}`,
+                        cmp = { week: w, profile: atLevel.profile, title: `${name}: the same week ${HOME_LEVELS[compareLevel].none ? 'with' : 'on'} ${chargerText(HOME_LEVELS[compareLevel])}`,
                             subtitle: `${weekSummary(settings)} · ${seasonText(settings, settings.season)} · ${chargingText(settings, HOME_LEVELS[compareLevel])}` };
                     }
 

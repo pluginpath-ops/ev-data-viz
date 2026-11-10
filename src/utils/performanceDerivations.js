@@ -33,6 +33,7 @@
  */
 
 import { MI_TO_KM, FT_TO_M, MPH_TO_MS, G_MS2 } from '../constants/units';
+import { val } from './calcTrace';
 
 const num = (v) => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v));
 
@@ -130,12 +131,18 @@ export function bestRunFor(runs, field) {
  * certain: true when backed by 2+ runs on reasonable grade (a single run can't
  *          be distinguished from a fluke).
  */
-export function deriveFromRuns(sessions, field) {
+export function deriveFromRuns(sessions, field, trace = null) {
     const runs = flattenRuns(sessions).filter(r => runValue(r, field) != null);
     if (runs.length === 0) return { ...EMPTY };
 
     const best = bestRunFor(runs, field);
     const value = runValue(best, field);
+    trace?.step('Best run', {
+        formula: LOWER_IS_BETTER.has(field) ? 'best = min of the runs' : 'best = max of the runs',
+        values: Object.fromEntries(runs.map((r, i) => [`run${i + 1}`, val(runValue(r, field), null, 'data')])),
+        result: value,
+        note: `best-of, not a mean: repeated maximum-effort attempts; drive mode ${best.drive_mode ?? 'not recorded'}`,
+    });
 
     // Spread is only meaningful between comparable attempts. A session sweeps
     // drive modes (Insane → Chill), so spanning all of them would report a
@@ -147,6 +154,7 @@ export function deriveFromRuns(sessions, field) {
     if (comparable.length === 1) flags.push('single-run');
     const grade = num(best.slope_pct);
     if (grade != null && Math.abs(grade) > GRADE_FLAG_PCT) flags.push('steep-grade');
+    trace?.note(`${comparable.length} comparable run${comparable.length === 1 ? '' : 's'} in that drive mode${flags.length ? `; flagged: ${flags.join(', ')}` : ''}${grade != null ? `; grade ${grade}%` : ''}`, { assumed: flags.length > 0 });
 
     return {
         value,
@@ -284,7 +292,7 @@ export function deriveClaimed(vehicle, field) {
  *
  * @returns {{value, runId, driveMode, flags}|null} seconds for the window
  */
-export function windowFromSplits(run, fromSpeed, toSpeed) {
+export function windowFromSplits(run, fromSpeed, toSpeed, trace = null) {
     const pts = (run?.performance_run_points || [])
         .filter(p => !/\(1ft\)/.test(p.label || '') && num(p.speed_mph) != null && num(p.elapsed_s) != null)
         .map(p => ({ speed: num(p.speed_mph), t: num(p.elapsed_s) }))
@@ -312,6 +320,12 @@ export function windowFromSplits(run, fromSpeed, toSpeed) {
     const tFrom = timeAt(fromSpeed);
     const tTo   = timeAt(toSpeed);
     if (tFrom == null || tTo == null || tTo <= tFrom) return null;
+    trace?.step(`${fromSpeed}–${toSpeed} mph from the launch's splits`, {
+        formula: 't = t(v_to) − t(v_from)',
+        values: { 't(v_to)': val(tTo, 's', 'data'), 't(v_from)': val(tFrom, 's', 'data') },
+        result: tTo - tFrom, unit: 's', assumed: true,
+        note: 'cut from a standing start, not a roll-on; a time between splits is interpolated linearly',
+    });
 
     const flags = ['derived-from-launch'];
     // Interpolated endpoints are softer evidence than recorded ones.
@@ -332,13 +346,15 @@ export function windowFromSplits(run, fromSpeed, toSpeed) {
  * Braking windows are never derivable this way — a launch trace contains no
  * deceleration — so only timed windows are attempted.
  */
-export function windowFromSessions(sessions = [], kind, fromSpeed, toSpeed) {
+export function windowFromSessions(sessions = [], kind, fromSpeed, toSpeed, trace = null) {
     if (kind === 'braking') return null;
-    let best = null;
+    let best = null, bestRun = null;
     for (const run of flattenRuns(sessions)) {
         const r = windowFromSplits(run, fromSpeed, toSpeed);
-        if (r && (!best || r.value < best.value)) best = r;
+        if (r && (!best || r.value < best.value)) { best = r; bestRun = run; }
     }
+    // The winning run, worked through: the same call, traced.
+    if (trace && bestRun) windowFromSplits(bestRun, fromSpeed, toSpeed, trace);
     return best;
 }
 
@@ -362,7 +378,7 @@ export function windowFromSessions(sessions = [], kind, fromSpeed, toSpeed) {
  *
  * @returns {Array<{value, sourceName, origin, certain, flags, url, basis}>}
  */
-export function deriveTestedResults(sessions = [], summaries = [], field) {
+export function deriveTestedResults(sessions = [], summaries = [], field, trace = null) {
     const lower = LOWER_IS_BETTER.has(field);
     const out = [];
 
@@ -374,7 +390,7 @@ export function deriveTestedResults(sessions = [], summaries = [], field) {
         bySource.get(key).push(s);
     }
     for (const [sourceName, group] of bySource) {
-        const rec = deriveFromRuns(group, field);
+        const rec = deriveFromRuns(group, field, trace?.group(`${sourceName}: from imported sessions`));
         if (rec.value == null) continue;
         out.push({
             value: rec.value,
@@ -391,6 +407,9 @@ export function deriveTestedResults(sessions = [], summaries = [], field) {
     for (const row of summaries || []) {
         const value = num(row[field]);
         if (value == null) continue;
+        trace?.step(`${row.source_name?.trim() || 'Unattributed'}: published`, {
+            values: { value: val(value, null, 'data') }, result: value, note: 'as published: no run data behind it to check',
+        });
         out.push({
             value,
             sourceName: row.source_name?.trim() || 'Unattributed',
@@ -784,25 +803,39 @@ export function windowLabel(interval) {
  * Callers get `rateCertain` to reflect this: true for braking, false for timed
  * windows, so the UI can mark the latter as indicative.
  */
-export function averageRateG(interval) {
+export function averageRateG(interval, trace = null) {
     const fromMph = speedToMph(interval.from_speed, interval.speed_unit);
     const toMph   = speedToMph(interval.to_speed ?? 0, interval.speed_unit);
     if (fromMph == null || toMph == null) return null;
 
     const v1 = fromMph * MPH_TO_MS;
     const v2 = toMph   * MPH_TO_MS;
+    trace?.step('Speeds in m/s', {
+        formula: 'v_1 = s_1 × c,  v_2 = s_2 × c', values: { s_1: val(fromMph, 'mph', 'data'), s_2: val(toMph, 'mph', 'data'), c: val(MPH_TO_MS, 'm/s per mph', 'code:MPH_TO_MS') },
+        note: `v_1 = ${v1.toFixed(2)} m/s, v_2 = ${v2.toFixed(2)} m/s${interval.speed_unit === 'kph' ? '; the speeds were reported in km/h' : ''}`,
+    });
 
     if (interval.kind === 'braking') {
         const distFt = distanceToFt(interval.distance, interval.distance_unit);
         if (distFt == null || distFt <= 0) return null;
         const d = distFt * FT_TO_M;
         // v₂² = v₁² − 2ad  ⇒  a = (v₁² − v₂²) / 2d
-        return Math.abs(v1 * v1 - v2 * v2) / (2 * d) / G_MS2;
+        const g = Math.abs(v1 * v1 - v2 * v2) / (2 * d) / G_MS2;
+        trace?.step('Average deceleration', {
+            formula: 'a = |v_1² − v_2²| / (2 × d) / g', values: { v_1: val(v1, 'm/s'), v_2: val(v2, 'm/s'), d: val(d, 'm', 'data'), g: val(G_MS2, 'm/s²', 'code:G_MS2') },
+            result: g, unit: 'g', note: 'constant deceleration assumed: braking is grip-limited, so it roughly holds',
+        });
+        return g;
     }
 
     const dt = num(interval.elapsed_s);
     if (dt == null || dt <= 0) return null;
-    return Math.abs(v2 - v1) / dt / G_MS2;
+    const g = Math.abs(v2 - v1) / dt / G_MS2;
+    trace?.step('Average acceleration', {
+        formula: 'a = |v_2 − v_1| / t / g', values: { v_1: val(v1, 'm/s'), v_2: val(v2, 'm/s'), t: val(dt, 's', 'data'), g: val(G_MS2, 'm/s²', 'code:G_MS2') },
+        result: g, unit: 'g', assumed: true, note: 'indicative: the rate falls away as the car goes power-limited',
+    });
+    return g;
 }
 
 /**

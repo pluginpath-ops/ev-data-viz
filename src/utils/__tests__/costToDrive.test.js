@@ -4,7 +4,7 @@ import {
     weekSummary, gasCarName, chargerText, chargingText,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
-import { DEFAULT_COST_TO_DRIVE, HOME_LEVELS, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
+import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF } from '../../constants/epa';
 
 // A Model Y-ish profile with fixed numbers, so the rule is tested apart from
@@ -288,7 +288,42 @@ describe('the week and the gas car in words', () => {
         expect(words(chargerText(HOME_LEVELS[4]))).toBe('L2 11.5 kW');
         expect(words(chargingText(plain(), HOME_LEVELS[4]))).toBe('L2 11.5 kW at $0.17/kWh · fast charging at $0.48/kWh');
         expect(words(chargingText(plain({ homePrice: 0.31 })))).toBe('home at $0.31/kWh · fast charging at $0.48/kWh');
+        expect(words(chargingText(plain(), HOME_LEVELS[NO_HOME_LEVEL]))).toBe('no home charging · fast charging at $0.48/kWh');
         // Wraps only between phrases.
         expect(chargingText(plain()).split(' ')).toHaveLength(3);
+    });
+});
+
+describe('no home charging', () => {
+    const noHome = { home: { kw: 0, eff: 0.885, none: true } };
+
+    it('is a level of its own, after the six chargers, with no power at home', () => {
+        expect(NO_HOME_LEVEL).toBe(HOME_LEVELS.length - 1);
+        const p = costToDriveVehicle({ socWindowKwh: 75, epaRange: { mi: 290 }, specs: {} }, settings({ level: NO_HOME_LEVEL }));
+        expect(p.home.kw).toBe(0);
+        expect(p.home.none).toBe(true);
+    });
+
+    it('buys no energy at home: every kWh is a fast charge, at the fast price', () => {
+        const w = simulateWeek(profile(noHome), settings());
+        expect(w.homeKwh).toBe(0);
+        expect(w.homeCost).toBe(0);
+        expect(w.fastKwh).toBeGreaterThan(0);
+        expect(w.fastCost).toBeCloseTo(w.fastKwh * settings().fastPrice, 6);
+        for (const d of w.days) expect(d.night.added).toBe(0);
+    });
+
+    it('costs more and takes more time than any home charger, the floor still kept', () => {
+        const none = simulateWeek(profile(noHome), settings());
+        const outlet = simulateWeek(profile(wallOutlet), settings());
+        expect(none.fastMinutes).toBeGreaterThan(outlet.fastMinutes);
+        expect(none.stopCount).toBeGreaterThanOrEqual(outlet.stopCount);
+        expect(none.fastCost).toBeGreaterThan(outlet.fastCost + outlet.homeCost);
+        expect(Math.min(...none.points.map(([, soc]) => soc))).toBeGreaterThanOrEqual(10 - 1e-6);
+    });
+
+    it('settles: the pack energy bought over the week covers the energy used', () => {
+        const w = simulateWeek(profile(noHome), settings());
+        expect(w.fastShare).toBeGreaterThan(0.9);
     });
 });

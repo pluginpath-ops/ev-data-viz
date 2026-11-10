@@ -11,7 +11,7 @@ import { whenNewRangeOfRun } from '../utils/testedRange';
 import { fullPackRange } from '../utils/fullPackRange';
 import { vehicleLabel } from '../utils/specHelpers';
 import { buildSeriesLabels, buildVehicleLabels } from '../utils/seriesLabel';
-import { correctionFactor, correctionNote, runConditions } from '../utils/conditionCorrection';
+import { correctRunDistance, correctionNote } from '../utils/conditionCorrection';
 import { correctionCaption, correctionSummary } from '../utils/correctionSettings';
 import { sessionFor } from '../utils/testSessions';
 import CorrectionControl from './CorrectionControl';
@@ -33,6 +33,7 @@ import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme'
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
+import RangeMath from './calcTrace/RangeMath';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import { useSourceLine } from '../hooks/useSourceLine';
@@ -115,12 +116,12 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     const vehicleNameOf = v => (verboseLabels ? vehicleNames.get(v.id)?.full : vehicleNames.get(v.id)?.short) ?? vehicleLabel(v);
     const corrected = (v, r) => {
         const session = sessionFor(testSessions, r);
-        const result = correctionFactor(runConditions(r, session), { mode: correctionMode, target: correctionTarget });
+        const { result, distanceMiles } = correctRunDistance(r, session, { mode: correctionMode, target: correctionTarget });
         const base = { ...r, vehicle: v, vehicleName: vehicleNameOf(v), vehicleId: v.id };
         if (result.factor === 1) return base;
         return {
             ...base,
-            distance_miles: base.distance_miles != null ? base.distance_miles * result.factor : null,
+            distance_miles: distanceMiles,
             _correction: { ...result, note: correctionNote(result) },
         };
     };
@@ -866,6 +867,9 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
                 />
             )}
 
+            {!presentationMode && (
+                <RangeMath plotted={plottableRuns} mode={correctionMode} target={correctionTarget} testSessions={testSessions} />
+            )}
             {!presentationMode && <ChartInfoBubble chartKey="range" />}
 
             </div>{/* .chart-main */}

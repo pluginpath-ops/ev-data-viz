@@ -46,6 +46,7 @@
 import { isListed, isExcluded } from './runListing';
 import { defaultRangeRun, miPerKwhFrom } from './rangeSource';
 import { speedBasisNote } from './unitConversions';
+import { val } from './calcTrace';
 
 /**
  * How much of the pack a run actually covered, as a percentage, or null when
@@ -164,7 +165,15 @@ export const REPORTED_RANGE_REASON = {
 };
 
 /** reportedRangeRun, with which rule chose it (a key of REPORTED_RANGE_REASON). */
-export function reportedRangeChoice(vehicle) {
+export function reportedRangeChoice(vehicle, trace = null) {
+    const choice = pickReportedRange(vehicle);
+    trace?.note(choice.run
+        ? `The reported range test: ${choice.run.name ?? `test ${choice.run.id}`}. ${REPORTED_RANGE_REASON[choice.reason]}`
+        : 'No usable range test');
+    return choice;
+}
+
+function pickReportedRange(vehicle) {
     // A quoted figure names one test, so a listed one a reader can find, and
     // never one kept out of the figures (#394, utils/runListing).
     const usable = (vehicle?.runs || []).filter(r => r.distance_miles > 0 && isListed(r) && !isExcluded(r));
@@ -192,8 +201,8 @@ export function reportedRangeChoice(vehicle) {
  *   speedMph: number|null, temperatureF: number|null, speedNote: string|null,
  * }|null}
  */
-export function testedRangeSummary(vehicle) {
-    const { run, reason } = reportedRangeChoice(vehicle);
+export function testedRangeSummary(vehicle, trace = null) {
+    const { run, reason } = reportedRangeChoice(vehicle, trace);
     if (!run) return null;
 
     const distanceMi = run.distance_miles;
@@ -210,6 +219,19 @@ export function testedRangeSummary(vehicle) {
     // Half a mile, so a 97→2 test is not annotated for a rounding difference
     // while a 100→15 one is.
     const isScaled = fullPackMi != null && Math.abs(fullPackMi - distanceMi) >= 0.5;
+    if (trace) {
+        if (fullPackMi != null) {
+            trace.step('Scaled to a full pack', {
+                formula: 'R = round(d × 100 / ΔSoC, 0.1)',
+                values: { d: val(distanceMi, 'mi', 'data'), ΔSoC: val(windowPct, '%', 'data') },
+                result: fullPackMi, unit: 'mi', note: 'linear in SoC; only for a test that covered the practical pack',
+            });
+        } else {
+            trace.note(windowPct != null && windowPct >= FULL_WINDOW_MIN_PCT
+                ? 'A full-pack test: its distance is the range'
+                : `Window ${windowPct ?? 'not recorded'}${windowPct != null ? '%' : ''}: too narrow to scale, so no range is reported`, { assumed: false });
+        }
+    }
 
     return {
         run,
@@ -257,10 +279,10 @@ export function testedRangeSummary(vehicle) {
  *             isRepresentative: boolean, startSoc, endSoc, speedMph, temperatureF,
  *             speedNote: string|null }|null}
  */
-export function testedEfficiency(vehicle) {
-    const { run, reason } = reportedRangeChoice(vehicle);
+export function testedEfficiency(vehicle, trace = null) {
+    const { run, reason } = reportedRangeChoice(vehicle, trace);
     if (!run) return null;
-    const { miPerKwh, method } = miPerKwhFrom(run, vehicle?.socWindowKwh);
+    const { miPerKwh, method } = miPerKwhFrom(run, vehicle?.socWindowKwh, trace);
     if (!(miPerKwh > 0) || !Number.isFinite(miPerKwh)) return null;
     return {
         run,
@@ -322,23 +344,53 @@ export const WHEN_NEW_CAPACITY_BASES = ['epa-tested', 'usable'];
  */
 export const CAPACITY_RETENTION_SHOWN_BELOW = 0.95;
 
-export function whenNewRange(vehicle) {
-    return whenNewRangeOfRun(reportedRangeChoice(vehicle).run, vehicle);
+export function whenNewRange(vehicle, trace = null) {
+    return whenNewRangeOfRun(reportedRangeChoice(vehicle, trace).run, vehicle, trace);
 }
 
 /** whenNewRange for one named test — a chart bar is any test, not the reported one. */
-export function whenNewRangeOfRun(run, vehicle) {
-    if (!run ||!(run.energy_kwh > 0) || !(run.distance_miles > 0)) return null;
-    if (!coversPracticalPack(run)) return null;
+export function whenNewRangeOfRun(run, vehicle, trace = null) {
+    if (!run ||!(run.energy_kwh > 0) || !(run.distance_miles > 0)) {
+        trace?.note('No when-new range: the test recorded no energy');
+        return null;
+    }
+    if (!coversPracticalPack(run)) {
+        trace?.note('No when-new range: the test did not cover the practical pack');
+        return null;
+    }
 
     const capacityKwh = Number(vehicle?.socWindowKwh);
-    if (!(capacityKwh > 0) || !WHEN_NEW_CAPACITY_BASES.includes(vehicle?.socWindowBasis)) return null;
+    if (!(capacityKwh > 0) || !WHEN_NEW_CAPACITY_BASES.includes(vehicle?.socWindowBasis)) {
+        trace?.note('No when-new range: the capacity is not a new pack\'s own (EPA tested or Usable)');
+        return null;
+    }
 
     const windowPct = socWindow(run);
     if (!windowPct) return null;
 
     const impliedKwh = run.energy_kwh * 100 / windowPct;
-    if (!(impliedKwh / capacityKwh < CAPACITY_RETENTION_SHOWN_BELOW)) return null;
+    if (trace) {
+        trace.step('Pack energy the test implies', {
+            formula: 'E_full = E × 100 / ΔSoC',
+            values: { E: val(run.energy_kwh, 'kWh', 'data'), ΔSoC: val(windowPct, '%', 'data') },
+            result: impliedKwh, unit: 'kWh',
+        });
+        trace.step('Capacity retention', {
+            formula: 'retention = E_full / E_new',
+            values: { E_full: val(impliedKwh, 'kWh'), E_new: val(capacityKwh, 'kWh', 'data') },
+            result: impliedKwh / capacityKwh,
+            note: `shown only below ${CAPACITY_RETENTION_SHOWN_BELOW} (CAPACITY_RETENTION_SHOWN_BELOW)`,
+        });
+    }
+    if (!(impliedKwh / capacityKwh < CAPACITY_RETENTION_SHOWN_BELOW)) {
+        trace?.note('At or above the threshold: no when-new range or retention shown');
+        return null;
+    }
+    trace?.step('When-new range', {
+        formula: 'R_new = d / E × E_new',
+        values: { d: val(run.distance_miles, 'mi', 'data'), E: val(run.energy_kwh, 'kWh', 'data'), E_new: val(capacityKwh, 'kWh', 'data') },
+        result: (run.distance_miles / run.energy_kwh) * capacityKwh, unit: 'mi', note: 'the test\'s efficiency on a new pack',
+    });
     return {
         run,
         whenNewMi: (run.distance_miles / run.energy_kwh) * capacityKwh,

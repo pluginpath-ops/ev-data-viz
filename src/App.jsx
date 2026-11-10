@@ -3,7 +3,7 @@ import { DEFAULT_SERIES_PALETTE } from './utils/colorUtils';
 import { useAppContext } from './context/AppContext';
 import { useChartSync } from './hooks/useChartSync';
 import { AxisLimitsProvider } from './hooks/useAxisLimits';
-import { AXIS_LIMITS_PARAM, decodeAxisLimits, withAxisLimits } from './utils/axisLimits';
+import { AXIS_LIMITS_PARAM, axisLimitsOf, decodeAxisLimits, withAxisLimits } from './utils/axisLimits';
 import { useHeaderHeight } from './hooks/useHeaderHeight';
 import AppNav from './components/shell/AppNav';
 import SubTabStrip from './components/shell/SubTabStrip';
@@ -33,6 +33,10 @@ import { SITE_EVENTS } from './utils/siteEvents';
 import { FeaturedComparisonsContext } from './context/FeaturedComparisonsContext';
 import HomeView from './components/home/HomeView';
 import FeaturedComparisonEditor from './components/home/FeaturedComparisonEditor';
+import SetupWizard from './components/setup/SetupWizard';
+import SetupReviewBar from './components/setup/SetupReviewBar';
+import { flipSeason, skippedCount } from './utils/setupWizard';
+import { readSetupReview, writeSetupReview } from './utils/setupWizardStorage';
 import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink, chartQueryString } from './utils/chartUrlState';
 import SpecChart from './components/SpecChart';
 import EpaCurvesView from './components/EpaCurvesView';
@@ -478,6 +482,77 @@ export default function App() {
         setEpaConfig(state.epaConfig);
         setPairings(state.pairings);
     }, [vehicles, setVehicleSelection]);
+
+    /**
+     * The setup wizard: open it from Home, an empty chart or the nav, and
+     * apply its plan (utils/setupWizard.js). Applying lays each patch over the
+     * reader's current settings through the same setters the sidebars use,
+     * then opens the plan's chart like a sub-tab click — so the URL, the
+     * pop-out and the history entry follow as they always do.
+     */
+    const [setupOpen, setSetupOpen] = useState(false);
+    const openSetup = useCallback((from) => {
+        recordEvent(SITE_EVENTS.SETUP_OPEN, { detail: { from } });
+        setSetupOpen(true);
+    }, [recordEvent]);
+    const closeSetup = useCallback((step) => {
+        recordEvent(SITE_EVENTS.SETUP_CLOSE, { detail: { step } });
+        setSetupOpen(false);
+    }, [recordEvent]);
+
+    /**
+     * The review bar (SetupReviewBar): the charts Apply chose and the season
+     * shown, kept in browser storage until × or the next Apply. Its season
+     * toggle flips the correction temperature and Cost & Time's season
+     * together, through the same setters.
+     */
+    const [setupReview, setSetupReviewState] = useState(readSetupReview);
+    const setSetupReview = (review) => {
+        setSetupReviewState(review);
+        writeSetupReview(review);
+    };
+    const openReviewChart = (mode, index) => {
+        recordEvent(SITE_EVENTS.SETUP_JUMP, { detail: { mode, index } });
+        handleChartModeChange(mode);
+        window.scrollTo(0, 0);
+    };
+    const toggleReviewSeason = () => {
+        const next = flipSeason(setupReview.season);
+        recordEvent(SITE_EVENTS.SEASON_TOGGLE, { detail: { to: next.season } });
+        setChartConfig(prev => ({ ...prev, correctionTarget: { ...prev.correctionTarget, temperatureF: next.tempF } }));
+        updateCostToDrive({ season: next.season });
+        setSetupReview({ ...setupReview, season: next });
+    };
+
+    const applySetup = (plan, answers) => {
+        recordEvent(SITE_EVENTS.SETUP_APPLY, {
+            detail: { goals: plan.goals.join(','), cars: plan.carsFrom === 'set' ? plan.setKey : plan.carsFrom, skipped: skippedCount(answers) },
+        });
+        if (plan.vehicleIds) setVehicleSelection(plan.vehicleIds);
+        setChartConfig(prev => {
+            // A goal's own chart settings (constants/setupWizard.js `chart`). The
+            // axes live at the top of chartConfig and belong to Charging Curves.
+            let axisLimits = prev.axisLimits;
+            let axes = {};
+            for (const [mode, { axisLimits: limits, ...rest }] of Object.entries(plan.charts ?? {})) {
+                if (limits) axisLimits = withAxisLimits(axisLimits, mode, { ...axisLimitsOf(axisLimits, mode), ...limits });
+                axes = { ...axes, ...rest, ...(rest.raceThreshold != null && { alignRaw: false }) };
+            }
+            return {
+                ...prev,
+                ...axes,
+                axisLimits,
+                correctionTarget: { ...prev.correctionTarget, ...plan.correction },
+                assumptions: { ...prev.assumptions, ...plan.assumptions },
+            };
+        });
+        updateCostToDrive(plan.costToDrive);
+        setRoadTripConfig(prev => ({ ...prev, ...plan.roadTrip }));
+        handleChartModeChange(plan.mode);
+        setSetupOpen(false);
+        setSetupReview({ modes: plan.modes, season: plan.season ?? null });
+        window.scrollTo(0, 0);
+    };
 
     /**
      * A platform's page, from anywhere a platform is named (#354). A history
@@ -932,7 +1007,7 @@ export default function App() {
 
     return (
         <AxisLimitsProvider chartConfig={chartConfig} setChartConfig={setChartConfig}>
-        <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison }}>
+        <NavigationContext.Provider value={{ openPlatform, openExplainer, openFeaturedChart, resetToComparison, openSetup }}>
         <FeaturedComparisonsContext.Provider value={featuredContext}>
         <VehicleBaseContext.Provider value={vehicleBaseApi}>
             {showAuthModal && (
@@ -968,6 +1043,7 @@ export default function App() {
                         onNavigateChartCategory={navigateToChartCategory}
                         onSignIn={() => setShowAuthModal(true)}
                         onSignOut={signOut}
+                        onOpenSetup={() => openSetup('nav')}
                     />
 
                     {/* Sub-nav for whichever section has one. Every section's
@@ -1425,6 +1501,22 @@ export default function App() {
                         />
                     )}
                 </main>
+
+                {setupOpen && (
+                    <SetupWizard onApply={applySetup} onClose={closeSetup} />
+                )}
+
+                {setupReview && (
+                    <SetupReviewBar
+                        review={setupReview}
+                        currentMode={isChartCategory(view) ? chartMode : null}
+                        units={units}
+                        onOpen={openReviewChart}
+                        onToggleSeason={toggleReviewSeason}
+                        onChangeAnswers={() => openSetup('review')}
+                        onClose={() => setSetupReview(null)}
+                    />
+                )}
 
                 {featuredEditor && (
                     <FeaturedComparisonEditor

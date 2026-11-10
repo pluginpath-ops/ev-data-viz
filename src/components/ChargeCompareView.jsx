@@ -9,7 +9,7 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, speedBasisNote, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
-import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { pairRangeSource, epaRangeOption, defaultRangeRun } from '../utils/rangeSource';
 import { figureSources, epaCredits } from '../utils/vehicleFigures';
 import { useSourceLine } from '../hooks/useSourceLine';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
@@ -27,6 +27,7 @@ import { DEFAULT_COMPARE_ORIENTATION } from '../utils/chartUrlState';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
+import ChargeStopMath from './calcTrace/ChargeStopMath';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
@@ -443,9 +444,8 @@ export default function ChargeCompareView({
                     // The range side is always explicit here — it IS the row — so
                     // the resolver is entered at rank 1 and its fallbacks only
                     // matter when the chosen test carries no usable data.
-                    const rangeSrc = resolveRangeSource(chargingRun, {
+                    const rangeSrc = pairRangeSource(chargingRun, rangeRun, {
                         vehicle,
-                        explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
                         correction: { mode: correctionMode, target: correctionTarget },
                         session: sessionFor(testSessions, rangeRun),
                     });
@@ -1142,6 +1142,7 @@ export default function ChargeCompareView({
                 </>
             )}
 
+            {!presentationMode && <ChargeStopMath pairs={activePairs} mode={correctionMode} target={correctionTarget} />}
             {!presentationMode && <ChartInfoBubble chartKey="compare" />}
 
             </div>{/* .chart-main */}

@@ -23,6 +23,7 @@
  * Pure module — no React, no database.
  */
 import { SOC_WINDOW_BASIS } from './vehicleFigures';
+import { val } from './calcTrace';
 
 const positive = (v) => {
     if (v == null || v === '') return null;
@@ -37,19 +38,30 @@ const positive = (v) => {
  *             socUsed?: number, miPerKwh?: number, capacityKwh?: number, capacityLabel?: string } | null}
  *   null when the test has no distance
  */
-export function fullPackRange(run, vehicle = null) {
+export function fullPackRange(run, vehicle = null, trace = null) {
     const distance = positive(run?.distance_miles);
     if (!distance) return null;
 
     if (run.start_soc != null && run.end_soc != null) {
         const socUsed = run.start_soc - run.end_soc;
-        if (socUsed > 0) return { mi: (distance * 100) / socUsed, basis: 'soc-window', socUsed };
+        trace?.step('SoC used', { formula: 'ΔSoC = SoC_start − SoC_end', values: { SoC_start: val(run.start_soc, '%', 'data'), SoC_end: val(run.end_soc, '%', 'data') }, result: socUsed, unit: '%' });
+        if (socUsed > 0) {
+            const mi = (distance * 100) / socUsed;
+            trace?.step('Full-pack range (SoC window)', { formula: 'R = d × 100 / ΔSoC', values: { d: val(distance, 'mi'), ΔSoC: val(socUsed, '%') }, result: mi, unit: 'mi' });
+            return { mi, basis: 'soc-window', socUsed };
+        }
     }
 
     const energy = positive(run.energy_kwh);
     const capacityKwh = positive(vehicle?.socWindowKwh);
     if (energy && capacityKwh) {
         const miPerKwh = distance / energy;
+        trace?.step('Full-pack range (own efficiency × capacity)', {
+            formula: 'R = d / E × E_pack',
+            values: { d: val(distance, 'mi'), E: val(energy, 'kWh', 'data'), E_pack: val(capacityKwh, 'kWh', 'data') },
+            result: miPerKwh * capacityKwh, unit: 'mi',
+            note: `no SoC window logged; capacity is ${SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label ?? 'the vehicle\'s'}`,
+        });
         return {
             mi: miPerKwh * capacityKwh,
             basis: 'efficiency',
@@ -59,5 +71,6 @@ export function fullPackRange(run, vehicle = null) {
         };
     }
 
+    trace?.note('Neither an SoC window nor energy and capacity: the bar is the distance driven, not a range', { assumed: true });
     return { mi: distance, basis: 'distance' };
 }

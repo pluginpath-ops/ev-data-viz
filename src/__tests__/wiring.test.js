@@ -272,7 +272,7 @@ describe('the seams that broke before', () => {
     });
 
     it('routes every chart that resolves a range basis through the correction', () => {
-        const resolvers = ALL.filter(x => /resolveRangeSource\(/.test(x.text) && /\.jsx$/.test(x.file));
+        const resolvers = ALL.filter(x => /(resolveRangeSource|pairRangeSource)\(/.test(x.text) && /\.jsx$/.test(x.file));
         expect(resolvers.length).toBeGreaterThan(0);
         for (const { file, text } of resolvers) {
             expect(text, `${file} resolves a range basis but never corrects it`)
@@ -1543,8 +1543,15 @@ describe('one correction, everywhere it is applied', () => {
     // and corrects to the reader's target (utils/correctionSettings.js).
     const sources = () => [
         'src/utils/rangeSource.js', 'src/utils/roadTripSpread.js', 'src/utils/compositeRange.js',
-        'src/components/RangeChartView.jsx', 'src/components/ChargingView.jsx',
+        'src/components/ChargingView.jsx',
+        // The Range chart corrects through correctRunDistance, which "Show the
+        // math" also calls, so the conditions are built there (2026-11-08).
+        'src/utils/conditionCorrection.js',
     ];
+
+    it('has the Range chart correct through correctRunDistance', () => {
+        expect(read('src/components/RangeChartView.jsx')).toMatch(/correctRunDistance\(/);
+    });
 
     it('builds every correction\'s conditions in one place', () => {
         for (const file of sources()) {
@@ -2763,12 +2770,17 @@ describe('site events are counted without knowing who (#448 layer 4)', () => {
 
     it('the client, the table and the function agree on the events', () => {
         const client = [...events.matchAll(/:\s+'([a-z_]+)',/g)].map(m => m[1]).sort();
-        expect(client).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view']);
+        expect(client).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view',
+            'season_toggle', 'setup_apply', 'setup_close', 'setup_jump', 'setup_open']);
         const quoted = (src) => [...src.matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
-        const check = migration.match(/CHECK \(event IN \(([^)]*)\)/)[1];
-        const fn = migration.match(/p_event NOT IN \(([^)]*)\)/)[1];
+        // The latest migration to set the list (098, the setup wizard) is the one in force.
+        const latest = read('supabase/migrations/098_site_events_setup_wizard.sql');
+        const check = latest.match(/CHECK \(event IN \(([^)]*)\)/)[1];
+        const fn = latest.match(/p_event NOT IN \(([^)]*)\)/)[1];
         expect(quoted(check).sort()).toEqual(client);
         expect(quoted(fn).sort()).toEqual(client);
+        expect(latest).toMatch(/EXCEPTION WHEN OTHERS THEN\s+RETURN false/);
+        expect(latest).toMatch(/>= 60 THEN/);
     });
 
     it('only the function writes, and only an admin reads', () => {
@@ -2799,6 +2811,9 @@ describe('site events are counted without knowing who (#448 layer 4)', () => {
         expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_OPEN/);
         expect(home).toMatch(/record\(SITE_EVENTS\.FEATURED_RESET/);
         expect(read('src/App.jsx')).toMatch(/recordEvent\(SITE_EVENTS\.CHART_VIEW/);
+        for (const e of ['SETUP_OPEN', 'SETUP_APPLY', 'SETUP_CLOSE', 'SEASON_TOGGLE', 'SETUP_JUMP']) {
+            expect(read('src/App.jsx')).toMatch(new RegExp(`recordEvent\\(SITE_EVENTS\\.${e}`));
+        }
         const hook = read('src/hooks/useSiteEvents.js');
         expect(hook).toMatch(/shouldRecord\(\{ role: userRole, popout \}\)/);
         // Nobody else calls the service directly, or the curator skip is bypassable.
