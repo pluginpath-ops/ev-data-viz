@@ -18,7 +18,7 @@ import { useMemo, useState } from 'react';
 import { vehicleLabel } from '../../utils/specHelpers';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { SERIES_NEUTRAL } from '../../utils/colorUtils';
-import { HOME_LEVELS } from '../../constants/costToDrive';
+import { HOME_LEVELS, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import {
     simulateWeek, dollars, minutesText, weekSummary, gasCarName, chargingText, chargerText,
 } from '../../utils/costToDrive';
@@ -182,8 +182,8 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                                     {compare === 'level' && (
                                         <select className="form-input" value={compareLevel} aria-label="Charger to compare with"
                                                 onChange={e => setCompareLevel(Number(e.target.value))}>
-                                            {HOME_LEVELS.map((l, i) => i === settings.level ? null : (
-                                                <option key={i} value={i}>{levelLabel(l)}</option>
+                                            {HOME_LEVEL_ORDER.map(i => i === settings.level ? null : (
+                                                <option key={i} value={i}>{levelLabel(HOME_LEVELS[i])}</option>
                                             ))}
                                         </select>
                                     )}

@@ -4,7 +4,7 @@ import {
     weekSummary, gasCarName, chargerText, chargingText,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
-import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL } from '../../constants/costToDrive';
+import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF } from '../../constants/epa';
 
 // A Model Y-ish profile with fixed numbers, so the rule is tested apart from
@@ -296,6 +296,13 @@ describe('the week and the gas car in words', () => {
 
 describe('no home charging', () => {
     const noHome = { home: { kw: 0, eff: 0.885, none: true } };
+
+    it('is shown first, then the chargers smallest to largest, each level once', () => {
+        expect(HOME_LEVEL_ORDER[0]).toBe(NO_HOME_LEVEL);
+        expect([...HOME_LEVEL_ORDER].sort((a, b) => a - b)).toEqual(HOME_LEVELS.map((_, i) => i));
+        const kw = HOME_LEVEL_ORDER.slice(1).map(i => HOME_LEVELS[i].volts * HOME_LEVELS[i].amps);
+        expect(kw).toEqual([...kw].sort((a, b) => a - b));
+    });
 
     it('is a level of its own, after the six chargers, with no power at home', () => {
         expect(NO_HOME_LEVEL).toBe(HOME_LEVELS.length - 1);

@@ -29,6 +29,13 @@ export const HOME_LEVELS = [
 /** The level index for no home charging. */
 export const NO_HOME_LEVEL = HOME_LEVELS.findIndex(l => l.none);
 
+/**
+ * The order the levels are shown in, picker and Home Charger alike: no home
+ * charging first, then the chargers smallest to largest (owner, 2026-11-10).
+ * HOME_LEVELS keeps its own order: the key stores a level by its place there.
+ */
+export const HOME_LEVEL_ORDER = [NO_HOME_LEVEL, ...HOME_LEVELS.map((_, i) => i).filter(i => i !== NO_HOME_LEVEL)];
+
 /** A level's power at the wall, kW. 0 for no home charging. */
 export const levelKw = (level) => (level.volts * level.amps) / 1000;
 

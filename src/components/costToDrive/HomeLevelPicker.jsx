@@ -4,7 +4,7 @@
  * the sidebar (`compact`). Each names its volts and amps and the power they
  * make, a wall outlet saying so. The last is no home charging.
  */
-import { HOME_LEVELS, levelKw } from '../../constants/costToDrive';
+import { HOME_LEVELS, HOME_LEVEL_ORDER, levelKw } from '../../constants/costToDrive';
 
 export const levelLabel = (level) => (level.none ? 'No home charging' : `${level.volts} V · ${level.amps} A`);
 const powerText = (level) => (level.none ? 'fast chargers only' : `${levelKw(level).toFixed(1)} kW${level.volts < 200 ? ' · wall outlet' : ''}`);
@@ -18,19 +18,19 @@ export default function HomeLevelPicker({ settings, onChange, compact = false })
                 value={settings.level}
                 onChange={e => onChange({ level: Number(e.target.value) })}
             >
-                {HOME_LEVELS.map((l, i) => <option key={i} value={i}>{levelLabel(l)} ({powerText(l)})</option>)}
+                {HOME_LEVEL_ORDER.map(i => <option key={i} value={i}>{levelLabel(HOME_LEVELS[i])} ({powerText(HOME_LEVELS[i])})</option>)}
             </select>
         );
     }
     return (
         <fieldset className="home-levels">
             <legend className="text-label">Charger</legend>
-            {HOME_LEVELS.map((l, i) => (
+            {HOME_LEVEL_ORDER.map(i => (
                 <label key={i} className={`home-level${settings.level === i ? ' is-on' : ''}`}>
                     <input type="radio" className="sr-only" name="home-level" checked={settings.level === i} onChange={() => onChange({ level: i })} />
                     <span className="home-level-text">
-                        <span className="text-body">{levelLabel(l)}</span>
-                        <span className="text-meta">{powerText(l)}</span>
+                        <span className="text-body">{levelLabel(HOME_LEVELS[i])}</span>
+                        <span className="text-meta">{powerText(HOME_LEVELS[i])}</span>
                     </span>
                 </label>
             ))}
