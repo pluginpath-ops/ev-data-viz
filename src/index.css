@@ -483,7 +483,11 @@
     background-color: var(--color-surface-sunken);
     color: var(--color-text-primary);
 }
-.btn-toggle.active {
+/* Also the week or gas car Your Driving's settings pick now (.drive-presets),
+   without the clear-on-hover below: picking another is how you change it. */
+.btn-toggle.active,
+.drive-presets .btn[aria-pressed="true"],
+.drive-presets .drive-name-input.is-selected {
     background-color: var(--color-primary-surface);
     border-color: var(--color-primary-border);
     color: var(--color-primary-text);
@@ -9825,6 +9829,12 @@ a.is-test-link:focus-visible {
 }
 .drive-intro-text p { max-width: 40rem; }
 .drive-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+/* The row's lead-in ("Start from", "Car") on a line of its own, as "Charger"
+   heads its cards: inline, a wrapped row left buttons stranded under it. */
+.drive-presets > .text-label { flex-basis: 100%; }
+/* Your own gas car's name, last in the row of cars: wide enough for "Custom"
+   and a short name, narrower than a full model name. */
+.drive-name-input { flex: 0 1 9rem; min-width: 6rem; }
 /* Wide enough for a full vehicle name beside its two figures: it shares the
    row evenly with the intro rather than taking only what the intro leaves. */
 .drive-preview {
@@ -9950,7 +9960,14 @@ a.is-test-link:focus-visible {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-control);
 }
-.home-level input { accent-color: var(--color-primary); }
+.home-level:hover { border-color: var(--color-primary-border); }
+/* The radio itself is hidden (owner, 2026-11-10: the site has no radio dots
+   elsewhere); the card's fill says which is on, and the keyboard focus ring
+   moves to the card. */
+.home-level:has(input:focus-visible) {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
 .home-level.is-on {
     background-color: var(--color-primary-surface);
     border-color: var(--color-primary-border);
@@ -9984,6 +10001,21 @@ a.is-test-link:focus-visible {
 }
 .week-day.is-O { background-color: var(--color-surface-sunken); }
 .week-day-type { font-weight: 600; white-space: nowrap; }
+/* The full picker follows its card's width, not the window's: Your Driving's
+   cards are half the page on a laptop and all of it on a phone. Narrow, the
+   row labels take a line of their own; narrower, the day names become
+   letters, as in the sidebar. */
+.week-picker-frame { container: week-picker / inline-size; }
+.week-day-letter { display: none; }
+@container week-picker (max-width: 37.99rem) {
+    .week-picker { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .week-picker > .text-label,
+    .week-picker-label { grid-column: 1 / -1; }
+}
+@container week-picker (max-width: 28.99rem) {
+    .week-day-name { display: none; }
+    .week-day-letter { display: inline; }
+}
 .week-planned {
     height: 32px;
     display: flex;

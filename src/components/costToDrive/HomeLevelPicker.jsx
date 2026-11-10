@@ -1,5 +1,6 @@
 /**
- * The home charger level: a grid of radio cards on Your Driving, a select in
+ * The home charger level: a grid of cards on Your Driving (radios underneath,
+ * their dots hidden), a select in
  * the sidebar (`compact`). Each names its volts and amps and the power they
  * make, a wall outlet saying so.
  */
@@ -26,7 +27,7 @@ export default function HomeLevelPicker({ settings, onChange, compact = false })
             <legend className="text-label">Charger</legend>
             {HOME_LEVELS.map((l, i) => (
                 <label key={i} className={`home-level${settings.level === i ? ' is-on' : ''}`}>
-                    <input type="radio" name="home-level" checked={settings.level === i} onChange={() => onChange({ level: i })} />
+                    <input type="radio" className="sr-only" name="home-level" checked={settings.level === i} onChange={() => onChange({ level: i })} />
                     <span className="home-level-text">
                         <span className="text-body">{levelLabel(l)}</span>
                         <span className="text-meta">{powerText(l)}</span>

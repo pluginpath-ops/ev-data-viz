@@ -27,6 +27,11 @@
  * its miles in fives (V1_STEPS) and its gas price and fill-up at version 1's
  * defaults when it left them out.
  *
+ * Version 3 (2026-11-10): the defaults moved to the Commuter week
+ * (V3_DEFAULTS), and two fields were added: the picked gas car and a custom
+ * car's name, the first text field — its UTF-8 length as a varint, then its
+ * bytes. A version-2 key reads its week at version 2's defaults.
+ *
  * Pure leaf: imports only the constants leaf, so the short link can carry it.
  */
 import { COST_TO_DRIVE_FIELDS, DAY_TYPES } from '../constants/costToDrive';
@@ -34,10 +39,13 @@ import { COST_TO_DRIVE_FIELDS, DAY_TYPES } from '../constants/costToDrive';
 /** The address parameter that carries the key. */
 export const COST_TO_DRIVE_PARAM = 'cd';
 
-export const COST_TO_DRIVE_KEY_VERSION = '2';
+export const COST_TO_DRIVE_KEY_VERSION = '3';
 
 /** Version 2's fields, in order. The constants list is append-only, so this is its prefix. */
 const FIELDS_V2 = COST_TO_DRIVE_FIELDS.slice(0, 33);
+
+/** Version 3's: version 2's, then the gas car and its name. */
+const FIELDS_V3 = COST_TO_DRIVE_FIELDS.slice(0, 35);
 
 /** The steps version 1 stored a field in, where they differ from today's. FROZEN. */
 const V1_STEPS = Object.freeze({ dailyMi: 5, longMi: 5 });
@@ -59,6 +67,13 @@ const V1_DEFAULTS = Object.freeze({
 /** Version 2's defaults, frozen: version 1's with gas at $4 and a 5-minute fill-up. */
 const V2_DEFAULTS = Object.freeze({ ...V1_DEFAULTS, gasPrice: 4.00, gasFillMin: 5 });
 
+/** Version 3's defaults, frozen: version 2's with the Commuter week. */
+const V3_DEFAULTS = Object.freeze({
+    ...V2_DEFAULTS,
+    week: 'DDDDDLO', planned: 0, dailyMi: 35, dailyCity: 50, longMi: 80, longCity: 20,
+    gasCar: 'custom', gasName: '',
+});
+
 const decimalsOf = (step) => String(step).split('.')[1]?.length ?? 0;
 
 /** One setting held to its slider; the field's default when it cannot be read. */
@@ -74,6 +89,10 @@ function normalizeField(f, raw) {
         const n = Number(raw);
         return Number.isInteger(n) && n >= 0 && n < 128 ? n : f.def;
     }
+    case 'text':
+        // Not trimmed: a name is typed a character at a time, spaces included.
+        // eslint-disable-next-line no-control-regex
+        return typeof raw === 'string' ? [...raw.replace(/[\u0000-\u001f\u007f]/g, '')].slice(0, f.max).join('') : f.def;
     default: {
         const n = Number(raw);
         if (raw == null || raw === '' || !Number.isFinite(n)) return f.def;
@@ -165,23 +184,37 @@ function fromBase64Url(text) {
 }
 
 /**
- * The key for a set of settings, or null when every one is at its version-2
+ * The key for a set of settings, or null when every one is at its version-3
  * default (the address then carries no `cd` at all).
  */
 export function encodeCostToDriveKey(settings) {
     const s = normalizeCostToDrive(settings);
     let mask = 0;
-    const values = [];
-    FIELDS_V2.forEach((f, i) => {
-        if (s[f.key] === V2_DEFAULTS[f.key]) return;
+    const body = [];
+    FIELDS_V3.forEach((f, i) => {
+        if (s[f.key] === V3_DEFAULTS[f.key]) return;
         mask += 2 ** i;
-        values.push(toIndex(f, s[f.key]));
+        if (f.kind === 'text') {
+            const utf8 = new TextEncoder().encode(s[f.key]);
+            pushVarint(body, utf8.length);
+            body.push(...utf8);
+        } else {
+            pushVarint(body, toIndex(f, s[f.key]));
+        }
     });
     if (mask === 0) return null;
     const bytes = [];
     pushVarint(bytes, mask);
-    values.forEach(v => pushVarint(bytes, v));
-    return `${COST_TO_DRIVE_KEY_VERSION}.${toBase64Url(bytes)}`;
+    return `${COST_TO_DRIVE_KEY_VERSION}.${toBase64Url([...bytes, ...body])}`;
+}
+
+/** A text field from the key: its length, then that many UTF-8 bytes. */
+function readText(bytes, at) {
+    const length = readVarint(bytes, at);
+    if (at.i + length > bytes.length) throw new Error('truncated');
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes.slice(at.i, at.i + length)));
+    at.i += length;
+    return text;
 }
 
 /**
@@ -192,11 +225,15 @@ export function encodeCostToDriveKey(settings) {
  * @returns {{ settings: Object, error: string|null }}
  */
 export function decodeCostToDriveKey(key) {
-    const defaults = normalizeCostToDrive(V2_DEFAULTS);
+    const defaults = normalizeCostToDrive(V3_DEFAULTS);
     if (key == null || key === '') return { settings: defaults, error: null };
     const dot = String(key).indexOf('.');
     const version = dot < 0 ? '' : key.slice(0, dot);
-    const [fields, frozen] = version === '1' ? [FIELDS_V1, V1_DEFAULTS] : version === '2' ? [FIELDS_V2, V2_DEFAULTS] : [];
+    const [fields, frozen] = {
+        1: [FIELDS_V1, V1_DEFAULTS],
+        2: [FIELDS_V2, V2_DEFAULTS],
+        3: [FIELDS_V3, V3_DEFAULTS],
+    }[version] ?? [];
     if (!fields) {
         return { settings: defaults, error: `This link's settings were made by a newer version of the site (key version ${version || '?'}).` };
     }
@@ -210,7 +247,7 @@ export function decodeCostToDriveKey(key) {
             if (rest % 2 === 0) continue;
             const f = fields[i];
             if (!f) throw new Error('unknown field');
-            const v = fromIndex(f, readVarint(bytes, at));
+            const v = f.kind === 'text' ? readText(bytes, at) : fromIndex(f, readVarint(bytes, at));
             if (v === undefined) throw new Error(`bad ${f.key}`);
             out[f.key] = v;
         }

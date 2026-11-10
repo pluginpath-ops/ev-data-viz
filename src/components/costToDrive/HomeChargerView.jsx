@@ -16,7 +16,7 @@ import { fastChargingFill } from '../../utils/stripedFill';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
-import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel } from '../../utils/costToDrive';
+import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel, chargingText } from '../../utils/costToDrive';
 import { useCostToDriveByLevel } from '../../hooks/useCostToDrive';
 import { useChartPng } from '../../hooks/useChartPng';
 import { useSourceLine } from '../../hooks/useSourceLine';
@@ -130,7 +130,7 @@ const homeCostText = (w) => (!w ? DASH : dollars(w.homeCost));
 const fastCostText = (w) => (!w ? DASH : dollars(w.fastCost));
 const totalText = (w) => (!w ? DASH : dollars(w.fastCost + w.homeCost));
 
-export default function HomeChargerView({ vehicles, selectedVehicleIds, settings, onChange, onOpenSetup, presentationMode = false }) {
+export default function HomeChargerView({ vehicles, selectedVehicleIds, settings, onChange, presentationMode = false }) {
     const byLevel = useCostToDriveByLevel(vehicles, selectedVehicleIds, settings);
     // The vehicles as priced at the reader's own level: the columns, and what the
     // source line credits.
@@ -232,7 +232,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
 
     const season = settings.season === 'winter' ? `Winter, ${settings.winterF}°F` : `Summer, ${settings.summerF}°F`;
     const title = 'Charging cost per month, by home charger';
-    const subtitle = `${weekSummary(settings)} · ${season} · plugged in ${hourText(settings.plugFrom)} to ${hourText(settings.plugUntil)}`;
+    const subtitle = `${weekSummary(settings)} · ${season} · plugged in ${hourText(settings.plugFrom)} to ${hourText(settings.plugUntil)} · ${chargingText(settings)}`;
     const png = useChartPng(chartRef, { title, subtitle, sources: sourceLine.text, signature });
 
     const tableCols = [
@@ -247,7 +247,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
 
     return (
         <div className="chart-layout">
-            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} onOpenSetup={onOpenSetup} />}
+            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} />}
             <div className="chart-main">
                 {missing.length > 0 && (
                     <p className="text-note drive-missing">
