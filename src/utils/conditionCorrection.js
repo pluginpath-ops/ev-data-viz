@@ -26,8 +26,9 @@
  *
  *     C ∝ f · (v/v_ref)² · (ρ/ρ_ref) + (1 − f)
  *
- * `f` is the aero fraction at the reference speed. This is the same split that
- * roadTripSimulation's speedCorrectionFactor has always used for speed alone;
+ * `f` is the aero fraction at the reference speed. Road Trip prices a trip at
+ * its travel speed through this same model (tripEfficiency.js, SPEED_ONLY_MODE
+ * when nothing else is corrected), so there is one speed model, not two;
  * density is the same idea with a different ratio, so the two compose rather
  * than competing.
  *
@@ -94,8 +95,19 @@ export const CORRECTION_MODES = [
 
 export const DEFAULT_CORRECTION_MODE = 'none';
 
-const modeAxes = (mode) =>
-    CORRECTION_MODES.find(m => m.key === mode)?.axes ?? [];
+/**
+ * The aero model on the speed axis alone. Not a reader's choice — no picker
+ * offers it and no link can carry it (correctionSettings validates against
+ * CORRECTION_MODES). It is how a trip is priced at its travel speed when the
+ * reader corrects nothing, and how towing is always priced
+ * (tripEfficiency.js): speed is the one condition a trip cannot leave as
+ * tested.
+ */
+export const SPEED_ONLY_MODE = 'speed';
+
+const modeAxes = (mode) => (mode === SPEED_ONLY_MODE
+    ? ['speed']
+    : CORRECTION_MODES.find(m => m.key === mode)?.axes ?? []);
 
 /**
  * What a range test was driven in, as correctionFactor reads it. Every
@@ -362,15 +374,6 @@ export function correctRunDistance(run, session, { mode, target } = {}, trace = 
     });
     return { result, distanceMiles };
 }
-
-/**
- * Whether a correction moved a figure to the target SPEED — from the test's own
- * speed or from an assumed one — so a caller that re-prices for speed starts
- * from the target, not from the test (rangeSource.pricedAtSpeedMph,
- * roadTripSpread).
- */
-export const speedCorrected = (result) =>
-    !!(result?.applied?.includes('speed') || result?.assumed?.some(a => a.axis === 'speed'));
 
 // An axis as a reader is told of it: the accessory term is "accessory load".
 const axisName = (axis) => (axis === 'accessory' ? 'accessory load' : axis);
