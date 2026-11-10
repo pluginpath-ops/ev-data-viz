@@ -85,7 +85,7 @@ function membershipState(m, rowId) {
  *   orphans: Array,
  * }}  items: one per Guide row, each match carrying its `membership` (this
  *     row's certification's) and `state`; status is 'ready' when the row's
- *     Tested via names an awaiting membership, 'judgement' when awaiting
+ *     Tested via names an awaiting membership, 'judgment' when awaiting
  *     memberships remain but none is named, 'done' otherwise. orphans: the
  *     awaiting memberships whose certification has no Guide row at all.
  */
@@ -130,7 +130,7 @@ export function buildGuideRowSweep(guideRows = [], members = []) {
         });
         const awaiting = matches.filter(m => m.state === 'awaiting');
         const status = awaiting.some(m => NAMED.has(m.match)) ? 'ready'
-            : awaiting.length ? 'judgement' : 'done';
+            : awaiting.length ? 'judgment' : 'done';
         items.push({ row, via, others, matches, status, awaiting: awaiting.length });
     }
 

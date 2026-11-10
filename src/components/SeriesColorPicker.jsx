@@ -103,7 +103,7 @@ export default function SeriesColorPicker({
     const showParked = Boolean(parkedColor) && !sameHex(parkedColor, plotted);
     const subject = label || 'this series';
 
-    // The scope control only appears when the owner can actually honour it.
+    // The scope control only appears when the owner can actually honor it.
     const scoped = Boolean(onApplyMany && series?.length && seriesId != null);
 
     return (
@@ -235,9 +235,9 @@ function PickerPanel({
      * is no chart palette to open on or commit to, and the draft is all there is.
      *
      * VEHICLE_PALETTE is not a set of swatches, so when the plot is drawn from
-     * curated vehicle colours the GRID falls back to the default set while the
+     * curated vehicle colors the GRID falls back to the default set while the
      * dropdown still reads "Vehicle color". Those answer different questions:
-     * where the plot's colours come from, and which set to pick a new one from.
+     * where the plot's colors come from, and which set to pick a new one from.
      */
     const lifted = Boolean(onChartPaletteChange);
     const [selectedPaletteId, setPaletteId] = useState(
@@ -297,7 +297,7 @@ function PickerPanel({
      */
     const pickPalette = (id) => {
         setPaletteId(id);
-        // "Vehicle color" names where the PLOT takes its colours; it is not a
+        // "Vehicle color" names where the PLOT takes its colors; it is not a
         // set to move the base into, and moving it would be this panel silently
         // editing the series you opened it on.
         if (id === VEHICLE_PALETTE) return;
@@ -626,9 +626,9 @@ function autoOnLabel(scope, count) {
 }
 
 /**
- * A labelled range whose track shows what it controls. The hue track is the
+ * A labeled range whose track shows what it controls. The hue track is the
  * spectrum; the lightness track is the CURRENT hue from black to white, so the
- * slider is a preview of its own result rather than a grey bar with a number.
+ * slider is a preview of its own result rather than a gray bar with a number.
  */
 function Slider({ label, min, max, value, onChange, track, hue = 0, sat = 100, lit = 50 }) {
     return (

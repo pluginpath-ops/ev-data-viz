@@ -81,7 +81,7 @@ export function vehicleDataCategories(vehicle, performanceCounts = {}) {
 
 /**
  * Unlisted tests per category that still count in the statistics (#394, the
- * pool) — the grey half of "Charging (4/2)". Categories with no pool are absent.
+ * pool) — the gray half of "Charging (4/2)". Categories with no pool are absent.
  * @returns {Record<string, number>}
  */
 export function vehiclePooledCounts(vehicle) {

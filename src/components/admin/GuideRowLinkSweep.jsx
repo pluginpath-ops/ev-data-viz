@@ -20,7 +20,7 @@ import GuideModelTypeDesc from '../epa/GuideModelTypeDesc';
 
 const STATUS = [
     { key: 'ready',     label: 'Ready',           why: 'Tested via names a test vehicle that is not linked yet' },
-    { key: 'judgement', label: 'Needs judgement', why: 'Test vehicles await a decision, but Tested via names none of them' },
+    { key: 'judgment', label: 'Needs judgment', why: 'Test vehicles await a decision, but Tested via names none of them' },
     { key: 'done',      label: 'Done',            why: 'Every test vehicle of its certification is decided' },
 ];
 const PAGE = 40;

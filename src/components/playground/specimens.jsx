@@ -6,8 +6,8 @@
  * that says "this filter would leave nothing". Same for a plot frame, a
  * distribution bar, a stat cell.
  *
- * Kept OUT of `catalogue.js` on purpose: that file is imported by
- * `scripts/health.js` in plain node, which cannot parse JSX. The catalogue
+ * Kept OUT of `catalog.js` on purpose: that file is imported by
+ * `scripts/health.js` in plain node, which cannot parse JSX. The catalog
  * names a composite by key and this file supplies the markup, so the data and
  * the rendering stay on opposite sides of that line.
  */
@@ -170,7 +170,7 @@ export const COMPOSITES = {
                         <button type="button" className="guide-facet-exclude active" aria-pressed="true">not</button>
                     </div>
                     {/* Disabled, not hidden: a make vanishing reads as a bug,
-                        where a greyed one reads as an answer. */}
+                        where a grayed one reads as an answer. */}
                     <label className="guide-facet-option">
                         <input type="checkbox" disabled readOnly />
                         <span className="guide-facet-option-name">Lotus</span>
@@ -252,8 +252,8 @@ export const COMPOSITES = {
                 <button type="button" className="popover-close" aria-label="Close">×</button>
             </div>
             <div>
-                <p>The curve default is the modelled steady-state draw; these are the
-                   figures to reach for when modelling a specific ambient.</p>
+                <p>The curve default is the modeled steady-state draw; these are the
+                   figures to reach for when modeling a specific ambient.</p>
             </div>
         </div>
     ),

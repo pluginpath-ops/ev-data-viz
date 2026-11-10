@@ -734,7 +734,7 @@ export default function App() {
             setView(e.state.view);
             // Back and Forward return to a page, not to a link's moment of arrival.
             setFocusRunId(null);
-            // Restore chart mode without clearing runs — auto-select re-initialises
+            // Restore chart mode without clearing runs — auto-select re-initializes
             // them for the restored mode automatically.
             if (e.state.chartMode) setChartMode(e.state.chartMode);
             if (e.state.view === 'runs' && e.state.vehicleId != null) {
@@ -1488,7 +1488,7 @@ export default function App() {
                         <div className="card">
                             <h2 className="page-title">Playground</h2>
                             <p className="text-note mb-4">
-                                Every catalogued control, live. Unlinked — reached by URL, or via Admin &gt; Playground.
+                                Every cataloged control, live. Unlinked — reached by URL, or via Admin &gt; Playground.
                             </p>
                             <Playground />
                         </div>

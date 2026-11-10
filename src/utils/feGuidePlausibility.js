@@ -27,7 +27,7 @@
  * A clean singleton, two orders of magnitude below the next lowest value. The
  * bounds below sit ~30% outside the widest genuine observation, so the gate has
  * to be badly wrong before it touches real data — which matters, because EVs do
- * legitimately vary here: regen favours city, aero favours highway, and a
+ * legitimately vary here: regen favors city, aero favors highway, and a
  * slippery sedan can beat its own city figure (the Polestar 3 at 1.23).
  *
  * ── Flag, never drop ─────────────────────────────────────────────────────────

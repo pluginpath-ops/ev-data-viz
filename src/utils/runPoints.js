@@ -99,7 +99,7 @@ const readOne = (dataService, runId, run) => run?._inherited
  *     takes the per-test path;
  *   - if the batch fails, every test falls back to the per-test path, where a
  *     failure empties only the test that failed — the loops' own behavior,
- *     so a bad run never blanks its neighbours.
+ *     so a bad run never blanks its neighbors.
  *
  * @param runsById  Map from runsByIdString; a missing run is read by id.
  */

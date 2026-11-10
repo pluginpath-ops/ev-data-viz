@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # A throwaway Postgres that mirrors production, for testing migrations and
-# role-gated behaviour without touching the live database.
+# role-gated behavior without touching the live database.
 #
 # ── Why ──────────────────────────────────────────────────────────────────────
 #

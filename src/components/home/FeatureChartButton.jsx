@@ -3,7 +3,7 @@ import { useFeaturedComparisonsContext } from '../../context/FeaturedComparisons
 /**
  * "Save as featured comparison" in a chart's toolbar (#448): the curator's way
  * to put the chart on screen, as they have set it up, into a featured
- * comparison. Labelled "★ Feature" to fit the toolbar; the tooltip carries
+ * comparison. Labeled "★ Feature" to fit the toolbar; the tooltip carries
  * the full name. `className` is the toolbar's small button by default; the vehicle
  * table, which has no toolbar, draws it as an ordinary button in its control row.
  * Not drawn for anyone who cannot curate, nor in the pop-out.

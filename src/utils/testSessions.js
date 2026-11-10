@@ -188,7 +188,7 @@ export function filterSessions(summaries, query) {
     });
 }
 
-/** Every session, summarised, newest first — the browser's backing list. */
+/** Every session, summarized, newest first — the browser's backing list. */
 export function summariseSessions(sessions, vehicles) {
     return (sessions || [])
         .map(s => sessionSummary(s, vehicles))

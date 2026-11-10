@@ -41,7 +41,7 @@ describe('labelRangeCheck', () => {
         expect(labelRangeCheck(320, 250).deltaMi).toBeGreaterThan(0);
     });
 
-    it('honours an explicit tolerance', () => {
+    it('honors an explicit tolerance', () => {
         expect(labelRangeCheck(330, 307, 10).mismatch).toBe(false);
         expect(labelRangeCheck(330, 307, 1).mismatch).toBe(true);
         // Exactly at the threshold is agreement, not a flag.

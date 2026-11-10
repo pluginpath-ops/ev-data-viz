@@ -194,7 +194,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                             <details className="mt-1">
                                 <summary className="text-[11px] text-meta cursor-pointer hover:text-secondary">
                                     {parsed.unmatched.length} line{parsed.unmatched.length === 1 ? '' : 's'} not
-                                    recognised (won’t be imported)
+                                    recognized (won’t be imported)
                                 </summary>
                                 <ul className="mt-1 text-[11px] text-meta font-mono list-none">
                                     {parsed.unmatched.map((l, i) => <li key={i} className="truncate">{l}</li>)}

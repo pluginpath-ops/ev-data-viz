@@ -3,7 +3,7 @@
  *
  * Built from the split series (performance_run_points), so it only has anything
  * to draw where a detail testing CSV has been imported. Reported figures carry
- * no trace, and are deliberately not synthesised into a fake curve.
+ * no trace, and are deliberately not synthesized into a fake curve.
  *
  * Defaults to the best run per drive mode: a session is typically eight
  * launches, and plotting all of them at once buries the comparison that
@@ -85,7 +85,7 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     );
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         setLoading(true);
         (async () => {
             const ids = selected.map(v => v.id);
@@ -97,9 +97,9 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
             for (const id of ids) { next[id] = []; sums[id] = []; }
             for (const s of allSessions)  next[s.vehicle_id]?.push(s);
             for (const s of allSummaries) sums[s.vehicle_id]?.push(s);
-            if (!cancelled) { setSessionsByVehicle(next); setSummariesByVehicle(sums); setLoading(false); }
+            if (!canceled) { setSessionsByVehicle(next); setSummariesByVehicle(sums); setLoading(false); }
         })();
-        return () => { cancelled = true; };
+        return () => { canceled = true; };
     }, [selected.map(v => v.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /**

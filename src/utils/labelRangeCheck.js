@@ -10,7 +10,7 @@
  * ── Why this flags rather than ties ──────────────────────────────────────────
  *
  * The fields are deliberately NOT bound together. One vehicle trim legitimately
- * maps to several EPA configurations — a wheel and tyre change, a carry-over
+ * maps to several EPA configurations — a wheel and tire change, a carry-over
  * model year — and those differ by a few miles with neither figure being wrong.
  * Nothing about that difference matters for charging or range comparison, so
  * forcing them equal would destroy real information to satisfy a checkbox.

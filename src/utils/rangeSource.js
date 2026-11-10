@@ -35,7 +35,7 @@
  * range, which is 35 of 76 runs on the live database. It sits BELOW the vehicle
  * default deliberately: the default range test is a deliberate, curated choice,
  * whereas a row being dual-role is an artifact of how the data happened to be
- * collected. Provenance, not a judgement about which conditions to compare against.
+ * collected. Provenance, not a judgment about which conditions to compare against.
  *
  * Note this is the run's *measured* distance and SoC bounds, which is a different
  * thing from rank 4. 'recorded' stays last as agreed: range_value is usually the
@@ -46,7 +46,7 @@
  * so it can never match. The same-session partner is surfaced through rank 1
  * instead, with paired_range_run_id populated from the session.
  *
- * Pure module — no data-point access. The 'recorded' branch is *signalled* here
+ * Pure module — no data-point access. The 'recorded' branch is *signaled* here
  * and computed by the caller, which is the side that holds the time series.
  */
 
@@ -356,7 +356,7 @@ export function resolveRangeSource(chargingRun, {
         };
     }
 
-    // Rank 4: the charging run's own recorded range column. Signalled only —
+    // Rank 4: the charging run's own recorded range column. Signaled only —
     // the miles come from interpolating the caller's data points, not from a
     // scalar, so there is nothing to return but the provenance.
     if (hasRecordedRange) {

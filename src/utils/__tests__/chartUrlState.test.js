@@ -132,7 +132,7 @@ describe('the spec chart', () => {
     });
 });
 
-describe('the settings that already travelled still do', () => {
+describe('the settings that already traveled still do', () => {
     it('round-trips axes, limits, display and correction', () => {
         const chartConfig = {
             ...baseConfig(), xAxis: 'time', yAxis: 'soc', y2Axis: 'chargeRate', alignRaw: true,

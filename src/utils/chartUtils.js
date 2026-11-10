@@ -1,11 +1,11 @@
 // ── Chart PNG export helpers ──────────────────────────────────────────────────
 //
 // An exported chart used to be the canvas and nothing else: a reader who pasted
-// one into a thread got unlabelled curves with no title, no conditions, no units
+// one into a thread got unlabeled curves with no title, no conditions, no units
 // and no source. Everything a reader needs is in the frame around the canvas, so
 // the export draws that frame too.
 //
-// Drawn onto the export canvas rather than rasterised from the DOM. An
+// Drawn onto the export canvas rather than rasterized from the DOM. An
 // html-to-image dependency would capture the real markup and would also pull in
 // a library, inherit its font and CSS-support quirks, and make the output depend
 // on how the page happened to be laid out at that moment. Six draw calls are
@@ -130,7 +130,7 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
             // Two fills, not one. On screen the mark is an element with an
             // inner span — `EV` faint, `BENCH` accent (.plot-frame-mark) — and
             // canvas has no span, so a single fillText silently flattened the
-            // accent half to grey. Drawn right-to-left: BENCH sits against the
+            // accent half to gray. Drawn right-to-left: BENCH sits against the
             // padding and EV is offset by its measured width, so the pair lands
             // exactly where the one string used to.
             ctx.font = `700 ${px(MARK_SIZE)}px ${DISPLAY}`;

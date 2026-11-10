@@ -67,7 +67,7 @@ export default function AccountMenu({ user, userRole, emailOptIn, onEmailOptInCh
 
                     <div className="account-row">
                         <span className="text-nano">Units</span>
-                        {/* Two labelled halves rather than the bar's old `⇄ IMP`.
+                        {/* Two labeled halves rather than the bar's old `⇄ IMP`.
                             The glyph said a switch existed but never which way
                             it would go, and there is room for the words here. */}
                         <div className="account-segmented">

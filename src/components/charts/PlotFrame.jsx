@@ -5,7 +5,7 @@ import SourceLine from './SourceLine';
  * The bordered frame a chart lives in — and the boundary a PNG export captures.
  *
  * That equivalence is the point. Before this, the export flattened the canvas
- * alone: a reader who pasted a chart into a thread got unlabelled curves with
+ * alone: a reader who pasted a chart into a thread got unlabeled curves with
  * no title, no conditions, no units and no source. Everything needed to read
  * the image has to be INSIDE the frame, so putting the frame and the export
  * boundary in one component is what stops the two drifting apart.

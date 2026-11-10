@@ -357,7 +357,7 @@ function assumptionContext(assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial'
  * A column as a header shows it: a column whose name carries an assumption
  * ("Time to add 150 mi", "Charge 10→80%") is named from it.
  */
-export function labelledColumn(col, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE) {
+export function labeledColumn(col, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE) {
     if (!col?.labelFor) return col;
     const ctx = assumptionContext(assumptions, units, correctionTarget, correctionMode);
     // `fullLabelFor` names the column in full where the header's name is cut

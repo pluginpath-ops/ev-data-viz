@@ -2,10 +2,10 @@
  * The week day by day, as bars (utils/dayBars.js), in percent of the battery.
  *
  * Owner, 2026-11-07, from the mockups: A3 the default, A behind the toggle —
- *  - `day` (A3), in time order: a grey bar for the day out, from the
+ *  - `day` (A3), in time order: a gray bar for the day out, from the
  *    morning's level (the tick) to where the car gets home; each fast stop on
  *    the route inside it at the levels it charged between, striped orange over
- *    the grey since it happened during the drive; a planned fast charge solid
+ *    the gray since it happened during the drive; a planned fast charge solid
  *    orange; then the night at home in the series color, up to the next
  *    morning, where a dashed line hands over to the next day.
  *  - `balance` (A): charge in above zero (fast stops striped, a planned
@@ -34,7 +34,7 @@ const NO_SOURCES = {};
 const pctText = (v) => `${Math.round(v)}%`;
 const DRIVE = withAlpha(SERIES_NEUTRAL, 0.75);
 
-/** A fast stop on the route: orange stripes over the driving's grey. */
+/** A fast stop on the route: orange stripes over the driving's gray. */
 const routeStopFill = (callout) => stripedFill(DRIVE, callout);
 
 /** The datasets, [low, high] per day. `legendOnly` ones carry no bars: the plugin draws them. */

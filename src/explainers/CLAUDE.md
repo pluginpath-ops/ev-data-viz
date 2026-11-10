@@ -43,7 +43,7 @@ does the same for Modeled Efficiency: each link's curve at standard conditions,
 its range tests corrected to them, and a link into the chart with them
 overlaid. The ids are the chart's `epa_m=`. Labs are
 registered in `ExplainerPage.jsx` (`LABS`); a figure with no component yet
-renders as a labelled placeholder.
+renders as a labeled placeholder.
 
 **Explainers are written in public** (owner, 2026-09-28). `status: DRAFT`
 pages are readable on the site, tagged Draft on the landing page, with every
@@ -112,9 +112,9 @@ theme's guards read `index.css` only, so the boundary test guards this file.
   "Where it breaks:" note.
 - In page text a run is a **test** ("charging test"), per `docs/vocabulary.md`.
   "Run" is fine in code and in these notes.
-- **Simulations are labelled "model, not measurement"**, with the real EVBench
+- **Simulations are labeled "model, not measurement"**, with the real EVBench
   run overlaid wherever one exists. Amps shown on a run are derived (P ÷
-  modelled V), because runs record neither pack voltage nor current. Label them
+  modeled V), because runs record neither pack voltage nor current. Label them
   that way.
 
 ## Voice
@@ -167,7 +167,7 @@ Each step can ship alone:
 3. `voltage-vs-charge-time`
 4. `what-limits-charging` + its three children + Cell Lab
 5. `series-and-parallel`, `modules-vs-cell-to-pack`
-6. The hubs, written last because they summarise the pages under them.
+6. The hubs, written last because they summarize the pages under them.
 
 The EPA hub (`epa-ratings`, owner's priority, 2026-09-29) runs alongside:
 `epa-vs-real-world`, then `reading-modeled-efficiency`, `epa-drive-cycles`,

@@ -336,7 +336,7 @@ export function buildComposite(tests, { minTests = COMPOSITE_MIN_TESTS } = {}) {
  *
  * A composite's mean steps wherever a test joins or leaves it — a test's data
  * starts or ends, a charger-limited stretch begins or stops being set aside —
- * and the step is an artefact of which tests happened to cover that percent,
+ * and the step is an artifact of which tests happened to cover that percent,
  * not something the car did. ±3% turns a step into a ramp over 7% of SoC.
  * Measured on the 2026-09-28 data: the iX3's 800 V composite stepped 29 kW at
  * 31% and now moves under 18 kW a percent; the R2's 9 kW step where CarWow
@@ -355,7 +355,7 @@ export const SMOOTHING_MAX_GAP = 10;
  *
  * The window shrinks SYMMETRICALLY at a stretch's ends rather than going
  * one-sided: a one-sided average on a curving taper drags the end point
- * toward its neighbours, which bends the tail it is meant to preserve. A null
+ * toward its neighbors, which bends the tail it is meant to preserve. A null
  * value (no spread where one test stands alone) stays null, and is never
  * averaged in. Values are left unrounded: each caller knows its own precision
  * (a kW to 0.1 is fine; minutes per percent to 0.1 is a 5% error).
@@ -560,7 +560,7 @@ export function compositeCurves(vehicle, pointsByRunId = {}) {
                 inferredTests: members.filter(t => classes.get(t.run.id).inferred).map(t => t.run.name),
                 // Said only on a composite split by current: there, a test nobody
                 // classified sits in a class on the strength of a default, and
-                // can hold its neighbours' stretches back without anyone having
+                // can hold its neighbors' stretches back without anyone having
                 // chosen it. With no split, no class is involved.
                 assumedCurrentTests: chargerCurrentA != null
                     ? members.filter(t => t.run.charger_current_class_a == null).map(t => t.run.name)

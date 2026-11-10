@@ -7,7 +7,7 @@
  * pointer-transparent, so it cannot hold the link itself. It does not say
  * where the link is either: it shows on hovering the whole cell, and "click to
  * open" would be untrue anywhere but the link — which is plain enough in link
- * colour without being pointed at.
+ * color without being pointed at.
  */
 export default function TestPeek({ test, figure = null }) {
     if (!test) return null;

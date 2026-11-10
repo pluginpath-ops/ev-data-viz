@@ -80,7 +80,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
     const nameOf = v => vehicleNames.get(v.id)?.short ?? vehicleLabel(v);
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         setLoading(true);
         (async () => {
             const ids = selected.map(v => v.id);
@@ -92,9 +92,9 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
             for (const id of ids) next[id] = { sessions: [], summaries: [] };
             for (const s of allSessions)  next[s.vehicle_id]?.sessions.push(s);
             for (const s of allSummaries) next[s.vehicle_id]?.summaries.push(s);
-            if (!cancelled) { setData(next); setLoading(false); }
+            if (!canceled) { setData(next); setLoading(false); }
         })();
-        return () => { cancelled = true; };
+        return () => { canceled = true; };
     }, [selected.map(v => v.id).join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /** Every speed window any selected vehicle has, split by kind. */
@@ -144,7 +144,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
         [selected],
     );
 
-    /** Tested entries for one metric, per vehicle, honouring the origin filter (performanceCompare.js). */
+    /** Tested entries for one metric, per vehicle, honoring the origin filter (performanceCompare.js). */
     const entriesFor = (metricKey, category) => {
         if (!data || !metricKey) return [];
         return selected.map(v => ({
@@ -155,7 +155,7 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
 
     /**
      * Braking in g mode: every window collapses into one comparison.
-     * Grip is near-constant across a stop, so a 70–0 and a 75–0 normalise to the
+     * Grip is near-constant across a stop, so a 70–0 and a 75–0 normalize to the
      * same quantity — measured at 0.920 and 0.921 g on the same car. Distances
      * can't be compared across windows; g can.
      */
@@ -167,10 +167,10 @@ export default function PerformanceCompareView({ vehicles, selectedVehicleIds, p
         }));
     };
 
-    /** Flatten per-vehicle entries into bars, honouring bar mode and sort. */
+    /** Flatten per-vehicle entries into bars, honoring bar mode and sort. */
     const rowsFrom = (byVehicle, lowerIsBest) => {
         // Flatten first: a bar is a (vehicle, source) pair, and the labels can
-        // only be minimised once the full set of bars is known.
+        // only be minimized once the full set of bars is known.
         const flat = [];
         for (const v of byVehicle) {
             if (v.entries.length === 0) { flat.push({ v, e: null }); continue; }

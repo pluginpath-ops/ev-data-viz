@@ -40,7 +40,7 @@ const num = (v) => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v)
 const EMPTY = Object.freeze({ value: null, source: null, certain: false, flags: [] });
 
 /**
- * Grade beyond which a run materially flatters or penalises the result.
+ * Grade beyond which a run materially flatters or penalizes the result.
  * The sample data runs ±0.5%; anything past this is worth flagging rather than
  * silently averaging in.
  */
@@ -636,7 +636,7 @@ export function buildSyntheticCurve(summary) {
         .map(iv => ({ x: num(iv.elapsed_s), y: num(iv.to_speed) }));
 
     // 0-100 is a promoted column (migration 042); the interval form is still
-    // honoured for anything entered before that existed.
+    // honored for anything entered before that existed.
     const t100 = num(summary.zero_to_100_sec)
         ?? fromRest.find(p => p.y === 100)?.x
         ?? null;
@@ -723,7 +723,7 @@ export const PERFORMANCE_METRICS = [
 //
 // Braking windows vary (75-0, 70-0, 60-0) and passing windows vary (50-80,
 // 50-90), so these can't be fixed columns like 0-60. Sources also report metric
-// (100-0 km/h in metres), and normalising on write would destroy the label —
+// (100-0 km/h in metres), and normalizing on write would destroy the label —
 // so values are stored as reported and converted here.
 
 const KPH_TO_MPH = 1 / MI_TO_KM;
@@ -785,7 +785,7 @@ export function windowLabel(interval) {
  *
  * ── ACCURACY, because this matters for how it should be presented ──
  *
- * BRAKING normalises well, and this is measured rather than assumed: on the
+ * BRAKING normalizes well, and this is measured rather than assumed: on the
  * sample data one car's 60-0 (0.986 g) and 75-0 (0.983 g) agree to 0.3%.
  * Braking is grip-limited, so deceleration really is near-constant across the
  * stop and the constant-rate assumption roughly holds. Cross-window braking
@@ -839,10 +839,10 @@ export function averageRateG(interval, trace = null) {
 }
 
 /**
- * Normalise an interval row into a comparable record.
+ * Normalize an interval row into a comparable record.
  * `value` is in the interval's natural unit; `comparable` is mph/ft/seconds.
  */
-export function normaliseInterval(interval) {
+export function normalizeInterval(interval) {
     const isBraking = interval.kind === 'braking';
     const raw = isBraking ? num(interval.distance) : num(interval.elapsed_s);
     return {
@@ -854,7 +854,7 @@ export function normaliseInterval(interval) {
         comparable: isBraking ? distanceToFt(interval.distance, interval.distance_unit) : raw,
         displayUnit: isBraking ? (interval.distance_unit || 'ft') : 's',
         lowerIsBetter: true,
-        // Cross-window normalisation — see averageRateG for the caveats.
+        // Cross-window normalization — see averageRateG for the caveats.
         rateG: averageRateG(interval),
         rateCertain: isBraking,
     };
@@ -873,7 +873,7 @@ export function ratesByWindow(summaries = [], kind = null) {
     for (const s of summaries || []) {
         for (const iv of s.performance_intervals || []) {
             if (kind && iv.kind !== kind) continue;
-            const n = normaliseInterval(iv);
+            const n = normalizeInterval(iv);
             if (n.rateG == null) continue;
             out.push({
                 key: n.key,
@@ -902,7 +902,7 @@ export function groupIntervals(summaries = []) {
     const buckets = new Map();
     for (const s of summaries || []) {
         for (const iv of s.performance_intervals || []) {
-            const n = normaliseInterval(iv);
+            const n = normalizeInterval(iv);
             if (n.comparable == null) continue;
             n.source_name = s.source_name ?? null;
             n.summary_id  = s.id ?? null;

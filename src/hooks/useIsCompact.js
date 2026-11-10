@@ -10,7 +10,7 @@ import { useCallback, useSyncExternalStore } from 'react';
  * hiding one, which puts every tab in the accessibility tree twice and leaves
  * two menus holding open state.
  *
- * 1000px is the design handoff's own line ("Responsive behaviour", <1000px),
+ * 1000px is the design handoff's own line ("Responsive behavior", <1000px),
  * where the six top-level tabs stop fitting beside the wordmark and the account
  * control.
  *

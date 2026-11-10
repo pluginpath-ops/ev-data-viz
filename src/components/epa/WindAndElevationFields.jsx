@@ -8,7 +8,7 @@ import NumberInput from '../NumberInput';
  * (CorrectionTargetFields), the same sliders every chart and the vehicle table
  * read (#449). What is left here has no counterpart in the correction: the
  * correction is for the days range TESTS were driven in, calm air on a round
- * trip, where this chart draws a modelled curve and a reader can ask what a
+ * trip, where this chart draws a modeled curve and a reader can ask what a
  * headwind or a climb would do to it. Both are DISPLAY-TIME scalings: they
  * change the curve on screen and never touch stored coefficients, accessory
  * fields, or the standard-condition η.

@@ -72,7 +72,7 @@ describe('compositing', () => {
 
     it('folds a stack outermost-last, the way a browser paints', () => {
         const half = (c) => ({ ...c, a: 0.5 });
-        // Black at 50% over white is grey; another black 50% over that is darker.
+        // Black at 50% over white is gray; another black 50% over that is darker.
         const once = compositeStack(white, half(black));
         const twice = compositeStack(white, half(black), half(black));
         expect(twice.r).toBeLessThan(once.r);

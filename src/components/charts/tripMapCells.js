@@ -15,11 +15,11 @@
  * spending its contrast on how bad the worst ones are.
  *
  * @param {object} o
- * @param {Array<{x:number, y:number, total:number|null}>} o.cells  centres, in axis units
+ * @param {Array<{x:number, y:number, total:number|null}>} o.cells  centers, in axis units
  * @param {number} o.halfX, o.halfY   half a cell, in axis units
  * @param {number} o.best, o.worst    the fastest and slowest totals, minutes
  * @param {boolean[][]} o.mask        within-tolerance, [speedIndex][stopIndex]
- * @param {number[]} o.xs, o.ys       cell centres by index
+ * @param {number[]} o.xs, o.ys       cell centers by index
  * @param {string} o.color            the vehicle's color
  * @param {string} o.outline          the outline's ink, chosen against the vehicle's color
  * @param {string} o.halo             drawn under the outline, so it reads on any cell
@@ -51,12 +51,12 @@ export function tripMapCells({ cells, halfX, halfY, best, worst, mask, xs, ys, c
                 const left = px(c.x - halfX), right = px(c.x + halfX);
                 const top = py(c.y + halfY), bottom = py(c.y - halfY);
                 ctx.globalAlpha = alphaOf(c.total) * (allowed(c.si) ? 1 : 0.35);
-                // Half a pixel over, so neighbours meet without a hairline gap.
+                // Half a pixel over, so neighbors meet without a hairline gap.
                 ctx.fillRect(left, top, right - left + 0.5, bottom - top + 0.5);
             }
 
             // The within-tolerance region's edge: every side of a near cell
-            // whose neighbour across it is not near.
+            // whose neighbor across it is not near.
             ctx.globalAlpha = 1;
             ctx.beginPath();
             const near = (si, ti) => mask[si]?.[ti] === true;

@@ -102,7 +102,7 @@ export function defaultRoadTripConfig() {
         optimizerChart: 'map',    // 'map' | 'speed' | 'tripDist' (charge per stop)
         bestPlan: true,           // each sweep point takes the best of the other setting
         // The speeds the BEST plan may use. The fastest is still drawn, and
-        // labelled as such: 95 mph wins on a fast charger, and nobody should
+        // labeled as such: 95 mph wins on a fast charger, and nobody should
         // be told to drive it.
         optimizerSpeedMin: 55,
         optimizerSpeedMax: 80,

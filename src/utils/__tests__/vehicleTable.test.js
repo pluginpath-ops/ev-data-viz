@@ -5,7 +5,7 @@ import {
     vehicleBarMaxima, vehicleBarPercent, firstSortDir,
     encodeVehicleTableParams, decodeVehicleTableParams,
     vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
-    DEFAULT_ASSUMPTIONS, labelledColumn, needsAssumptions, assumptionsFor,
+    DEFAULT_ASSUMPTIONS, labeledColumn, needsAssumptions, assumptionsFor,
 } from '../vehicleTable';
 import { CHARGE_SUMMARY_VERSION } from '../chargeWindows';
 import { VEHICLE_TABLE_PRESETS } from '../vehicleTablePresets';
@@ -307,8 +307,8 @@ describe('assumptions (#335)', () => {
         const [row] = buildVehicleRows([car(300, 21)], { assumptions: { addDistance: 150 }, units: 'metric' });
         expect(time(row)).toBeCloseTo(150 / 1.60934 / 10);
         const col = vehicleColumnByKey('calc.timeToAdd');
-        expect(labelledColumn(col, { addDistance: 200 }, 'imperial').label).toBe('Time to add 200 mi');
-        expect(labelledColumn(col, { addDistance: 250 }, 'metric').label).toBe('Time to add 250 km');
+        expect(labeledColumn(col, { addDistance: 200 }, 'imperial').label).toBe('Time to add 200 mi');
+        expect(labeledColumn(col, { addDistance: 250 }, 'metric').label).toBe('Time to add 250 km');
         expect(needsAssumptions(['name', 'calc.timeToAdd'])).toBe(true);
         expect(needsAssumptions(['name', 'calc.efficiency'])).toBe(false);
     });
@@ -392,7 +392,7 @@ describe('tested range columns (#335)', () => {
             .values['tested.composite_range_mi'];
         expect(at({ speedMph: 60 })).toBeGreaterThan(at({}));
         expect(at({ altitudeFt: 5000 })).toBeGreaterThan(at({}));   // thinner air
-        expect(labelledColumn(vehicleColumnByKey('tested.composite_range_mi'), DEFAULT_ASSUMPTIONS, 'imperial', { speedMph: 65 }).label)
+        expect(labeledColumn(vehicleColumnByKey('tested.composite_range_mi'), DEFAULT_ASSUMPTIONS, 'imperial', { speedMph: 65 }).label)
             .toBe('Composite range, 65 mph');
         expect(assumptionsFor(['calc.pctOfEpaHwy']).has('conditions')).toBe(true);
         // The target is not the table's to write: no vt_ parameter carries it.
@@ -423,7 +423,7 @@ describe('tested range columns (#335)', () => {
         expect(at(80).notes['tested.range_mi']).not.toMatch(/corrected/);
         // The reader's conditions are offered with them, and name the header.
         expect(assumptionsFor(['tested.range_mi', 'tested.efficiency_mi_kwh', 'tested.when_new_range_mi']).has('conditions')).toBe(true);
-        expect(labelledColumn(vehicleColumnByKey('tested.range_mi'), DEFAULT_ASSUMPTIONS, 'imperial', { speedMph: 65 }).label).toBe('Tested range, 65 mph');
+        expect(labeledColumn(vehicleColumnByKey('tested.range_mi'), DEFAULT_ASSUMPTIONS, 'imperial', { speedMph: 65 }).label).toBe('Tested range, 65 mph');
     });
 
     it('leaves the range blank, and says why, when the window was too narrow to scale', () => {
@@ -482,20 +482,20 @@ describe('tested range columns (#335)', () => {
 });
 
 describe('EPA efficiency and electricity cost (#335)', () => {
-    const labelled = vehicle({ socWindowKwh: 100, epaRangeMi: 300, epaRange: { combinedMpge: 101.115 } });
-    const unlabelled = vehicle({ id: 2, socWindowKwh: 100, epaRangeMi: 300, epaRange: {} });
+    const labeled = vehicle({ socWindowKwh: 100, epaRangeMi: 300, epaRange: { combinedMpge: 101.115 } });
+    const unlabeled = vehicle({ id: 2, socWindowKwh: 100, epaRangeMi: 300, epaRange: {} });
 
     it('turns the label\'s MPGe into miles per kWh from the wall', () => {
-        const [r] = buildVehicleRows([labelled]);
+        const [r] = buildVehicleRows([labeled]);
         expect(r.values['figures.epaEfficiency']).toBeCloseTo(3);   // 101.115 ÷ 33.705
         expect(r.notes['figures.epaEfficiency']).toBe('101 MPGe');
     });
 
     it('prices 100 miles at each assumed price, on EPA efficiency where there is one', () => {
-        const [r] = buildVehicleRows([labelled]);
+        const [r] = buildVehicleRows([labeled]);
         expect(r.values['calc.costPer100Home']).toBeCloseTo(0.17 * 100 / 3);
         expect(r.notes['calc.costPer100Home']).toBeNull();
-        const [cheap] = buildVehicleRows([labelled], { assumptions: { homePrice: 0.1 } });
+        const [cheap] = buildVehicleRows([labeled], { assumptions: { homePrice: 0.1 } });
         expect(cheap.values['calc.costPer100Home']).toBeCloseTo(10 / 3);
     });
 
@@ -505,7 +505,7 @@ describe('EPA efficiency and electricity cost (#335)', () => {
         });
 
         it('takes the assumed AC loss out of the label, then adds the DC session loss, and says the DC loss is an assumed average', () => {
-            const [r] = buildVehicleRows([labelled]);
+            const [r] = buildVehicleRows([labeled]);
             const battery = 3 / ASSUMED_CHARGER_EFF;
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (battery * (1 - DC_FAST_LOSS)));
             expect(r.notes['calc.costPer100Fast']).toBe('est.');
@@ -518,24 +518,24 @@ describe('EPA efficiency and electricity cost (#335)', () => {
         });
 
         it('costs less than the wall basis it replaced, and the home figure keeps the wall basis', () => {
-            const [r] = buildVehicleRows([labelled]);
+            const [r] = buildVehicleRows([labeled]);
             expect(r.values['calc.costPer100Fast']).toBeLessThan(0.48 * 100 / 3);
             expect(r.values['calc.costPer100Home']).toBeCloseTo(0.17 * 100 / 3);
         });
 
-        it('prices an unlabelled vehicle on range ÷ battery, grossed up by the DC loss alone', () => {
-            const [r] = buildVehicleRows([unlabelled]);
+        it('prices an unlabeled vehicle on range ÷ battery, grossed up by the DC loss alone', () => {
+            const [r] = buildVehicleRows([unlabeled]);
             expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 * (1 - DC_FAST_LOSS)));
             expect(r.notes['calc.costPer100Fast']).toBe('est.');
         });
 
         it('links every fast figure\'s estimate note to the explainer, with the takeaway as its tooltip', () => {
-            for (const v of [labelled, unlabelled]) {
+            for (const v of [labeled, unlabeled]) {
                 const [r] = buildVehicleRows([v]);
                 expect(r.links['calc.costPer100Fast']).toMatchObject({ explainer: 'dc-fast-charging-loss' });
                 expect(r.links['calc.costPer100Fast'].title).toContain(`${Math.round(DC_FAST_LOSS * 100)}%`);
             }
-            const [home] = buildVehicleRows([labelled]);
+            const [home] = buildVehicleRows([labeled]);
             expect(home.links['calc.costPer100Home']).toBeUndefined();
         });
 
@@ -547,26 +547,26 @@ describe('EPA efficiency and electricity cost (#335)', () => {
     });
 
     it('estimates from the battery-side efficiency, less charging losses, without a label — and says so', () => {
-        const [r] = buildVehicleRows([unlabelled]);
+        const [r] = buildVehicleRows([unlabeled]);
         expect(r.values['calc.costPer100Home']).toBeGreaterThan(0.17 * 100 / 3);   // losses cost more
         expect(r.notes['calc.costPer100Home']).toBe('est. recharge efficiency');
     });
 
     it('names the cost per 100 km for a metric reader, and converts it', () => {
         const col = vehicleColumnByKey('calc.costPer100Home');
-        expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'metric').label).toBe('Cost/100 km, home');
-        const [r] = buildVehicleRows([labelled]);
+        expect(labeledColumn(col, DEFAULT_ASSUMPTIONS, 'metric').label).toBe('Cost/100 km, home');
+        const [r] = buildVehicleRows([labeled]);
         expect(Number(formatVehicleCell(r, col, 'metric'))).toBeCloseTo(0.17 * 100 / 3 / 1.60934, 2);
     });
 
     it('keeps "DC fast" in the fast column\'s full name, and follows the unit system', () => {
-        const fast = labelledColumn(vehicleColumnByKey('calc.costPer100Fast'), DEFAULT_ASSUMPTIONS, 'metric');
+        const fast = labeledColumn(vehicleColumnByKey('calc.costPer100Fast'), DEFAULT_ASSUMPTIONS, 'metric');
         expect(fast.label).toBe('Cost/100 km, fast');
         expect(fast.fullLabel).toBe('Cost per 100 km, DC fast');
         const weight = vehicleColumnByKey('calc.weightPerHp');
-        expect(labelledColumn(weight, DEFAULT_ASSUMPTIONS, 'imperial')).toMatchObject({ label: 'Weight per hp', fullLabel: 'Weight per horsepower' });
+        expect(labeledColumn(weight, DEFAULT_ASSUMPTIONS, 'imperial')).toMatchObject({ label: 'Weight per hp', fullLabel: 'Weight per horsepower' });
         // Its cells are kg/kW in metric, so the name says kW.
-        expect(labelledColumn(weight, DEFAULT_ASSUMPTIONS, 'metric')).toMatchObject({ label: 'Weight per kW', fullLabel: 'Weight per kilowatt' });
+        expect(labeledColumn(weight, DEFAULT_ASSUMPTIONS, 'metric')).toMatchObject({ label: 'Weight per kW', fullLabel: 'Weight per kilowatt' });
     });
 });
 
@@ -649,8 +649,8 @@ describe('the charge window (#335)', () => {
 
     it('names its columns from the window, and asks only for what is shown', () => {
         const w = { ...DEFAULT_ASSUMPTIONS, windowFrom: 20, windowTo: 90 };
-        expect(labelledColumn(vehicleColumnByKey(W), w).label).toBe('Charge 20→90%');
-        expect(labelledColumn(vehicleColumnByKey('calc.avgChargeKw'), w).label).toBe('Avg charge 20→90%');
+        expect(labeledColumn(vehicleColumnByKey(W), w).label).toBe('Charge 20→90%');
+        expect(labeledColumn(vehicleColumnByKey('calc.avgChargeKw'), w).label).toBe('Avg charge 20→90%');
         expect([...assumptionsFor(['name', 'calc.timeToAdd'])].sort()).toEqual(['addDistance', 'conditions', 'rangeBasis', 'window']);
         expect([...assumptionsFor(['name', 'calc.costPer100Fast'])]).toEqual(['fastPrice']);
         expect(assumptionsFor(['name', 'calc.efficiency']).size).toBe(0);
@@ -724,10 +724,10 @@ describe('the reported test follows the reader\'s correction mode', () => {
 
     it('drops the target speed from the header when nothing is corrected to it', () => {
         const col = vehicleColumnByKey('tested.range_mi');
-        expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'imperial', undefined, 'none').label).toBe('Tested range');
-        expect(labelledColumn(col, DEFAULT_ASSUMPTIONS, 'imperial').label).toBe('Tested range, 70 mph');
+        expect(labeledColumn(col, DEFAULT_ASSUMPTIONS, 'imperial', undefined, 'none').label).toBe('Tested range');
+        expect(labeledColumn(col, DEFAULT_ASSUMPTIONS, 'imperial').label).toBe('Tested range, 70 mph');
         // The full name, for the tooltip and the column picker, drops it too.
-        const eff = labelledColumn(vehicleColumnByKey('tested.efficiency_mi_kwh'), DEFAULT_ASSUMPTIONS, 'imperial', undefined, 'none');
+        const eff = labeledColumn(vehicleColumnByKey('tested.efficiency_mi_kwh'), DEFAULT_ASSUMPTIONS, 'imperial', undefined, 'none');
         expect([eff.label, eff.fullLabel]).toEqual(['Tested eff.', 'Tested efficiency']);
     });
 });

@@ -76,7 +76,7 @@ export function alignmentOffset(points, thresholdSoc) {
  * A run's points shifted so the threshold SoC sits at t = 0, with the crossing
  * INTERPOLATED rather than snapped to the next sample.
  *
- * Snapping was the old behaviour and it quietly broke the alignment it promised.
+ * Snapping was the old behavior and it quietly broke the alignment it promised.
  * One real run carries five points — 0%, 25%, 50%, … — so its "10% anchor" was
  * the sample at 25%, and it was drawn from t=0 alongside runs that genuinely
  * started at 10%. The curves shared an origin and not a state of charge, which
@@ -255,10 +255,10 @@ const SLOPE_SPAN_SOC     = 3;    // measure the rate over at least this much SoC
  * Uses recorded power when there is any, because the ramp is a fact about power
  * and reads directly: below `RAMP_PLATEAU_FRACTION` of the opening plateau is
  * still climbing. A tapering run — power highest at its first point — trims
- * nothing, which is the behaviour that matters for a run that starts high.
+ * nothing, which is the behavior that matters for a run that starts high.
  *
  * Falls back to nothing when power was not logged. The SoC slope alone cannot
- * tell a ramp from coarse sampling: this data is quantised to whole percent, so
+ * tell a ramp from coarse sampling: this data is quantized to whole percent, so
  * the settled R2 alternates 3.33 and 5.0 %/min, and any rule sensitive enough
  * to catch a real ramp would also catch that sawtooth.
  */
@@ -309,7 +309,7 @@ export function trimRamp(points) {
  *
  * Measured after the ramp, and over at least `SLOPE_SPAN_SOC` of SoC — a single
  * segment of whole-percent data is 1% wide, so its rate carries the sampling
- * interval's error rather than the car's behaviour.
+ * interval's error rather than the car's behavior.
  *
  * Returns null when no positive rate can be measured. A flat or falling trace is
  * not a slow charge, it is a discharge or a stall, and running it backwards

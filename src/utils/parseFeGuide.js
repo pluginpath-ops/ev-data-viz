@@ -331,7 +331,7 @@ function mapRow(row, original = row) {
  *          anyway (feGuideColumns); `warnings` names optional columns this file
  *          lacks, which import fine but arrive null.
  *          `rows` is empty when required columns are absent — a file whose
- *          headers we do not recognise is reported, never partially imported.
+ *          headers we do not recognize is reported, never partially imported.
  */
 export function parseFeGuide(csvText) {
     const empty = { rows: [], skipped: { nonEv: 0, duplicateUnit: 0, unusable: 0 }, flagged: [], suggestions: [], renamed: [] };
@@ -354,7 +354,7 @@ export function parseFeGuide(csvText) {
     const missingColumns = REQUIRED_COLUMNS.filter(c => resolved.missing.includes(c));
     const claimed = Object.values(resolved.found);
     if (missingColumns.length) {
-        // Hard fail rather than import what is recognisable: a guide missing
+        // Hard fail rather than import what is recognizable: a guide missing
         // its range column would import as a list of names with no figures,
         // which looks like a successful import of useless data. The closest
         // headers are named, never applied: a wrong pairing imports a

@@ -95,7 +95,7 @@ const clean = v => {
  *        An overridden series short-circuits BEFORE elision — manual must beat
  *        auto — and is also excluded from the ambiguity computation, since a
  *        hand-named series is already distinct and must not force its
- *        neighbours to grow longer labels to differ from it.
+ *        neighbors to grow longer labels to differ from it.
  * @param {boolean} [opts.useSessionName]  when both halves of a pair come from
  *        one session, prefer that session's name as the short label: "Ottawa
  *        loop" beats "10→80% DC fast × 70 mph highway" at a quarter the width.
