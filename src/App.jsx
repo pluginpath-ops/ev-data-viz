@@ -1422,7 +1422,6 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             settings={costToDrive}
                             onChange={updateCostToDrive}
-                            onOpenSetup={() => handleChartModeChange('drivesetup')}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'driveplan' && (
@@ -1431,7 +1430,6 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             settings={costToDrive}
                             onChange={updateCostToDrive}
-                            onOpenSetup={() => handleChartModeChange('drivesetup')}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'drivecharger' && (
@@ -1440,7 +1438,6 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             settings={costToDrive}
                             onChange={updateCostToDrive}
-                            onOpenSetup={() => handleChartModeChange('drivesetup')}
                         />
                     )}
                     {/* No selection gate: the vehicle table is where a selection is

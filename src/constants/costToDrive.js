@@ -29,6 +29,13 @@ export const HOME_LEVELS = [
 /** The level index for no home charging. */
 export const NO_HOME_LEVEL = HOME_LEVELS.findIndex(l => l.none);
 
+/**
+ * The order the levels are shown in, picker and Home Charger alike: no home
+ * charging first, then the chargers smallest to largest (owner, 2026-11-10).
+ * HOME_LEVELS keeps its own order: the key stores a level by its place there.
+ */
+export const HOME_LEVEL_ORDER = [NO_HOME_LEVEL, ...HOME_LEVELS.map((_, i) => i).filter(i => i !== NO_HOME_LEVEL)];
+
 /** A level's power at the wall, kW. 0 for no home charging. */
 export const levelKw = (level) => (level.volts * level.amps) / 1000;
 
@@ -124,6 +131,13 @@ export const EPA_LAB_TEMP_F = 75;
 export const GAS_COLD_AT_F = 20;
 export const GAS_COLD_LOSS = Object.freeze({ city: 0.15, hwy: 0.07 });
 
+/**
+ * When a planned fast charge happens: at this hour on a day off; on a driving
+ * day, in the gap between drives nearest it. Fixed (owner, 2026-11-10: "just
+ * assume 5pm"); it was a setting from 2026-11-07.
+ */
+export const PLANNED_HOUR = 17;
+
 /** Days of the week, Monday first, as the week setting stores them. */
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -131,12 +145,29 @@ export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export const DAY_TYPES = ['D', 'L', 'O'];
 
 /**
+ * Your gas car's one-click cars: EPA city and highway mpg (2025 models) and the
+ * tank, rounded to the gallon the field takes. A starting point, not a
+ * comparison of these cars; each says which version it is. Picking one names
+ * the gas car after it (`gasCar`).
+ *
+ * APPEND ONLY: the key stores the picked car by its place in this list.
+ */
+export const GAS_CAR_PRESETS = [
+    { key: 'f150',  label: 'F-150', title: 'Ford F-150 2.7 L EcoBoost 4WD', settings: { gasCity: 18, gasHwy: 23, gasTank: 23 } },
+    { key: 'civic', label: 'Civic', title: 'Honda Civic sedan 2.0 L', settings: { gasCity: 32, gasHwy: 41, gasTank: 12 } },
+    { key: 'rav4',  label: 'RAV4',  title: 'Toyota RAV4 2.5 L AWD', settings: { gasCity: 27, gasHwy: 33, gasTank: 15 } },
+    { key: 'x3',    label: 'X3',    title: 'BMW X3 30 xDrive', settings: { gasCity: 27, gasHwy: 33, gasTank: 17 } },
+    { key: 'pilot', label: 'Pilot', title: 'Honda Pilot 3.5 L AWD', settings: { gasCity: 19, gasHwy: 25, gasTank: 19 } },
+];
+
+/**
  * Every setting, its slider and its default. The order is the key's field
  * order (costToDriveKey.js) — APPEND ONLY: a field moved or removed changes
  * what every key already shared says.
  *
  * kinds: 'num' (min, max, step), 'bool', 'enum' (values), 'week' (7 day
- * types), 'mask' (7 days, Monday the low bit).
+ * types), 'mask' (7 days, Monday the low bit), 'text' (up to `max`
+ * characters).
  *
  * `step` is what a value is stored to; `spin`, where given, is what the
  * field's spinner moves by. The two miles fields take any whole mile but spin
@@ -151,14 +182,16 @@ export const COST_TO_DRIVE_FIELDS = [
     { key: 'chargeTo',       kind: 'num',  min: 50,   max: 100,  step: 5,    def: 80 },
     { key: 'fullBeforeLong', kind: 'bool', def: true },
     { key: 'homePrice',      kind: 'num',  min: 0.05, max: 0.60, step: 0.01, def: 0.17 },
-    { key: 'week',           kind: 'week', def: 'LDLDLDO' },
-    { key: 'planned',        kind: 'mask', def: 0b1000000 },
-    { key: 'dailyMi',        kind: 'num',  min: 5,    max: 400,  step: 1,    def: 45, spin: 5 },
+    // The week's defaults are the Commuter week (owner, 2026-11-10): an
+    // untouched page is the commonest reader, not the hardest case.
+    { key: 'week',           kind: 'week', def: 'DDDDDLO' },
+    { key: 'planned',        kind: 'mask', def: 0 },
+    { key: 'dailyMi',        kind: 'num',  min: 5,    max: 400,  step: 1,    def: 35, spin: 5 },
     { key: 'dailyMph',       kind: 'num',  min: 45,   max: 85,   step: 5,    def: 70 },
-    { key: 'dailyCity',      kind: 'num',  min: 0,    max: 100,  step: 5,    def: 40 },
-    { key: 'longMi',         kind: 'num',  min: 5,    max: 400,  step: 1,    def: 220, spin: 5 },
+    { key: 'dailyCity',      kind: 'num',  min: 0,    max: 100,  step: 5,    def: 50 },
+    { key: 'longMi',         kind: 'num',  min: 5,    max: 400,  step: 1,    def: 80, spin: 5 },
     { key: 'longMph',        kind: 'num',  min: 45,   max: 85,   step: 5,    def: 70 },
-    { key: 'longCity',       kind: 'num',  min: 0,    max: 100,  step: 5,    def: 15 },
+    { key: 'longCity',       kind: 'num',  min: 0,    max: 100,  step: 5,    def: 20 },
     { key: 'detourMin',      kind: 'num',  min: 5,    max: 30,   step: 1,    def: 10 },
     { key: 'stopBy',         kind: 'num',  min: 10,   max: 50,   step: 5,    def: 30 },
     { key: 'capTo',          kind: 'num',  min: 50,   max: 90,   step: 5,    def: 70 },
@@ -181,10 +214,15 @@ export const COST_TO_DRIVE_FIELDS = [
     // 2–3 to fill, half a minute to two to pay. Was 8 with a detour in it.
     { key: 'gasFillMin',     kind: 'num',  min: 2,    max: 30,   step: 1,    def: 5 },
     { key: 'efficiencyFrom', kind: 'enum', values: ['tested', 'epa'], def: 'tested' },
-    // When a planned fast charge happens: at this hour on a day off; on a
-    // driving day, in the gap between drives nearest it (owner, 2026-11-07:
-    // "~5pm, or perhaps configurable").
+    // RETIRED 2026-11-10: the hour of a planned fast charge, now fixed at
+    // PLANNED_HOUR (owner: "nobody is going to see or use it"). Nothing reads
+    // it; it stays only because the key's fields are append-only.
     { key: 'plannedHour',    kind: 'num',  min: 0,    max: 23,   step: 1,    def: 17 },
+    // The gas car's name (owner, 2026-11-10): a picked car's, or the reader's
+    // own for a custom one — "Custom" while blank. Editing its mpg or tank
+    // makes it custom.
+    { key: 'gasCar',         kind: 'enum', values: ['custom', ...GAS_CAR_PRESETS.map(p => p.key)], def: 'custom' },
+    { key: 'gasName',        kind: 'text', max: 24, def: '' },
 ];
 
 /** The settings an untouched page shows. */
@@ -195,23 +233,16 @@ export const DEFAULT_COST_TO_DRIVE = Object.freeze(
 export const costToDriveField = (key) => COST_TO_DRIVE_FIELDS.find(f => f.key === key) ?? null;
 
 /**
- * Your Driving's "Start from" buttons: a week laid over the current settings,
- * which keep their charger, prices and season. Reset is the defaults whole.
+ * The Your week card's buttons: one click lays a week over the current settings, which
+ * keep their charger, prices and season. Each sets every week field, so the
+ * result does not depend on the one before. Commuter is the default week
+ * (owner, 2026-11-10); the weekend is the Long days.
  */
+const week = (w, dailyMi, dailyCity, longMi, longCity, planned = 0) => ({ week: w, dailyMi, dailyCity, longMi, longCity, planned });
 export const COST_TO_DRIVE_PRESETS = [
-    { key: 'commuter', label: 'Commuter, 40 mi', settings: { week: 'DDDDDOO', dailyMi: 40, dailyCity: 40, planned: 0 } },
-    { key: 'roadWarrior', label: 'Road warrior, 220 mi days', settings: { week: 'LLDLLDO', longMi: 220, longCity: 15, dailyMi: 45, planned: 0b1000000 } },
-];
-
-/**
- * Your gas car's one-click cars: EPA city and highway mpg (2025 models) and the
- * tank, rounded to the gallon the field takes. A starting point, not a
- * comparison of these cars; each says which version it is.
- */
-export const GAS_CAR_PRESETS = [
-    { key: 'f150',  label: 'F-150', title: 'Ford F-150 2.7 L EcoBoost 4WD', settings: { gasCity: 18, gasHwy: 23, gasTank: 23 } },
-    { key: 'civic', label: 'Civic', title: 'Honda Civic sedan 2.0 L', settings: { gasCity: 32, gasHwy: 41, gasTank: 12 } },
-    { key: 'rav4',  label: 'RAV4',  title: 'Toyota RAV4 2.5 L AWD', settings: { gasCity: 27, gasHwy: 33, gasTank: 15 } },
-    { key: 'x3',    label: 'X3',    title: 'BMW X3 30 xDrive', settings: { gasCity: 27, gasHwy: 33, gasTank: 17 } },
-    { key: 'pilot', label: 'Pilot', title: 'Honda Pilot 3.5 L AWD', settings: { gasCity: 19, gasHwy: 25, gasTank: 19 } },
+    { key: 'commuter',        label: 'Commuter',        title: '35 mi a weekday, half city; one 80 mi weekend day, mostly highway', settings: week('DDDDDLO', 35, 50, 80, 20) },
+    { key: 'wfh',             label: 'WFH',             title: 'Working from home: 10 mi a weekday, all city; 50 mi each weekend day, mostly highway', settings: week('DDDDDLL', 10, 100, 50, 20) },
+    { key: 'supercommuter',   label: 'Supercommuter',   title: '160 mi a weekday, 90% highway; 50 mi each weekend day, half city', settings: week('DDDDDLL', 160, 10, 50, 50) },
+    { key: 'onTheRoad',       label: 'On the road',     title: 'Four 220 mi days a week, a fast charge planned on Sunday', settings: week('LLDLLDO', 45, 40, 220, 15, 0b1000000) },
+    { key: 'weekendWarrior',  label: 'Weekend warrior', title: '25 mi a weekday, half city; 220 mi each weekend day, mostly highway', settings: week('DDDDDLL', 25, 50, 220, 15) },
 ];

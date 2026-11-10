@@ -18,7 +18,7 @@ import { fastChargingFill } from '../../utils/stripedFill';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
 import {
-    dollars, minutesText, savedText, perMonth, weekSummary,
+    dollars, minutesText, savedText, perMonth, weekSummary, gasCarName, chargingText,
 } from '../../utils/costToDrive';
 import { HOME_LEVELS } from '../../constants/costToDrive';
 import { useCostToDrive } from '../../hooks/useCostToDrive';
@@ -31,9 +31,6 @@ import PngButton from '../charts/PngButton';
 import ChartInfoBubble from '../ChartInfoBubble';
 import CostMath from '../calcTrace/CostMath';
 import CostToDriveSidebar from './CostToDriveSidebar';
-import { levelLabel } from './HomeLevelPicker';
-
-const GAS_LABEL = 'Your gas car';
 
 /**
  * Everything on this tab is a month (owner, 2026-11-07): the simulated week ×
@@ -66,7 +63,7 @@ function CostTimeCard({ entry, settings }) {
             </div>
             <span className="text-secondary">{stopLine(c.week)}</span>
             <span className="text-note">
-                {dollars(c.monthly.ev)}/mo to charge against {dollars(c.monthly.gas)}/mo in gas, in {settings.season}.
+                {dollars(c.monthly.ev)}/mo to charge vs {dollars(c.monthly.gas)}/mo in gas, in {settings.season}.
                 Over a year, {dollars(c.yearly.saved)} {c.yearly.saved >= 0 ? 'less' : 'more'}.
             </span>
         </section>
@@ -125,7 +122,7 @@ function barOptions({ stacked, xTitle, totals, tooltipLabel }) {
     };
 }
 
-export default function CostTimeView({ vehicles, selectedVehicleIds, settings, onChange, onOpenSetup, presentationMode = false }) {
+export default function CostTimeView({ vehicles, selectedVehicleIds, settings, onChange, presentationMode = false }) {
     const priced = useCostToDrive(vehicles, selectedVehicleIds, settings);
     const shown = useMemo(() => priced.filter(p => !p.missing), [priced]);
     const missing = priced.filter(p => p.missing);
@@ -134,7 +131,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
     const costRef = useRef(null), costChart = useRef(null);
     const timeRef = useRef(null), timeChart = useRef(null);
 
-    const labels = [...shown.map(p => vehicleLabel(p.vehicle)), GAS_LABEL];
+    const labels = [...shown.map(p => vehicleLabel(p.vehicle)), gasCarName(settings)];
     // What is plotted, for the PNG preview's staleness check; with the theme and
     // the series colors, what the charts are rebuilt on.
     const signature = `${labels.join('|')}|${JSON.stringify(settings)}`;
@@ -203,9 +200,9 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
     const sourceLine = useSourceLine({ runs: sourceRuns, allRuns, epa: { label: usesEpa } });
 
     const season = settings.season === 'winter' ? `Winter, ${settings.winterF}°F` : `Summer, ${settings.summerF}°F`;
-    const subtitle = `${weekSummary(settings)} · ${season} · home ${levelLabel(HOME_LEVELS[settings.level])}`;
-    const costTitle = 'Cost per month, against your gas car';
-    const timeTitle = 'Time per month: fast charging against fill-ups';
+    const subtitle = `${weekSummary(settings)} · ${season} · ${chargingText(settings, HOME_LEVELS[settings.level])}`;
+    const costTitle = 'Cost per month, vs selected ICE comparison';
+    const timeTitle = 'Time per month: fast charging vs fill-ups';
     const costPng = useChartPng(costChart, { title: costTitle, subtitle, sources: sourceLine.text, signature });
     const timePng = useChartPng(timeChart, { title: timeTitle, subtitle, sources: sourceLine.text, signature });
 
@@ -213,7 +210,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
 
     return (
         <div className="chart-layout">
-            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} onOpenSetup={onOpenSetup} />}
+            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} />}
             <div className="chart-main">
                 {missing.length > 0 && (
                     <p className="text-note drive-missing">

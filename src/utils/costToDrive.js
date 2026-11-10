@@ -12,8 +12,9 @@
  */
 import {
     HOME_LEVELS, levelKw, WALL_OUTLET_CHARGER_EFF, ASSUMED_ONBOARD_AC_KW, DETOUR_MPH,
-    MIN_STOP_ADD, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS,
+    MIN_STOP_ADD, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS, PLANNED_HOUR,
     SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, GAS_COLD_AT_F, GAS_COLD_LOSS, WEEKDAYS, ENOUGH_MARGIN_MIN,
+    GAS_CAR_PRESETS,
 } from '../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, HWFET_AVG_MPH, STANDARD_CONDITIONS } from '../constants/epa';
 import { correctionFactor } from './conditionCorrection';
@@ -319,7 +320,7 @@ export function plannedSlot(spans, hour) {
  * at keepAbove + the detour + LATE_STOP_MARGIN, if the day started below it —
  * and charges enough to finish the day above `keepAbove`, at least MIN_STOP_ADD,
  * under `capTo`, stretching to STRETCH_CAP_TO when that saves a second stop.
- * A planned day tops up to `capTo` unless already above it, at `plannedHour`
+ * A planned day tops up to `capTo` unless already above it, at PLANNED_HOUR
  * on a day off and in the gap between drives nearest it on a driving day.
  *
  * @param {Object} profile   costToDriveVehicle's answer (missing must be null)
@@ -443,7 +444,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             };
 
             const spans = DAY_SPANS[type];
-            const plan = planned(d) ? plannedSlot(spans, s.plannedHour) : null;
+            const plan = planned(d) ? plannedSlot(spans, PLANNED_HOUR) : null;
             // The day's clock: a stop that runs past a span's end pushes the
             // next span later, rather than the line stepping back in time.
             let clock = morning;
@@ -704,17 +705,63 @@ export function weekTimeText(weekHour) {
     return `${day} ${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
 }
 
-/** The week in one line: "795 mi per week · three long days, three daily, one off". */
+/**
+ * The week in one line, in numerals with each kind of day's miles: "255 mi
+ * per week · 5 days 35 mi, 1 day 80 mi, 1 day off". The commonest first; two
+ * kinds at the same miles are one. "Daily" and "Long day" are the settings'
+ * names, not the reader's (owner, 2026-11-10: "the long / daily means nothing").
+ * Each phrase is held together with no-break spaces (NBSP), so a narrow card
+ * wraps between them, never "1 / day off".
+ */
+const NBSP = '\u00a0';
 export function weekSummary(settings) {
     const count = (t) => [...settings.week].filter(c => c === t).length;
-    const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
-    const miles = count('L') * settings.longMi + count('D') * settings.dailyMi;
-    const parts = [
-        `${words[count('L')]} long day${count('L') === 1 ? '' : 's'}`,
-        `${words[count('D')]} daily`,
-        `${words[count('O')]} off`,
-    ];
-    return `${miles.toLocaleString('en-US')} mi per week · ${parts.join(', ')}`;
+    const days = (n) => `${n}${NBSP}day${n === 1 ? '' : 's'}`;
+    const driving = [];
+    for (const [type, mi] of [['D', settings.dailyMi], ['L', settings.longMi]]) {
+        const n = count(type);
+        if (n === 0) continue;
+        const same = driving.find(d => d.mi === mi);
+        if (same) same.n += n; else driving.push({ n, mi });
+    }
+    driving.sort((a, b) => b.n - a.n);
+    const parts = driving.map(d => `${days(d.n)}${NBSP}${d.mi}${NBSP}mi`);
+    if (count('O') > 0) parts.push(`${days(count('O'))}${NBSP}off`);
+    const miles = driving.reduce((sum, d) => sum + d.n * d.mi, 0);
+    return `${miles.toLocaleString('en-US')}${NBSP}mi${NBSP}per${NBSP}week · ${parts.join(', ')}`;
+}
+
+/**
+ * The gas car's name: the picked car's, else the reader's own, else "Custom"
+ * (owner, 2026-11-10).
+ */
+export function gasCarName(settings) {
+    const picked = GAS_CAR_PRESETS.find(p => p.key === settings.gasCar);
+    return picked ? picked.label : (settings.gasName.trim() || 'Custom');
+}
+
+/**
+ * A home charger as the charts name it: "L2 11.5 kW", a wall outlet "L1 1.4
+ * kW" (owner, 2026-11-10); "no home charging" for the level that is none.
+ * The settings keep "240 V · 48 A", what a reader buys and wires.
+ */
+export const chargerText = (level) => (level.none
+    ? `no${NBSP}home${NBSP}charging`
+    : `L${level.volts < 200 ? 1 : 2}${NBSP}${levelKw(level).toFixed(1)}${NBSP}kW`);
+
+/**
+ * What a chart assumed charging costs, for its subtitle: "L2 11.5 kW at
+ * $0.17/kWh · fast charging at $0.48/kWh". Without a level (Home Charger
+ * compares them all), "home at $0.17/kWh · …"; with no home charging, no
+ * home price. Each phrase is held together, as the week's are, so a subtitle
+ * wraps at a "·".
+ */
+export function chargingText(settings, level = null) {
+    const held = (t) => t.replace(/ /g, NBSP);
+    const home = level?.none
+        ? chargerText(level)
+        : held(`${level ? chargerText(level) : 'home'} at $${settings.homePrice.toFixed(2)}/kWh`);
+    return `${home} · ${held(`fast charging at $${settings.fastPrice.toFixed(2)}/kWh`)}`;
 }
 
 // ── Home Charger ────────────────────────────────────────────────────────────

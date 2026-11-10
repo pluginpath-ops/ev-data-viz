@@ -9,9 +9,10 @@
  * what it holds while closed. Open or closed is remembered per group.
  */
 import { HOME_LEVELS } from '../../constants/costToDrive';
-import { weekSummary } from '../../utils/costToDrive';
+import { weekSummary, gasCarName } from '../../utils/costToDrive';
 import { useRememberedOpen } from '../../hooks/useRememberedOpen';
 import SectionBand from '../SectionBand';
+import ShareSettingsButton from './ShareSettingsButton';
 import { hourText } from './DriveFields';
 import { levelLabel } from './HomeLevelPicker';
 import {
@@ -39,7 +40,7 @@ const GROUPS = [
     },
     {
         key: 'gas', label: 'Your gas car', open: false, Fields: GasCarFields,
-        note: (s) => `${s.gasCity} city · ${s.gasHwy} hwy mpg · $${s.gasPrice.toFixed(2)}/gal`,
+        note: (s) => `${gasCarName(s)} · ${s.gasCity} city · ${s.gasHwy} hwy mpg · $${s.gasPrice.toFixed(2)}/gal`,
     },
     {
         key: 'efficiency', label: 'Efficiency from', open: false, Fields: EfficiencyFields,
@@ -62,14 +63,15 @@ function SidebarGroup({ group, settings, onChange }) {
     );
 }
 
-export default function CostToDriveSidebar({ settings, onChange, onOpenSetup }) {
+/**
+ * Opens with a link to these settings (owner, 2026-11-10), where a button to
+ * Your Driving was: the sub-tab row already goes there, and a reader who has
+ * set their week wants to share it.
+ */
+export default function CostToDriveSidebar({ settings, onChange }) {
     return (
         <aside className="chart-rail">
-            {onOpenSetup && (
-                <button type="button" className="btn btn-primary" onClick={onOpenSetup}>
-                    Your Driving: every setting on one page ↘
-                </button>
-            )}
+            <ShareSettingsButton />
             {GROUPS.map(g => <SidebarGroup key={g.key} group={g} settings={settings} onChange={onChange} />)}
         </aside>
     );

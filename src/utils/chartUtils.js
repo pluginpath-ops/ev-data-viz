@@ -19,10 +19,12 @@ const GAP = 10;
 
 
 /**
- * Break a source line ("Data: A · B · C") between names so no line is wider
- * than `maxWidth` device pixels. A wrapped line begins with its separator dot. Measured with the font it is drawn in.
+ * Break a line of " · " phrases — a source line ("Data: A · B · C"), a
+ * subtitle — between phrases, so no line is wider than `maxWidth` device
+ * pixels. A wrapped line begins with its separator dot. Measured with the font
+ * it is drawn in.
  */
-function wrapSources(text, maxWidth, font) {
+function wrapAtDots(text, maxWidth, font) {
     const ctx = document.createElement('canvas').getContext('2d');
     ctx.font = font;
     const [head, ...names] = text.split(' · ');
@@ -85,15 +87,22 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
             display: DISPLAY, mono: MONO } = chartFonts();
 
     const hasChrome = Boolean(title || subtitle || wordmark);
+    const LINE_H = SUB_SIZE + 3;
+    const subFont = `400 ${px(SUB_SIZE)}px ${MONO}`;
+    // The subtitle wraps between its phrases as the frame's does on screen: a
+    // long one (Cost & Time's names its week, season, charger and prices) ran
+    // off the canvas edge.
+    const subtitleLines = subtitle ? wrapAtDots(subtitle, src.width, subFont) : [];
     const headerH = hasChrome
-        ? px((title ? TITLE_SIZE + 4 : 0) + (subtitle ? SUB_SIZE + 5 : 0) + GAP)
+        ? px((title ? TITLE_SIZE + 4 : 0)
+            + (subtitleLines.length ? SUB_SIZE + 5 + (subtitleLines.length - 1) * LINE_H : 0)
+            + GAP)
         : 0;
     const pad = hasChrome ? px(PAD) : 0;
     // The source line sits under the plot, as in the frame (.plot-frame-sources).
     // It wraps like the on-screen line does (.plot-frame-sources is flex-wrap):
     // a long list of sources breaks between names, never off the canvas edge.
-    const LINE_H = SUB_SIZE + 3;
-    const sourceLines = sources ? wrapSources(sources, src.width, `400 ${px(SUB_SIZE)}px ${MONO}`) : [];
+    const sourceLines = sources ? wrapAtDots(sources, src.width, subFont) : [];
     const footerH = sourceLines.length ? px(GAP + SUB_SIZE + (sourceLines.length - 1) * LINE_H) : 0;
 
     // A chart may add to its export what the canvas itself does not carry (a
@@ -119,12 +128,12 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
             ctx.fillText(title, pad, y);
             y += px(4);
         }
-        if (subtitle) {
+        if (subtitleLines.length) {
             y += px(SUB_SIZE);
-            ctx.font = `400 ${px(SUB_SIZE)}px ${MONO}`;
+            ctx.font = subFont;
             ctx.fillStyle = theme.tick;
             ctx.textAlign = 'left';
-            ctx.fillText(subtitle, pad, y);
+            subtitleLines.forEach((line, i) => ctx.fillText(line, pad, y + px(i * LINE_H)));
         }
         if (wordmark) {
             // Two fills, not one. On screen the mark is an element with an
@@ -149,7 +158,7 @@ export function chartToPngDataUrl(chartInstance, options = {}) {
     ctx.drawImage(src, pad, pad + headerH);
     extra?.draw(ctx, { x: pad, y: pad + headerH, dpr });
     if (sourceLines.length) {
-        ctx.font = `400 ${px(SUB_SIZE)}px ${MONO}`;
+        ctx.font = subFont;
         ctx.fillStyle = theme.tick;
         ctx.textAlign = 'left';
         sourceLines.forEach((line, i) => {

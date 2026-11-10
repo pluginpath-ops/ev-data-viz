@@ -18,9 +18,9 @@ import { useMemo, useState } from 'react';
 import { vehicleLabel } from '../../utils/specHelpers';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { SERIES_NEUTRAL } from '../../utils/colorUtils';
-import { HOME_LEVELS } from '../../constants/costToDrive';
+import { HOME_LEVELS, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import {
-    simulateWeek, dollars, minutesText, weekSummary,
+    simulateWeek, dollars, minutesText, weekSummary, gasCarName, chargingText, chargerText,
 } from '../../utils/costToDrive';
 import { useCostToDrive } from '../../hooks/useCostToDrive';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
@@ -71,7 +71,7 @@ function PlanChart({ kind, week, profile, ...chart }) {
     return <DayBarsChart week={week} view={kind} {...chart} />;
 }
 
-export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings, onChange, onOpenSetup, presentationMode = false }) {
+export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings, onChange, presentationMode = false }) {
     const priced = useCostToDrive(vehicles, selectedVehicleIds, settings);
     const shown = priced.filter(p => !p.missing);
     const [pickedId, setPickedId] = useState(null);
@@ -99,7 +99,7 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
 
     return (
         <div className="chart-layout">
-            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} onOpenSetup={onOpenSetup} />}
+            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} />}
             <div className="chart-main">
                 {!entry && (
                     <p className="text-note">
@@ -111,19 +111,19 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                 {entry && (() => {
                     const week = entry.comparison.week;
                     const name = vehicleLabel(entry.vehicle);
-                    const level = levelLabel(HOME_LEVELS[settings.level]);
-                    const subtitle = `${weekSummary(settings)} · ${seasonText(settings, settings.season)} · home ${level}`;
+                    const charging = chargingText(settings, HOME_LEVELS[settings.level]);
+                    const subtitle = `${weekSummary(settings)} · ${seasonText(settings, settings.season)} · ${charging}`;
                     const signature = `${entry.vehicle.id}|${JSON.stringify(settings)}`;
 
                     let cmp = null;
                     if (compare === 'season') {
                         const w = otherSeason === 'winter' ? entry.comparison.winter : entry.comparison.summer;
                         cmp = { week: w, profile: entry.profile, title: `${name}: the same week in ${otherSeason}`,
-                            subtitle: `${weekSummary(settings)} · ${seasonText(settings, otherSeason)} · home ${level}` };
+                            subtitle: `${weekSummary(settings)} · ${seasonText(settings, otherSeason)} · ${charging}` };
                     } else if (compare === 'level' && atLevel && !atLevel.missing) {
                         const w = simulateWeek(atLevel.profile, levelSettings);
-                        cmp = { week: w, profile: atLevel.profile, title: `${name}: the same week on ${levelLabel(HOME_LEVELS[compareLevel])}`,
-                            subtitle: `${weekSummary(settings)} · ${seasonText(settings, settings.season)} · home ${levelLabel(HOME_LEVELS[compareLevel])}` };
+                        cmp = { week: w, profile: atLevel.profile, title: `${name}: the same week ${HOME_LEVELS[compareLevel].none ? 'with' : 'on'} ${chargerText(HOME_LEVELS[compareLevel])}`,
+                            subtitle: `${weekSummary(settings)} · ${seasonText(settings, settings.season)} · ${chargingText(settings, HOME_LEVELS[compareLevel])}` };
                     }
 
                     const gas = entry.comparison.gas;
@@ -182,8 +182,8 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                                     {compare === 'level' && (
                                         <select className="form-input" value={compareLevel} aria-label="Charger to compare with"
                                                 onChange={e => setCompareLevel(Number(e.target.value))}>
-                                            {HOME_LEVELS.map((l, i) => i === settings.level ? null : (
-                                                <option key={i} value={i}>{levelLabel(l)}</option>
+                                            {HOME_LEVEL_ORDER.map(i => i === settings.level ? null : (
+                                                <option key={i} value={i}>{levelLabel(HOME_LEVELS[i])}</option>
                                             ))}
                                         </select>
                                     )}
@@ -212,7 +212,7 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                                     <button type="button" className={`subgroup-header${gasOpen ? ' is-open' : ''}`}
                                             aria-expanded={gasOpen} onClick={() => setGasOpen(o => !o)}>
                                         <span aria-hidden="true">{gasOpen ? '▼' : '▶'}</span>
-                                        <span>Your gas car&rsquo;s week: {gas.fillsPerWeek.toFixed(1)} fill-ups, {minutesText(gas.minutesPerWeek)}, {dollars(gas.cost)}</span>
+                                        <span>{gasCarName(settings)}, the same week: {gas.fillsPerWeek.toFixed(1)} fill-ups, {minutesText(gas.minutesPerWeek)}, {dollars(gas.cost)}</span>
                                     </button>
                                     {gasOpen && (
                                         <WeekLineChart
@@ -223,7 +223,7 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                                             stops={gas.fills.map(f => ({ from: f.hour, to: f.hour + settings.gasFillMin / 60, label: `${settings.gasFillMin}m` }))}
                                             color={SERIES_NEUTRAL}
                                             yLabel="Range left (mi)"
-                                            title="Your gas car: the same week"
+                                            title={`${gasCarName(settings)}: the same week`}
                                             subtitle={`${weekSummary(settings)} · ${Math.round(gas.cityMpg)} city / ${Math.round(gas.hwyMpg)} hwy mpg in ${settings.season}, ${settings.gasTank} gal`}
                                             signature={`gas|${JSON.stringify(settings)}`}
                                             height={height}
