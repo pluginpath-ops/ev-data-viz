@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLightDismiss } from '../../hooks/useLightDismiss';
+import { useTheme } from '../../hooks/useTheme';
 
 /**
  * The account and settings control at the right end of the nav (#281).
@@ -16,9 +17,11 @@ import { useLightDismiss } from '../../hooks/useLightDismiss';
  * every figure on every screen is not a property of the current selection, and
  * two controls for one setting is the drift this project keeps paying for.
  *
- * The light/dark toggle belongs in this menu too and is deliberately not built
- * yet — the re-skin is dark-only until the light pass lands.
+ * The theme picker is here for the same reason: Light, Dark or System (follow
+ * the device), kept per browser like the units.
  */
+const THEME_CHOICES = [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']];
+
 function PersonIcon() {
     return (
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -29,6 +32,7 @@ function PersonIcon() {
 
 export default function AccountMenu({ user, userRole, emailOptIn, onEmailOptInChange, units, onToggleUnits, onSignIn, onSignOut }) {
     const [open, setOpen] = useState(false);
+    const { theme, setTheme } = useTheme();
     const ref = useLightDismiss(open, () => setOpen(false));
 
     const initial = user?.email?.[0]?.toUpperCase() ?? null;
@@ -70,7 +74,7 @@ export default function AccountMenu({ user, userRole, emailOptIn, onEmailOptInCh
                         {/* Two labeled halves rather than the bar's old `⇄ IMP`.
                             The glyph said a switch existed but never which way
                             it would go, and there is room for the words here. */}
-                        <div className="account-segmented">
+                        <div className="segmented" role="group" aria-label="Units">
                             {['imperial', 'metric'].map(system => (
                                 <button
                                     key={system}
@@ -80,6 +84,24 @@ export default function AccountMenu({ user, userRole, emailOptIn, onEmailOptInCh
                                     onClick={() => units !== system && onToggleUnits()}
                                 >
                                     {system === 'imperial' ? 'Imperial' : 'Metric'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="account-row">
+                        <span className="text-nano">Theme</span>
+                        <div className="segmented" role="group" aria-label="Theme">
+                            {THEME_CHOICES.map(([choice, label]) => (
+                                <button
+                                    key={choice}
+                                    type="button"
+                                    className={theme === choice ? 'active' : ''}
+                                    aria-pressed={theme === choice}
+                                    title={choice === 'system' ? 'Follow this device' : undefined}
+                                    onClick={() => setTheme(choice)}
+                                >
+                                    {label}
                                 </button>
                             ))}
                         </div>

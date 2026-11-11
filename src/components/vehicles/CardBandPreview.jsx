@@ -29,6 +29,7 @@
  * The geometry all comes from utils/cardBand, including the fade's stops, which
  * are one declaration shared with the real band in index.css.
  */
+import MediaTitle from './MediaTitle';
 import { useRef } from 'react';
 import {
     CARD_BAND_BODY_FRACTION,
@@ -138,17 +139,17 @@ export default function CardBandPreview({
                     'aria-valuetext': focal == null ? 'Centered' : `${value}% down the photo`,
                 } : { 'aria-hidden': true })}
             >
-                <div className="card-band-scrim" />
+                <div className="card-band-scrim" data-theme="dark" />
                 {/* The card body's top edge. On a card the band runs under it,
                     so the photo below this line is never seen. */}
                 <div className="card-band-body" />
                 {/* The card's own title element, under the card's own rule —
                     the point being that the preview cannot put the name
                     anywhere the card would not. */}
-                <div className="vehicle-media-title">
+                <MediaTitle>
                     <h3>{name || 'Unnamed vehicle'}</h3>
                     {subtitle && <p>{subtitle}</p>}
-                </div>
+                </MediaTitle>
             </div>
         </div>
     );

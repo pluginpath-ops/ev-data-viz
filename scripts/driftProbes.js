@@ -316,7 +316,7 @@ export const LEDGER = [
     },
     {
         key: 'css-color-literal',
-        count: 27,  // new with #296: 17 on the vehicle photo (media band), 6 cycle bars, 2 card shadows, the modal overlay, the race-mode knob
+        count: 19,  // 27 when added (#296). 27 → 19: the media band's scrim and name follow the card color. Left: 9 plates and marks over the vehicle photo, 6 cycle bars, 2 card shadows, the modal overlay, the race-mode knob
         scope: 'src/index.css',
         what: 'Color literals in a rule, outside the token blocks. The stylesheet '
             + 'is where the tokens live, and until light mode came back (#296) '

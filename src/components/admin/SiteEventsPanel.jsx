@@ -68,7 +68,7 @@ export default function SiteEventsPanel() {
         <div className="events-view">
             <div className="controls-strip">
                 <span className="text-meta">Window</span>
-                <div className="stats-segmented" role="group" aria-label="Window">
+                <div className="segmented" role="group" aria-label="Window">
                     {WINDOWS.map(w => (
                         <button key={w.label} type="button" className={days === w.days ? 'active' : ''} onClick={() => setDays(w.days)}>
                             {w.label}
@@ -231,7 +231,7 @@ export default function SiteEventsPanel() {
                     <section className="card">
                         <div className="events-section-head">
                             <h3 className="section-title">Home views over time</h3>
-                            <div className="stats-segmented" role="group" aria-label="Group by">
+                            <div className="segmented" role="group" aria-label="Group by">
                                 <button type="button" className={grain === 'day' ? 'active' : ''} onClick={() => setGrain('day')}>By day</button>
                                 <button type="button" className={grain === 'week' ? 'active' : ''} onClick={() => setGrain('week')}>By week</button>
                             </div>

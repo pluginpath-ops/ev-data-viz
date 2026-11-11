@@ -24,13 +24,14 @@ it.
 | A labeled group of items in a sub-nav | **a section** — its label, its items, a rule between sections | — | `group` on an item; `.subtab-section-label`, `.subtab-section-rule`, `.nav-menu-section` |
 | The one width at which the chrome collapses | **compact** — the only breakpoint | — | [useIsCompact.js](../src/hooks/useIsCompact.js) |
 | The circle at the right end, and what it opens | **account menu** | Material *account* | `.account-menu`, [AccountMenu.jsx](../src/components/shell/AccountMenu.jsx) |
+| Light or dark, and the reader's choice of it | **theme** — **Light**, **Dark** or **System** (follows the device; the default). Chosen with the **theme picker** in the account menu, kept per browser like units. Not "mode" (chart modes) or "appearance" | — | [themeBootstrap.js](../src/styles/themeBootstrap.js), [useTheme.js](../src/hooks/useTheme.js), `data-theme` |
 | A signed-in user's yes to rare emails about major changes | **email opt-in** — off until they tick it; in the account menu. Not "newsletter", "subscribe" or "marketing" | — | `profiles.email_opt_in`, `.account-opt-in` |
 | What sign-in keeps and promises, under the sign-in buttons | **privacy note** | — | `.auth-privacy`, [AuthModal.jsx](../src/components/AuthModal.jsx) |
 | A button stating its value, opening a panel | **menu button** | WAI-ARIA *menu button* | `.menu-button`, [MenuButton.jsx](../src/components/shell/MenuButton.jsx) |
 | Anything that floats above the page | **popover** | common web | `.popover` + one `.popover--<placement>` |
 | Where it opens relative to its anchor | **placement** | Floating UI | `--above`, `--below`, `--center`, `--right`, `--end`, `--stretch` |
 | A row of controls above a table or chart | **controls strip** | — | `.controls-strip` |
-| One always-visible choice of two or three — more if every option is a short word and the row may scroll | **segmented control** | Apple HIG | `.stats-segmented`, `.account-segmented`; `.preset-picker` wraps one |
+| One always-visible choice of two or three — more if every option is a short word and the row may scroll | **segmented control** | Apple HIG | `.segmented`; `.preset-picker` wraps one |
 | Row 3 — the removable selected-vehicle pills; also a vehicle picker's chosen vehicle, closed | **chips** | Material *input chips* | `.selected-strip`, `.selected-vehicle-chip`; `.combobox-chip` in [VehicleCombobox.jsx](../src/components/VehicleCombobox.jsx) — name reopens search, × clears, `.combobox-detail` beside it tells lookalikes apart |
 | The capped box the chips scroll inside | **chip scroller** — two rows, then scrolls | — | `.selected-chip-scroll` |
 | "＋ Add" at the end of the chips row, and its search-and-tick list | **the vehicle quick-add** — a click toggles a vehicle at once; the panel stays open. Not "picker" alone, which is the run picker | — | [VehicleQuickAdd.jsx](../src/components/VehicleQuickAdd.jsx), `.vehicle-quick-add` |
@@ -161,7 +162,7 @@ The tab that prices a reader's own week of driving against their gas car
 |---|---|---|---|
 | The colored left edge encoding state | **accent border** — orange = selected or overridden, red = queued for deletion, run color = series | CSS `border-left` | `.vehicle-card`, `.vehicle-row`, `.vehicle-run-group`, `.routing-row` |
 | The ✓ on a selected card | **selected indicator** | ARIA | `.vehicle-card.is-selected::before` |
-| The photo band with the title over a scrim | **media band** | Material *media* | [VehicleMedia.jsx](../src/components/vehicles/VehicleMedia.jsx) |
+| The photo band with the title over a scrim | **media band** — dark in both themes, so the name is white over any photo | Material *media* | [VehicleMedia.jsx](../src/components/vehicles/VehicleMedia.jsx) |
 | The slice of the photo the band shows | **the band window** — not a fixed fraction (62–79% of height on desktop cards); previews draw the tightest case | — | `bandWindow()` in [cardBand.js](../src/utils/cardBand.js) |
 | The vertical point (0 top – 100 foot) the band centers on; null is centered | **focal point** — not a crop: nothing is thrown away, so reposition freely. Belongs to the photo: replacing it clears the point, and a variant showing its source's photo uses the source's point. Say **crop a little wide** | Cloudinary, Contentful | `vehicles.image_focal_y`, `focalY()` |
 | Moving a photo within the band | **repositioning** | — | [CardBandPreview.jsx](../src/components/vehicles/CardBandPreview.jsx) |

@@ -43,7 +43,7 @@ export function SegmentedChoice({ label, options, value, onChange }) {
     return (
         <div className="setup-field">
             <span className="text-label">{label}</span>
-            <div role="group" aria-label={label} className="stats-segmented">
+            <div role="group" aria-label={label} className="segmented">
                 {options.map(([key, text]) => (
                     <button
                         key={key}

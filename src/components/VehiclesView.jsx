@@ -13,6 +13,7 @@ import { useAppContext } from '../context/AppContext';
 import { distanceUnit } from '../utils/unitConversions';
 import VehicleCardFigures, { TagPills, epaRangeValue, epaRangeBasisMark, epaRangeTitle } from './vehicles/VehicleCardFigures';
 import VehicleMedia from './vehicles/VehicleMedia';
+import MediaTitle from './vehicles/MediaTitle';
 import PullColorButton from './vehicles/PullColorButton';
 import { CARD_BAND_HEIGHT } from '../utils/cardBand';
 import TestedFigure from './vehicles/TestedFigure';
@@ -290,10 +291,10 @@ export default function VehiclesView({
                     full-card background under an 80% wash that
                     made it unreadable AND unlookable-at. */}
                 <VehicleMedia vehicle={vehicle} height={CARD_BAND_HEIGHT} className="is-card-band">
-                    <div className="vehicle-media-title">
+                    <MediaTitle>
                         <h3>{vehicle.name}<LineageIcon role={lineageRole(vehicle, lineage)} /></h3>
                         <p>{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
-                    </div>
+                    </MediaTitle>
                     <VisibilityPill vehicle={vehicle} onMedia />
                     {/* The curator's swatch, on the band under the
                         selection mark's corner. It was the first row

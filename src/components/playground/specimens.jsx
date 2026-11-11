@@ -149,7 +149,7 @@ export const COMPOSITES = {
                     several values (#338). */}
                 <div className="guide-facet-panel-head">
                     <span className="text-nano">Match</span>
-                    <span className="stats-segmented guide-facet-match" role="group" aria-label="Match">
+                    <span className="segmented guide-facet-match" role="group" aria-label="Match">
                         <button type="button" className="active">any</button>
                         <button type="button">all</button>
                     </span>
@@ -194,9 +194,17 @@ export const COMPOSITES = {
                 </div>
                 <div className="account-row">
                     <span className="text-nano">Units</span>
-                    <div className="account-segmented">
+                    <div className="segmented">
                         <button type="button" className="active">Imperial</button>
                         <button type="button">Metric</button>
+                    </div>
+                </div>
+                <div className="account-row">
+                    <span className="text-nano">Theme</span>
+                    <div className="segmented">
+                        <button type="button">Light</button>
+                        <button type="button">Dark</button>
+                        <button type="button" className="active">System</button>
                     </div>
                 </div>
                 <label className="account-opt-in">
