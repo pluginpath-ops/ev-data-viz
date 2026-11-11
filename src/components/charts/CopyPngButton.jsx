@@ -1,10 +1,10 @@
 import { useReadoutFixed } from '../../hooks/useChartReadout';
 
 /**
- * The PNG button, and beside it "Side readout": [PNG | Side readout], one control with
+ * The Image button, and beside it "Side readout": [Image | Side readout], one control with
  * a dashed divider (#456).
  *
- * PNG copies the framed chart, with a fixed readout drawn over the plot.
+ * Image copies the framed chart, with a fixed readout drawn over the plot.
  * "Side readout" copies it with the readout's values in a panel BESIDE the plot, so
  * a crowded chart is exported with nothing covered. It is always present and
  * greyed out until a readout is fixed — a button that appeared on fixing would
@@ -21,15 +21,15 @@ export default function CopyPngButton({ readout, onCopy, onCopyBeside, copied, c
     return (
         <span className="chart-copy-split">
             <button type="button" onClick={onCopy} disabled={disabled} className={active(copied)}
-                    title="Copy the framed chart as a PNG">
-                {copied ? '✓ Copied' : 'PNG'}
+                    title="Copy the framed chart as an image (PNG)">
+                {copied ? '✓ Image copied' : 'Image'}
             </button>
             <button type="button" onClick={onCopyBeside} disabled={disabled || !fixed}
                     className={active(copiedBeside)}
                     title={fixed
-                        ? 'Copy the framed chart as a PNG, with the fixed readout\'s values in a panel beside the plot'
+                        ? 'Copy the framed chart as an image, with the fixed readout\'s values in a panel beside the plot'
                         : 'Click the chart to fix a readout first; its values then go in a panel beside the plot'}>
-                {copiedBeside ? '✓ Copied' : 'Side readout'}
+                {copiedBeside ? '✓ Image copied' : 'Side readout'}
             </button>
         </span>
     );

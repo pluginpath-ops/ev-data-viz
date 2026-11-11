@@ -3450,9 +3450,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * self-describing — a chart of four runs that says which four, under what
  * conditions, in what units.
  *
- * The strip above it says so out loud, because the alternative is a reader
- * discovering what an export does or does not include after pasting it
- * somewhere.
+ * The toolbar above it is labeled Share; Link and Image name what each copies.
  */
 .chart-export-strip {
     display: flex;
@@ -3462,14 +3460,13 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 }
 .chart-export-rule {
     flex: 1;
-    min-width: 12px;
+    min-width: 0;   /* gives way on a phone, so "Image" being longer than "PNG" costs no width */
     height: 1px;
     background-color: var(--color-border);
 }
-/* The strip's caption (PlotFrame, `truncate`) gives way first: every control
-   in the toolbar keeps its width, so the caption truncates before any of them
-   is squeezed or wrapped. Its tooltip keeps the whole sentence. */
-.chart-export-strip > :not(.text-micro):not(.chart-export-rule) {
+/* The toolbar's label (PlotFrame, "Share", `truncate`) gives way first: every control keeps
+   its width, so the label truncates before any of them is squeezed or wrapped. */
+.chart-export-strip > :not(.truncate):not(.chart-export-rule) {
     flex-shrink: 0;
 }
 
@@ -5084,7 +5081,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .zoom-hint-link:hover { color: var(--color-text-secondary); }
 
-/* The PNG button and its "Side readout" half, read as one control: two buttons
+/* The Image button and its "Side readout" half, read as one control: two buttons
    joined at a dashed divider. The second is disabled until a readout is fixed. */
 .chart-copy-split { display: inline-flex; }
 .chart-copy-split > .chart-copy-btn:first-child {

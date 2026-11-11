@@ -1103,9 +1103,9 @@ export default function ChargeCompareView({
                                 <button
                                     onClick={png1.copyPng}
                                     className={`chart-copy-btn ${png1.copied ? 'chart-copy-btn-active' : ''}`}
-                                    title="Copy the framed chart as a PNG"
+                                    title="Copy the framed chart as an image (PNG)"
                                 >
-                                    {png1.copied ? '✓ Copied' : 'PNG'}
+                                    {png1.copied ? '✓ Image copied' : 'Image'}
                                 </button>
                             </>
                         )}
@@ -1128,9 +1128,9 @@ export default function ChargeCompareView({
                                 <button
                                     onClick={png2.copyPng}
                                     className={`chart-copy-btn ${png2.copied ? 'chart-copy-btn-active' : ''}`}
-                                    title="Copy the framed chart as a PNG"
+                                    title="Copy the framed chart as an image (PNG)"
                                 >
-                                    {png2.copied ? '✓ Copied' : 'PNG'}
+                                    {png2.copied ? '✓ Image copied' : 'Image'}
                                 </button>
                             )}
                         >

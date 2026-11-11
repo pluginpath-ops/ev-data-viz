@@ -186,9 +186,9 @@ export default function SpecsChartView({ plot, col, colorOf, units, scope = 'sel
                     <button
                         onClick={copyPng}
                         className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy the framed chart as a PNG"
+                        title="Copy the framed chart as an image (PNG)"
                     >
-                        {imageCopied ? '✓ Copied' : 'PNG'}
+                        {imageCopied ? '✓ Image copied' : 'Image'}
                     </button>
                 </>
             )}

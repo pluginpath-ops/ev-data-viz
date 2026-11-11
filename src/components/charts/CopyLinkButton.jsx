@@ -3,7 +3,7 @@ import { chartShortLink } from '../../utils/chartUrlState';
 import { SHORT_LINK_PARAM } from '../../utils/shortLink';
 
 /**
- * The toolbar's URL button: copies the chart's short link (#476), `?k=1.…`.
+ * The toolbar's Link button: copies the chart's short link (#476), `?k=1.…`.
  *
  * The address bar keeps the readable chart link; this copies the same state
  * packed into one parameter (utils/shortLink.js), with every default written
@@ -29,7 +29,7 @@ export default function CopyLinkButton({ withExtra, title = 'Copy a short link t
     return (
         <button type="button" onClick={copy} title={title}
                 className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}>
-            {copied ? '✓ Copied' : 'URL'}
+            {copied ? '✓ Link copied' : 'Link'}
         </button>
     );
 }

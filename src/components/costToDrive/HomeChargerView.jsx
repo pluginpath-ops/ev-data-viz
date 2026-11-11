@@ -6,7 +6,7 @@
  * from here"), and where the car's own onboard charger caps it.
  *
  * Every other setting is the reader's; only the level moves. The chart is
- * Chart.js in a PlotFrame (PNG capture, URL button, source line), the table the
+ * Chart.js in a PlotFrame (image capture, Link button, source line), the table the
  * shared table parts.
  */
 import { useEffect, useMemo, useRef } from 'react';

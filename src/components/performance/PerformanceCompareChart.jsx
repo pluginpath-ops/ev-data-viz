@@ -227,9 +227,9 @@ export default function PerformanceCompareChart({
                     <button
                         onClick={copyPng}
                         className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy the framed chart as a PNG"
+                        title="Copy the framed chart as an image (PNG)"
                     >
-                        {copied ? '✓ Copied' : 'PNG'}
+                        {copied ? '✓ Image copied' : 'Image'}
                     </button>
                     </>
                 )}
