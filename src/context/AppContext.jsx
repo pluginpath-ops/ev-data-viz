@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { withVehicleFigures } from '../utils/vehicleFigures';
 import { withInheritance, variantLinkPlan } from '../utils/vehicleInheritance';
-import { listedFor } from '../utils/vehicleListing';
+import { listedFor, isListedVehicle } from '../utils/vehicleListing';
 import { withPlatforms } from '../utils/platforms';
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
@@ -1371,17 +1371,22 @@ export function AppProvider({ children }) {
 
     // Can this user edit a vehicle or run record?
     // resource: { user_id } for vehicles; for runs pass the parent vehicle
+    // Mirrors can_write_vehicle (migration 099): a viewer owns their vehicle
+    // only until a curator lists it.
+    const ownsUnlisted = (resource) =>
+        resource?.user_id === user.id && !isListedVehicle(resource);
+
     const canEdit = (resource) => {
         if (!user) return false;
         if (isContributor) return true;        // admin + contributor can edit anything
-        return resource?.user_id === user.id;  // user can only edit their own
+        return ownsUnlisted(resource);
     };
 
     // Can this user delete a record?
     const canDelete = (resource) => {
         if (!user) return false;
         if (isAdmin) return true;              // only admin can delete others' items
-        return resource?.user_id === user.id;
+        return ownsUnlisted(resource);
     };
 
     // Can this user toggle public/private visibility?
