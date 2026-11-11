@@ -14,8 +14,11 @@ import { SHORT_LINK_PARAM } from '../../utils/shortLink';
  *   keeps outside App's state to the query before it is packed (Road Trip's
  *   `rt_r`; the Performance views' tab and mode)
  * @param {string} [title]
+ * @param {string} [label]      the button's text; "Link" on a chart's toolbar
+ * @param {string} [className]  a page button's classes in place of the toolbar's
+ *   (Cost & Time's settings: `btn btn-secondary`)
  */
-export default function CopyLinkButton({ withExtra, title = 'Copy a short link to this chart view' }) {
+export default function CopyLinkButton({ withExtra, title = 'Copy a short link to this chart view', label = 'Link', className = null }) {
     const [copied, setCopied] = useState(false);
     const copy = () => {
         const p = new URLSearchParams(window.location.search);
@@ -28,8 +31,8 @@ export default function CopyLinkButton({ withExtra, title = 'Copy a short link t
     };
     return (
         <button type="button" onClick={copy} title={title}
-                className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}>
-            {copied ? '✓ Link copied' : 'Link'}
+                className={className ?? `chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}>
+            {copied ? '✓ Link copied' : label}
         </button>
     );
 }

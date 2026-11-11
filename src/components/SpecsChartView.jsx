@@ -61,7 +61,7 @@ function makeInsideLabelPlugin(getLabelFn) {
  *
  * Props:
  *   plot     {object}  plotValues() of the column: { kind, points, missing, total }
- *   col      {object}  the table column, labelled
+ *   col      {object}  the table column, labeled
  *   colorOf  {(vehicleId) => string}  the vehicle's series color
  *   units    {string}
  */

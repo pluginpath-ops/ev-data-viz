@@ -69,7 +69,7 @@ export default function CardBandPreview({
     // The drag moves the POINT, one-for-one with the pointer. It may run past
     // where the window stops at the photo's edge — dragging hard to the top
     // should mean "the top", which on a wider card (a smaller window) is still
-    // the top, rather than whatever centre the window happened to clamp at
+    // the top, rather than whatever center the window happened to clamp at
     // here. It starts from where the window visibly is, so a point stored past
     // the edge never leaves a dead zone before the window moves.
     const moveTo = (clientY) => {

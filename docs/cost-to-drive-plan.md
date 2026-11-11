@@ -23,7 +23,7 @@ One state, shared by every sub-tab and kept when switching between them.
 | Your week | seven days, each **Daily**, **Long day** or **Off** (default L D L D L D Off); a **planned fast charge** on any days (default Sunday); Daily: **45** mi, highway at **70** mph, city share **40**%; Long day: **220** mi, **70** mph, **15**% |
 | Fast charging | detour to a charger **10** min (5–30, as miles at 40 mph, energy too); stop to charge by **30**% (10–50); charge no higher than **70**%; keep battery above **10**%; time to start and pay **5** min; fast price **$0.48**/kWh |
 | Season | shown: summer / **winter**; summer **75**°F, winter **15**°F; winter lasts **4** months; elevation **800** ft |
-| Your gas car | city **18** mpg, highway **24** mpg, **$4.00**/gal (one click fills in an F-150, Civic, RAV4, X3 or Pilot's EPA mpg and tank), tank **26** gal, fill up at **15**% left, each fill-up **5** min (about 1 to start the pump, 2–3 to fill, ½–2 to pay; the station on the way). Its mpg drops in the cold: 15% city and 7% highway at 20°F, a straight line to none at 75°F (`GAS_COLD_LOSS`; fueleconomy.gov's cold-weather figures) |
+| Your gas car | city **18** mpg, highway **24** mpg, **$4.00**/gal (one click picks an F-150, Civic, RAV4, X3 or Pilot and fills in its EPA mpg and tank; editing mpg or tank makes it the reader's own car, named in the Custom field — "Custom" while blank; the charts call the gas car by that name), tank **26** gal, fill up at **15**% left, each fill-up **5** min (about 1 to start the pump, 2–3 to fill, ½–2 to pay; the station on the way). Its mpg drops in the cold: 15% city and 7% highway at 20°F, a straight line to none at 75°F (`GAS_COLD_LOSS`; fueleconomy.gov's cold-weather figures) |
 | Efficiency from | **Tested + EPA** / EPA only |
 
 Prices default to `vehicleTable.DEFAULT_ASSUMPTIONS` (0.17 / 0.48) so the two
@@ -69,8 +69,8 @@ The window is the plug-in hours; a night that runs out says so.
   generic taper from `max_dc_kw`. Detour minutes and time to start and pay are
   added. Energy bought = added ÷ (1 − `DC_FAST_LOSS`).
 - A **planned fast charge** tops up to the cap and is skipped when the car is
-  already above it. It happens at **5 pm** by default (`plannedHour`, a
-  setting): at that hour on a day off, and on a driving day in the gap between
+  already above it. It happens at **5 pm** (`PLANNED_HOUR`; a
+  setting until 2026-11-10, dropped as one nobody would use): at that hour on a day off, and on a driving day in the gap between
   drives nearest it — before the drive home on a Daily, after a Long day.
 
 **The week.** Days drive in two spans (Long day 7–12 and 12–18; Daily 7–8 and
@@ -86,7 +86,7 @@ winter months with summer ones.
 
 ## The link
 
-`?tab=cost&m=<sub-tab>&v=<vehicle ids>&cd=2.<key>`.
+`?tab=cost&m=<sub-tab>&v=<vehicle ids>&cd=3.<key>`.
 
 `v` stays the readable vehicle parameter every tab shares. Every setting above
 is packed into ONE versioned parameter, `cd` — **the Cost to Drive key**, not
@@ -102,6 +102,13 @@ meant to be read (owner, 2026-11-07). `src/utils/costToDriveKey.js`:
   (2026-11-08). Same fields and packing otherwise. Keys are written as
   version 2; version-1 keys still read, their miles in fives and their gas
   price and fill-up at version 1's defaults when they left them out.
+- Version 3 (2026-11-10): the gas car picked (`gasCar`) and a custom car's
+  name (`gasName`, the first text field: its UTF-8 length, then its bytes)
+  were added, and the defaults moved to the Commuter week (35 mi
+  weekdays half city, one 80 mi weekend day 20% city, nothing planned). Keys
+  are written as version 3; version-1 and -2 keys open on the old week (long
+  days between short ones, 220 mi, a planned Sunday stop) when they left it
+  out.
 - All defaults → no `cd` at all. A key that cannot be read falls back to the
   defaults and says so.
 - The short link (`k=`) carries `cd` as a string: append `cd` to `NAMES_V1`
@@ -116,13 +123,16 @@ are frozen once merged (chartNav.js says why):
 
 | Mode | Sub-tab | What it is |
 |---|---|---|
-| `drivesetup` | **Your Driving** | the landing: every setting on one page, presets (Commuter 40 mi, Road warrior 220 mi days, Reset), a live preview of the selected cars against the gas car, links on |
+| `drivesetup` | **Your Driving** | the landing: every setting on one page, week buttons after "Start from" in the Your week card (Commuter — the default —, WFH, Supercommuter, On the road, Weekend warrior; each sets every week field, the rest keep) and the gas cars after "Car" in Your gas car — both on this page only, not in the chart sidebars, a live preview of the selected cars against the gas car, links on |
 | `drivecost` | **Compare** ("Cost & Time" until the tab took the name, 2026-11-07) | cards below the charts (chart first); the selected vehicles against the gas car: everything per month (the week × 52 ÷ 12): $/month and extra minutes/month on the cards, stops a month; bars "Cost per month" (home solid, fast striped) and "Time per month"; a stop line per car |
-| `driveplan` | **Weekly Charging Plan** | one vehicle (a dropdown of the selection) and a chart dropdown: **day by day** (default, mockup A3, in time order — a grey bar for the day out from the morning's battery to arriving home, each fast stop inside it at the levels it charged between, striped on the route and solid when planned, then the night at home up to the next morning; `utils/dayBars.js`), **day by day, charge in and used** (the same figures from zero), or **the week as a line** (range left in miles, SoC on the right, dashed lines at 10% and 80% — fades over 0–10% and 80–100% until the owner found them distracting — stop bands), the day-by-day table under the chart, transposed (a column a day; rows Day type, Home adds, Starts at, Ready at — the time the night filled or the window ended, asterisked and footnoted when the plug-in schedule cut it short — Home cost, then Fast stops, Fast time and Fast cost outlined in orange; the % in the figure, one plain line a cell), an optional comparison chart (another charger level or the other season) stacked below, and the gas car's chart collapsed by default |
+| `driveplan` | **Weekly Charging Plan** | one vehicle (a dropdown of the selection) and a chart dropdown: **day by day** (default, mockup A3, in time order — a gray bar for the day out from the morning's battery to arriving home, each fast stop inside it at the levels it charged between, striped on the route and solid when planned, then the night at home up to the next morning; `utils/dayBars.js`), **day by day, charge in and used** (the same figures from zero), or **the week as a line** (range left in miles, SoC on the right, dashed lines at 10% and 80% — fades over 0–10% and 80–100% until the owner found them distracting — stop bands), the day-by-day table under the chart, transposed (a column a day; rows Day type, Home adds, Starts at, Ready at — the time the night filled or the window ended, asterisked and footnoted when the plug-in schedule cut it short — Home cost, then Fast stops, Fast time and Fast cost outlined in orange; the % in the figure, one plain line a cell), an optional comparison chart (another charger level or the other season) stacked below, and the gas car's chart collapsed by default |
 | `drivecharger` | **Home Charger** | each level against each selected vehicle — everything per month, as on Compare (the week × 52 ÷ 12; owner, 2026-11-07, so the two tabs read in one unit) — a column a car at each level, its cost per month stacked: home underneath in the full color, fast on top striped in the full color over its desaturated shade, as on Compare (the other way round, briefly, left the charts muted; the shade alone read as a faded copy, so stripes, owner 2026-11-08; `utils/stripedFill.js`, shared with the day-by-day fast stops), the total over it and the home figure on the home part where there is fast charging (owner, 2026-11-07; it drew fast minutes until then); the table transposed: a column a level (yours marked), per vehicle rows for fast charging, home cost, fast cost and total cost per month, one plain line a cell, notes as marks under the table (bold orange for "enough", ^ for capped) — where "enough" begins (the first level within `ENOUGH_MARGIN_MIN`, 5 min a week, of the best any level manages), where the car's onboard charger caps it (by more than 0.25 kW: a 48 A circuit's 11.52 kW against an 11.5 kW car is not capped) |
 
 Your Driving is the PRIMARY place to set things. The analysis sub-tabs keep a
-sidebar with EVERY setting too — the secondary way in, not a summary. Number
+sidebar with EVERY setting too — the secondary way in, not a summary. Both
+open with **Share this comparison** (`ShareSettingsButton`, the chart
+toolbar's short link as a page button; owner, 2026-11-10), which replaced the
+sidebar's button to Your Driving: the sub-tab row goes there already. Number
 fields are one row each: label, a narrow box, the unit (`NumberInput`).
 
 ## Reuse, not rebuild (owner, 2026-11-07)
@@ -158,7 +168,7 @@ present here exactly as on every other chart tab:
 5. **Home Charger**.
 
 Every layer: `npm test`, `npm run lint`, `npm run drift`, `npm run vocab`,
-`vite build`. New semantic classes in `index.css` from tokens; no inline colour
+`vite build`. New semantic classes in `index.css` from tokens; no inline color
 or size.
 
 ## Open, not blocking
@@ -170,10 +180,10 @@ or size.
   test record (`buildEpaCurveFromModel`), fetched per car — a later layer.
 - The detour model (minutes → miles at 40 mph) is a guess the owner is unsure
   of; it is one constant, easy to revisit.
-- "Your gas car" here vs Road Trip's "ICE Reference" — both stand; recorded in
-  vocabulary as different things (a reader's own car with a cost vs a time-only
-  reference line).
+- "Your gas car" here and Road Trip's "ICE Reference" are one thing, to merge
+  into one model and one name (owner, 2026-11-10; #555). Until then both
+  stand; the shared name is in vocabulary's Open names.
 - Road Trip / Trip Optimizer may move under this tab later; not now.
 - The Weekly Charging Plan's vehicle and its "Compare with" are picked on the
-  page and are not in the link. The key holds the week; adding them is a key
-  version 2 or a separate parameter, if a shared link should open on them.
+  page and are not in the link. The key holds the week; adding them is a new
+  key version or a separate parameter, if a shared link should open on them.

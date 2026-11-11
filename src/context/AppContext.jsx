@@ -1259,7 +1259,7 @@ export function AppProvider({ children }) {
             await dataService.updateTag(id, name);
             setTags(prev => prev.map(t => t.id === id ? { ...t, name } : t)
                                 .sort((a, b) => a.name.localeCompare(b.name)));
-            // Tags are denormalised onto each vehicle for the cards, so a rename
+            // Tags are denormalized onto each vehicle for the cards, so a rename
             // has to reach them too or the old label survives until a reload.
             setVehicles(prev => prev.map(v => ({
                 ...v,
@@ -1938,7 +1938,7 @@ export function AppProvider({ children }) {
                 // "it said it worked but nothing appeared" can't happen again.
                 const why =
                     res.runsMatched === 0   ? 'none of the runs in this file matched by timestamp'
-                  : res.splitsSeen === 0    ? 'no splits were found in the file — the format may not be recognised'
+                  : res.splitsSeen === 0    ? 'no splits were found in the file — the format may not be recognized'
                   : res.alreadyPresent > 0  ? 'every split in this file is already on these runs'
                   : 'the file produced no new splits';
                 showError(`Nothing was added: ${why}.`);
@@ -2231,6 +2231,7 @@ export function AppProvider({ children }) {
         appNotification,
         clearNotification,
         showUndoable,
+        showSuccess,
         showError,
         uploadHeaderImage,
         publishModelConstant,

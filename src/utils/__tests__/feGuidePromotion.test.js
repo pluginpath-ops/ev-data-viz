@@ -170,7 +170,7 @@ describe('acceptGuideTags — letting go of a held value', () => {
 });
 
 describe('isCuratorOwned — one spelling of "a human set this"', () => {
-    it('recognises the source the curator editor actually writes', () => {
+    it('recognizes the source the curator editor actually writes', () => {
         // EpaCuratorEditor tags hand edits `manual`. An unlink guard written
         // against 'curator' never fired, and would have wiped the very choice
         // it was meant to protect.

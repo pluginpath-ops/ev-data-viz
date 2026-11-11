@@ -38,7 +38,7 @@ describe('pair colors', () => {
         expect(dist(out.a, out.b)).toBeLessThan(dist(out.a, out.c));
     });
 
-    it('leaves an unrelated primary unaffected by a neighbour being shaded', () => {
+    it('leaves an unrelated primary unaffected by a neighbor being shaded', () => {
         const out = resolvePairColors([r('a', 1, '#0072B2'), r('b', 1, '#0072B2'), r('c', 2, '#D55E00')]);
         expect(out.c).toBe('#D55E00');
     });
@@ -99,7 +99,7 @@ describe('HSL round trip', () => {
         }
     });
 
-    it('keeps a grey at zero saturation rather than inventing a hue', () => {
+    it('keeps a gray at zero saturation rather than inventing a hue', () => {
         expect(hexToHsl('#9ca3af').s).toBeLessThan(20);
         expect(hexToHsl('#808080').s).toBe(0);
     });
@@ -251,10 +251,10 @@ describe('extending the palette past its length', () => {
     it('does not breed the neutral slot', () => {
         // Varying a color with no hue only makes more colors with no hue, and
         // they collide with every other pale variant. Measured: the worst pair
-        // in a 16-series set used to be two pale variants of the grey.
+        // in a 16-series set used to be two pale variants of the gray.
         const set = expandPalette(OKABE_ITO_SET, 30);
-        const greys = set.filter(c => hexToHsl(c).s < 20);
-        expect(greys).toEqual([SERIES_NEUTRAL]);
+        const grays = set.filter(c => hexToHsl(c).s < 20);
+        expect(grays).toEqual([SERIES_NEUTRAL]);
     });
 
     it('keeps every color clear of pure white and black', () => {
@@ -284,7 +284,7 @@ describe('a vehicle color is the family base (#308)', () => {
     // Color moved from the run to the vehicle. These replace the suite that
     // covered `run.color` and its clash nudge — a stored run color was often
     // incidental, so two of them sharing a hex was an accident worth correcting;
-    // a curated VEHICLE color is a deliberate statement and is honoured exactly.
+    // a curated VEHICLE color is a deliberate statement and is honored exactly.
     const at = (id, day) => ({ id, created_at: `2026-01-${String(day).padStart(2, '0')}` });
     const vehicle = (id, color, runs) => ({ id, color, runs });
 
@@ -531,7 +531,7 @@ describe('the palettes on offer', () => {
 
     it('every palette can grow to twenty without repeating', () => {
         // Including the monochromes, which have no hue to nudge — expandPalette
-        // has to vary the greys when varying them is all there is.
+        // has to vary the grays when varying them is all there is.
         for (const p of SERIES_PALETTES) {
             const set = expandPalette(p.colors, 20);
             expect(set.length, p.id).toBe(20);
@@ -547,7 +547,7 @@ describe('the palettes on offer', () => {
             // channels, so the less saturated the color the fewer units carry
             // it and the coarser the rounding — mono-orange spans 1 degree at
             // s=88, mono-ice spans 3 at s=37. Five is still nowhere near a
-            // different color: the palette's own neighbours sit 40 apart.
+            // different color: the palette's own neighbors sit 40 apart.
             const hues = hsl.map(c => c.h);
             expect(Math.max(...hues) - Math.min(...hues), p.id).toBeLessThan(5);
             for (let i = 1; i < hsl.length; i++) {

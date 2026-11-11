@@ -106,7 +106,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const [loadingData, setLoadingData] = useState(false);
 
     // Preserve the user's pill order
-    // Memoised, as every other chart view already does it. Unmemoised this was a
+    // Memoized, as every other chart view already does it. Unmemoized this was a
     // fresh array on every render, and it is a dependency of the chart effect —
     // so Chart.js destroyed and rebuilt the whole instance whenever ANY state in
     // this component changed, and the effect's first act, `setChartImage(null)`,
@@ -121,12 +121,12 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // Chart-side color edits are a SESSION OVERRIDE, never a database write.
     // The durable color is edited in Tests & Data; changing it while reading a
     // chart would edit stored data for every visitor, and a stored value could
-    // not honour the reset rules the override follows.
+    // not honor the reset rules the override follows.
     const handleColorChange = (_vehicleId, runId, color) => setColorOverride(runId, color);
 
     // ── Which runs are plotted ────────────────────────────────────────────────
     //
-    // Selection behaviour is the shared hook (hooks/useRunSelection.js), the same
+    // Selection behavior is the shared hook (hooks/useRunSelection.js), the same
     // one Charge Compare and Road Trip use. This view had its own copy — prune,
     // bootstrap-once and mode-reset written again by hand — which is the
     // duplication #176 exists to end.
@@ -340,7 +340,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         fetchMissingData();
     }, [missingRunIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Memoised because the frame's title derives from it: a fresh array every
+    // Memoized because the frame's title derives from it: a fresh array every
     // render made that memo churn, which the lint spotted before anyone noticed
     // the work. Only the unit system moves it.
     const axisOptions = useMemo(() => chargingAxisOptions(units), [units]);
@@ -745,7 +745,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             const y1Points = workingData
                 // A composite's points carry how many tests stand behind them and
                 // its test spread. An interpolated race-mode start reads n from
-                // its neighbours; a projected one has none and counts as thin.
+                // its neighbors; a projected one has none and counts as thin.
                 .map(d => composite
                     ? { x: getX(d), y: getY(d), n: d.n ?? 1, hi: d.spreadHi, lo: d.spreadLo }
                     : { x: getX(d), y: getY(d) })
@@ -1390,7 +1390,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 missing a car. */}
             {raceActive && trimmedRuns.length > 0 && (
                 <p className="text-xs text-meta mb-2"
-                   title="A session opens with the charger and the BMS negotiating power upward, below what the car can take. Those samples describe the plug rather than the car, and they only appear in runs whose logging started at plug-in — so comparing with them in place penalises exactly those runs.">
+                   title="A session opens with the charger and the BMS negotiating power upward, below what the car can take. Those samples describe the plug rather than the car, and they only appear in runs whose logging started at plug-in — so comparing with them in place penalizes exactly those runs.">
                     Opening charge ramp excluded from{' '}
                     {trimmedRuns.map(t => `${t.name} (${t.n} point${t.n === 1 ? '' : 's'})`).join(', ')}
                     {' '}· switch to raw test time to see every sample

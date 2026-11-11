@@ -7,7 +7,7 @@ import { DATA_CATEGORIES, vehicleDataCategories, vehiclePooledCounts } from '../
  * mean something, and on the list it would mean nothing the word does not
  * already say. Zeros are left out; the full name is each count's tooltip.
  *
- * "Charging 4/2": four listed tests, and in grey two unlisted ones that still
+ * "Charging 4/2": four listed tests, and in gray two unlisted ones that still
  * count in the statistics (#394, the pool). A pool alone shows "0/2".
  *
  * With `onOpenSubtab` each count is a link to that kind's Tests & Data sub-tab

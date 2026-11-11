@@ -3,7 +3,7 @@ import Popover from './Popover';
 /**
  * A ⓘ glyph that explains the thing beside it.
  *
- * The floating behaviour — peek on hover, panel on click, sheet on a narrow
+ * The floating behavior — peek on hover, panel on click, sheet on a narrow
  * screen, placement, dismissal, focus — all belongs to `Popover`. What is left
  * here is the two things that are actually about an info icon: the glyph, and
  * the rule for which tier a call site gets.

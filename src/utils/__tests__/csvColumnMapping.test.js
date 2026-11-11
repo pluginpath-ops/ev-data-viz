@@ -57,7 +57,7 @@ describe('a whole file', () => {
         expect(autoMapHeaders(['Power', 'Charge Power']).chargeRate).toBe('Charge Power');
     });
 
-    it('maps nothing it does not recognise', () => {
+    it('maps nothing it does not recognize', () => {
         expect(autoMapHeaders(['Voltage', 'Amps', 'Notes'])).toEqual({});
         expect(autoMapHeaders([])).toEqual({});
     });

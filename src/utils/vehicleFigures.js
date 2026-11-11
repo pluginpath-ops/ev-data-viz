@@ -181,10 +181,10 @@ export function resolveEpaRange(vehicle, vehicles = []) {
     if (pick) {
         if (positive(pick.mapping.epaTestVehicle.label_range_published)) return fromLabel(pick.mapping.epaTestVehicle);
     } else {
-        const labelled = links.filter(m => positive(m.epaTestVehicle.label_range_published));
-        const values = [...new Set(labelled.map(m => positive(m.epaTestVehicle.label_range_published)))].sort((a, b) => a - b);
+        const labeled = links.filter(m => positive(m.epaTestVehicle.label_range_published));
+        const values = [...new Set(labeled.map(m => positive(m.epaTestVehicle.label_range_published)))].sort((a, b) => a - b);
         // Every configuration reads the same: there is nothing to choose.
-        if (values.length === 1) return fromLabel(labelled[0].epaTestVehicle);
+        if (values.length === 1) return fromLabel(labeled[0].epaTestVehicle);
         if (values.length > 1) spanMi = [values[0], values[values.length - 1]];
     }
 

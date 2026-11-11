@@ -21,7 +21,7 @@ export default function VehicleLink({ vehicle, name, onView, className = '', tit
     // `name` wins when given, because how much of a name to show is the
     // CALLER's question and the two callers answer it differently. The session
     // band is an inline "with A, B, C" where the full label would swamp the
-    // line; "Inherited from:" is a labelled field on its own line, and it has
+    // line; "Inherited from:" is a labeled field on its own line, and it has
     // always shown `vehicleLabel` — the disambiguated form that separates two
     // cars of the same model. Defaulting to the short form here quietly
     // demoted "2025-2026 R1S · Dual Max" to "R1S".

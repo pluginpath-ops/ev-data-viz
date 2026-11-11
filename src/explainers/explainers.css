@@ -2,7 +2,7 @@
    the folder stays whole (src/explainers/CLAUDE.md). The same rules as
    index.css apply, and explainersBoundary.test.js holds them: colors come from
    tokens only, sizes derive from --fs-body. The theme's guards (drift,
-   contrast, playground catalogue) read index.css only, so that test is this
+   contrast, playground catalog) read index.css only, so that test is this
    file's guard. */
 
 /* The article keeps a reading measure; the contents box takes the right
@@ -187,12 +187,12 @@
 .explainer-preview-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .explainer-preview-line.is-series-0, .explainer-preview-swatch.is-series-0 { stroke: var(--color-accent-blue); background-color: var(--color-accent-blue); }
 .explainer-preview-line.is-series-1, .explainer-preview-swatch.is-series-1 { stroke: var(--color-accent-violet); background-color: var(--color-accent-violet); }
-.explainer-preview-line.is-series-2, .explainer-preview-swatch.is-series-2 { stroke: var(--color-accent-grey); background-color: var(--color-accent-grey); }
+.explainer-preview-line.is-series-2, .explainer-preview-swatch.is-series-2 { stroke: var(--color-accent-gray); background-color: var(--color-accent-gray); }
 .explainer-preview-line.is-modeled { stroke-dasharray: 7 5; }
 .explainer-preview-dot { stroke: var(--color-card); stroke-width: 2; }
 .explainer-preview-dot.is-series-0 { fill: var(--color-accent-blue); }
 .explainer-preview-dot.is-series-1 { fill: var(--color-accent-violet); }
-.explainer-preview-dot.is-series-2 { fill: var(--color-accent-grey); }
+.explainer-preview-dot.is-series-2 { fill: var(--color-accent-gray); }
 .explainer-preview-band { fill: var(--color-surface-sunken); }
 .explainer-preview-axes { margin-top: 2px; }
 .explainer-preview-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; color: var(--color-text-secondary); font-size: calc(var(--fs-body) * 0.93); }
@@ -409,7 +409,7 @@
     overflow: hidden;
 }
 .explainer-lab-vbar-fill { position: absolute; left: 0; right: 0; bottom: 0; transition: height 0.25s; }
-.explainer-lab-vbar-fill.is-direct     { background-color: var(--color-accent-grey); }
+.explainer-lab-vbar-fill.is-direct     { background-color: var(--color-accent-gray); }
 .explainer-lab-vbar-fill.is-split-pack { background-color: var(--color-accent-violet); }
 .explainer-lab-vbar-fill.is-dc-booster { background-color: var(--color-accent-blue); }
 .explainer-lab-vbar-label { font-weight: 600; color: var(--color-text-primary); white-space: nowrap; }

@@ -72,7 +72,7 @@ export const KNOB_GROUPS = [
               help: 'Heating and cooling watts become range through the test’s own consumption. A test that recorded no energy is corrected from this figure instead, and its note says so.' },
             { key: 'COMPOSITE_RANGE_TEMP_BAND', label: 'Composite range: test temperature band', kind: 'range',
               min: -20, max: 120, step: 1, unit: '°F',
-              help: 'A range test outside this band is left out of the composite range and efficiency. Temperature is corrected for air density and for an assumed heating or cooling load, so the band is wide — but below freezing the error in that load (battery conditioning, cold tyres, heat pump against resistive heater) is comparable to the effect itself, so a test at the cold end is a rough one.' },
+              help: 'A range test outside this band is left out of the composite range and efficiency. Temperature is corrected for air density and for an assumed heating or cooling load, so the band is wide — but below freezing the error in that load (battery conditioning, cold tires, heat pump against resistive heater) is comparable to the effect itself, so a test at the cold end is a rough one.' },
             { key: 'COMPOSITE_RANGE_SPEED_GAP_MPH', label: 'Composite range: speed gap', kind: 'number',
               min: 0, max: 40, step: 1, unit: 'mph',
               help: 'How far a test’s held speed may sit from the target speed and still be corrected into the composite. Further out, the one fleet-wide aero fraction is doing most of the work.' },
@@ -90,7 +90,7 @@ export const KNOB_GROUPS = [
               help: 'Corrected figures are stated as though at this elevation.' },
             { key: 'STD_TEMP_F', label: 'Standard temperature', kind: 'number',
               min: -20, max: 120, step: 1, unit: '°F',
-              help: 'Corrected figures are stated as though at this ambient temperature. Temperature is modelled as air density plus an assumed heating or cooling load; battery conditioning and cold tyres are not.' },
+              help: 'Corrected figures are stated as though at this ambient temperature. Temperature is modeled as air density plus an assumed heating or cooling load; battery conditioning and cold tires are not.' },
         ],
     },
     {

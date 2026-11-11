@@ -53,7 +53,7 @@ console.log(`${pad('total', 22)}${pad(total, 6)}`);
 // The two ratchets that live in their own suites, read straight from those
 // files so this table cannot quietly go stale against them.
 const readNum = (file, re) => (readFileSync(join(ROOT, file), 'utf8').match(re) || [])[1];
-console.log(`\nRatcheted elsewhere (see driftProbes.mjs for why)`);
+console.log(`\nRatcheted elsewhere (see driftProbes.js for why)`);
 console.log(BAR);
 console.log(`${pad('light surfaces', 22)}${pad(readNum('src/__tests__/contrast.test.js', /KNOWN_OFFENDERS = (\d+)/) ?? '?', 6)}src/__tests__/contrast.test.js`);
 console.log(`${pad('dark overrides', 22)}${pad(readNum('src/__tests__/playground.test.js', /toBeLessThanOrEqual\((\d+)\)/) ?? '?', 6)}src/__tests__/playground.test.js`);
@@ -74,7 +74,7 @@ if (arg === '--all') {
 console.log(
     drifted
         ? `\n${drifted} probe${drifted === 1 ? '' : 's'} moved. A fall means you cleared some — `
-          + `lower the count in scripts/driftProbes.mjs. A rise needs a reason in the PR.\n`
+          + `lower the count in scripts/driftProbes.js. A rise needs a reason in the PR.\n`
         : `\nEvery probe matches the ledger.\n`,
 );
 

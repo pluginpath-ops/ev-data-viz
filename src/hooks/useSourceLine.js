@@ -14,7 +14,7 @@ const NONE = [];
  * source; viewers see only what is known.
  *
  * `runs` and `epa` should be stable between renders when the plot has not
- * changed (memoise them), since the line is recomputed when they change.
+ * changed (memoize them), since the line is recomputed when they change.
  *
  * @param {{ runs?: Array, allRuns?: Array, epa?: { label?: boolean, tests?: boolean } }} plotted
  */

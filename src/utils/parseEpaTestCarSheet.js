@@ -33,7 +33,7 @@ function numOrNull(str) {
 }
 
 /**
- * Normalise a RND_ADJ_FE reading to MPGe. Returns MPGe (AC-side) or null.
+ * Normalize a RND_ADJ_FE reading to MPGe. Returns MPGe (AC-side) or null.
  *
  * FE_UNIT is deliberately IGNORED: real EPA files label this column 'MPG' even
  * when the value is plainly kWh/100mi. Observed in the wild — Rivian/Lucid/
@@ -59,7 +59,7 @@ function csvOverrides(obj, fields) {
 
 /**
  * Split one line into fields, respecting RFC 4180 CSV quoting. TSV (sep='\t')
- * is split directly; CSV honours quoted fields and "" escapes.
+ * is split directly; CSV honors quoted fields and "" escapes.
  */
 function splitLine(line, sep) {
     if (sep === '\t') return line.split('\t');
@@ -93,7 +93,7 @@ const PROC_CODE_TO_CATEGORY = {
 };
 
 /**
- * Normalised cycle category for a row.
+ * Normalized cycle category for a row.
  *
  * IMPORTANT: `Test Category` holds the charge MODE ('CD' = charge-depleting,
  * 'CS' = charge-sustaining), NOT the drive cycle — every BEV row reads 'CD'.
@@ -252,7 +252,7 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         if (cs.set_b === null && sb !== null) cs.set_b = sb;
         if (cs.set_c === null && sc !== null) cs.set_c = sc;
 
-        // Label MPGe (AC-side), unit-normalised, by cycle:
+        // Label MPGe (AC-side), unit-normalized, by cycle:
         //   MCT (proc 77) → label_combined_mpge (the genuine combined value)
         //   HWY (proc 84) → label_hwy_mpge      (highway-only secondary metric)
         const category = deriveCycleCategory(row, get);
@@ -265,7 +265,7 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
         }
     }
 
-    // Finalise: attach override provenance + summary flags.
+    // Finalize: attach override provenance + summary flags.
     const GROUP_CSV_FIELDS = ['model_year', 'make', 'epa_carline_name',
         'vehicle_config_number', 'drive', 'transmission', 'fuel_type',
         'label_combined_mpge', 'label_hwy_mpge'];
@@ -284,7 +284,7 @@ export function parseEpaTestCarSheet(text, sourceFileName = null) {
 }
 
 /**
- * Summarise what was parsed, for the import preview.
+ * Summarize what was parsed, for the import preview.
  * @param {Array} testVehicles  Output of parseEpaTestCarSheet
  */
 export function summariseEpaTestVehicles(testVehicles) {

@@ -14,7 +14,7 @@ import { PERFORMANCE_METRICS, deriveTestedResults } from '../../utils/performanc
 
 const FLAG_NOTES = {
     'single-run': 'Backed by a single run — could be a fluke.',
-    'steep-grade': 'Best run was on a noticeable grade, which flatters or penalises the time.',
+    'steep-grade': 'Best run was on a noticeable grade, which flatters or penalizes the time.',
 };
 
 /** Marks entries EVBench holds the full run data for. */

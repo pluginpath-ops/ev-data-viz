@@ -18,7 +18,7 @@
  * cannot be compared. Each such reading says `interpolated`, and the readout
  * marks it, because it is a reading of the drawn line, not a measurement.
  *
- * A series that is only points, or whose neighbours are different tests, is
+ * A series that is only points, or whose neighbors are different tests, is
  * SAMPLED: the nearest real sample within `tolerance` x-units, else nothing.
  * Interpolating between two different tests would invent a value neither test
  * produced. A series set to interpolate still snaps to its end sample just past
@@ -227,7 +227,7 @@ export function nearestRow(rows, cursorPixelY, reach = Infinity) {
 export const ACTIVE_REACH_PX = 40;
 
 /**
- * The rows to show when there are more than `cap`: a window centred on the
+ * The rows to show when there are more than `cap`: a window centerd on the
  * nearest row, so the one the cursor is on never scrolls out of view. The rest
  * are counted, above and below, not dropped silently.
  */

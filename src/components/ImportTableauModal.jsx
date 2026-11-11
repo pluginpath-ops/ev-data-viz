@@ -36,7 +36,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
             }
             setSessions(parsed);
 
-            // Initialise per-session editable names
+            // Initialize per-session editable names
             const names = {};
             parsed.forEach((s, i) => { names[i] = s.runName; });
             setSessionNames(names);
@@ -239,7 +239,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                 const mappedId      = vehicleMap[raw] || '';
                                 const mappedVehicle = mappedId ? vehicles.find(v => v.id === mappedId) : null;
                                 const existingRuns  = mappedVehicle?.runs || [];
-                                // Dates of sessions for this vehicle (normalised) for clash detection
+                                // Dates of sessions for this vehicle (normalized) for clash detection
                                 const sessionDates  = new Set(vehicleSessions.map(s => normalizeDate(s.date)));
 
                                 return (

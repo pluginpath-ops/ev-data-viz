@@ -114,7 +114,7 @@ describe('browsing and search', () => {
     ];
     const summaries = summariseSessions(all, fleet);
 
-    it('summarises newest first, with run counts and vehicles', () => {
+    it('summarizes newest first, with run counts and vehicles', () => {
         expect(summaries.map(s => s.session.id)).toEqual([9, 5, 12]);
         const five = summaries.find(s => s.session.id === 5);
         expect(five.runCount).toBe(4);

@@ -7,7 +7,7 @@ import { useReadoutFixed } from '../../hooks/useChartReadout';
  * Image copies the framed chart, with a fixed readout drawn over the plot.
  * "Side readout" copies it with the readout's values in a panel BESIDE the plot, so
  * a crowded chart is exported with nothing covered. It is always present and
- * greyed out until a readout is fixed — a button that appeared on fixing would
+ * grayed out until a readout is fixed — a button that appeared on fixing would
  * shift the ones beside it.
  *
  * @param {object} readout            from useChartReadout

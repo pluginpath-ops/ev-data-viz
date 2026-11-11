@@ -73,7 +73,7 @@ const CAPACITY_HELP =
     'bigger battery.';
 
 const EFFICIENCY_HELP =
-    'How much further the target goes on the same energy — aero, tyres, ' +
+    'How much further the target goes on the same energy — aero, tires, ' +
     'drivetrain. Scales distance only, so this is the knob that moves the ' +
     'efficiency figure.';
 
@@ -1056,7 +1056,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
         setEstimateError('');
     };
 
-    // Build the anchor list actually fed to the engine, honouring the
+    // Build the anchor list actually fed to the engine, honoring the
     // "derive from populated data" default vs. opt-in calibration.
     const buildDeriveAnchors = () => {
         if (estimateMode === 'power') return [];
@@ -1290,11 +1290,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     useEffect(() => {
         const ids = chargingRunKey ? chargingRunKey.split(',') : [];
         if (!ids.length) return;
-        let cancelled = false;
+        let canceled = false;
         dataService.getSocRanges(ids)
-            .then(ranges => { if (!cancelled) setSocRanges(prev => ({ ...prev, ...ranges })); })
+            .then(ranges => { if (!canceled) setSocRanges(prev => ({ ...prev, ...ranges })); })
             .catch(() => { /* the card falls back to its stored fields */ });
-        return () => { cancelled = true; };
+        return () => { canceled = true; };
     }, [chargingRunKey]);
     const [collapsedSessions, setCollapsedSessions] = useState(() => new Set());
     const [editingSessionId, setEditingSessionId] = useState(null);
@@ -1380,7 +1380,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             tests, and the color is edited on the vehicle form
                             that Edit Vehicle opens from this same page. An
                             uncurated vehicle shows no swatch rather than a
-                            placeholder — the palette is choosing, and a grey
+                            placeholder — the palette is choosing, and a gray
                             square would claim otherwise. */}
                         {vehicle.color && (
                             <span
@@ -2748,7 +2748,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             : [];
                         const counts = selectedSrc ? linkableCounts(selectedSrc, alreadyLinkedRunIds) : { all: 0, charging: 0, range: 0 };
                         // null means "everything matching the filter", so the
-                        // default behaviour is unchanged until a box is unticked.
+                        // default behavior is unchanged until a box is unticked.
                         const isPicked = (id) => newLinkRunIds === null || newLinkRunIds.includes(Number(id));
                         const runsToLink = candidates.filter(r => isPicked(r.id));
                         const togglePick = (id) => setNewLinkRunIds(prev => {

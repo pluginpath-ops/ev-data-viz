@@ -67,7 +67,7 @@ function mctTestsOf(tests) {
  * the other run brings it to +0.01%.
  *
  * Picking the most recent is a defensible default and NOT a resolution. Which
- * run represents the vehicle is a curator's judgement, and the wrong reading of
+ * run represents the vehicle is a curator's judgment, and the wrong reading of
  * this — that one must be deleted — would destroy a valid test. So the count is
  * carried out and the UI states that a choice was made.
  *

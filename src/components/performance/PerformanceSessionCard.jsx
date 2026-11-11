@@ -243,7 +243,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                         </tbody>
                     </table>
                     <p className="text-[10px] text-meta mt-1">
-                        Grade is signed: + is uphill. Runs on a steeper grade flatter or penalise
+                        Grade is signed: + is uphill. Runs on a steeper grade flatter or penalize
                         the result and are flagged when used as a measured figure.
                     </p>
                 </div>

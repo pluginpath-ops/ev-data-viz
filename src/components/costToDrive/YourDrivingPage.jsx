@@ -8,10 +8,10 @@
  * Efficiency from as one strip. Beside the intro, a live preview of the
  * selected vehicles against the gas car.
  */
-import { COST_TO_DRIVE_PRESETS, DEFAULT_COST_TO_DRIVE } from '../../constants/costToDrive';
 import { vehicleLabel } from '../../utils/specHelpers';
-import { savedText, extraTimeText, weekSummary } from '../../utils/costToDrive';
+import { savedText, extraTimeText, weekSummary, gasCarName } from '../../utils/costToDrive';
 import { useCostToDrive } from '../../hooks/useCostToDrive';
+import ShareSettingsButton from './ShareSettingsButton';
 import {
     HomeChargingFields, WeekFields, FastChargingFields, SeasonFields, GasCarFields, EfficiencyFields,
 } from './DriveSections';
@@ -29,12 +29,12 @@ function DriveCard({ title, aside, children, className = '' }) {
     );
 }
 
-/** The selected vehicles against the gas car, as the settings stand. */
+/** The selected vehicles vs the gas car, as the settings stand. */
 function DrivePreview({ priced, settings, onOpenMode }) {
     return (
         <aside className="drive-preview" aria-label="With these settings">
             <span className="text-secondary">
-                With these settings, a {settings.season} week against your gas car
+                With these settings, a {settings.season} week vs {gasCarName(settings)}
             </span>
             {priced.length === 0 && (
                 <span className="text-note">Add vehicles with ＋ Add above to see them priced.</span>
@@ -86,14 +86,7 @@ export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings
                         so a friend sees your week as you set it.
                     </p>
                     <div className="drive-presets">
-                        {COST_TO_DRIVE_PRESETS.map((p, i) => (
-                            <button key={p.key} type="button" className="btn btn-secondary" onClick={() => onChange(p.settings)}>
-                                {i === 0 ? `Start from: ${p.label}` : p.label}
-                            </button>
-                        ))}
-                        <button type="button" className="btn btn-secondary" onClick={() => onChange(DEFAULT_COST_TO_DRIVE)}>
-                            Reset to defaults
-                        </button>
+                        <ShareSettingsButton />
                     </div>
                 </div>
                 <DrivePreview priced={priced} settings={settings} onOpenMode={onOpenMode} />
@@ -111,7 +104,9 @@ export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings
             <div className="drive-row">
                 <DriveCard title="Home charging"><HomeChargingFields {...props} /></DriveCard>
                 <DriveCard title="Season"><SeasonFields {...props} /></DriveCard>
-                <DriveCard title="Your gas car"><GasCarFields {...props} /></DriveCard>
+                <DriveCard title="Your gas car" aside={<span className="text-secondary">{gasCarName(settings)}</span>}>
+                    <GasCarFields {...props} />
+                </DriveCard>
             </div>
 
             <DriveCard title="Efficiency from" className="is-strip">

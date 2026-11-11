@@ -117,7 +117,7 @@ describe('utilities built for the UI are reached by the UI', () => {
         'socAlignment.trimRamp':
             'Called by alignSeries and minimumCommonSoc, both of which the chart calls. Exported so the trim can be asserted on its own.',
         'socAlignment.rampLength':
-            'The ramp detector. Called by extrapolationSlope; exported so its behaviour is pinned directly against real R2 data.',
+            'The ramp detector. Called by extrapolationSlope; exported so its behavior is pinned directly against real R2 data.',
         'feGuidePlausibility.HWY_CITY_RATIO_MIN':
             'The bound itself, consumed inside the module by rangePlausibility and asserted by name against the observed real spread.',
         'feGuidePlausibility.HWY_CITY_RATIO_MAX':
@@ -130,11 +130,11 @@ describe('utilities built for the UI are reached by the UI', () => {
             'The band itself, consumed inside the module by statusFor and asserted by name so moving it is a deliberate edit.',
         'epaDerivationCheck.DIVERGENCE_TOLERANCE':
             'As above — the boundary beyond which a difference is larger than any plausible rounding.',
-        'phaseTypes.SS_NEIGHBOUR_MULTIPLE':
+        'phaseTypes.SS_NEIGHBOR_MULTIPLE':
             'The multiple itself, consumed inside the module by suggestPhaseType and asserted by name so changing it is deliberate.',
         'socAlignment.extrapolationSlope':
             'Called by alignSeries, which the chart calls. Exported so the slope basis can be asserted without going through alignment.',
-        'feGuideMatch.normaliseMake':
+        'feGuideMatch.normalizeMake':
             'The make comparison, consumed inside the module by sameMake. Exported so the abbreviation and punctuation rules can be asserted directly.',
         'feGuideMatch.sameMake':
             'The candidate filter, consumed inside the module by rankFeCandidates. Exported so "same manufacturer" is testable without ranking.',
@@ -1003,7 +1003,7 @@ describe('the seams that broke before', () => {
         expect(read('src/components/SpecChart.jsx'), 'the bar/scatter switch lives in the spec chart sidebar').toMatch(/<SpecChartKind mode=\{mode\} onChange=\{onModeChange\} \/>/);
         expect(app, 'a header tab returns to the chart mode last shown under it').toMatch(/onNavigate=\{navigateToTab\}/);
         expect(read('src/components/VehiclesView.jsx'), 'the in-page toggle is gone').not.toMatch(/setViewMode/);
-        expect(read('src/components/shell/SubTabStrip.jsx'), 'sections are labelled').toMatch(/subtab-section-label/);
+        expect(read('src/components/shell/SubTabStrip.jsx'), 'sections are labeled').toMatch(/subtab-section-label/);
         expect(read('src/components/shell/NavMenu.jsx'), 'and survive the collapse').toMatch(/nav-menu-section/);
     });
 
@@ -1297,7 +1297,7 @@ describe('the seams that broke before', () => {
         expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }')), 'getVehicles must read EPA_TEST_VEHICLE_FIELDS')
             .toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
         expect(read('src/utils/epaRecordFromTestVehicle.js'),
-            'the derivation must honour the selection')
+            'the derivation must honor the selection')
             .toMatch(/preferred_test_number/);
     });
 
@@ -1334,7 +1334,7 @@ describe('the seams that broke before', () => {
 
         // One copy of the default's rule. The picker labels a row "Automatic";
         // if that label and the derivation disagreed the control would be
-        // describing behaviour it does not have.
+        // describing behavior it does not have.
         const picker = read('src/components/epa/PreferredTestPicker.jsx');
         expect(picker, 'the picker must use the shared default, not its own copy')
             .toMatch(/defaultMctTest/);
@@ -1399,7 +1399,7 @@ describe('the seams that broke before', () => {
         }
     });
 
-    it('makes no judgement the per-vehicle card does not', () => {
+    it('makes no judgment the per-vehicle card does not', () => {
         // A finding shown in the sweep and not on the vehicle's own card would
         // mean the sweep had grown a second opinion. It calls the four checks
         // and must not define thresholds of its own.
@@ -1526,7 +1526,7 @@ describe('the seams that broke before', () => {
             .toEqual([]);
     });
 
-    it('keeps vehicleLabel out of graph labelling', () => {
+    it('keeps vehicleLabel out of graph labeling', () => {
         // The vehicle's free-text name is a SELECTION label. Charts must compose
         // from atoms instead — see #170.
         const roadTrip = read('src/components/RoadTripView.jsx');
@@ -1542,7 +1542,7 @@ describe('one correction, everywhere it is applied', () => {
     // reader choose. Every correction now reads the run through runConditions
     // and corrects to the reader's target (utils/correctionSettings.js).
     const sources = () => [
-        'src/utils/rangeSource.js', 'src/utils/roadTripSpread.js', 'src/utils/compositeRange.js',
+        'src/utils/rangeSource.js', 'src/utils/compositeRange.js',
         'src/components/ChargingView.jsx',
         // The Range chart corrects through correctRunDistance, which "Show the
         // math" also calls, so the conditions are built there (2026-11-08).
@@ -1559,6 +1559,27 @@ describe('one correction, everywhere it is applied', () => {
             expect(src, `${file} corrects`).toMatch(/correctionFactor\(/);
             expect(src, `${file} must read the run through runConditions`).toMatch(/correctionFactor\(runConditions\(/);
         }
+        // Road Trip corrects per trip, from a basis that carries the run's
+        // conditions, so its runConditions call is where the basis is built.
+        const trip = read('src/utils/tripEfficiency.js');
+        expect(trip).toMatch(/correctionFactor\(basis\.conditions/);
+        expect(trip).toMatch(/conditions: runConditions\(run, session\)/);
+    });
+
+    // Road Trip had two speed models: the correction priced a trip at its
+    // speed, and the simulation re-priced it again with its own aero-only
+    // factor — a no-op when corrected, the only pricing when not, and
+    // towing's. One path now: every trip is priced by tripEfficiency, through
+    // the correction model, and the simulation takes the figure as given.
+    it('prices every Road Trip trip through one function, and the simulation prices no speed', () => {
+        const view = read('src/components/RoadTripView.jsx');
+        expect(view.match(/simulateRoadTrip\(/g), 'only simulateAt calls the simulation').toHaveLength(1);
+        expect(view).toMatch(/const simulateAt = \(priced, speedMph, inputs\) =>\s*\(\{ \.\.\.simulateRoadTrip\(/);
+        expect(view.match(/efficiencyAtSpeed\(/g)?.length, 'priced only through tripEfficiency').toBeGreaterThan(0);
+        expect(view, 'a correction applied at rangeSource would be applied twice').not.toMatch(/correction: \{ mode: correctionMode/);
+        const sim = read('src/utils/roadTripSimulation.js');
+        expect(sim).not.toMatch(/AERO_FRACTION|testSpeedMph|towingMode/);
+        expect(read('src/utils/roadTripSpread.js')).not.toMatch(/correctionFactor\(/);
     });
 
     it('hands every chart\'s correction control the reader\'s target', () => {
@@ -1584,7 +1605,7 @@ describe('one correction, everywhere it is applied', () => {
 });
 
 describe('the charger current class (#313, migration 092)', () => {
-    it('is written by the form, normalised on the way in and out, and read by the composite', () => {
+    it('is written by the form, normalized on the way in and out, and read by the composite', () => {
         const runs = read('src/components/RunsView.jsx');
         expect(runs, 'both forms offer it').toMatch(/<ChargerCurrentSelect[\s\S]+<ChargerCurrentSelect/);
         expect(runs, 'an edit sends it only when it changed').toMatch(/toChargerCurrent\(chargerCurrentClass\) !== toChargerCurrent\(storedRun\?\.charger_current_class_a\)/);
@@ -1704,8 +1725,8 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
 
     it('offers Road Trip no correction speed slider, and states the trip speed instead', () => {
         // Trip -> Speed is the only speed on that chart: a trip is corrected to
-        // the speed it is driven (tripTarget), so the shared target's speed is
-        // redundant there.
+        // the speed it is driven (utils/tripEfficiency.js), so the shared
+        // target's speed is redundant there.
         const src = read('src/components/RoadTripView.jsx');
         const fields = src.match(/const TRIP_CORRECTION_FIELDS = (\[[^\]]*\])/)?.[1];
         expect(fields, 'Road Trip must name the conditions it offers').toBeTruthy();
@@ -1883,7 +1904,7 @@ describe('run color is retired, not merely unused', () => {
  *
  * `PickerPanel` falls back to its own `useState` when no `onChartPaletteChange`
  * reaches it, which is correct for the pickers with no plot behind them — the
- * vehicle form and the vehicle card edit one durable colour.
+ * vehicle form and the vehicle card edit one durable color.
  *
  * That fallback is also how this silently regresses. A chart that renders
  * `RunSelector` without the setter keeps working, keeps looking right, and
@@ -1891,7 +1912,7 @@ describe('run color is retired, not merely unused', () => {
  * the picker, read Okabe-Ito. Nothing throws and no test of the picker itself
  * would notice, because the picker is behaving exactly as designed.
  */
-describe('every chart hands the colour panel its palette', () => {
+describe('every chart hands the color panel its palette', () => {
     const CHART_VIEWS = [
         'src/components/ChargingView.jsx',
         'src/components/RangeChartView.jsx',
@@ -1908,7 +1929,7 @@ describe('every chart hands the colour panel its palette', () => {
 
     it('RunSelector forwards it all the way to the picker', () => {
         const sel = ALL.find(x => x.file === 'src/components/RunSelector.jsx').text;
-        // Named in the props, handed to the colour control, and handed on from
+        // Named in the props, handed to the color control, and handed on from
         // there to SeriesColorPicker — a break at any link is a silent fallback.
         expect(sel).toMatch(/onChartPaletteChange = null/);
         expect((sel.match(/onChartPaletteChange=\{onChartPaletteChange\}/g) || []).length)

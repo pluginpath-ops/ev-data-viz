@@ -72,7 +72,7 @@ const pointLabelPlugin = {
  *
  * Props:
  *   xPlot, yPlot  {object}  plotValues() of each column
- *   xCol, yCol    {object}  the table columns, labelled
+ *   xCol, yCol    {object}  the table columns, labeled
  *   colorOf       {(vehicleId) => string}
  *   units         {string}
  */

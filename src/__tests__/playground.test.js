@@ -1,13 +1,13 @@
 /**
  * The playground's two guarantees.
  *
- * 1. COMPLETE — every class in an owned family is catalogued, or explicitly
+ * 1. COMPLETE — every class in an owned family is cataloged, or explicitly
  *    excused. A menu with items missing from it is worse than no menu, because
  *    the missing ones are exactly the divergent ones nobody remembered.
  *
  * 2. INERT — the page reads no data and performs no action. It is reachable by
  *    URL without a role, deliberately, and that is only safe while it stays a
- *    catalogue of appearances. The day a specimen gains a real action, "hidden
+ *    catalog of appearances. The day a specimen gains a real action, "hidden
  *    by obscurity" stops being enough — so this asserts it instead of trusting
  *    a comment.
  */
@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { OWNED_FAMILIES, NOT_CATALOGUED, SECTIONS, cataloguedClasses, DARK_OVERRIDE_CLASSES } from '../components/playground/catalogue';
+import { OWNED_FAMILIES, NOT_CATALOGED, SECTIONS, catalogedClasses, DARK_OVERRIDE_CLASSES } from '../components/playground/catalog';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CSS = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8');
@@ -42,20 +42,20 @@ function definedClasses() {
     return out;
 }
 
-describe('the catalogue covers every control it claims to own', () => {
+describe('the catalog covers every control it claims to own', () => {
     const defined = [...definedClasses()];
-    const catalogued = cataloguedClasses();
+    const cataloged = catalogedClasses();
 
     for (const family of OWNED_FAMILIES) {
         it(`${family.label}: nothing missing`, () => {
             const missing = defined
                 .filter(family.match)
-                .filter(n => !catalogued.has(n) && !(n in NOT_CATALOGUED));
+                .filter(n => !cataloged.has(n) && !(n in NOT_CATALOGED));
 
             expect(
                 missing,
-                `Defined in index.css but absent from the playground catalogue.\n`
-                + `Add a specimen to SECTIONS, or an entry to NOT_CATALOGUED with a reason:\n`
+                `Defined in index.css but absent from the playground catalog.\n`
+                + `Add a specimen to SECTIONS, or an entry to NOT_CATALOGED with a reason:\n`
                 + missing.map(n => `  .${n}`).join('\n'),
             ).toEqual([]);
         });
@@ -63,22 +63,22 @@ describe('the catalogue covers every control it claims to own', () => {
 
     it('excuses only classes that exist and are actually owned', () => {
         // A stale excuse hides a class that was renamed or deleted, and quietly
-        // shrinks what the catalogue is checked against.
-        for (const name of Object.keys(NOT_CATALOGUED)) {
+        // shrinks what the catalog is checked against.
+        for (const name of Object.keys(NOT_CATALOGED)) {
             expect(defined, `.${name} is excused but no longer defined`).toContain(name);
             expect(
                 OWNED_FAMILIES.some(f => f.match(name)),
                 `.${name} is excused but is not in an owned family — the excuse does nothing`,
             ).toBe(true);
-            expect(NOT_CATALOGUED[name].length, `.${name} needs a reason`).toBeGreaterThan(10);
+            expect(NOT_CATALOGED[name].length, `.${name} needs a reason`).toBeGreaterThan(10);
         }
     });
 
-    it('catalogues only classes that exist', () => {
+    it('catalogs only classes that exist', () => {
         // The other direction: a specimen for a class the stylesheet no longer
         // has renders an unstyled box that looks like a design decision.
-        const orphans = [...catalogued].filter(n => !definedClasses().has(n));
-        expect(orphans, `Catalogued but not defined in index.css: ${orphans.join(', ')}`).toEqual([]);
+        const orphans = [...cataloged].filter(n => !definedClasses().has(n));
+        expect(orphans, `Cataloged but not defined in index.css: ${orphans.join(', ')}`).toEqual([]);
     });
 });
 
@@ -127,7 +127,7 @@ describe('the playground is inert', () => {
     // specimens.jsx is on this list because it CAN hold live components — the
     // popover specimen is one. That is exactly when an inertness guarantee
     // stops being free and has to be checked.
-    const files = ['components/playground/Playground.jsx', 'components/playground/catalogue.js',
+    const files = ['components/playground/Playground.jsx', 'components/playground/catalog.js',
         'components/playground/specimens.jsx']
         .map(f => ({ f, src: readFileSync(join(ROOT, 'src', f), 'utf8') }));
 
@@ -144,7 +144,7 @@ describe('the playground is inert', () => {
 
     it('wires no specimen to an action', () => {
         // Specimens are rendered from data, and the data carries no handlers —
-        // so a catalogue entry cannot smuggle one in.
+        // so a catalog entry cannot smuggle one in.
         for (const section of SECTIONS) {
             for (const spec of section.specimens) {
                 for (const key of Object.keys(spec)) {
@@ -173,7 +173,7 @@ describe('the playground is inert', () => {
     });
 });
 
-describe('the catalogue is well formed', () => {
+describe('the catalog is well formed', () => {
     it('has no duplicate specimens within a section', () => {
         for (const section of SECTIONS) {
             const keys = section.specimens.map(s => `${s.cls}|${s.label}`);

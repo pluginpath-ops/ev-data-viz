@@ -4,7 +4,7 @@ import Papa from 'papaparse';
  * Parse a GPS performance-testing CSV export (acceleration / braking runs).
  *
  * File structure — TRANSPOSED relative to most exports: each COLUMN is one run,
- * each ROW is one labelled metric, with the label embedded in every cell:
+ * each ROW is one labeled metric, with the label embedded in every cell:
  *
  *   Insane + Launch Mode,Insane + Launch Mode,Standard,Chill        ← row 0: drive mode
  *   "Test Time: 7/24/2026, 10:48:22 AM (local)",…                   ← row 1+
@@ -14,15 +14,15 @@ import Papa from 'papaparse';
  *   • 0–10: 0.578 s,…                                               ← split rows
  *
  * Rows are matched by label prefix rather than position, so a source that omits
- * or reorders rows still parses. Unrecognised rows are ignored.
+ * or reorders rows still parses. Unrecognized rows are ignored.
  *
  * Returns a plain object — no Supabase calls, no side effects (same contract as
  * parseTableauCSV.js).
  */
 
-// Sources use an en-dash in "0–60" and a bullet on split rows. Normalise both
+// Sources use an en-dash in "0–60" and a bullet on split rows. Normalize both
 // so every downstream regex can assume ASCII "-".
-const normaliseDashes = (s) => s.replace(/[‐-―−]/g, '-');
+const normalizeDashes = (s) => s.replace(/[‐-―−]/g, '-');
 const stripBullet     = (s) => s.replace(/^[\s•*·-]+/, '');
 
 /** First capture group of `re` as a float, or null. */
@@ -38,8 +38,8 @@ function num(text, re) {
  * start of the cell (case-insensitive), else null.
  */
 function valueFor(cell, label) {
-    const text = stripBullet(normaliseDashes(cell || '')).trim();
-    const want = normaliseDashes(label).toLowerCase();
+    const text = stripBullet(normalizeDashes(cell || '')).trim();
+    const want = normalizeDashes(label).toLowerCase();
     if (!text.toLowerCase().startsWith(want.toLowerCase())) return null;
     return text.slice(want.length).replace(/^\s*:\s*/, '').trim();
 }
@@ -78,7 +78,7 @@ const DRAG_DISTANCES = {
  * Returns { label, distanceFt, elapsedS, speedMph } or null.
  */
 function parseDistanceSplit(cell) {
-    const text = stripBullet(normaliseDashes(cell || '')).trim();
+    const text = stripBullet(normalizeDashes(cell || '')).trim();
     const m = /^(60ft|330ft|500ft|1000ft|1\/8|1\/4)\s*:\s*([\d.]+)\s*s\s*@\s*([\d.]+)\s*mph/i.exec(text);
     if (!m) return null;
     const label = m[1].toLowerCase();
@@ -93,7 +93,7 @@ function parseDistanceSplit(cell) {
  * Returns { speedMph, label, elapsedS } or null.
  */
 function parseSplit(cell) {
-    const text = stripBullet(normaliseDashes(cell || '')).trim();
+    const text = stripBullet(normalizeDashes(cell || '')).trim();
     // 0-60(1ft): 3.300 s   |   0-10: 0.578 s
     const m = /^0-(\d+)(\(1ft\))?\s*:\s*([\d.]+)\s*s/i.exec(text);
     if (!m) return null;

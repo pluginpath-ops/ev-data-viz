@@ -24,7 +24,16 @@ export default function WeekPicker({ settings, onChange, compact = false }) {
             onClick={() => cycle(d)}
         >
             <span className="text-meta">{name}</span>
-            <span className="week-day-type">{compact ? SHORT[week[d]] : NAMES[week[d]]}</span>
+            {compact
+                ? <span className="week-day-type">{SHORT[week[d]]}</span>
+                : (
+                    // Both, and the card's width picks (.week-picker-frame): the
+                    // names overran each other at phone width.
+                    <span className="week-day-type">
+                        <span className="week-day-name">{NAMES[week[d]]}</span>
+                        <span className="week-day-letter" aria-hidden="true">{SHORT[week[d]]}</span>
+                    </span>
+                )}
             {!compact && <span className="text-caption">{miles(week[d])}</span>}
         </button>
     ));
@@ -56,24 +65,26 @@ export default function WeekPicker({ settings, onChange, compact = false }) {
     }
 
     return (
-        <div className="week-picker">
-            <span className="text-label">Day</span>
-            {days}
-            <span className="week-picker-label">
-                <span className="text-label">Planned fast charge</span>
-                <span className="text-meta">a grocery run</span>
-            </span>
-            {WEEKDAYS.map((name, d) => {
-                const on = (planned & (1 << d)) !== 0;
-                return (
-                    <label key={name} className={`week-planned${on ? ' is-on' : ''}`}>
-                        <input type="checkbox" checked={on} aria-label={`Planned fast charge on ${name}`} onChange={() => togglePlanned(d)} />
-                        {/* A glyph, not the words: "Fast charge" wrapped to two lines in a day's
-                            narrow column. The row's label and the checkbox's name say it. */}
-                        {on && <span aria-hidden="true">⚡</span>}
-                    </label>
-                );
-            })}
+        <div className="week-picker-frame">
+            <div className="week-picker">
+                <span className="text-label">Day</span>
+                {days}
+                <span className="week-picker-label">
+                    <span className="text-label">Planned fast charge</span>
+                    <span className="text-meta">a grocery run</span>
+                </span>
+                {WEEKDAYS.map((name, d) => {
+                    const on = (planned & (1 << d)) !== 0;
+                    return (
+                        <label key={name} className={`week-planned${on ? ' is-on' : ''}`}>
+                            <input type="checkbox" checked={on} aria-label={`Planned fast charge on ${name}`} onChange={() => togglePlanned(d)} />
+                            {/* A glyph, not the words: "Fast charge" wrapped to two lines in a day's
+                                narrow column. The row's label and the checkbox's name say it. */}
+                            {on && <span aria-hidden="true">⚡</span>}
+                        </label>
+                    );
+                })}
+            </div>
         </div>
     );
 }

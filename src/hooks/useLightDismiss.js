@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
  *
  * "Light dismiss" is the platform's own term for this pair — it is what the
  * HTML popover API's `auto` state does — so it is what the hook is called,
- * rather than a house name for behaviour that already has one.
+ * rather than a house name for behavior that already has one.
  *
  * Two details it exists to stop being retyped:
  *

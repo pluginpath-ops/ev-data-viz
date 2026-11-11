@@ -35,7 +35,7 @@
  * range, which is 35 of 76 runs on the live database. It sits BELOW the vehicle
  * default deliberately: the default range test is a deliberate, curated choice,
  * whereas a row being dual-role is an artifact of how the data happened to be
- * collected. Provenance, not a judgement about which conditions to compare against.
+ * collected. Provenance, not a judgment about which conditions to compare against.
  *
  * Note this is the run's *measured* distance and SoC bounds, which is a different
  * thing from rank 4. 'recorded' stays last as agreed: range_value is usually the
@@ -46,14 +46,13 @@
  * so it can never match. The same-session partner is surfaced through rank 1
  * instead, with paired_range_run_id populated from the session.
  *
- * Pure module — no data-point access. The 'recorded' branch is *signalled* here
+ * Pure module — no data-point access. The 'recorded' branch is *signaled* here
  * and computed by the caller, which is the side that holds the time series.
  */
 
 import { isListed, isExcluded } from './runListing';
-import { correctionFactor, applyCorrection, correctionNote, runConditions, speedCorrected } from './conditionCorrection';
+import { correctionFactor, applyCorrection, correctionNote, runConditions } from './conditionCorrection';
 import { isRangeRun } from './runUtils';
-import { STANDARD_CONDITIONS } from '../constants/epa';
 import { val } from './calcTrace';
 
 /**
@@ -260,30 +259,8 @@ function correctBasis(basis, run, correction, session, trace = null) {
     });
     return {
         ...corrected,
-        // The target travels with the result, so pricedAtSpeedMph knows what
-        // speed a corrected figure now stands at.
-        correction: { ...result, note: correctionNote(result), target: correction.target ?? STANDARD_CONDITIONS },
+        correction: { ...result, note: correctionNote(result) },
     };
-}
-
-/**
- * The speed a resolved source's miPerKwh is priced at — what a caller that
- * re-prices for speed (simulateRoadTrip's testSpeedMph) must start from.
- *
- * When correction applied the speed axis, the figure has already been moved to
- * the target speed (the reader's, else STANDARD_CONDITIONS'); handing the simulation the test's own speed on
- * top re-prices from 80 mph a figure that is already at 70, and counts speed
- * twice (an 80 mph test read 21% better corrected than uncorrected). Otherwise
- * — correction off, the run states no speed, or a mixed cycle skipped the axis
- * — the figure is still at the test's own speed.
- *
- * @param {Object} src           a resolveRangeSource result
- * @param {number|null} ownSpeedMph  the test's own speed, as the caller reads it
- */
-export function pricedAtSpeedMph(src, ownSpeedMph) {
-    return speedCorrected(src?.correction)
-        ? (src.correction.target ?? STANDARD_CONDITIONS).speedMph
-        : ownSpeedMph;
 }
 
 export function resolveRangeSource(chargingRun, {
@@ -295,7 +272,9 @@ export function resolveRangeSource(chargingRun, {
     // place a series' range basis is decided, so every chart corrects
     // identically instead of each deciding for itself — which is how Road Trip
     // came to correct for speed while Charge Compare did not, and the same test
-    // read differently on the two.
+    // read differently on the two. Road Trip itself resolves with no correction
+    // and corrects per trip, at the travel speed, through the same model
+    // (tripEfficiency.js): a trip has a speed of its own.
     correction = null,          // { mode, target, aeroFraction } | null
     session = null,             // supplies altitude/temperature the run omits
     trace = null,               // calcTrace.js, for "Show the math"
@@ -356,7 +335,7 @@ export function resolveRangeSource(chargingRun, {
         };
     }
 
-    // Rank 4: the charging run's own recorded range column. Signalled only —
+    // Rank 4: the charging run's own recorded range column. Signaled only —
     // the miles come from interpolating the caller's data points, not from a
     // scalar, so there is nothing to return but the provenance.
     if (hasRecordedRange) {

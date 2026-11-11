@@ -15,9 +15,9 @@
  * ── Light is deferred, not deleted ──────────────────────────────────────────
  * The design handoff draws dark only. `evbench_theme` — the pre-re-skin
  * preference key — is deliberately not read: the nav toggle that would let
- * someone leave light is gone for the duration, so honouring an old preference
+ * someone leave light is gone for the duration, so honoring an old preference
  * would strand a returning visitor on a half-migrated theme with no way out.
- * The escape hatch is a separate key, so clearing it restores shipped behaviour
+ * The escape hatch is a separate key, so clearing it restores shipped behavior
  * exactly:
  *
  *     localStorage.setItem('evbench_theme_dev', 'light')

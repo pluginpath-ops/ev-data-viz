@@ -367,7 +367,7 @@ export default function EpaCurvesView({
     const shown = useMemo(() => new Set(selectedMappings), [selectedMappings]);
 
     // Colors move into epaConfig for the same reason the selection does — a
-    // pop-out was losing them. Memoised because `?? {}` allocates, and a fresh
+    // pop-out was losing them. Memoized because `?? {}` allocates, and a fresh
     // object every render invalidates every dependency array holding it.
     const mappingColors = useMemo(() => epaConfig.mappingColors ?? {}, [epaConfig.mappingColors]);
     const setMappingColors = useCallback(
@@ -703,7 +703,7 @@ export default function EpaCurvesView({
 
     // ── The frame's caption, and its export ─────────────────────────────────
     // The export was a hand-rolled copy of chartToPngDataUrl that drew the
-    // canvas alone: a modelled curve with no statement of what it was modelled
+    // canvas alone: a modeled curve with no statement of what it was modeled
     // AT is not a chart anyone can act on, and the conditions are the whole
     // point of this screen.
     const plotTitle = useMemo(
@@ -815,7 +815,7 @@ export default function EpaCurvesView({
                         <span className="text-micro">Axes</span>
                         <div className="axis-rows">
                             {/* Not a disabled <input>. A field box says "you may
-                                type here" and then refuses, and greying it only
+                                type here" and then refuses, and graying it only
                                 turns that into "you may type here later" — this
                                 axis is never anything else. Stated as a value
                                 with the reason beside it. */}
@@ -846,7 +846,7 @@ export default function EpaCurvesView({
                     </div>
 
                     {/* ── OVERLAY ── the vehicle's own measured points, on top of
-                      * the modelled curve. Three states, so a segmented row
+                      * the modeled curve. Three states, so a segmented row
                       * rather than two toggles that can both look off. */}
                     <div className="chart-rail-group">
                         <span className="text-micro">
@@ -887,7 +887,7 @@ export default function EpaCurvesView({
                     {/* The shared correction target, less its speed (speed is
                         this chart's x axis), and Modeled Efficiency's own
                         extras. No "Correct:" dropdown: the sliders always
-                        apply, because a modelled curve has no measured value
+                        apply, because a modeled curve has no measured value
                         to leave uncorrected. The overlay above stays here: it
                         plots a VEHICLE's own range runs, which the
                         certification view has no way to reach. */}
@@ -921,7 +921,7 @@ export default function EpaCurvesView({
                       * collapse, a name competing with four readings on a single
                       * line, and a swatch computed by an expression that could
                       * not agree with the plot. A mapping is not a run, so the
-                      * rows are adapted rather than the component generalised —
+                      * rows are adapted rather than the component generalized —
                       * `selectorVehicles` is the whole of the adapter. */}
                     {vehiclesWithEpa.length > 0 && (
                         <div className="chart-rail-group">

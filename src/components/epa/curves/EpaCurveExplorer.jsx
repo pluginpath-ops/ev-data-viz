@@ -130,7 +130,7 @@ function makeReferencePlugin(refX, refLabel, xCaption, yCaption) {
                 });
             }
 
-            // Axis captions, replacing Chart.js's centred titles: the units
+            // Axis captions, replacing Chart.js's centerd titles: the units
             // belong at the ends of the axes they describe, where the eye
             // already is when it reaches the last tick.
             ctx.font = `${fonts.nano}px ${fonts.mono}`;
@@ -237,8 +237,8 @@ export default function EpaCurveExplorer({
     );
 
     // ── The frame's caption ─────────────────────────────────────────────────
-    // Deliberately the same shape as EpaCurvesView's: a modelled curve with no
-    // statement of what it was modelled AT is not a chart anyone can act on,
+    // Deliberately the same shape as EpaCurvesView's: a modeled curve with no
+    // statement of what it was modeled AT is not a chart anyone can act on,
     // and these two screens plot the same maths from different subjects.
     const plotTitle = useMemo(
         () => `${axis.label} vs steady speed`,
@@ -273,7 +273,7 @@ export default function EpaCurveExplorer({
     const [urlCopied, setUrlCopied] = useState(false);
 
     // Tell App what is on screen so it can broadcast it to a pop-out. Keyed on the
-    // serialised state because `conditions.values` is a new object every render,
+    // serialized state because `conditions.values` is a new object every render,
     // which would otherwise report on every render.
     const reportKey = JSON.stringify({ selected, yAxis, conditions: conditions.values });
     useEffect(() => {
@@ -329,7 +329,7 @@ export default function EpaCurveExplorer({
             };
         });
 
-        // One number, drawn on the plot, labelled, and read back in the legend.
+        // One number, drawn on the plot, labeled, and read back in the legend.
         const refX = convSpeed(CURVE_REFERENCE_MPH, units);
         const refLabel = `${Math.round(refX)} ${speedLabel(units).toUpperCase()}`;
 
@@ -437,7 +437,7 @@ export default function EpaCurveExplorer({
                         <span className="text-micro">Axes</span>
                         <div className="axis-rows">
                             {/* Stated as a value, not a disabled <input>: a field
-                                box says "type here" and then refuses, and greying
+                                box says "type here" and then refuses, and graying
                                 it only turns that into "type here later". This
                                 axis is never anything else. */}
                             <div className="axis-row">
@@ -473,7 +473,7 @@ export default function EpaCurveExplorer({
 
                     {/* The shared correction target, less its speed (speed is
                         this chart's x axis). No "Correct:" dropdown: the sliders
-                        always apply, because a modelled curve has no measured
+                        always apply, because a modeled curve has no measured
                         value to leave uncorrected. Not offered in a view that
                         cannot write it (setChartConfig). */}
                     {setChartConfig && (

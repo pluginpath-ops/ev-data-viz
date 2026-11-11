@@ -12,7 +12,7 @@ import { placePopover } from '../../utils/popoverPlacement';
  * the column picker on Browse, each with its own `useState(open)`, its own
  * `useLightDismiss`, and its own copy of the same three spans. They already
  * shared the CSS; sharing only the CSS is how the range menus ended up as
- * `<details>` — visually identical to their neighbours in a row of nine, and
+ * `<details>` — visually identical to their neighbors in a row of nine, and
  * the only two that did not close when you clicked away.
  *
  * The panel's CONTENT stays with the caller. A facet list, a min/max pair and a

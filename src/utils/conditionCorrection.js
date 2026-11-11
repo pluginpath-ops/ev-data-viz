@@ -26,8 +26,9 @@
  *
  *     C ∝ f · (v/v_ref)² · (ρ/ρ_ref) + (1 − f)
  *
- * `f` is the aero fraction at the reference speed. This is the same split that
- * roadTripSimulation's speedCorrectionFactor has always used for speed alone;
+ * `f` is the aero fraction at the reference speed. Road Trip prices a trip at
+ * its travel speed through this same model (tripEfficiency.js, SPEED_ONLY_MODE
+ * when nothing else is corrected), so there is one speed model, not two;
  * density is the same idea with a different ratio, so the two compose rather
  * than competing.
  *
@@ -60,7 +61,7 @@
  * temperature alone, as one line for every car. A heat pump draws about half a
  * resistive heater; the line is one answer for both. It is steady state: the
  * pull-down of a hot-soaked cabin is not in it, and neither are the battery
- * conditioning (folded into the line, not modelled apart), cold tyres, the
+ * conditioning (folded into the line, not modeled apart), cold tires, the
  * regen a cold pack refuses, or the extra cell resistance. Time spent stopped
  * is not counted, and the ramps are straight lines. Below freezing the error
  * in the assumed load is comparable to the effect, so a figure corrected from
@@ -94,8 +95,19 @@ export const CORRECTION_MODES = [
 
 export const DEFAULT_CORRECTION_MODE = 'none';
 
-const modeAxes = (mode) =>
-    CORRECTION_MODES.find(m => m.key === mode)?.axes ?? [];
+/**
+ * The aero model on the speed axis alone. Not a reader's choice — no picker
+ * offers it and no link can carry it (correctionSettings validates against
+ * CORRECTION_MODES). It is how a trip is priced at its travel speed when the
+ * reader corrects nothing, and how towing is always priced
+ * (tripEfficiency.js): speed is the one condition a trip cannot leave as
+ * tested.
+ */
+export const SPEED_ONLY_MODE = 'speed';
+
+const modeAxes = (mode) => (mode === SPEED_ONLY_MODE
+    ? ['speed']
+    : CORRECTION_MODES.find(m => m.key === mode)?.axes ?? []);
 
 /**
  * What a range test was driven in, as correctionFactor reads it. Every
@@ -164,7 +176,7 @@ function loadTerm(speedMph, densityRatio, aeroFraction, airSpeedSq = null, trace
  * headwind leg's (v + w)² and the tailwind leg's (v − w)² average to v² + w².
  * So a wind that "turns into a tailwind on the return" is recorded as its
  * speed with no direction, and it costs the test a little rather than
- * cancelling, because drag goes as the square of air speed.
+ * canceling, because drag goes as the square of air speed.
  *
  * Under THIS law that holds for an out-and-back in any wind, quartering
  * included: the legs face θ and θ + 180°, and the −2vw·cos θ term of one
@@ -173,7 +185,7 @@ function loadTerm(speedMph, densityRatio, aeroFraction, airSpeedSq = null, trace
  * The law is a simplification, and the simplification is the reason. Drag
  * acts along the apparent wind, and the battery pays only for its component
  * along the road, |V_rel|·(v − w·cos θ), not |V_rel|²; the sideways part is
- * carried by the tyres. On that basis an out-and-back costs w² of the aero
+ * carried by the tires. On that basis an out-and-back costs w² of the aero
  * term in a head/tail wind but about w²/2 in a crosswind (70 mph, 10 mph wind:
  * 5000 / 4975 / 4950 at 0° / 45° / 90°, against 4900 calm), so a direction
  * WOULD matter on an out-and-back, and an out-and-back flag would be needed
@@ -231,7 +243,7 @@ export function correctionFactor(conditions, {
     // Correcting for speed assumes the test held one. Aero energy goes as the
     // MEAN OF v², while an average speed supplies the SQUARE OF THE MEAN, and
     // ⟨v²⟩ > ⟨v⟩² for any varying speed — so a mixed cycle reads as a gentle
-    // steady cruise and gets over-penalised on the way to the reference speed.
+    // steady cruise and gets over-penalized on the way to the reference speed.
     // Air density does not care what the speed trace looked like, so altitude
     // and temperature still apply.
     const mixedCycle = conditions?.speedBasis === 'mixed';
@@ -362,15 +374,6 @@ export function correctRunDistance(run, session, { mode, target } = {}, trace = 
     });
     return { result, distanceMiles };
 }
-
-/**
- * Whether a correction moved a figure to the target SPEED — from the test's own
- * speed or from an assumed one — so a caller that re-prices for speed starts
- * from the target, not from the test (rangeSource.pricedAtSpeedMph,
- * roadTripSpread).
- */
-export const speedCorrected = (result) =>
-    !!(result?.applied?.includes('speed') || result?.assumed?.some(a => a.axis === 'speed'));
 
 // An axis as a reader is told of it: the accessory term is "accessory load".
 const axisName = (axis) => (axis === 'accessory' ? 'accessory load' : axis);

@@ -14,7 +14,7 @@ import { readMemory } from '../utils/vehicleTableStorage';
 import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import {
     VEHICLE_COLUMNS, DEFAULT_ASSUMPTIONS, decodeVehicleTableParams, vehicleTableStartSearch,
-    vehicleColumnByKey, labelledColumn,
+    vehicleColumnByKey, labeledColumn,
 } from '../utils/vehicleTable';
 import {
     chartColumns, currentFieldKey, defaultFieldKey, plotValues, isPlottableColumn, isPlottableOnScatter,
@@ -66,7 +66,7 @@ export default function SpecChart({
     const yKey = currentFieldKey(chartConfig.scatterYField);
 
     const label = useCallback(
-        (col) => labelledColumn(col, assumptions, units, correctionTarget, correctionMode),
+        (col) => labeledColumn(col, assumptions, units, correctionTarget, correctionMode),
         [assumptions, units, correctionTarget, correctionMode],
     );
     const allColumns = useMemo(() => chartColumns(VEHICLE_COLUMNS).map(label), [label]);

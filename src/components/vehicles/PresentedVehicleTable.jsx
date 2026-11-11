@@ -6,7 +6,7 @@ import { sessionFor } from '../../utils/testSessions';
 import { groupPerformanceByVehicle } from '../../utils/dataChecks';
 import { vehiclesInOrder } from '../../utils/featuredComparisons';
 import {
-    decodeVehicleTableParams, buildVehicleRows, vehicleColumnByKey, labelledColumn,
+    decodeVehicleTableParams, buildVehicleRows, vehicleColumnByKey, labeledColumn,
     needsPerformance, vehicleBarMaxima,
 } from '../../utils/vehicleTable';
 
@@ -61,7 +61,7 @@ export default function PresentedVehicleTable({ vehicleIds, search, correctionTa
 
     const cols = useMemo(
         () => columns.map(vehicleColumnByKey).filter(Boolean)
-            .map(col => labelledColumn(col, assumptions, units, correctionTarget, correctionMode)),
+            .map(col => labeledColumn(col, assumptions, units, correctionTarget, correctionMode)),
         [columns, assumptions, units, correctionTarget, correctionMode],
     );
     const maxima = useMemo(() => vehicleBarMaxima(rows, cols), [rows, cols]);

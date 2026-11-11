@@ -90,7 +90,7 @@ export function resolvePrimaryCoeffs(testVehicle) {
 }
 
 /**
- * Choose the test to derive from, honouring procedure precedence:
+ * Choose the test to derive from, honoring procedure precedence:
  * 77 (MCT) → 84 (CD-Hwy). 81 and others are never used for efficiency.
  *
  * @returns {object|null} the selected test row (with epa_test_phases)
@@ -442,7 +442,7 @@ export function deriveSteadyStateEta(testVehicle, speedMph = SS_CYCLE_SPEED_MPH)
     // wrong distance, and deriveImpliedSsSpeed against SS_SPEED_BAND catches a
     // phase that implies an impossible speed.
     //
-    // What is checked is physics rather than judgement: a drivetrain cannot
+    // What is checked is physics rather than judgment: a drivetrain cannot
     // return more energy than it is given. Above 1 the inputs contradict each
     // other regardless of what any band says.
     const flags = eta > 1 ? ['nonphysical-eta'] : [];

@@ -3,7 +3,7 @@
  * and save-on-blur. Reused across every section of the EPA curator form.
  *
  * Override flag (spec cross-cutting requirement): distinguishes
- *   • CSV-imported values (subtle grey "csv")
+ *   • CSV-imported values (subtle gray "csv")
  *   • curator-overridden values (amber "edited")
  * so curators can see at a glance what came from the spreadsheet vs. by hand.
  */
@@ -33,7 +33,7 @@ export default function CuratorField({
         if (draft === null) return;
         const raw = draft.trim();
         setDraft(null);
-        // Normalise to the stored representation for comparison.
+        // Normalize to the stored representation for comparison.
         const next = raw === '' ? null : (type === 'number' ? Number(raw) : raw);
         if (type === 'number' && next !== null && Number.isNaN(next)) return;
         const current = value ?? null;

@@ -31,14 +31,14 @@
  * the same card is a full-pack number, so the two are not comparable as they
  * stand.
  *
- * So an adequately characterised window IS scaled to 100%, and the figure is
+ * So an adequately characterized window IS scaled to 100%, and the figure is
  * marked as scaled wherever it is shown. That is a deliberate trade and it
  * should be named: scaling assumes consumption is FLAT across the pack, which
  * it is not exactly. The error is small over a wide window and grows as the
  * window narrows, which is precisely why scaling is gated on
  * `coversPracticalPack` rather than applied to anything with two SoC readings.
  *
- * A window too narrow to characterise the pack is NOT scaled. Multiplying a
+ * A window too narrow to characterize the pack is NOT scaled. Multiplying a
  * 56→10% test by 2.17 would not be a measurement with a caveat, it would be a
  * guess with a decimal point. Those are reported as measured, with the window
  * named, and the reader is told the test cannot answer the question.
@@ -61,7 +61,7 @@ export function socWindow(run) {
 }
 
 /**
- * What counts as an adequately characterised test.
+ * What counts as an adequately characterized test.
  *
  * ANCHORED AT BOTH ENDS, rather than a minimum span, and the difference
  * matters. A bare span cannot tell 100→15 (stopped a little early, 85 points)
@@ -76,7 +76,7 @@ export function socWindow(run) {
  *     to be, so the START is whatever it was, often well under 80
  *   · one-off tests at assorted speeds, with no consistent window at all
  *
- * 80→10 is the practical driving band and characterises a vehicle adequately.
+ * 80→10 is the practical driving band and characterizes a vehicle adequately.
  * 56→10 saw half a pack. Both end at 10; only one is a test you can report a
  * figure from — which is why the START bound is the one doing the real work.
  *
@@ -142,7 +142,7 @@ export function coversPracticalPack(run) {
  *      "these are the conditions to report", and it wins even over a newer
  *      full-pack test.
  *   2. the newest full-pack test
- *   3. the newest adequately characterised one (coversPracticalPack)
+ *   3. the newest adequately characterized one (coversPracticalPack)
  *   4. whatever defaultRangeRun resolves to — the newest usable test, partial
  *      window and all: some evidence, correctly qualified, beats none.
  *

@@ -93,7 +93,7 @@ const IMAGE_CACHE_SECONDS = 31536000;
  *
  * Migrations are applied by hand in the Supabase SQL editor, so a deploy can
  * lead its schema by hours or days. Features reading a brand-new relation
- * degrade to their un-migrated behaviour instead of erroring — an un-merged
+ * degrade to their un-migrated behavior instead of erroring — an un-merged
  * brand list is a worse page, not a broken one.
  *
  * Deliberately narrow: only "undefined table" (42P01), "undefined function"
@@ -110,8 +110,8 @@ function isMissingRelation(error) {
   return code === '42P01' || code === '42883' || code === 'PGRST202';
 }
 
-/** Normalise a raw data-point object into a clean DB row shape. */
-function normalisePoint(point, runId, frame) {
+/** Normalize a raw data-point object into a clean DB row shape. */
+function normalizePoint(point, runId, frame) {
   return {
     run_id:      runId,
     frame,
@@ -189,7 +189,7 @@ function shapeRun(r) {
     // through, so a read we missed anywhere downstream paints magenta
     // rather than silently keeping the old per-run color alive.
     color: RETIRED_RUN_COLOR,
-    // Normalise DB snake_case to the camelCase used throughout the app.
+    // Normalize DB snake_case to the camelCase used throughout the app.
     isDefault: !!r.is_default,
     // Unlisted (#394: is_hidden narrowed to this in migration 079) and
     // excluded from the statistics — two questions, see utils/runListing.js.
@@ -200,7 +200,7 @@ function shapeRun(r) {
     isExcluded: r.is_excluded === undefined ? !!r.is_hidden : !!r.is_excluded,
     // A curator's "I have looked; count it" (migration 080, runListing).
     qualityOverride: !!r.quality_override,
-    // data_points(count) returns [{ count: N }]; normalise to a plain number.
+    // data_points(count) returns [{ count: N }]; normalize to a plain number.
     // null when the select carried no embed at all: "not counted" is not "none",
     // and utils/runPoints.js skips a fetch only for a counted 0.
     dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : null,
@@ -718,7 +718,7 @@ class DataService {
    *
    * The join rows are removed explicitly rather than relying on a cascade:
    * `tags` and `vehicle_tags` predate this repo's migrations directory, so the
-   * FK's delete behaviour is not stated anywhere we control, and a missing
+   * FK's delete behavior is not stated anywhere we control, and a missing
    * cascade would fail the delete instead of orphaning it.
    */
   async deleteTag(id) {
@@ -874,6 +874,77 @@ class DataService {
     if (!data?.length) {
       throw new Error('The featured comparison was not deleted: it no longer exists, or only an admin may delete one.');
     }
+  }
+
+  // ── Saved selections (096) ────────────────────────────────────────────────
+  //
+  // The signed-in reader's own named vehicle sets; RLS shows each user only
+  // theirs. Signed out, useSavedSelections keeps them in the browser instead.
+  // Raw rows; utils/savedSelections.js normalizes them.
+
+  /**
+   * Resilient like getFeaturedComparisons: a missing table (096 not yet
+   * applied) is null and a console note, so the menu can fall back to the
+   * browser rather than break the chips row.
+   */
+  async getSavedSelections() {
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .select('id, name, vehicle_ids')
+      .order('name');
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205') {
+        console.warn('saved_selections unavailable — is migration 096 applied?', error.message);
+        return null;
+      }
+      throw error;
+    }
+    return data || [];
+  }
+
+  /** Insert one or more { name, vehicleIds }. Returns the saved rows. */
+  async addSavedSelections(entries) {
+    if (!entries.length) return [];
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .insert(entries.map(e => ({ name: e.name, vehicle_ids: e.vehicleIds })))
+      .select('id, name, vehicle_ids');
+    if (error) {
+      if (error.code === '23505') throw new Error('You already have a saved selection with that name.');
+      throw error;
+    }
+    return data;
+  }
+
+  /**
+   * Change one: `fields` is { name?, vehicleIds? }. Raises on 0 rows, as every
+   * RLS-filtered update must (the lesson of 087).
+   */
+  async updateSavedSelection(id, fields) {
+    const row = { updated_at: new Date().toISOString() };
+    if (fields.name != null) row.name = fields.name;
+    if (fields.vehicleIds != null) row.vehicle_ids = fields.vehicleIds;
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .update(row)
+      .eq('id', id)
+      .select('id, name, vehicle_ids');
+    if (error) {
+      if (error.code === '23505') throw new Error('You already have a saved selection with that name.');
+      throw error;
+    }
+    if (!data?.length) throw new Error('The saved selection was not changed: it no longer exists.');
+    return data[0];
+  }
+
+  async deleteSavedSelection(id) {
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .delete()
+      .eq('id', id)
+      .select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('The saved selection was not deleted: it no longer exists.');
   }
 
   // ── Spec links ────────────────────────────────────────────────────────────
@@ -1389,7 +1460,7 @@ class DataService {
       const batchSize = 1000;
       for (let i = 0; i < run.data.length; i += batchSize) {
         const batch = run.data.slice(i, i + batchSize).map((point, j) =>
-          normalisePoint(point, newRun.id, point.frame ?? (i + j))
+          normalizePoint(point, newRun.id, point.frame ?? (i + j))
         );
         const { error: batchError } = await getSupabase().from('data_points').insert(batch);
         if (batchError) throw batchError;
@@ -1778,7 +1849,7 @@ class DataService {
     // A run with no non-null SoC sample is absent from the result rather than
     // present with nulls, which the caller already reads as "no span known".
     for (const r of data || []) {
-      // Coerced because PostgREST may serialise a numeric column as a string,
+      // Coerced because PostgREST may serialize a numeric column as a string,
       // and these are compared and scaled downstream.
       out[r.run_id] = { min: Number(r.min_soc), max: Number(r.max_soc) };
     }
@@ -3789,7 +3860,7 @@ class DataService {
    * Skip a finding, recording the values it was judged on — or clear the skip
    * when `fingerprint` is null.
    *
-   * Skipping again replaces the earlier judgement rather than adding a second:
+   * Skipping again replaces the earlier judgment rather than adding a second:
    * one per (vehicle, check), which is the unique constraint the upsert targets.
    * A skip is kept against its fingerprint, so a finding whose values later
    * change returns on its own; nothing here has to notice.
@@ -4079,7 +4150,7 @@ class DataService {
     const { data, error } = await getSupabase().rpc('fe_guide_summary');
     if (error) throw error;
 
-    // count() returns bigint, which PostgREST may serialise as a string.
+    // count() returns bigint, which PostgREST may serialize as a string.
     return (data || []).map(r => ({
       modelYear: r.model_year,
       rows:      Number(r.row_count),
@@ -4881,7 +4952,7 @@ class DataService {
   // ── Access logging ──────────────────────────────────────────────────────────
 
   /**
-   * Record an unauthorised access attempt (RLS violation or permission error).
+   * Record an unauthorized access attempt (RLS violation or permission error).
    * Writes via a SECURITY DEFINER RPC so anonymous callers can always insert.
    * Errors are silently swallowed — logging must never surface to the user.
    *

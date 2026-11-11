@@ -11,7 +11,7 @@ const profile = (home) => ({
     home,
     fast: { basis: 'maxDc', minutes: (a, b) => taperMinutes(75, 170, a, b) },
 });
-const settings = normalizeCostToDrive({ ...DEFAULT_COST_TO_DRIVE, dailyMi: 45, longMi: 120 });
+const settings = normalizeCostToDrive({ ...DEFAULT_COST_TO_DRIVE, week: 'LDLDLDO', planned: 0b1000000, dailyMi: 45, longMi: 120 });
 const weeks = [{ kw: 11.5, eff: 0.885 }, { kw: 1.44, eff: 0.80 }].map(h => simulateWeek(profile(h), settings));
 
 describe('the day by day as bars', () => {

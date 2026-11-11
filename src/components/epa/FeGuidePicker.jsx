@@ -111,15 +111,15 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
 
     useEffect(() => {
         if (!tgid || linked) return;
-        let cancelled = false;
+        let canceled = false;
         getFeGuideCandidates({
             test_vehicle_id: tgid, make, model_year: modelYear, epa_carline_name: carline,
         })
-            .then(c => { if (!cancelled) setCandidates(c); })
-            .catch(e => { if (!cancelled) setError(e.message); });
-        return () => { cancelled = true; };
+            .then(c => { if (!canceled) setCandidates(c); })
+            .catch(e => { if (!canceled) setError(e.message); });
+        return () => { canceled = true; };
         // getFeGuideCandidates is recreated on every provider render and is
-        // stable in behaviour; including it would refetch on unrelated global
+        // stable in behavior; including it would refetch on unrelated global
         // state changes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tgid, make, modelYear, carline, linked]);
@@ -133,11 +133,11 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
         // the same cascading-render shape the loading flag had; deriving it from
         // feRowId instead means there is nothing to clear.
         if (feRowId == null) return;
-        let cancelled = false;
+        let canceled = false;
         getFeGuideRow(feRowId)
-            .then(r => { if (!cancelled) setLinkedRow(r); })
+            .then(r => { if (!canceled) setLinkedRow(r); })
             .catch(() => { /* the conflict list is advisory; its absence is not an error */ });
-        return () => { cancelled = true; };
+        return () => { canceled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [feRowId]);
 

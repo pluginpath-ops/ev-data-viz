@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
     simulateWeek, simulateGasWeek, gasColdLoss, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
+    weekSummary, gasCarName, chargerText, chargingText,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
-import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL } from '../../constants/costToDrive';
+import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF } from '../../constants/epa';
 
 // A Model Y-ish profile with fixed numbers, so the rule is tested apart from
@@ -16,7 +17,11 @@ const profile = (over = {}) => ({
     fast: { basis: 'maxDc', minutes: (a, b) => taperMinutes(75, 170, a, b) },
     ...over,
 });
-const settings = (over = {}) => normalizeCostToDrive({ ...DEFAULT_COST_TO_DRIVE, ...over });
+// The week these tests were written on: long days between short ones and a
+// planned Sunday stop — the default until 2026-11-10, kept because it
+// exercises every rule. Today's default (Commuter) rarely fast charges.
+const TEST_WEEK = { week: 'LDLDLDO', planned: 0b1000000, dailyMi: 45, dailyCity: 40, longMi: 220, longCity: 15 };
+const settings = (over = {}) => normalizeCostToDrive({ ...DEFAULT_COST_TO_DRIVE, ...TEST_WEEK, ...over });
 const wallOutlet = { home: { kw: 1.44, eff: 0.80 } };
 
 describe('the week', () => {
@@ -91,9 +96,8 @@ describe('the week', () => {
 describe('when a planned fast charge happens', () => {
     const at = (week, d) => simulateWeek(profile(wallOutlet), settings({ week, planned: 1 << d })).stops.find(x => x.planned);
 
-    it('at 5 pm on a day off by default, and at the hour set', () => {
+    it('at 5 pm on a day off', () => {
         expect(at('LDLDLDO', 6).hour).toBe(6 * 24 + 17);
-        expect(simulateWeek(profile(wallOutlet), settings({ plannedHour: 10 })).stops.find(x => x.planned).hour).toBe(6 * 24 + 10);
     });
 
     it('on a driving day, in the gap between drives nearest the hour', () => {
@@ -107,10 +111,11 @@ describe('when a planned fast charge happens', () => {
     });
 
     it('keeps the line running forward wherever the stop lands', () => {
-        for (const plannedHour of [0, 6, 12, 17, 23]) {
+        for (const week of ['LDLDLDO', 'DDDDDLO', 'LLLLLLL', 'OOOOOOO']) {
             for (const p of [profile(), profile(wallOutlet)]) {
-                const { points } = simulateWeek(p, settings({ planned: 0b1111111, plannedHour }));
-                for (let i = 1; i < points.length; i++) expect(points[i][0]).toBeGreaterThanOrEqual(points[i - 1][0]);
+                const { points } = simulateWeek(p, settings({ week, planned: 0b1111111 }));
+                // Forward to within float rounding: hours summed from minutes can land 1e-14 apart.
+                for (let i = 1; i < points.length; i++) expect(points[i][0]).toBeGreaterThanOrEqual(points[i - 1][0] - 1e-9);
             }
         }
     });
@@ -254,8 +259,50 @@ describe('a time in the week', () => {
     });
 });
 
+describe('the week and the gas car in words', () => {
+    const plain = (over) => normalizeCostToDrive({ ...DEFAULT_COST_TO_DRIVE, ...over });
+    // Read with plain spaces; the phrases are held together with no-break ones.
+    const summary = (s) => weekSummary(s).replace(/\u00a0/g, ' ');
+
+    it('counts days in numerals, with each kind\'s miles, the commonest first', () => {
+        expect(summary(plain())).toBe('255 mi per week · 5 days 35 mi, 1 day 80 mi, 1 day off');
+        expect(summary(plain({ week: 'LLDLLDO', dailyMi: 45, longMi: 220 }))).toBe('970 mi per week · 4 days 220 mi, 2 days 45 mi, 1 day off');
+        // Two kinds at the same miles read as one.
+        expect(summary(plain({ week: 'DDDDDLL', dailyMi: 50, longMi: 50 }))).toBe('350 mi per week · 7 days 50 mi');
+        expect(summary(plain({ week: 'OOOOOOO' }))).toBe('0 mi per week · 7 days off');
+    });
+
+    it('names the gas car: the picked one, else the reader\'s, else Custom', () => {
+        expect(weekSummary(plain())).not.toMatch(/\d day/);
+        expect(gasCarName(plain())).toBe('Custom');
+        expect(gasCarName(plain({ gasCar: 'civic' }))).toBe('Civic');
+        expect(gasCarName(plain({ gasName: 'My Accord' }))).toBe('My Accord');
+        expect(gasCarName(plain({ gasName: '   ' }))).toBe('Custom');
+        // A picked car wins over a name typed earlier.
+        expect(gasCarName(plain({ gasCar: 'pilot', gasName: 'My Accord' }))).toBe('Pilot');
+    });
+
+    it('names a charger by level and power, and says what charging was priced at', () => {
+        const words = (t) => t.replace(/\u00a0/g, ' ');
+        expect(words(chargerText(HOME_LEVELS[0]))).toBe('L1 1.4 kW');
+        expect(words(chargerText(HOME_LEVELS[4]))).toBe('L2 11.5 kW');
+        expect(words(chargingText(plain(), HOME_LEVELS[4]))).toBe('L2 11.5 kW at $0.17/kWh · fast charging at $0.48/kWh');
+        expect(words(chargingText(plain({ homePrice: 0.31 })))).toBe('home at $0.31/kWh · fast charging at $0.48/kWh');
+        expect(words(chargingText(plain(), HOME_LEVELS[NO_HOME_LEVEL]))).toBe('no home charging · fast charging at $0.48/kWh');
+        // Wraps only between phrases.
+        expect(chargingText(plain()).split(' ')).toHaveLength(3);
+    });
+});
+
 describe('no home charging', () => {
     const noHome = { home: { kw: 0, eff: 0.885, none: true } };
+
+    it('is shown first, then the chargers smallest to largest, each level once', () => {
+        expect(HOME_LEVEL_ORDER[0]).toBe(NO_HOME_LEVEL);
+        expect([...HOME_LEVEL_ORDER].sort((a, b) => a - b)).toEqual(HOME_LEVELS.map((_, i) => i));
+        const kw = HOME_LEVEL_ORDER.slice(1).map(i => HOME_LEVELS[i].volts * HOME_LEVELS[i].amps);
+        expect(kw).toEqual([...kw].sort((a, b) => a - b));
+    });
 
     it('is a level of its own, after the six chargers, with no power at home', () => {
         expect(NO_HOME_LEVEL).toBe(HOME_LEVELS.length - 1);

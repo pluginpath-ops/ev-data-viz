@@ -47,7 +47,7 @@ import { CHEMISTRIES, DC_400V_CHARGING } from './platforms';
  * even with the toggle on.
  *
  * Ground clearance is deliberately NOT annotated, though the design named it.
- * It is a trade-off — clearance against aerodynamics and roll centre — and it
+ * It is a trade-off — clearance against aerodynamics and roll center — and it
  * fails the same test the design applies to everything else.
  */
 export const SPEC_CATEGORIES = [

@@ -6,7 +6,7 @@ A throwaway Postgres restored from a production dump, with a stubbed auth layer,
 so two things can be tested without touching the live database:
 
 1. **Migrations**, before they are pasted into the Supabase SQL editor.
-2. **Role-gated behaviour** — RLS policies, and anything that depends on being
+2. **Role-gated behavior** — RLS policies, and anything that depends on being
    an admin or contributor.
 
 The second is the one that has been missing. The browser preview is signed out,
@@ -96,10 +96,10 @@ Requires `brew install postgrest` (16.x) and Node.
 
 ### How the fidelity works, and where it stops
 
-**`auth.uid()` is stubbed. Authorisation is not.** `public.current_user_role()`
+**`auth.uid()` is stubbed. Authorization is not.** `public.current_user_role()`
 arrives from the dump exactly as migration 001 defines it, and every RLS policy
 that calls it is the real one. A test therefore exercises the actual
-authorisation logic and only lies about who is asking.
+authorization logic and only lies about who is asking.
 
 Two settings make that work, and both are required:
 

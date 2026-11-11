@@ -4,7 +4,7 @@
  * ── Why a ledger and not a lint rule ────────────────────────────────────────
  *
  * The project already has a ratchet: `KNOWN_OFFENDERS` in
- * `src/__tests__/contrast.test.js`. It watches 61 things, and it reads as
+ * `src/__tests__/contrast.test.js`. It watches nothing now (it is 0), and it once read as
  * though it watches "drift". It does not. It matches one narrow shape — a
  * LIGHT background utility with no `dark:` on the same line — which is about
  * 13% of the color drift here and none of the size drift. Everything else
@@ -45,7 +45,7 @@
  *     light surface with no dark counterpart is the invisible-input bug — and
  *     Phase 10 owns driving it to zero.
  *   - the `[data-theme="dark"] .foo` cap (playground.test.js) is bound to
- *     `DARK_OVERRIDE_CLASSES` in the playground catalogue, which marks those
+ *     `DARK_OVERRIDE_CLASSES` in the playground catalog, which marks those
  *     specimens in the side-by-side view. Splitting the count from the list it
  *     keeps in step would leave two half-guards.
  *
@@ -225,7 +225,7 @@ export const LEDGER = [
     },
     {
         key: 'hex-literal',
-        count: 38,  // 44 → 40: the spec chart's hard-coded yes/no greens and reds, and its grey, went when yes/no became vehicle-colored bars (#450); 40 → 38: Road Trip's box-zoom drag, written out at each of its charts, became one ZOOM_DRAG (Trip Optimizer)
+        count: 38,  // 44 → 40: the spec chart's hard-coded yes/no greens and reds, and its gray, went when yes/no became vehicle-colored bars (#450); 40 → 38: Road Trip's box-zoom drag, written out at each of its charts, became one ZOOM_DRAG (Trip Optimizer)
         scope: 'src/**/*.jsx',
         what: 'Raw hex colors in component source. Mostly canvas drawing and the '
             + '`#3b82f6` default series color, repeated at eight call sites rather '
@@ -255,7 +255,7 @@ export const LEDGER = [
         count: 0,
         scope: 'src/**/*.jsx, src/utils/chartUtils.js',
         what: 'Canvas text drawn with a hardcoded font shorthand. Held at ZERO — it '
-            + 'was 15 across seven files, every chart on the site labelling itself in '
+            + 'was 15 across seven files, every chart on the site labeling itself in '
             + '`11px system-ui` while the page around it rendered in Public Sans, and '
             + 'none of them moving when the --ui-scale knob did. This is the one probe '
             + 'that guards a surface already clean, because canvas is where the '

@@ -89,11 +89,11 @@ function CandidatePicker({ vehicle, linkedIds, mappings, onLinked }) {
     const missingKey = missing.map(r => r.id).join(',');
     useEffect(() => {
         if (!open || !missingKey) return;
-        let cancelled = false;
+        let canceled = false;
         getGuideRowsTestedVia(missing)
-            .then(j => { if (!cancelled) setVias(v => ({ ...v, ...j })); })
-            .catch(e => { if (!cancelled) setError(e.message); });
-        return () => { cancelled = true; };
+            .then(j => { if (!canceled) setVias(v => ({ ...v, ...j })); })
+            .catch(e => { if (!canceled) setError(e.message); });
+        return () => { canceled = true; };
         // `missing` is keyed by missingKey; getGuideRowsTestedVia is recreated
         // on every provider render.
         // eslint-disable-next-line react-hooks/exhaustive-deps

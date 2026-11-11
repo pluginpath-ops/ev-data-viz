@@ -1,9 +1,9 @@
 /**
- * The catalogue of controls the site is allowed to draw with.
+ * The catalog of controls the site is allowed to draw with.
  *
  * Data, not markup, and deliberately so. It is read twice: `Playground.jsx`
  * renders it, and `playground.test.js` checks the stylesheet against it. That
- * second reader is the point — a catalogue nobody verifies drifts out of date
+ * second reader is the point — a catalog nobody verifies drifts out of date
  * within a month and then actively misleads, which is worse than not having one.
  *
  * ── What this is for ────────────────────────────────────────────────────────
@@ -16,19 +16,19 @@
  *   2. CHOOSING. A menu. "Use the filter pill, not a fourth kind of button" is
  *      a sentence you can only say if there is a list to point at.
  *   3. CONSTRAINING. A new class in an owned family fails the coverage test
- *      until it is catalogued or explicitly excused, so the list stays true and
+ *      until it is cataloged or explicitly excused, so the list stays true and
  *      additions stay deliberate.
  *
  * ── Owned families ─────────────────────────────────────────────────────────
  *
  * Coverage is asserted only within `OWNED_FAMILIES`. The stylesheet has ~411
  * classes and most are layout, tables and chart internals that need real data
- * to mean anything — cataloguing them would be a list of empty boxes. The
+ * to mean anything — cataloging them would be a list of empty boxes. The
  * families here are the ones a feature actually picks FROM, which is the
  * decision this page exists to inform. Widen them as later sections land.
  */
 
-/** A class is expected in the catalogue when it matches one of these. */
+/** A class is expected in the catalog when it matches one of these. */
 export const OWNED_FAMILIES = [
     { id: 'buttons', label: 'Buttons', match: (n) => /^btn(-|$)/.test(n) },
     { id: 'pills',   label: 'Pills, chips & badges',
@@ -51,17 +51,17 @@ export const OWNED_FAMILIES = [
  * appearance of their own — a specimen of them would be an empty box that
  * teaches nothing — or variants whose parent is already shown.
  */
-export const NOT_CATALOGUED = {
-    'color-source-note': 'Not a menu — a line of secondary text at the top of the run picker (ColorSourceNote), matched here only by its color- prefix. It holds the applied dot, which is catalogued with the section band, and a .color-source-link.',
+export const NOT_CATALOGED = {
+    'color-source-note': 'Not a menu — a line of secondary text at the top of the run picker (ColorSourceNote), matched here only by its color- prefix. It holds the applied dot, which is cataloged with the section band, and a .color-source-link.',
     'color-source-link': 'The underlined text button inside .color-source-note (Use each vehicle\'s own color, Clear picks): primary color, no box. Shown with the note it sits in.',
-    'featured-vehicle-chip': 'The same pill as .selected-vehicle-chip (one rule, two names) where Home and the featured comparison editor name a comparison\'s vehicles. It reports a set, so it is not the selection. The selection chip is catalogued.',
+    'featured-vehicle-chip': 'The same pill as .selected-vehicle-chip (one rule, two names) where Home and the featured comparison editor name a comparison\'s vehicles. It reports a set, so it is not the selection. The selection chip is cataloged.',
     'featured-chip-button': 'The ‹ › × buttons inside a .featured-vehicle-chip in the editor (move earlier, move later, remove): inherit the chip\'s color, dim on hover and when unavailable.',
-    'selected-vehicle-chip-name': 'The name inside .selected-vehicle-chip, drawn as a button: inherits the chip\'s color and only underlines on hover. The chip is catalogued.',
-    'info-icon':        'Layout wrapper — an inline-flex span holding the glyph. The glyph is catalogued.',
+    'selected-vehicle-chip-name': 'The name inside .selected-vehicle-chip, drawn as a button: inherits the chip\'s color and only underlines on hover. The chip is cataloged.',
+    'info-icon':        'Layout wrapper — an inline-flex span holding the glyph. The glyph is cataloged.',
     'popover-foot-gap': 'A flex spacer inside the action row — it has no appearance at '
-        + 'all, it is the gap that keeps Auto away from Apply. The row is catalogued.',
-    'popover--anchored': 'Position and layer only, no appearance: it carries the `fixed` that lets a panel leave a scrolling sidebar. Its two tiers are catalogued.',
-    'cert-chips':        'Layout wrapper — a flex row that holds chips. The chips are catalogued.',
+        + 'all, it is the gap that keeps Auto away from Apply. The row is cataloged.',
+    'popover--anchored': 'Position and layer only, no appearance: it carries the `fixed` that lets a panel leave a scrolling sidebar. Its two tiers are cataloged.',
+    'cert-chips':        'Layout wrapper — a flex row that holds chips. The chips are cataloged.',
     'tag-filter-bar':    'Layout wrapper for the filter row.',
     'tag-filter-legend': 'The "AND / OR / NOT" key beside the bar, not a control.',
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
@@ -80,7 +80,7 @@ export const NOT_CATALOGUED = {
         + 'the facet-menu composite only when the list is long enough to need it.',
     'guide-facet-label': 'Superseded by the menu button — a leftover of the chip wall 5a '
         + 'replaced, still styling one label in the stats controls.',
-    'guide-facet-values': 'Layout wrapper for a row of chips. The chips are catalogued.',
+    'guide-facet-values': 'Layout wrapper for a row of chips. The chips are cataloged.',
     'guide-facet-search': 'Layout wrapper for the search input beside a facet row.',
     'guide-facet-columns': 'Layout wrapper — a grid of facet columns.',
     'fixed-action-bar':
@@ -90,7 +90,7 @@ export const NOT_CATALOGUED = {
     'selected-chip-scroll':
         'The capped, scrolling box the selected-vehicle chips sit in. It is a '
         + 'height budget for the sticky header, not a control — a specimen of it '
-        + 'would be an empty 60px rectangle. The chips inside it are catalogued.',
+        + 'would be an empty 60px rectangle. The chips inside it are cataloged.',
     'btn-toggle-clear':  'The × inside an active .btn-toggle; shown as part of that specimen.',
     'vehicle-media-badge':
         'Absolutely positioned over a vehicle photograph, on a dark plate that only '
@@ -172,7 +172,7 @@ export const SECTIONS = [
               note: 'The base every floating surface uses — one fill, one radius, one shadow, one layer. Width comes from --popover-w, placement from a --<placement> modifier.' },
             { composite: 'facet-panel', label: 'Facet menu, open',
               covers: ['menu-button', 'popover--stretch', 'popover--end', 'guide-facet-panel', 'guide-facet-panel-head', 'guide-facet-panel-list', 'guide-facet-panel-foot', 'guide-facet-option', 'guide-facet-option-name', 'guide-facet-option-count', 'guide-facet-btn-value', 'guide-facet-caret', 'guide-facet-option-row', 'guide-facet-exclude', 'guide-facet-match'],
-              note: 'A value that would leave nothing is disabled rather than hidden: a make vanishing reads as a bug, a greyed one reads as an answer.' },
+              note: 'A value that would leave nothing is disabled rather than hidden: a make vanishing reads as a bug, a grayed one reads as an answer.' },
             { cls: 'nav-menu-icon', as: 'span', label: '☰',
               note: 'The mark before a collapsed bar\'s current name (#338): three bars on the main nav, a bulleted list on the sub-nav, so the two menus never look alike. The real ones are inline SVG in the label\'s color.' },
             { cls: 'nav-menu-icon-dot', as: 'span', label: '•',
@@ -368,13 +368,13 @@ export const SECTIONS = [
     },
 ];
 
-/** Every class this catalogue claims to show, flattened. */
-export function cataloguedClasses() {
+/** Every class this catalog claims to show, flattened. */
+export function catalogedClasses() {
     const out = new Set();
     for (const section of SECTIONS) {
         for (const s of section.specimens) {
             // Only the semantic classes count — a `py-1` in a specimen is
-            // demonstrating an override, not claiming to catalogue a utility.
+            // demonstrating an override, not claiming to catalog a utility.
             //
             // The size utilities are listed WHOLE rather than as a prefix with
             // a trailing hyphen: `text-xs` has no hyphen after `xs`, so a
@@ -384,7 +384,7 @@ export function cataloguedClasses() {
             // in specimens.jsx, out of reach of `scripts/health.js`, which
             // imports this in plain node. So it DECLARES what it shows. That
             // is a list to keep in step, and deliberately so: the alternative
-            // is a composite quietly claiming to catalogue whatever it happens
+            // is a composite quietly claiming to catalog whatever it happens
             // to contain today.
             for (const c of (s.cls ?? (s.covers ?? []).join(' ')).split(/\s+/).filter(Boolean)) {
                 const isUtility = /^(p|px|py|m|mx|my|w|h)-[\d.]/.test(c)

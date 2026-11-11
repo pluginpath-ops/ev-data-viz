@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    normaliseMake, sameMake, carlineScore, rankFeCandidates, bestFeCandidate, MATCH_FLOOR,
+    normalizeMake, sameMake, carlineScore, rankFeCandidates, bestFeCandidate, MATCH_FLOOR,
 } from '../feGuideMatch';
 
 /** Shapes taken from the staged MY2025 rows. */
@@ -29,9 +29,9 @@ describe('sameMake', () => {
         expect(sameMake('Ford', null)).toBe(false);
     });
 
-    it('normalises to comparable text', () => {
-        expect(normaliseMake('Mercedes-Benz')).toBe('mercedesbenz');
-        expect(normaliseMake(null)).toBe('');
+    it('normalizes to comparable text', () => {
+        expect(normalizeMake('Mercedes-Benz')).toBe('mercedesbenz');
+        expect(normalizeMake(null)).toBe('');
     });
 });
 
@@ -139,7 +139,7 @@ describe('bestFeCandidate', () => {
     it('proposes nothing when the top candidates tie', () => {
         // Real case: our carline is often just `Ioniq 5`, which scores
         // identically against every variant — and those are 221 and ~300 miles
-        // apart. Any tie-break is arbitrary dressed as a judgement, and the
+        // apart. Any tie-break is arbitrary dressed as a judgment, and the
         // first version proposed the 221-mile N purely for having a short name.
         const ambiguous = { make: 'Hyundai', model_year: 2025, epa_carline_name: 'Ioniq 5' };
         const variants = [

@@ -63,7 +63,7 @@ its power is capped at about the charger's current times half the pack voltage
 
 Current ratings vary a lot from one charger to the next
 [[fact:dc-cable-current-ratings]]. For a sense of scale: a Tesla V3 post
-is labelled 350 A continuous [[fact:tesla-v3-cable-current]], this limits a 
+is labeled 350 A continuous [[fact:tesla-v3-cable-current]], this limits a 
 350 V effective battery (700 V native) to about 120 kW. V3 posts do boost above that label
 [[fact:tesla-v3-boost-current]] for a short period, depending on weather and equipment conditions.
 

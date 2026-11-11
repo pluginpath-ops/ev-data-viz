@@ -151,7 +151,7 @@
     --color-accent-orange: rgb(217, 119, 6);   /* provisional — light pass */
     --color-accent-green:  rgb(5, 150, 105);   /* provisional — light pass */
     --color-accent-violet: rgb(124, 58, 237);  /* provisional — light pass */
-    --color-accent-grey:   rgb(107, 114, 128); /* provisional — light pass */
+    --color-accent-gray:   rgb(107, 114, 128); /* provisional — light pass */
 }
 
 /* ── Dark mode overrides ─────────────────────────────────────────────────── */
@@ -178,7 +178,7 @@
  * the contrast sweep is right to reject it. Rather than exempt it (it is a
  * label, not decoration, and it is SMALL, so the large-text allowance does not
  * apply) the tier merges upward into --color-text-meta at #7c8798, which is the
- * handoff's own next value up and measures 5.05:1. Eight grey tiers become
+ * handoff's own next value up and measures 5.05:1. Eight gray tiers become
  * seven; nothing else about the palette moves.
  */
 [data-theme="dark"] {
@@ -188,12 +188,12 @@
        tick — and, solid, the one commit button a view may carry. Nothing else
        on the page may use it; that is what makes "where am I" answerable from
        across the room. Green stays a data and status color,
-       never chrome. Violet and grey are series colors only. */
+       never chrome. Violet and gray are series colors only. */
     --color-accent-blue:   rgb(45, 127, 249);   /* #2d7ff9 */
     --color-accent-orange: rgb(242, 139, 60);   /* #f28b3c */
     --color-accent-green:  rgb(35, 180, 126);   /* #23b47e */
     --color-accent-violet: rgb(155, 140, 240);  /* #9b8cf0 */
-    --color-accent-grey:   rgb(107, 122, 143);  /* #6b7a8f */
+    --color-accent-gray:   rgb(107, 122, 143);  /* #6b7a8f */
 
     /* Semantic roles, re-valued onto those accents. The button API
        (btn-primary / -edit / -danger / -secondary / -warning) is untouched —
@@ -335,7 +335,7 @@
 
 /* ── Radii ──────────────────────────────────────────────────────────────────
    The handoff's six, named for what they wrap rather than by size, so a call
-   site says `--radius-control` and cannot drift to a neighbouring value. There
+   site says `--radius-control` and cannot drift to a neighboring value. There
    was no radius token before this: six literal `border-radius` declarations and
    about a hundred `@apply rounded-xs*`, which is how a 6px button came to sit
    beside a 4px one.
@@ -407,7 +407,7 @@
  *                         Examples: View Tests & Data ↘, Open chart ↘,
  *                                   Open in new window
  *
- * btn-secondary (grey)  — Every other action: add, create, select, upload,
+ * btn-secondary (gray)  — Every other action: add, create, select, upload,
  *                         cancel, export, edit.
  *                         Examples: + Add Vehicle, Select All Visible, Create
  *                                   tag, Upload image, Cancel, Edit
@@ -483,7 +483,11 @@
     background-color: var(--color-surface-sunken);
     color: var(--color-text-primary);
 }
-.btn-toggle.active {
+/* Also the week or gas car Your Driving's settings pick now (.drive-presets),
+   without the clear-on-hover below: picking another is how you change it. */
+.btn-toggle.active,
+.drive-presets .btn[aria-pressed="true"],
+.drive-presets .drive-name-input.is-selected {
     background-color: var(--color-primary-surface);
     border-color: var(--color-primary-border);
     color: var(--color-primary-text);
@@ -1462,7 +1466,7 @@ body {
     justify-content: space-between;
     gap: 10px;
 }
-/* Two labelled halves rather than the bar's old `⇄ IMP`, which said a switch
+/* Two labeled halves rather than the bar's old `⇄ IMP`, which said a switch
    existed but never which way it would go. */
 .account-segmented {
     display: flex;
@@ -1604,7 +1608,7 @@ body {
     border-color: var(--color-border);
 }
 
-/* Chip row summarising the plan (create / fill / skip / error counts) */
+/* Chip row summarizing the plan (create / fill / skip / error counts) */
 .import-summary-row {
     @apply flex flex-wrap items-center gap-2;
 }
@@ -1736,7 +1740,7 @@ body {
 .data-cell-input:disabled {
     color: var(--color-text-secondary);
     @apply cursor-default;
-    opacity: 1;   /* Safari greys a disabled input to near-invisible otherwise. */
+    opacity: 1;   /* Safari grays a disabled input to near-invisible otherwise. */
 }
 
 /* CSV file upload drag-drop target */
@@ -1892,7 +1896,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 }
 
 /* Border-style status badge (full-radius); color classes added inline */
-/* Same shape and metrics as .badge-default and .badge-hidden, in grey. It was
+/* Same shape and metrics as .badge-default and .badge-hidden, in gray. It was
    the odd one out — a bare outline with no fill and no color of its own, so it
    took whatever text color it inherited and read as stray text, not a badge. */
 /* .badge-status shares the micro-badge metrics and intents defined above. */
@@ -2007,7 +2011,6 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* The label and Clear keep their width: squeezed by the chips at 375px,
    what was "Clear all" wrapped to two lines and made the strip taller than the chips it
    was there to remove. */
-.selected-strip-row > .text-micro,
 .selected-strip-actions > .btn {
     flex: none;
     white-space: nowrap;
@@ -2043,7 +2046,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * third of a phone viewport.
  *
  * The cap is two chip rows exactly: 2 × 26px of chip plus the 8px between
- * them. `Selected` and `Clear` stay OUTSIDE this box, so the way out of a
+ * them. The label (Selected ▾) and `Clear` stay OUTSIDE this box, so the way out of a
  * large selection is never the thing that scrolled away. */
 .selected-chip-scroll {
     display: flex;
@@ -2068,14 +2071,16 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * appears beside it rather than pushing it along. */
 /* The list scrolls; the search above it does not, so the field you are typing
    in never scrolls away from the rows it is narrowing. */
-.vehicle-quick-add-list {
+.vehicle-quick-add-list,
+.saved-selections-list {
     max-height: 18rem;
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
     margin: 0 -12px;
 }
-.vehicle-quick-add-row {
+.vehicle-quick-add-row,
+.saved-selections-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -2086,7 +2091,8 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     text-align: left;
 }
 /* A fixed column, so names line up whether or not a row is ticked. */
-.vehicle-quick-add-check {
+.vehicle-quick-add-check,
+.saved-selections-mark {
     flex: none;
     width: 1em;
     text-align: center;
@@ -2097,6 +2103,78 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 }
 .vehicle-quick-add-empty {
     @apply px-3 py-2 italic;
+}
+
+/* ── Saved selections ────────────────────────────────────────────────────────
+ *
+ * "Selected ▾", the chips row's label, and its panel: the reader's named
+ * vehicle sets (SavedSelectionsMenu.jsx). Its list, rows and ✓ column are the
+ * quick-add's, grouped into those rules above. */
+.saved-selections-actions {
+    margin: 0 -12px;
+    border-bottom: 1px solid var(--color-border);
+}
+.saved-selections-item {
+    display: flex;
+    align-items: center;
+}
+.saved-selections-item > .saved-selections-row {
+    flex: 1 1 auto;
+}
+.saved-selections-count {
+    margin-left: auto;
+    padding-left: 8px;
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-text-muted);
+}
+/* Rename and delete: quiet until approached, so the name is what reads. */
+.saved-selections-tool {
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-right: 4px;
+    color: var(--color-text-meta);
+}
+.saved-selections-tool:not(.btn-icon-danger):hover {
+    color: var(--color-text-primary);
+}
+.saved-selections-problem {
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    color: var(--color-danger-text);
+}
+.saved-selections-note {
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+}
+/* The trigger IS the chips row's label. Keeps its width like Clear does, but
+   caps a long name so the chips keep theirs. */
+.saved-selections {
+    flex: none;
+}
+.saved-selections-trigger {
+    display: inline-flex;
+    align-items: center;
+    max-width: 14rem;
+    white-space: nowrap;
+}
+/* The name, and under it "modified" once the chips change: a second line
+   rather than a wider button, since two lines fit inside the chips' two rows. */
+.saved-selections-trigger-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.15;
+    text-align: left;
+}
+.saved-selections-modified {
+    font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
+    color: var(--color-text-meta);
+}
+/* One step above body, where the facets' caret is micro: the ▾ glyph is small
+   for its size, and at micro it read as a dot beside a two-line label. */
+.saved-selections-caret {
+    --caret-size: calc(var(--fs-body) / var(--fs-step));
+    margin-left: 0.35em;
 }
 
 /* ── Tested figure ──────────────────────────────────────────────────────────
@@ -2240,8 +2318,8 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* Hover leaves the LEFT border alone and previews the selection color on it.
  *
  * `border-color` is a shorthand, so the old `:hover { border-color: … }`
- * repainted the selection bar grey — and you select by CLICKING, which leaves
- * the cursor on the card, so grey-on-hover was the whole of the feedback at
+ * repainted the selection bar gray — and you select by CLICKING, which leaves
+ * the cursor on the card, so gray-on-hover was the whole of the feedback at
  * the one moment it had to be legible. Selecting looked like nothing had
  * happened. Now hover shows the bar at 45%: a hovered card says "this is what
  * selecting looks like", and the click completes it rather than undoing it. */
@@ -2309,7 +2387,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * A grid, not a flex row (#338): every row and the header share these tracks,
  * so a figure sits under its heading whatever the row holds. As a flex row, a
  * row with one more button pushed its figures sideways, and a row with a
- * platform line grew taller than its neighbours. */
+ * platform line grew taller than its neighbors. */
 .vehicle-row,
 .vehicle-list-head {
     display: grid;
@@ -2334,8 +2412,8 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     background-color: var(--color-background);
     border-bottom: 1px solid var(--color-border);
 }
-/* Every heading is centred the same way, sortable (a button) or not, so none
-   sits on a text baseline its neighbours do not share. */
+/* Every heading is centerd the same way, sortable (a button) or not, so none
+   sits on a text baseline its neighbors do not share. */
 .vehicle-list-head > [role="columnheader"] {
     display: flex;
     align-items: center;
@@ -2446,7 +2524,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: var(--color-text-value);
 }
 /* The pool's half of "4/2" (#394): unlisted tests that still count in the
-   statistics. Grey, so the listed count — what a reader can open — leads. */
+   statistics. Gray, so the listed count — what a reader can open — leads. */
 .test-count-pool {
     font-family: var(--font-mono);
     color: var(--color-text-meta);
@@ -2550,7 +2628,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * two-row subgrid of the grid: rolodex cards in the first track, the card in
  * the second. So the cards in a row start level and share one height whether
  * or not they carry a stack, and a plain card is never stretched to the
- * height of its neighbour's stack. */
+ * height of its neighbor's stack. */
 .vehicle-stack {
     display: grid;
     grid-row: span 2;
@@ -2578,7 +2656,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     cursor: pointer;
 }
 
-/* A source, saying only enough to recognise it. The card's own edge: the
+/* A source, saying only enough to recognize it. The card's own edge: the
    3px left border reserved for the selection bar and the square corner on
    that side, so a selected source and a selected card draw one continuous
    bar. Open at the bottom, so it tucks behind the one below. */
@@ -2903,7 +2981,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  * above the canvas doing the same to the plot.
  *
  * Absolute, so its cost to layout is zero and the acceptance test can be a
- * measurement rather than a judgement: the first control's top must not move
+ * measurement rather than a judgment: the first control's top must not move
  * between idle and loading. Pointer-transparent, because the stale chart
  * underneath stays readable and worth interacting with while the new data
  * arrives.
@@ -3063,7 +3141,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     min-height: 0;
 }
 
-/* A labelled group inside the rail. */
+/* A labeled group inside the sidebar. */
 .chart-rail-group {
     display: flex;
     flex-direction: column;
@@ -3188,7 +3266,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     min-width: 0;
     cursor: pointer;
 }
-/* The real checkbox stays in the DOM and keeps its keyboard behaviour and its
+/* The real checkbox stays in the DOM and keeps its keyboard behavior and its
    focus ring; the track is what you see. */
 .race-mode-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 
@@ -3419,7 +3497,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     gap: 6px 10px;
 }
 
-/* A labelled <select> in the sidebar — the correction basis in Display, the
+/* A labeled <select> in the sidebar — the correction basis in Display, the
    color source atop the run selector, and any that follow.
  *
  * They are written as separate components with unrelated data, and they were
@@ -3526,12 +3604,14 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .color-source-note > .applied-dot {
     align-self: center;
 }
-.color-source-link {
+.color-source-link,
+.saved-selections-sign-in {
     color: var(--color-primary);
     text-decoration: underline;
     cursor: pointer;
 }
-.color-source-link:hover { color: var(--color-text-primary); }
+.color-source-link:hover,
+.saved-selections-sign-in:hover { color: var(--color-text-primary); }
 
 /* The export receipt. A quarter width, because its job is to say "this is what
    you got" and to be right-clickable — not to be a second copy of the chart
@@ -3929,7 +4009,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     letter-spacing: 0.06em;
     color: var(--color-text-meta);
 }
-/* The scrim would grey out the fallback panel for no reason — there is no
+/* The scrim would gray out the fallback panel for no reason — there is no
    photograph under it to darken. */
 .vehicle-media.is-empty .vehicle-media-scrim { display: none; }
 
@@ -4488,7 +4568,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 
-/* The section band (SectionBand.jsx): the labelled divider that opens a
+/* The section band (SectionBand.jsx): the labeled divider that opens a
    section of the sidebar — the run selector, routing overrides, the
    performance run picker, every Display section. One class for all of them;
    the label inside is .text-micro, the band's micro all-caps voice. */
@@ -4553,7 +4633,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    as a flex item the header's `w-full` pins it to the parent's content box, so
    the negative margins shifted it without widening it. As a block child of a
    block parent, `width: auto` on a `display: flex` element fills the parent and
-   the margins then extend past it, which is the behaviour wanted. */
+   the margins then extend past it, which is the behavior wanted. */
 .chart-rail .run-selector-bar { display: block; }
 .chart-rail .section-band {
     /* Explicit width, not `auto`: a <button> sizes to its CONTENT even at
@@ -4841,7 +4921,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* A hand-set color this run is holding while a palette draws it — parked.
  *
  * A chip peeking out behind the swatch, not a replacement for it: the face of
- * the swatch still reports the DRAWN color, which is the rule the whole colour
+ * the swatch still reports the DRAWN color, which is the rule the whole color
  * vocabulary rests on. This says "and there is another one under here".
  *
  * `box-shadow` rather than a pseudo-element, because a ::before with a negative
@@ -5237,8 +5317,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  *
  * The inherited card carries three in this row — a color and the two scaling
  * knobs — and side by side they ran to nearly half the card's width, so the
- * quietest controls on the card were also its widest thing. Each is a labelled
- * field; a labelled field wants a line. */
+ * quietest controls on the card were also its widest thing. Each is a labeled
+ * field; a labeled field wants a line. */
 .run-actions-stack {
     @apply flex flex-col gap-1.5 items-end;
 }
@@ -5599,7 +5679,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
    `Differences only` is the control that answers the question; a badge that is
    always on does not. */
 /* Best in row: a muted WASH on the cell, never colored text. The figure stays
-   the same color as its neighbours so the eye lands on the cell rather than
+   the same color as its neighbors so the eye lands on the cell rather than
    reading the digits as special. */
 .specs-td.is-best {
     background-color: var(--color-success-surface);
@@ -5959,7 +6039,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * There is no hover on touch, so the peek tier has no trigger there — rather
  * than reproduce it as a tap, the tap opens this directly.
  *
- * Full width and bottom-anchored: a centred panel on a phone leaves margins
+ * Full width and bottom-anchored: a centerd panel on a phone leaves margins
  * too thin to read past, and a table wants every pixel of the width. */
 .popover.popover--sheet {
     font-size: var(--fs-note, calc(var(--fs-body) * var(--fs-step)));
@@ -6128,7 +6208,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* The palette switch. It carries `.form-input` in the markup now and this rule
    only widens it, where it used to restate every one of that class's properties
-   with different values -- its own padding, border-radius, colour and, worst, a
+   with different values -- its own padding, border-radius, color and, worst, a
    `--fs-nano` font size. Nano is the bottom of the whole scale, a step BELOW
    micro, meant for the legend inside a chip. On a control naming the set the
    entire plot is drawn from, in a panel whose other controls are body-sized, it
@@ -6200,7 +6280,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
  * there is room to keep them.
  *
  * Each track shows what it controls: hue is the spectrum, lightness is the
- * CURRENT hue from black to white. A grey bar with a number beside it would be
+ * CURRENT hue from black to white. A gray bar with a number beside it would be
  * a control you have to operate to find out what it does. */
 .color-slider {
     @apply block;
@@ -7362,7 +7442,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* ── Certification paths (#206) ──────────────────────────────────────────────
-   One grid, two labelled rows of equal cells. The 5-cycle cell spans both rows
+   One grid, two labeled rows of equal cells. The 5-cycle cell spans both rows
    because it has no adjustment step — the geometry is the statement, which is
    why there is no longer a rail with a caption explaining itself. */
 
@@ -7799,7 +7879,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* The any / all switch in a facet's head: the segmented control, small. */
 .guide-facet-match button { padding: 1px 8px; }
 
-/* Disabled, not hidden: a make vanishing reads as a bug, a greyed one reads as
+/* Disabled, not hidden: a make vanishing reads as a bug, a grayed one reads as
    an answer. */
 .guide-facet-option:has(input:disabled) {
     opacity: 0.45;
@@ -7864,7 +7944,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 
 /* A range's bounds, in the same button-and-panel shape as a facet so the row
-   reads as one kind of control — and now with the same open/close behaviour
+   reads as one kind of control — and now with the same open/close behavior
    too, which <details> could not give it. */
 .guide-range-panel { --popover-w: 200px; }
 
@@ -8021,7 +8101,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-weight: 700;
     color: var(--color-text-primary);
 }
-/* Numeric columns are centred, text stays left. Centring trades away decimal
+/* Numeric columns are centerd, text stays left. Centring trades away decimal
    alignment, which is the usual reason to right-align a number column — but
    these are whole-number figures at a fixed precision per column, and the bar
    fill behind them already gives the eye a left-anchored edge to scan. */
@@ -8481,10 +8561,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     line-height: 1.25;
 }
 /* Text that names a test links to it — a tested cell's note in the vehicle
-   table, the conditions on a card's tested line. Link-coloured and underlined
+   table, the conditions on a card's tested line. Link-colored and underlined
    only on hover: every tested figure carries one, and a column of underlines
    would read as noise rather than as "you can open this". Doubled with its
-   element so it outranks the note's own colour wherever it lands. */
+   element so it outranks the note's own color wherever it lands. */
 a.is-test-link {
     color: var(--color-text-link);
     text-decoration: none;
@@ -8886,7 +8966,7 @@ a.is-test-link:focus-visible {
     width: 100%;
     accent-color: var(--color-primary);
 }
-/* The accessory load while it follows the temperature: grey, as an untouched
+/* The accessory load while it follows the temperature: gray, as an untouched
    control reads, so that blue means "set by you". The thumb and the filled bar
    take the one accent color. */
 .assumption-slider.is-auto { accent-color: var(--color-text-muted); }
@@ -8902,7 +8982,7 @@ a.is-test-link:focus-visible {
     gap: 2px;
     padding: 4px 0;
 }
-/* The heading row is a .rail-select-row, the sidebar's own labelled row; only
+/* The heading row is a .rail-select-row, the sidebar's own labeled row; only
    "reset" needs placing, at the far end. */
 .correction-target .section-action { margin-left: auto; }
 .correction-target-row {
@@ -9397,7 +9477,7 @@ a.is-test-link:focus-visible {
    instead of needing a fifth rule. */
 
 /* ── Playground ──────────────────────────────────────────────────────────────
-   The catalogue page. Its own chrome is deliberately plain — anything eye-
+   The catalog page. Its own chrome is deliberately plain — anything eye-
    catching here competes with the specimens, which are the content. */
 
 .pg-root { @apply flex flex-col gap-8; }
@@ -9420,7 +9500,7 @@ a.is-test-link:focus-visible {
     background-color: var(--color-surface-muted);
     border: 1px solid var(--color-border);
 }
-/* Fixed height so a tall control does not shunt its neighbours out of line. */
+/* Fixed height so a tall control does not shunt its neighbors out of line. */
 .pg-specimen-stage { @apply flex items-center min-h-9; }
 .pg-specimen-meta  { @apply flex flex-wrap items-center gap-x-2 gap-y-1; }
 
@@ -9830,6 +9910,12 @@ a.is-test-link:focus-visible {
 }
 .drive-intro-text p { max-width: 40rem; }
 .drive-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+/* The row's lead-in ("Start from", "Car") on a line of its own, as "Charger"
+   heads its cards: inline, a wrapped row left buttons stranded under it. */
+.drive-presets > .text-label { flex-basis: 100%; }
+/* Your own gas car's name, last in the row of cars: wide enough for "Custom"
+   and a short name, narrower than a full model name. */
+.drive-name-input { flex: 0 1 9rem; min-width: 6rem; }
 /* Wide enough for a full vehicle name beside its two figures: it shares the
    row evenly with the intro rather than taking only what the intro leaves. */
 .drive-preview {
@@ -9955,7 +10041,14 @@ a.is-test-link:focus-visible {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-control);
 }
-.home-level input { accent-color: var(--color-primary); }
+.home-level:hover { border-color: var(--color-primary-border); }
+/* The radio itself is hidden (owner, 2026-11-10: the site has no radio dots
+   elsewhere); the card's fill says which is on, and the keyboard focus ring
+   moves to the card. */
+.home-level:has(input:focus-visible) {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
 .home-level.is-on {
     background-color: var(--color-primary-surface);
     border-color: var(--color-primary-border);
@@ -9989,6 +10082,21 @@ a.is-test-link:focus-visible {
 }
 .week-day.is-O { background-color: var(--color-surface-sunken); }
 .week-day-type { font-weight: 600; white-space: nowrap; }
+/* The full picker follows its card's width, not the window's: Your Driving's
+   cards are half the page on a laptop and all of it on a phone. Narrow, the
+   row labels take a line of their own; narrower, the day names become
+   letters, as in the sidebar. */
+.week-picker-frame { container: week-picker / inline-size; }
+.week-day-letter { display: none; }
+@container week-picker (max-width: 37.99rem) {
+    .week-picker { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .week-picker > .text-label,
+    .week-picker-label { grid-column: 1 / -1; }
+}
+@container week-picker (max-width: 28.99rem) {
+    .week-day-name { display: none; }
+    .week-day-letter { display: inline; }
+}
 .week-planned {
     height: 32px;
     display: flex;
@@ -10061,7 +10169,7 @@ a.is-test-link:focus-visible {
     margin-bottom: 12px;
 }
 .plan-compare { margin: 16px 0 0; }
-/* One labelled dropdown in the plan's controls: Vehicle, Chart. */
+/* One labeled dropdown in the plan's controls: Vehicle, Chart. */
 .plan-control { display: inline-flex; align-items: center; gap: 8px; }
 .plan-control .form-input { width: auto; max-width: 22rem; }
 /* The Weekly Charging Plan's table, transposed: a column a day, a row a
@@ -10237,7 +10345,7 @@ a.is-test-link:focus-visible {
     @apply flex flex-wrap items-center gap-2;
 }
 /* The fill marks the season on the charts; bold as well would widen it and
-   nudge its neighbour on every click. */
+   nudge its neighbor on every click. */
 .review-bar-season .stats-segmented button.active { font-weight: inherit; }
 .review-bar-end {
     @apply flex items-center gap-2 ml-auto;

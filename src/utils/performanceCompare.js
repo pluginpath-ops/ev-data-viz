@@ -7,7 +7,7 @@
  * Pure module — no React.
  */
 import {
-    deriveTestedResults, groupIntervals, normaliseInterval, parseWindowKey,
+    deriveTestedResults, groupIntervals, normalizeInterval, parseWindowKey,
     windowFromSessions, averageRateG,
 } from './performanceDerivations';
 import { MPH_TO_MS, G_MS2 } from '../constants/units';
@@ -31,7 +31,7 @@ const scalarOf = (key) => [...PERFORMANCE_SCALARS.accel, ...PERFORMANCE_SCALARS.
 
 /**
  * One vehicle's entries for a metric (a scalar key, or a window key such as
- * "passing:50-80mph"), honouring the origin filter, best first.
+ * "passing:50-80mph"), honoring the origin filter, best first.
  *
  * @param {{ sessions, summaries }} bucket
  * @returns {Array<{ value, display, badge, sourceName, origin, flags, windowLabel? }>}
@@ -44,7 +44,7 @@ export function metricEntries(bucket, metricKey, category, origin = 'all', trace
         const w = parseWindowKey(metricKey);
         const rows = groupIntervals(bucket.summaries).find(x => x.key === metricKey)?.rows || [];
         entries = rows.map(r => {
-            const n = normaliseInterval(r);
+            const n = normalizeInterval(r);
             if (trace && n.rateG != null) averageRateG(r, trace.group(`${r.source_name || 'Unattributed'}: ${n.value} ${n.displayUnit}, as an average g`));
             return {
                 value: n.comparable, display: `${n.value} ${n.displayUnit}`,
@@ -101,14 +101,14 @@ export function metricEntries(bucket, metricKey, category, origin = 'all', trace
 /**
  * Braking in g: every braking window of one vehicle collapses into one
  * comparison, strongest first. Grip is near-constant across a stop, so a 70–0
- * and a 75–0 normalise to the same quantity.
+ * and a 75–0 normalize to the same quantity.
  */
 export function brakingGEntries(bucket, origin = 'all', trace = null) {
     let entries = [];
     for (const b of groupIntervals(bucket.summaries)) {
         if (b.kind !== 'braking') continue;
         for (const r of b.rows) {
-            const n = normaliseInterval(r);
+            const n = normalizeInterval(r);
             if (n.rateG == null) continue;
             if (trace) averageRateG(r, trace.group(`${r.source_name || 'Unattributed'}: ${n.label} in ${n.value} ${n.displayUnit}`));
             entries.push({

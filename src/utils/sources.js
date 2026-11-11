@@ -66,7 +66,7 @@ const isSharedHost = (url) => {
 };
 
 /**
- * The listed source a name or link refers to, and how it was recognised.
+ * The listed source a name or link refers to, and how it was recognized.
  *
  *   name       the canonical name, ignoring case
  *   alias      a listed alias, ignoring case

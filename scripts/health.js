@@ -3,7 +3,7 @@
  *
  * They accumulated one at a time, each in the suite that needed it, and they
  * are now in four places: a contrast ratchet in `contrast.test.js`, a
- * dark-override cap in the playground catalogue, ten drift probes in
+ * dark-override cap in the playground catalog, ten drift probes in
  * `driftProbes.js`, three stylesheet probes in `cssProbes.js`. Each is
  * readable on its own and none of them answers "how is the codebase doing".
  *
@@ -19,7 +19,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { measure as measureDrift, ROOT } from './driftProbes.js';
 import { measure as measureCss, stats as cssStats } from './cssProbes.js';
-import { DARK_OVERRIDE_CLASSES } from '../src/components/playground/catalogue.js';
+import { DARK_OVERRIDE_CLASSES } from '../src/components/playground/catalog.js';
 
 const BAR = '═'.repeat(74);
 const bar = '─'.repeat(74);

@@ -2,7 +2,7 @@
  * The vehicle table's presets (#335): a named set of columns in a set order,
  * with a sort, each answering one question a reader brings to the table.
  *
- * On screen the choice is labelled "Compare for" — Performance, Road trips,
+ * On screen the choice is labeled "Compare for" — Performance, Road trips,
  * Value — because the reader picks a purpose, not a configuration. "Preset" is
  * the name in code and in docs/vocabulary.md, and the control's tooltip says it.
  *

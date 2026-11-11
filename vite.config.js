@@ -56,7 +56,7 @@ export default defineConfig({
     preloadAppChunk(),
   ],
   server: {
-    // Honour PORT so a second concurrent session can still get a dev server.
+    // Honor PORT so a second concurrent session can still get a dev server.
     // Bare `vite` ignores PORT and hunts for the next free port on its own
     // (5173 → 5174), which breaks browser-preview tooling: the proxy is told
     // the port it assigned, nothing ever binds there, and every navigation

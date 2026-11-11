@@ -16,7 +16,7 @@ import { fastChargingFill } from '../../utils/stripedFill';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
-import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel } from '../../utils/costToDrive';
+import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel, chargingText } from '../../utils/costToDrive';
 import { useCostToDriveByLevel } from '../../hooks/useCostToDrive';
 import { useChartPng } from '../../hooks/useChartPng';
 import { useSourceLine } from '../../hooks/useSourceLine';
@@ -29,7 +29,7 @@ import SortHeader from '../tables/SortHeader';
 import TableCell from '../tables/TableCell';
 import CostToDriveSidebar from './CostToDriveSidebar';
 import { levelLabel } from './HomeLevelPicker';
-import { WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
+import { HOME_LEVEL_ORDER, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF } from '../../constants/epa';
 import { hourText } from './DriveFields';
 import PackWarmingNote from './PackWarmingNote';
@@ -130,13 +130,17 @@ const homeCostText = (w) => (!w ? DASH : dollars(w.homeCost));
 const fastCostText = (w) => (!w ? DASH : dollars(w.fastCost));
 const totalText = (w) => (!w ? DASH : dollars(w.fastCost + w.homeCost));
 
-export default function HomeChargerView({ vehicles, selectedVehicleIds, settings, onChange, onOpenSetup, presentationMode = false }) {
+export default function HomeChargerView({ vehicles, selectedVehicleIds, settings, onChange, presentationMode = false }) {
     const byLevel = useCostToDriveByLevel(vehicles, selectedVehicleIds, settings);
     // The vehicles as priced at the reader's own level: the columns, and what the
     // source line credits.
     const columns = useMemo(() => (byLevel[settings.level]?.priced ?? []).filter(p => !p.missing), [byLevel, settings.level]);
     const missing = (byLevel[settings.level]?.priced ?? []).filter(p => p.missing);
     const at = (levelIndex, vehicleId) => byLevel[levelIndex].priced.find(p => p.vehicle.id === vehicleId);
+    // The levels as the chart and table show them (HOME_LEVEL_ORDER): no home
+    // charging first. A bar's or column's place is not its level index, so
+    // each looks its level up through `shown`.
+    const shown = HOME_LEVEL_ORDER.map(i => byLevel[i]);
     const enough = useMemo(() => Object.fromEntries(columns.map(c => [
         c.vehicle.id,
         enoughLevel(byLevel.map(l => {
@@ -157,7 +161,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
         chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
             type: 'bar',
             data: {
-                labels: byLevel.map(l => levelLabel(l.level)),
+                labels: shown.map(l => levelLabel(l.level)),
                 // Two bars a car, stacked on the car's own stack: home cost
                 // underneath in the full color, fast cost on top striped in it
                 // over its desaturated shade — the Compare cost chart's style.
@@ -166,7 +170,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                     part,
                     vehicleIndex: ci,
                     stack: String(c.vehicle.id),
-                    data: byLevel.map(l => {
+                    data: shown.map(l => {
                         const w = monthOf(at(l.index, c.vehicle.id)?.comparison?.week);
                         return w ? (part === 'home' ? w.homeCost : w.fastCost) : null;
                     }),
@@ -174,11 +178,12 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                 }))),
             },
             plugins: [totalLabels(ds => ds.part === 'fast', (li, ds) => {
-                const w = monthOf(at(li, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
+                const w = monthOf(at(shown[li].index, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
                 return w ? w.fastCost + w.homeCost : null;
             }, (li, ds) => {
-                const w = monthOf(at(li, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
-                return w && w.fastCost >= 0.5 ? w.homeCost : null;
+                const w = monthOf(at(shown[li].index, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
+                // No "$0" under a bar with no home charging.
+                return w && w.fastCost >= 0.5 && w.homeCost >= 0.5 ? w.homeCost : null;
             })],
             options: {
                 // Room over the tallest column for its label.
@@ -204,7 +209,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                         callbacks: {
                             label: (ctx) => {
                                 const ds = ctx.dataset;
-                                const w = monthOf(at(ctx.dataIndex, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
+                                const w = monthOf(at(shown[ctx.dataIndex].index, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
                                 if (!w) return null;
                                 return ds.part === 'home'
                                     ? `${ds.label}: ${dollars(w.homeCost)} home`
@@ -232,12 +237,12 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
 
     const season = settings.season === 'winter' ? `Winter, ${settings.winterF}°F` : `Summer, ${settings.summerF}°F`;
     const title = 'Charging cost per month, by home charger';
-    const subtitle = `${weekSummary(settings)} · ${season} · plugged in ${hourText(settings.plugFrom)} to ${hourText(settings.plugUntil)}`;
+    const subtitle = `${weekSummary(settings)} · ${season} · plugged in ${hourText(settings.plugFrom)} to ${hourText(settings.plugUntil)} · ${chargingText(settings)}`;
     const png = useChartPng(chartRef, { title, subtitle, sources: sourceLine.text, signature });
 
     const tableCols = [
         { key: 'figure', label: '', holds: 'noted-figures' },
-        ...byLevel.map(l => ({ key: String(l.index), label: `${levelLabel(l.level)}${l.index === settings.level ? ' (yours)' : ''}`, numeric: true })),
+        ...shown.map(l => ({ key: String(l.index), label: `${levelLabel(l.level)}${l.index === settings.level ? ' (yours)' : ''}`, numeric: true })),
     ];
     // The onboard chargers that cap a level, for the ^ footnote's tooltip.
     const cappedBy = columns
@@ -247,7 +252,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
 
     return (
         <div className="chart-layout">
-            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} onOpenSetup={onOpenSetup} />}
+            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} />}
             <div className="chart-main">
                 {missing.length > 0 && (
                     <p className="text-note drive-missing">
@@ -287,7 +292,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                                 {[['Fast charging per month', fastText], ['Home cost per month', homeCostText], ['Fast cost per month', fastCostText], ['Total cost per month', totalText]].map(([label, text]) => (
                                                     <tr key={label}>
                                                         <TableCell text={label} className="plan-table-label" />
-                                                        {byLevel.map(l => {
+                                                        {shown.map(l => {
                                                             const e = at(l.index, c.vehicle.id);
                                                             const capped = e && !e.missing && e.profile.home.capped;
                                                             return (

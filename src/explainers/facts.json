@@ -140,7 +140,7 @@
       "value": null,
       "sources": [],
       "status": "observed",
-      "rationale": "The owner's explanation (2026-09-28): the cabinet's power is shared across stalls and was not the limit; the V3 post's cable was. Consistent with the post ratings: a V3 post is labelled 350 A continuous (tesla-v3-cable-current, observed) and a V4 post 615 A continuous (tesla-v4-post-ratings, verified)."
+      "rationale": "The owner's explanation (2026-09-28): the cabinet's power is shared across stalls and was not the limit; the V3 post's cable was. Consistent with the post ratings: a V3 post is labeled 350 A continuous (tesla-v3-cable-current, observed) and a V4 post 615 A continuous (tesla-v4-post-ratings, verified)."
     },
     {
       "id": "tesla-v4-post-ratings",
@@ -1056,7 +1056,7 @@
       "value": null,
       "sources": [],
       "status": "accepted",
-      "rationale": "Engineering judgement, widely shared (owner, 2026-09-29), and visible in the makers' own choices: Lucid argues voltage for motor boost (lucid-gravity-400v-method), Porsche fits a 150 kW converter (taycan-2025-booster), Tesla and Audi split the pack (cybertruck-400v-method, audi-ppe-bank-charging), and Mercedes first shipped the CLA with none (mercedes-cla-400v-method)."
+      "rationale": "Engineering judgment, widely shared (owner, 2026-09-29), and visible in the makers' own choices: Lucid argues voltage for motor boost (lucid-gravity-400v-method), Porsche fits a 150 kW converter (taycan-2025-booster), Tesla and Audi split the pack (cybertruck-400v-method, audi-ppe-bank-charging), and Mercedes first shipped the CLA with none (mercedes-cla-400v-method)."
     },
     {
       "id": "evbench-voltage-class-split",
@@ -1992,7 +1992,7 @@
         }
       ],
       "status": "verified",
-      "note": "An EVBench modelling assumption, not a measured value for any car."
+      "note": "An EVBench modeling assumption, not a measured value for any car."
     },
     {
       "id": "evbench-wind-simplified-law",
@@ -2133,7 +2133,7 @@
         }
       ],
       "status": "verified",
-      "note": "An EVBench modelling assumption, not a measurement of any car. The base load is an Admin setting; the published value on the site may differ from the compiled 300 W."
+      "note": "An EVBench modeling assumption, not a measurement of any car. The base load is an Admin setting; the published value on the site may differ from the compiled 300 W."
     },
     {
       "id": "evbench-accessory-load-curve",

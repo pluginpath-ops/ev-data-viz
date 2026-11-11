@@ -92,7 +92,7 @@ EVBench uses one straight line for every car. That is a convenience, and a rough
   deep cold takes the advantage away [[fact:physics-heat-pump-vs-resistive]]. The line is one answer for both. A
   heat-pump car corrected from a cold day will be over-credited, and a resistive one under-credited.
 - **Below freezing.** The error in the assumed load is comparable to the effect itself. A cold pack can also
-  need conditioning, and tyres and regeneration behave differently; EVBench does not model any of that. EVBench lets
+  need conditioning, and tires and regeneration behave differently; EVBench does not model any of that. EVBench lets
   you correct to 0 °F, and includes tests down to 0 °F in a composite, because you asked or because that is the
   data; it just does not claim the answer is precise.
 - **Car size and shape.** A larger cabin and more glass take more to heat and cool. The slopes are a starting
