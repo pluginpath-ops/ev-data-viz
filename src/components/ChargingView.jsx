@@ -1443,7 +1443,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     on; now that it is the default, saying nothing would leave a
                     shifted axis unexplained. */}
                 {isTimeAxis && (
-                    <p className={`mt-2 text-xs ${raceActive ? 'text-indigo-700' : 'text-amber-700'}`}>
+                    <p className={`mt-2 text-xs status-text ${raceActive ? 'is-info' : 'is-warning'}`}>
                         {raceActive
                             ? `Each run is shifted so its ${raceThreshold}% SoC point lands at t = 0`
                               + (chartConfig.raceThreshold == null && commonSoc != null

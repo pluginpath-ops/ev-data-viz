@@ -74,7 +74,7 @@ function RowDetail({ row }) {
             ))}
             {row.manufacturerName && (
                 <p>Brand: <span className="font-medium">{row.manufacturerName}</span>
-                    {row.manufacturerIsNew && <span className="text-amber-600 dark:text-amber-400"> (new)</span>}</p>
+                    {row.manufacturerIsNew && <span className="status-text is-warning"> (new)</span>}</p>
             )}
             {row.inherit && <p>Inherits specs from <span className="font-medium">{row.inheritRef}</span></p>}
             {row.tagNames.length > 0 && <p>Tags added: {row.tagNames.join(', ')}</p>}
@@ -98,7 +98,7 @@ function RowDetail({ row }) {
             {row.coercions.length > 0 && (
                 <>
                     <p className="font-medium mt-1">Adjusted to a schema value</p>
-                    <ul className="import-detail-list text-amber-600 dark:text-amber-400">
+                    <ul className="import-detail-list status-text is-warning">
                         {row.coercions.map(c => (
                             <li key={c.path}>
                                 {fieldPathLabel(c.path)}: <span className="font-mono">{c.from}</span> → <span className="font-mono">{String(c.to)}</span>
@@ -111,7 +111,7 @@ function RowDetail({ row }) {
             {row.fieldSkips.length > 0 && (
                 <>
                     <p className="font-medium mt-1">Skipped — value not understood</p>
-                    <ul className="import-detail-list text-red-600 dark:text-red-400">
+                    <ul className="import-detail-list status-text is-danger">
                         {row.fieldSkips.map(s => (
                             <li key={s.path}>{fieldPathLabel(s.path)}: {s.reason}</li>
                         ))}
@@ -133,8 +133,8 @@ function RowDetail({ row }) {
                 </>
             )}
 
-            {row.errors.map((e, i) => <p key={`e${i}`} className="text-red-600 dark:text-red-400">⚠ {e}</p>)}
-            {row.warnings.map((w, i) => <p key={`w${i}`} className="text-amber-600 dark:text-amber-400">{w}</p>)}
+            {row.errors.map((e, i) => <p key={`e${i}`} className="status-text is-danger">⚠ {e}</p>)}
+            {row.warnings.map((w, i) => <p key={`w${i}`} className="status-text is-warning">{w}</p>)}
         </div>
     );
 }

@@ -17,9 +17,6 @@
 @import "@fontsource-variable/public-sans";
 @import "@fontsource-variable/jetbrains-mono";
 
-/* Enable dark: Tailwind prefix via data-theme attribute */
-@variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
 /* ── Type stacks and radii ──────────────────────────────────────────────────
    In `@theme` rather than `:root` so Tailwind generates utilities from them —
    `font-mono` then resolves to JetBrains Mono, which is what makes .text-data's
@@ -974,6 +971,49 @@ body {
     color: var(--color-text-primary);
 }
 
+/* ── Status color on a call site's own shape ─────────────────────────────────
+   Color only. Size, spacing and edges stay with the call site, so these sit on
+   whatever layout a curator screen already has. Those screens carried about a
+   hundred inline `text-red-500`, `text-amber-600 dark:text-amber-400` and
+   `bg-amber-50 border-amber-200` clusters, each one fixed color in both themes
+   (#296).
+
+   .status-text — text that reports a status: an error under a form, an
+   import's warnings, "measured" against "assumed". Info is the brand text:
+   a note or mark that says nothing is wrong.
+   .callout — the status triad (wash, edge, text) together, on a panel, a strip
+   or a badge. Info is the brand surface: nothing is wrong. */
+.status-text.is-danger  { color: var(--color-danger-text); }
+.status-text.is-warning { color: var(--color-warning-text); }
+.status-text.is-good    { color: var(--color-success-text); }
+.status-text.is-info    { color: var(--color-primary-text); }
+
+.callout.is-danger {
+    border-color: var(--color-danger-border);
+    background-color: var(--color-danger-surface);
+    color: var(--color-danger-text);
+}
+.callout.is-warning {
+    border-color: var(--color-warning-border);
+    background-color: var(--color-warning-surface);
+    color: var(--color-warning-text);
+}
+.callout.is-good {
+    border-color: var(--color-success-border);
+    background-color: var(--color-success-surface);
+    color: var(--color-success-text);
+}
+.callout.is-info {
+    border-color: var(--color-primary-border);
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
+}
+
+/* A button that reads as a link: "＋ Add phase", "Edit", "Link to vehicle".
+   Link color, underlined on hover. Also on an <a> written the same way. */
+.link-button { color: var(--color-text-link); }
+.link-button:hover { text-decoration: underline; }
+
 /* Horizontal inline group — flex row with standard gap */
 .inline-row {
     @apply flex items-center gap-2;
@@ -1004,6 +1044,11 @@ body {
     border-top-color: var(--color-danger-border);
     background-image: linear-gradient(var(--color-danger-surface), var(--color-danger-surface));
     color: var(--color-danger-text);
+}
+.fixed-action-bar.is-warning {
+    border-top-color: var(--color-warning-border);
+    background-image: linear-gradient(var(--color-warning-surface), var(--color-warning-surface));
+    color: var(--color-warning-text);
 }
 .fixed-action-bar.is-info {
     border-top-color: var(--color-primary-border);
@@ -5196,11 +5241,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* ── Runs View ──────────────────────────────────────────────────────────────── */
 
 
-/* "Adding data to: X" merge-mode banner */
+/* "Adding data to: X" merge-mode banner. Its color is `.callout.is-info`. */
 .merge-target-banner {
     @apply mb-4 px-4 py-3 border rounded-xs flex items-center justify-between;
-    background-color: var(--color-primary-surface);
-    border-color: var(--color-primary-border);
 }
 
 /* Data-type flag toggle chip strip */
@@ -6569,7 +6612,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Subtle fixed watermark in bottom-right corner */
 .popout-watermark {
     @apply fixed bottom-3 right-4 z-50 text-xs font-medium
-           bg-black/10 px-2 py-1 rounded-xs select-none pointer-events-none;
+           px-2 py-1 rounded-xs select-none pointer-events-none;
+    background-color: var(--color-surface-sunken);
     color: var(--color-text-faint);
 }
 
@@ -7227,8 +7271,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .data-check-finding.is-disagrees { border-left-color: var(--color-danger); }
 .data-check-finding.is-gap       { border-left-color: var(--color-border-strong); }
-/* A follow-up a finding leaves a curator: a vehicle left with no configuration. */
-.data-check-warning { color: var(--color-warning-text); }
 /* Shown only under "Show skipped", and quieter than an open finding: a decision
    already made, kept findable rather than hidden. */
 .data-check-finding.is-skipped   { @apply opacity-60; }

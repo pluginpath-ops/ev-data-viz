@@ -10,7 +10,7 @@
 export default function LoadingSpinner({ message = 'Loading…', className = '' }) {
     return (
         <div className={`flex items-center gap-2 text-sm text-secondary ${className}`}>
-            <span className="inline-block w-4 h-4 border-2 border-[var(--color-border)] border-t-blue-500 rounded-full animate-spin shrink-0" />
+            <span className="inline-block w-4 h-4 border-2 border-[var(--color-border)] border-t-[var(--color-primary)] rounded-full animate-spin shrink-0" />
             {message}
         </div>
     );

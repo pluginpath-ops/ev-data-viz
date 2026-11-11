@@ -57,7 +57,7 @@ function PhaseRow({ phase, canEdit, onSave, onDelete }) {
             <td className="py-1 pr-2 text-right font-mono text-secondary">{consumption ? `${consumption} Wh/mi` : '—'}</td>
             <td className="py-1 text-right">
                 {canEdit && (
-                    <button onClick={() => onDelete(phase)} className="text-red-500 hover:text-red-600 text-xs" title="Delete phase">✕</button>
+                    <button onClick={() => onDelete(phase)} className="status-text is-danger text-xs" title="Delete phase">✕</button>
                 )}
             </td>
         </tr>
@@ -183,14 +183,14 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
                 <div className="flex items-center gap-4 mt-1">
                     <button
                         onClick={() => onAddPhase(test, addCount)}
-                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                        className="text-xs link-button"
                     >
                         {addCount > 1 ? `+ Add ${addCount} phases` : '+ Add phase'}
                     </button>
                     {canSumPhases && (
                         <button
                             onClick={fillTotalsFromPhases}
-                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                            className="text-xs link-button"
                             title={`Set Total DC (${phaseSum.toFixed(2)} kWh) and Total distance (${distSum.toFixed(2)} mi) from the sum of all phases`}
                         >
                             Σ Fill totals from phases
@@ -201,7 +201,7 @@ function TestCard({ test, canEdit, onSaveTest, onDeleteTest, onSavePhase, onDele
 
             {/* Inline sanity */}
             {(sumMismatch || bagMismatch) && (
-                <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 space-y-0.5">
+                <div className="mt-1 text-[10px] status-text is-warning space-y-0.5">
                     {sumMismatch && <div>⚠ Phase DC sum {phaseSum.toFixed(2)} kWh ≠ Total DC {totalDc} kWh (&gt;5%)</div>}
                     {bagMismatch && <div>⚠ {phases.length} phase(s) entered vs {bags} declared</div>}
                 </div>

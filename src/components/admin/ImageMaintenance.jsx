@@ -68,7 +68,7 @@ export default function ImageMaintenance() {
                             : `Generated ${result.updated} thumbnail${result.updated === 1 ? '' : 's'}.`}
                     </p>
                     {result.failures.length > 0 && (
-                        <ul className="mt-2 space-y-0.5 text-red-700 dark:text-red-400">
+                        <ul className="mt-2 space-y-0.5 status-text is-danger">
                             {result.failures.map(f => (
                                 <li key={f.id}>{f.name || `#${f.id}`}: {f.error}</li>
                             ))}
@@ -78,7 +78,7 @@ export default function ImageMaintenance() {
             )}
 
             {error && (
-                <p className="text-sm mt-3 text-red-700 dark:text-red-400">⚠️ {error}</p>
+                <p className="text-sm mt-3 status-text is-danger">⚠️ {error}</p>
             )}
         </div>
     );

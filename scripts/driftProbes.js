@@ -6,7 +6,7 @@
  * The project already has a ratchet: `KNOWN_OFFENDERS` in
  * `src/__tests__/contrast.test.js`. It watches nothing now (it is 0), and it once read as
  * though it watches "drift". It does not. It matches one narrow shape — a
- * LIGHT background utility with no `dark:` on the same line — which is about
+ * LIGHT background utility (it used to excuse one with a `dark:` pair) — about
  * 13% of the color drift here and none of the size drift. Everything else
  * has been growing unwatched: 272 `text-<palette>-<shade>`, 102 `text-[Npx]`,
  * 62 raw hex literals.
@@ -193,7 +193,7 @@ function scanCssCode(key, test) {
 export const LEDGER = [
     {
         key: 'palette-text',
-        count: 178,
+        count: 0,  // 178 → 0: curator screens moved onto tokens — .status-text, .callout, .link-button (#296)
         scope: 'src/**/*.jsx',
         what: 'Text colors written as Tailwind palette utilities. These sit outside '
             + 'the theme: when the re-skin re-valued the tokens, every one of these '
@@ -204,7 +204,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-bg',
-        count: 32,
+        count: 0,  // 32 → 0: curator screens moved onto tokens (#296)
         scope: 'src/**/*.jsx',
         what: 'Background fills written as palette utilities. The subset of these that '
             + 'are LIGHT fills with no dark counterpart is separately ratcheted as '
@@ -216,7 +216,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-border',
-        count: 29,
+        count: 0,  // 29 → 0: curator screens moved onto tokens (#296)
         scope: 'src/**/*.jsx',
         what: 'Border colors written as palette utilities.',
         fix: '--color-border, --color-border-strong, --color-border-subtle.',
@@ -224,7 +224,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-other',
-        count: 1,
+        count: 0,  // 1 → 0: the Road Trip table's row rules read --color-border (#296)
         scope: 'src/**/*.jsx',
         what: 'Palette colors on the remaining properties — ring, divide, gradient '
             + 'stops, fill, stroke. Small, and kept as its own probe so a new one '
@@ -233,6 +233,18 @@ export const LEDGER = [
         scan: () => scanJsx('palette-other', paletteFor(
             'ring|divide|from|via|to|fill|stroke|outline|decoration|accent|caret|shadow',
         )),
+    },
+    {
+        key: 'dark-variant',
+        count: 0,  // 57 when the curator screens moved onto tokens and the variant was deleted (#296)
+        scope: 'src/**/*.jsx',
+        what: 'Tailwind `dark:` utilities. Held at ZERO. The stylesheet used to key '
+            + '`dark:` to data-theme; that line is gone, and Tailwind\'s own `dark:` '
+            + 'follows the device rather than the theme picker. One written now is '
+            + 'wrong whenever the two differ, and inside a themed subtree always.',
+        fix: 'A token. Both values live in the two token blocks, so one class '
+            + 'serves both themes.',
+        scan: () => scanJsx('dark-variant', /(?<![\w-])dark:[\w[-]+/g),
     },
     {
         key: 'arbitrary-text-size',
@@ -248,7 +260,7 @@ export const LEDGER = [
     },
     {
         key: 'hex-literal',
-        count: 15,  // 38 → 15: chart text and lines read chartTheme(), and two retyped palettes import the one in colorUtils (#296)
+        count: 6,  // 38 → 15: chart text and lines read chartTheme(), and two retyped palettes import the one in colorUtils (#296). 15 → 6: the Admin role badges use the status triads (#296). Left: white labels on bars (4), which sit on a series color, and the zoom drag box (2)
         scope: 'src/**/*.jsx',
         what: 'Raw hex colors in component source. Mostly canvas drawing and the '
             + '`#3b82f6` default series color, repeated at eight call sites rather '
@@ -264,7 +276,7 @@ export const LEDGER = [
     },
     {
         key: 'rgb-literal',
-        count: 9,  // 20 → 9: the EPA curve plugin and the Road Trip lane lines read chartTheme() (#296)
+        count: 6,  // 20 → 9: the EPA curve plugin and the Road Trip lane lines read chartTheme() (#296). 9 → 6: Charge Stop's no-data bars and Road Trip's charge-stop wash read chartTheme() (#296). Left: plates under bar labels (4) and the zoom drag box (2)
         scope: 'src/**/*.jsx',
         what: 'rgb()/rgba()/hsl() color literals, almost all of them canvas fills and '
             + 'alpha washes drawn by chart plugins. Canvas cannot take a class — but '

@@ -21,8 +21,8 @@ const FLAG_NOTES = {
 function OriginBadge({ entry }) {
     if (entry.origin !== 'session') return null;
     const style = entry.certain
-        ? 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700'
-        : 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700';
+        ? 'callout is-good'
+        : 'callout is-warning';
     return (
         <span
             className={`text-[9px] px-1 py-0.5 rounded-xs border font-medium ${style}`}
@@ -44,7 +44,7 @@ function Entry({ entry, unit }) {
             <span className="text-secondary flex items-center gap-1.5 min-w-0">
                 {entry.url ? (
                     <a href={entry.url} target="_blank" rel="noopener noreferrer"
-                        className="text-indigo-600 dark:text-indigo-400 hover:underline truncate">
+                        className="link-button truncate">
                         {entry.sourceName} ↗
                     </a>
                 ) : (
@@ -52,7 +52,7 @@ function Entry({ entry, unit }) {
                 )}
                 <OriginBadge entry={entry} />
                 {detail && <span className="text-meta text-[10px] truncate">{detail}</span>}
-                {flagText && <span className="text-amber-500 text-[9px]" title={flagText}>⚠</span>}
+                {flagText && <span className="status-text is-warning text-[9px]" title={flagText}>⚠</span>}
             </span>
             <span className="font-mono shrink-0">
                 {entry.value.toFixed(3)} {unit}
@@ -95,7 +95,7 @@ export default function TestedResults({ sessions = [], summaries = [] }) {
                                 <button
                                     type="button"
                                     onClick={() => setExpanded(e => ({ ...e, [field]: !e[field] }))}
-                                    className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline shrink-0"
+                                    className="text-[10px] link-button shrink-0"
                                 >
                                     {open ? 'show best only' : `+${others} other source${others === 1 ? '' : 's'}`}
                                 </button>

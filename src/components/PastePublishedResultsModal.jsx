@@ -203,12 +203,12 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                         )}
 
                         {errors.length > 0 && (
-                            <ul className="mt-2 text-[11px] text-red-600 dark:text-red-400 list-disc list-inside">
+                            <ul className="mt-2 text-[11px] status-text is-danger list-disc list-inside">
                                 {errors.map((w, i) => <li key={i}>{w.message}</li>)}
                             </ul>
                         )}
                         {warns.length > 0 && (
-                            <ul className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 list-disc list-inside">
+                            <ul className="mt-2 text-[11px] status-text is-warning list-disc list-inside">
                                 {warns.map((w, i) => <li key={i}>{w.message}</li>)}
                             </ul>
                         )}
@@ -229,7 +229,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                                 This block says: <span className="font-mono">“{parsed.rollout.raw}”</span>
                             </p>
                         ) : (
-                            <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
+                            <p className="text-[11px] status-text is-warning mb-2">
                                 {sourceBasis
                                     ? `No footnote in this block. Defaulted to how ${picked.source.name} usually prints 0–60 — check this article’s own wording.`
                                     : 'No footnote in this block. Defaulted to the rollout convention, which is what published road-test figures now use — check the source’s own wording.'}
@@ -297,7 +297,7 @@ export default function PastePublishedResultsModal({ vehicle, onImport, onClose 
                     </label>
                 </div>
 
-                {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+                {error && <p className="text-xs status-text is-danger mt-2">{error}</p>}
 
                 <div className="flex gap-2 mt-4">
                     <button

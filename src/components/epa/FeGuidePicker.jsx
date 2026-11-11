@@ -249,7 +249,7 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
                         {busy ? 'Unlinking…' : 'Unlink'}
                     </button>
                 )}
-                {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+                {error && <p className="text-xs status-text is-danger mt-1">{error}</p>}
             </div>
         );
     }
@@ -344,7 +344,7 @@ export default function FeGuidePicker({ testVehicle, canEdit, onChanged }) {
                 </>
             )}
 
-            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+            {error && <p className="text-xs status-text is-danger mt-1">{error}</p>}
         </div>
     );
 }
