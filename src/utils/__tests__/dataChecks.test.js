@@ -528,10 +528,30 @@ describe('test attribution', () => {
         expect(keys(out.rows)).toEqual(['source-spelling']);
     });
 
-    it('wants the name to start with the source, ignoring case', () => {
-        const out = testAttribution([vehicle([run({ name: 'OoS 70mph' }), run({ name: 'out of spec 70mph' })])], { sources: SOURCES });
+    it('wants the name to start with the source or its abbreviation, ignoring case', () => {
+        // Out of Spec names carry the short form (owner, 2026-11-11): "OoS 70mph" is an Out of Spec test.
+        const out = testAttribution([vehicle([
+            run({ name: 'OoS 70mph' }),
+            run({ name: 'out of spec 70mph' }),
+            run({ name: 'oos 10-80%' }),
+            run({ name: 'State of Charge 70mph' }),
+        ])], { sources: SOURCES });
         expect(out.rows).toHaveLength(1);
+        expect(out.rows[0].name).toBe('State of Charge 70mph');
         expect(keys(out.rows)).toEqual(['name-not-source']);
+        expect(out.rows[0].findings[0].text).toBe('“State of Charge 70mph” does not start with “Out of Spec” or “OoS”.');
+    });
+
+    it('ends the match at a word: a name that merely begins with the letters does not start with the source', () => {
+        const out = testAttribution([vehicle([run({ name: 'OoSomething 70mph' }), run({ name: 'Out of Spectacular' })])], { sources: SOURCES });
+        expect(out.rows).toHaveLength(2);
+        expect(keys(out.rows, 0)).toEqual(['name-not-source']);
+        expect(keys(out.rows, 1)).toEqual(['name-not-source']);
+    });
+
+    it('names only the source when it lists no abbreviation', () => {
+        const out = testAttribution([vehicle([run({ source: 'Ever', name: 'State of Charge 10-80%' })])], { sources: SOURCES });
+        expect(out.rows[0].findings.find(f => f.key === 'name-not-source').text).toBe('“State of Charge 10-80%” does not start with “Ever”.');
     });
 
     it('holds Out of Spec to a video or its testing page', () => {
