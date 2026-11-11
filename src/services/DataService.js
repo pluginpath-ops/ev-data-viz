@@ -2413,55 +2413,38 @@ class DataService {
    */
   async getVehicleSpecVouches(vehicleId) {
     if (!this.useSupabase) return { count: 0, myVouch: false };
-    const token = this.getBrowserToken();
     const sb = getSupabase();
 
+    // The token column is not readable (migration 099): counts come from the
+    // table, "did this browser vouch" from my_votes.
     const [{ count }, { data: mine }] = await Promise.all([
       sb.from('votes')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('target_type', 'vehicle_specs')
         .eq('target_id', vehicleId)
         .eq('vote_type', 'vouch'),
-      sb.from('votes')
-        .select('id')
-        .eq('target_type', 'vehicle_specs')
-        .eq('target_id', vehicleId)
-        .eq('vote_type', 'vouch')
-        .eq('browser_token', token)
-        .maybeSingle(),
+      sb.rpc('my_votes', {
+        p_browser_token: this.getBrowserToken(),
+        p_target_type: 'vehicle_specs',
+        p_target_ids: [vehicleId],
+      }),
     ]);
-    return { count: count ?? 0, myVouch: !!mine };
+    return { count: count ?? 0, myVouch: (mine || []).some(r => r.vote_type === 'vouch') };
   }
 
   /**
-   * Toggle a vouch on a vehicle's specs.
-   * If the current browser has already vouched → removes the vouch.
-   * Otherwise → inserts a vouch.
-   * Returns updated { count, myVouch }.
+   * Toggle a vouch on a vehicle's specs: cast_vote takes it back if this
+   * browser already vouched. Returns updated { count, myVouch }.
    */
   async toggleSpecVouch(vehicleId) {
     if (!this.useSupabase) return { count: 0, myVouch: false };
-    const token = this.getBrowserToken();
-    const sb = getSupabase();
-
-    const { data: existing } = await sb.from('votes')
-      .select('id')
-      .eq('target_type', 'vehicle_specs')
-      .eq('target_id', vehicleId)
-      .eq('vote_type', 'vouch')
-      .eq('browser_token', token)
-      .maybeSingle();
-
-    if (existing) {
-      await sb.from('votes').delete().eq('id', existing.id);
-    } else {
-      await sb.from('votes').insert({
-        target_type: 'vehicle_specs',
-        target_id: vehicleId,
-        vote_type: 'vouch',
-        browser_token: token,
-      });
-    }
+    const { error } = await getSupabase().rpc('cast_vote', {
+      p_browser_token: this.getBrowserToken(),
+      p_target_type: 'vehicle_specs',
+      p_target_id: vehicleId,
+      p_vote_type: 'vouch',
+    });
+    if (error) throw error;
     return this.getVehicleSpecVouches(vehicleId);
   }
 
@@ -2471,7 +2454,6 @@ class DataService {
    */
   async getRunVotes(runIds) {
     if (!this.useSupabase || !runIds.length) return {};
-    const token = this.getBrowserToken();
     const sb = getSupabase();
 
     const [{ data: all }, { data: mine }] = await Promise.all([
@@ -2479,11 +2461,11 @@ class DataService {
         .select('target_id, vote_type')
         .eq('target_type', 'run')
         .in('target_id', runIds),
-      sb.from('votes')
-        .select('target_id, vote_type')
-        .eq('target_type', 'run')
-        .in('target_id', runIds)
-        .eq('browser_token', token),
+      sb.rpc('my_votes', {
+        p_browser_token: this.getBrowserToken(),
+        p_target_type: 'run',
+        p_target_ids: runIds,
+      }),
     ]);
 
     const result = {};
@@ -2500,35 +2482,19 @@ class DataService {
   }
 
   /**
-   * Toggle a vouch or flag on a run.
-   * If the browser's current vote matches voteType → removes it (toggle off).
-   * If the browser has a different vote → replaces it.
+   * Toggle a vouch or flag on a run. cast_vote does the rest: the same vote
+   * again takes it back, a different one replaces it.
    * Returns updated { vouch, flag, myVote } for that run.
    */
   async toggleRunVote(runId, voteType) {
     if (!this.useSupabase) return { vouch: 0, flag: 0, myVote: null };
-    const token = this.getBrowserToken();
-    const sb = getSupabase();
-
-    const { data: existing } = await sb.from('votes')
-      .select('id, vote_type')
-      .eq('target_type', 'run')
-      .eq('target_id', runId)
-      .eq('browser_token', token)
-      .maybeSingle();
-
-    if (existing?.vote_type === voteType) {
-      // Same vote — toggle off
-      await sb.from('votes').delete().eq('id', existing.id);
-    } else {
-      if (existing) await sb.from('votes').delete().eq('id', existing.id);
-      await sb.from('votes').insert({
-        target_type: 'run',
-        target_id: runId,
-        vote_type: voteType,
-        browser_token: token,
-      });
-    }
+    const { error } = await getSupabase().rpc('cast_vote', {
+      p_browser_token: this.getBrowserToken(),
+      p_target_type: 'run',
+      p_target_id: runId,
+      p_vote_type: voteType,
+    });
+    if (error) throw error;
     const updated = await this.getRunVotes([runId]);
     return updated[runId] ?? { vouch: 0, flag: 0, myVote: null };
   }
