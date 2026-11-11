@@ -41,10 +41,10 @@ with the ladder turned over and accents taken dark enough to read on white.
 | `accent-blue` | `rgb(29, 106, 229)` | `rgb(45, 127, 249)` | 10 |
 | `accent-green` | `rgb(14, 134, 90)` | `rgb(35, 180, 126)` | 2 |
 | `accent-gray` | `rgb(94, 107, 125)` | `rgb(107, 122, 143)` | 3 |
-| `accent-orange` | `rgb(232, 112, 24)` | `rgb(242, 139, 60)` | 32 |
-| `accent-orange-muted` | `rgba(232, 112, 24, 0.50)` | `rgba(242, 139, 60, 0.45)` | 3 |
-| `accent-orange-surface` | `rgba(232, 112, 24, 0.12)` | `rgba(242, 139, 60, 0.10)` | 8 |
-| `accent-orange-text` | `rgb(176, 78, 8)` | `rgb(242, 139, 60)` | 21 |
+| `accent-orange` | `rgb(240, 108, 0)` | `rgb(242, 139, 60)` | 32 |
+| `accent-orange-muted` | `rgba(240, 108, 0, 0.50)` | `rgba(242, 139, 60, 0.45)` | 3 |
+| `accent-orange-surface` | `rgba(240, 108, 0, 0.12)` | `rgba(242, 139, 60, 0.10)` | 8 |
+| `accent-orange-text` | `rgb(200, 80, 0)` | `rgb(242, 139, 60)` | 21 |
 | `accent-violet` | `rgb(108, 88, 214)` | `rgb(155, 140, 240)` | 5 |
 | `primary` | `rgb(29, 106, 229)` | `rgb(45, 127, 249)` | 129 |
 | `primary-border` | `rgba(29, 106, 229, 0.45)` | `rgba(45, 127, 249, 0.60)` | 8 |
@@ -103,10 +103,10 @@ with the ladder turned over and accents taken dark enough to read on white.
 | `success-border` | `rgba(14, 134, 90, 0.45)` | `rgba(35, 180, 126, 0.60)` | 7 |
 | `success-surface` | `rgba(14, 134, 90, 0.10)` | `rgba(35, 180, 126, 0.18)` | 9 |
 | `success-text` | `rgb(10, 98, 64)` | `rgb(95, 214, 168)` | 9 |
-| `warning` | `rgb(232, 112, 24)` | `rgb(242, 139, 60)` | 66 |
-| `warning-border` | `rgba(232, 112, 24, 0.55)` | `rgba(242, 139, 60, 0.60)` | 10 |
-| `warning-surface` | `rgba(232, 112, 24, 0.12)` | `rgba(242, 139, 60, 0.18)` | 13 |
-| `warning-text` | `rgb(156, 66, 4)` | `rgb(245, 176, 119)` | 17 |
+| `warning` | `rgb(240, 108, 0)` | `rgb(242, 139, 60)` | 66 |
+| `warning-border` | `rgba(240, 108, 0, 0.55)` | `rgba(242, 139, 60, 0.60)` | 10 |
+| `warning-surface` | `rgba(240, 108, 0, 0.12)` | `rgba(242, 139, 60, 0.18)` | 13 |
+| `warning-text` | `rgb(176, 70, 0)` | `rgb(245, 176, 119)` | 17 |
 
 #### Other
 

@@ -248,7 +248,7 @@ export const LEDGER = [
     },
     {
         key: 'hex-literal',
-        count: 38,  // 44 → 40: the spec chart's hard-coded yes/no greens and reds, and its gray, went when yes/no became vehicle-colored bars (#450); 40 → 38: Road Trip's box-zoom drag, written out at each of its charts, became one ZOOM_DRAG (Trip Optimizer)
+        count: 15,  // 38 → 15: chart text and lines read chartTheme(), and two retyped palettes import the one in colorUtils (#296)
         scope: 'src/**/*.jsx',
         what: 'Raw hex colors in component source. Mostly canvas drawing and the '
             + '`#3b82f6` default series color, repeated at eight call sites rather '
@@ -264,7 +264,7 @@ export const LEDGER = [
     },
     {
         key: 'rgb-literal',
-        count: 20,  // 22 → 20: Road Trip's box-zoom drag, written out at each of its charts, became one ZOOM_DRAG (Trip Optimizer)
+        count: 9,  // 20 → 9: the EPA curve plugin and the Road Trip lane lines read chartTheme() (#296)
         scope: 'src/**/*.jsx',
         what: 'rgb()/rgba()/hsl() color literals, almost all of them canvas fills and '
             + 'alpha washes drawn by chart plugins. Canvas cannot take a class — but '

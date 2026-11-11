@@ -32,7 +32,7 @@ import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE, STANDARD_CONDITIONS } from '../const
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromTestVehicle, NO_RECORD_REASONS } from '../utils/epaRecordFromTestVehicle';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
-import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults, fade } from '../utils/chartTheme';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import ColorSourceNote from './ColorSourceNote';
 import { useRunSelection } from '../hooks/useRunSelection';
@@ -56,7 +56,7 @@ const EPA_TESTS = { tests: true };
  * Draws the 65–75 mph highway band after Chart.js renders its datasets.
  * Follows the same afterDraw pattern as barGroupPlugin / makeBarPlugin.
  */
-function makeReferencePlugin(bandMph, units, isDark) {
+function makeReferencePlugin(bandMph, units) {
     return {
         id: 'epaReferenceLines',
         afterDraw(chart) {
@@ -64,8 +64,9 @@ function makeReferencePlugin(bandMph, units, isDark) {
             if (!area || !scales.x) return;
 
             const x = v => scales.x.getPixelForValue(convSpeed(v, units));
-            const textColor = isDark ? 'rgba(226,232,240,0.6)' : 'rgba(107,114,128,0.8)';
-            const bandColor = isDark ? 'rgba(59,130,246,0.07)' : 'rgba(59,130,246,0.06)';
+            // Read at draw time: the chart is rebuilt on a theme flip.
+            const { tick: textColor, accent } = chartTheme();
+            const bandColor = fade(accent, 0.07);
 
             ctx.save();
 
@@ -81,80 +82,6 @@ function makeReferencePlugin(bandMph, units, isDark) {
             ctx.fillText('Hwy', (xBand0 + xBand1) / 2, area.top + 10);
 
             ctx.restore();
-        },
-    };
-}
-
-// ── Speed callout plugin ──────────────────────────────────────────────────────
-
-/**
- * Draws filled dots + range labels on each curve at specified reference speeds.
- * Pass an empty array to disable without removing the code.
- *
- * To re-enable: pass [70, 80] (or any mph values) at the call site.
- */
-function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
-    return {
-        id: 'epaCallouts',
-        afterDatasetsDraw(chart) {
-            if (!calloutMphs.length) return;
-            const { ctx, chartArea: area, scales, data } = chart;
-            if (!area || !scales.x || !scales.y) return;
-
-            data.datasets.forEach((ds) => {
-                const curve = ds._curve;
-                if (!curve?.length) return;
-
-                const color = ds.borderColor;
-
-                calloutMphs.forEach((targetMph) => {
-                    const pt = curve.reduce((best, p) =>
-                        Math.abs(p.mph - targetMph) < Math.abs(best.mph - targetMph) ? p : best
-                    , curve[0]);
-                    if (!pt) return;
-
-                    const xVal = convSpeed(targetMph, units);
-                    const yVal = convertYValue(getYValue(pt, yAxis), yAxis, units);
-                    if (yVal == null) return;
-
-                    const px = scales.x.getPixelForValue(xVal);
-                    const py = scales.y.getPixelForValue(yVal);
-                    if (px < area.left || px > area.right || py < area.top || py > area.bottom) return;
-
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-                    ctx.fillStyle = color;
-                    ctx.fill();
-                    ctx.strokeStyle = isDark ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.9)';
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-
-                    if (pt.rangeMi != null) {
-                        const rangeDisplay = units === 'metric'
-                            ? `${(pt.rangeMi * 1.60934).toFixed(0)} km`
-                            : `${pt.rangeMi.toFixed(0)} mi`;
-
-                        const fonts = chartFonts();
-                        ctx.font = `${fonts.micro}px ${fonts.sans}`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'alphabetic';
-
-                        const textW = ctx.measureText(rangeDisplay).width;
-                        const labelY = py - 9;
-                        const padX = 3, padY = 2;
-                        ctx.fillStyle = isDark ? 'rgba(15,23,42,0.82)' : 'rgba(255,255,255,0.88)';
-                        ctx.beginPath();
-                        ctx.roundRect(px - textW / 2 - padX, labelY - 10 - padY, textW + padX * 2, 11 + padY * 2, 3);
-                        ctx.fill();
-
-                        ctx.fillStyle = color;
-                        ctx.fillText(rangeDisplay, px, labelY);
-                    }
-
-                    ctx.restore();
-                });
-            });
         },
     };
 }
@@ -619,14 +546,11 @@ export default function EpaCurvesView({
         const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
         applyChartDefaults(Chart);
 
-        const refPlugin     = makeReferencePlugin(HIGHWAY_BAND_MPH, units, isDark);
-        // Speed callouts disabled — labels overlap with multiple curves.
-        // Re-enable by restoring [70, 80] (or any mph values) here.
-        const calloutPlugin = makeCalloutPlugin([], yAxis, units, isDark);
+        const refPlugin     = makeReferencePlugin(HIGHWAY_BAND_MPH, units);
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
-            plugins: [refPlugin, calloutPlugin, readout.plugin({
+            plugins: [refPlugin, readout.plugin({
                 title: (x) => `${readoutNumber(x)} ${speedLabel(units)}`,
                 subtitle: yAxisLabel(yAxis, units),
                 describe: (row) => ({
