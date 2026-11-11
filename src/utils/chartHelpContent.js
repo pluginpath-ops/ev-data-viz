@@ -303,15 +303,19 @@ export const CHART_HELP_DEFAULTS = {
             'the car’s color is the night at home, up to the next morning, where a dashed ' +
             'line hands over to the next day. The gray bar is how far the battery fell, so ' +
             'a day with a stop used more than it shows; hover a day for both. "Charge in and ' +
-            'used" draws the same figures from zero: charge in above, driving below.\n' +
+            'used" draws the same figures from zero: charge in above, driving below. The dashed tick on ' +
+            'a night’s bar is the most that night could have added, with your charger at full power for the whole ' +
+            'plug-in window: the gap above the bar is the charger’s margin, and no gap means the window cut the ' +
+            'night short. A tick above the top of the chart sits on its edge with an arrow.\n' +
             '"The week as a line" is range left, in miles on the left and the battery’s percent on the ' +
             'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +
             'at home overnight. Each orange band is a fast stop, labeled with its minutes ' +
             '(detour and time to start and pay in); a lighter one is a planned fast charge. ' +
-            'The dashed lines at 10% and 80% mark the everyday range. Under the chart, ' +
+            'The dashed lines at 10% and 80% mark the everyday range. The gray bands are your plug-in ' +
+            'window each night; where the line has leveled off, the darker end of a band is time to spare. Under the chart, ' +
             'the week as a table, a column a day: the fast-charging rows (stops, time, ' +
             'cost) are outlined in orange, and "Ready at" gives the time the night filled ' +
-            'the battery, or the end of your plug-in window when it ran out. Compare with the other ' +
+            'the battery, or the end of your plug-in window when it ran out. "Spare plug-in time" is the window left after that, "None" when it ran out. Compare with the other ' +
             'season or another home charger in a second chart below, and open your gas ' +
             'car’s week to see its fill-ups.',
         key_terms:

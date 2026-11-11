@@ -15,6 +15,7 @@ import { vehicleLabel } from '../../utils/specHelpers';
 import { fastChargingFill } from '../../utils/stripedFill';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
+import { drawCeilingMarks, ceilingLegend } from '../../utils/ceilingMark';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
 import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel, chargingText, homeCostCeiling } from '../../utils/costToDrive';
 import { useCostToDriveByLevel } from '../../hooks/useCostToDrive';
@@ -120,48 +121,25 @@ const totalLabels = (isTop, totalOf, homeOf) => ({
  * The most each car's home charging could cost a month at the level, a dashed
  * line across its column (owner, 2026-11-11): `ceilingOf(levelIndex,
  * vehicleIndex)` gives the figure, null draws nothing (no home charging).
- * Drawn here, not as a dataset, so a line above the plot never moves the
- * y-axis — the axis stays as tall as the tallest column. A line above it is
- * pinned to the top edge with an up-arrow; its figure is in the tooltip only
+ * Drawn by a plugin, not as a dataset (utils/ceilingMark.js), so a line above
+ * the plot never moves the y-axis — the axis stays as tall as the tallest
+ * column. A line above it is pinned to the top edge with an up-arrow; its figure is in the tooltip only
  * (a dollar figure on each arrow read as clutter, owner, 2026-11-11; the
  * labelled version is commit b0b296e if it is wanted back).
  */
 const homeCeilings = (ceilingOf) => ({
     id: 'homeCeilings',
     afterDatasetsDraw(chart) {
-        const { ctx, chartArea: a, scales: { y } } = chart;
-        const { ink } = chartTheme();
-        ctx.save();
-        ctx.strokeStyle = ink;
-        ctx.fillStyle = ink;
-        ctx.lineWidth = 2;
+        const marks = [];
         chart.data.datasets.forEach((ds, di) => {
             const meta = chart.getDatasetMeta(di);
             if (meta.hidden || ds.part !== 'home') return;
             meta.data.forEach((bar, li) => {
-                const ceiling = ceilingOf(li, ds.vehicleIndex);
-                if (ceiling == null || !Number.isFinite(bar.x)) return;
-                const top = y.getPixelForValue(ceiling);
-                const off = top < a.top;
-                const py = Math.round(off ? a.top : top);
-                const half = bar.width / 2 + 2;
-                ctx.setLineDash([4, 3]);
-                ctx.beginPath();
-                ctx.moveTo(bar.x - half, py);
-                ctx.lineTo(bar.x + half, py);
-                ctx.stroke();
-                if (!off) return;
-                // Off the plot: an arrow over the line.
-                ctx.setLineDash([]);
-                ctx.beginPath();
-                ctx.moveTo(bar.x, py - 9);
-                ctx.lineTo(bar.x + 4, py - 3);
-                ctx.lineTo(bar.x - 4, py - 3);
-                ctx.closePath();
-                ctx.fill();
+                const value = ceilingOf(li, ds.vehicleIndex);
+                if (value != null && Number.isFinite(bar.x)) marks.push({ x: bar.x, half: bar.width / 2 + 2, value });
             });
         });
-        ctx.restore();
+        drawCeilingMarks(chart, marks);
     },
 });
 
@@ -219,12 +197,25 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
     useEffect(() => {
         if (!canvasRef.current || !columns.length) return undefined;
         applyChartDefaults(Chart);
-        const { tick, grid, legend, ink } = chartTheme();
+        const { tick, grid, legend } = chartTheme();
         // Level by place on the chart (`shown`), car by place in `columns`.
         const ceilingOf = (li, ci) => {
             const e = at(shown[li].index, columns[ci].vehicle.id);
             return e && !e.missing ? homeCostCeiling(e.profile, settings) : null;
         };
+        // A car once in the legend, by its home bar's full color, then the ceiling's key.
+        const ceilingKey = ceilingLegend(Chart, {
+            keep: (item, data) => data.datasets[item.datasetIndex].part === 'home',
+            text: 'Most it could cost at home',
+            // Hiding a car hides both its bars.
+            onClick: (e, item, leg) => {
+                const ch = leg.chart;
+                const vi = ch.data.datasets[item.datasetIndex].vehicleIndex;
+                const show = !ch.isDatasetVisible(item.datasetIndex);
+                ch.data.datasets.forEach((d, i) => { if (d.vehicleIndex === vi) ch.setDatasetVisibility(i, show); });
+                ch.update();
+            },
+        });
         chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
             type: 'bar',
             data: {
@@ -261,26 +252,8 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: {
-                            color: legend, boxWidth: 12, usePointStyle: true,
-                            // A car once, by its home bar's full color; then the
-                            // dashed line's key, which no dataset stands for.
-                            generateLabels: (chart) => [
-                                ...Chart.defaults.plugins.legend.labels.generateLabels(chart)
-                                    .filter(item => chart.data.datasets[item.datasetIndex].part === 'home')
-                                    .map(item => ({ ...item, pointStyle: 'rect' })),
-                                { text: 'Most it could cost at home', pointStyle: 'line', lineDash: [4, 3], lineWidth: 2, strokeStyle: ink, fillStyle: ink, fontColor: legend, hidden: false },
-                            ],
-                        },
-                        // Hiding a car hides both its bars (and the key does nothing).
-                        onClick: (e, item, leg) => {
-                            if (item.datasetIndex == null) return;
-                            const ch = leg.chart;
-                            const vi = ch.data.datasets[item.datasetIndex].vehicleIndex;
-                            const show = !ch.isDatasetVisible(item.datasetIndex);
-                            ch.data.datasets.forEach((d, i) => { if (d.vehicleIndex === vi) ch.setDatasetVisibility(i, show); });
-                            ch.update();
-                        },
+                        labels: { color: legend, boxWidth: 12, usePointStyle: true, generateLabels: ceilingKey.generateLabels },
+                        onClick: ceilingKey.onClick,
                     },
                     tooltip: {
                         callbacks: {

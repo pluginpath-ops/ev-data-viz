@@ -14,6 +14,12 @@
  * Chart.js floating bars in a PlotFrame, so it has the PNG capture, the link
  * button and the source line every chart here has. The stops in `day` are
  * drawn by the plugin over the day's bar, since two can share one bar.
+ *
+ * A dashed tick on each night's bar is the night's home ceiling (owner,
+ * 2026-11-11): the most the plug-in window could have added at full power,
+ * so the gap above the bar is the charger's margin. In `day` it stands on
+ * where the car got home, in `balance` on the charge already in. Off the plot
+ * it is pinned to the top edge with an arrow (utils/ceilingMark.js).
  */
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
@@ -28,6 +34,7 @@ import PlotFrame from '../charts/PlotFrame';
 import CopyLinkButton from '../charts/CopyLinkButton';
 import PngButton from '../charts/PngButton';
 import { stripedFill } from '../../utils/stripedFill';
+import { drawCeilingMarks, ceilingLegend } from '../../utils/ceilingMark';
 
 const TYPE_NAMES = { D: 'Daily', L: 'Long day', O: 'Off' };
 const NO_SOURCES = {};
@@ -143,6 +150,15 @@ const dayMarks = (bars, view, fills) => ({
                 (l + r) / 2, Math.max(a.top + fonts.badge, y.getPixelForValue(top) - 6));
         });
         ctx.restore();
+        // The home ceiling over each night's bar, stood on where the night starts.
+        const marks = [];
+        bars.forEach((b, i) => {
+            const home = slot('home', i);
+            if (!home || !(b.mostAdd > 0)) return;
+            const base = view === 'day' ? b.arrive : b.fast + b.planned;
+            marks.push({ x: (home[0] + home[1]) / 2, half: (home[1] - home[0]) / 2 + 2, value: base + b.mostAdd });
+        });
+        drawCeilingMarks(chart, marks);
     },
 });
 
@@ -171,6 +187,16 @@ export default function DayBarsChart({
         const fills = { striped: routeStopFill(theme.callout) };
         const ceil20 = (v) => Math.ceil(v / 20) * 20;
         const max = day ? 100 : Math.max(40, ceil20(Math.max(...bars.map(b => Math.max(b.fast + b.planned + b.home, b.used))) + 8));
+        const ceilingKey = ceilingLegend(Chart, {
+            // Only what this week has: a stop kind with no stops leaves the legend.
+            keep: (item, data) => {
+                const ds = data.datasets[item.datasetIndex];
+                if (!ds.legendOnly) return ds.data.some(Boolean);
+                return bars.some(b => b.stopBands.some(s => s.planned === (ds.key === 'planned')));
+            },
+            // No home charging, or no night charged: no ceiling drawn, no key.
+            text: bars.some(b => b.mostAdd > 0 && b.home > 0.05) ? 'Most a night could add' : null,
+        });
         chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
             type: 'bar',
             data: {
@@ -179,6 +205,8 @@ export default function DayBarsChart({
             },
             plugins: [dayMarks(bars, view, fills)],
             options: {
+                // Room over the plot for a ceiling's arrow.
+                layout: { padding: { top: 14 } },
                 animation: false,
                 responsive: true,
                 maintainAspectRatio: false,
@@ -186,15 +214,8 @@ export default function DayBarsChart({
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: {
-                            color: theme.legend, boxWidth: 12,
-                            // Only what this week has: a stop kind with no stops leaves the legend.
-                            filter: (item, data) => {
-                                const ds = data.datasets[item.datasetIndex];
-                                if (!ds.legendOnly) return ds.data.some(Boolean);
-                                return bars.some(b => b.stopBands.some(s => s.planned === (ds.key === 'planned')));
-                            },
-                        },
+                        labels: { color: theme.legend, boxWidth: 12, usePointStyle: true, generateLabels: ceilingKey.generateLabels },
+                        onClick: ceilingKey.onClick,
                     },
                     tooltip: {
                         callbacks: {
@@ -206,7 +227,10 @@ export default function DayBarsChart({
                                 const b = bars[ctx.dataIndex];
                                 switch (ctx.dataset.key) {
                                 case 'out': return `The day out: ${pctText(b.start)} → home at ${pctText(b.arrive)} (driving used ${pctText(b.used)})`;
-                                case 'home': return day ? `Home overnight: +${pctText(b.home)}, to ${pctText(b.next)} next morning` : `Home: +${pctText(b.home)}`;
+                                case 'home': {
+                                    const most = b.mostAdd > 0 ? ` (most it could add: ${pctText(b.mostAdd)})` : '';
+                                    return day ? `Home overnight: +${pctText(b.home)}, to ${pctText(b.next)} next morning${most}` : `Home: +${pctText(b.home)}${most}`;
+                                }
                                 case 'used': return `Driving: −${pctText(b.used)}`;
                                 default: return `${ctx.dataset.label}: +${pctText(b[ctx.dataset.key])}`;
                                 }

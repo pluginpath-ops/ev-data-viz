@@ -53,6 +53,7 @@ function chartOf(week, profile) {
         right: (v) => `${Math.round(v / miPerPct)}%`,
         guides: GUIDES_PCT.map(p => p * miPerPct),
         stops: week.stops.map(s => ({ from: s.hour, to: s.endHour, planned: s.planned, label: `${Math.round(s.minutes)}m` })),
+        windows: week.windows,
     };
 }
 
