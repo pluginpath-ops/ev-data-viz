@@ -274,10 +274,28 @@ describe('the two themes declare the same tokens', () => {
         const onlyLight = Object.keys(tokensFor('light')).filter(k => !(k in tokensFor('dark')));
         expect(
             { onlyDark, onlyLight },
-            'Add the missing token to the other theme block. If it is a re-skin '
-            + 'addition, give light a provisional value and mark it '
-            + '`/* provisional — light pass */` so the light pass can find it.',
+            'Add the missing token to the other theme block.',
         ).toEqual({ onlyDark: [], onlyLight: [] });
+    });
+});
+
+describe('tint text never sits on its own solid', () => {
+    // `--color-primary-text` is made to be read on the WASH (`-surface`,
+    // `-light`). On the solid `--color-primary` it is blue on blue: 2.2:1 in
+    // dark and 1.7:1 in light, which is how every segmented control's active
+    // option shipped unreadable. The pair sweep above cannot see it, because
+    // it checks pairs someone listed; this reads the rules.
+    it('no rule pairs a status -text token with that status as a fill', () => {
+        const rules = CSS.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g);
+        const bad = [];
+        for (const [, selector, body] of rules) {
+            for (const hue of ['primary', 'warning', 'danger', 'success']) {
+                const fill = new RegExp(`background(?:-color)?:\\s*var\\(--color-${hue}\\)`).test(body);
+                const text = new RegExp(`(?<![-\\w])color:\\s*var\\(--color-${hue}-text[,)]`).test(body);
+                if (fill && text) bad.push(selector.trim());
+            }
+        }
+        expect(bad, `Use the wash (-surface or -light) under the tint text: ${bad.join(', ')}`).toEqual([]);
     });
 });
 
