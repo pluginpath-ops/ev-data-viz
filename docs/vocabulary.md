@@ -92,11 +92,11 @@ it.
 | The "Data: …" credit along a figure's bottom | **source line** | dataviz convention | [SourceLine.jsx](../src/components/charts/SourceLine.jsx), [useSourceLine.js](../src/hooks/useSourceLine.js) |
 | The box listing every series' value at the cursor's X, on line and scatter charts | **readout**. Bar charts keep a per-bar **tooltip**; the readout isn't one because its rows carry links | Highcharts *shared tooltip* | [ChartReadout.jsx](../src/components/charts/ChartReadout.jsx), [useChartReadout.jsx](../src/hooks/useChartReadout.jsx), [readoutAtX.js](../src/utils/readoutAtX.js) |
 | The vertical line at that X, and a dot per line | **crosshair** — a ring where the value was interpolated | Highcharts, Grafana | `.chart-crosshair`, `.chart-crosshair-dot` |
-| A readout held by a click | **fixed**. Not "pinned" (see Tables). Cleared by a second click, Esc or a click outside; local to the window. PNG redraws it; **Side readout** puts it beside the plot instead | — | `chart-readout--fixed`, [drawFixedReadout.js](../src/utils/drawFixedReadout.js), [readoutBox.js](../src/utils/readoutBox.js) |
-| The strip of Colors, ★ Feature, URL and PNG | **toolbar** | WAI-ARIA `toolbar` | `.chart-export-strip` |
+| A readout held by a click | **fixed**. Not "pinned" (see Tables). Cleared by a second click, Esc or a click outside; local to the window. **Image** redraws it; **Side readout** puts it beside the plot instead | — | `chart-readout--fixed`, [drawFixedReadout.js](../src/utils/drawFixedReadout.js), [readoutBox.js](../src/utils/readoutBox.js) |
+| The strip of Colors, ★ Feature, Link and Image | **toolbar**; labeled **Share**, whose two buttons are **Link** (copies the chart's short link) and **Image** (copies the figure as a PNG) | WAI-ARIA `toolbar` | `.chart-export-strip` |
 | Undoing a box-zoom | **Reset zoom** (button in the Axis Scale controls, only while zoomed) and **the zoom hint** (line under the plot). Not in the toolbar | — | [useChartZoom.js](../src/hooks/useChartZoom.js), [ZoomHint.jsx](../src/components/ZoomHint.jsx) |
 | Min/Max a reader types to set an axis | **axis limits** — six fields, Auto when empty; link parameter `ax`. The heading stays **Axis Scale**. Not "zoom" or "bounds" | — | [axisLimits.js](../src/utils/axisLimits.js), [useAxisLimits.jsx](../src/hooks/useAxisLimits.jsx), [AxisScaleControls.jsx](../src/components/AxisScaleControls.jsx) |
-| The thumbnail of what PNG copied | **export preview** | — | [useChartPng.js](../src/hooks/useChartPng.js) |
+| The thumbnail of what Image copied | **export preview** | — | [useChartPng.js](../src/hooks/useChartPng.js) |
 | Canvas type sizes from `--fs-body` | **chart fonts** | — | `chartFonts()` in [chartTheme.js](../src/utils/chartTheme.js) |
 | Canvas colors from the tokens | **chart theme** | — | `chartTheme()` |
 | The address that reopens a chart as left | **a chart link**; its parts are **parameters** (`r`, `rc`, `eff` …), read and written in one module | — | [chartUrlState.js](../src/utils/chartUrlState.js) |
@@ -392,6 +392,8 @@ it borrows the pinned band.
 | `epa_test_groups`, `test_group_id`, `testGroupId`, `epaGroup`, `epa_test_family_id` | `epa_test_vehicles`, `test_vehicle_id`, `testVehicleId`, `epaTestVehicle`, `test_group` | renamed in migration 081 |
 | "Hidden" / "Hide" for a test, in UI text | **Unlisted** / Unlist — or **Excluded** for statistics | one word carried two questions |
 | "nominal" for a measured curve | composite | *nominal* means rated, as filed |
+| "URL" or "Copy link" on the toolbar button | **Link** (copied: "Link copied") | the row is Share; each button names its format. Say **chart link** / **short link** in prose |
+| "PNG" or "Copy PNG" on the toolbar button | **Image** (copied: "Image copied") | the format matters only in the tooltip and for the file you save |
 
 ## Open names
 

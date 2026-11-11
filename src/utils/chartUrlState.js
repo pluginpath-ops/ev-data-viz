@@ -42,7 +42,7 @@
  *   written out       the defaults put back (`withDefaultsWrittenOut`), for
  *                     what must not change when a default does: a featured
  *                     comparison's saved chart, and the input to …
- *   the short link    `?k=1.…`, the toolbar's URL button (`chartShortLink`,
+ *   the short link    `?k=1.…`, the toolbar's Link button (`chartShortLink`,
  *                     utils/shortLink.js) — the written-out form, packed.
  */
 import { ALL_CHART_MODES, DEFAULT_CHART_MODE, categoryForMode } from '../constants/chartNav';
@@ -490,7 +490,7 @@ export const chartQueryString = (p) => p.toString().replace(/%2C/gi, ',').replac
 
 /**
  * The short link for a chart's query: its defaults written out, then packed
- * (utils/shortLink.js). What the toolbar's URL button copies.
+ * (utils/shortLink.js). What the toolbar's Link button copies.
  *
  * @param {string} search  a query string, with or without the leading `?`
  * @returns {string} the key, `1.…`

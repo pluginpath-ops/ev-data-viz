@@ -141,7 +141,7 @@ The charts and tables use the site's own machinery, so each affordance is
 present here exactly as on every other chart tab:
 - **Charts are Chart.js**, as every chart tab's are — not the canvas's
   hand-drawn SVG. That brings the PNG capture (`useChartPng` +
-  `CopyPngButton`, frame caption and source line drawn on), the copy-link
+  `CopyPngButton` — its Image button, frame caption and source line drawn on), the Link
   button (`CopyLinkButton`, which carries the `cd` key), the readout
   (`useChartReadout` / `ChartReadout`), `PlotFrame`, `SourceLine`,
   `chartTheme` colors, series colors (`useStickyChartColors`, the vehicle's own

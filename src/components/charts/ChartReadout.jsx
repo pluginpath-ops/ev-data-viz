@@ -221,7 +221,7 @@ export default function ChartReadout({ store }) {
                 <div className="chart-readout-foot">
                     {anyInterpolated && <span>≈ read off the line</span>}
                     {missing > 0 && <span>{missing} without data here</span>}
-                    <span>{fixed ? 'Kept in the PNG · click the chart or press Esc to clear' : 'Click to fix, and it goes in the PNG'}</span>
+                    <span>{fixed ? 'Kept in the image · click the chart or press Esc to clear' : 'Click to fix, and it goes in the image'}</span>
                 </div>
             </div>
         </div>

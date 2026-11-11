@@ -159,7 +159,7 @@ function mappingColor(baseColor, mappingIdx) {
  *   1. Chart Options card  — Y-axis toggles, axis scale controls, collapsible
  *      per-mapping selector with color pickers and metadata
  *   2. Chart card          — canvas
- *   3. Below chart         — legend note, Copy URL, Copy PNG
+ *   3. Below chart         — legend note, Link, Image
  *
  * Props:
  *   vehicles           {Array}    — full vehicles array from context (with epa_mappings)

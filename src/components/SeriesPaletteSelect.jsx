@@ -2,7 +2,7 @@ import { SERIES_PALETTES, VEHICLE_PALETTE, DEFAULT_SERIES_PALETTE, paletteColors
 
 /**
  * Where a chart's series colors come from — the Colors field in the chart's
- * toolbar, beside URL and PNG.
+ * toolbar, beside Link and Image.
  *
  * This replaces the "Auto Color" checkbox, which described its mechanism rather
  * than its effect and then read backwards once vehicles owned their colors
