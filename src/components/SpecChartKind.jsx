@@ -15,7 +15,7 @@ const KINDS = [
 
 export default function SpecChartKind({ mode, onChange }) {
     return (
-        <div className="stats-segmented" role="group" aria-label="Chart kind">
+        <div className="segmented" role="group" aria-label="Chart kind">
             {KINDS.map(k => (
                 <button
                     key={k.mode}

@@ -81,7 +81,7 @@ export default function VehicleAssumptionFields({ assumptions, needed, units, on
             {shows('rangeBasis') && (
                 <div className="assumption-field">
                     <span className="assumption-field-name">Price each percent at</span>
-                    <div className="stats-segmented" role="group" aria-label="Range basis">
+                    <div className="segmented" role="group" aria-label="Range basis">
                         {[['tested', 'Tested range'], ['epa', 'EPA range']].map(([value, label]) => (
                             <button
                                 key={value}

@@ -56,7 +56,7 @@ export default function FieldPicker({ columns, tableKeys, unitOf, mode = 'single
                     className="form-input guide-facet-panel-search"
                 />
             )}
-            <div className="stats-segmented" role="group" aria-label="Fields listed">
+            <div className="segmented" role="group" aria-label="Fields listed">
                 {[['table', 'In the table'], ['all', 'All fields']].map(([key, label]) => (
                     <button
                         key={key}

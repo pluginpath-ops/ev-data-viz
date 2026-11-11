@@ -68,7 +68,7 @@ export function DriveSlider({ settings, onChange, field, label, value, ends = []
 /** A two-way choice as a segmented control. */
 export function DriveChoice({ settings, onChange, field, options, label }) {
     return (
-        <div role="group" aria-label={label} className="stats-segmented drive-choice">
+        <div role="group" aria-label={label} className="segmented drive-choice">
             {options.map(([value, text]) => (
                 <button
                     key={value}

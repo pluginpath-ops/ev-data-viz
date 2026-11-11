@@ -60,8 +60,9 @@ export default function VehicleMedia({ vehicle, height = 104, className = '', ch
                     className={`vehicle-media-image${vehicle.image_focal_y == null ? '' : ' has-focal'}`}
                     style={{ backgroundImage: `url(${url})`, ...focalStyle(vehicle.image_focal_y, aspect) }}
                 />
-                : <span className="vehicle-media-fallback">{fallback}</span>}
-            <div className="vehicle-media-scrim" />
+                : <span className="vehicle-media-fallback" data-theme="dark">{fallback}</span>}
+            {/* Dark in both themes: see MediaTitle. */}
+            <div className="vehicle-media-scrim" data-theme="dark" />
             {children}
         </div>
     );

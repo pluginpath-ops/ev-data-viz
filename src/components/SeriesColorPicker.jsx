@@ -386,7 +386,7 @@ function PickerPanel({
         <>
             <div className="color-picker-body">
                 {scoped && (
-                    <div className="stats-segmented color-scope" role="group" aria-label="Apply to">
+                    <div className="segmented color-scope" role="group" aria-label="Apply to">
                         {scopeOptions(label, vehicleName, series).map(([id, text, subject]) => (
                             <button
                                 key={id}

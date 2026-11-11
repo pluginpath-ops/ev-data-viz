@@ -604,7 +604,7 @@ export default function DataChecksPanel() {
 
             <div className="flex flex-wrap items-center gap-3 mb-3">
                 <span className="text-note">EPA tested is compared with</span>
-                <div className="stats-segmented" role="group" aria-label="How EPA tested is compared">
+                <div className="segmented" role="group" aria-label="How EPA tested is compared">
                     {TESTED_RULES.map(r => (
                         <button
                             key={r.key}

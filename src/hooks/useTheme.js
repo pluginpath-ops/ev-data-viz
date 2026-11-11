@@ -1,18 +1,21 @@
 import { useSyncExternalStore } from 'react';
+import { storedTheme, setStoredTheme, subscribeStoredTheme } from '../styles/themeBootstrap';
 
 /**
- * Whether the document is in the dark theme, for code that paints in JS.
+ * The theme, for React.
  *
- * CSS follows `data-theme` by itself. A canvas does not: a chart reads its
- * colors from the tokens while it is built (`chartTheme()`), so it has to be
- * rebuilt when the theme flips. `isDark` is that trigger. Put it in the build
- * effect's dependencies; do not branch on it to pick a color.
+ * `isDark` is for code that paints in JS. CSS follows `data-theme` by itself;
+ * a canvas does not: a chart reads its colors from the tokens while it is
+ * built (`chartTheme()`), so it has to be rebuilt when the theme flips.
+ * `isDark` is that trigger. Put it in the build effect's dependencies; do not
+ * branch on it to pick a color.
  *
- * One observer on the document root serves every caller. It was one observer
- * and one state per chart component.
+ * `theme` is the reader's choice ('light', 'dark' or 'system') and `setTheme`
+ * changes it; the account menu's picker is their one caller.
  *
- * Choosing and storing the theme is `styles/themeBootstrap`, which runs before
- * React exists.
+ * One observer on the document root serves every caller. Choosing, storing
+ * and applying the theme is `styles/themeBootstrap`, which runs before React
+ * exists.
  */
 const listeners = new Set();
 let observer = null;
@@ -35,5 +38,9 @@ function subscribe(onChange) {
 const isDarkNow = () => document.documentElement.getAttribute('data-theme') === 'dark';
 
 export function useTheme() {
-    return { isDark: useSyncExternalStore(subscribe, isDarkNow) };
+    return {
+        isDark: useSyncExternalStore(subscribe, isDarkNow),
+        theme: useSyncExternalStore(subscribeStoredTheme, storedTheme),
+        setTheme: setStoredTheme,
+    };
 }

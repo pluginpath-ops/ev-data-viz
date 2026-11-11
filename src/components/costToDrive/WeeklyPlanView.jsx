@@ -174,7 +174,7 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                             {!presentationMode && (
                                 <div className="plan-compare">
                                     <span className="text-label">Compare with</span>
-                                    <div className="stats-segmented" role="group" aria-label="Compare with">
+                                    <div className="segmented" role="group" aria-label="Compare with">
                                         {[['none', 'Nothing'], ['season', `${otherSeason === 'winter' ? 'Winter' : 'Summer'}`], ['level', 'Another charger']].map(([k, label]) => (
                                             <button key={k} type="button" aria-pressed={compare === k} className={compare === k ? 'active' : undefined} onClick={() => setCompare(k)}>{label}</button>
                                         ))}

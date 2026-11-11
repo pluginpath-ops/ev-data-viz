@@ -57,7 +57,7 @@ export default function SetupReviewBar({ review, currentMode, units, onOpen, onT
                         <span className="text-micro">{season.label}</span>
                         {/* Both seasons in a fixed order: a click moves the highlight,
                             not the buttons. */}
-                        <span className="stats-segmented" role="group" aria-label={season.label}>
+                        <span className="segmented" role="group" aria-label={season.label}>
                             {season.options.map(o => (
                                 <button
                                     key={o.season}

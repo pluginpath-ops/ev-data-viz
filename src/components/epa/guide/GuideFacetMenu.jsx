@@ -118,7 +118,7 @@ export default function GuideFacetMenu({
                     {onAllChange && (
                         <div className="guide-facet-panel-head">
                             <span className="text-nano">Match</span>
-                            <span className="stats-segmented guide-facet-match" role="group" aria-label={`${label}: match`}>
+                            <span className="segmented guide-facet-match" role="group" aria-label={`${label}: match`}>
                                 {[['any', false], ['all', true]].map(([word, v]) => (
                                     <button
                                         key={word}
