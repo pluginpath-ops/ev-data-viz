@@ -104,9 +104,9 @@ own file rather than duplicating it.
   how it looks (`.vehicle-grid`, not `.blue-box`). Reuse an existing class
   first. When you touch markup carrying such a cluster, convert it.
 - Never add a `[data-theme="dark"] .foo` rule — it cannot follow a themed
-  subtree.
+  subtree. `playground.test.js` fails on one.
 
-Three ratchets track what is left. Each fails on a fall as well as a rise, so
+Two ratchets track what is left. Each fails on a fall as well as a rise, so
 when you clear something, lower the count; a rise needs a reason in the PR. (A
 cap alone would hide cleanups, and nobody could tell progress from a broken
 probe.)
@@ -116,7 +116,6 @@ probe.)
   Genuinely un-tokenizable code goes in `EXEMPT` with a reason.
 - `KNOWN_OFFENDERS` in `contrast.test.js` — light surfaces with no dark
   counterpart.
-- The dark-override cap in `playground.test.js`.
 
 ### Naming
 

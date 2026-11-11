@@ -2,9 +2,8 @@
  * `npm run health` — every ratchet in this project, in one table.
  *
  * They accumulated one at a time, each in the suite that needed it, and they
- * are now in four places: a contrast ratchet in `contrast.test.js`, a
- * dark-override cap in the playground catalog, ten drift probes in
- * `driftProbes.js`, three stylesheet probes in `cssProbes.js`. Each is
+ * are now in three places: a contrast ratchet in `contrast.test.js`, ten
+ * drift probes in `driftProbes.js`, three stylesheet probes in `cssProbes.js`. Each is
  * readable on its own and none of them answers "how is the codebase doing".
  *
  * This does not add a rule. It reads the same numbers the suites assert, so it
@@ -19,7 +18,6 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { measure as measureDrift, ROOT } from './driftProbes.js';
 import { measure as measureCss, stats as cssStats } from './cssProbes.js';
-import { DARK_OVERRIDE_CLASSES } from '../src/components/playground/catalog.js';
 
 const BAR = '═'.repeat(74);
 const bar = '─'.repeat(74);
@@ -44,8 +42,6 @@ for (const p of drift.filter(p => p.actual > 0)) {
 }
 rows.push({ group: 'Theme', name: 'hardcoded light surfaces', now: knownOffenders(), target: 0,
     note: 'KNOWN_OFFENDERS, contrast.test.js' });
-rows.push({ group: 'Theme', name: 'dark overrides', now: DARK_OVERRIDE_CLASSES.size, target: 0,
-    note: 'cannot follow a themed subtree' });
 
 // ── The stylesheet itself ──────────────────────────────────────────────────
 for (const p of measureCss()) {

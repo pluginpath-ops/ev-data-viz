@@ -89,7 +89,7 @@
 
        Text values are AA against their own surface in both themes; a test
        asserts it, so a re-tint cannot quietly drop below 4.5:1. */
-    --color-primary-surface: rgba(29, 106, 229, 0.07);
+    --color-primary-surface: rgba(29, 106, 229, 0.09);
     --color-primary-border:  rgba(29, 106, 229, 0.45);
 
     --color-warning-surface: rgba(232, 112, 24, 0.12);
@@ -155,6 +155,14 @@
     --color-accent-green:  rgb(14, 134, 90);
     --color-accent-violet: rgb(108, 88, 214);
     --color-accent-gray:   rgb(94, 107, 125);
+
+    /* Magnitude bars: the table's bar cells, the stats IQR box, the histogram
+       bars and the sweep note. Blue washes at fixed strengths. --bar-strong is
+       a filled box's; a bar cell needs the stronger edge. */
+    --bar-strong: rgba(29, 106, 229, 0.24);
+    --bar-soft:   rgba(29, 106, 229, 0.30);
+    --bar-edge:   rgba(29, 106, 229, 0.85);
+    --bar-track:  rgba(92, 103, 120, 0.16);
 }
 
 /* ── Dark mode overrides ─────────────────────────────────────────────────── */
@@ -309,6 +317,12 @@
     --color-success-surface: rgba(35, 180, 126, 0.18);
     --color-success-border:  rgba(35, 180, 126, 0.60);
     --color-success-text:    rgb(95, 214, 168);
+
+    /* Magnitude bars — see the light block. */
+    --bar-strong: rgba(96, 165, 250, 0.34);
+    --bar-soft:   rgba(96, 165, 250, 0.30);
+    --bar-edge:   rgba(96, 165, 250, 0.95);
+    --bar-track:  rgba(148, 163, 184, 0.16);
 }
 
 /* ── Layers ──────────────────────────────────────────────────────────────────
@@ -566,7 +580,9 @@
 .subtab-strip .btn-subtab { color: var(--color-text-nav-meta); }
 .subtab-strip .btn-subtab:hover:not(:disabled),
 .subtab-strip .btn-subtab.active { color: var(--color-text-on-nav); }
-.subtab-strip .btn-subtab:hover:not(:disabled) { background-color: var(--color-hover-lift); }
+/* The strip is a deep fill in both themes, so its hover lifts with its own
+   text color rather than --color-hover-lift, which darkens in light. */
+.subtab-strip .btn-subtab:hover:not(:disabled) { background-color: color-mix(in srgb, var(--color-text-on-nav) 9%, transparent); }
 .btn-subtab:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Tab/Navigation Button - Used for: Top navigation tabs */
@@ -950,7 +966,7 @@ body {
 /* The same banner for a failure. Tinted rather than solid so the text stays
    readable in both themes without a second color token. */
 .notice-error {
-    background-color: rgba(239, 68, 68, 0.12);
+    background-color: var(--color-danger-surface);
     border: 1px solid var(--color-danger);
     color: var(--color-text-primary);
 }
@@ -1487,8 +1503,9 @@ body {
 }
 .account-segmented button:hover { color: var(--color-text-primary); }
 .account-segmented button.active {
-    background-color: var(--color-primary);
-    color: var(--color-primary-text, #fff);
+    background-color: var(--color-primary-light);
+    box-shadow: inset 0 0 0 1px var(--color-primary-border);
+    color: var(--color-primary-text);
 }
 .account-action { width: 100%; justify-content: center; }
 /* The email opt-in: a checkbox with a one-line promise under its label. */
@@ -1587,7 +1604,9 @@ body {
 
 
 .spec-link-type-badge {
-    @apply text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 whitespace-nowrap;
+    @apply text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap;
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
 }
 .spec-link-add-form {
     @apply border rounded-xs p-3;
@@ -1623,10 +1642,10 @@ body {
 .import-badge-error {
     @apply text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap;
 }
-.import-badge-create { @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }
-.import-badge-update { @apply bg-blue-100  text-blue-800  dark:bg-blue-900  dark:text-blue-200; }
-.import-badge-skip   { @apply bg-gray-100  text-gray-600  dark:bg-slate-700 dark:text-slate-300; }
-.import-badge-error  { @apply bg-red-100   text-red-800   dark:bg-red-900   dark:text-red-200; }
+.import-badge-create { background-color: var(--color-success-surface); color: var(--color-success-text); }
+.import-badge-update { background-color: var(--color-primary-surface); color: var(--color-primary-text); }
+.import-badge-skip   { background-color: var(--color-surface-sunken);  color: var(--color-text-secondary); }
+.import-badge-error  { background-color: var(--color-danger-surface);  color: var(--color-danger-text); }
 
 /* Preview table row — clicking anywhere on it opens the detail panel */
 .import-row {
@@ -1650,8 +1669,8 @@ body {
 .import-note-warn {
     @apply text-xs whitespace-nowrap cursor-help;
 }
-.import-note-info { @apply text-amber-600 dark:text-amber-400; }
-.import-note-warn { @apply text-red-600   dark:text-red-400; }
+.import-note-info { color: var(--color-warning-text); }
+.import-note-warn { color: var(--color-danger-text); }
 
 /* Inline text button used in the summary line above the table */
 .import-link-button {
@@ -1913,14 +1932,14 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     @apply text-[10px] font-semibold px-1.5 py-0.5 rounded-xs border cursor-help;
 }
 .knob-source-local {
-    color: var(--color-warning);
-    border-color: rgba(245, 158, 11, 0.35);
-    background-color: rgba(245, 158, 11, 0.12);
+    color: var(--color-accent-orange-text);
+    border-color: var(--color-accent-orange-muted);
+    background-color: var(--color-accent-orange-surface);
 }
 .knob-source-site {
     color: var(--color-primary);
-    border-color: rgba(59, 130, 246, 0.35);
-    background-color: rgba(59, 130, 246, 0.12);
+    border-color: var(--color-primary-border);
+    background-color: var(--color-primary-surface);
 }
 
 /* ── Navigation (App.jsx) ───────────────────────────────────────────────────── */
@@ -3005,7 +3024,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     border-radius: var(--radius-control);
     border: 1px solid var(--color-border);
     background-color: var(--color-card);
-    box-shadow: var(--shadow-popover, 0 4px 12px rgba(0, 0, 0, 0.3));
+    box-shadow: var(--shadow-popover);
     pointer-events: none;
 }
 /* Still ring, same words: the message carries the meaning, the spin only
@@ -3752,7 +3771,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     background-color: var(--color-popover);
     border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-popover);
-    box-shadow: var(--shadow-popover, 0 4px 12px rgba(0, 0, 0, 0.3));
+    box-shadow: var(--shadow-popover);
     pointer-events: none;
 }
 
@@ -4006,7 +4025,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     justify-content: center;
     background-color: var(--color-surface-sunken);
     background-image: repeating-linear-gradient(135deg,
-        rgba(255, 255, 255, 0.03) 0 7px, transparent 7px 14px);
+        var(--color-hover-lift) 0 7px, transparent 7px 14px);
 }
 .vehicle-media-fallback {
     font-family: var(--font-display);
@@ -4399,7 +4418,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* AND / OR / NOT, on the tokens that already mean those things.
  *
- * These were `@apply bg-blue-500 text-white border-blue-500` and its green and
+ * These were solid blue utilities (a fill, white text, a matching edge) and their green and
  * red twins — raw palette, no tokens, no dark rule, and the last three things
  * #277 named that the re-skin had not reached. They were never illegible, so
  * this was not a bug: it was three states of one control sitting outside the
@@ -5135,14 +5154,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 /* Active/success state — overrides default bg/border/color */
 .chart-copy-btn-active {
-    background-color: rgb(240, 253, 244);
-    border-color: rgb(187, 247, 208);
-    color: rgb(21, 128, 61);
-}
-[data-theme="dark"] .chart-copy-btn-active {
-    background-color: rgba(34, 197, 94, 0.15);
-    border-color: rgba(34, 197, 94, 0.4);
-    color: rgb(134, 239, 172);
+    background-color: var(--color-success-surface);
+    border-color: var(--color-success-border);
+    color: var(--color-success-text);
 }
 
 /* Reset zoom, beside the Axis Scale controls (AxisScaleControls). Drawn only
@@ -5203,11 +5217,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 
 /* "Adding data to: X" merge-mode banner */
 .merge-target-banner {
-    @apply mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xs flex items-center justify-between;
-}
-[data-theme="dark"] .merge-target-banner {
-    background-color: rgba(59, 130, 246, 0.1);
-    border-color: rgba(59, 130, 246, 0.3);
+    @apply mb-4 px-4 py-3 border rounded-xs flex items-center justify-between;
+    background-color: var(--color-primary-surface);
+    border-color: var(--color-primary-border);
 }
 
 /* Data-type flag toggle chip strip */
@@ -6171,9 +6183,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     color: var(--color-text-primary);
 }
 .color-auto.is-on {
-    border-color: transparent;
-    background-color: var(--color-primary);
-    color: var(--color-primary-text, #fff);
+    border-color: var(--color-primary-border);
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-text);
     cursor: default;
 }
 .color-auto:focus-visible,
@@ -6522,7 +6534,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* ── Road trip simulation ────────────────────────────────────────────────────── */
 
 .roadtrip-warning {
-    @apply text-amber-700 text-xs font-medium;
+    @apply text-xs font-medium;
+    color: var(--color-warning-text);
 }
 
 /* ── Trip Optimizer: the best-plan table ─────────────────────────────────────
@@ -7043,8 +7056,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .section-action {
     @apply text-xs px-2 py-1 rounded-xs whitespace-nowrap transition;
-    @apply bg-indigo-50 text-indigo-700 hover:bg-indigo-100;
+    background-color: var(--color-primary-surface);
+    color: var(--color-primary-text);
 }
+.section-action:hover { background-color: var(--color-primary-light); }
 
 /* ── EPA methodology diagram (#206) ──────────────────────────────────────────
    A flow, not a chart: two cycle columns merging into the label. Sized in rem
@@ -7407,7 +7422,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     height: 100%;
     margin-left: 0;
     border-color: var(--color-primary);
-    background-color: rgba(59, 130, 246, 0.10);
+    background-color: var(--color-primary-surface);
     z-index: 1;
 }
 
@@ -7444,7 +7459,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .cycle-swatch-band {
     @apply inline-block w-4 h-3 border-l border-r border-dashed not-italic;
     border-color: var(--color-primary);
-    background-color: rgba(59, 130, 246, 0.10);
+    background-color: var(--color-primary-surface);
 }
 
 /* ── Certification paths (#206) ──────────────────────────────────────────────
@@ -7572,7 +7587,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .curator-field-flag {
     @apply text-[9px] font-bold px-1 rounded-xs cursor-help;
     color: var(--color-warning);
-    background-color: rgba(245, 158, 11, 0.12);
+    background-color: var(--color-warning-surface);
 }
 
 /* ── Fuel Economy Guide import (#206) ───────────────────────────────────────── */
@@ -8217,11 +8232,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .guide-row.selected .guide-td.sticky-select,
 .guide-row.selected .guide-td.sticky-name {
-    background-color: var(--color-primary-light);
-}
-[data-theme="dark"] .guide-row.selected .guide-td.sticky-select,
-[data-theme="dark"] .guide-row.selected .guide-td.sticky-name {
-    background-color: rgb(30, 44, 66);
+    /* The row's wash is translucent and a pinned cell must be opaque, so the
+       same wash is laid over the card color here. */
+    background: linear-gradient(var(--color-primary-surface), var(--color-primary-surface)), var(--color-card);
 }
 /* A hairline marking where the pinned block ends, so the seam is legible when
    content scrolls under it. */
@@ -8286,10 +8299,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply cursor-pointer transition-colors;
 }
 .guide-row:hover     { background-color: var(--color-surface-muted); }
-.guide-row.selected  { background-color: var(--color-primary-light); }
-[data-theme="dark"] .guide-row.selected {
-    background-color: rgba(59, 130, 246, 0.15);
-}
+.guide-row.selected  { background-color: var(--color-primary-surface); }
 .guide-td {
     /* With fixed widths a long value has to clip rather than widen its column,
        which is the whole point of fixing them. */
@@ -8369,21 +8379,6 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     background-image: linear-gradient(to right, var(--bar-soft), var(--bar-edge));
     background-size: var(--bar-fill, 0%) 100%;
     background-repeat: no-repeat;
-}
-/* --bar-strong is NOT the table's; the stats IQR box, the histogram bars and
-   the sweep note all fill with it. It stays at its old value rather than
-   following the sparkline, which needs a stronger edge than a filled box does. */
-:root {
-    --bar-strong: rgba(59, 130, 246, 0.28);
-    --bar-soft:   rgba(59, 130, 246, 0.35);
-    --bar-edge:   rgba(59, 130, 246, 0.85);
-    --bar-track:  rgba(100, 116, 139, 0.18);
-}
-[data-theme="dark"] {
-    --bar-strong: rgba(96, 165, 250, 0.34);
-    --bar-soft:   rgba(96, 165, 250, 0.30);
-    --bar-edge:   rgba(96, 165, 250, 0.95);
-    --bar-track:  rgba(148, 163, 184, 0.16);
 }
 
 /* ── Clusters ───────────────────────────────────────────────────────────────
@@ -8633,18 +8628,14 @@ a.is-test-link:focus-visible {
 
 .guide-warning {
     @apply px-3 py-2 rounded-xs text-sm;
-    background-color: rgba(245, 158, 11, 0.12);
+    background-color: var(--color-warning-surface);
     color: var(--color-text-primary);
     border: 1px solid var(--color-warning);
 }
 .guide-tested-note {
     @apply px-3 py-2 rounded-xs text-sm mb-3;
-    background-color: var(--color-primary-light);
+    background-color: var(--color-primary-surface);
     color: var(--color-primary-text);
-}
-[data-theme="dark"] .guide-tested-note {
-    background-color: rgba(59, 130, 246, 0.15);
-    color: var(--color-text-primary);
 }
 
 /* ── Compare panel ───────────────────────────────────────────────────────── */
@@ -8662,7 +8653,7 @@ a.is-test-link:focus-visible {
     @apply leading-none px-1;
     color: var(--color-text-faint);
 }
-.guide-compare-remove:hover { color: var(--color-danger, rgb(239, 68, 68)); }
+.guide-compare-remove:hover { color: var(--color-danger); }
 .guide-compare-group {
     @apply uppercase;
     font-size: 0.625rem;
@@ -8821,7 +8812,7 @@ a.is-test-link:focus-visible {
    vehicles and aliases rather than asking "are you sure?". */
 .brand-merge-confirm {
     @apply p-2 rounded-xs;
-    background-color: rgba(245, 158, 11, 0.12);
+    background-color: var(--color-warning-surface);
     border: 1px solid var(--color-warning);
 }
 
@@ -8834,7 +8825,7 @@ a.is-test-link:focus-visible {
     color: var(--color-text-faint);
 }
 .brand-alias-chip button:hover {
-    color: var(--color-danger, rgb(239, 68, 68));
+    color: var(--color-danger);
 }
 .brand-alias-add {
     @apply flex items-center gap-1.5;
@@ -8928,9 +8919,13 @@ a.is-test-link:focus-visible {
     background-color: var(--color-hover-lift);
     color: var(--color-text-primary);
 }
+/* Tinted, like .btn-toggle.active: a wash, an edge, the tint text. It was the
+   tint text on a SOLID blue, which nothing checked: 2.2:1 in dark, 1.7:1 in
+   light. */
 .stats-segmented button.active {
-    background-color: var(--color-primary);
-    color: var(--color-primary-text, #fff);
+    background-color: var(--color-primary-light);
+    box-shadow: inset 0 0 0 1px var(--color-primary-border);
+    color: var(--color-primary-text);
     font-weight: 600;
 }
 
@@ -9131,11 +9126,8 @@ a.is-test-link:focus-visible {
     @apply ml-2 px-1.5 py-0.5 rounded-xs;
     font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
     font-weight: 700;
-    background-color: var(--color-surface-sunken);
+    background-color: var(--color-hover-lift);
     color: var(--color-text-muted);
-}
-[data-theme="dark"] .stats-suppressed-flag {
-    background-color: rgba(255, 255, 255, 0.08);
 }
 
 /* ── Box plot ────────────────────────────────────────────────────────────── */
@@ -9317,11 +9309,8 @@ a.is-test-link:focus-visible {
    with the count stated so it is a decision rather than a leap. */
 .sweep-batch {
     @apply flex flex-wrap items-center justify-between gap-3 p-3 rounded-xs;
-    background-color: var(--color-primary-light);
-    border: 1px solid var(--color-primary);
-}
-[data-theme="dark"] .sweep-batch {
-    background-color: rgba(59, 130, 246, 0.15);
+    background-color: var(--color-primary-surface);
+    border: 1px solid var(--color-primary-border);
 }
 
 /* The Guide-row sweep's queue: held under the header while the curator
@@ -9341,7 +9330,7 @@ a.is-test-link:focus-visible {
    Fuel Economy Guide link sweep and Data Checks: the same act in both places. */
 .skip-ask {
     @apply flex flex-wrap items-center gap-2 p-2 rounded-xs;
-    background-color: rgba(245, 158, 11, 0.12);
+    background-color: var(--color-warning-surface);
     border: 1px solid var(--color-warning);
 }
 
@@ -9572,17 +9561,6 @@ a.is-test-link:focus-visible {
     border: 1px solid var(--color-border);
 }
 .pg-token-sample { @apply text-sm; }
-
-/* Marks a specimen whose colors come from a `[data-theme="dark"]` override
-   instead of tokens — it cannot follow a themed subtree, so the side-by-side
-   view shows it in the document's theme regardless of the pane. Amber because
-   it is a caveat on the specimen, not a fault in it. */
-.pg-unscoped {
-    @apply text-[10px] font-mono rounded-xs px-1 py-0.5;
-    background-color: var(--color-warning-surface);
-    color: var(--color-warning-text);
-}
-
 
 /* ── Home: the featured comparison (#448) ───────────────────────────────────── */
 

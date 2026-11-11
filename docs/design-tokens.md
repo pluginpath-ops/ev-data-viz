@@ -18,7 +18,7 @@ counts what remains; `npm run health` shows it beside every other ratchet.
 the document root, so a `.foo` inside a `[data-theme="light"]` pane is *still*
 inside `html[data-theme="dark"]` and keeps the dark styling — light-mode
 background under dark-mode text. The playground's side-by-side view is where
-this shows up, and `playground.test.js` caps the ones that remain. Put the
+this shows up, and `playground.test.js` fails on any such rule. Put the
 difference in a **token** instead; that is what tokens are for.
 
 **3. A token has both values or it is not a token.** `contrast.test.js` asserts
@@ -172,6 +172,10 @@ explainer hub edges.
 `-surface`, `-border` and `-text`, and they are used together. A component
 picking one and inventing the other two is how `bg-amber-50 text-amber-700
 border-amber-200` ended up written inline eight times.
+
+**The four `--bar-*` tokens** (`-strong`, `-soft`, `-edge`, `-track`) fill the
+magnitude bars: bar cells, the stats box and histogram. They sit in the same two
+blocks as the colors, so they follow a themed subtree.
 
 ## Radii
 

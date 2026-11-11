@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { OWNED_FAMILIES, NOT_CATALOGED, SECTIONS, catalogedClasses, DARK_OVERRIDE_CLASSES } from '../components/playground/catalog';
+import { OWNED_FAMILIES, NOT_CATALOGED, SECTIONS, catalogedClasses } from '../components/playground/catalog';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CSS = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8');
@@ -82,44 +82,21 @@ describe('the catalog covers every control it claims to own', () => {
     });
 });
 
-describe('the classes that cannot follow a themed subtree', () => {
+describe('no rule is written against the document theme', () => {
     /**
-     * Classes the stylesheet styles via `[data-theme="dark"] .foo`.
+     * `[data-theme="dark"] .foo` cannot follow a themed subtree: a `.foo` inside
+     * a `[data-theme="light"]` pane is still inside `html[data-theme="dark"]`
+     * and keeps the dark styling. The difference between themes belongs in a
+     * token. There were 17 of these rules once; the last went when light mode
+     * came back (#296), and this keeps them out.
      *
-     * Comments stripped FIRST. A comment explaining why a dark override once
-     * existed still contains the selector, so scanning the raw text counted the
-     * explanation as an occurrence — `.guide-chip` stayed on this list after its
-     * last real rule was deleted, purely because the note about it survived. A
-     * backlog metric that a paragraph of prose can inflate is not a metric.
+     * Comments are stripped first, so a note that quotes the selector does not
+     * count as a rule.
      */
-    const actual = new Set(
-        [...CSS.replace(/\/\*[\s\S]*?\*\//g, '')
-            .matchAll(/\[data-theme="dark"\]\s+\.([a-z][a-z0-9-]*)/g)].map(m => m[1]),
-    );
-
-    it('matches what the stylesheet actually does', () => {
-        // Kept in step with index.css rather than remembered. A stale list marks
-        // the wrong specimens and, worse, stops marking the right ones — and the
-        // marker is the only thing telling a reader that the side-by-side view
-        // is showing them the document theme rather than the pane's.
-        const missing = [...actual].filter(c => !DARK_OVERRIDE_CLASSES.has(c));
-        const stale = [...DARK_OVERRIDE_CLASSES].filter(c => !actual.has(c));
-
-        expect(missing, `Gained a [data-theme="dark"] override — add to DARK_OVERRIDE_CLASSES, `
-            + `or better, move it onto tokens: ${missing.join(', ')}`).toEqual([]);
-        expect(stale, `No longer has a dark override — remove from DARK_OVERRIDE_CLASSES `
-            + `(it moved onto tokens, which is the point): ${stale.join(', ')}`).toEqual([]);
-    });
-
-    it('is a backlog that should shrink, never grow', () => {
-        // 17 when the marker was added, 15 after #277, 13 once the re-skin's
-        // chrome phase rebuilt .btn-tab on tokens and deleted
-        // .app-header-compact with the photo hero, 12 once .badge-default
-        // became the mono DEF marker, 11 once the curve tier badges moved onto
-        // .badge-micro's intents, 10 once the curve picker's selected row took
-        // --color-popover. Lower it as classes move; a rise means a new class
-        // was written the old way.
-        expect(actual.size).toBeLessThanOrEqual(10);
+    it('index.css has no [data-theme="dark"] .foo selector', () => {
+        const found = [...CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+            .matchAll(/\[data-theme="(?:dark|light)"\]\s+\.([a-z][a-z0-9-]*)/g)].map(m => m[1]);
+        expect(found, `Move the difference into a token: ${found.join(', ')}`).toEqual([]);
     });
 });
 
