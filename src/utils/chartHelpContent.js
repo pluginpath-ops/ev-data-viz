@@ -341,10 +341,13 @@ export const CHART_HELP_DEFAULTS = {
             'for each car, its minutes of fast charging and its home, fast and total cost ' +
             'per month. The bold orange cell is “enough from here”: the smallest charger past ' +
             'which a bigger one saves less than five minutes a week (about 20 a month). A ^ means the car’s own ' +
-            'onboard charger, not the wall, sets the pace, so a bigger charger buys nothing.',
+            'onboard charger, not the wall, sets the pace, so a bigger charger buys nothing. ' +
+            'The dashed line over a column is the most home charging could cost that month, a ceiling the home part never passes. A ceiling above the top of the chart ' +
+            'sits on its edge with an arrow and its figure, and does not stretch the scale.',
         key_terms:
             'Home charger — 120 V on a wall outlet, or 240 V at the amps the circuit allows.\n' +
             'Onboard charger — the car’s own AC charger; it limits how fast any home charger can fill it.\n' +
+            'Most it could cost at home — the charger (or the onboard charger, if lower) at full power the whole time you are plugged in, every night, at your home price.\n' +
             'Enough from here — where a bigger charger stops making a difference you would notice.',
         math_approach:
             'Power at home is the lesser of volts × amps and the car’s onboard charger ' +

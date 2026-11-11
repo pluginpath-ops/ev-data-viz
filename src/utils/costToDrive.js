@@ -25,6 +25,9 @@ import { val } from './calcTrace';
 const WEEKS_PER_MONTH = 52 / 12;
 const finite = (v) => v != null && v !== '' && Number.isFinite(Number(v)) && Number(v) > 0;
 
+/** Hours the car is plugged in a night: 10 pm to 7 am is 9; the same hour twice is all 24. */
+export const plugHours = (s) => ((s.plugUntil - s.plugFrom + 24) % 24) || 24;
+
 // ── Charging speed ───────────────────────────────────────────────────────────
 
 /**
@@ -349,7 +352,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     });
     const planned = (d) => (s.planned & (1 << d)) !== 0;
     const nightKwh = (() => {
-        const hours = ((s.plugUntil - s.plugFrom + 24) % 24) || 24;
+        const hours = plugHours(s);
         return { hours, addPct: pct(profile.home.kw * hours * profile.home.eff) };
     })();
     trace?.step('Most a night can add', {
@@ -784,6 +787,20 @@ export function enoughLevel(fastMinutes) {
 
 /** A week's cost and time as a month: × 52 ÷ 12. */
 export const perMonth = (weekly) => weekly * WEEKS_PER_MONTH;
+
+/**
+ * The most a car's home charging could cost in a month at its level: the lesser
+ * of the charger and the car's onboard charger, at full power for the whole
+ * plug-in window, every night (the day off too), at the home price. Energy
+ * bought at the wall, losses in, so it is directly comparable to the `homeCost`
+ * the week is priced at, which never exceeds it. Null with no home charging.
+ *
+ * @param {Object} profile   costToDriveVehicle's answer (`home.kw`, `home.none`)
+ * @param {Object} settings  normalized settings
+ */
+export const homeCostCeiling = (profile, settings) => (
+    profile.home.none ? null : perMonth(7 * profile.home.kw * plugHours(settings) * settings.homePrice)
+);
 
 /**
  * One vehicle against the gas car, for the season shown and across a year

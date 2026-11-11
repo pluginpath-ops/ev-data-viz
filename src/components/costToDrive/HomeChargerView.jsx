@@ -16,7 +16,7 @@ import { fastChargingFill } from '../../utils/stripedFill';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
-import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel, chargingText } from '../../utils/costToDrive';
+import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel, chargingText, homeCostCeiling } from '../../utils/costToDrive';
 import { useCostToDriveByLevel } from '../../hooks/useCostToDrive';
 import { useChartPng } from '../../hooks/useChartPng';
 import { useSourceLine } from '../../hooks/useSourceLine';
@@ -49,13 +49,26 @@ const totalLabels = (isTop, totalOf, homeOf) => ({
     id: 'totalLabels',
     afterDatasetsDraw(chart) {
         const { ctx, chartArea: a } = chart;
-        const { ink } = chartTheme();
+        const { ink, background } = chartTheme();
         const fonts = chartFonts();
         ctx.save();
         ctx.font = `600 ${fonts.badge}px ${fonts.mono}`;
         ctx.fillStyle = ink;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
+        // A figure over a column sits on the panel, where a home ceiling's
+        // dashed line can run through it: an outline in the panel's color
+        // keeps it legible. (Not the home figure inside a bar: there the
+        // outline would box it.)
+        const overPanel = (text, x, y) => {
+            ctx.save();
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = background;
+            ctx.strokeText(text, x, y);
+            ctx.restore();
+            ctx.fillText(text, x, y);
+        };
         chart.data.datasets.forEach((ds, di) => {
             const meta = chart.getDatasetMeta(di);
             if (meta.hidden || !isTop(ds)) return;
@@ -71,11 +84,11 @@ const totalLabels = (isTop, totalOf, homeOf) => ({
                     ctx.rotate(-Math.PI / 2);
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(text, 0, 0);
+                    overPanel(text, 0, 0);
                     ctx.restore();
                     return;
                 }
-                ctx.fillText(text, bar.x, y);
+                overPanel(text, bar.x, y);
             });
         });
         // The home part's own figure, only where fast charging sits on it:
@@ -96,6 +109,72 @@ const totalLabels = (isTop, totalOf, homeOf) => ({
                 } else {
                     ctx.textBaseline = 'bottom';
                     ctx.fillText(text, bar.x, bar.y - 3);
+                }
+            });
+        });
+        ctx.restore();
+    },
+});
+
+/**
+ * The most each car's home charging could cost a month at the level, a dashed
+ * line across its column (owner, 2026-11-11): `ceilingOf(levelIndex,
+ * vehicleIndex)` gives the figure, null draws nothing (no home charging).
+ * Drawn here, not as a dataset, so a line above the plot never moves the
+ * y-axis — the axis stays as tall as the tallest column. A line above it is
+ * pinned to the top edge with an up-arrow and its figure, so the number is not
+ * lost.
+ */
+const homeCeilings = (ceilingOf) => ({
+    id: 'homeCeilings',
+    afterDatasetsDraw(chart) {
+        const { ctx, chartArea: a, scales: { y } } = chart;
+        const { ink } = chartTheme();
+        const fonts = chartFonts();
+        ctx.save();
+        ctx.strokeStyle = ink;
+        ctx.fillStyle = ink;
+        ctx.lineWidth = 2;
+        ctx.font = `600 ${fonts.badge}px ${fonts.mono}`;
+        chart.data.datasets.forEach((ds, di) => {
+            const meta = chart.getDatasetMeta(di);
+            if (meta.hidden || ds.part !== 'home') return;
+            meta.data.forEach((bar, li) => {
+                const ceiling = ceilingOf(li, ds.vehicleIndex);
+                if (ceiling == null || !Number.isFinite(bar.x)) return;
+                const top = y.getPixelForValue(ceiling);
+                const off = top < a.top;
+                const py = Math.round(off ? a.top : top);
+                const half = bar.width / 2 + 2;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.moveTo(bar.x - half, py);
+                ctx.lineTo(bar.x + half, py);
+                ctx.stroke();
+                if (!off) return;
+                // Off the plot: an arrow over the line, the figure under it.
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.moveTo(bar.x, py - 9);
+                ctx.lineTo(bar.x + 4, py - 3);
+                ctx.lineTo(bar.x - 4, py - 3);
+                ctx.closePath();
+                ctx.fill();
+                const text = dollars(ceiling);
+                // Neighbors often share a figure: stand it on end unless it
+                // clears the bar with room to spare, so they never run together.
+                if (ctx.measureText(text).width > bar.width - 10) {
+                    ctx.save();
+                    ctx.translate(bar.x, py + 4);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(text, 0, 0);
+                    ctx.restore();
+                } else {
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(text, bar.x, py + 4);
                 }
             });
         });
@@ -157,7 +236,12 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
     useEffect(() => {
         if (!canvasRef.current || !columns.length) return undefined;
         applyChartDefaults(Chart);
-        const { tick, grid, legend } = chartTheme();
+        const { tick, grid, legend, ink } = chartTheme();
+        // Level by place on the chart (`shown`), car by place in `columns`.
+        const ceilingOf = (li, ci) => {
+            const e = at(shown[li].index, columns[ci].vehicle.id);
+            return e && !e.missing ? homeCostCeiling(e.profile, settings) : null;
+        };
         chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
             type: 'bar',
             data: {
@@ -177,7 +261,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                     backgroundColor: part === 'home' ? c.color : fastChargingFill(c.color),
                 }))),
             },
-            plugins: [totalLabels(ds => ds.part === 'fast', (li, ds) => {
+            plugins: [homeCeilings(ceilingOf), totalLabels(ds => ds.part === 'fast', (li, ds) => {
                 const w = monthOf(at(shown[li].index, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
                 return w ? w.fastCost + w.homeCost : null;
             }, (li, ds) => {
@@ -194,10 +278,20 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        // A car once, by its home bar's full color.
-                        labels: { color: legend, boxWidth: 12, filter: (item, data) => data.datasets[item.datasetIndex].part === 'home' },
-                        // Hiding a car hides both its bars.
+                        labels: {
+                            color: legend, boxWidth: 12, usePointStyle: true,
+                            // A car once, by its home bar's full color; then the
+                            // dashed line's key, which no dataset stands for.
+                            generateLabels: (chart) => [
+                                ...Chart.defaults.plugins.legend.labels.generateLabels(chart)
+                                    .filter(item => chart.data.datasets[item.datasetIndex].part === 'home')
+                                    .map(item => ({ ...item, pointStyle: 'rect' })),
+                                { text: 'Most it could cost at home', pointStyle: 'line', lineDash: [4, 3], lineWidth: 2, strokeStyle: ink, fillStyle: ink, fontColor: legend, hidden: false },
+                            ],
+                        },
+                        // Hiding a car hides both its bars (and the key does nothing).
                         onClick: (e, item, leg) => {
+                            if (item.datasetIndex == null) return;
                             const ch = leg.chart;
                             const vi = ch.data.datasets[item.datasetIndex].vehicleIndex;
                             const show = !ch.isDatasetVisible(item.datasetIndex);
@@ -211,8 +305,9 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                 const ds = ctx.dataset;
                                 const w = monthOf(at(shown[ctx.dataIndex].index, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
                                 if (!w) return null;
+                                const ceiling = ds.part === 'home' ? ceilingOf(ctx.dataIndex, ds.vehicleIndex) : null;
                                 return ds.part === 'home'
-                                    ? `${ds.label}: ${dollars(w.homeCost)} home`
+                                    ? `${ds.label}: ${dollars(w.homeCost)} home${ceiling == null ? '' : ` (most it could cost: ${dollars(ceiling)})`}`
                                     : `${ds.label}: ${dollars(w.fastCost)} fast (${minutesText(w.fastMinutes)}, about ${Math.round(w.stopCount)} stops), ${dollars(w.fastCost + w.homeCost)} total per month`;
                             },
                         },
