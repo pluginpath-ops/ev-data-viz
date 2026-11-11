@@ -237,8 +237,8 @@ const DeriveAxisPanel = ({
                         type="button"
                         onClick={() => onChangeMode(key)}
                         className={`text-xs px-2 py-1 rounded-xs border ${mode === key
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-[var(--color-surface)] text-secondary hover:text-[var(--color-text-primary)]'}`}
+                            ? 'callout is-info'
+                            : 'text-secondary hover:text-[var(--color-text-primary)]'}`}
                         title={`from ${m.source}`}
                     >{m.label}</button>
                 ))}
@@ -337,7 +337,7 @@ const DeriveAxisPanel = ({
                                         <button
                                             type="button"
                                             onClick={() => onChangeAnchors(anchors.filter((_, j) => j !== i))}
-                                            className="text-meta hover:text-red-500 font-bold leading-none"
+                                            className="text-meta hover:text-[var(--color-danger-text)] font-bold leading-none"
                                             title="Remove anchor"
                                         >✕</button>
                                     </div>
@@ -346,7 +346,7 @@ const DeriveAxisPanel = ({
                             <button
                                 type="button"
                                 onClick={() => onChangeAnchors([...anchors, { x: '', y: '' }])}
-                                className="mt-1 text-xs text-blue-600 hover:text-blue-800"
+                                className="mt-1 text-xs link-button"
                             >+ Add anchor</button>
                         </div>
                     )}
@@ -1508,12 +1508,12 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <div className="card mb-6">
                     {/* ── Merge-mode banner ── */}
                     {uploadMode === 'merge' && mergeTargetRun && (
-                        <div className="merge-target-banner">
+                        <div className="merge-target-banner callout is-info">
                             <div>
-                                <span className="text-sm font-semibold text-blue-800">Adding data to: </span>
-                                <span className="text-sm text-blue-700">{mergeTargetRun.name}</span>
+                                <span className="text-sm font-semibold">Adding data to: </span>
+                                <span className="text-sm">{mergeTargetRun.name}</span>
                             </div>
-                            <button onClick={resetUploadState} className="text-blue-500 hover:text-blue-700 text-sm">
+                            <button onClick={resetUploadState} className="link-button text-sm">
                                 Cancel
                             </button>
                         </div>
@@ -1744,7 +1744,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                     </label>
                                     <div className="csv-drop-zone">
                                         <label className="cursor-pointer">
-                                            <span className="text-blue-600 font-medium">Click to upload CSV file</span>
+                                            <span className="link-button font-medium">Click to upload CSV file</span>
                                             <span className="block text-xs text-meta mt-1">Optional — attach data points to this record</span>
                                             <input
                                                 type="file"
@@ -1893,7 +1893,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                         })}
                                                     </select>
                                                 )}
-                                                <p className={`text-xs mt-0.5 ${estimations.range === 'measured' ? 'text-green-700' : 'text-amber-700'}`}>
+                                                <p className="text-xs mt-0.5">
                                                     {estimations.range === 'measured'
                                                         ? `range = SoC% × ${effectiveRangeFromTest} mi (${selectedRangeTestRun?.name})`
                                                         : `${selectedRangeTestRun?.name}: ${selectedRangeTestRun?.distance_miles} mi @ ${selectedRangeTestRun?.start_soc}→${selectedRangeTestRun?.end_soc}% SoC → ${effectiveRangeFromTest} mi effective`}
@@ -1919,7 +1919,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         </p>
                                     ) : showJoinSelector ? (
                                         <>
-                                            <p className="text-sm font-semibold text-yellow-800 mb-2">
+                                            <p className="text-sm font-semibold mb-2">
                                                 Both SoC and Time are mapped — which should be used to link rows?
                                             </p>
                                             <div className="flex gap-6">
@@ -1936,7 +1936,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             </div>
                                         </>
                                     ) : (
-                                        <p className="text-sm text-green-800">
+                                        <p className="text-sm">
                                             ✓ Rows will be linked by <strong>{canJoinBySoc ? 'SoC' : 'Time'}</strong>.
                                         </p>
                                     )}
@@ -2269,7 +2269,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             <span className="text-xs text-meta">({editData.length} rows)</span>
                                         )}
                                         {editDataDirty && (
-                                            <span className="ml-1 text-xs text-orange-500 font-medium">● unsaved changes</span>
+                                            <span className="ml-1 text-xs status-text is-warning font-medium">● unsaved changes</span>
                                         )}
                                     </button>
 
@@ -2296,7 +2296,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                 return (
                                                                     <button
                                                                         onClick={() => handleEstimateRangeInEdit(effectiveRangeFromTest)}
-                                                                        className="text-xs px-3 py-1 rounded-xs border bg-amber-600 text-white border-amber-600 hover:bg-amber-700 transition-colors"
+                                                                        className="btn btn-warning"
                                                                         title={tip}
                                                                     >
                                                                         Measured ({effectiveRangeFromTest} mi / 100%){!hasSocMeta && ' *'}
@@ -2306,7 +2306,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                             {epaRange && (
                                                                 <button
                                                                     onClick={() => handleEstimateRangeInEdit(epaRange)}
-                                                                    className="text-xs px-3 py-1 rounded-xs border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors"
+                                                                    className="btn btn-primary"
                                                                     title={`Use the vehicle's ${epaName} range (${epaRange} mi) as the 100% SoC baseline`}
                                                                 >
                                                                     {epaName} ({epaRange} mi)
@@ -2381,7 +2381,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                                                 <button
                                                                                     onClick={() => handleSortByField(field)}
                                                                                     title={`Sort by ${label}`}
-                                                                                    className={`text-left hover:text-[var(--color-text-primary)] transition-colors ${isActive ? 'text-blue-600 font-semibold' : ''}`}
+                                                                                    className={`text-left hover:text-[var(--color-text-primary)] transition-colors ${isActive ? 'text-[var(--color-primary-text)] font-semibold' : ''}`}
                                                                                 >
                                                                                     {label}{indicator}
                                                                                 </button>
@@ -2460,7 +2460,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                                     {canEdit(vehicle) && (
                                                         <button
                                                             onClick={handleAddDataRow}
-                                                            className="mt-2 text-xs text-blue-600 hover:text-blue-800"
+                                                            className="mt-2 text-xs link-button"
                                                         >
                                                             + Add row
                                                         </button>

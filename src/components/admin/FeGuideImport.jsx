@@ -111,10 +111,10 @@ export default function FeGuideImport() {
                 <span className="text-xs text-meta">Exported from the EPA Fuel Economy Guide</span>
             </div>
 
-            {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
+            {error && <p className="mt-3 text-sm status-text is-danger">{error}</p>}
 
             {parsed?.missingColumns?.length > 0 && (
-                <ul className="mt-2 text-xs text-red-500 list-disc pl-5">
+                <ul className="mt-2 text-xs status-text is-danger list-disc pl-5">
                     {parsed.missingColumns.map(c => {
                         // The closest header in the file, named for a person to
                         // judge. It is never applied: a wrong pairing would import
@@ -220,7 +220,7 @@ export default function FeGuideImport() {
                 </div>
             )}
             {result?.errors?.length > 0 && (
-                <ul className="mt-2 text-xs text-red-500 list-disc pl-5">
+                <ul className="mt-2 text-xs status-text is-danger list-disc pl-5">
                     {result.errors.map(e => <li key={e}>{e}</li>)}
                 </ul>
             )}

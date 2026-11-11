@@ -30,8 +30,8 @@ import { EpaPdfImportModal } from './lazyComponents';
 import { useAppContext } from '../context/AppContext';
 
 const CONFIDENCE_COLORS = {
-    verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
-    likely:   'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700',
+    verified: 'callout is-good',
+    likely:   'callout is-warning',
     inferred: 'text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]',
 };
 
@@ -417,7 +417,7 @@ function EpaTestVehicleCard({ mapping, vehicle, standing, canEdit, onUnlink, onD
                         className="mt-3 fe-picker-link-btn"
                     >
                         {curating ? '▾ Hide curator fields' : '▸ Curate fields & test data'}
-                        {curating && curatorDirty && <span className="ml-1 text-amber-500" title="Unsaved edits">●</span>}
+                        {curating && curatorDirty && <span className="ml-1 status-text is-warning" title="Unsaved edits">●</span>}
                     </button>
                     {curating && (
                         <EpaCuratorEditor
@@ -556,7 +556,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                         href={EPA_SOURCE_URL}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap"
+                        className="text-xs link-button whitespace-nowrap"
                         title="EPA Annual Certification Data — look up Test Groups, coefficients, and lab reports"
                     >
                         EPA source data ↗
@@ -588,7 +588,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                                     <li className="px-3 py-2 text-sm text-meta italic">Searching…</li>
                                 )}
                                 {!searching && searchError && (
-                                    <li className="px-3 py-2 text-sm text-red-500">Error: {searchError}</li>
+                                    <li className="px-3 py-2 text-sm status-text is-danger">Error: {searchError}</li>
                                 )}
                                 {!searching && results.map(g => (
                                     <li
@@ -616,7 +616,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                     <button
                         type="button"
                         onClick={() => setShowPdfModal(true)}
-                        className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline mt-2 mr-4"
+                        className="text-xs font-medium link-button mt-2 mr-4"
                     >
                         Import from EPA lab PDF
                     </button>
@@ -636,7 +636,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                         <button
                             type="button"
                             onClick={() => { setShowCreate(true); setCreateError(null); }}
-                            className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline mt-2"
+                            className="text-xs font-medium link-button mt-2"
                         >
                             + Create EPA test vehicle from scratch
                         </button>
@@ -645,7 +645,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs font-semibold">New EPA test vehicle</span>
                                 <a href={EPA_SOURCE_URL} target="_blank" rel="noopener noreferrer"
-                                    className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">
+                                    className="text-[11px] link-button">
                                     Find the Certified Test Group on EPA ↗
                                 </a>
                             </div>
@@ -690,7 +690,7 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                                     />
                                 </label>
                             </div>
-                            {createError && <p className="text-xs text-red-500 mt-1">{createError}</p>}
+                            {createError && <p className="text-xs status-text is-danger mt-1">{createError}</p>}
                             <p className="text-[11px] text-meta mt-1">
                                 Creates and links the test vehicle; add coefficients, tests and phases in the curator fields afterward.
                             </p>

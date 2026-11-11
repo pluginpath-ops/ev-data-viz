@@ -103,7 +103,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                                             <button
                                                 type="button"
                                                 onClick={() => onDelete(iv.id)}
-                                                className="text-meta hover:text-red-500"
+                                                className="text-meta hover:text-[var(--color-danger-text)]"
                                                 title="Remove this window"
                                             >
                                                 ×
@@ -121,7 +121,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                 <button
                     type="button"
                     onClick={() => { setDraft({ ...BLANK }); setError(null); }}
-                    className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline mt-1"
+                    className="text-[11px] font-medium link-button mt-1"
                 >
                     + Add braking / passing / rolling-start figure
                 </button>
@@ -214,7 +214,7 @@ export default function PerformanceIntervals({ intervals = [], canEdit, onSave, 
                         Entered as reported — a metric 100–0 km/h stays metric, and is converted
                         only when comparing.
                     </p>
-                    {error && <p className="text-[11px] text-red-500 mt-1">{error}</p>}
+                    {error && <p className="text-[11px] status-text is-danger mt-1">{error}</p>}
 
                     <div className="flex gap-2 mt-2">
                         <button type="button" onClick={submit} disabled={saving}

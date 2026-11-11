@@ -85,8 +85,9 @@ export const NOT_CATALOGED = {
     'guide-facet-columns': 'Layout wrapper — a grid of facet columns.',
     'fixed-action-bar':
         'position: fixed. A specimen of it would leave the stage and pin itself to the '
-        + 'bottom of the window, over the page it is meant to be illustrating. Its three '
-        + 'intents are the same success / warning / danger triad the state panel shows.',
+        + 'bottom of the window, over the page it is meant to be illustrating. Its four '
+        + 'intents are the success / warning / danger triads the state panel shows, and '
+        + 'the brand one the callout shows as info.',
     'selected-chip-scroll':
         'The capped, scrolling box the selected-vehicle chips sit in. It is a '
         + 'height budget for the sticky header, not a control — a specimen of it '
@@ -127,6 +128,17 @@ export const SECTIONS = [
             { cls: 'drop-zone', as: 'span', label: 'Drop a CSV here' },
             { cls: 'drop-zone is-over', as: 'span', label: 'Drop a CSV here', note: 'While a file is over it.' },
             { cls: 'empty-state', as: 'span', label: 'No configurations match these filters.' },
+            { cls: 'callout is-warning px-2 py-1', as: 'span', label: 'How to prepare the file',
+              note: 'Color only — the status triad on whatever shape the call site draws (a panel, a strip, a badge). The edge shows once the call site adds `border`.' },
+            { cls: 'callout is-danger px-2 py-1', as: 'span', label: '⚠ Could not load test vehicles.' },
+            { cls: 'callout is-good px-2 py-1', as: 'span', label: 'verified' },
+            { cls: 'callout is-info px-2 py-1', as: 'span', label: '12 test vehicles found',
+              note: 'The brand surface: nothing is wrong.' },
+            { cls: 'status-text is-danger', as: 'span', label: 'Error: could not save.',
+              note: 'Text that reports a status, on no surface of its own. Color only; size stays with the call site.' },
+            { cls: 'status-text is-warning', as: 'span', label: 'assumed' },
+            { cls: 'status-text is-good', as: 'span', label: 'measured' },
+            { cls: 'status-text is-info', as: 'span', label: '∗ feeds a derived calculation' },
         ],
     },
     {
@@ -233,6 +245,8 @@ export const SECTIONS = [
             { cls: 'btn btn-danger',    as: 'button', label: 'Danger',    note: 'Destructive. Delete, Remove.' },
             { cls: 'btn-icon-danger',   as: 'button', label: 'Danger · icon',
               note: 'A destructive glyph that stays quiet until you approach it — a row × , a clear-column ×.' },
+            { cls: 'link-button',       as: 'button', label: '＋ Add phase',
+              note: 'A button that reads as a link: link color, underlined on hover. No box — for small actions inside a curator panel.' },
             { cls: 'btn-symbol',        as: 'span',   label: '⌧',
               note: 'A text symbol leading a button label — ⌧ on the chips row\'s Clear. Text, not an image, so it takes the button\'s color in either theme.' },
             { cls: 'btn-tab',        as: 'button', label: 'Nav tab',   note: 'Top-level navigation. Add `.active` for the current one.' },

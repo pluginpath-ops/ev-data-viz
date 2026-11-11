@@ -38,7 +38,7 @@ import { useRunSelection } from '../hooks/useRunSelection';
 import ChartLoading from './charts/ChartLoading';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, resolvePairColors, DEFAULT_SERIES_PALETTE, LEGACY_PALETTE, SERIES_NEUTRAL } from '../utils/colorUtils';
-import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults, fade } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import PlotFrame from './charts/PlotFrame';
@@ -584,7 +584,8 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             ctx.beginPath();
             ctx.rect(left, top, right - left, bottom - top);
             ctx.clip();
-            ctx.fillStyle = 'rgba(134,239,172,0.22)'; // green-300 at low opacity
+            // A wash of the success green, so it reads on either theme's panel.
+            ctx.fillStyle = fade(chartTheme().good, 0.22);
 
             // EV charge regions
             simResults.forEach((sim, runIndex) => {
@@ -2821,12 +2822,12 @@ export default function RoadTripView({
                                 const arrow = active ? (sortDir === 'asc' ? '↑' : '↓') : '↕';
                                 return (
                                     <th
-                                        className={`px-3 py-2 text-left font-semibold cursor-pointer select-none hover:bg-[var(--color-surface-sunken)] whitespace-nowrap ${active ? 'text-blue-600' : ''} ${className}`}
+                                        className={`px-3 py-2 text-left font-semibold cursor-pointer select-none hover:bg-[var(--color-surface-sunken)] whitespace-nowrap ${active ? 'text-[var(--color-primary-text)]' : ''} ${className}`}
                                         onClick={() => handleSort(col)}
                                     >
                                         <span className="flex items-center gap-1">
                                             {children}
-                                            <span className={`text-xs ${active ? 'text-blue-500' : 'text-meta'}`}>{arrow}</span>
+                                            <span className={`text-xs ${active ? 'text-[var(--color-primary-text)]' : 'text-meta'}`}>{arrow}</span>
                                         </span>
                                     </th>
                                 );
@@ -2888,7 +2889,7 @@ export default function RoadTripView({
                                     <SortTh col="vsIce">vs ICE</SortTh>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y dark:divide-slate-700">
+                            <tbody className="divide-y divide-[var(--color-border)]">
                                 {rows.map(({ entry, sim, avgChargeTime, speedDiff, adjPct, vsIce }) => {
 
                                     return (
@@ -2908,7 +2909,7 @@ export default function RoadTripView({
                                             </td>
                                             <td className="px-3 py-2 font-medium">
                                                 {sim.completed === false
-                                                    ? <span className="text-red-500" title={`Only reached ${Math.round(convDistance(sim.totalDistMi, units))} ${dl} of ${Math.round(convDistance(totalDistance, units))} ${dl}`}>Did not finish</span>
+                                                    ? <span className="status-text is-danger" title={`Only reached ${Math.round(convDistance(sim.totalDistMi, units))} ${dl} of ${Math.round(convDistance(totalDistance, units))} ${dl}`}>Did not finish</span>
                                                     : formatTime(sim.totalTimeMin)}
                                             </td>
                                             <td className="px-3 py-2">{sim.chargeStops}</td>
@@ -2916,8 +2917,8 @@ export default function RoadTripView({
                                             <td className="px-3 py-2">
                                                 {towingMode ? (
                                                     <>
-                                                        <span className="text-amber-700 font-medium">{dispTowingEff} {effLabel}</span>
-                                                        <span className="block text-xs text-amber-500">towing @ {dispTowingRef} {sl}</span>
+                                                        <span className="status-text is-warning font-medium">{dispTowingEff} {effLabel}</span>
+                                                        <span className="block text-xs status-text is-warning">towing @ {dispTowingRef} {sl}</span>
                                                     </>
                                                 ) : (
                                                     <>
@@ -2925,7 +2926,7 @@ export default function RoadTripView({
                                                         {entry.testSpeedMph ? (
                                                             <span className="text-meta ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
                                                         ) : (
-                                                            <span className="text-amber-500 ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
+                                                            <span className="status-text is-warning ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
                                                         )}
                                                         {entry.efficiencyNote && (
                                                             <span className="block text-xs text-meta">{entry.efficiencyNote}</span>
@@ -2951,8 +2952,8 @@ export default function RoadTripView({
                                                     const m = Math.round(absDelta % 60);
                                                     const label = h > 0 ? `${h}h ${m}m` : `${m}m`;
                                                     return vsIce > 0
-                                                        ? <span className="text-amber-600">+{label}</span>
-                                                        : <span className="text-green-600">−{label}</span>;
+                                                        ? <span className="status-text is-warning">+{label}</span>
+                                                        : <span className="status-text is-good">−{label}</span>;
                                                 })()}
                                             </td>
                                         </tr>

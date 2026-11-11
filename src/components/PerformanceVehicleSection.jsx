@@ -209,7 +209,7 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                 <button
                     type="button"
                     onClick={() => setShowImport(true)}
-                    className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                    className="text-xs font-medium link-button"
                 >
                     Import testing CSV
                 </button>
@@ -243,14 +243,14 @@ export default function PerformanceVehicleSection({ vehicle, canEdit }) {
                     <button
                         type="button"
                         onClick={() => setShowPaste(true)}
-                        className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                        className="text-xs font-medium link-button"
                     >
                         Paste a result block
                     </button>
                     <button
                         type="button"
                         onClick={() => setAddingResult(true)}
-                        className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                        className="text-xs font-medium link-button"
                     >
                         + Add reported result
                     </button>

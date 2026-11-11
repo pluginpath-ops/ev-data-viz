@@ -31,7 +31,7 @@ import ChargeStopMath from './calcTrace/ChargeStopMath';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
-import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults, fade } from '../utils/chartTheme';
 import NumberInput from './NumberInput';
 import { wrapCanvasText } from '../utils/wrapCanvasText';
 import { countParts } from '../utils/plotCaption';
@@ -832,11 +832,14 @@ export default function ChargeCompareView({
         if (flatRuns.length === 0) return null;
 
         const yLabel   = chartType === 'range_added' ? `Range Added (${distanceLabel(units)})` : 'Time (min)';
+        // A run with no data draws a gray stub in the tick color, so it holds
+        // on either theme's panel.
+        const { tick: noDataGray } = chartTheme();
         const datasets = [{
             label:           yLabel,
             data:            flatRuns.map(r => r._yValue),
-            backgroundColor: flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.35)' : r.color),
-            borderColor:     flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.6)'  : r.color),
+            backgroundColor: flatRuns.map(r => r._noData ? fade(noDataGray, 0.35) : r.color),
+            borderColor:     flatRuns.map(r => r._noData ? fade(noDataGray, 0.6)  : r.color),
             borderRadius: 2,
             borderSkipped:   false,
         }];

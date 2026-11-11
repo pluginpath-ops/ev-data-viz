@@ -171,7 +171,14 @@ explainer hub edges.
 **Status is a triad, not a color.** Each of warning / danger / success carries
 `-surface`, `-border` and `-text`, and they are used together. A component
 picking one and inventing the other two is how `bg-amber-50 text-amber-700
-border-amber-200` ended up written inline eight times.
+border-amber-200` ended up written inline eight times. On a shape of the call
+site's own, reach for `.callout.is-<intent>` (all three) or
+`.status-text.is-<intent>` (text alone); both are color only.
+
+**No `dark:` utilities.** The stylesheet used to key Tailwind's `dark:` to
+`data-theme`. That line went with the last of them (#296), so `dark:` now
+follows the device, not the theme picker. The `dark-variant` drift probe holds
+it at zero.
 
 **The four `--bar-*` tokens** (`-strong`, `-soft`, `-edge`, `-track`) fill the
 magnitude bars: bar cells, the stats box and histogram. They sit in the same two

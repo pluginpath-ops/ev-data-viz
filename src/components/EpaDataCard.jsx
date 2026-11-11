@@ -16,8 +16,8 @@ import { certifiedYears, formatYears } from '../utils/epaCertifications';
 import { isNoLabelSkip } from '../utils/epaBehindNoLabel';
 
 const CONFIDENCE_COLORS = {
-    verified: 'text-green-700 bg-green-50 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-700',
-    likely:   'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-700',
+    verified: 'callout is-good',
+    likely:   'callout is-warning',
     inferred: 'text-secondary bg-[var(--color-surface-muted)] border-[var(--color-border)]',
 };
 
@@ -154,7 +154,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
 
             {/* Error */}
             {error && (
-                <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-700 text-red-800 dark:text-red-300 text-xs">
+                <div className="px-4 py-2 callout is-danger border-b text-xs">
                     ⚠ {error}
                 </div>
             )}
@@ -261,7 +261,7 @@ export default function EpaDataCard({ getEpaTestVehiclesAdmin, deleteEpaTestVehi
                                                         <div>{Number(a).toFixed(2)}</div>
                                                         <div>{Number(b).toFixed(4)}</div>
                                                         <div>{Number(c).toFixed(5)}</div>
-                                                        {!isTarget && <div className="text-[9px] text-amber-500 mt-0.5">set only</div>}
+                                                        {!isTarget && <div className="text-[9px] status-text is-warning mt-0.5">set only</div>}
                                                     </div>
                                                 );
                                             })()}

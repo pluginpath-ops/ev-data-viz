@@ -1,9 +1,11 @@
 const ROLES = ['user', 'contributor', 'admin'];
 
-const roleBadgeStyle = {
-    admin:       { backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' },
-    contributor: { backgroundColor: '#dbeafe', color: '#1e40af', border: '1px solid #93c5fd' },
-    user:        { backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db' },
+// Admin amber, contributor blue, user gray — the status triads, so each
+// badge follows the theme.
+const ROLE_BADGE = {
+    admin:       'callout is-warning',
+    contributor: 'callout is-info',
+    user:        'border-[var(--color-border-strong)] bg-[var(--color-surface-sunken)] text-[var(--color-text-secondary)]',
 };
 
 /**
@@ -36,10 +38,7 @@ export default function RolesPermissions({ users, loading, saving, currentUserId
                                         {new Date(u.created_at).toLocaleDateString()}
                                     </td>
                                     <td className="px-4 py-3">
-                                        <span
-                                            className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                                            style={roleBadgeStyle[u.role] || roleBadgeStyle.user}
-                                        >
+                                        <span className={`px-2 py-0.5 rounded-full border text-xs font-semibold ${ROLE_BADGE[u.role] || ROLE_BADGE.user}`}>
                                             {u.role}
                                         </span>
                                     </td>
@@ -73,8 +72,8 @@ export default function RolesPermissions({ users, loading, saving, currentUserId
             )}
 
             <div className="note-panel mt-6">
-                <p className="text-sm text-amber-800 font-semibold mb-1">Role permissions</p>
-                <ul className="text-xs text-amber-700 space-y-1">
+                <p className="text-sm font-semibold mb-1">Role permissions</p>
+                <ul className="text-xs space-y-1">
                     <li><strong>admin</strong> — full access: edit/delete any vehicle or test, manage users, toggle visibility, change site settings</li>
                     <li><strong>contributor</strong> — edit any public vehicle or test, plus anything they submitted; can toggle visibility</li>
                     <li><strong>user</strong> — edit only vehicles and tests they submitted; visibility locked</li>

@@ -178,6 +178,9 @@ The tab that prices a reader's own week of driving against their gas car
 | Size + weight + color, picked as a set | **a role** — `.text-body`, `.text-micro`, `.text-nano`, `.text-caption` | same |
 | The global size multiplier | **the UI scale** — `--ui-scale` | [typographyKnobs.js](../src/styles/typographyKnobs.js) |
 | Named color values | **tokens** — `--color-*` | index.css |
+| A status color on a call site's own shape — a panel, a strip, a badge | **a callout** — the status triad (wash, edge, text) together; `.is-warning` / `-danger` / `-good`, and `-info` for the brand one (nothing is wrong). Color only | `.callout` in index.css |
+| Text that reports a status, with no surface of its own | **status text** — an error under a form, an import's warnings, "measured". Color only | `.status-text.is-*` |
+| A button drawn as link text ("＋ Add phase", "Edit") | **a link button** — link color, underlined on hover | `.link-button` |
 | Appearance outside the theme, counted | **drift** | [driftProbes.js](../scripts/driftProbes.js) |
 | A count asserted exactly, so a fall fails too | **a ratchet** | drift, `KNOWN_OFFENDERS` |
 

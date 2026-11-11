@@ -126,7 +126,7 @@ export default function SessionControl({
 
             {current?.url && (
                 <a href={current.url} target="_blank" rel="noopener noreferrer"
-                   className="text-xs text-blue-500 hover:underline" title={current.url}>source ↗</a>
+                   className="text-xs link-button" title={current.url}>source ↗</a>
             )}
 
             {current && runCount > 1 && (
@@ -140,7 +140,7 @@ export default function SessionControl({
                 an outing it was not part of. Say so; do not block it. */}
             {mismatch != null && (
                 <span
-                    className="text-xs text-amber-600"
+                    className="text-xs status-text is-warning"
                     title={`This run is dated ${run.date}, the session ${String(current.tested_at).slice(0, 10)}. Correct if they really were the same outing.`}
                 >
                     ⚠ {mismatch} days from session date

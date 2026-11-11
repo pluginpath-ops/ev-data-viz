@@ -1137,7 +1137,7 @@ export default function App() {
                                             <div key={vehicleId} className="flex items-center">
                                                 {/* Drop indicator before this pill */}
                                                 {dragOverIdx === idx && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs mr-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-[var(--color-primary)] rounded-xs mr-1 shrink-0" />
                                                 )}
                                                 <div
                                                     draggable
@@ -1184,7 +1184,7 @@ export default function App() {
                                                 </div>
                                                 {/* Drop indicator after the last pill */}
                                                 {idx === selectedVehicles.length - 1 && dragOverIdx === selectedVehicles.length && (
-                                                    <div className="w-0.5 h-6 bg-blue-500 rounded-xs ml-1 shrink-0" />
+                                                    <div className="w-0.5 h-6 bg-[var(--color-primary)] rounded-xs ml-1 shrink-0" />
                                                 )}
                                             </div>
                                         );
@@ -1570,9 +1570,7 @@ export default function App() {
                 <div className={`fixed-action-bar z-[60] ${appNotification.type === 'error' ? 'is-danger' : 'is-good'}`}>
                     <div className="page-container py-3 flex items-center gap-4">
                         <span className="text-xl">{appNotification.type === 'error' ? '⚠' : '✓'}</span>
-                        <p className={`flex-1 text-sm font-medium ${
-                            appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
-                        }`}>
+                        <p className="flex-1 text-sm font-medium">
                             {appNotification.message}
                         </p>
                         {appNotification.action && (
@@ -1585,9 +1583,7 @@ export default function App() {
                         )}
                         <button
                             onClick={clearNotification}
-                            className={`text-lg leading-none opacity-50 hover:opacity-100 transition ${
-                                appNotification.type === 'error' ? 'text-red-900' : 'text-green-900'
-                            }`}
+                            className="text-lg leading-none opacity-50 hover:opacity-100 transition"
                             aria-label="Dismiss"
                         >×</button>
                     </div>
