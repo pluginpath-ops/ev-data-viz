@@ -55,7 +55,7 @@ import { formatYears } from './epaCertifications';
 // passes is one whose EPA tested the calculations actually use.
 import { testedAgreement } from './vehicleFigures';
 import { labelRangeCheck } from './labelRangeCheck';
-import { sameSource, findSource, isYouTubeLink, isPlainYouTubeLink, linkProblem } from './sources';
+import { sameSource, findSource, isYouTubeLink, isPlainYouTubeLink, linkProblem, nameStartsWithSource, sourceAbbreviation } from './sources';
 import { isCompositeRun, isInheritedRunId, filterRangeRuns } from './runUtils';
 import { statisticalRuns } from './runListing';
 import { deriveTested } from './performanceDerivations';
@@ -726,8 +726,6 @@ function statedWindow(name) {
     return lo < hi && hi <= 100 ? { lo, hi } : null;
 }
 
-const norm = (s) => String(s ?? '').trim().toLowerCase();
-
 /**
  * A charging session's curve, as far as stored figures can tell it from
  * another's. Without the summary a point count and a span would match too
@@ -783,11 +781,15 @@ export function testAttribution(vehicles = [], { sources = [], socRanges = {} } 
                 add('source-spelling', `Stored as “${run.source}”; the source is “${canonical}”.`);
             }
 
-            // Its name starts with it.
+            // Its name starts with it — under its name or any spelling it lists,
+            // so "OoS 70mph" is an Out of Spec test (owner, 2026-11-11: names
+            // carry the abbreviation, the source keeps the full name).
             const owner = canonical ?? stored;
             const name = String(run.name ?? '').trim();
-            if (owner && !norm(name).startsWith(norm(owner))) {
-                add('name-not-source', `“${name}” does not start with “${owner}”.`);
+            const spellings = found ? [found.source.name, ...(found.source.aliases ?? [])] : [stored];
+            if (owner && !nameStartsWithSource(name, spellings)) {
+                const short = found ? sourceAbbreviation(found.source) : owner;
+                add('name-not-source', `“${name}” does not start with “${owner}”${short !== owner ? ` or “${short}”` : ''}.`);
             }
 
             // Its link: there, right for the source, and stored one way.

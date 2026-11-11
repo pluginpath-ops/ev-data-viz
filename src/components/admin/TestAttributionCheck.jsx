@@ -50,8 +50,8 @@ export default function TestAttributionCheck() {
         <div>
             <p className="text-note mb-2">
                 {plural(result.rows.length, 'test')} of {result.checked} {result.rows.length === 1 ? 'has' : 'have'} a
-                finding. A source is chosen from the source list when a test is edited; its name starts with it, and
-                its link follows the source’s rule.
+                finding. A source is chosen from the source list when a test is edited; its name starts with it (or
+                with an abbreviation the source lists, as OoS for Out of Spec), and its link follows the source’s rule.
             </p>
             {result.rows.length === 0 ? (
                 <p className="text-note">Every test names its source one way, starts its name with it and links to it.</p>

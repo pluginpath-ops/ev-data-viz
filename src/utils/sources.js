@@ -123,14 +123,46 @@ export function pickedSource(sources = [], { sourceId = null, newName = null } =
 }
 
 /**
+ * The abbreviation a source lists for itself, or its own name when it lists
+ * none. "OoS" for Out of Spec, "C&D" for Car and Driver; the first one listed
+ * wins, so the curator orders them. An alias that merely respells the name
+ * ("Car & Driver", "DirtyTesla") is not an abbreviation: it is no shorter.
+ */
+export function sourceAbbreviation(source) {
+    const name = String(source?.name ?? '');
+    const short = (source?.aliases ?? []).find(a => letters(a) && letters(a).length < letters(name).length && sameSource(a, name));
+    return short ? short.trim() : name;
+}
+
+/**
+ * Whether a test's name starts with its source — the name itself or any
+ * spelling the source lists, so "OoS 70mph" starts with Out of Spec. The word
+ * must end where the spelling does: "CD" does not start "CDC test".
+ *
+ * @param {string} name
+ * @param {string[]} spellings  the source's name and aliases; for a source that
+ *                              is not listed, the text typed for it
+ */
+export function nameStartsWithSource(name, spellings = []) {
+    const n = String(name ?? '').trim().toLowerCase();
+    return spellings.some(s => {
+        const t = String(s ?? '').trim().toLowerCase();
+        if (!t || !n.startsWith(t)) return false;
+        const next = n.charAt(t.length);
+        return !next || !/[\p{L}\p{N}]/u.test(next);
+    });
+}
+
+/**
  * The name to offer a test when its source is chosen and it has none yet:
- * "<source> ", ready for what the test was ("Out of Spec 70mph"). Null when
+ * "<source> ", ready for what the test was ("OoS 70mph" — the abbreviation
+ * when the source lists one, since that is how its tests are named). Null when
  * there is nothing to offer — the name is already started, or the source is
  * not a listed one (a half-typed new name must not seed the field).
  */
 export function startingName(currentName, source) {
     if (String(currentName ?? '').trim() || !source?.name) return null;
-    return `${source.name} `;
+    return `${sourceAbbreviation(source)} `;
 }
 
 /**
