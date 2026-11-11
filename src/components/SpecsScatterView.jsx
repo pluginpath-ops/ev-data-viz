@@ -38,7 +38,7 @@ const pointLabelPlugin = {
         const fonts = chartFonts();
         ctx.save();
         ctx.font = `${fonts.badge}px ${fonts.sans}`;
-        ctx.fillStyle = '#6b7280';
+        ctx.fillStyle = chartTheme().tick;
         ctx.textBaseline = 'middle';
         const area = chart.chartArea;
         const maxW = (area.right - area.left) * 0.4;
@@ -144,7 +144,7 @@ export default function SpecsScatterView({ xPlot, yPlot, xCol, yCol, colorOf, un
             label:       'Trend',
             data:        trendData,
             type:        'line',
-            borderColor: 'rgba(156,163,175,0.6)',
+            borderColor: chartTheme().axis,
             borderWidth: 1.5,
             borderDash:  [5, 4],
             pointRadius: 0,

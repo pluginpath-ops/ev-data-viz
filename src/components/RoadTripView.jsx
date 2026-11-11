@@ -37,7 +37,7 @@ import {
 import { useRunSelection } from '../hooks/useRunSelection';
 import ChartLoading from './charts/ChartLoading';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, resolvePairColors, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
+import { seriesRowsOf, resolvePairColors, DEFAULT_SERIES_PALETTE, LEGACY_PALETTE, SERIES_NEUTRAL } from '../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
@@ -450,12 +450,6 @@ function calcIceTotalTimeAtSpeed(speedMph, totalDistanceMi, overheadMin) {
 // derive from is now one ranked, user-overridable decision instead of two
 // views each guessing separately.
 
-// ── Default vehicle colors ───────────────────────────────────────────────────
-const PALETTE = [
-    '#6366f1', '#f59e0b', '#10b981', '#ef4444',
-    '#3b82f6', '#a855f7', '#ec4899', '#14b8a6',
-];
-
 // ── Per-row routing overrides panel ───────────────────────────────────────────
 //
 // Keyed by PAIR KEY, not charging-run id. When this was written a road-trip row
@@ -656,7 +650,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                     // vs ICE delta below, in amber (slower) or green (faster)
                     if (vsIce) {
                         ctx.font      = `${fonts.micro}px ${fonts.sans}`;
-                        ctx.fillStyle = deltaMin > 0 ? '#d97706' : '#16a34a'; // amber-600 / green-600
+                        ctx.fillStyle = deltaMin > 0 ? chartTheme().caution : chartTheme().good;
                         ctx.fillText(vsIce, lastPt.x + 6, labelY + 13);
                     }
 
@@ -680,7 +674,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                             const labelY = lastPt.y - 13;
                             ctx.save();
                             ctx.font         = `600 ${fonts.badge}px ${fonts.sans}`;
-                            ctx.fillStyle    = '#6b7280'; // gray-500
+                            ctx.fillStyle    = chartTheme().tick;
                             ctx.textAlign    = 'left';
                             ctx.textBaseline = 'middle';
                             ctx.fillText(`ICE — ${formatTime(iceByTestInfo.totalTimeMin)}`, lastPt.x + 6, labelY);
@@ -1104,7 +1098,7 @@ export default function RoadTripView({
         for (const entry of pairStructure.values()) {
             map.set(entry.key, {
                 ...entry,
-                color: colorMap[entry.rangeRun.id] || PALETTE[colorIdx % PALETTE.length],
+                color: colorMap[entry.rangeRun.id] || LEGACY_PALETTE[colorIdx % LEGACY_PALETTE.length],
             });
             colorIdx++;
         }
@@ -1694,7 +1688,7 @@ export default function RoadTripView({
             speedDatasets.unshift({
                 label: 'ICE Reference',
                 data: iceSpeedData,
-                borderColor: '#9ca3af',
+                borderColor: SERIES_NEUTRAL,
                 backgroundColor: 'transparent',
                 borderWidth: 1.5,
                 borderDash: [6, 4],
@@ -1808,7 +1802,7 @@ export default function RoadTripView({
             distDatasets.unshift({
                 label: 'ICE Reference',
                 data: iceDistData,
-                borderColor: '#9ca3af',
+                borderColor: SERIES_NEUTRAL,
                 backgroundColor: 'transparent',
                 borderWidth: 1.5,
                 borderDash: [6, 4],
@@ -1965,7 +1959,7 @@ export default function RoadTripView({
             datasets.push({
                 label: 'ICE Reference',
                 data: iceByTestPoints,
-                borderColor: '#9ca3af',
+                borderColor: SERIES_NEUTRAL,
                 backgroundColor: 'transparent',
                 borderWidth: 1.5,
                 borderDash: [6, 4],
@@ -1979,7 +1973,7 @@ export default function RoadTripView({
             datasets.unshift({
                 label: 'ICE Reference',
                 data: icePoints,
-                borderColor: '#9ca3af',
+                borderColor: SERIES_NEUTRAL,
                 backgroundColor: 'transparent',
                 borderWidth: 1.5,
                 borderDash: [6, 4],
@@ -2111,8 +2105,8 @@ export default function RoadTripView({
                                 const v   = ctx.tick?.value;
                                 const frac = v != null ? (v - Math.floor(v)) : 0;
                                 return Math.abs(frac) < 0.01
-                                    ? 'rgba(0,0,0,0.25)'  // heavy — lane boundary (integer)
-                                    : 'rgba(0,0,0,0.07)'; // light — lane center
+                                    ? chartTheme().axis   // heavy — lane boundary (integer)
+                                    : chartTheme().grid;  // light — lane center
                             },
                             lineWidth: (ctx) => {
                                 const v   = ctx.tick?.value;

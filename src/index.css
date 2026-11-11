@@ -69,7 +69,7 @@
        fill with them; see the button guide. */
     --color-success: rgb(14, 134, 90);
     --color-danger: rgb(208, 60, 51);
-    --color-warning: rgb(232, 112, 24);
+    --color-warning: rgb(240, 108, 0);
 
     /* Every token below is documented in docs/design-tokens.md, with its light
        and dark value and how many places use it. */
@@ -92,9 +92,9 @@
     --color-primary-surface: rgba(29, 106, 229, 0.09);
     --color-primary-border:  rgba(29, 106, 229, 0.45);
 
-    --color-warning-surface: rgba(232, 112, 24, 0.12);
-    --color-warning-border:  rgba(232, 112, 24, 0.55);
-    --color-warning-text:    rgb(156, 66, 4);
+    --color-warning-surface: rgba(240, 108, 0, 0.12);
+    --color-warning-border:  rgba(240, 108, 0, 0.55);
+    --color-warning-text:    rgb(176, 70, 0);
 
     --color-danger-surface:  rgba(208, 60, 51, 0.10);
     --color-danger-border:   rgba(208, 60, 51, 0.45);
@@ -130,8 +130,8 @@
     --color-nav-active:  rgb(24, 70, 136);
 
     --color-hover-lift: rgba(13, 17, 23, 0.06);
-    --color-accent-orange-surface: rgba(232, 112, 24, 0.12);
-    --color-accent-orange-muted: rgba(232, 112, 24, 0.50);
+    --color-accent-orange-surface: rgba(240, 108, 0, 0.12);
+    --color-accent-orange-muted: rgba(240, 108, 0, 0.50);
 
     --color-chart-grid: rgb(233, 237, 243);
     --color-chart-axis: rgb(160, 170, 184);
@@ -148,10 +148,10 @@
     --color-text-nav-meta: rgb(190, 212, 245);
 
     --color-accent-blue:   rgb(29, 106, 229);
-    --color-accent-orange: rgb(232, 112, 24);
+    --color-accent-orange: rgb(240, 108, 0);
     /* Orange as TEXT. The accent itself is a mark color (a dot, an edge, an
        underline) and is too light to read as small text on white. */
-    --color-accent-orange-text: rgb(176, 78, 8);
+    --color-accent-orange-text: rgb(200, 80, 0);
     --color-accent-green:  rgb(14, 134, 90);
     --color-accent-violet: rgb(108, 88, 214);
     --color-accent-gray:   rgb(94, 107, 125);

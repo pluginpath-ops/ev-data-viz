@@ -24,7 +24,7 @@ import AxisScaleControls from './AxisScaleControls';
 import { useAxisLimits } from '../hooks/useAxisLimits';
 import PerformanceRunSelector from './performance/PerformanceRunSelector';
 import { buildSyntheticCurve, tracedCurvePoints, segmentAccelerationG } from '../utils/performanceDerivations';
-import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { resolveChartColors, VEHICLE_PALETTE, OKABE_ITO } from '../utils/colorUtils';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import { useSourceLine } from '../hooks/useSourceLine';
@@ -32,8 +32,8 @@ import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 import CopyPngButton from './charts/CopyPngButton';
 import CopyLinkButton from './charts/CopyLinkButton';
 
-/** Okabe-Ito, matching the palette the other charts use for run colors. */
-const PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#F0E442'];
+/** Okabe-Ito, in this chart's own order: blue first, yellow last. */
+const PALETTE = [4, 5, 2, 6, 0, 1, 3].map(i => OKABE_ITO[i]);
 
 // What distinguishes two curves beyond the vehicle: the drive mode, then which
 // run of that mode, then — for the dashed reconstructions — who published the
