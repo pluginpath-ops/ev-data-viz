@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { useTheme } from './useTheme';
 import { resolveChartColors, applyColorOverrides, VEHICLE_PALETTE } from '../utils/colorUtils';
 
 const EMPTY = {};
@@ -67,7 +68,11 @@ export function useStickyChartColors(runs, {
         generation.current += 1;
         prevPalette.current = palette;
     }
-    const sessionKey = `${resetKey}|${generation.current}`;
+    // The theme is part of the key: the EVBench palette holds different colors
+    // in light and dark, so a flip re-assigns. Picks key on `resetKey` alone
+    // (below) and survive it.
+    const { isDark } = useTheme();
+    const sessionKey = `${resetKey}|${generation.current}|${isDark ? 'dark' : 'light'}`;
 
     const assigned = useRef({});               // runId → color, auto-assigned
     const assignedKey = useRef(sessionKey);

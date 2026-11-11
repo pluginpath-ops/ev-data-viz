@@ -146,6 +146,8 @@ const FALLBACK = {
     accent:     'rgb(45, 127, 249)',
     callout:    'rgb(242, 139, 60)',
     background: 'rgb(17, 22, 31)',
+    good:       'rgb(95, 214, 168)',
+    caution:    'rgb(245, 176, 119)',
 };
 
 /**
@@ -160,6 +162,7 @@ const FALLBACK = {
  *   accent     — the site's blue, for canvas text that is branding rather than data
  *   background — the flat fill a PNG export is composited onto
  *   callout    — the orange a reference mark drawn OVER the plot is called out in
+ *   good, caution — canvas text that says better or worse than a reference
  */
 export function chartTheme() {
     if (typeof document === 'undefined' || !document.documentElement) {
@@ -189,5 +192,19 @@ export function chartTheme() {
         // of the plot — a reference speed, a median. Distinct from `accent`,
         // which is the brand blue the wordmark is drawn in.
         callout:    read('--color-accent-orange', FALLBACK.callout),
+        // Canvas TEXT that says better or worse (a time saved or lost against
+        // a reference). The status text tints, so they read on the panel.
+        good:       read('--color-success-text', FALLBACK.good),
+        caution:    read('--color-warning-text', FALLBACK.caution),
     };
+}
+
+/**
+ * A chart theme color at an opacity, for a wash drawn behind the data.
+ * Takes the `rgb(r, g, b)` a token resolves to; anything else is returned
+ * unchanged rather than guessed at.
+ */
+export function fade(color, opacity) {
+    const m = /^rgb\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)\s*\)$/.exec(color ?? '');
+    return m ? `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${opacity})` : color;
 }

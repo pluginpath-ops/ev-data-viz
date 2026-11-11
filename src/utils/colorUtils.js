@@ -629,6 +629,26 @@ export const HOUSE_PALETTE = [
 ];
 
 /**
+ * The same palette for the light theme, with one slot changed (owner,
+ * 2026-11-11). The "white" slot is `--color-text-primary` in both themes, and
+ * in light that is near-black: a near-white series on a white plot cannot be
+ * seen. Every other color is the dark set's, because a series color is a line
+ * or a bar, not text, and wants to stay vivid.
+ */
+export const HOUSE_PALETTE_LIGHT = HOUSE_PALETTE.map(c => (c === '#f2f5f9' ? '#11161f' : c));
+
+/**
+ * The house palette for the theme on the document now. Read when asked, not at
+ * import: the theme can change, and `useStickyChartColors` re-assigns when it
+ * does. With no document (the test suite) it is the dark set.
+ */
+export function housePalette() {
+    const light = typeof document !== 'undefined'
+        && document.documentElement?.getAttribute('data-theme') === 'light';
+    return light ? HOUSE_PALETTE_LIGHT : HOUSE_PALETTE;
+}
+
+/**
  * `count` evenly spaced lightness steps of one color, light to dark.
  *
  * Not `rampFrom`: that anchors an END on a base a person picked and travels
@@ -640,6 +660,41 @@ function monochrome(hex, count, from = 84, to = 24) {
     const { h, s } = hexToHsl(hex);
     return Array.from({ length: count }, (_, i) =>
         hslToHex({ h, s, l: from + (to - from) * (i / (count - 1)) }));
+}
+
+/** CIE L*, the lightness the eye sees, from a hex. */
+function perceivedLightness(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    const y = 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    return y > 0.008856 ? 116 * Math.cbrt(y) - 16 : 903.3 * y;
+}
+
+/**
+ * `monochrome` for a hue HSL misjudges. Green is the case: at full saturation
+ * the five palest HSL steps were all the same neon mint, 1.2 to 1.3:1 against
+ * white, and a reader could not tell series 1 to 5 apart.
+ *
+ * Two changes. The steps are evenly spaced in perceived lightness, solved per
+ * step, not in HSL lightness. And the pale end fades toward gray (half the
+ * saturation) so a pale step reads as quieter, not as brighter.
+ */
+function evenMonochrome(hex, count, from = 84, to = 24) {
+    const { h, s } = hexToHsl(hex);
+    const FADE = 0.5;
+    const top = perceivedLightness(hslToHex({ h, s: s * FADE, l: from }));
+    const bottom = perceivedLightness(hslToHex({ h, s, l: to }));
+    return Array.from({ length: count }, (_, i) => {
+        const t = i / (count - 1);
+        const sat = s * (FADE + (1 - FADE) * t);
+        const target = top + (bottom - top) * t;
+        let lo = 0, hi = 100;
+        for (let k = 0; k < 24; k++) {
+            const mid = (lo + hi) / 2;
+            if (perceivedLightness(hslToHex({ h, s: sat, l: mid })) > target) hi = mid; else lo = mid;
+        }
+        return hslToHex({ h, s: sat, l: (lo + hi) / 2 });
+    });
 }
 
 /**
@@ -659,9 +714,11 @@ export const SERIES_PALETTES = [
     // plot behind it opens on, and what the resolver assigns from.
     { id: 'colorful',  label: 'Colorful',       safe: false, colors: TAB10 },
     { id: 'okabe-ito', label: 'Okabe-Ito',      safe: true,  colors: OKABE_ITO_SET },
-    { id: 'evbench',   label: 'EVBench',        safe: false, colors: HOUSE_PALETTE },
+    // A getter: the one palette whose colors follow the theme.
+    { id: 'evbench',   label: 'EVBench',        safe: false, get colors() { return housePalette(); } },
     { id: 'mono-blue', label: 'Mono · blue',    safe: true,  colors: monochrome('#2d7ff9', 8) },
-    { id: 'mono-green', label: 'Mono · green',  safe: true,  colors: monochrome('#009E73', 8) },
+    // The theme's green, like its neighbors' blue and orange, and the even ramp.
+    { id: 'mono-green', label: 'Mono · green',  safe: true,  colors: evenMonochrome('#23b47e', 8) },
     { id: 'mono-orange', label: 'Mono · orange', safe: true, colors: monochrome('#f28b3c', 8) },
     // "Ice" rather than "faint blue", which read as a weaker version of the
     // palette above it rather than as its own thing. It starts lighter than the

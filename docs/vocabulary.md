@@ -178,7 +178,7 @@ The tab that prices a reader's own week of driving against their gas car
 | The global size multiplier | **the UI scale** — `--ui-scale` | [typographyKnobs.js](../src/styles/typographyKnobs.js) |
 | Named color values | **tokens** — `--color-*` | index.css |
 | Appearance outside the theme, counted | **drift** | [driftProbes.js](../scripts/driftProbes.js) |
-| A count asserted exactly, so a fall fails too | **a ratchet** | drift, `KNOWN_OFFENDERS`, the dark-override cap |
+| A count asserted exactly, so a fall fails too | **a ratchet** | drift, `KNOWN_OFFENDERS` |
 
 **Blue** leads the chrome. **Orange** is the one active/now signal and means
 nothing else. **Green** is data and status, never chrome.

@@ -4,7 +4,7 @@ import {
     resolvePairColors, seriesColorNote, DEFAULT_RUN_COLOR, OKABE_ITO_SET,
     hexToHsl, hslToHex, rotatePaletteFrom, paletteSlotOf, rampFrom, seedPreview,
     seriesRowsOf, expandPalette, OKABE_ITO, SERIES_NEUTRAL, resolveChartColors, seedPlot,
-    SERIES_PALETTES, HOUSE_PALETTE,
+    SERIES_PALETTES, HOUSE_PALETTE, HOUSE_PALETTE_LIGHT, housePalette,
     VEHICLE_PALETTE,
     paletteColorsById, withAlpha
 } from '../colorUtils';
@@ -573,6 +573,16 @@ describe('the palettes on offer', () => {
         for (const token of ['#2d7ff9', '#f28b3c', '#23b47e', '#9b8cf0', '#6b7a8f', '#f2f5f9']) {
             expect(HOUSE_PALETTE.map(c => c.toLowerCase())).toContain(token);
         }
+    });
+
+    it('has a light set that changes only the near-white slot', () => {
+        // The default palette's third slot is the theme's text color. On a
+        // white plot the dark set's #f2f5f9 cannot be seen; nothing else moves.
+        expect(HOUSE_PALETTE_LIGHT).toHaveLength(HOUSE_PALETTE.length);
+        const changed = HOUSE_PALETTE_LIGHT.map((c, i) => [HOUSE_PALETTE[i], c]).filter(([a, b]) => a !== b);
+        expect(changed).toEqual([['#f2f5f9', '#11161f']]);
+        // No document here, so the dark set.
+        expect(housePalette()).toBe(HOUSE_PALETTE);
     });
 });
 
