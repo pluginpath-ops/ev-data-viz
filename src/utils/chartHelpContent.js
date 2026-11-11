@@ -343,7 +343,7 @@ export const CHART_HELP_DEFAULTS = {
             'which a bigger one saves less than five minutes a week (about 20 a month). A ^ means the car’s own ' +
             'onboard charger, not the wall, sets the pace, so a bigger charger buys nothing. ' +
             'The dashed line over a column is the most home charging could cost that month, a ceiling the home part never passes. A ceiling above the top of the chart ' +
-            'sits on its edge with an arrow and its figure, and does not stretch the scale.',
+            'sits on its edge with an arrow, and does not stretch the scale; hover a column for its figure.',
         key_terms:
             'Home charger — 120 V on a wall outlet, or 240 V at the amps the circuit allows.\n' +
             'Onboard charger — the car’s own AC charger; it limits how fast any home charger can fill it.\n' +

@@ -122,20 +122,19 @@ const totalLabels = (isTop, totalOf, homeOf) => ({
  * vehicleIndex)` gives the figure, null draws nothing (no home charging).
  * Drawn here, not as a dataset, so a line above the plot never moves the
  * y-axis — the axis stays as tall as the tallest column. A line above it is
- * pinned to the top edge with an up-arrow and its figure, so the number is not
- * lost.
+ * pinned to the top edge with an up-arrow; its figure is in the tooltip only
+ * (a dollar figure on each arrow read as clutter, owner, 2026-11-11; the
+ * labelled version is commit b0b296e if it is wanted back).
  */
 const homeCeilings = (ceilingOf) => ({
     id: 'homeCeilings',
     afterDatasetsDraw(chart) {
         const { ctx, chartArea: a, scales: { y } } = chart;
         const { ink } = chartTheme();
-        const fonts = chartFonts();
         ctx.save();
         ctx.strokeStyle = ink;
         ctx.fillStyle = ink;
         ctx.lineWidth = 2;
-        ctx.font = `600 ${fonts.badge}px ${fonts.mono}`;
         chart.data.datasets.forEach((ds, di) => {
             const meta = chart.getDatasetMeta(di);
             if (meta.hidden || ds.part !== 'home') return;
@@ -152,7 +151,7 @@ const homeCeilings = (ceilingOf) => ({
                 ctx.lineTo(bar.x + half, py);
                 ctx.stroke();
                 if (!off) return;
-                // Off the plot: an arrow over the line, the figure under it.
+                // Off the plot: an arrow over the line.
                 ctx.setLineDash([]);
                 ctx.beginPath();
                 ctx.moveTo(bar.x, py - 9);
@@ -160,22 +159,6 @@ const homeCeilings = (ceilingOf) => ({
                 ctx.lineTo(bar.x - 4, py - 3);
                 ctx.closePath();
                 ctx.fill();
-                const text = dollars(ceiling);
-                // Neighbors often share a figure: stand it on end unless it
-                // clears the bar with room to spare, so they never run together.
-                if (ctx.measureText(text).width > bar.width - 10) {
-                    ctx.save();
-                    ctx.translate(bar.x, py + 4);
-                    ctx.rotate(-Math.PI / 2);
-                    ctx.textAlign = 'right';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(text, 0, 0);
-                    ctx.restore();
-                } else {
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'top';
-                    ctx.fillText(text, bar.x, py + 4);
-                }
             });
         });
         ctx.restore();
