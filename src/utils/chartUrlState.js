@@ -31,6 +31,7 @@
  *                 (written before the optimizer had its own tab) opens here.
  *   specs         sf (the field charted)
  *   specscatter   scx scy
+ *   drivecharger  hc (the chart: written only for 'time', absent is the cost chart)
  *   epacurves     epa_ya epa_m epa_ov
  *   specstable    vt_* (carried over, written by the table itself) and filters
  *
@@ -67,6 +68,10 @@ export { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIE
 
 /** Road Trip X axes that are sweeps: Trip Optimizer's charts since it got its own tab. */
 const ROAD_TRIP_SWEEPS = ['speed', 'tripDist'];
+
+/** Home Charger's charts: the cost per month, or the minutes of fast charging. */
+export const HOME_CHARGER_CHARTS = ['cost', 'time'];
+export const DEFAULT_HOME_CHARGER_CHART = 'cost';
 
 /** Trip Optimizer's charts. */
 export const OPTIMIZER_CHARTS = ['speed', 'tripDist', 'map'];
@@ -146,6 +151,7 @@ export function parseChartUrl(search) {
 
     const rangeChartType = p.get('rc');
     const effUnit = p.get('eff');
+    const homeChart = p.get('hc');
     // A stale or hand-edited ?m= would otherwise fall through to the charging
     // chart with no indication why.
     const linkedMode = ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE;
@@ -179,6 +185,7 @@ export function parseChartUrl(search) {
         // be handed a chart type it has no entry for.
         rangeChartType: RANGE_CHART_TYPES.includes(rangeChartType) ? rangeChartType : null,
         effUnit:        EFFICIENCY_UNITS.includes(effUnit) ? effUnit : null,
+        homeChargerChart: HOME_CHARGER_CHARTS.includes(homeChart) ? homeChart : null,
         correction:    decodeCorrection(p.toString()),
     };
 
@@ -278,6 +285,8 @@ export function chartConfigFromParsed(chart, base) {
         ...((s.chartMode === 'specs' || s.chartMode === 'specscatter') && { specScope: s.specScope ?? 'selection' }),
         ...(s.rangeChartType && { rangeChartType: s.rangeChartType }),
         ...(s.effUnit       && { effUnit: s.effUnit }),
+        // A link names its chart either way: absent means the cost chart.
+        ...(s.chartMode === 'drivecharger' && { homeChargerChart: s.homeChargerChart ?? DEFAULT_HOME_CHARGER_CHART }),
         correctionMode:   s.correction.mode,
         correctionTarget: s.correction.target,
     };
@@ -370,6 +379,9 @@ export function buildChartParams({
         if (chartConfig.rangeChartType && chartConfig.rangeChartType !== DEFAULT_RANGE_CHART_TYPE) p.set('rc', chartConfig.rangeChartType);
         if (chartConfig.effUnit && chartConfig.effUnit !== DEFAULT_EFFICIENCY_UNIT) p.set('eff', chartConfig.effUnit);
     }
+
+    // Home Charger's chart: the minutes view only; absent is the cost chart.
+    if (chartMode === 'drivecharger' && chartConfig.homeChargerChart === 'time') p.set('hc', 'time');
 
     // Charge Stop
     if (chartMode === 'compare') {

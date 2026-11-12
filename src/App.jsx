@@ -1458,6 +1458,8 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             settings={costToDrive}
                             onChange={updateCostToDrive}
+                            chart={chartConfig.homeChargerChart}
+                            onChartChange={homeChargerChart => setChartConfig(prev => ({ ...prev, homeChargerChart }))}
                         />
                     )}
                     {/* No selection gate: the vehicle table is where a selection is

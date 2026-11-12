@@ -64,6 +64,8 @@ const NAMES_V1 = [
     'q', 'rt_otd', 'rt_oc', 'rt_bp', 'rt_osn', 'rt_osx',
     // Cost to Drive: its key (costToDriveKey.js), carried as a string.
     'cd',
+    // Home Charger's chart (`hc=time`), appended after #476.
+    'hc',
 ];
 
 // Values that recur: tabs, modes, axes, chart types, units, presets, and the
