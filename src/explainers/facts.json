@@ -2985,25 +2985,37 @@
     },
     {
       "id": "physics-ac-cable-loss-share",
-      "claim": "Resistive loss in a cable is I²R, so as a share of the power it is I·R ÷ V. 50 ft of 14 AWG copper (about 0.25 Ω out and back) carrying 12 A at 120 V loses about 36 W, 2.5%; 50 ft of 6 AWG (about 0.04 Ω) carrying 48 A at 240 V loses about 91 W, 0.8%.",
+      "claim": "Resistive loss in a cable is I²R, so as a share of the power it is I·R ÷ V. House wiring: 50 ft of 14 AWG copper (about 0.25 Ω out and back) at 12 A and 120 V loses about 36 W, 2.5%; 50 ft of 6 AWG (about 0.04 Ω) at 48 A and 240 V about 91 W, 0.8%. Charging cord: 20 ft of 8 AWG at 12 A loses under 4 W, 0.25% (14 AWG about 1%); 20 ft of 6 AWG at 48 A about 36 W, 0.3%.",
       "value": {
-        "r_14awg_ohm_per_kft": 2.525,
-        "r_6awg_ohm_per_kft": 0.395,
-        "l1_w": 36,
-        "l1_share": 0.025,
-        "l2_w": 91,
-        "l2_share": 0.008
+        "r_ohm_per_kft": {
+          "14awg": 2.525,
+          "8awg": 0.628,
+          "6awg": 0.395
+        },
+        "house_50ft": {
+          "l1_w": 36,
+          "l1_share": 0.025,
+          "l2_w": 91,
+          "l2_share": 0.008
+        },
+        "cord_20ft": {
+          "l1_8awg_w": 3.6,
+          "l1_8awg_share": 0.0025,
+          "l1_14awg_share": 0.01,
+          "l2_6awg_w": 36,
+          "l2_6awg_share": 0.0031
+        }
       },
       "sources": [],
       "status": "accepted",
-      "rationale": "Joule heating and Ohm's law (arithmetic), with copper's resistance per length from the standard AWG tables at room temperature (14 AWG ≈ 2.5 Ω and 6 AWG ≈ 0.4 Ω per 1,000 ft). 14 AWG is the smallest copper the NEC allows on a common 15 A outlet circuit. A worked example, not a measurement: real runs differ in length and gauge, and warm wire resists more. Upgrade with NEC Chapter 9 Table 8."
+      "rationale": "Joule heating and Ohm's law (arithmetic), with copper's resistance per length from the standard AWG tables at room temperature (14 AWG ≈ 2.5 Ω and 6 AWG ≈ 0.4 Ω per 1,000 ft). 14 AWG is the smallest copper the NEC allows on a common 15 A outlet circuit. A worked example, not a measurement; the cord gauges are the owner's estimate (2026-11-12) and a lighter one for portable cords: real runs differ in length and gauge, and warm wire resists more. Upgrade with NEC Chapter 9 Table 8."
     },
     {
       "id": "onboard-charger-light-load",
-      "claim": "An onboard charger's conversion is least efficient well below its rated power and on low input voltage, where it draws more current for the same power; a Level 1 charge runs it at a small fraction of its rating on 120 V.",
+      "claim": "An onboard charger should be a little less efficient on 120 V than on 240 V: it draws twice the current for the same power, and boosts a lower input voltage up to the pack's.",
       "sources": [],
       "status": "accepted",
-      "rationale": "General power-electronics knowledge: switching, gate-drive and magnetizing losses are roughly fixed, so efficiency falls at light load, and conduction losses rise with input current, which is about double on 120 V for the same power. Context only; the page's figures rest on the measurements (ac-socket-vs-wallbox-adac-2026, ac-level1-vs-level2-sears-2014). Upgrade with an onboard-charger data sheet that gives an efficiency curve against load and input voltage."
+      "rationale": "General power-electronics knowledge: conduction losses rise with input current, and the power-factor stage works harder from a lower input voltage. An argument, not a measurement; the one measurement found (volt-onboard-charger-inl-2012) shows about a point, with power changing too. Upgrade with an onboard-charger data sheet that gives efficiency against input voltage at equal power."
     },
     {
       "id": "ac-loss-fixed-plus-proportional-fit",
@@ -3074,6 +3086,67 @@
       ],
       "status": "verified",
       "note": "Five cars, with wallbox losses spanning only 5.1–7.0%, so a weak test: it shows the 240 V figure adds no accuracy here, not that it never could. Tests EVBench's per-car scaling of WALL_OUTLET_CHARGER_EFF (evbench-wall-outlet-charger-eff). The ratio and the gap are the medians: (1 − 0.142) ÷ (1 − 0.069) and 14.2 − 6.9 points."
+    },
+    {
+      "id": "volt-onboard-charger-inl-2012",
+      "claim": "Idaho National Laboratory measured a 2012 Chevrolet Volt's onboard charger at 91.7% efficient on 208 V between 3.0 and 3.3 kW, and 90.6% on 120 V near 1.3 kW; with the EVSE included, 90.8% on Level 2 and 88.8% on Level 1.",
+      "value": {
+        "obcm_208v": 0.917,
+        "obcm_208v_kw": [
+          3.0,
+          3.3
+        ],
+        "obcm_120v": 0.906,
+        "obcm_120v_kw": 1.3,
+        "overall_l2": 0.908,
+        "overall_l1": 0.888,
+        "vehicle": "2012 Chevrolet Volt"
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "R. B. Carlson, \"Advanced Vehicle Testing Activity: Benchmark Testing of the Chevrolet Volt Onboard Charger\", Idaho National Laboratory, INL/EXT-12-25761, April 2012",
+          "url": "https://inldigitallibrary.inl.gov/sites/sti/sti/5436981.pdf",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Summary: \"Charging with Level 2 EVSE at 208 VAC input … 91.7% efficient … Charging with Level 1 EVSE at 120 VAC input … 90.6% efficient while operating near 1.3 AC kW.\" Efficiency is the charger's combined DC output (high and low voltage) ÷ its AC input, read from the car's CAN data with the key off. The two points differ in both voltage and power, so the 1.1-point gap is not voltage alone. It leaves out the rest of the car's draw while charging (pumps, controllers fed from the pack), so it is not a wall-to-battery figure. The Volt's charger is rated 3.3 kW on 240 V and 1.2 kW on 120 V (its Table 1)."
+    },
+    {
+      "id": "evse-efficiency-inl",
+      "claim": "INL found most Level 2 EVSE more than 99% efficient above 3 kW, and a Level 1 EVSE 98% efficient above 1.25 kW.",
+      "value": {
+        "level2": ">0.99",
+        "level1": 0.98
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "R. B. Carlson, \"Advanced Vehicle Testing Activity: Benchmark Testing of the Chevrolet Volt Onboard Charger\", Idaho National Laboratory, INL/EXT-12-25761, April 2012",
+          "url": "https://inldigitallibrary.inl.gov/sites/sti/sti/5436981.pdf",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "From the same report's summary and footnotes: \"most Level 2 EVSE are greater than 99% efficient when operating above 3.0 kW (208 to 240 VAC) and Level 1 EVSE are 98% efficient when operating above 1.25 AC kW (120 VAC)\". The Level 1 figure is one unit, tested by INL but \"not yet published\" when the report was written. EVSE efficiency covers the whole unit (its relay, control board and cord), not the cord alone."
+    },
+    {
+      "id": "physics-three-phase-cable-loss",
+      "claim": "Balanced three-phase power puts a third of the current in each of three conductors, so over the same wire it loses about a sixth of what single-phase loses at the same power and phase voltage.",
+      "value": {
+        "ratio": 0.167
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Arithmetic from Joule heating: single-phase loss 2·I²R (out and back); balanced three-phase 3·(I/3)²R = I²R/3, with no neutral current. Textbook power engineering, not any one product's figure."
+    },
+    {
+      "id": "onboard-charger-three-phase-designs",
+      "claim": "Three-phase home charging is common in Europe, Australia and New Zealand. Onboard chargers that take it are built either as three single-phase stages, one per phase, or around a single three-phase rectifier.",
+      "sources": [],
+      "status": "accepted",
+      "rationale": "General industry knowledge (11 and 22 kW AC is sold as three-phase in those markets, and onboard-charger reference designs from silicon makers show both layouts). Context only: no conclusion on this page depends on it, and the page says the efficiency question is open. Upgrade with an onboard-charger maker's description of a specific car's charger."
     }
   ]
 }

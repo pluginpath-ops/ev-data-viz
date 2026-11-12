@@ -31,10 +31,12 @@ Charging from a wall outlet loses energy in a few places, and they do not all sc
   [[fact:charging-control-electronics-draw]]. This part is roughly fixed in watts, so it is the one that punishes a
   slow charge.
 - **The onboard charger.** The car turns the outlet's alternating current into the direct current the battery
-  stores. Like most power electronics, it is least efficient far below its rated power, and on 120 V it draws more
-  current for the same power than on 240 V [[fact:onboard-charger-light-load]]. A Level 1 charge does both at once.
-- **The wiring.** Every wire turns some current into heat, and a thin 120 V branch circuit loses a bigger share than
-  a heavy 240 V one built for a charger [[fact:physics-ac-cable-loss-share]].
+  stores. On 120 V it has to draw twice the current for the same power and boost a lower voltage up to the pack's,
+  so it should do a little worse than on 240 V [[fact:onboard-charger-light-load]]. "A little" is what was measured:
+  Idaho National Laboratory found the Chevrolet Volt's charger 90.6% efficient on 120 V and 91.7% on 208 V, about a
+  point apart [[fact:volt-onboard-charger-inl-2012]].
+- **The wiring.** Every wire turns some current into heat. The house circuit to a 120 V outlet is usually the thinnest
+  wire in the chain; the charging cord adds a little more [[fact:physics-ac-cable-loss-share]].
 - **The battery.** At home-charging power it loses little, and a gentle charge usually needs no heating or cooling
   of the pack [[fact:charging-control-electronics-draw]]. That changes in the cold, below.
 
@@ -55,9 +57,19 @@ Now add 40 kWh to the battery. The outlet takes about 35 hours, and the electron
 The 240 V charger takes under four hours, and the electronics burn under 1 kWh. Same car, same few hundred watts,
 nine times as long [[fact:physics-fixed-draw-share]].
 
-The wiring adds to this. Fifty feet of the 14-gauge wire a 120 V outlet circuit often uses loses about 2.5% at 12 A;
-fifty feet of the 6-gauge wire a 48 A charger needs loses under 1% [[fact:physics-ac-cable-loss-share]]. A long or
-old run to a garage outlet can lose more [[fact:charging-control-electronics-draw]].
+The wiring adds to this, in two parts. Both are arithmetic, for wire lengths and sizes we picked as typical
+[[fact:physics-ac-cable-loss-share]]:
+
+- **The house wiring.** Fifty feet of 14-gauge wire, common on a 120 V outlet circuit, loses about 36 W at 12 A, or
+  2.5%. Fifty feet of the 6-gauge wire a 48 A charger needs loses about 91 W at 11.5 kW, under 1%. A long or old run
+  to a garage outlet can lose more [[fact:charging-control-electronics-draw]].
+- **The charging cord** (the EVSE). Twenty feet of 8-gauge cord at 12 A loses under 4 W, about 0.25%, and 6-gauge at
+  48 A about 36 W, 0.3%: next to nothing either way. If a portable cord uses lighter wire, say 14-gauge, it is still
+  about 1%. Measured whole, with its electronics, INL found a Level 1 EVSE 98% efficient and Level 2 EVSE above 99%
+  [[fact:evse-efficiency-inl]], so the box at the end of the cord loses more than the cable does.
+
+So on 120 V the house wiring is worth a couple of points, the EVSE one or two, the onboard charger's lower input
+voltage about one, and the fixed draw the rest.
 
 ## What do the measurements say?
 
@@ -93,6 +105,23 @@ heater can take a large part of the power for a long time. ADAC kept its batteri
 [[fact:ac-socket-vs-wallbox-adac-2026]], so its figures are a warm-weather best case. Cost & Time says so where it
 warns about warming the battery in winter; the [heating and cooling explainer](heating-cooling-and-range) covers the
 driving side.
+
+## Does three-phase do better?
+
+In Europe, Australia and New Zealand, a home wallbox can use three-phase power, and ADAC's 11 kW wallbox was
+three-phase [[fact:ac-socket-vs-wallbox-adac-2026]]. You might expect it to be more efficient still, and in the wiring
+it is: for the same power over the same wire, three phases lose about a sixth of what a single phase does, because
+each wire carries a third of the current [[fact:physics-three-phase-cable-loss]]. But the wiring on a proper 240 V
+circuit already loses under 1%, so the most three-phase can save there is a fraction of a point.
+
+Inside the car, the answer is less clear. Many onboard chargers handle three-phase as three single-phase stages, each
+at a third of the power, which saves nothing by itself; others use a true three-phase rectifier
+[[fact:onboard-charger-three-phase-designs]]. We have found no
+measurement of one car charging at the same power on one phase and on three, so this is still open. What ADAC's
+figures do show is that power matters more than phase count: at 4.1 kW, also three-phase, its cars lost 8.0 to 12.8%,
+more than on any 11 kW wallbox [[fact:ac-socket-vs-wallbox-adac-2026]]. That is the fixed draw again, not the phases.
+It also means ADAC's wallbox figures, three-phase at 11 kW, are not quite like-for-like with a US 240 V single-phase
+charger at 11.5 kW.
 
 ## What does EVBench do with it?
 
@@ -130,7 +159,9 @@ wall, alongside the same cars on 240 V, warm and cold.
   2013.
 - Each car's own fixed draw while charging. It is the biggest part of the 120 V loss and almost no maker publishes it.
 - Whether a car's 240 V figure predicts its 120 V figure at all. Five cars say not much.
-- How much a 120 V input, rather than ADAC's 230 V, lowers the onboard charger's own efficiency.
+- How much a 120 V input lowers a current car's onboard charger efficiency. The one measurement is a 2012 Volt, about
+  a point, and it changes power and voltage together.
+- Whether three-phase charging beats single-phase at the same power, inside the car.
 - How much winter adds on a 120 V outlet. The one study that looked at temperature only says the gap grows.
 
 ::: held
@@ -153,8 +184,12 @@ against a measured 9.4%, then η(1.44) ≈ 0.803 and η(11.52) ≈ 0.932 [[fact:
 caveats: k is likely higher at 120 V input than at 230 V, and ADAC's 10–90% window leaves out balancing near full,
 which EPA's recharge includes.
 
-Cable loss as a share of power is I²R ÷ (V·I) = I·R ÷ V. For 50 ft of 14 AWG out and back (R ≈ 0.25 Ω) at 12 A and
-120 V, that is 2.5%; for 6 AWG (R ≈ 0.04 Ω) at 48 A and 240 V, 0.8% [[fact:physics-ac-cable-loss-share]].
+Cable loss as a share of power is I²R ÷ (V·I) = I·R ÷ V, with R the resistance out and back. House wiring, 50 ft: 14
+AWG (R ≈ 0.25 Ω) at 12 A and 120 V is 2.5%; 6 AWG (R ≈ 0.04 Ω) at 48 A and 240 V is 0.8%. EVSE cord, 20 ft: 8 AWG
+(R ≈ 0.025 Ω) at 12 A is 0.25%, 14 AWG (R ≈ 0.10 Ω) 1.0%; 6 AWG (R ≈ 0.016 Ω) at 48 A is 0.3%
+[[fact:physics-ac-cable-loss-share]]. Balanced three-phase at the same power and wire size: each of three conductors
+carries I/3, so the loss is 3·(I/3)²R = I²R/3 against 2·I²R for a single phase, a sixth
+[[fact:physics-three-phase-cable-loss]].
 
 EVBench's home efficiency on 120 V is η_home = η_240 × η_outlet ÷ η_site, with η_outlet = `WALL_OUTLET_CHARGER_EFF`
 (0.80, `src/constants/costToDrive.js`) and η_site = `ASSUMED_CHARGER_EFF` (0.885, `src/constants/epa.js`), in
