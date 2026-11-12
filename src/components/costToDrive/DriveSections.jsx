@@ -1,11 +1,11 @@
 /**
  * The Cost to Drive settings in their groups — Home charging, Your week, Fast
- * charging, Season, Your gas car, Efficiency from. Written once: Your Driving
- * lays them out as cards across the page, the sidebar stacks them (`compact`),
- * so the two ways in cannot drift apart. Names: docs/vocabulary.md, Cost to
- * Drive.
+ * charging, Season, Efficiency from (Your gas car's is GasCarFields, shared with
+ * Road Trip). Written once: Your Driving lays them out as cards across the
+ * page, the sidebar stacks them (`compact`), so the two ways in cannot drift
+ * apart. Names: docs/vocabulary.md, Cost to Drive.
  */
-import { COST_TO_DRIVE_PRESETS, DETOUR_MPH, GAS_CAR_PRESETS, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
+import { COST_TO_DRIVE_PRESETS, DETOUR_MPH, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS } from '../../constants/epa';
 import { percentText } from '../../utils/costToDrive';
 import { DriveNumberField, DriveSlider, DriveChoice, DriveCheckbox, PlugWindow } from './DriveFields';
@@ -123,48 +123,6 @@ export function SeasonFields({ settings, onChange }) {
                 not, so winter is a floor.
             </span>
             <PackWarmingNote settings={settings} />
-        </>
-    );
-}
-
-export function GasCarFields({ settings, onChange, compact }) {
-    const props = { settings, onChange };
-    // The car's own figures: changing one makes it the reader's own car.
-    const ownCar = { settings, onChange: (patch) => onChange({ ...patch, gasCar: 'custom' }) };
-    const custom = settings.gasCar === 'custom';
-    return (
-        <>
-            {/* Your Driving only, like the week buttons. */}
-            {!compact && (
-                <div className="drive-presets" role="group" aria-label="Car">
-                    <span className="text-label">Car</span>
-                    {GAS_CAR_PRESETS.map(p => (
-                        <button key={p.key} type="button" className="btn btn-secondary" title={`${p.title}: ${p.settings.gasCity} city / ${p.settings.gasHwy} hwy mpg, ${p.settings.gasTank} gal`}
-                            aria-pressed={settings.gasCar === p.key}
-                            onClick={() => onChange({ ...p.settings, gasCar: p.key })}>
-                            {p.label}
-                        </button>
-                    ))}
-                    <input type="text" className={`form-input drive-name-input${custom ? ' is-selected' : ''}`}
-                        value={settings.gasName} placeholder="Custom" maxLength={24}
-                        aria-label="Your own car's name" title="Your own car: name it here"
-                        onClick={() => { if (!custom) onChange({ gasCar: 'custom' }); }}
-                        onChange={e => onChange({ gasName: e.target.value, gasCar: 'custom' })} />
-                </div>
-            )}
-            <div className="flex flex-col gap-2">
-                <DriveNumberField {...ownCar} field="gasCity" label="City" unit="mpg" />
-                <DriveNumberField {...ownCar} field="gasHwy" label="Highway" unit="mpg" />
-                <DriveNumberField {...props} field="gasPrice" label="Price" unit="$/gal" />
-                <DriveNumberField {...ownCar} field="gasTank" label="Tank" unit="gal" />
-                <DriveNumberField {...props} field="gasFillAt" label="Fill up at" unit="% left" />
-                <DriveNumberField {...props} field="gasFillMin" label="Each fill-up" unit="min" />
-            </div>
-            <span className="text-note">
-                {!compact && 'A car fills in its EPA mpg and tank. Change one and it becomes your own, named as you like. '}
-                It drives the same week as the EVs. A fill-up&rsquo;s minutes are at the pump, the station on
-                the way. Cold costs mpg: about 15% city and 7% highway at 20°F, none from 75°F up.
-            </span>
         </>
     );
 }

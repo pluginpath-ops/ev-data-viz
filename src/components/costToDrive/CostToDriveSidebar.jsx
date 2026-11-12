@@ -16,8 +16,9 @@ import ShareSettingsButton from './ShareSettingsButton';
 import { hourText } from './DriveFields';
 import { levelLabel } from './HomeLevelPicker';
 import {
-    HomeChargingFields, WeekFields, FastChargingFields, SeasonFields, GasCarFields, EfficiencyFields,
+    HomeChargingFields, WeekFields, FastChargingFields, SeasonFields, EfficiencyFields,
 } from './DriveSections';
+import GasCarFields from './GasCarFields';
 
 const GROUPS = [
     {

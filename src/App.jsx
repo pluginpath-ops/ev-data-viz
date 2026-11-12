@@ -1355,6 +1355,8 @@ export default function App() {
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
                             correctionTarget={chartConfig.correctionTarget}
                             setChartConfig={setChartConfig}
+                            gasCar={costToDrive}
+                            onGasCarChange={updateCostToDrive}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'compare' && (

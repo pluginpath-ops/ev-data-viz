@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-    simulateWeek, simulateGasWeek, gasColdLoss, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
+    simulateWeek, simulateGasWeek, gasColdLoss, gasTripLegs, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
     weekSummary, gasCarName, chargerText, chargingText,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
-import { DEFAULT_COST_TO_DRIVE, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
+import { DEFAULT_COST_TO_DRIVE, GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF } from '../../constants/epa';
 
 // A Model Y-ish profile with fixed numbers, so the rule is tested apart from
@@ -164,6 +164,83 @@ describe('the gas car', () => {
     });
 });
 
+describe('the gas car on a road trip (#555)', () => {
+    // The default car: 26 gal at 24 mpg highway, fill at 15% left, 5 min a fill-up.
+    const car = (over = {}) => normalizeCostToDrive({ ...DEFAULT_COST_TO_DRIVE, ...over });
+    const preset = (key) => ({ ...GAS_CAR_PRESETS.find(p => p.key === key).settings, gasCar: key });
+    const trip = (settingsOver, distanceMi, speedMph = 70, temperatureF = null) =>
+        gasTripLegs(car(settingsOver), { distanceMi, speedMph, temperatureF });
+
+    it('runs from full down to the fill-up level: usable fuel times highway mpg', () => {
+        // 26 gal x 85% usable x 24 mpg
+        expect(trip({}, 1).rangeMi).toBeCloseTo(530.4, 6);
+        // The F-150: 23 gal x 85% x 23 mpg is the "about 450 mi" the issue quotes
+        expect(trip(preset('f150'), 1).rangeMi).toBeCloseTo(449.65, 6);
+        expect(trip(preset('civic'), 1).rangeMi).toBeCloseTo(12 * 0.85 * 41, 6);
+    });
+
+    it('puts each stop at the right mile, one per tankful, none at the finish', () => {
+        const t = trip(preset('f150'), 1000);
+        expect(t.stops).toBe(2);
+        expect(t.stopMi[0]).toBeCloseTo(449.65, 6);
+        expect(t.stopMi[1]).toBeCloseTo(899.3, 6);
+        expect(t.legs.map(l => l.driveMi).reduce((a, b) => a + b, 0)).toBeCloseTo(1000, 9);
+        expect(t.legs.at(-1).driveMi).toBeCloseTo(1000 - 899.3, 6);
+        // Exactly one range long: the trip is over where the stop would be.
+        expect(trip(preset('f150'), 449.65).stops).toBe(0);
+        expect(trip(preset('f150'), 449.65 + 5).stops).toBe(1);
+    });
+
+    it('times a trip as driving plus each stop at the fill-up\'s own minutes, never the EV overhead', () => {
+        const t = trip({}, 700, 70);
+        expect(t.stops).toBe(1);
+        expect(t.stopMin).toBe(5);
+        expect(t.driveMin).toBeCloseTo(600, 9);
+        expect(t.totalMin).toBeCloseTo(605, 9);
+        // The fill-up's own setting moves it; nothing else is read for a stop.
+        expect(trip({ gasFillMin: 12 }, 700, 70).totalMin).toBeCloseTo(612, 9);
+        // (settings, trip): there is no overhead argument to pass
+        expect(gasTripLegs.length).toBe(2);
+    });
+
+    it('speed sets how long a leg takes, not where the stops fall', () => {
+        const slow = trip(preset('civic'), 1200, 55), fast = trip(preset('civic'), 1200, 80);
+        expect(slow.stopMi).toEqual(fast.stopMi);
+        expect(slow.stops).toBe(2);
+        expect(slow.totalMin).toBeGreaterThan(fast.totalMin);
+        expect(fast.totalMin).toBeCloseTo(1200 / 80 * 60 + 2 * 5, 9);
+    });
+
+    it('a car with a huge tank makes no stop, and a short trip makes none either', () => {
+        // The sliders' biggest tank at their best mpg: 40 gal x 85% x 60 mpg = 2,040 mi
+        const huge = { gasTank: 40, gasHwy: 60 };
+        expect(trip(huge, 2000).stops).toBe(0);
+        expect(trip(huge, 2000).totalMin).toBeCloseTo(2000 / 70 * 60, 9);
+        expect(trip({}, 500).stops).toBe(0);
+        expect(trip({}, 0).legs).toEqual([]);
+        expect(trip({}, 0).totalMin).toBe(0);
+    });
+
+    it('is full after a stop, at the fill-up level before the next, and what is left at the finish', () => {
+        const t = trip(preset('f150'), 600);
+        expect(t.legs).toHaveLength(2);
+        expect(t.legs[0].fuelLeft).toBeCloseTo(0.15, 9);
+        // 150.35 mi left to drive from a full 23 gal tank at 23 mpg
+        expect(t.legs[1].fuelLeft).toBeCloseTo((23 - 150.35 / 23) / 23, 9);
+    });
+
+    it('takes no cold loss unless it is given a temperature, then the highway share of Cost & Time\'s', () => {
+        const none = trip({}, 1000), lab = trip({}, 1000, 70, 75), cold = trip({}, 1000, 70, 20);
+        expect(none.hwyMpg).toBe(24);
+        expect(lab.hwyMpg).toBe(24);
+        expect(cold.hwyMpg).toBeCloseTo(24 * (1 - gasColdLoss(20).hwy), 9);
+        expect(cold.rangeMi).toBeCloseTo(none.rangeMi * 0.93, 6);
+        expect(cold.stops).toBeGreaterThan(none.stops);
+        // 70°F, the standard conditions a corrected chart defaults to: a sliver
+        expect(trip({}, 1000, 70, 70).hwyMpg).toBeCloseTo(24 * (1 - 0.07 * 5 / 55), 9);
+    });
+});
+
 describe('a vehicle record', () => {
     const vehicle = {
         socWindowKwh: 75,
@@ -272,12 +349,13 @@ describe('the week and the gas car in words', () => {
         expect(summary(plain({ week: 'OOOOOOO' }))).toBe('0 mi per week · 7 days off');
     });
 
-    it('names the gas car: the picked one, else the reader\'s, else Custom', () => {
+    it('names the gas car: the picked one, else the reader\'s, else Your gas car', () => {
         expect(weekSummary(plain())).not.toMatch(/\d day/);
-        expect(gasCarName(plain())).toBe('Custom');
+        expect(gasCarName(plain())).toBe('Your gas car');
+        expect(GAS_CAR_FALLBACK_NAME).toBe('Your gas car');
         expect(gasCarName(plain({ gasCar: 'civic' }))).toBe('Civic');
         expect(gasCarName(plain({ gasName: 'My Accord' }))).toBe('My Accord');
-        expect(gasCarName(plain({ gasName: '   ' }))).toBe('Custom');
+        expect(gasCarName(plain({ gasName: '   ' }))).toBe('Your gas car');
         // A picked car wins over a name typed earlier.
         expect(gasCarName(plain({ gasCar: 'pilot', gasName: 'My Accord' }))).toBe('Pilot');
     });

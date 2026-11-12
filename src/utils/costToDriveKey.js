@@ -208,6 +208,32 @@ export function encodeCostToDriveKey(settings) {
     return `${COST_TO_DRIVE_KEY_VERSION}.${toBase64Url([...bytes, ...body])}`;
 }
 
+/**
+ * The settings that make a gas car: its picked name or the reader's own, its
+ * mpg, tank, and what a stop is. NOT its price, which only Cost & Time reads.
+ * What a Road Trip link carries of the shared settings (#555).
+ */
+export const GAS_CAR_KEY_FIELDS = Object.freeze(
+    ['gasCar', 'gasName', 'gasCity', 'gasHwy', 'gasTank', 'gasFillAt', 'gasFillMin']);
+
+/**
+ * The key for the gas car alone, or null while it is every one at its
+ * version-3 default — Road Trip's chart link carries this where Cost & Time's
+ * carries the whole key, so the picked car travels with the chart and an
+ * untouched car adds nothing to the address. The same `cd` parameter and the
+ * same codec, not a second one: App reads it back as every other `cd` key, the
+ * rest of the settings at their defaults.
+ *
+ * Laid over the frozen version-3 defaults rather than today's, so a default
+ * that moves later cannot put a setting this link never meant into it.
+ */
+export function encodeGasCarKey(settings) {
+    const own = normalizeCostToDrive(settings);
+    const base = decodeCostToDriveKey(null).settings;
+    for (const key of GAS_CAR_KEY_FIELDS) base[key] = own[key];
+    return encodeCostToDriveKey(base);
+}
+
 /** A text field from the key: its length, then that many UTF-8 bytes. */
 function readText(bytes, at) {
     const length = readVarint(bytes, at);

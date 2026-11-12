@@ -59,7 +59,7 @@ import {
     defaultCompareConfig, defaultRoadTripConfig,
 } from './chartDefaults';
 import { encodeShortLink } from './shortLink';
-import { COST_TO_DRIVE_PARAM, encodeCostToDriveKey } from './costToDriveKey';
+import { COST_TO_DRIVE_PARAM, encodeCostToDriveKey, encodeGasCarKey } from './costToDriveKey';
 
 // The defaults live with the rest of a fresh page's settings (chartDefaults.js);
 // re-exported because the views have always found them here.
@@ -432,6 +432,15 @@ export function buildChartParams({
     // so switching between them keeps the week (and an untouched week, none).
     if (categoryForMode(chartMode).key === 'cost' && costToDrive) {
         const key = encodeCostToDriveKey(costToDrive);
+        if (key) p.set(COST_TO_DRIVE_PARAM, key);
+    }
+
+    // Road Trip and Trip Optimizer draw the gas car Cost & Time prices, so a
+    // link to them carries it: the picked car and anything set on it, in the
+    // same `cd` key and only the car's part of it (#555). Written only when it
+    // is not the default car, so an untouched chart keeps its short link.
+    if ((chartMode === 'roadtrip' || chartMode === 'optimizer') && costToDrive) {
+        const key = encodeGasCarKey(costToDrive);
         if (key) p.set(COST_TO_DRIVE_PARAM, key);
     }
 

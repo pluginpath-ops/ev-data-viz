@@ -9920,8 +9920,8 @@ a.is-test-link:focus-visible {
 /* The row's lead-in ("Start from", "Car") on a line of its own, as "Charger"
    heads its cards: inline, a wrapped row left buttons stranded under it. */
 .drive-presets > .text-label { flex-basis: 100%; }
-/* Your own gas car's name, last in the row of cars: wide enough for "Custom"
-   and a short name, narrower than a full model name. */
+/* Your own gas car's name, last in the row of cars: wide enough for its
+   placeholder, "Your gas car", and a short name, narrower than a full model name. */
 .drive-name-input { flex: 0 1 9rem; min-width: 6rem; }
 /* Wide enough for a full vehicle name beside its two figures: it shares the
    row evenly with the intro rather than taking only what the intro leaves. */

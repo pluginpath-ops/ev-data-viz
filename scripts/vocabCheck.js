@@ -76,6 +76,13 @@ const RETIRED = [
         why:     'the record is the EPA test vehicle; EPA\'s Test Group is the certification',
     },
     {
+        // #555: the gas car goes by its own name. "ICE" alone is not matched (it
+        // is also the engine type in prose); these are the house phrases.
+        pattern: /\bICE (Reference|comparison)\b|\bvs\.? ICE\b/g,
+        write:   "the gas car's own name · Your gas car",
+        why:     'three house words for the one car Cost & Time prices (owner, 2026-11-12)',
+    },
+    {
         pattern: /\b(certification|cert) groups?\b/gi,
         write:   'EPA test vehicle(s)',
         why:     'the Vehicle ID record is a test vehicle; a certification is a Test Group',
