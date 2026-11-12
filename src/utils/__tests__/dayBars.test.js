@@ -43,6 +43,15 @@ describe('the day by day as bars', () => {
         }
     });
 
+    it('carries each night\'s home ceiling: the most the window could add, never less than what it did', () => {
+        for (const w of weeks) {
+            for (const b of dayBars(w)) expect(b.mostAdd).toBeGreaterThanOrEqual(b.home - 1e-9);
+        }
+        // 120 V: a night the window cuts short added all it could.
+        const cut = dayBars(weeks[1]).filter(b => b.home > 0.05 && Math.abs(b.mostAdd - b.home) < 1e-6);
+        expect(cut.length).toBeGreaterThan(0);
+    });
+
     it('a settled week balances: what goes in comes out', () => {
         for (const w of weeks) {
             const bars = dayBars(w);

@@ -310,15 +310,19 @@ export const CHART_HELP_DEFAULTS = {
             'the car’s color is the night at home, up to the next morning, where a dashed ' +
             'line hands over to the next day. The gray bar is how far the battery fell, so ' +
             'a day with a stop used more than it shows; hover a day for both. "Charge in and ' +
-            'used" draws the same figures from zero: charge in above, driving below.\n' +
+            'used" draws the same figures from zero: charge in above, driving below. The dashed tick on ' +
+            'a night’s bar is the most that night could have added, with your charger at full power for the whole ' +
+            'plug-in window: the gap above the bar is the charger’s margin, and no gap means the window cut the ' +
+            'night short. A tick above the top of the chart sits on its edge with an arrow.\n' +
             '"The week as a line" is range left, in miles on the left and the battery’s percent on the ' +
             'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +
             'at home overnight. Each orange band is a fast stop, labeled with its minutes ' +
             '(detour and time to start and pay in); a lighter one is a planned fast charge. ' +
-            'The dashed lines at 10% and 80% mark the everyday range. Under the chart, ' +
+            'The dashed lines at 10% and 80% mark the everyday range. The gray shading is your plug-in ' +
+            'window each night; where the line has leveled off, the darker end of the shading is time to spare. Under the chart, ' +
             'the week as a table, a column a day: the fast-charging rows (stops, time, ' +
             'cost) are outlined in orange, and "Ready at" gives the time the night filled ' +
-            'the battery, or the end of your plug-in window when it ran out. Compare with the other ' +
+            'the battery, or the end of your plug-in window when it ran out. "Spare plug-in time" is the window left after that, "None" when it ran out. Compare with the other ' +
             'season or another home charger in a second chart below, and open your gas ' +
             'car’s week to see its fill-ups.',
         key_terms:
@@ -349,10 +353,13 @@ export const CHART_HELP_DEFAULTS = {
             'for each car, its minutes of fast charging and its home, fast and total cost ' +
             'per month. The bold orange cell is “enough from here”: the smallest charger past ' +
             'which a bigger one saves less than five minutes a week (about 20 a month). A ^ means the car’s own ' +
-            'onboard charger, not the wall, sets the pace, so a bigger charger buys nothing.',
+            'onboard charger, not the wall, sets the pace, so a bigger charger buys nothing. ' +
+            'The dashed line over a column is the most home charging could cost that month, a ceiling the home part never passes. A ceiling above the top of the chart ' +
+            'sits on its edge with an arrow, and does not stretch the scale; hover a column for its figure.',
         key_terms:
             'Home charger — 120 V on a wall outlet, or 240 V at the amps the circuit allows.\n' +
             'Onboard charger — the car’s own AC charger; it limits how fast any home charger can fill it.\n' +
+            'Most it could cost at home — the charger (or the onboard charger, if lower) at full power the whole time you are plugged in, every night, at your home price.\n' +
             'Enough from here — where a bigger charger stops making a difference you would notice.',
         math_approach:
             'Power at home is the lesser of volts × amps and the car’s onboard charger ' +

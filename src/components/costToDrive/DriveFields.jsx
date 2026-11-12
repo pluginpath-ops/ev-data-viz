@@ -6,6 +6,7 @@
  */
 import NumberInput from '../NumberInput';
 import { costToDriveField } from '../../constants/costToDrive';
+import { plugHours } from '../../utils/costToDrive';
 
 /** A number setting as one row: label · box · unit. */
 export function DriveNumberField({ settings, onChange, field, label, unit, integer }) {
@@ -114,7 +115,7 @@ export function HourSelect({ field, label, settings, onChange, disabled = false 
 
 /** The plug-in window as a sentence: Plugged in [10 pm] to [7 am] · 9 hours. */
 export function PlugWindow({ settings, onChange }) {
-    const hours = ((settings.plugUntil - settings.plugFrom + 24) % 24) || 24;
+    const hours = plugHours(settings);
     const select = (field, label) => <HourSelect field={field} label={label} settings={settings} onChange={onChange} />;
     return (
         <div className="flex flex-wrap items-center gap-2">

@@ -22,8 +22,9 @@ import { vehicleLabel } from '../../utils/specHelpers';
 import { fastChargingFill } from '../../utils/stripedFill';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
+import { drawCeilingMarks, ceilingLegend } from '../../utils/ceilingMark';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
-import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel, chargingText } from '../../utils/costToDrive';
+import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel, chargingText, homeCostCeiling } from '../../utils/costToDrive';
 import { useCostToDriveByLevel } from '../../hooks/useCostToDrive';
 import { useChartPng } from '../../hooks/useChartPng';
 import { useSourceLine } from '../../hooks/useSourceLine';
@@ -56,13 +57,26 @@ const totalLabels = (isTop, totalOf, homeOf, format = dollars) => ({
     id: 'totalLabels',
     afterDatasetsDraw(chart) {
         const { ctx, chartArea: a } = chart;
-        const { ink } = chartTheme();
+        const { ink, background } = chartTheme();
         const fonts = chartFonts();
         ctx.save();
         ctx.font = `600 ${fonts.badge}px ${fonts.mono}`;
         ctx.fillStyle = ink;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
+        // A figure over a column sits on the panel, where a home ceiling's
+        // dashed line can run through it: an outline in the panel's color
+        // keeps it legible. (Not the home figure inside a bar: there the
+        // outline would box it.)
+        const overPanel = (text, x, y) => {
+            ctx.save();
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = background;
+            ctx.strokeText(text, x, y);
+            ctx.restore();
+            ctx.fillText(text, x, y);
+        };
         chart.data.datasets.forEach((ds, di) => {
             const meta = chart.getDatasetMeta(di);
             if (meta.hidden || !isTop(ds)) return;
@@ -78,11 +92,11 @@ const totalLabels = (isTop, totalOf, homeOf, format = dollars) => ({
                     ctx.rotate(-Math.PI / 2);
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(text, 0, 0);
+                    overPanel(text, 0, 0);
                     ctx.restore();
                     return;
                 }
-                ctx.fillText(text, bar.x, y);
+                overPanel(text, bar.x, y);
             });
         });
         // The home part's own figure, only where fast charging sits on it:
@@ -107,6 +121,32 @@ const totalLabels = (isTop, totalOf, homeOf, format = dollars) => ({
             });
         });
         ctx.restore();
+    },
+});
+
+/**
+ * The most each car's home charging could cost a month at the level, a dashed
+ * line across its column (owner, 2026-11-11): `ceilingOf(levelIndex,
+ * vehicleIndex)` gives the figure, null draws nothing (no home charging).
+ * Drawn by a plugin, not as a dataset (utils/ceilingMark.js), so a line above
+ * the plot never moves the y-axis — the axis stays as tall as the tallest
+ * column. A line above it is pinned to the top edge with an up-arrow; its figure is in the tooltip only
+ * (a dollar figure on each arrow read as clutter, owner, 2026-11-11; the
+ * labelled version is commit b0b296e if it is wanted back).
+ */
+const homeCeilings = (ceilingOf) => ({
+    id: 'homeCeilings',
+    afterDatasetsDraw(chart) {
+        const marks = [];
+        chart.data.datasets.forEach((ds, di) => {
+            const meta = chart.getDatasetMeta(di);
+            if (meta.hidden || ds.part !== 'home') return;
+            meta.data.forEach((bar, li) => {
+                const value = ceilingOf(li, ds.vehicleIndex);
+                if (value != null && Number.isFinite(bar.x)) marks.push({ x: bar.x, half: bar.width / 2 + 2, value });
+            });
+        });
+        drawCeilingMarks(chart, marks);
     },
 });
 
@@ -173,6 +213,25 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
         const { tick, grid, legend } = chartTheme();
         const cost = !timeView;
         const monthAt = (li, c) => monthOf(at(shown[li].index, c.vehicle.id)?.comparison?.week);
+        // Level by place on the chart (`shown`), car by place in `columns`.
+        const ceilingOf = (li, ci) => {
+            const e = at(shown[li].index, columns[ci].vehicle.id);
+            return e && !e.missing ? homeCostCeiling(e.profile, settings) : null;
+        };
+        // A car once in the legend, by its home bar's full color (its one bar on
+        // the time chart), then the ceiling's key — the cost chart only.
+        const ceilingKey = ceilingLegend(Chart, {
+            keep: (item, data) => data.datasets[item.datasetIndex].part === (cost ? 'home' : 'fast'),
+            text: cost ? 'Most it could cost at home' : null,
+            // Hiding a car hides both its bars.
+            onClick: (e, item, leg) => {
+                const ch = leg.chart;
+                const vi = ch.data.datasets[item.datasetIndex].vehicleIndex;
+                const show = !ch.isDatasetVisible(item.datasetIndex);
+                ch.data.datasets.forEach((d, i) => { if (d.vehicleIndex === vi) ch.setDatasetVisibility(i, show); });
+                ch.update();
+            },
+        });
         chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
             type: 'bar',
             data: {
@@ -201,16 +260,17 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                         backgroundColor: c.color,
                     })),
             },
-            plugins: [cost
-                ? totalLabels(ds => ds.part === 'fast', (li, ds) => {
+            plugins: cost
+                ? [homeCeilings(ceilingOf), totalLabels(ds => ds.part === 'fast', (li, ds) => {
                     const w = monthAt(li, columns[ds.vehicleIndex]);
                     return w ? w.fastCost + w.homeCost : null;
                 }, (li, ds) => {
                     const w = monthAt(li, columns[ds.vehicleIndex]);
                     // No "$0" under a bar with no home charging.
                     return w && w.fastCost >= 0.5 && w.homeCost >= 0.5 ? w.homeCost : null;
-                })
-                : totalLabels(() => true, (li, ds) => monthAt(li, columns[ds.vehicleIndex])?.fastMinutes ?? null, () => null, minutesLabel)],
+                })]
+                // The ceiling is a cost figure: not drawn over minutes.
+                : [totalLabels(() => true, (li, ds) => monthAt(li, columns[ds.vehicleIndex])?.fastMinutes ?? null, () => null, minutesLabel)],
             options: {
                 // Room over the tallest column for its label.
                 layout: { padding: { top: 18 } },
@@ -220,16 +280,8 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        // A car once, by its home bar's full color.
-                        labels: { color: legend, boxWidth: 12, filter: (item, data) => data.datasets[item.datasetIndex].part === (cost ? 'home' : 'fast') },
-                        // Hiding a car hides both its bars.
-                        onClick: (e, item, leg) => {
-                            const ch = leg.chart;
-                            const vi = ch.data.datasets[item.datasetIndex].vehicleIndex;
-                            const show = !ch.isDatasetVisible(item.datasetIndex);
-                            ch.data.datasets.forEach((d, i) => { if (d.vehicleIndex === vi) ch.setDatasetVisibility(i, show); });
-                            ch.update();
-                        },
+                        labels: { color: legend, boxWidth: 12, usePointStyle: true, generateLabels: ceilingKey.generateLabels },
+                        onClick: ceilingKey.onClick,
                     },
                     tooltip: {
                         callbacks: {
@@ -238,8 +290,9 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                 const w = monthAt(ctx.dataIndex, columns[ds.vehicleIndex]);
                                 if (!w) return null;
                                 if (!cost) return `${ds.label}: ${minutesLabel(w.fastMinutes)} of fast charging (about ${Math.round(w.stopCount)} stops) per month`;
+                                const ceiling = ds.part === 'home' ? ceilingOf(ctx.dataIndex, ds.vehicleIndex) : null;
                                 return ds.part === 'home'
-                                    ? `${ds.label}: ${dollars(w.homeCost)} home`
+                                    ? `${ds.label}: ${dollars(w.homeCost)} home${ceiling == null ? '' : ` (most it could cost: ${dollars(ceiling)})`}`
                                     : `${ds.label}: ${dollars(w.fastCost)} fast (${minutesText(w.fastMinutes)}, about ${Math.round(w.stopCount)} stops), ${dollars(w.fastCost + w.homeCost)} total per month`;
                             },
                         },

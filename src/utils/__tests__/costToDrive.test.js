@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     simulateWeek, simulateGasWeek, gasColdLoss, gasTripLegs, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
-    weekSummary, gasCarName, chargerText, chargingText,
+    weekSummary, gasCarName, chargerText, chargingText, homeCostCeiling, plugHours, plugWindows,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
 import { DEFAULT_COST_TO_DRIVE, GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
@@ -410,5 +410,102 @@ describe('no home charging', () => {
     it('settles: the pack energy bought over the week covers the energy used', () => {
         const w = simulateWeek(profile(noHome), settings());
         expect(w.fastShare).toBeGreaterThan(0.9);
+    });
+});
+
+describe('the most home charging could cost', () => {
+    it('is the charger at full power through the plug-in window every night, a month of them, at the home price', () => {
+        // 48 A: 11.52 kW × 9 h (10 pm to 7 am) × 7 nights × 52 ÷ 12 × $0.17.
+        const p = costToDriveVehicle({ socWindowKwh: 75, epaRange: { mi: 290 }, specs: { charging: { max_ac_kw: 19.2 } } }, settings({ level: 4 }));
+        expect(homeCostCeiling(p, settings({ level: 4 }))).toBeCloseTo(11.52 * 9 * 7 * (52 / 12) * 0.17, 6);
+    });
+
+    it('stops at the onboard charger where the car cannot take the charger\'s power', () => {
+        const car = (kw) => costToDriveVehicle({ socWindowKwh: 75, epaRange: { mi: 290 }, specs: { charging: { max_ac_kw: kw } } }, settings({ level: 5 }));
+        const s = settings({ level: 5 });
+        expect(homeCostCeiling(car(7.7), s)).toBeCloseTo(perMonth(7 * 7.7 * 9 * 0.17), 6);
+        expect(homeCostCeiling(car(7.7), s)).toBeLessThan(homeCostCeiling(car(11.5), s));
+    });
+
+    it('follows the plug-in window and the home price, and counts a window that wraps past midnight', () => {
+        const p = profile();
+        expect(plugHours(settings({ plugFrom: 22, plugUntil: 7 }))).toBe(9);
+        expect(plugHours(settings({ plugFrom: 7, plugUntil: 22 }))).toBe(15);
+        expect(plugHours(settings({ plugFrom: 7, plugUntil: 7 }))).toBe(24);
+        expect(homeCostCeiling(p, settings({ plugFrom: 20, plugUntil: 7, homePrice: 0.2 })))
+            .toBeCloseTo(perMonth(7 * 11.5 * 11 * 0.2), 6);
+    });
+
+    it('is none with no home charging', () => {
+        expect(homeCostCeiling({ home: { kw: 0, eff: 0.885, none: true } }, settings())).toBeNull();
+    });
+
+    it('is never less than the home cost the week is priced at, at any level', () => {
+        // The bars carry the home part and the line the ceiling over it: a bar through its line would be a bug in one of them.
+        for (const [level, { volts, amps, none }] of HOME_LEVELS.entries()) {
+            const s = settings({ level });
+            const p = profile({ home: { kw: Math.min(volts * amps / 1000, 11.5), eff: 0.885, none: !!none } });
+            const ceiling = homeCostCeiling(p, s);
+            if (none) { expect(ceiling).toBeNull(); continue; }
+            expect(perMonth(simulateWeek(p, s).homeCost)).toBeLessThanOrEqual(ceiling + 1e-6);
+        }
+    });
+});
+
+describe('the margin a night has', () => {
+    const night = (kw, over = {}) => simulateWeek(profile({ home: { kw, eff: 0.885 } }), settings(over)).days;
+
+    it('records the hours the charger ran and the most a night could add at full power', () => {
+        const s = settings();
+        for (const d of night(11.5)) {
+            expect(d.night.mostAdd).toBeCloseTo(11.5 * plugHours(s) * 0.885 / 75 * 100, 6);
+            expect(d.night.hours).toBeLessThanOrEqual(plugHours(s) + 1e-9);
+            // What was added is what the hours bought, never more than the most.
+            expect(d.night.added).toBeCloseTo(d.night.hours / plugHours(s) * d.night.mostAdd, 6);
+            expect(d.night.added).toBeLessThanOrEqual(d.night.mostAdd + 1e-9);
+        }
+    });
+
+    it('a night the window cut short has used all of it, and added exactly the most', () => {
+        const cut = night(1.44).filter(d => d.night.ranOut);
+        expect(cut.length).toBeGreaterThan(0);
+        for (const d of cut) {
+            expect(d.night.hours).toBeCloseTo(plugHours(settings()), 6);
+            expect(d.night.added).toBeCloseTo(d.night.mostAdd, 6);
+        }
+    });
+
+    it('a bigger charger has more margin: the same night finishes sooner', () => {
+        const small = night(3.84), big = night(11.5);
+        small.forEach((d, i) => {
+            if (d.night.added >= 0.5 && !d.night.ranOut) expect(big[i].night.hours).toBeLessThan(d.night.hours + 1e-9);
+        });
+    });
+
+    it('has no window to have margin in without a home charger', () => {
+        const w = simulateWeek(profile({ home: { kw: 0, eff: 0.885, none: true } }), settings());
+        expect(w.windows).toEqual([]);
+        expect(w.days.every(d => d.night.mostAdd === 0 && d.night.hours === 0)).toBe(true);
+    });
+
+    it('draws each night as a span of the week, the charger\'s hours first and the spare time after', () => {
+        const s = settings({ plugFrom: 22, plugUntil: 7 });
+        const spans = plugWindows(s, [0, 1, 2, 3, 4, 5, 6].map(() => ({ hours: 3 })));
+        // Monday night is 22:00 to 7:00 Tuesday; the charger ran three hours of it.
+        expect(spans[0]).toEqual({ from: 22, to: 31, spareFrom: 25 });
+        // Sunday night runs past the week's end: cut there, the rest from Monday 0:00.
+        expect(spans.slice(-2)).toEqual([
+            { from: 6 * 24 + 22, to: 168, spareFrom: 168 },
+            { from: 0, to: 7, spareFrom: 1 },
+        ]);
+        // A charger that used the whole window leaves none spare.
+        expect(plugWindows(s, [{ hours: 9 }])[0].spareFrom).toBe(31);
+    });
+
+    it('the week returns its windows, one a night, matching the nights\' hours', () => {
+        const w = simulateWeek(profile(), settings());
+        // Sunday night is cut in two, so a night more than seven spans.
+        expect(w.windows.length).toBe(8);
+        expect(w.windows[0].spareFrom - w.windows[0].from).toBeCloseTo(w.days[0].night.hours, 6);
     });
 });
