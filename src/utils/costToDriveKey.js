@@ -32,6 +32,13 @@
  * car's name, the first text field — its UTF-8 length as a varint, then its
  * bytes. A version-2 key reads its week at version 2's defaults.
  *
+ * Version 4 (2026-11-12): "stop to charge by" defaults to 25% and the fast
+ * price to $0.42 (V4_DEFAULTS), and three limits were loosened — home and fast
+ * price down to $0 (fast also up to $1.50, home to $1) and the detour down to
+ * 0 min. A number is stored as its steps
+ * above its MINIMUM, so a lower minimum shifts every index: versions 1–3 read
+ * their numbers against the minimums they were written with (V3_MINS).
+ *
  * Pure leaf: imports only the constants leaf, so the short link can carry it.
  */
 import { COST_TO_DRIVE_FIELDS, DAY_TYPES } from '../constants/costToDrive';
@@ -39,19 +46,29 @@ import { COST_TO_DRIVE_FIELDS, DAY_TYPES } from '../constants/costToDrive';
 /** The address parameter that carries the key. */
 export const COST_TO_DRIVE_PARAM = 'cd';
 
-export const COST_TO_DRIVE_KEY_VERSION = '3';
+export const COST_TO_DRIVE_KEY_VERSION = '4';
 
-/** Version 2's fields, in order. The constants list is append-only, so this is its prefix. */
-const FIELDS_V2 = COST_TO_DRIVE_FIELDS.slice(0, 33);
+/** The minimums versions 1–3 stored a field against, where today's differ. FROZEN. */
+const V3_MINS = Object.freeze({ homePrice: 0.05, fastPrice: 0.15, detourMin: 5 });
 
-/** Version 3's: version 2's, then the gas car and its name. */
-const FIELDS_V3 = COST_TO_DRIVE_FIELDS.slice(0, 35);
+/** Fields held to the minimums (and steps) they were written with. */
+const withFrozen = (fields, over) => fields.map(f => (over[f.key] ? { ...f, ...over[f.key] } : f));
+const minsOf = (mins) => Object.fromEntries(Object.entries(mins).map(([key, min]) => [key, { min }]));
+
+/** Version 4's fields: the whole list so far. The constants list is append-only, so earlier versions are its prefixes. */
+const FIELDS_V4 = COST_TO_DRIVE_FIELDS.slice(0, 35);
+
+/** Version 3's: the same fields on version 3's minimums. */
+const FIELDS_V3 = withFrozen(FIELDS_V4, minsOf(V3_MINS));
+
+/** Version 2's: version 3's, without the gas car and its name. */
+const FIELDS_V2 = FIELDS_V3.slice(0, 33);
 
 /** The steps version 1 stored a field in, where they differ from today's. FROZEN. */
 const V1_STEPS = Object.freeze({ dailyMi: 5, longMi: 5 });
 
 /** Version 1's fields: version 2's, with version 1's steps. */
-const FIELDS_V1 = FIELDS_V2.map(f => (V1_STEPS[f.key] ? { ...f, step: V1_STEPS[f.key] } : f));
+const FIELDS_V1 = withFrozen(FIELDS_V2, Object.fromEntries(Object.entries(V1_STEPS).map(([key, step]) => [key, { step }])));
 
 /** Version 1's defaults, frozen: what a version-1 key leaves out. */
 const V1_DEFAULTS = Object.freeze({
@@ -73,6 +90,9 @@ const V3_DEFAULTS = Object.freeze({
     week: 'DDDDDLO', planned: 0, dailyMi: 35, dailyCity: 50, longMi: 80, longCity: 20,
     gasCar: 'custom', gasName: '',
 });
+
+/** Version 4's defaults, frozen: version 3's with a 25% stop and a 42¢ fast price. */
+const V4_DEFAULTS = Object.freeze({ ...V3_DEFAULTS, stopBy: 25, fastPrice: 0.42 });
 
 const decimalsOf = (step) => String(step).split('.')[1]?.length ?? 0;
 
@@ -184,15 +204,15 @@ function fromBase64Url(text) {
 }
 
 /**
- * The key for a set of settings, or null when every one is at its version-3
+ * The key for a set of settings, or null when every one is at its version-4
  * default (the address then carries no `cd` at all).
  */
 export function encodeCostToDriveKey(settings) {
     const s = normalizeCostToDrive(settings);
     let mask = 0;
     const body = [];
-    FIELDS_V3.forEach((f, i) => {
-        if (s[f.key] === V3_DEFAULTS[f.key]) return;
+    FIELDS_V4.forEach((f, i) => {
+        if (s[f.key] === V4_DEFAULTS[f.key]) return;
         mask += 2 ** i;
         if (f.kind === 'text') {
             const utf8 = new TextEncoder().encode(s[f.key]);
@@ -218,13 +238,13 @@ export const GAS_CAR_KEY_FIELDS = Object.freeze(
 
 /**
  * The key for the gas car alone, or null while it is every one at its
- * version-3 default — Road Trip's chart link carries this where Cost & Time's
+ * version-4 default — Road Trip's chart link carries this where Cost & Time's
  * carries the whole key, so the picked car travels with the chart and an
  * untouched car adds nothing to the address. The same `cd` parameter and the
  * same codec, not a second one: App reads it back as every other `cd` key, the
  * rest of the settings at their defaults.
  *
- * Laid over the frozen version-3 defaults rather than today's, so a default
+ * Laid over the frozen version-4 defaults rather than today's, so a default
  * that moves later cannot put a setting this link never meant into it.
  */
 export function encodeGasCarKey(settings) {
@@ -251,7 +271,7 @@ function readText(bytes, at) {
  * @returns {{ settings: Object, error: string|null }}
  */
 export function decodeCostToDriveKey(key) {
-    const defaults = normalizeCostToDrive(V3_DEFAULTS);
+    const defaults = normalizeCostToDrive(V4_DEFAULTS);
     if (key == null || key === '') return { settings: defaults, error: null };
     const dot = String(key).indexOf('.');
     const version = dot < 0 ? '' : key.slice(0, dot);
@@ -259,6 +279,7 @@ export function decodeCostToDriveKey(key) {
         1: [FIELDS_V1, V1_DEFAULTS],
         2: [FIELDS_V2, V2_DEFAULTS],
         3: [FIELDS_V3, V3_DEFAULTS],
+        4: [FIELDS_V4, V4_DEFAULTS],
     }[version] ?? [];
     if (!fields) {
         return { settings: defaults, error: `This link's settings were made by a newer version of the site (key version ${version || '?'}).` };

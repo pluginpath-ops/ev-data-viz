@@ -34,10 +34,10 @@ describe('the week', () => {
 
     it('a stop is made on the route at "stop to charge by", not at the end of the day', () => {
         const w = simulateWeek(profile(), settings());
-        for (const st of w.stops.filter(x => !x.planned)) expect(st.fromSoc).toBeCloseTo(30, 5);
+        for (const st of w.stops.filter(x => !x.planned)) expect(st.fromSoc).toBeCloseTo(25, 5);
     });
 
-    it('never adds less than the minimum, so there are no 30→37% top-ups', () => {
+    it('never adds less than the minimum, so there are no 25→32% top-ups', () => {
         for (const p of [profile(), profile(wallOutlet)]) {
             for (const st of simulateWeek(p, settings()).stops) {
                 expect(st.toSoc - st.fromSoc).toBeGreaterThanOrEqual(MIN_STOP_ADD - 1e-9);
@@ -47,7 +47,7 @@ describe('the week', () => {
 
     it('120 V: a day that starts below "stop to charge by" waits until it is needed, never mile 0', () => {
         const w = simulateWeek(profile(wallOutlet), settings());
-        const lateStarts = w.days.filter(d => d.startSoc < 30 && d.stops.some(x => !x.planned));
+        const lateStarts = w.days.filter(d => d.startSoc < 25 && d.stops.some(x => !x.planned));
         expect(lateStarts.length).toBeGreaterThan(0);
         for (const d of lateStarts) expect(d.stops[0].mile).toBeGreaterThan(0);
     });
@@ -86,7 +86,7 @@ describe('the week', () => {
 
     it('prices fast energy with the DC loss and home energy with the charger efficiency', () => {
         const w = simulateWeek(profile(), settings());
-        expect(w.fastCost).toBeCloseTo(w.fastKwh * 0.48, 6);
+        expect(w.fastCost).toBeCloseTo(w.fastKwh * 0.42, 6);
         expect(w.homeCost).toBeCloseTo(w.homeKwh * 0.17, 6);
         expect(w.fastShare).toBeGreaterThan(0);
         expect(w.fastShare).toBeLessThan(0.25);
@@ -364,9 +364,9 @@ describe('the week and the gas car in words', () => {
         const words = (t) => t.replace(/\u00a0/g, ' ');
         expect(words(chargerText(HOME_LEVELS[0]))).toBe('L1 1.4 kW');
         expect(words(chargerText(HOME_LEVELS[4]))).toBe('L2 11.5 kW');
-        expect(words(chargingText(plain(), HOME_LEVELS[4]))).toBe('L2 11.5 kW at $0.17/kWh · fast charging at $0.48/kWh');
-        expect(words(chargingText(plain({ homePrice: 0.31 })))).toBe('home at $0.31/kWh · fast charging at $0.48/kWh');
-        expect(words(chargingText(plain(), HOME_LEVELS[NO_HOME_LEVEL]))).toBe('no home charging · fast charging at $0.48/kWh');
+        expect(words(chargingText(plain(), HOME_LEVELS[4]))).toBe('L2 11.5 kW at $0.17/kWh · fast charging at $0.42/kWh');
+        expect(words(chargingText(plain({ homePrice: 0.31 })))).toBe('home at $0.31/kWh · fast charging at $0.42/kWh');
+        expect(words(chargingText(plain(), HOME_LEVELS[NO_HOME_LEVEL]))).toBe('no home charging · fast charging at $0.42/kWh');
         // Wraps only between phrases.
         expect(chargingText(plain()).split(' ')).toHaveLength(3);
     });

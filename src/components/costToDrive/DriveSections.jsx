@@ -88,7 +88,7 @@ export function FastChargingFields({ settings, onChange }) {
     return (
         <>
             <DriveSlider {...props} field="detourMin" label="Detour to a charger"
-                value={`${settings.detourMin} min ≈ ${detourMi} mi`} ends={['5 · on my route', '15 · a town over', '30 · rural']} />
+                value={`${settings.detourMin} min ≈ ${detourMi} mi`} ends={['0 · on my route', '15 · a town over', '30 · rural']} />
             <DriveSlider {...props} field="stopBy" label="Stop to charge by"
                 value={`${settings.stopBy}%`} ends={['10% · run it low', '50% · whichever charger comes up']} />
             <div className="flex flex-col gap-2">

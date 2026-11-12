@@ -188,7 +188,9 @@ export const COST_TO_DRIVE_FIELDS = [
     { key: 'plugUntil',      kind: 'num',  min: 0,    max: 23,   step: 1,    def: 7 },
     { key: 'chargeTo',       kind: 'num',  min: 50,   max: 100,  step: 5,    def: 80 },
     { key: 'fullBeforeLong', kind: 'bool', def: true },
-    { key: 'homePrice',      kind: 'num',  min: 0.05, max: 0.60, step: 0.01, def: 0.17 },
+    // Free overnight charging exists, so 0 (owner request, 2026-11-12); the ceiling
+    // covers the dearest on-peak rates. Both widened in key version 4.
+    { key: 'homePrice',      kind: 'num',  min: 0,    max: 1.00, step: 0.01, def: 0.17 },
     // The week's defaults are the Commuter week (owner, 2026-11-10): an
     // untouched page is the commonest reader, not the hardest case.
     { key: 'week',           kind: 'week', def: 'DDDDDLO' },
@@ -199,12 +201,14 @@ export const COST_TO_DRIVE_FIELDS = [
     { key: 'longMi',         kind: 'num',  min: 5,    max: 400,  step: 1,    def: 80, spin: 5 },
     { key: 'longMph',        kind: 'num',  min: 45,   max: 85,   step: 5,    def: 70 },
     { key: 'longCity',       kind: 'num',  min: 0,    max: 100,  step: 5,    def: 20 },
-    { key: 'detourMin',      kind: 'num',  min: 5,    max: 30,   step: 1,    def: 10 },
-    { key: 'stopBy',         kind: 'num',  min: 10,   max: 50,   step: 5,    def: 30 },
+    { key: 'detourMin',      kind: 'num',  min: 0,    max: 30,   step: 1,    def: 10 },
+    { key: 'stopBy',         kind: 'num',  min: 10,   max: 50,   step: 5,    def: 25 },
     { key: 'capTo',          kind: 'num',  min: 50,   max: 90,   step: 5,    def: 70 },
     { key: 'keepAbove',      kind: 'num',  min: 5,    max: 30,   step: 1,    def: 10 },
     { key: 'startMin',       kind: 'num',  min: 0,    max: 15,   step: 1,    def: 5 },
-    { key: 'fastPrice',      kind: 'num',  min: 0.15, max: 1.00, step: 0.01, def: 0.48 },
+    // $0.42 from key version 4 (owner, 2026-11-12). Free fast charging is real
+    // (a carmaker's or network's offer), and some chargers pass a dollar.
+    { key: 'fastPrice',      kind: 'num',  min: 0,    max: 1.50, step: 0.01, def: 0.42 },
     { key: 'season',         kind: 'enum', values: ['winter', 'summer'], def: 'winter' },
     { key: 'summerF',        kind: 'num',  min: 40,   max: 110,  step: 5,    def: 75 },
     { key: 'winterF',        kind: 'num',  min: -20,  max: 50,   step: 5,    def: 15 },

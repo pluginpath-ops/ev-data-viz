@@ -166,7 +166,7 @@ export const SETUP_WIZARD = {
                 { key: 'none',      label: 'No home charging',  detail: 'Public chargers only', level: 6 },
             ],
         },
-        homePrice: { label: 'Electricity at home',    min: 0.05, max: 0.60, step: 0.01, hint: 0.17, prefix: '$', unit: '/ kWh' },
+        homePrice: { label: 'Electricity at home',    min: 0,    max: 1,    step: 0.01, hint: 0.17, prefix: '$', unit: '/ kWh' },
         gasMpg:    { label: "Your gas car's mileage", min: 5,    max: 60,   step: 1,    hint: 25,   unit: 'mpg' },
         gasPrice:  { label: 'Gas price',              min: 1,    max: 8,    step: 0.01, hint: 3.20, prefix: '$', unit: '/ gal' },
     },
