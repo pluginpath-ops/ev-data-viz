@@ -127,6 +127,8 @@ const WORDS_V1 = [
     // Cost to Drive's tab and its sub-tabs, all four appended at once so the
     // later layers of the stack need not touch this table.
     'cost', 'drivesetup', 'drivecost', 'driveplan', 'drivecharger',
+    // The vehicle table's EPA charger efficiency column, appended.
+    'figures.chargerEfficiency',
 ];
 
 /**

@@ -164,6 +164,15 @@ const FIGURE_COLUMNS = [
     { key: 'figures.epaEfficiency', label: 'EPA efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
       group: 'Battery & range', numeric: true, better: 'higher', bar: true, digits: 2, scale: 'efficiency',
       hint: 'The EPA label’s combined MPGe ÷ 33.705: miles per kWh from the wall, charging losses included, so it reads below Efficiency, which divides by the battery. The MPGe is shown beneath.' },
+    // The share of wall energy that reaches the pack: the loss inside EPA
+    // efficiency, on its own. Blank unless the cert measured it (or a curator
+    // pinned it) — never the 88.5% assumed elsewhere, which would read as data.
+    // Too wide for the default column as "EPA charger efficiency"; the header
+    // tooltip and the column picker say it in full.
+    { key: 'figures.chargerEfficiency', label: 'Charger eff.', unit: '%',
+      labelFor: () => 'Charger eff.', fullLabelFor: () => 'EPA charger efficiency',
+      group: 'Battery & range', numeric: true, better: 'higher', digits: 1,
+      hint: 'AC charging: the share of wall energy that reaches the battery, from the EPA certification’s own recharge test (battery energy ÷ wall energy), or a curator’s pinned figure. Blank where the cert did not measure it. Not DC fast charging, which has its own loss.' },
 ];
 
 const TESTED_COLUMNS = [
@@ -829,6 +838,8 @@ function vehicleRow(vehicle, index, vehicles, calcContext, { performance = null,
         const mpge = vehicle.epaRange?.combinedMpge ?? null;
         values['figures.epaEfficiency'] = mpge ? mpge / MPG_E_CONVERSION : null;
         notes['figures.epaEfficiency'] = mpge ? `${Math.round(mpge)} MPGe` : null;
+        const chargerEff = vehicle.epaRange?.chargerEfficiency;
+        values['figures.chargerEfficiency'] = chargerEff > 0 ? chargerEff * 100 : null;
 
         const whenNewTrace = trace && traceGroup(trace, columns, ['tested.when_new_range_mi', 'tested.capacity_retention'], 'When-new range and capacity retention');
         const whenNew = whenNewRange(vehicle, whenNewTrace);
