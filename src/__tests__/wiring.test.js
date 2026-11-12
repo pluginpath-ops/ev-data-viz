@@ -345,7 +345,8 @@ describe('the seams that broke before', () => {
                                     view.indexOf('suppress integer tick labels'));
         expect(callback.length).toBeGreaterThan(0);
         expect(callback).toMatch(/entryLabel\(validEntries\[idx\]\)/);
-        expect(callback).toMatch(/'ICE Reference'/);
+        // The gas car's lane is labeled with its own name (#555), not a house word.
+        expect(callback).toMatch(/idx === validEntries\.length \? gasName/);
         expect(callback).toMatch(/wrapAxisLabel\(/);
         expect(callback).toMatch(/laneLabelBudget\(/);
         expect(callback).toMatch(/autoSkip:\s*false/);
@@ -3427,5 +3428,79 @@ describe('the reader\'s week reaches every place Cost to Drive is drawn', () => 
         expect(read('src/components/PresentedChart.jsx')).toMatch(/<CostTimeView[\s\S]{0,200}settings=\{costToDrive\}/);
         expect(read('src/utils/featuredComparisons.js')).toMatch(/costToDrive:\s+decodeCostToDriveKey\(parsed\.costToDrive\)\.settings/);
         expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/costToDrive=\{seed\.costToDrive\}/);
+    });
+});
+
+describe('Road Trip and Cost & Time share one gas car (#555)', () => {
+    // The car is picked, set and defaulted once. A second picker, a second set
+    // of defaults, or a timer left in Road Trip would each look right alone and
+    // quietly disagree with the other tab.
+    const roadTrip = read('src/components/RoadTripView.jsx');
+
+    it('both tabs draw the one shared component, and it holds the one picker', () => {
+        expect(read('src/components/costToDrive/YourDrivingPage.jsx')).toMatch(/import GasCarFields from '\.\/GasCarFields'/);
+        expect(read('src/components/costToDrive/CostToDriveSidebar.jsx')).toMatch(/import GasCarFields from '\.\/GasCarFields'/);
+        expect(read('src/components/RoadTripGasCar.jsx')).toMatch(/import GasCarFields from '\.\/costToDrive\/GasCarFields'/);
+        expect(read('src/components/RoadTripGasCar.jsx')).toMatch(/<GasCarFields[^>]*timeOnly/);
+        expect(roadTrip).toMatch(/<RoadTripGasCar settings=\{gasCar\} onChange=\{onGasCarChange\}/);
+        expect(read('src/components/costToDrive/GasCarFields.jsx')).toMatch(/<GasCarPicker /);
+        // Road Trip explains how the car stops in an ⓘ beside "Car", not in a caption under the fields.
+        expect(read('src/components/costToDrive/GasCarFields.jsx')).toMatch(/info=\{timeOnly \? <GasCarStopsInfo \/> : null\}/);
+        expect(read('src/components/costToDrive/GasCarFields.jsx')).toMatch(/\{!timeOnly && \(\s*<span className="text-note">/);
+        expect(read('src/components/costToDrive/GasCarStopsInfo.jsx')).toMatch(/<InfoIcon[\s\S]{0,120}title="How the gas car stops"/);
+        expect(read('src/components/costToDrive/GasCarPicker.jsx')).toMatch(/Car\{info\}/);
+        // No second picker: only the shared one lists the cars.
+        const pickers = ALL.filter(x => /GAS_CAR_PRESETS\.map\(p => \(\s*<button/.test(x.text)).map(x => x.file);
+        expect(pickers).toEqual([join('src', 'components', 'costToDrive', 'GasCarPicker.jsx')]);
+        // Cost & Time's own file no longer defines it.
+        expect(read('src/components/costToDrive/DriveSections.jsx')).not.toMatch(/function GasCarFields/);
+    });
+
+    it('both tabs read the one set of settings: Road Trip keeps no defaults or state of its own for the car', () => {
+        const app = read('src/App.jsx');
+        expect(app).toMatch(/gasCar=\{costToDrive\}\s+onGasCarChange=\{updateCostToDrive\}/);
+        expect(read('src/components/PresentedChart.jsx')).toMatch(/<RoadTripView[\s\S]{0,900}gasCar=\{costToDrive\}/);
+        expect(roadTrip).toMatch(/gasCar = DEFAULT_COST_TO_DRIVE/);
+        // The default car is the constants' one; no gas figure is typed into Road Trip or its config.
+        expect(read('src/utils/chartDefaults.js')).not.toMatch(/gas(Tank|Hwy|City|Fill|Car|Name)/);
+        expect(roadTrip).not.toMatch(/gas(Tank|Hwy|City|FillAt|FillMin)\s*[:=]\s*\d/);
+        expect(roadTrip).not.toMatch(/\bgasMpg\b|\btankGal\b/);
+    });
+
+    it('the gas car stops on its tank, for its own fill-up minutes, through the one schedule', () => {
+        // The timer is gone, from the timeline, the sweeps and the table alike.
+        expect(roadTrip).not.toMatch(/ICE_DRIVE_INTERVAL_MIN|\b180\b/);
+        expect(roadTrip).toMatch(/import \{ gasTripLegs, gasCarName \} from '\.\.\/utils\/costToDrive'/);
+        expect(roadTrip.match(/gasTripAt\(/g).length, 'timeline, speed sweep, stop sweep and table gap').toBeGreaterThanOrEqual(4);
+        // Its stop is gasTrip.stopMin (the fill-up's), never the EV overhead.
+        const line = roadTrip.slice(roadTrip.indexOf("// ── The gas car's line"), roadTrip.indexOf('const validSims'));
+        expect(line.length).toBeGreaterThan(0);
+        expect(line).toMatch(/gasTrip\.stopMin/);
+        expect(line).not.toMatch(/overhead/i);
+        // Every gas figure in the trip is gasTripAt's.
+        expect(roadTrip).not.toMatch(/calcIceTotalTimeAtSpeed/);
+    });
+
+    it('the cold loss is applied only while a correction names a temperature', () => {
+        expect(roadTrip).toMatch(/correctionMode !== 'none' \? correction\.target\.temperatureF : null/);
+    });
+
+    it('Road Trip stays time only: no fuel price is read there', () => {
+        expect(roadTrip).not.toMatch(/gasPrice|gasCity|dollars\(|simulateGasWeek/);
+    });
+
+    it('the chart link carries the car for Road Trip and Trip Optimizer, in the shared key', () => {
+        expect(read('src/utils/chartUrlState.js'))
+            .toMatch(/chartMode === 'roadtrip' \|\| chartMode === 'optimizer'\) && costToDrive\) \{\s+const key = encodeGasCarKey\(costToDrive\)/);
+    });
+
+    it('leaves no house word for the gas car in what a reader sees', () => {
+        // The gas car goes by its own name (docs/vocabulary.md); "ICE" is a house
+        // word that read as three different things before #555 merged them.
+        const offenders = ALL
+            .filter(x => /\bICE (Reference|comparison)\b|\bvs\.? ICE\b|[`'"“]ICE [—-]/.test(x.text))
+            .map(x => x.file);
+        expect(offenders).toEqual([]);
+        expect(read('src/utils/chartHelpContent.js')).not.toMatch(/\bICE\b/);
     });
 });

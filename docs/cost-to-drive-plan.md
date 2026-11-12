@@ -180,9 +180,10 @@ or size.
   test record (`buildEpaCurveFromModel`), fetched per car — a later layer.
 - The detour model (minutes → miles at 40 mph) is a guess the owner is unsure
   of; it is one constant, easy to revisit.
-- "Your gas car" here and Road Trip's "ICE Reference" are one thing, to merge
-  into one model and one name (owner, 2026-11-10; #555). Until then both
-  stand; the shared name is in vocabulary's Open names.
+- Merged (owner, 2026-11-12; #555): Road Trip's gas-car line is this tab's gas
+  car, one picker and one set of settings shared by both tabs, named by the
+  car's own name ("Your gas car" while none is picked). Road Trip draws it time
+  only and stops it on its tank (`gasTripLegs`). See vocabulary, Cost to Drive.
 - Road Trip / Trip Optimizer may move under this tab later; not now.
 - The Weekly Charging Plan's vehicle and its "Compare with" are picked on the
   page and are not in the link. The key holds the week; adding them is a new

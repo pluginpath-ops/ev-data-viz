@@ -14,7 +14,7 @@ import {
     HOME_LEVELS, levelKw, WALL_OUTLET_CHARGER_EFF, ASSUMED_ONBOARD_AC_KW, DETOUR_MPH,
     MIN_STOP_ADD, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS, PLANNED_HOUR,
     SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, GAS_COLD_AT_F, GAS_COLD_LOSS, WEEKDAYS, ENOUGH_MARGIN_MIN,
-    GAS_CAR_PRESETS,
+    GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME,
 } from '../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, HWFET_AVG_MPH, STANDARD_CONDITIONS } from '../constants/epa';
 import { correctionFactor } from './conditionCorrection';
@@ -710,6 +710,68 @@ export function simulateGasWeek(settings, { season = settings.season, trace = nu
     };
 }
 
+/**
+ * The gas car on a road trip: where it stops for fuel, and how long the trip
+ * takes it (#555). It stops when its TANK runs down to the fill-up level
+ * (`gasFillAt`, 15% left by default), not on a timer, and each stop is the
+ * fill-up's own minutes (`gasFillMin`, 5), not the EVs' stop overhead — the
+ * same car, rule and defaults as Cost & Time's week (simulateGasWeek), read
+ * from the one set of settings both tabs share.
+ *
+ * Range between stops is the usable fuel × the EPA HIGHWAY mpg. Cost & Time's
+ * highway miles use that figure whatever the speed, so this does too: speed
+ * sets how long a leg takes, not how far it goes. (Real mpg falls above about
+ * 60 mph; neither tab models that, and a car priced differently in the two
+ * would be the larger fault.)
+ *
+ * The cold loss (gasColdLoss, the highway share) applies only when the caller
+ * names a temperature. Cost & Time always has one (the season shown); Road
+ * Trip has one only while its correction is on, the temperature the EVs are
+ * corrected to, so that a trip corrected to 20°F cuts the gas car's range as
+ * it cuts the EVs'. With no correction the EVs run as tested, at whatever
+ * temperature each test was, so there is no one temperature to cut the gas
+ * car by and `temperatureF` is left null: no loss.
+ *
+ * The car starts full, and the trip ends when its miles are done: a stop is
+ * made only where more driving follows, so a trip exactly one range long makes
+ * none.
+ *
+ * @param {Object} settings   the shared settings (gasHwy, gasTank, gasFillAt, gasFillMin)
+ * @param {Object} trip
+ * @param {number} trip.distanceMi
+ * @param {number} trip.speedMph
+ * @param {number|null} [trip.temperatureF]  null: no cold loss
+ *
+ * @returns {{ legs: Array<{ fromMi, driveMi, driveMin, fuelLeft }>, stops: number, stopMi: number[],
+ *             stopMin: number, driveMin: number, totalMin: number, rangeMi: number, hwyMpg: number }}
+ *   `fuelLeft` — the share of the tank left at the end of a leg (the fill-up level on every leg but the last)
+ */
+export function gasTripLegs(settings, { distanceMi, speedMph, temperatureF = null }) {
+    const s = settings;
+    const loss = temperatureF == null ? 0 : gasColdLoss(temperatureF).hwy;
+    const hwyMpg = s.gasHwy * (1 - loss);
+    const rangeMi = s.gasTank * (1 - s.gasFillAt / 100) * hwyMpg;
+    const legs = [];
+    let at = 0;
+    // An unreadable range (never from the sliders) is one leg, not a loop.
+    while (distanceMi - at > 0.01) {
+        const driveMi = Number.isFinite(rangeMi) && rangeMi > 0 ? Math.min(rangeMi, distanceMi - at) : distanceMi - at;
+        legs.push({
+            fromMi: at, driveMi,
+            driveMin: speedMph > 0 ? (driveMi / speedMph) * 60 : 0,
+            fuelLeft: (s.gasTank - driveMi / hwyMpg) / s.gasTank,
+        });
+        at += driveMi;
+    }
+    const stops = Math.max(0, legs.length - 1);
+    const driveMin = legs.reduce((sum, leg) => sum + leg.driveMin, 0);
+    return {
+        legs, stops, stopMi: legs.slice(1).map(leg => leg.fromMi),
+        stopMin: s.gasFillMin, driveMin, totalMin: driveMin + stops * s.gasFillMin,
+        rangeMi, hwyMpg,
+    };
+}
+
 // ── As a reader reads them ───────────────────────────────────────────────────
 
 /** A share as a percent to a tenth: 0.885 → "88.5%". */
@@ -765,12 +827,13 @@ export function weekSummary(settings) {
 }
 
 /**
- * The gas car's name: the picked car's, else the reader's own, else "Custom"
- * (owner, 2026-11-10).
+ * The gas car's name: the picked car's, else the reader's own, else "Your gas
+ * car" (owner, 2026-11-10; the fallback was "Custom" until #555, 2026-11-12).
+ * The one label every chart gives it, in Cost & Time and Road Trip alike.
  */
 export function gasCarName(settings) {
     const picked = GAS_CAR_PRESETS.find(p => p.key === settings.gasCar);
-    return picked ? picked.label : (settings.gasName.trim() || 'Custom');
+    return picked ? picked.label : ((settings.gasName ?? '').trim() || GAS_CAR_FALLBACK_NAME);
 }
 
 /**

@@ -145,6 +145,13 @@ export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export const DAY_TYPES = ['D', 'L', 'O'];
 
 /**
+ * What the gas car is called while none is picked and the reader has not named
+ * their own (owner, 2026-11-12, #555) — on every chart in Cost & Time and Road
+ * Trip. Was "Custom", which is the picker's own key and says nothing on a chart.
+ */
+export const GAS_CAR_FALLBACK_NAME = 'Your gas car';
+
+/**
  * Your gas car's one-click cars: EPA city and highway mpg (2025 models) and the
  * tank, rounded to the gallon the field takes. A starting point, not a
  * comparison of these cars; each says which version it is. Picking one names
@@ -212,6 +219,8 @@ export const COST_TO_DRIVE_FIELDS = [
     { key: 'gasFillAt',      kind: 'num',  min: 5,    max: 50,   step: 5,    def: 15 },
     // 5 min (owner, 2026-11-08): about a minute to get out and start the pump,
     // 2–3 to fill, half a minute to two to pay. Was 8 with a detour in it.
+    // Road Trip's gas car stops this long too, not the EVs' stop overhead
+    // (owner, 2026-11-12, #555); the fill-up level and the tank set where.
     { key: 'gasFillMin',     kind: 'num',  min: 2,    max: 30,   step: 1,    def: 5 },
     { key: 'efficiencyFrom', kind: 'enum', values: ['tested', 'epa'], def: 'tested' },
     // RETIRED 2026-11-10: the hour of a planned fast charge, now fixed at
@@ -219,8 +228,8 @@ export const COST_TO_DRIVE_FIELDS = [
     // it; it stays only because the key's fields are append-only.
     { key: 'plannedHour',    kind: 'num',  min: 0,    max: 23,   step: 1,    def: 17 },
     // The gas car's name (owner, 2026-11-10): a picked car's, or the reader's
-    // own for a custom one — "Custom" while blank. Editing its mpg or tank
-    // makes it custom.
+    // own for a custom one — GAS_CAR_FALLBACK_NAME while blank. Editing its mpg
+    // or tank makes it custom.
     { key: 'gasCar',         kind: 'enum', values: ['custom', ...GAS_CAR_PRESETS.map(p => p.key)], def: 'custom' },
     { key: 'gasName',        kind: 'text', max: 24, def: '' },
 ];

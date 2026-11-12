@@ -189,11 +189,12 @@ export const CHART_HELP_DEFAULTS = {
             'directly (distance ÷ energy) or estimated from the SoC drop × battery size. ' +
             'You set the trip: total distance, travel speed, miles between charging stops ' +
             '(or a target charge time), start/min SoC, and a per-stop overhead. A dashed ' +
-            'gray “ICE Reference” line models a gas car for comparison.',
+            'gray line models a gas car for comparison: the car picked in the sidebar, the same one ' +
+            'Cost & Time uses, labeled with its name (“Your gas car” until you pick or name one).',
         how_to_read:
             'Read it as a race against the clock (and against gas). The default view plots ' +
             'distance covered vs elapsed time; flat steps are charging stops, and each ' +
-            'car’s total trip time — and how it compares to ICE — is labeled at the ' +
+            'car’s total trip time — and how it compares to the gas car — is labeled at the ' +
             'finish. You can also chart cumulative charge time or per-car SoC “lanes”; the ' +
             'Trip Optimizer tab searches travel speed and stop plan for the sweet spot. Because ' +
             'charging follows each car’s actual curve, a faster-charging car can win a long ' +
@@ -203,8 +204,12 @@ export const CHART_HELP_DEFAULTS = {
             'SoC — battery %.\n' +
             'mi/kWh — driving efficiency.\n' +
             'Leg / distance between charges — how far you drive before each stop.\n' +
-            'Overhead — fixed minutes added per stop (park, plug in, break).\n' +
-            'ICE Reference — a gas car driving 3-hour legs with the same per-stop overhead.\n' +
+            'Overhead — the extra minutes off the route for each charging stop (park, plug in, break). ' +
+            'A gas stop has none: its fill-up minutes are already its whole time off the route.\n' +
+            'The gas car — the one picked under Your gas car, set once for here and Cost & Time. ' +
+            'It stops when its tank runs down to the fill-up level, and each stop takes the fill-up’s ' +
+            'minutes, the total time off the route with nothing added. This chart times it; it ' +
+            'prices no fuel.\n' +
             'Charge stop — modeled from the real charging curve between your start and minimum SoC.',
         math_approach:
             'For each car it steps through drive legs and charge stops: a leg drains the ' +
@@ -212,7 +217,9 @@ export const CHART_HELP_DEFAULTS = {
             'measured charging curve for the set time (or until there’s enough range for ' +
             'the next leg). Efficiency is scaled for travel speed (faster = less ' +
             'efficient). Trip time = driving time + charging time + per-stop overhead. The ' +
-            'ICE line drives fixed 3-hour legs with the same overhead. It’s a model — real ' +
+            'gas car line drives its tank down to the fill-up level at its highway mpg (cut for ' +
+            'cold when the trip is corrected to a temperature under 75°F), then stops for its ' +
+            'fill-up minutes (the total time off the route). It’s a model — real ' +
             'charger availability, weather and traffic will vary.',
     },
 
