@@ -2816,6 +2816,238 @@
       "sources": [],
       "status": "accepted",
       "rationale": "How standby power is permitted in the US: NEC Article 702 optional standby systems with transfer equipment are not parallel with the utility, and UL 1741 SB / IEEE 1547 apply only to equipment that operates in parallel. Upgrade with an NEC or utility interconnection-handbook source."
+    },
+    {
+      "id": "ac-level1-vs-level2-sears-2014",
+      "claim": "Logging 115 home and public charges on two Nissan Leafs and two Chevrolet Volts in Vermont in 2013, Level 2 (240 V) charging put 89.4% of the grid energy into the battery and Level 1 (120 V) 83.8%. On charges under 4 kWh the gap widened to 87.2% against 74.2%, and it also widened below 50 °F and above 70 °F.",
+      "value": {
+        "n_charges": 115,
+        "vehicles": "2 Nissan Leaf, 2 Chevrolet Volt",
+        "period": "Jun–Nov 2013",
+        "mean_eff": 0.857,
+        "level2_eff": 0.894,
+        "level1_eff": 0.838,
+        "under_4kwh": {
+          "level2_eff": 0.872,
+          "level1_eff": 0.742
+        },
+        "ratio_l1_to_l2": 0.937
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "J. Sears, D. Roberts, K. Glitman et al., \"A comparison of electric vehicle Level 1 and Level 2 charging efficiency\", 2014 IEEE Conference on Technologies for Sustainability (SusTech), doi:10.1109/SusTech.2014.7046253 (abstract)",
+          "url": "https://ieeexplore.ieee.org/document/7046253",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Abstract: \"On average, Level 2 charging was 5.6% more efficient than Level 1 (89.4% vs. 83.8%). In those charges in which the battery took up less than 4 kWh, this difference in efficiency was even greater: 87.2% for Level 2 vs. 74.2% for Level 1.\" 5.6 is percentage points. Efficiency is battery uptake ÷ grid draw, by logger, per charge. Only the abstract was read; the full paper is paywalled. Two 2013 models, so older onboard chargers than today's. ratio_l1_to_l2 is EVBench's arithmetic: 83.8 ÷ 89.4."
+    },
+    {
+      "id": "ac-socket-vs-wallbox-adac-2026",
+      "claim": "ADAC charged five 2025–26 cars from 10 to 90% with the battery at 20–30 °C: from a 230 V household socket at 2.3 kW they lost 12.7 to 24.2% of the energy drawn (median 14.2%), at 4.1 kW 8.0 to 12.8% (median 9.4%), and on an 11 kW wallbox 5.1 to 7.0% (median 6.9%).",
+      "value": {
+        "unit": "% of energy drawn, lost before the battery",
+        "socket_kw": 2.3,
+        "socket": "230 V, 1 × 10 A",
+        "low_kw": 4.1,
+        "low": "3 × 6 A (solar-surplus setting)",
+        "wallbox_kw": 11,
+        "cars": [
+          {
+            "car": "Mercedes CLA 350 EQ",
+            "socket": 24.2,
+            "low": 12.8,
+            "wallbox_11": 6.9
+          },
+          {
+            "car": "Renault R5 E-Tech",
+            "socket": 13.7,
+            "low": 8.0,
+            "wallbox_11": 5.1
+          },
+          {
+            "car": "Tesla Model Y",
+            "socket": 12.7,
+            "low": 9.4,
+            "wallbox_11": 6.1
+          },
+          {
+            "car": "Volvo EX30",
+            "socket": 14.2,
+            "low": 9.1,
+            "wallbox_11": 7.0,
+            "wallbox_22": 6.7
+          },
+          {
+            "car": "VW ID.7",
+            "socket": 15.3,
+            "low": 10.6,
+            "wallbox_11": 6.9
+          }
+        ],
+        "median": {
+          "socket": 14.2,
+          "low": 9.4,
+          "wallbox_11": 6.9
+        },
+        "mean": {
+          "socket": 16.0,
+          "wallbox_11": 6.4
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "ADAC (W. Rudschies), \"Ladeverluste beim Elektroauto: Wie hoch sind sie wirklich?\", 6 Aug 2026, table \"AC-Ladeverluste an der Steckdose am höchsten\"",
+          "url": "https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste-elektroauto-studie/",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Measured between 10 and 90% SoC to leave out end-of-charge balancing and battery heating or cooling; battery 20–30 °C at the start of each charge. The CLA's onboard charger takes only 8 A from the socket, not 10 A, which ADAC blames for its outlier. A European socket is 230 V at 2.3 kW, not a US 120 V outlet at 1.4 kW, and the 11 kW wallbox is three-phase. Medians and means are EVBench's arithmetic on the table."
+    },
+    {
+      "id": "charging-control-electronics-draw",
+      "claim": "While a car charges, its control units draw 100 to 300 W just to run the charge, so the longer it sits on a slow outlet, the more that adds up. Most of the AC charging loss is this and the onboard charger's conversion; the cable, the high-voltage wiring and the battery lose little, and a socket charge usually needs no battery heating or cooling.",
+      "value": {
+        "control_w": [
+          100,
+          300
+        ]
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "ADAC (W. Rudschies), \"Ladeverluste beim Elektroauto: Wie hoch sind sie wirklich?\", 6 Aug 2026, section \"Wie sind Ladeverluste zu erklären?\"",
+          "url": "https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste-elektroauto-studie/",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "ADAC (German): \"Allein 100 bis 300 Watt werden für den Betrieb von Komponenten für die Steuerung des Ladevorgangs benötigt\" (100 to 300 W go to the components that control the charge alone). It also says the house wiring to a socket may lose up to 4% under DIN VDE 0100, so a long, old run can add to the loss."
+    },
+    {
+      "id": "onboard-charger-loss-dtu-2016",
+      "claim": "A DTU test method for onboard chargers, run on a Renault Zoe, Nissan Leaf and Peugeot iOn across charging currents, found losses between 15% and 40%.",
+      "value": {
+        "loss_pct": [
+          15,
+          40
+        ],
+        "cars": [
+          "Renault Zoe",
+          "Nissan Leaf",
+          "Peugeot iOn"
+        ]
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "A. Kieldsen, A. Thingvad, S. Martinenas, T. M. Sørensen, \"Efficiency Test Method for Electric Vehicle Chargers\", EVS29, 2016 (abstract)",
+          "url": "https://orbit.dtu.dk/en/publications/efficiency-test-method-for-electric-vehicle-chargers",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Abstract: \"The results show a loss between 15 % and 40 %, which is far above the state of the art power converters.\" Only the abstract was read: the PDF sits behind a bot check. Which current gave which loss is in the paper, not the abstract, so this page uses only the range. Older cars (2013–2015 era)."
+    },
+    {
+      "id": "tessie-level1-level2-figures",
+      "claim": "Tessie, an app that logs Tesla charging from the car's own readings, gives about 70% charging efficiency on a 120 V outlet and about 90% on 240 V.",
+      "value": {
+        "level1_eff": 0.7,
+        "level2_eff": 0.9
+      },
+      "sources": [
+        {
+          "rank": "D",
+          "title": "Tessie Help Center, \"About Charging Efficiency\"",
+          "url": "https://help.tessie.com/article/49-charging-efficiency",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Rank D: round figures with no method or sample given. Its efficiency is the car's \"energy added\" ÷ the car's own reading of the charger's voltage and current, so it counts neither the wall wiring nor anything the car's meters miss. The same page puts DC fast charging at ~100%, which is not a loss figure EVBench uses (see dc-fast-round-trip-pairs)."
+    },
+    {
+      "id": "physics-fixed-draw-share",
+      "claim": "A draw that stays about the same in watts however fast the car charges is a larger share of a slow charge than a fast one, and it runs for longer: the same 210 W is 15% of 1.44 kW and under 2% of 11.5 kW.",
+      "value": {
+        "fixed_w": 210,
+        "share_at_1_44_kw": 0.146,
+        "share_at_11_52_kw": 0.018
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Arithmetic: share = fixed watts ÷ charging watts, and energy = watts × hours. The 210 W is the fit in ac-loss-fixed-plus-proportional-fit, inside ADAC's 100–300 W (charging-control-electronics-draw). Widely treated as the reason slow charging loses more, by ADAC and Sears et al. among others."
+    },
+    {
+      "id": "physics-ac-cable-loss-share",
+      "claim": "Resistive loss in a cable is I²R, so as a share of the power it is I·R ÷ V. 50 ft of 14 AWG copper (about 0.25 Ω out and back) carrying 12 A at 120 V loses about 36 W, 2.5%; 50 ft of 6 AWG (about 0.04 Ω) carrying 48 A at 240 V loses about 91 W, 0.8%.",
+      "value": {
+        "r_14awg_ohm_per_kft": 2.525,
+        "r_6awg_ohm_per_kft": 0.395,
+        "l1_w": 36,
+        "l1_share": 0.025,
+        "l2_w": 91,
+        "l2_share": 0.008
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Joule heating and Ohm's law (arithmetic), with copper's resistance per length from the standard AWG tables at room temperature (14 AWG ≈ 2.5 Ω and 6 AWG ≈ 0.4 Ω per 1,000 ft). 14 AWG is the smallest copper the NEC allows on a common 15 A outlet circuit. A worked example, not a measurement: real runs differ in length and gauge, and warm wire resists more. Upgrade with NEC Chapter 9 Table 8."
+    },
+    {
+      "id": "onboard-charger-light-load",
+      "claim": "An onboard charger's conversion is least efficient well below its rated power and on low input voltage, where it draws more current for the same power; a Level 1 charge runs it at a small fraction of its rating on 120 V.",
+      "sources": [],
+      "status": "accepted",
+      "rationale": "General power-electronics knowledge: switching, gate-drive and magnetizing losses are roughly fixed, so efficiency falls at light load, and conduction losses rise with input current, which is about double on 120 V for the same power. Context only; the page's figures rest on the measurements (ac-socket-vs-wallbox-adac-2026, ac-level1-vs-level2-sears-2014). Upgrade with an onboard-charger data sheet that gives an efficiency curve against load and input voltage."
+    },
+    {
+      "id": "ac-loss-fixed-plus-proportional-fit",
+      "claim": "A straight line through ADAC's median losses, a fixed draw plus a share of the power, fits with about 210 W fixed and 5% of the power: it gives 14.2% at 2.3 kW and 6.9% at 11 kW by construction, predicts 10.1% at 4.1 kW against 9.4% measured, and extends to about 20% lost (80% reaching the pack) at 1.44 kW and 7% at 11.5 kW.",
+      "value": {
+        "fixed_kw": 0.212,
+        "proportional": 0.05,
+        "check_4_1_kw": {
+          "predicted": 0.101,
+          "measured": 0.094
+        },
+        "eff_at_1_44_kw": 0.803,
+        "eff_at_11_52_kw": 0.932,
+        "ratio_1_44_to_11_52": 0.862
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench arithmetic on the medians in ac-socket-vs-wallbox-adac-2026: loss fraction = P₀ ÷ P + k, solved through (2.3 kW, 14.2%) and (11 kW, 6.9%)",
+          "url": null,
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Model, not measurement. Two points fixed, one checked. Extending to 1.44 kW assumes a US car on a 120 V outlet behaves like a European car on a 230 V socket, which it may not: lower input voltage likely raises k, and a car whose fixed draw differs moves P₀. ADAC left out 90–100% and battery heating, which EPA's full recharge includes."
+    },
+    {
+      "id": "evbench-wall-outlet-charger-eff",
+      "claim": "EVBench prices a 120 V wall outlet at 80% reaching the pack for a car at the site-wide 240 V figure of 88.5%; a car with its own EPA figure gets that figure × 0.80 ÷ 0.885, about 0.90 of it.",
+      "value": {
+        "wall_outlet": 0.8,
+        "site_240": 0.885,
+        "ratio": 0.904
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench: WALL_OUTLET_CHARGER_EFF in src/constants/costToDrive.js, applied in costToDriveVehicle (src/utils/costToDrive.js)",
+          "url": null,
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "The constant's own comment calls it \"a round figure, not a measurement\". Set by the owner 2026-11-08. This page's evidence brackets it: Sears' ratio gives 83%, ADAC's socket against wallbox 82%, the fit extended to 1.44 kW 76%, Tessie's round figures about 70%. A ratio rather than a fixed gap: the constant's comment says the two differ by under half a point across the real range of 240 V figures."
     }
   ]
 }
