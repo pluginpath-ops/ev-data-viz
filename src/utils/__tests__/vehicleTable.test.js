@@ -491,6 +491,12 @@ describe('EPA efficiency and electricity cost (#335)', () => {
         expect(r.notes['figures.epaEfficiency']).toBe('101 MPGe');
     });
 
+    it('shows the cert\'s charger efficiency as a percent, blank where none was measured', () => {
+        const measured = vehicle({ socWindowKwh: 100, epaRangeMi: 300, epaRange: { chargerEfficiency: 0.9 } });
+        expect(buildVehicleRows([measured])[0].values['figures.chargerEfficiency']).toBeCloseTo(90);
+        expect(buildVehicleRows([unlabeled])[0].values['figures.chargerEfficiency']).toBeNull();
+    });
+
     it('prices 100 miles at each assumed price, on EPA efficiency where there is one', () => {
         const [r] = buildVehicleRows([labeled]);
         expect(r.values['calc.costPer100Home']).toBeCloseTo(0.17 * 100 / 3);

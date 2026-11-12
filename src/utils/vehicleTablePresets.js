@@ -97,7 +97,7 @@ export const VEHICLE_TABLE_PRESETS = [
         label: 'Efficiency',
         description: 'Miles per kWh, and the visible reasons two versions of a car differ.',
         columns: [
-            'name', 'calc.efficiency', 'figures.epaEfficiency', 'tested.efficiency_mi_kwh', 'tested.composite_efficiency_mi_kwh', 'calc.costPer100Home',
+            'name', 'calc.efficiency', 'figures.epaEfficiency', 'figures.chargerEfficiency', 'tested.efficiency_mi_kwh', 'tested.composite_efficiency_mi_kwh', 'calc.costPer100Home',
             'figures.epaCityMi', 'figures.epaHwyMi', 'figures.socWindowKwh',
             'performance.weight_lbs', 'powertrain.drive_type', 'wheels.wheel_size_in', 'wheels.tire_size',
             'dimensions.height_in', 'charging.heat_pump', 'charging.max_ac_kw', 'charging.v2l',
