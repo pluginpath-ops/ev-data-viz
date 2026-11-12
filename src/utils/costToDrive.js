@@ -25,6 +25,33 @@ import { val } from './calcTrace';
 const WEEKS_PER_MONTH = 52 / 12;
 const finite = (v) => v != null && v !== '' && Number.isFinite(Number(v)) && Number(v) > 0;
 
+/** Hours the car is plugged in a night: 10 pm to 7 am is 9; the same hour twice is all 24. */
+export const plugHours = (s) => ((s.plugUntil - s.plugFrom + 24) % 24) || 24;
+
+/**
+ * Each night's plug-in window as a span of the week's hours (Monday 0:00 = 0):
+ * `{ from, to, spareFrom }`. The charger ran from `from` to `spareFrom`; from
+ * there to `to` the battery had what it wanted and the charger had time to
+ * spare. A window that runs past Sunday midnight is cut at the week's end and
+ * its rest starts the week, as the week's line does.
+ *
+ * @param {Object} s  normalized settings
+ * @param {Array<{ hours: number }>} nights  each night's charging hours, Monday's first
+ */
+export function plugWindows(s, nights) {
+    const WEEK = 7 * 24;
+    const len = plugHours(s);
+    return nights.flatMap((n, d) => {
+        const from = d * 24 + s.plugFrom, to = from + len;
+        const spareFrom = Math.min(to, from + n.hours);
+        if (to <= WEEK) return [{ from, to, spareFrom }];
+        return [
+            { from, to: WEEK, spareFrom: Math.min(spareFrom, WEEK) },
+            { from: 0, to: to - WEEK, spareFrom: Math.max(0, spareFrom - WEEK) },
+        ];
+    });
+}
+
 // ── Charging speed ───────────────────────────────────────────────────────────
 
 /**
@@ -331,7 +358,9 @@ export function plannedSlot(spans, hour) {
  *   points: Array<[number, number]>,   [hour of the week, SoC %], Monday 0:00 = 0
  *   stops: Array<{ day, hour, endHour, planned: boolean, fromSoc, toSoc, mile, minutes, chargeMinutes, kwh, cost }>,
  *   days: Array<{ day, type, miles, kwhUsed, startSoc, homeSoc, plannedSkipped: boolean,
- *                 night: { added: number, endSoc: number, fullAt: number|null, ranOut: boolean } }>,
+ *                 night: { added: number, endSoc: number, fullAt: number|null, ranOut: boolean,
+ *                          hours: number, mostAdd: number } }>,
+ *   windows: Array<{ from, to, spareFrom }>,   the plug-in window of each night, in hours of the week (plugWindows)
  *   stopCount, fastMinutes, fastKwh, homeKwh, fastCost, homeCost, usedKwh, fastShare, miles
  * }}  `fastKwh`/`homeKwh` are what was bought (losses in); `fastShare` the share of
  *     the pack energy used that came from fast chargers
@@ -349,7 +378,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     });
     const planned = (d) => (s.planned & (1 << d)) !== 0;
     const nightKwh = (() => {
-        const hours = ((s.plugUntil - s.plugFrom + 24) % 24) || 24;
+        const hours = plugHours(s);
         return { hours, addPct: pct(profile.home.kw * hours * profile.home.eff) };
     })();
     trace?.step('Most a night can add', {
@@ -494,7 +523,8 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             // The night: plugged in from plugFrom to plugUntil, to the limit.
             const homeSoc = soc;
             const limit = s.fullBeforeLong && s.week[(d + 1) % 7] === 'L' ? 100 : s.chargeTo;
-            const night = { added: 0, endSoc: soc, fullAt: null, ranOut: false };
+            // `hours` the charger ran; `mostAdd` what a night's whole window could add at full power, % of the pack (the home ceiling).
+            const night = { added: 0, endSoc: soc, fullAt: null, ranOut: false, hours: 0, mostAdd: nightKwh.addPct };
             const plugIn = Math.max(s.plugFrom, clock);
             if (rec) out.points.push([base + plugIn, soc]);
             // No home charging: nothing is added overnight, so every kWh comes
@@ -504,6 +534,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                 night.added = add;
                 night.ranOut = add < limit - soc - 1e-9;
                 const hours = add / nightKwh.addPct * nightKwh.hours;
+                night.hours = hours;
                 night.fullAt = night.ranOut ? null : (s.plugFrom + hours) % 24;
                 soc += add;
                 if (rec) {
@@ -557,6 +588,8 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
         homeCost: homeKwh * s.homePrice,
         usedKwh: out.usedKwh,
         fastShare: out.usedKwh > 0 ? out.fastPackKwh / out.usedKwh : 0,
+        // No charger, no window to have margin in.
+        windows: profile.home.none ? [] : plugWindows(s, out.days.map(d => d.night)),
     };
 }
 
@@ -847,6 +880,20 @@ export function enoughLevel(fastMinutes) {
 
 /** A week's cost and time as a month: × 52 ÷ 12. */
 export const perMonth = (weekly) => weekly * WEEKS_PER_MONTH;
+
+/**
+ * The most a car's home charging could cost in a month at its level: the lesser
+ * of the charger and the car's onboard charger, at full power for the whole
+ * plug-in window, every night (the day off too), at the home price. Energy
+ * bought at the wall, losses in, so it is directly comparable to the `homeCost`
+ * the week is priced at, which never exceeds it. Null with no home charging.
+ *
+ * @param {Object} profile   costToDriveVehicle's answer (`home.kw`, `home.none`)
+ * @param {Object} settings  normalized settings
+ */
+export const homeCostCeiling = (profile, settings) => (
+    profile.home.none ? null : perMonth(7 * profile.home.kw * plugHours(settings) * settings.homePrice)
+);
 
 /**
  * One vehicle against the gas car, for the season shown and across a year

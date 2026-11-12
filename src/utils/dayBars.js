@@ -20,7 +20,7 @@
 
 /**
  * @param {Object} week  simulateWeek's answer
- * @returns {Array<{ day, type, miles, start, arrive, fast, planned, home, used, next,
+ * @returns {Array<{ day, type, miles, start, arrive, fast, planned, home, mostAdd, used, next,
  *   stopBands: Array<{ from, to, planned, minutes }>, minutes, cost, stops }>}
  */
 export function dayBars(week) {
@@ -39,6 +39,8 @@ export function dayBars(week) {
             fast,
             planned,
             home,
+            // What the night's window could have added at full power: the home ceiling.
+            mostAdd: d.night.mostAdd,
             used: start + fast + planned - d.homeSoc,
             // The week is settled, so Sunday night leads into this Monday.
             next: week.days[(i + 1) % week.days.length].startSoc,

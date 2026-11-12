@@ -28,17 +28,27 @@ const WEEK_HOURS = 7 * 24;
 const NO_SOURCES = {};
 
 /**
- * Marks over the plot: stops (vertical bands, over their minutes) and guides
+ * Marks over the plot: plug-in windows (a quiet vertical shading a night, its
+ * last part, after the charger finished, a shade darker: the spare time —
+ * owner, 2026-11-11), stops (vertical bands, over their minutes) and guides
  * (horizontal dashed lines at left-axis values), the guides drawn after the
  * line so they read across it.
  */
-const weekMarks = ({ stops, guides }) => ({
+const weekMarks = ({ stops, guides, windows }) => ({
     id: 'weekMarks',
     beforeDatasetsDraw(chart) {
         const { ctx, chartArea: a, scales: { x } } = chart;
-        const { callout, ink } = chartTheme();
+        const { callout, ink, tick } = chartTheme();
         const fonts = chartFonts();
         ctx.save();
+        ctx.fillStyle = tick;
+        for (const w of windows) {
+            const x0 = x.getPixelForValue(w.from), x1 = x.getPixelForValue(w.to), xs = x.getPixelForValue(w.spareFrom);
+            ctx.globalAlpha = 0.08;
+            ctx.fillRect(x0, a.top, x1 - x0, a.bottom - a.top);
+            ctx.fillRect(xs, a.top, x1 - xs, a.bottom - a.top);
+        }
+        ctx.globalAlpha = 1;
         for (const s of stops) {
             const x0 = x.getPixelForValue(s.from);
             // A stop is minutes long, a hairline at this scale; a few pixels so it shows.
@@ -81,12 +91,13 @@ const weekMarks = ({ stops, guides }) => ({
  * @param {(v: number) => string} format    a left-axis value as the tooltip says it
  * @param {(v: number) => string} [right]   a left-axis value on the right axis ("46%")
  * @param {Array<{from, to, label?, planned?}>} [stops]  bands, in hours of the week
+ * @param {Array<{from, to, spareFrom}>} [windows]  each night's plug-in window, in hours of the week (plugWindows)
  * @param {number[]} [guides]             left-axis values drawn as dashed lines
  * @param {string} color                    the series color
  * @param {{runs, allRuns, epa}} [sources]  what the line was priced from, for its source line (useSourceLine)
  */
 export default function WeekLineChart({
-    points, max, yLabel, format, right = null, stops = [], guides = [], color,
+    points, max, yLabel, format, right = null, stops = [], windows = [], guides = [], color,
     title, subtitle, sources = NO_SOURCES, signature, presentationMode = false, height = '340px', linkButton = false,
 }) {
     const sourceLine = useSourceLine(sources);
@@ -112,7 +123,7 @@ export default function WeekLineChart({
                     tension: 0,
                 }],
             },
-            plugins: [weekMarks({ stops, guides })],
+            plugins: [weekMarks({ stops, guides, windows })],
             options: {
                 animation: false,
                 responsive: true,
