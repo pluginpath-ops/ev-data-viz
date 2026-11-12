@@ -28,7 +28,7 @@ const WEEK_HOURS = 7 * 24;
 const NO_SOURCES = {};
 
 /**
- * Marks over the plot: plug-in windows (a quiet vertical band a night, its
+ * Marks over the plot: plug-in windows (a quiet vertical shading a night, its
  * last part, after the charger finished, a shade darker: the spare time —
  * owner, 2026-11-11), stops (vertical bands, over their minutes) and guides
  * (horizontal dashed lines at left-axis values), the guides drawn after the

@@ -311,8 +311,8 @@ export const CHART_HELP_DEFAULTS = {
             'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +
             'at home overnight. Each orange band is a fast stop, labeled with its minutes ' +
             '(detour and time to start and pay in); a lighter one is a planned fast charge. ' +
-            'The dashed lines at 10% and 80% mark the everyday range. The gray bands are your plug-in ' +
-            'window each night; where the line has leveled off, the darker end of a band is time to spare. Under the chart, ' +
+            'The dashed lines at 10% and 80% mark the everyday range. The gray shading is your plug-in ' +
+            'window each night; where the line has leveled off, the darker end of the shading is time to spare. Under the chart, ' +
             'the week as a table, a column a day: the fast-charging rows (stops, time, ' +
             'cost) are outlined in orange, and "Ready at" gives the time the night filled ' +
             'the battery, or the end of your plug-in window when it ran out. "Spare plug-in time" is the window left after that, "None" when it ran out. Compare with the other ' +
