@@ -2819,31 +2819,80 @@
     },
     {
       "id": "ac-level1-vs-level2-sears-2014",
-      "claim": "Logging 115 home and public charges on two Nissan Leafs and two Chevrolet Volts in Vermont in 2013, Level 2 (240 V) charging put 89.4% of the grid energy into the battery and Level 1 (120 V) 83.8%. On charges under 4 kWh the gap widened to 87.2% against 74.2%, and it also widened below 50 °F and above 70 °F.",
+      "claim": "Logging 114 charges on two Chevrolet Volts and two Nissan Leafs in Vermont, June to November 2013, Level 2 (240 V) charging put 89.4% of the energy into the battery and Level 1 (120 V) 83.8%. On charges under 4 kWh it was 87.2% against 74.2%. Heat above 70 °F lowered Level 1 to 81.4%; cold below 50 °F did not (83.0%), and Level 2 was unaffected by temperature between 25 and 88 °F.",
       "value": {
-        "n_charges": 115,
-        "vehicles": "2 Nissan Leaf, 2 Chevrolet Volt",
+        "n_charges": 114,
+        "n_level1": 63,
+        "n_level2": 51,
+        "vehicles": "2 Chevrolet Volt, 2 Nissan Leaf",
         "period": "Jun–Nov 2013",
+        "temp_f": [
+          25,
+          88
+        ],
+        "mean_temp_f": 54,
+        "basis": "into the battery",
         "mean_eff": 0.857,
-        "level2_eff": 0.894,
         "level1_eff": 0.838,
+        "level1_sd": 0.08,
+        "level2_eff": 0.894,
+        "level2_sd": 0.05,
         "under_4kwh": {
+          "level1_eff": 0.742,
+          "level1_sd": 0.12,
+          "n_level1": 11,
           "level2_eff": 0.872,
-          "level1_eff": 0.742
+          "level2_sd": 0.06,
+          "n_level2": 13
+        },
+        "below_50f": {
+          "level1_eff": 0.83,
+          "level1_sd": 0.09,
+          "n_level1": 32,
+          "level2_eff": 0.906,
+          "level2_sd": 0.04,
+          "n_level2": 9
+        },
+        "above_70f": {
+          "level1_eff": 0.814,
+          "level1_sd": 0.09,
+          "n_level1": 23,
+          "level2_eff": 0.899,
+          "level2_sd": 0.04,
+          "n_level2": 10
+        },
+        "from_8kwh_read_by_eye": {
+          "level1_eff": 0.86,
+          "level1_range": [
+            0.83,
+            0.88
+          ],
+          "level2_eff": 0.88,
+          "level2_range": [
+            0.86,
+            0.89
+          ]
+        },
+        "prior_volt_research": {
+          "level2_gain_pct": 2.7,
+          "level2_gain_under_2kwh_grid_pct": 12.8
         },
         "ratio_l1_to_l2": 0.937,
-        "basis": "into the battery"
+        "lowest_level1_read_by_eye": {
+          "eff": 0.49,
+          "temp_f": 36
+        }
       },
       "sources": [
         {
           "rank": "B",
-          "title": "J. Sears, D. Roberts, K. Glitman et al., \"A comparison of electric vehicle Level 1 and Level 2 charging efficiency\", 2014 IEEE Conference on Technologies for Sustainability (SusTech), doi:10.1109/SusTech.2014.7046253 (abstract)",
+          "title": "J. Sears, D. Roberts, K. Glitman, \"A comparison of electric vehicle Level 1 and Level 2 charging efficiency\", 2014 IEEE Conference on Technologies for Sustainability (SusTech), pp. 255–258, doi:10.1109/SusTech.2014.7046253: Tables I and II, Figures 1 and 2, and the Results text",
           "url": "https://ieeexplore.ieee.org/document/7046253",
           "accessed": "2026-11-12"
         }
       ],
       "status": "verified",
-      "note": "Abstract: \"On average, Level 2 charging was 5.6% more efficient than Level 1 (89.4% vs. 83.8%). In those charges in which the battery took up less than 4 kWh, this difference in efficiency was even greater: 87.2% for Level 2 vs. 74.2% for Level 1.\" 5.6 is percentage points. Efficiency is battery uptake ÷ grid draw, by logger, per charge: energy into the battery, not back out of it as EPA counts. Only the abstract was read; the full paper is paywalled. Two 2013 models, so older onboard chargers than today's. ratio_l1_to_l2 is EVBench's arithmetic: 83.8 ÷ 89.4."
+      "note": "Read from the full paper (the owner's copy, LocalDev/explainers/Reference Docs/). Efficiency = energy taken up by the battery ÷ energy drawn from the grid, per charge event: energy into the battery, not back out of it as EPA counts. Method differs by car: the Volts' FleetCarma loggers read energy received from the EVSE and taken up by the battery (so EVSE losses are left out); the Leafs combined a WattsLeft battery monitor with a Watts Up meter on the EVSE (grid side). Table I gives n = 114 (the abstract says 115). Temperature, from the Results: \"high ambient temperatures (> 70°F) reduced charging efficiency of Level 1 charges to 81.4%, but there was no similar effect observed for cold temperatures (< 50°F). Ambient temperature did not appear to affect the efficiency of Level 2 charge events\"; too few events below 40 °F to judge. The abstract's \"efficiency gains of Level 2 charging also increased under low and high temperatures\" is about the gap (Table II: 7.6% below 50 °F, 8.5% above 70 °F, 5.6% overall), which below 50 °F rose because Level 2 read higher, not because Level 1 read lower. from_8kwh_read_by_eye is EVBench's reading of Figure 1 (efficiency against kWh per charge), not a figure the paper states: charges from about 8 kWh up cluster near 86% (83–88) on Level 1 and 88% (86–89) on Level 2, so on full-size charges the gap is about 2–3 points; ±2 points. Several Level 2 events read 97–100%, so single small events are noisy. prior_volt_research is the paper's citation of earlier Volt work (its ref. [2], Hilshey): Level 2 2.7% more efficient on average, 12.8% on events drawing under 2 kWh. Both cars' Level 2 power is not given; the Volt's charger is rated 3.3 kW on 240 V (volt-onboard-charger-inl-2012). ratio_l1_to_l2 is EVBench's arithmetic: 83.8 ÷ 89.4. From Figure 2 by eye: the lowest Level 1 events (about 49%, 60% and 66%) sit between about 31 and 36 °F; two near 72 °F read about 65–66%."
     },
     {
       "id": "ac-socket-vs-wallbox-adac-2026",
@@ -2939,28 +2988,55 @@
     },
     {
       "id": "onboard-charger-loss-dtu-2016",
-      "claim": "A DTU test method for onboard chargers, run on a Renault Zoe, Nissan Leaf and Peugeot iOn across charging currents, found losses between 15% and 40%.",
+      "claim": "DTU measured the onboard chargers of a Peugeot iOn, Nissan Leaf and Renault Zoe at 19–22 °C, with the 12 V draw while charging subtracted: 49–77% efficient. The two single-phase cars did worse at 3.7 kW than at 2.3 kW (iOn 77% to 75%, Leaf 74% to 70%); the Zoe managed 49% on single-phase 2.3 kW and 63–65% on three-phase 11, 22 and 43 kW. The iOn's pack showed 0.38 Ω of internal resistance, about 7.2 W of heat on a 10 A, 230 V charge.",
       "value": {
-        "loss_pct": [
-          15,
-          40
+        "method3_eff": {
+          "ion": {
+            "2.3_kw_1ph": 0.77,
+            "3.7_kw_1ph": 0.75
+          },
+          "leaf": {
+            "2.3_kw_1ph": 0.74,
+            "3.7_kw_1ph": 0.7
+          },
+          "zoe": {
+            "2.3_kw_1ph": 0.49,
+            "11_kw_3ph": 0.64,
+            "22_kw_3ph": 0.65,
+            "43_kw_3ph": 0.63
+          }
+        },
+        "method1_eff_ion": {
+          "2.3_kw_1ph": 0.79,
+          "3.7_kw_1ph": 0.77
+        },
+        "ion_pack_resistance_ohm": 0.38,
+        "ion_pack_heat_w_at_10a": 7.2,
+        "ion_pack_heat_share_at_2_3_kw": 0.003,
+        "ion_dcdc_eff": 0.98,
+        "temp_c": [
+          19,
+          22
         ],
-        "cars": [
-          "Renault Zoe",
-          "Nissan Leaf",
-          "Peugeot iOn"
+        "soc_window": [
+          80,
+          100
+        ],
+        "odometer_km": [
+          10000,
+          20000
         ]
       },
       "sources": [
         {
           "rank": "B",
-          "title": "A. Kieldsen, A. Thingvad, S. Martinenas, T. M. Sørensen, \"Efficiency Test Method for Electric Vehicle Chargers\", EVS29, 2016 (abstract)",
+          "title": "A. Kieldsen, A. Thingvad, S. Martinenas, T. M. Sørensen, \"Efficiency Test Method for Electric Vehicle Chargers\", Proceedings of EVS29, 2016 (peer-reviewed version, DTU Orbit): Table 1, sections 1, 3.4 and 4.3, Fig. 12",
           "url": "https://orbit.dtu.dk/en/publications/efficiency-test-method-for-electric-vehicle-chargers",
           "accessed": "2026-11-12"
         }
       ],
       "status": "verified",
-      "note": "Abstract: \"The results show a loss between 15 % and 40 %, which is far above the state of the art power converters.\" Only the abstract was read: the PDF sits behind a bot check. Which current gave which loss is in the paper, not the abstract, so this page uses only the range. Older cars (2013–2015 era)."
+      "note": "Read in full from the owner's copy (LocalDev/explainers/Reference Docs/efficiency_paper.pdf). Method 3 (η3, Table 1): discharge the pack 100→80% through the 12 V system with metered energy, recharge 80→100% from metered AC, and subtract the 12 V draw during the charge: η3 = E_discharge ÷ (E_AC − E_12V,charge). So it leaves out the fixed draw, runs a round trip through the DC/DC converter, and covers 80–100% SoC, where the charge tapers to balance cells. Method 1 (η1, iOn only) measures both sides of the charger directly; η3 read 2% below it, which the paper puts down to battery heat, the DC/DC converter (~98%) and inverter standby. CAN-bus readings (η2) were judged unreliable (Leaf spikes above 100%). Battery, section 3.4.1: the iOn's pack voltage rose 2.5 V for a 6.5 A step, \"an internal resistance of 0.38 Ω, which is quite small and only result in a heat dissipation of P_loss = I²·R_internal = 7.2 W, when charging with 10 A 230 V\". 7.2 W of 2.3 kW is 0.3% (EVBench's arithmetic); the paper squares the 10 A AC current, so the pack-side figure would be smaller. Charger range, sections 1 and 4.4: chargers are tuned to an input range and lose efficiency outside it (Fig. 12, iOn efficiency against AC current); the paper cites a 95% converter losing about 10 points at half power. Three-phase, section 4.3: \"A 3-phased charger can use the system voltage of 400 V and use a buck converter to step it down to the MAIN voltage. When only one phase of the charger is used, the line voltage is 230 V and that causes a larger loss in the rectifier and means that a boost converter is needed\", the paper's explanation of the Zoe's single-phase result. The Zoe's comparison changes power and phase together. Cars had driven 10–20,000 km; tests were run in a temperature-controlled room."
     },
     {
       "id": "tessie-level1-level2-figures",
@@ -3024,7 +3100,7 @@
       "claim": "An onboard charger should be a little less efficient on 120 V than on 240 V: it draws twice the current for the same power, and boosts a lower input voltage up to the pack's.",
       "sources": [],
       "status": "accepted",
-      "rationale": "General power-electronics knowledge: conduction losses rise with input current, and the power-factor stage works harder from a lower input voltage. An argument, not a measurement; the one measurement found (volt-onboard-charger-inl-2012) shows about a point, with power changing too. Upgrade with an onboard-charger data sheet that gives efficiency against input voltage at equal power."
+      "rationale": "General power-electronics knowledge, and the mechanism DTU gives for a single-phase 230 V input against three-phase 400 V (onboard-charger-loss-dtu-2016): a lower line voltage means more loss in the rectifier and a boost stage up to the pack's voltage; 120 V against 240 V is the same direction. Conduction losses also rise with input current, about double on 120 V for the same power. An argument for 120 V, not a measurement; the one measurement found (volt-onboard-charger-inl-2012) shows about a point, with power changing too. Upgrade with an onboard-charger data sheet that gives efficiency against input voltage at equal power."
     },
     {
       "id": "ac-loss-fixed-plus-proportional-fit",
@@ -3109,7 +3185,17 @@
         "obcm_120v_kw": 1.3,
         "overall_l2": 0.908,
         "overall_l1": 0.888,
-        "vehicle": "2012 Chevrolet Volt"
+        "vehicle": "2012 Chevrolet Volt",
+        "full_power_kw": {
+          "level1": [
+            1.2,
+            1.4
+          ],
+          "level2": [
+            3.0,
+            3.3
+          ]
+        }
       },
       "sources": [
         {
@@ -3120,7 +3206,7 @@
         }
       ],
       "status": "verified",
-      "note": "Summary: \"Charging with Level 2 EVSE at 208 VAC input … 91.7% efficient … Charging with Level 1 EVSE at 120 VAC input … 90.6% efficient while operating near 1.3 AC kW.\" Efficiency is the charger's combined DC output (high and low voltage) ÷ its AC input, read from the car's CAN data with the key off. The two points differ in both voltage and power, so the 1.1-point gap is not voltage alone. It leaves out the rest of the car's draw while charging (pumps, controllers fed from the pack), so it is not a wall-to-battery figure. The Volt's charger is rated 3.3 kW on 240 V and 1.2 kW on 120 V (its Table 1)."
+      "note": "Summary: \"Charging with Level 2 EVSE at 208 VAC input … 91.7% efficient … Charging with Level 1 EVSE at 120 VAC input … 90.6% efficient while operating near 1.3 AC kW.\" Efficiency is the charger's combined DC output (high and low voltage) ÷ its AC input, read from the car's CAN data with the key off. The two points differ in both voltage and power, so the 1.1-point gap is not voltage alone. It leaves out the rest of the car's draw while charging (pumps, controllers fed from the pack), so it is not a wall-to-battery figure. The Volt's charger is rated 3.3 kW on 240 V and 1.2 kW on 120 V (its Table 1). Section 3.3: full power is 3.0–3.3 AC kW on Level 2 and 1.2–1.4 AC kW on Level 1, drawn for more than 99% of a typical charge."
     },
     {
       "id": "evse-efficiency-inl",
@@ -3155,7 +3241,24 @@
       "claim": "Three-phase home charging is common in Europe, Australia and New Zealand. Three-phase power flows steadily rather than pulsing twice a cycle as single-phase does, which eases an onboard charger's filtering; chargers that take it are built either as three single-phase stages, one per phase, or around a single three-phase rectifier.",
       "sources": [],
       "status": "accepted",
-      "rationale": "General power-engineering knowledge: balanced three-phase instantaneous power is constant, single-phase power pulses at twice the line frequency, so a single-phase charger needs more energy storage on its DC link. Both charger layouts appear in silicon makers' onboard-charger reference designs. An argument that three-phase is probably a little more efficient, not a measurement; the page says so. Upgrade with a measurement of one car at equal power on one phase and three."
+      "rationale": "General power-engineering knowledge: balanced three-phase instantaneous power is constant, single-phase power pulses at twice the line frequency, so a single-phase charger needs more energy storage on its DC link. Both charger layouts appear in silicon makers' onboard-charger reference designs. An argument that three-phase is probably a little more efficient, not a measurement; the page says so. Upgrade with a measurement of one car at equal power on one phase and three. DTU gives the input-voltage mechanism for one car, the Renault Zoe (onboard-charger-loss-dtu-2016): three-phase 400 V lets the charger step down to the pack, while single-phase 230 V needs a boost stage and loses more in the rectifier."
+    },
+    {
+      "id": "sears-cars-level2-3-3-kw",
+      "claim": "The 2013 Chevrolet Volts and Nissan Leafs in the Vermont study charged at about 3.3 kW on Level 2.",
+      "value": {
+        "level2_kw": 3.3
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "For the Volt: R. B. Carlson, INL/EXT-12-25761, Table 1 (3.3 kW maximum high-voltage output on 240 VAC; 3.0–3.3 AC kW at full power)",
+          "url": "https://inldigitallibrary.inl.gov/sites/sti/sti/5436981.pdf",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "observed",
+      "rationale": "The owner's knowledge of both cars (2026-11-12): the Volt and the Leaf of that era both charge at 3.3 kW on Level 2. The Volt's figure is sourced (INL); the Leaf's is not, and the Sears et al. paper does not give either. Upgrade with a Nissan specification for the 2013 Leaf's charger fitted to the study cars. Used only to place the study's Level 2 results on the loss-against-time figure."
     }
   ]
 }

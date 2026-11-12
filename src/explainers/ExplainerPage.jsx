@@ -5,6 +5,7 @@ import { FACTS } from './topics';
 import SplitPackLab from './labs/SplitPackLab';
 import DriveCycleLab from './labs/DriveCycleLab';
 import TestRoutesLab from './labs/TestRoutesLab';
+import OutletLossFigure from './figures/OutletLossFigure';
 import ExplainerToc from './ExplainerToc';
 import { chargingTestsHref, modeledEfficiencyHref } from './evbenchLinks';
 import ChargingPreview from './ChargingPreview';
@@ -23,6 +24,8 @@ import { useModeledEfficiency } from '../hooks/useModeledEfficiency';
  * quietly, on any page: it is a disclosure, not a gap.
  */
 const LABS = { 'split-pack': SplitPackLab, 'drive-cycles': DriveCycleLab, 'test-routes': TestRoutesLab };
+/** Figures with a component; any other `::: figure` id renders as a labeled placeholder. */
+const FIGURES = { 'outlet-loss': OutletLossFigure };
 
 /**
  * The two ways a fact may publish without a published source, each said
@@ -210,7 +213,7 @@ function Block({ block, ctx }) {
                 return <TestsCard runIds={block.id.split(',').filter(Boolean).map(Number)} caption={block.caption}
                     axes={block.options ?? {}} />;
             }
-            const Lab = block.name === 'lab' ? LABS[block.id] : null;
+            const Lab = block.name === 'lab' ? LABS[block.id] : block.name === 'figure' ? FIGURES[block.id] : null;
             if (Lab) return <Lab />;
             return (
                 <figure className="explainer-placeholder">
