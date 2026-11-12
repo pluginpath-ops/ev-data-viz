@@ -3047,7 +3047,33 @@
         }
       ],
       "status": "verified",
-      "note": "The constant's own comment calls it \"a round figure, not a measurement\". Set by the owner 2026-11-08. This page's evidence brackets it: Sears' ratio gives 83%, ADAC's socket against wallbox 82%, the fit extended to 1.44 kW 76%, Tessie's round figures about 70%. A ratio rather than a fixed gap: the constant's comment says the two differ by under half a point across the real range of 240 V figures."
+      "note": "The constant's own comment calls it \"a round figure, not a measurement\". Proposed while scoping Cost & Time with no source; the per-car scaling chosen by the owner 2026-11-08 (PR #550). Against this page's evidence: Sears' ratio gives 83%, ADAC's socket against wallbox 82%, the fit extended to 1.44 kW 76%, Tessie's round figures about 70%, so the evidence neither confirms 0.80 nor points to a better value; the per-car scaling adds no accuracy on ADAC's five cars (adac-per-car-scaling-check). A ratio rather than a fixed gap: the constant's comment says the two differ by under half a point across the real range of 240 V figures."
+    },
+    {
+      "id": "adac-per-car-scaling-check",
+      "claim": "On ADAC's five cars, a car's 11 kW wallbox efficiency does not predict its 2.3 kW socket efficiency better than one figure for every car: scaling by the median ratio, subtracting the median gap, and using the median socket figure alone all miss by about 2.6 points on average, and each misses the Mercedes CLA by 10 points.",
+      "value": {
+        "ratio": 0.922,
+        "gap": 0.073,
+        "flat": 0.858,
+        "mae_points": {
+          "ratio": 2.62,
+          "gap": 2.64,
+          "flat": 2.62
+        },
+        "cla_miss_points": 10.0,
+        "n": 5
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench arithmetic on the per-car table in ac-socket-vs-wallbox-adac-2026: predicted socket efficiency from each car's wallbox efficiency, against the measured one",
+          "url": null,
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Five cars, with wallbox losses spanning only 5.1–7.0%, so a weak test: it shows the 240 V figure adds no accuracy here, not that it never could. Tests EVBench's per-car scaling of WALL_OUTLET_CHARGER_EFF (evbench-wall-outlet-charger-eff). The ratio and the gap are the medians: (1 − 0.142) ÷ (1 − 0.069) and 14.2 − 6.9 points."
     }
   ]
 }

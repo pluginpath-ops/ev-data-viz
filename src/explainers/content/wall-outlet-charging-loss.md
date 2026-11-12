@@ -18,7 +18,9 @@ The measurements agree on the direction, and less on the size. A 2013 study of f
 put 83.8% of the energy into the battery and Level 2 89.4% [[fact:ac-level1-vs-level2-sears-2014]]. ADAC's 2026 test
 of five current cars on a European 230 V socket lost about twice as much as on a wallbox, a median of 14.2% against
 6.9% [[fact:ac-socket-vs-wallbox-adac-2026]]. EVBench assumes a 120 V outlet gets **80%** to the pack, for a car that
-gets 88.5% on 240 V [[fact:evbench-wall-outlet-charger-eff]]. That sits in the middle of what the evidence shows.
+gets 88.5% on 240 V [[fact:evbench-wall-outlet-charger-eff]]. That was a round figure, picked before anyone looked at
+the data. The data, it turns out, does not settle on a better one: depending on the source, it points anywhere from
+about 76% to 83%.
 
 ## Where does the energy go?
 
@@ -98,26 +100,43 @@ The 240 V figure comes first. EPA measures a car's charging loss on a Level 2 re
 [[fact:epa-mpge-at-the-wall]]; where a car's certification lets us derive it, EVBench uses that, and where it does not,
 the 2025 median of 88.5% [[fact:epa-charger-efficiency-is-ac]].
 
-For a 120 V outlet, Cost & Time › Home Charger scales that figure by 0.80 ÷ 0.885, about 0.90
-[[fact:evbench-wall-outlet-charger-eff]]. A car at the site-wide 88.5% gets 80%; a car EPA measured at 91% gets about
-82%. The idea is that the same charger and battery do the work on either outlet, so a car that does well on one does
-well on the other.
+For a 120 V outlet, Cost & Time › Home Charger makes two assumptions [[fact:evbench-wall-outlet-charger-eff]]:
 
-Does the evidence support it? Roughly. Applied to 88.5%, the Vermont ratio gives 83%, ADAC's socket against its
-wallbox 82%, ADAC's fit extended to a US outlet 76%, and Tessie's round figures about 70%. EVBench's 80% sits inside
-that spread, a little optimistic for a car with a large fixed draw or a cold garage, a little pessimistic against the
-oldest study. It is a round figure, and the page says it is assumed.
+- **A car at 88.5% on 240 V gets 80% on 120 V.** This was a round figure, chosen when Cost & Time was built, with no
+  measurement behind it.
+- **Every car scales the same way.** A car's own 240 V figure is multiplied by 0.80 ÷ 0.885, about 0.90, so a car EPA
+  measured at 91% gets about 82%. The thinking was that the same charger and battery do the work on either outlet.
+
+What does the evidence say about the first? Applied to 88.5%, the Vermont ratio gives 83%, ADAC's socket against its
+wallbox 82%, and ADAC's fit extended to a US outlet's 1.44 kW 76%; Tessie's round figures give about 70%. The two
+direct measurements sit a little above 80%, but neither is a current car on a US 120 V outlet. The one that tries to
+account for the lower power, the fit, sits below it, and it is a model. So 80% is not contradicted, but it is not
+confirmed either. It is the round figure EVBench started with, and the evidence does not point to a better one.
+
+And the second? ADAC's five cars let us test it: if a car's wallbox figure told you its socket figure, scaling would
+beat a single number for every car. It doesn't. Scaling by a ratio, subtracting a fixed gap, and ignoring the car
+altogether all miss by an average of 2.6 points, and all three miss the Mercedes CLA by 10
+[[fact:adac-per-car-scaling-check]]. The cars' wallbox figures span only 5.1 to 7.0%, while their socket figures span
+12.7 to 24.2%: what sets the slow-charge loss is mostly the car's own fixed draw and how its charger copes at low
+power, and the 240 V figure barely shows either. Five cars is a small test, and the scaling does no harm, but it adds
+no accuracy we can show.
+
+What would settle both is the measurement nobody has published: current cars on a US 120 V outlet, metered at the
+wall, alongside the same cars on 240 V, warm and cold.
 
 ## What we could not establish
 
 - A measurement of current cars on a US 120 V outlet, logged at the wall and at the pack. The best US study is from
   2013.
 - Each car's own fixed draw while charging. It is the biggest part of the 120 V loss and almost no maker publishes it.
+- Whether a car's 240 V figure predicts its 120 V figure at all. Five cars say not much.
 - How much a 120 V input, rather than ADAC's 230 V, lowers the onboard charger's own efficiency.
 - How much winter adds on a 120 V outlet. The one study that looked at temperature only says the gap grows.
 
 ::: held
-Owner: the constant holds (0.80; the evidence spans 76–83% for a car at 88.5%, Tessie lower). Worth having: an
+Owner: code left alone (steer 2026-11-12: change it only if the evidence supports a value). The evidence spans
+76–83% for a car at 88.5% (Tessie lower) and does not pick a better value than 0.80; the per-car scaling neither
+helps nor hurts on ADAC's five cars. Worth having: an
 EVBench test on a 120 V outlet with a wall meter and the car's own added-energy figure, warm and cold, which would
 replace the extended ADAC fit. The full Sears et al. paper (IEEE, paywalled) and the DTU paper (behind a bot check)
 were read only as abstracts.
@@ -140,5 +159,7 @@ Cable loss as a share of power is I²R ÷ (V·I) = I·R ÷ V. For 50 ft of 14 AW
 EVBench's home efficiency on 120 V is η_home = η_240 × η_outlet ÷ η_site, with η_outlet = `WALL_OUTLET_CHARGER_EFF`
 (0.80, `src/constants/costToDrive.js`) and η_site = `ASSUMED_CHARGER_EFF` (0.885, `src/constants/epa.js`), in
 `costToDriveVehicle` (`src/utils/costToDrive.js`) [[fact:evbench-wall-outlet-charger-eff]]. A ratio rather than a fixed
-gap: across the real range of η_240 they differ by under half a point.
+gap: across the real range of η_240 they differ by under half a point. On ADAC's five cars, predicting the socket
+efficiency from the wallbox one as η_w × 0.922 (the median ratio), as η_w − 0.073 (the median gap), or as a flat 0.858
+gives mean absolute errors of 2.62, 2.64 and 2.62 points [[fact:adac-per-car-scaling-check]].
 :::
