@@ -13,8 +13,9 @@ import { savedText, extraTimeText, weekSummary, gasCarName } from '../../utils/c
 import { useCostToDrive } from '../../hooks/useCostToDrive';
 import ShareSettingsButton from './ShareSettingsButton';
 import {
-    HomeChargingFields, WeekFields, FastChargingFields, SeasonFields, GasCarFields, EfficiencyFields,
+    HomeChargingFields, WeekFields, FastChargingFields, SeasonFields, EfficiencyFields,
 } from './DriveSections';
+import GasCarFields from './GasCarFields';
 
 /** A card on the page: a heading band and a body that fills the row's height. */
 function DriveCard({ title, aside, children, className = '' }) {

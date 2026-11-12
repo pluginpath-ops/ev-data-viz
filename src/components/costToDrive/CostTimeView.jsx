@@ -201,7 +201,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
 
     const season = settings.season === 'winter' ? `Winter, ${settings.winterF}°F` : `Summer, ${settings.summerF}°F`;
     const subtitle = `${weekSummary(settings)} · ${season} · ${chargingText(settings, HOME_LEVELS[settings.level])}`;
-    const costTitle = 'Cost per month, vs selected ICE comparison';
+    const costTitle = `Cost per month, vs ${gasCarName(settings)}`;
     const timeTitle = 'Time per month: fast charging vs fill-ups';
     const costPng = useChartPng(costChart, { title: costTitle, subtitle, sources: sourceLine.text, signature });
     const timePng = useChartPng(timeChart, { title: timeTitle, subtitle, sources: sourceLine.text, signature });

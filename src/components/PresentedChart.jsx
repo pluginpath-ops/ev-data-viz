@@ -115,6 +115,7 @@ export default function PresentedChart({
                 handSet={chartConfig?.handSet ?? false}
                 verboseLabels={chartConfig?.verboseLabels ?? false}
                 palette={chartConfig?.seriesPalette ?? DEFAULT_SERIES_PALETTE}
+                gasCar={costToDrive}
                 presentationMode
             />
         )}
