@@ -2831,7 +2831,8 @@
           "level2_eff": 0.872,
           "level1_eff": 0.742
         },
-        "ratio_l1_to_l2": 0.937
+        "ratio_l1_to_l2": 0.937,
+        "basis": "into the battery"
       },
       "sources": [
         {
@@ -2842,17 +2843,17 @@
         }
       ],
       "status": "verified",
-      "note": "Abstract: \"On average, Level 2 charging was 5.6% more efficient than Level 1 (89.4% vs. 83.8%). In those charges in which the battery took up less than 4 kWh, this difference in efficiency was even greater: 87.2% for Level 2 vs. 74.2% for Level 1.\" 5.6 is percentage points. Efficiency is battery uptake ÷ grid draw, by logger, per charge. Only the abstract was read; the full paper is paywalled. Two 2013 models, so older onboard chargers than today's. ratio_l1_to_l2 is EVBench's arithmetic: 83.8 ÷ 89.4."
+      "note": "Abstract: \"On average, Level 2 charging was 5.6% more efficient than Level 1 (89.4% vs. 83.8%). In those charges in which the battery took up less than 4 kWh, this difference in efficiency was even greater: 87.2% for Level 2 vs. 74.2% for Level 1.\" 5.6 is percentage points. Efficiency is battery uptake ÷ grid draw, by logger, per charge: energy into the battery, not back out of it as EPA counts. Only the abstract was read; the full paper is paywalled. Two 2013 models, so older onboard chargers than today's. ratio_l1_to_l2 is EVBench's arithmetic: 83.8 ÷ 89.4."
     },
     {
       "id": "ac-socket-vs-wallbox-adac-2026",
-      "claim": "ADAC charged five 2025–26 cars from 10 to 90% with the battery at 20–30 °C: from a 230 V household socket at 2.3 kW they lost 12.7 to 24.2% of the energy drawn (median 14.2%), at 4.1 kW 8.0 to 12.8% (median 9.4%), and on an 11 kW wallbox 5.1 to 7.0% (median 6.9%).",
+      "claim": "ADAC charged five 2025–26 cars from 10 to 90% with the battery at 20–30 °C and counted the electricity that did not land in the battery: from a single-phase 230 V household socket at 2.3 kW they lost 12.7 to 24.2% (median 14.2%), on a three-phase wallbox at 4.1 kW 8.0 to 12.8% (median 9.4%), and at 11 kW, also three-phase, 5.1 to 7.0% (median 6.9%).",
       "value": {
         "unit": "% of energy drawn, lost before the battery",
         "socket_kw": 2.3,
-        "socket": "230 V, 1 × 10 A",
+        "socket": "230 V, single-phase, 1 × 10 A",
         "low_kw": 4.1,
-        "low": "3 × 6 A (solar-surplus setting)",
+        "low": "three-phase, 3 × 6 A (solar-surplus setting)",
         "wallbox_kw": 11,
         "cars": [
           {
@@ -2895,7 +2896,9 @@
         "mean": {
           "socket": 16.0,
           "wallbox_11": 6.4
-        }
+        },
+        "wallbox": "three-phase, 11 kW (22 kW for the EX30)",
+        "basis": "into the battery"
       },
       "sources": [
         {
@@ -2903,10 +2906,16 @@
           "title": "ADAC (W. Rudschies), \"Ladeverluste beim Elektroauto: Wie hoch sind sie wirklich?\", 6 Aug 2026, table \"AC-Ladeverluste an der Steckdose am höchsten\"",
           "url": "https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste-elektroauto-studie/",
           "accessed": "2026-11-12"
+        },
+        {
+          "rank": "B",
+          "title": "ADAC press release, \"Strom, der verpufft\", 6 Aug 2026",
+          "url": "https://presse.adac.de/meldungen/adac-ev/technik/strom-der-verpufft.html",
+          "accessed": "2026-11-12"
         }
       ],
       "status": "verified",
-      "note": "Measured between 10 and 90% SoC to leave out end-of-charge balancing and battery heating or cooling; battery 20–30 °C at the start of each charge. The CLA's onboard charger takes only 8 A from the socket, not 10 A, which ADAC blames for its outlier. A European socket is 230 V at 2.3 kW, not a US 120 V outlet at 1.4 kW, and the 11 kW wallbox is three-phase. Medians and means are EVBench's arithmetic on the table."
+      "note": "Basis: energy into the battery, not out of it. The press release describes the CLA's loss as the share of electricity that \"nicht im Akku landete\" (did not land in the battery); ADAC does not say how it measured the battery side. EPA's charging figure is energy back out of the battery ÷ energy from the wall (epa-charger-efficiency-is-ac), so it also carries the battery's own loss, and ADAC's levels sit above it. Phases: the study lists the socket as 1 × 10 A and the reduced wallbox charge as 3 × 6 A, and says home wallbox charging is normally three-phase; the 11 and 22 kW charges are three-phase. So the socket-to-wallbox gap mixes power with phase count. Measured between 10 and 90% SoC to leave out end-of-charge balancing and battery heating or cooling; battery 20–30 °C at the start of each charge. The CLA's onboard charger takes only 8 A from the socket, not 10 A, which ADAC blames for its outlier. The press release gives the reduced wallbox charge as 4.2 kW, the study page 4.1 kW; this ledger uses the study page. Medians and means are EVBench's arithmetic on the table."
     },
     {
       "id": "charging-control-electronics-draw",
@@ -3040,7 +3049,7 @@
         }
       ],
       "status": "verified",
-      "note": "Model, not measurement. Two points fixed, one checked. Extending to 1.44 kW assumes a US car on a 120 V outlet behaves like a European car on a 230 V socket, which it may not: lower input voltage likely raises k, and a car whose fixed draw differs moves P₀. ADAC left out 90–100% and battery heating, which EPA's full recharge includes."
+      "note": "Model, not measurement. Two points fixed, one checked. Extending to 1.44 kW assumes a US car on a 120 V outlet behaves like a European car on a 230 V socket, which it may not: lower input voltage likely raises k, and a car whose fixed draw differs moves P₀. ADAC left out 90–100% and battery heating, which EPA's full recharge includes. Basis: energy into the battery, as ADAC measured, not out of it as EPA and EVBench count. The 2.3 kW point is single-phase 230 V and the 4.1 and 11 kW points three-phase, so k and P₀ also absorb whatever three-phase gains."
     },
     {
       "id": "evbench-wall-outlet-charger-eff",
@@ -3143,10 +3152,10 @@
     },
     {
       "id": "onboard-charger-three-phase-designs",
-      "claim": "Three-phase home charging is common in Europe, Australia and New Zealand. Onboard chargers that take it are built either as three single-phase stages, one per phase, or around a single three-phase rectifier.",
+      "claim": "Three-phase home charging is common in Europe, Australia and New Zealand. Three-phase power flows steadily rather than pulsing twice a cycle as single-phase does, which eases an onboard charger's filtering; chargers that take it are built either as three single-phase stages, one per phase, or around a single three-phase rectifier.",
       "sources": [],
       "status": "accepted",
-      "rationale": "General industry knowledge (11 and 22 kW AC is sold as three-phase in those markets, and onboard-charger reference designs from silicon makers show both layouts). Context only: no conclusion on this page depends on it, and the page says the efficiency question is open. Upgrade with an onboard-charger maker's description of a specific car's charger."
+      "rationale": "General power-engineering knowledge: balanced three-phase instantaneous power is constant, single-phase power pulses at twice the line frequency, so a single-phase charger needs more energy storage on its DC link. Both charger layouts appear in silicon makers' onboard-charger reference designs. An argument that three-phase is probably a little more efficient, not a measurement; the page says so. Upgrade with a measurement of one car at equal power on one phase and three."
     }
   ]
 }

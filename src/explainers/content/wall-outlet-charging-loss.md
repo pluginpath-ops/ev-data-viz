@@ -16,11 +16,12 @@ bigger share of the power, and it runs for many more hours.
 
 The measurements agree on the direction, and less on the size. A 2013 study of four cars in Vermont found Level 1
 put 83.8% of the energy into the battery and Level 2 89.4% [[fact:ac-level1-vs-level2-sears-2014]]. ADAC's 2026 test
-of five current cars on a European 230 V socket lost about twice as much as on a wallbox, a median of 14.2% against
-6.9% [[fact:ac-socket-vs-wallbox-adac-2026]]. EVBench assumes a 120 V outlet gets **80%** to the pack, for a car that
-gets 88.5% on 240 V [[fact:evbench-wall-outlet-charger-eff]]. That was a round figure, picked before anyone looked at
-the data. The data, it turns out, does not settle on a better one: depending on the source, it points anywhere from
-about 76% to 83%.
+of five current cars lost about twice as much on a single-phase European 230 V socket as on a three-phase wallbox, a
+median of 14.2% against 6.9% [[fact:ac-socket-vs-wallbox-adac-2026]]. Both count what goes *into* the battery, while
+EPA's figure, and EVBench's, count what comes back *out*, so their levels are not EVBench's; the trend with power is
+what carries over. EVBench assumes a 120 V outlet gets **80%** to the pack, for a car that gets 88.5% on 240 V
+[[fact:evbench-wall-outlet-charger-eff]]. That was a round figure, picked before anyone looked at the data. The data,
+it turns out, does not settle on a better one: depending on the source, it points anywhere from about 76% to 83%.
 
 ## Where does the energy go?
 
@@ -46,12 +47,15 @@ The fixed draw is the big one, and it is easy to see why with numbers.
 
 Take a car whose electronics draw 210 W while it charges and whose onboard charger loses another 5% of the power,
 the figures that best fit ADAC's measurements [[fact:ac-loss-fixed-plus-proportional-fit]]. This is a model, not a
-measurement of any one car.
+measurement of any one car, and like ADAC it counts energy into the battery, not what the battery gives back.
 
 - On a **120 V, 12 A** outlet, 1.44 kW comes in. The 210 W is about 15% of that, and with the charger's 5% the car
-  loses about 20%, so 80% reaches the pack [[fact:physics-fixed-draw-share]].
-- On a **240 V, 48 A** charger, 11.5 kW comes in. The same 210 W is under 2%, so the car loses about 7% and 93% reaches
-  the pack.
+  loses about 20%, so 80% goes into the pack [[fact:physics-fixed-draw-share]].
+- On a **240 V, 48 A** charger, 11.5 kW comes in. The same 210 W is under 2%, so the car loses about 7% and 93% goes
+  into the pack.
+
+That 80% is not the same 80% EVBench uses, which counts what comes back out of the battery; it only happens to match.
+The useful part is the gap between the two lines.
 
 Now add 40 kWh to the battery. The outlet takes about 35 hours, and the electronics burn about 7.3 kWh over that time.
 The 240 V charger takes under four hours, and the electronics burn under 1 kWh. Same car, same few hundred watts,
@@ -73,15 +77,33 @@ voltage about one, and the fixed draw the rest.
 
 ## What do the measurements say?
 
-There is less published data on this than you might think, and the studies differ in method, era and country.
+There is less published data on this than you might think, and the studies differ in method, era and country. Two
+differences matter when you read them against EVBench's figures:
+
+- **Where they measure.** Every study here counts the energy that goes into the battery
+  [[fact:ac-level1-vs-level2-sears-2014]] [[fact:ac-socket-vs-wallbox-adac-2026]]. EPA's charging figure, the one
+  EVBench starts from, is the energy the battery gives back while driving, divided by what came from the wall
+  [[fact:epa-charger-efficiency-is-ac]]. The difference is the battery's own loss, heat in the cells going in and coming
+  out, and we have no measurement of its size at these rates. It brings every figure in the table down by some amount
+  on EVBench's basis. Cell heat grows with the square of the current [[fact:physics-cell-heat-scales-with-current-squared]],
+  so a slow charge probably loses a little less inside the battery than a fast one, which narrows the gap slightly.
+- **Phases and voltage.** ADAC's socket is single-phase 230 V; its 4.1 kW, 11 kW and 22 kW charges were all
+  three-phase [[fact:ac-socket-vs-wallbox-adac-2026]]. So ADAC's socket-to-wallbox gap mixes power with phase count,
+  and a US 240 V charger is single-phase. A US outlet is also 120 V, not 230 V, which probably costs the onboard
+  charger a little more [[fact:volt-onboard-charger-inl-2012]]. The first makes ADAC's gap a little too big for the US,
+  the second a little too small, and we cannot say which wins.
+
+So compare the trend, slow against fast, more than the levels.
 
 | Study | Slow charging | Faster charging | Slow ÷ faster |
 |---|---|---|---|
 | Sears et al., 4 cars, Vermont, 2013 | 83.8% (120 V) | 89.4% (240 V) | 0.94 |
 | Same, charges under 4 kWh | 74.2% | 87.2% | 0.85 |
-| ADAC, 5 cars, 2026, median | 85.8% (230 V, 2.3 kW) | 93.1% (11 kW) | 0.92 |
+| ADAC, 5 cars, 2026, median | 85.8% (230 V single-phase, 2.3 kW) | 93.1% (three-phase, 11 kW) | 0.92 |
 | ADAC fit, extended to 1.44 kW (model) | 80% | 93% (11.5 kW) | 0.86 |
 | Tessie, Tesla owners' app (round figures) | ~70% (120 V) | ~90% (240 V) | 0.78 |
+
+All of these count energy into the battery.
 
 Sources: [[fact:ac-level1-vs-level2-sears-2014]], [[fact:ac-socket-vs-wallbox-adac-2026]],
 [[fact:ac-loss-fixed-plus-proportional-fit]], [[fact:tessie-level1-level2-figures]].
@@ -94,7 +116,7 @@ more than doubled [[fact:ac-level1-vs-level2-sears-2014]]. One car can be far wo
 EVs found onboard-charger losses of 15 to 40% [[fact:onboard-charger-loss-dtu-2016]].
 
 None of these is a US car on a US 120 V outlet measured with today's equipment. The Vermont cars are from 2013, the ADAC
-socket gives 2.3 kW rather than 1.4 kW, and the Tessie figures come with no method at all. That is why EVBench does not
+socket gives 2.3 kW at 230 V rather than 1.4 kW at 120 V, and the Tessie figures come with no method at all. That is why EVBench does not
 claim a sharper number than a round one.
 
 ## Cold makes it worse
@@ -108,20 +130,18 @@ driving side.
 
 ## Does three-phase do better?
 
-In Europe, Australia and New Zealand, a home wallbox can use three-phase power, and ADAC's 11 kW wallbox was
-three-phase [[fact:ac-socket-vs-wallbox-adac-2026]]. You might expect it to be more efficient still, and in the wiring
-it is: for the same power over the same wire, three phases lose about a sixth of what a single phase does, because
-each wire carries a third of the current [[fact:physics-three-phase-cable-loss]]. But the wiring on a proper 240 V
-circuit already loses under 1%, so the most three-phase can save there is a fraction of a point.
+In Europe, Australia and New Zealand, a home wallbox can use three-phase power, and every ADAC charge but the socket
+was three-phase [[fact:ac-socket-vs-wallbox-adac-2026]]. It is very likely a little more efficient, for two reasons.
+In the wiring, three phases at the same power over the same wire lose about a sixth of what a single phase does,
+because each wire carries a third of the current [[fact:physics-three-phase-cable-loss]]; but a proper 240 V circuit
+already loses under 1%, so that is a fraction of a point. Inside the car, three-phase power flows steadily instead of
+pulsing twice a cycle, which eases the charger's work, though many chargers simply run three single-phase stages at a
+third of the power each [[fact:onboard-charger-three-phase-designs]]. Both are arguments: we have found no
+measurement of one car at the same power on one phase and on three.
 
-Inside the car, the answer is less clear. Many onboard chargers handle three-phase as three single-phase stages, each
-at a third of the power, which saves nothing by itself; others use a true three-phase rectifier
-[[fact:onboard-charger-three-phase-designs]]. We have found no
-measurement of one car charging at the same power on one phase and on three, so this is still open. What ADAC's
-figures do show is that power matters more than phase count: at 4.1 kW, also three-phase, its cars lost 8.0 to 12.8%,
-more than on any 11 kW wallbox [[fact:ac-socket-vs-wallbox-adac-2026]]. That is the fixed draw again, not the phases.
-It also means ADAC's wallbox figures, three-phase at 11 kW, are not quite like-for-like with a US 240 V single-phase
-charger at 11.5 kW.
+What ADAC's figures do show is that power matters more than phase count. At 4.1 kW, three-phase like the wallbox,
+its cars still lost 8.0 to 12.8%, against 5.1 to 7.0% at 11 kW [[fact:ac-socket-vs-wallbox-adac-2026]]. Same phases,
+less power, more loss: that is the fixed draw again.
 
 ## What does EVBench do with it?
 
@@ -136,8 +156,10 @@ For a 120 V outlet, Cost & Time › Home Charger makes two assumptions [[fact:ev
 - **Every car scales the same way.** A car's own 240 V figure is multiplied by 0.80 ÷ 0.885, about 0.90, so a car EPA
   measured at 91% gets about 82%. The thinking was that the same charger and battery do the work on either outlet.
 
-What does the evidence say about the first? Applied to 88.5%, the Vermont ratio gives 83%, ADAC's socket against its
-wallbox 82%, and ADAC's fit extended to a US outlet's 1.44 kW 76%; Tessie's round figures give about 70%. The two
+What does the evidence say about the first? Because the studies measure into the battery and EVBench out of it, the
+fair use of them is as ratios, slow over fast, applied to 88.5%. That way the Vermont ratio gives 83%, ADAC's socket
+against its wallbox 82%, and ADAC's fit extended to a US outlet's 1.44 kW 76%; Tessie's round figures give about 70%.
+If a slow charge loses a little less inside the battery, each of these is a touch low on EVBench's basis. The two
 direct measurements sit a little above 80%, but neither is a current car on a US 120 V outlet. The one that tries to
 account for the lower power, the fit, sits below it, and it is a model. So 80% is not contradicted, but it is not
 confirmed either. It is the round figure EVBench started with, and the evidence does not point to a better one.
@@ -162,6 +184,8 @@ wall, alongside the same cars on 240 V, warm and cold.
 - How much a 120 V input lowers a current car's onboard charger efficiency. The one measurement is a 2012 Volt, about
   a point, and it changes power and voltage together.
 - Whether three-phase charging beats single-phase at the same power, inside the car.
+- The battery's own loss at home-charging rates, the gap between energy in and energy back out. Every study here
+  measured in; EPA measures out.
 - How much winter adds on a 120 V outlet. The one study that looked at temperature only says the gap grows.
 
 ::: held
@@ -180,9 +204,10 @@ draw (electronics, pumps, contactors) and k the proportional loss (onboard charg
     η(P) = 1 − P₀ / P − k
 
 Through ADAC's medians, (2.3 kW, 14.2%) and (11 kW, 6.9%), P₀ ≈ 0.212 kW and k ≈ 0.050. It predicts 10.1% at 4.1 kW
-against a measured 9.4%, then η(1.44) ≈ 0.803 and η(11.52) ≈ 0.932 [[fact:ac-loss-fixed-plus-proportional-fit]]. Two
-caveats: k is likely higher at 120 V input than at 230 V, and ADAC's 10–90% window leaves out balancing near full,
-which EPA's recharge includes.
+against a measured 9.4%, then η(1.44) ≈ 0.803 and η(11.52) ≈ 0.932 [[fact:ac-loss-fixed-plus-proportional-fit]].
+Caveats: η here is wall to battery input, where EPA's is wall to battery output, so the battery's own loss sits outside
+it; the 2.3 kW point is single-phase and the others three-phase, so k absorbs any three-phase gain; k is likely higher
+at 120 V input than at 230 V; and ADAC's 10–90% window leaves out balancing near full, which EPA's recharge includes.
 
 Cable loss as a share of power is I²R ÷ (V·I) = I·R ÷ V, with R the resistance out and back. House wiring, 50 ft: 14
 AWG (R ≈ 0.25 Ω) at 12 A and 120 V is 2.5%; 6 AWG (R ≈ 0.04 Ω) at 48 A and 240 V is 0.8%. EVSE cord, 20 ft: 8 AWG
