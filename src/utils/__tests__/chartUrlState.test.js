@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import {
     parseChartUrl, buildChartParams, chartConfigFromParsed, chartQueryString, withDefaultsWrittenOut,
-    RANGE_CHART_TYPES, DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION,
+    RANGE_CHART_TYPES, DEFAULT_RANGE_CHART_TYPE, HOME_CHARGER_CHARTS, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIENTATION,
 } from '../chartUrlState';
 import { DEFAULT_READER_MODE, DEFAULT_CORRECTION_TARGET } from '../correctionSettings';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig } from '../chartDefaults';
@@ -100,6 +100,30 @@ describe('Range & Efficiency', () => {
         const keys = [...view.slice(view.indexOf('const CHART_TYPES')).matchAll(/key: '([^']+)'/g)]
             .map(m => m[1]).slice(0, RANGE_CHART_TYPES.length);
         expect(keys).toEqual(RANGE_CHART_TYPES);
+    });
+});
+
+describe('Home Charger', () => {
+    const base = { ...baseConfig(), homeChargerChart: 'cost' };
+    it('writes the time chart and reads it back', () => {
+        const q = build({ chartMode: 'drivecharger', chartConfig: { ...base, homeChargerChart: 'time' } });
+        expect(q).toContain('hc=time');
+        const { chart } = parseChartUrl(q);
+        expect(chartConfigFromParsed(chart, baseConfig()).homeChargerChart).toBe('time');
+    });
+
+    it('leaves the cost chart, the default, out of the address, and reads absent as cost', () => {
+        const q = build({ chartMode: 'drivecharger', chartConfig: base });
+        expect(q).not.toContain('hc=');
+        const stale = { ...baseConfig(), homeChargerChart: 'time' };
+        expect(chartConfigFromParsed(parseChartUrl(q).chart, stale).homeChargerChart).toBe('cost');
+    });
+
+    it('is written on Home Charger links only, and drops a chart it does not know', () => {
+        expect(build({ chartMode: 'drivecharger', chartConfig: { ...base, homeChargerChart: 'time' } })).toContain('hc=time');
+        expect(build({ chartMode: 'drivecost', chartConfig: { ...base, homeChargerChart: 'time' } })).not.toContain('hc=');
+        expect(parseChartUrl('tab=cost&m=drivecharger&hc=pie').chart.homeChargerChart).toBeNull();
+        expect(HOME_CHARGER_CHARTS).toEqual(['cost', 'time']);
     });
 });
 

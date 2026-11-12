@@ -65,6 +65,8 @@ export function defaultChartConfig() {
         // the view, so a link — and the pop-out — draw the chart the sender saw.
         rangeChartType: DEFAULT_RANGE_CHART_TYPE,
         effUnit:        DEFAULT_EFFICIENCY_UNIT,
+        // Home Charger's chart ('cost' or 'time'), held here so a link and the pop-out draw it.
+        homeChargerChart: 'cost',
         scatterXField:  null,   // selected X column key for the spec chart's scatter
         scatterYField:  null,   // selected Y column key for the spec chart's scatter
         // The reader's correction (utils/correctionSettings.js): what every

@@ -81,6 +81,7 @@ export default function PresentedChart({
                 vehicles={vehicles}
                 selectedVehicleIds={selectedVehicles}
                 settings={costToDrive}
+                chart={chartConfig?.homeChargerChart}
                 presentationMode
             />
         )}

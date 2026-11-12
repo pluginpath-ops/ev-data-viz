@@ -341,10 +341,11 @@ export const CHART_HELP_DEFAULTS = {
             'home charger level, everything else as you set it. Priced the same way as ' +
             'the Compare sub-tab.',
         how_to_read:
-            'Each column is what a car costs a month with that charger at home (the week × 52 ÷ 12, as on Compare): home ' +
+            'The Cost chart: each column is what a car costs a month with that charger at home (the week × 52 ÷ 12, as on Compare): home ' +
             'charging underneath in its color, fast charging on top striped in it over a muted ' +
             'shade, the total over it, and the home figure on the home part when there is fast charging too. The faster the charger, the more the night ' +
-            'covers and the smaller the fast part. The table has a column a charger and, ' +
+            'covers and the smaller the fast part. The Time chart switches the same figures to minutes: one column a car, ' +
+            'its fast charging per month at each charger (home charging is overnight, so it is not counted). The table has a column a charger and, ' +
             'for each car, its minutes of fast charging and its home, fast and total cost ' +
             'per month. The bold orange cell is “enough from here”: the smallest charger past ' +
             'which a bigger one saves less than five minutes a week (about 20 a month). A ^ means the car’s own ' +

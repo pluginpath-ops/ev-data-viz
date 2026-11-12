@@ -5,6 +5,13 @@
  * 2026-11-07), and how many minutes of fast charging it takes, where a bigger charger stops helping ("enough
  * from here"), and where the car's own onboard charger caps it.
  *
+ * Two charts of the same figures, a [Cost | Time] switch above the plot: the
+ * cost per month (the default), and the minutes of fast charging per month, a
+ * column a car, which the cost chart replaced on 2026-11-07 and which comes back
+ * beside it. Time is only the fast part: home charging is overnight, not time
+ * the reader spends. The choice is `chartConfig.homeChargerChart`, so a link and
+ * the pop-out draw the chart the sender saw (utils/chartUrlState.js, `hc`).
+ *
  * Every other setting is the reader's; only the level moves. The chart is
  * Chart.js in a PlotFrame (image capture, Link button, source line), the table the
  * shared table parts.
@@ -45,7 +52,7 @@ const kwText = (kw) => `${Math.round(kw * 10) / 10} kW`;
  * part carries its own figure too (`homeOf`, null where there is no fast
  * charging): one label for a column that is all home, two where it is split.
  */
-const totalLabels = (isTop, totalOf, homeOf) => ({
+const totalLabels = (isTop, totalOf, homeOf, format = dollars) => ({
     id: 'totalLabels',
     afterDatasetsDraw(chart) {
         const { ctx, chartArea: a } = chart;
@@ -62,7 +69,7 @@ const totalLabels = (isTop, totalOf, homeOf) => ({
             meta.data.forEach((bar, li) => {
                 const total = totalOf(li, ds);
                 if (total == null || !Number.isFinite(bar.x)) return;
-                const text = dollars(total);
+                const text = format(total);
                 const y = Math.max(a.top + fonts.badge, Math.min(bar.y, a.bottom) - 3);
                 // Too wide for its bar (many vehicles at once): stand it on end.
                 if (ctx.measureText(text).width > bar.width + 2) {
@@ -86,7 +93,7 @@ const totalLabels = (isTop, totalOf, homeOf) => ({
             meta.data.forEach((bar, li) => {
                 const home = homeOf(li, ds);
                 if (home == null || !Number.isFinite(bar.x)) return;
-                const text = dollars(home);
+                const text = format(home);
                 if (ctx.measureText(text).width > bar.width + 2) return;
                 const room = Math.abs(bar.base - bar.y);
                 // Inside the home part under its top; above it when too short.
@@ -130,7 +137,13 @@ const homeCostText = (w) => (!w ? DASH : dollars(w.homeCost));
 const fastCostText = (w) => (!w ? DASH : dollars(w.fastCost));
 const totalText = (w) => (!w ? DASH : dollars(w.fastCost + w.homeCost));
 
-export default function HomeChargerView({ vehicles, selectedVehicleIds, settings, onChange, presentationMode = false }) {
+/** Minutes over a time column; "0 min" below half a minute, as the table says. */
+const minutesLabel = (m) => (m < 0.5 ? '0 min' : minutesText(m));
+
+const HOME_CHARGER_VIEWS = [['cost', 'Cost'], ['time', 'Time']];
+
+export default function HomeChargerView({ vehicles, selectedVehicleIds, settings, onChange, chart: view = 'cost', onChartChange, presentationMode = false }) {
+    const timeView = view === 'time';
     const byLevel = useCostToDriveByLevel(vehicles, selectedVehicleIds, settings);
     // The vehicles as priced at the reader's own level: the columns, and what the
     // source line credits.
@@ -151,40 +164,53 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
 
     const canvasRef = useRef(null), chartRef = useRef(null);
     const { isDark } = useTheme();
-    const signature = `${columns.map(c => c.vehicle.id).join(',')}|${JSON.stringify(settings)}`;
+    const signature = `${columns.map(c => c.vehicle.id).join(',')}|${JSON.stringify(settings)}|${view}`;
     const redraw = `${signature}|${columns.map(c => c.color).join(',')}|${isDark}`;
 
     useEffect(() => {
         if (!canvasRef.current || !columns.length) return undefined;
         applyChartDefaults(Chart);
         const { tick, grid, legend } = chartTheme();
+        const cost = !timeView;
+        const monthAt = (li, c) => monthOf(at(shown[li].index, c.vehicle.id)?.comparison?.week);
         chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
             type: 'bar',
             data: {
                 labels: shown.map(l => levelLabel(l.level)),
-                // Two bars a car, stacked on the car's own stack: home cost
-                // underneath in the full color, fast cost on top striped in it
-                // over its desaturated shade — the Compare cost chart's style.
-                datasets: columns.flatMap((c, ci) => ['home', 'fast'].map(part => ({
-                    label: vehicleLabel(c.vehicle),
-                    part,
-                    vehicleIndex: ci,
-                    stack: String(c.vehicle.id),
-                    data: shown.map(l => {
-                        const w = monthOf(at(l.index, c.vehicle.id)?.comparison?.week);
-                        return w ? (part === 'home' ? w.homeCost : w.fastCost) : null;
-                    }),
-                    backgroundColor: part === 'home' ? c.color : fastChargingFill(c.color),
-                }))),
+                // Cost: two bars a car, stacked on the car's own stack — home cost
+                // underneath in the full color, fast cost on top striped in it over
+                // its desaturated shade, the Compare cost chart's style. Time: one
+                // bar a car, the fast charging alone.
+                datasets: cost
+                    ? columns.flatMap((c, ci) => ['home', 'fast'].map(part => ({
+                        label: vehicleLabel(c.vehicle),
+                        part,
+                        vehicleIndex: ci,
+                        stack: String(c.vehicle.id),
+                        data: shown.map(l => {
+                            const w = monthOf(at(l.index, c.vehicle.id)?.comparison?.week);
+                            return w ? (part === 'home' ? w.homeCost : w.fastCost) : null;
+                        }),
+                        backgroundColor: part === 'home' ? c.color : fastChargingFill(c.color),
+                    })))
+                    : columns.map((c, ci) => ({
+                        label: vehicleLabel(c.vehicle),
+                        part: 'fast',
+                        vehicleIndex: ci,
+                        data: shown.map((l, li) => monthAt(li, c)?.fastMinutes ?? null),
+                        backgroundColor: c.color,
+                    })),
             },
-            plugins: [totalLabels(ds => ds.part === 'fast', (li, ds) => {
-                const w = monthOf(at(shown[li].index, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
-                return w ? w.fastCost + w.homeCost : null;
-            }, (li, ds) => {
-                const w = monthOf(at(shown[li].index, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
-                // No "$0" under a bar with no home charging.
-                return w && w.fastCost >= 0.5 && w.homeCost >= 0.5 ? w.homeCost : null;
-            })],
+            plugins: [cost
+                ? totalLabels(ds => ds.part === 'fast', (li, ds) => {
+                    const w = monthAt(li, columns[ds.vehicleIndex]);
+                    return w ? w.fastCost + w.homeCost : null;
+                }, (li, ds) => {
+                    const w = monthAt(li, columns[ds.vehicleIndex]);
+                    // No "$0" under a bar with no home charging.
+                    return w && w.fastCost >= 0.5 && w.homeCost >= 0.5 ? w.homeCost : null;
+                })
+                : totalLabels(() => true, (li, ds) => monthAt(li, columns[ds.vehicleIndex])?.fastMinutes ?? null, () => null, minutesLabel)],
             options: {
                 // Room over the tallest column for its label.
                 layout: { padding: { top: 18 } },
@@ -195,7 +221,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                     legend: {
                         position: 'bottom',
                         // A car once, by its home bar's full color.
-                        labels: { color: legend, boxWidth: 12, filter: (item, data) => data.datasets[item.datasetIndex].part === 'home' },
+                        labels: { color: legend, boxWidth: 12, filter: (item, data) => data.datasets[item.datasetIndex].part === (cost ? 'home' : 'fast') },
                         // Hiding a car hides both its bars.
                         onClick: (e, item, leg) => {
                             const ch = leg.chart;
@@ -209,8 +235,9 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                         callbacks: {
                             label: (ctx) => {
                                 const ds = ctx.dataset;
-                                const w = monthOf(at(shown[ctx.dataIndex].index, columns[ds.vehicleIndex].vehicle.id)?.comparison?.week);
+                                const w = monthAt(ctx.dataIndex, columns[ds.vehicleIndex]);
                                 if (!w) return null;
+                                if (!cost) return `${ds.label}: ${minutesLabel(w.fastMinutes)} of fast charging (about ${Math.round(w.stopCount)} stops) per month`;
                                 return ds.part === 'home'
                                     ? `${ds.label}: ${dollars(w.homeCost)} home`
                                     : `${ds.label}: ${dollars(w.fastCost)} fast (${minutesText(w.fastMinutes)}, about ${Math.round(w.stopCount)} stops), ${dollars(w.fastCost + w.homeCost)} total per month`;
@@ -219,8 +246,10 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                     },
                 },
                 scales: {
-                    x: { stacked: true, grid: { display: false }, ticks: { color: tick } },
-                    y: { stacked: true, beginAtZero: true, title: { display: true, text: '$ per month, home + fast', color: legend }, ticks: { color: tick, callback: (v) => dollars(v) }, grid: { color: grid } },
+                    x: { stacked: cost, grid: { display: false }, ticks: { color: tick } },
+                    y: cost
+                        ? { stacked: true, beginAtZero: true, title: { display: true, text: '$ per month, home + fast', color: legend }, ticks: { color: tick, callback: (v) => dollars(v) }, grid: { color: grid } }
+                        : { beginAtZero: true, title: { display: true, text: 'Fast charging per month', color: legend }, ticks: { color: tick, callback: (v) => minutesText(v) }, grid: { color: grid } },
                 },
             },
         });
@@ -236,7 +265,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
     const sourceLine = useSourceLine({ runs: sourceRuns, allRuns, epa: { label: usesEpa } });
 
     const season = settings.season === 'winter' ? `Winter, ${settings.winterF}°F` : `Summer, ${settings.summerF}°F`;
-    const title = 'Charging cost per month, by home charger';
+    const title = timeView ? 'Fast charging per month, by home charger' : 'Charging cost per month, by home charger';
     const subtitle = `${weekSummary(settings)} · ${season} · plugged in ${hourText(settings.plugFrom)} to ${hourText(settings.plugUntil)} · ${chargingText(settings)}`;
     const png = useChartPng(chartRef, { title, subtitle, sources: sourceLine.text, signature });
 
@@ -261,6 +290,16 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                 )}
                 {columns.length > 0 && (
                     <>
+                        {!presentationMode && onChartChange && (
+                            <div className="plan-controls">
+                                <span className="text-label">Chart</span>
+                                <div className="segmented" role="group" aria-label="Chart">
+                                    {HOME_CHARGER_VIEWS.map(([k, label]) => (
+                                        <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'active' : undefined} onClick={() => onChartChange(k)}>{label}</button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         <PlotFrame
                             title={title}
                             subtitle={subtitle}
