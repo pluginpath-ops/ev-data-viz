@@ -36,8 +36,9 @@
  * coefficients would be more precise, but only about half the fleet has them,
  * and a chart where half the series are corrected precisely and half not at all
  * is not a common basis — it is two treatments in one comparison, which is worse
- * than correcting none. `correctionModel` leaves room for the EPA path to be
- * offered later as a marked refinement.
+ * than correcting none. The `roadLoad` option takes a vehicle's EPA curve
+ * instead; only the correction check (#475, scripts/correctionCheck.js) passes
+ * it, to find out whether that refinement would earn its place.
  *
  * ── Heating and cooling (#449) ───────────────────────────────────────────────
  *
@@ -148,8 +149,15 @@ function consumptionWhPerMile(run) {
  * Aero-share road-load term at a given speed and air density. `airSpeedSq`,
  * when given, is the mean square of the speed through the AIR — the ground
  * speed with the wind added — and replaces the ground speed's square.
+ *
+ * With `roadLoad` ({ a, b, c }, an EPA road-load curve in lbf and mph) the
+ * vehicle's own curve replaces the generic split: A + B·v + C·v²·ρ, over the
+ * same curve at the reference speed in standard air. Only the C term feels
+ * the air. Nothing on the site passes it; the correction check (#475) does,
+ * to see whether a per-vehicle curve would beat the one fleet-wide fraction.
  */
-function loadTerm(speedMph, densityRatio, aeroFraction, airSpeedSq = null, trace = null, label = 'Road load') {
+function loadTerm(speedMph, densityRatio, aeroFraction, airSpeedSq = null, trace = null, label = 'Road load', roadLoad = null) {
+    if (roadLoad) return roadLoadTerm(speedMph, densityRatio, roadLoad, airSpeedSq, trace, label);
     const vSq = (airSpeedSq ?? (speedMph ?? REFERENCE_SPEED_MPH) ** 2) / REFERENCE_SPEED_MPH ** 2;
     const load = aeroFraction * vSq * densityRatio + (1 - aeroFraction);
     trace?.step(label, {
@@ -161,6 +169,20 @@ function loadTerm(speedMph, densityRatio, aeroFraction, airSpeedSq = null, trace
             ρ: densityRatio,
         },
         result: load, note: 'relative to the load at the reference speed in standard air',
+    });
+    return load;
+}
+
+/** loadTerm on a vehicle's own EPA road-load curve. */
+function roadLoadTerm(speedMph, densityRatio, { a, b, c }, airSpeedSq, trace, label) {
+    const v = speedMph ?? REFERENCE_SPEED_MPH;
+    const vAirSq = airSpeedSq ?? v ** 2;
+    const atRef = a + b * REFERENCE_SPEED_MPH + c * REFERENCE_SPEED_MPH ** 2;
+    const load = (a + b * v + c * vAirSq * densityRatio) / atRef;
+    trace?.step(label, {
+        formula: 'L = (A + B·v + C·v_air²·ρ) / (A + B·v_ref + C·v_ref²)',
+        values: { A: val(a, 'lbf', 'data'), B: val(b, 'lbf/mph', 'data'), C: val(c, 'lbf/mph²', 'data'), v: val(v, 'mph'), ρ: densityRatio },
+        result: load, note: 'the vehicle\'s own EPA road-load curve, in place of the aero fraction',
     });
     return load;
 }
@@ -214,6 +236,10 @@ function airSpeedSquared(speedMph, windMph, windDirDeg = null) {
  *                                     and optionally `accessoryW` (null = the temperature's own, "auto")
  * @param {number} [opts.aeroFraction] override, e.g. towing
  * @param {Object} [opts.assumed]      what a blank axis is taken as (ASSUMED_TEST_CONDITIONS)
+ * @param {Object} [opts.roadLoad]     { a, b, c }: a vehicle's EPA road-load curve, in place of
+ *                                     the aero fraction. Only the correction check passes it (#475)
+ * @param {Object} [opts.accessory]    { baseW, comfortBand, heatWPerF, coolWPerF }: the accessory
+ *                                     load's constants, when not the knobs' (the check's fit)
  * @returns {{ factor: number, applied: string[], missing: string[], skipped: Array,
  *             assumed: Array<{ axis: string, value: number }>,
  *             assumedConsumptionWhMi: number|null }}
@@ -227,6 +253,8 @@ export function correctionFactor(conditions, {
     target = STANDARD_CONDITIONS,
     aeroFraction = AERO_FRACTION,
     assumed: assumedConditions = ASSUMED_TEST_CONDITIONS,
+    roadLoad = null,
+    accessory: accessoryConstants = null,
     trace = null,
 } = {}) {
     const axes = modeAxes(mode);
@@ -322,8 +350,8 @@ export function correctionFactor(conditions, {
     targetAir?.step('Air density ratio at the target', { formula: 'ρ_target = ρ_alt × ρ_T', values: { ρ_alt: airDensityRatio(target.altitudeFt), ρ_T: temperatureDensityRatio(target.temperatureF) }, result: targetDensity });
 
     const airSq    = useWind ? airSpeedSquared(runSpeed, Number(conditions.windMph), conditions.windDirDeg) : null;
-    const atRun    = loadTerm(runSpeed,        runDensity,    aeroFraction, airSq, trace, 'Road load at the test');
-    const atTarget = loadTerm(target.speedMph, targetDensity, aeroFraction, null,  trace, 'Road load at the target');
+    const atRun    = loadTerm(runSpeed,        runDensity,    aeroFraction, airSq, trace, 'Road load at the test', roadLoad);
+    const atTarget = loadTerm(target.speedMph, targetDensity, aeroFraction, null,  trace, 'Road load at the target', roadLoad);
     if (!atRun || atRun <= 0) return { factor: 1, applied: [], missing, skipped, assumed: [], assumedConsumptionWhMi: null };
 
     // Consumption ratio inverted: a harder test (higher load) means the car
@@ -340,9 +368,9 @@ export function correctionFactor(conditions, {
         const acc = trace?.group('Swap the accessory load (heating, cooling, base draw)');
         const accessory = accessoryFactor({
             consumptionWhMi: conditions?.whPerMile,
-            runW:            assumedAccessoryW(runTemp, { trace: acc?.group('At the test') }),
+            runW:            assumedAccessoryW(runTemp, { ...accessoryConstants, trace: acc?.group('At the test') }),
             runSpeedMph:     heldSpeed > 0 ? heldSpeed : runSpeed,
-            targetW:         effectiveAccessoryW(target, { trace: acc?.group('At the target') }),
+            targetW:         effectiveAccessoryW(target, { ...accessoryConstants, trace: acc?.group('At the target') }),
             targetSpeedMph:  target.speedMph,
             tractionScale:   atTarget / atRun,
             trace:           acc,

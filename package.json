@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "css": "node scripts/css.js",
-    "health": "node scripts/health.js"
+    "health": "node scripts/health.js",
+    "correction-check": "node scripts/correctionCheck.js"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.3.0",

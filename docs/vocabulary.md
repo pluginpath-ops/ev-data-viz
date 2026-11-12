@@ -220,6 +220,10 @@ nothing else. **Green** is data and status, never chrome.
 | Modeled Efficiency's two controls outside the correction | **Wind & elevation change**. Not in the link (they ride the pop-out sync). Retired in UI text: "viewing conditions" | [WindAndElevationFields.jsx](../src/components/epa/WindAndElevationFields.jsx) |
 | Composite range over the EPA label's highway range | **% of EPA hwy** — a reference point, not a pass mark: EPA's highway cycle averages about 48 mph | `calc.pctOfEpaHwy` in [vehicleTable.js](../src/utils/vehicleTable.js) |
 | Reported range test scaled to a new pack | **when-new range** — shown only where capacity retention is. Not "original", "nominal" or "degraded range" | `whenNewRange()` in testedRange.js |
+| The offline check of the correction against a vehicle's own tests | **the correction check** — `npm run correction-check`, a report for the owner, not a page. Its three predictions: **Uncorrected**, **Generic (aero fraction)**, and **EPA curve (candidate)**, which the site never uses. Not "validation" or "calibration" | [correctionCheck.js](../src/utils/correctionCheck.js), [scripts/correctionCheck.js](../scripts/correctionCheck.js) |
+| Two range tests of one vehicle, one corrected to the other's conditions | **a test pair**; the test nearer the standard conditions is **the reference**, the other is corrected to it. Not "a pairing", which ties a range test to a charging test | `vehiclePairs` |
+| How far a prediction lands from the reference test | **a miss**, in % and mi/kWh: it **reads high** (more efficient than measured) or **reads low** | `misses` |
+| A vehicle's EPA A, B and C taken as force against speed | **road-load curve** (`roadLoad`) — the EPA curve the check tries in place of the aero fraction | `correctionFactor` in conditionCorrection.js |
 | Share of new-pack capacity the test delivered | **capacity retention** — shown only below 95%. Not "fade", "battery health" or "SoH" | `CAPACITY_RETENTION_SHOWN_BELOW` |
 
 ### Vehicle figures and specs

@@ -132,6 +132,28 @@ RLS) is the real path. The
   need a standing production credential and would sync the personal data the
   backup script deliberately excludes.
 
+## `correctionCheck.js` — the correction against a vehicle's own tests (#475)
+
+A report, not a page: how well the condition correction predicts a vehicle's
+own range tests. Every pair of a vehicle's usable tests is corrected, one to
+the other's conditions, three ways (uncorrected, the site's aero fraction, and
+the vehicle's EPA road-load curve as a candidate), and the miss is reported
+with how many vehicles and tests stand behind every figure.
+
+```bash
+npm run correction-check                         # production (public key, listed tests), published constants
+npm run correction-check -- --mirror             # the local mirror as admin: unlisted tests too
+npm run correction-check -- --defaults           # the repo's defaults instead of the published constants
+npm run correction-check -- --set AERO_FRACTION=0.62 --set ACCESSORY_COOL_W_PER_F=50
+npm run correction-check -- --fit                # plus a fit of the constants, scored on held-out vehicles
+```
+
+The report lands in `LocalDev/correction-check/` of the main checkout. It
+bundles the site's own modules with esbuild and calls `correctionFactor`
+itself, so it cannot disagree with the charts. Constants resolve when those
+modules load, so `--set` is a fresh run, not a slider. The fit suggests;
+nothing it finds is written anywhere.
+
 ## `fetchEpaCsi.py` — pull EPA Certificate Summary Information PDFs
 
 ```
