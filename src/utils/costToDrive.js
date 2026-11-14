@@ -29,26 +29,61 @@ const finite = (v) => v != null && v !== '' && Number.isFinite(Number(v)) && Num
 export const plugHours = (s) => ((s.plugUntil - s.plugFrom + 24) % 24) || 24;
 
 /**
- * Each night's plug-in window as a span of the week's hours (Monday 0:00 = 0):
- * `{ from, to, spareFrom }`. The charger ran from `from` to `spareFrom`; from
- * there to `to` the battery had what it wanted and the charger had time to
- * spare. A window that runs past Sunday midnight is cut at the week's end and
- * its rest starts the week, as the week's line does.
+ * The plug-in window a night charges in, for a car that is home from `arrive`
+ * (hours into the day; a day off has no arrival, so it is the hour the last
+ * charge ended). The window opens `plugFrom` every day, so the car uses the
+ * first one that is still open when it gets home, or the next to open, and
+ * never one an earlier night already used:
+ *
+ *   - arrives inside the window: it charges from `arrive`, to `plugUntil`;
+ *   - arrives before it opens: it waits, and charges from `plugFrom`;
+ *   - arrives after it closed (plugFrom 1 until 7, home at 6 pm): it waits for
+ *     tomorrow's, so `from` is past 24 — 1 am the morning after.
+ *
+ * The model does not know where the car is parked by day, so a window that
+ * opens inside the next day's driving hours holds that drive up until the
+ * charge is done, as any charge running into the morning does.
  *
  * @param {Object} s  normalized settings
- * @param {Array<{ hours: number }>} nights  each night's charging hours, Monday's first
+ * @param {number} arrive  hours into the day the car is home from
+ * @param {number} [minK=0]  the earliest window to use: 0 is the one that opens
+ *   today, 1 tomorrow's. The day after a night used tomorrow's, today's is
+ *   that same window, already spent.
+ * @returns {{ k: number, from: number, hours: number }}  `k` the window used (0 today's,
+ *   1 tomorrow's), `from` the hour of the day the charger can start (past 24 for
+ *   tomorrow's), `hours` the time it has, to the window's end
  */
-export function plugWindows(s, nights) {
-    const WEEK = 7 * 24;
+export function nightWindow(s, arrive, minK = 0) {
     const len = plugHours(s);
+    // The first window that closes after the car is home.
+    const k = Math.max(minK, Math.floor((arrive - s.plugFrom - len) / 24) + 1);
+    const opens = s.plugFrom + 24 * k;
+    const from = Math.max(opens, arrive);
+    return { k, from, hours: opens + len - from };
+}
+
+/**
+ * Each night's plug-in window as a span of the week's hours (Monday 0:00 = 0):
+ * `{ from, to, spareFrom }`. The window is the part the car could charge in
+ * (`nightWindow`): the charger ran from `from` to `spareFrom`; from there to
+ * `to` the battery had what it wanted and the charger had time to spare. A
+ * window that runs past Sunday midnight is cut at the week's end and its rest
+ * starts the week, as the week's line does.
+ *
+ * @param {Array<{ from: number, window: number, hours: number }>} nights  each night's
+ *   window start (hour of its day), length and charging hours, Monday's first
+ */
+export function plugWindows(nights) {
+    const WEEK = 7 * 24;
     return nights.flatMap((n, d) => {
-        const from = d * 24 + s.plugFrom, to = from + len;
-        const spareFrom = Math.min(to, from + n.hours);
-        if (to <= WEEK) return [{ from, to, spareFrom }];
-        return [
-            { from, to: WEEK, spareFrom: Math.min(spareFrom, WEEK) },
-            { from: 0, to: to - WEEK, spareFrom: Math.max(0, spareFrom - WEEK) },
-        ];
+        const from = d * 24 + n.from, to = from + n.window, spare = from + n.hours;
+        // The week itself, and the same week once more for what runs past its end.
+        return [0, WEEK]
+            .filter(lo => from < lo + WEEK && to > lo)
+            .map(lo => {
+                const a = Math.max(from, lo), b = Math.min(to, lo + WEEK);
+                return { from: a - lo, to: b - lo, spareFrom: Math.min(b, Math.max(a, spare)) - lo };
+            });
     });
 }
 
@@ -359,7 +394,7 @@ export function plannedSlot(spans, hour) {
  *   stops: Array<{ day, hour, endHour, planned: boolean, fromSoc, toSoc, mile, minutes, chargeMinutes, kwh, cost }>,
  *   days: Array<{ day, type, miles, kwhUsed, startSoc, homeSoc, plannedSkipped: boolean,
  *                 night: { added: number, endSoc: number, fullAt: number|null, ranOut: boolean,
- *                          hours: number, mostAdd: number } }>,
+ *                          from: number, window: number, hours: number, mostAdd: number } }>,
  *   windows: Array<{ from, to, spareFrom }>,   the plug-in window of each night, in hours of the week (plugWindows)
  *   stopCount, fastMinutes, fastKwh, homeKwh, fastCost, homeCost, usedKwh, fastShare, miles
  * }}  `fastKwh`/`homeKwh` are what was bought (losses in); `fastShare` the share of
@@ -377,26 +412,26 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
         result: detourMi, unit: 'mi', assumed: true,
     });
     const planned = (d) => (s.planned & (1 << d)) !== 0;
-    const nightKwh = (() => {
-        const hours = plugHours(s);
-        return { hours, addPct: pct(profile.home.kw * hours * profile.home.eff) };
-    })();
+    // What an hour of the home charger adds, % of the pack.
+    const perHour = pct(profile.home.kw * profile.home.eff);
     trace?.step('Most a night can add', {
         formula: 'ΔSoC_night = P_home × h × η_home / E_usable × 100',
         values: {
-            P_home: val(profile.home.kw, 'kW'), h: val(nightKwh.hours, 'h', 'setting'),
+            P_home: val(profile.home.kw, 'kW'), h: val(plugHours(s), 'h', 'setting'),
             η_home: val(profile.home.eff, null), E_usable: val(usable, 'kWh'),
         },
-        result: nightKwh.addPct, unit: '%', note: `plugged in ${s.plugFrom}:00 to ${s.plugUntil}:00, to ${s.chargeTo}% (100% before a Long day: ${s.fullBeforeLong ? 'yes' : 'no'})`,
+        result: perHour * plugHours(s), unit: '%',
+        note: `plugged in ${s.plugFrom}:00 to ${s.plugUntil}:00, to ${s.chargeTo}% (100% before a Long day: ${s.fullBeforeLong ? 'yes' : 'no'}); a night the car gets home after the window opens has only the rest of it`,
     });
     trace?.note(`Three weeks are driven (SETTLE_WEEKS = ${SETTLE_WEEKS} to settle) and the last reported, so Monday starts from what Sunday night left`);
     // The first stop of the reported week is written out as the example.
     let exampleStop = trace;
 
     let soc = s.chargeTo;
-    let sundayNight = null;
     // Hours into today the last night's charging ran: the day starts no earlier.
     let morning = 0;
+    // The plug-in window last night used (nightWindow's `k`), so no window serves two nights.
+    let windowK = 0;
     const out = { points: [], stops: [], days: [], miles: 0, usedKwh: 0, fastPackKwh: 0, homePackKwh: 0, fastMinutes: 0 };
 
     for (let w = 0; w <= SETTLE_WEEKS; w++) {
@@ -520,45 +555,49 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             });
             if (spans.length && plan?.gap === spans.length) clock = plannedStop(Math.max(plan.hour, clock));
 
-            // The night: plugged in from plugFrom to plugUntil, to the limit.
+            // The night: the car charges in the first plug-in window it can
+            // reach (nightWindow), from whenever it is home and the window is
+            // open, to the limit.
             const homeSoc = soc;
             const limit = s.fullBeforeLong && s.week[(d + 1) % 7] === 'L' ? 100 : s.chargeTo;
-            // `hours` the charger ran; `mostAdd` what a night's whole window could add at full power, % of the pack (the home ceiling).
-            const night = { added: 0, endSoc: soc, fullAt: null, ranOut: false, hours: 0, mostAdd: nightKwh.addPct };
-            const plugIn = Math.max(s.plugFrom, clock);
-            if (rec) out.points.push([base + plugIn, soc]);
+            const win = nightWindow(s, clock, windowK);
+            windowK = win.k;
+            // `from` the hour of the day the charger could start, `window` the hours it had;
+            // `hours` the charger ran; `mostAdd` what the window could add at full power, % of the pack (the home ceiling).
+            const night = { added: 0, endSoc: soc, fullAt: null, ranOut: false, from: win.from, window: win.hours, hours: 0, mostAdd: perHour * win.hours };
+            if (rec) out.points.push([base + win.from, soc]);
             // No home charging: nothing is added overnight, so every kWh comes
             // from the fast-stop rule above, at the fast price.
-            if (nightKwh.addPct > 0 && soc < limit - 1e-9) {
-                const add = Math.min(limit - soc, nightKwh.addPct);
+            if (night.mostAdd > 0 && soc < limit - 1e-9) {
+                const add = Math.min(limit - soc, night.mostAdd);
                 night.added = add;
                 night.ranOut = add < limit - soc - 1e-9;
-                const hours = add / nightKwh.addPct * nightKwh.hours;
-                night.hours = hours;
-                night.fullAt = night.ranOut ? null : (s.plugFrom + hours) % 24;
+                night.hours = add / perHour;
+                night.fullAt = night.ranOut ? null : (win.from + night.hours) % 24;
                 soc += add;
                 if (rec) {
-                    out.points.push([base + plugIn + hours, soc]);
+                    out.points.push([base + win.from + night.hours, soc]);
                     out.homePackKwh += add / 100 * usable;
-                    if (d === 6) sundayNight = { from: base + plugIn, hours, startSoc: soc - add, add };
                 }
             }
             night.endSoc = soc;
-            morning = Math.max(0, plugIn + (night.added ? night.added / nightKwh.addPct * nightKwh.hours : 0) - 24);
+            morning = Math.max(0, win.from + night.hours - 24);
             if (rec) out.days.push({ ...day, homeSoc, night });
         }
     }
-    // The week wraps. A Sunday night that charges past midnight is, on the
-    // line, Monday morning: cut it at the week's end and carry the rest to
+    // The week wraps. What the last night charges past Sunday midnight is, on
+    // the line, Monday morning: cut it at the week's end and carry the rest to
     // Monday 0:00, which (the week being settled) starts where this one ends.
     const WEEK = 7 * 24;
-    const n = sundayNight;
-    if (n && n.from + n.hours > WEEK) {
-        const atMidnight = n.startSoc + n.add * (WEEK - n.from) / n.hours;
-        out.points[out.points.length - 1] = [WEEK, atMidnight];
-        out.points.splice(0, 1, [0, atMidnight], [n.from + n.hours - WEEK, soc]);
-    } else {
+    const past = out.points.findIndex(([x]) => x > WEEK);
+    if (past < 0) {
         out.points.push([WEEK, soc]);
+    } else {
+        const [x0, y0] = out.points[past - 1], [x1, y1] = out.points[past];
+        const atMidnight = y0 + (y1 - y0) * (WEEK - x0) / (x1 - x0);
+        const rest = out.points.splice(past).map(([x, y]) => [x - WEEK, y]);
+        out.points.push([WEEK, atMidnight]);
+        out.points.splice(0, 1, [0, atMidnight], ...rest);
     }
 
     const fastKwh = out.fastPackKwh / (1 - DC_FAST_LOSS);
@@ -589,7 +628,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
         usedKwh: out.usedKwh,
         fastShare: out.usedKwh > 0 ? out.fastPackKwh / out.usedKwh : 0,
         // No charger, no window to have margin in.
-        windows: profile.home.none ? [] : plugWindows(s, out.days.map(d => d.night)),
+        windows: profile.home.none ? [] : plugWindows(out.days.map(d => d.night)),
     };
 }
 

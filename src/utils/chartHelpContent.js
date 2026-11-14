@@ -311,8 +311,8 @@ export const CHART_HELP_DEFAULTS = {
             'line hands over to the next day. The gray bar is how far the battery fell, so ' +
             'a day with a stop used more than it shows; hover a day for both. "Charge in and ' +
             'used" draws the same figures from zero: charge in above, driving below. The dashed tick on ' +
-            'a night’s bar is the most that night could have added, with your charger at full power for the whole ' +
-            'plug-in window: the gap above the bar is the charger’s margin, and no gap means the window cut the ' +
+            'a night’s bar is the most that night could have added, with your charger at full power for the ' +
+            'plug-in window from when the car gets home: the gap above the bar is the charger’s margin, and no gap means the window cut the ' +
             'night short. A tick above the top of the chart sits on its edge with an arrow.\n' +
             '"The week as a line" is range left, in miles on the left and the battery’s percent on the ' +
             'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +

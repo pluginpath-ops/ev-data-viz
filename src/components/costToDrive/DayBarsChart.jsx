@@ -16,8 +16,8 @@
  * drawn by the plugin over the day's bar, since two can share one bar.
  *
  * A dashed tick on each night's bar is the night's home ceiling (owner,
- * 2026-11-11): the most the plug-in window could have added at full power,
- * so the gap above the bar is the charger's margin. In `day` it stands on
+ * 2026-11-11): the most the plug-in window could have added at full power
+ * from when the car was home, so the gap above the bar is the charger's margin. In `day` it stands on
  * where the car got home, in `balance` on the charge already in. Off the plot
  * it is pinned to the top edge with an arrow (utils/ceilingMark.js).
  */

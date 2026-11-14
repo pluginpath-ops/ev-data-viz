@@ -8,7 +8,7 @@
  * charging rows are outlined in orange, the chart’s stop color. It replaced
  * the day strip, whose boxes said the same things again.
  */
-import { dollars, minutesText, weekTimeText, plugHours } from '../../utils/costToDrive';
+import { dollars, minutesText, weekTimeText } from '../../utils/costToDrive';
 import SortHeader from '../tables/SortHeader';
 import TableCell from '../tables/TableCell';
 
@@ -36,11 +36,12 @@ const ROWS = [
             : { text: DASH }),
     },
     {
-        // The charger's margin: the plug-in window left once the night was done.
-        // None where the window cut the night short, as the * says.
+        // The charger's margin: the plug-in window left once the night was done,
+        // counted from when the car was home. None where the window cut the
+        // night short, as the * says.
         key: 'spare', label: 'Spare plug-in time',
-        cell: (d, s) => (d.night.added >= 0.5
-            ? (d.night.ranOut ? { text: 'None', mark: '*' } : { text: minutesText(Math.max(0, plugHours(s) - d.night.hours) * 60) })
+        cell: (d) => (d.night.added >= 0.5
+            ? (d.night.ranOut ? { text: 'None', mark: '*' } : { text: minutesText(Math.max(0, d.night.window - d.night.hours) * 60) })
             : { text: DASH }),
     },
     { key: 'homeCost', label: 'Home cost', cell: (d, s, homeCost) => ({ text: d.night.added >= 0.5 ? dollars(homeCost(d.night)) : DASH }) },

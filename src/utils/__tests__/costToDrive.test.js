@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     simulateWeek, simulateGasWeek, gasColdLoss, gasTripLegs, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
-    weekSummary, gasCarName, chargerText, chargingText, homeCostCeiling, plugHours, plugWindows,
+    weekSummary, gasCarName, chargerText, chargingText, homeCostCeiling, plugHours, plugWindows, nightWindow,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
 import { DEFAULT_COST_TO_DRIVE, GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
@@ -455,13 +455,12 @@ describe('the most home charging could cost', () => {
 describe('the margin a night has', () => {
     const night = (kw, over = {}) => simulateWeek(profile({ home: { kw, eff: 0.885 } }), settings(over)).days;
 
-    it('records the hours the charger ran and the most a night could add at full power', () => {
-        const s = settings();
+    it('records the hours the charger ran and the most the night\'s window could add at full power', () => {
         for (const d of night(11.5)) {
-            expect(d.night.mostAdd).toBeCloseTo(11.5 * plugHours(s) * 0.885 / 75 * 100, 6);
-            expect(d.night.hours).toBeLessThanOrEqual(plugHours(s) + 1e-9);
+            expect(d.night.mostAdd).toBeCloseTo(11.5 * d.night.window * 0.885 / 75 * 100, 6);
+            expect(d.night.hours).toBeLessThanOrEqual(d.night.window + 1e-9);
             // What was added is what the hours bought, never more than the most.
-            expect(d.night.added).toBeCloseTo(d.night.hours / plugHours(s) * d.night.mostAdd, 6);
+            expect(d.night.added).toBeCloseTo(d.night.hours / d.night.window * d.night.mostAdd, 6);
             expect(d.night.added).toBeLessThanOrEqual(d.night.mostAdd + 1e-9);
         }
     });
@@ -470,7 +469,7 @@ describe('the margin a night has', () => {
         const cut = night(1.44).filter(d => d.night.ranOut);
         expect(cut.length).toBeGreaterThan(0);
         for (const d of cut) {
-            expect(d.night.hours).toBeCloseTo(plugHours(settings()), 6);
+            expect(d.night.hours).toBeCloseTo(d.night.window, 6);
             expect(d.night.added).toBeCloseTo(d.night.mostAdd, 6);
         }
     });
@@ -489,8 +488,7 @@ describe('the margin a night has', () => {
     });
 
     it('draws each night as a span of the week, the charger\'s hours first and the spare time after', () => {
-        const s = settings({ plugFrom: 22, plugUntil: 7 });
-        const spans = plugWindows(s, [0, 1, 2, 3, 4, 5, 6].map(() => ({ hours: 3 })));
+        const spans = plugWindows([0, 1, 2, 3, 4, 5, 6].map(() => ({ from: 22, window: 9, hours: 3 })));
         // Monday night is 22:00 to 7:00 Tuesday; the charger ran three hours of it.
         expect(spans[0]).toEqual({ from: 22, to: 31, spareFrom: 25 });
         // Sunday night runs past the week's end: cut there, the rest from Monday 0:00.
@@ -499,7 +497,16 @@ describe('the margin a night has', () => {
             { from: 0, to: 7, spareFrom: 1 },
         ]);
         // A charger that used the whole window leaves none spare.
-        expect(plugWindows(s, [{ hours: 9 }])[0].spareFrom).toBe(31);
+        expect(plugWindows([{ from: 22, window: 9, hours: 9 }])[0].spareFrom).toBe(31);
+    });
+
+    it('draws a night where the car could charge: from when it was home, and from tomorrow\'s window when today\'s had closed', () => {
+        // Home at 18:00 into a window that opened at 15:00 and ends at 7:00.
+        expect(plugWindows([{ from: 18, window: 13, hours: 3.5 }])).toEqual([{ from: 18, to: 31, spareFrom: 21.5 }]);
+        // Tomorrow's window, 1 to 7 am the morning after: on Sunday that is all of Monday morning.
+        const nights = [0, 1, 2, 3, 4, 5, 6].map(() => ({ from: 25, window: 6, hours: 2 }));
+        expect(plugWindows(nights)[0]).toEqual({ from: 25, to: 31, spareFrom: 27 });
+        expect(plugWindows(nights).at(-1)).toEqual({ from: 1, to: 7, spareFrom: 3 });
     });
 
     it('the week returns its windows, one a night, matching the nights\' hours', () => {
@@ -507,5 +514,196 @@ describe('the margin a night has', () => {
         // Sunday night is cut in two, so a night more than seven spans.
         expect(w.windows.length).toBe(8);
         expect(w.windows[0].spareFrom - w.windows[0].from).toBeCloseTo(w.days[0].night.hours, 6);
+    });
+});
+
+describe('which plug-in window a night charges in', () => {
+    const win = (plugFrom, plugUntil, arrive, minK) => nightWindow(settings({ plugFrom, plugUntil }), arrive, minK);
+
+    it('a window that opens after the car is home: it waits, and charges from plugFrom', () => {
+        expect(win(22, 7, 18)).toEqual({ k: 0, from: 22, hours: 9 });
+    });
+
+    it('a car home inside the window charges from then, to the window\'s end', () => {
+        expect(win(15, 7, 18)).toEqual({ k: 0, from: 18, hours: 13 });
+        // Late: a stop kept it out until 11 pm.
+        expect(win(22, 7, 23)).toEqual({ k: 0, from: 23, hours: 8 });
+        // The minute the window opens is the whole of it.
+        expect(win(22, 7, 22)).toEqual({ k: 0, from: 22, hours: 9 });
+    });
+
+    it('a window that closed before the car got home is tomorrow\'s: 1 to 7 am, home at 6 pm, charges from 1 am the morning after', () => {
+        expect(win(1, 7, 18)).toEqual({ k: 1, from: 25, hours: 6 });
+        // Home as it closes is too late for it.
+        expect(win(1, 7, 7)).toEqual({ k: 1, from: 25, hours: 6 });
+    });
+
+    it('a window that opens after a day off begins is that day\'s own', () => {
+        expect(win(1, 7, 0)).toEqual({ k: 0, from: 1, hours: 6 });
+    });
+
+    it('never gives a window to two nights: the one after a night in tomorrow\'s window starts there too', () => {
+        // Friday used Saturday's 1 to 7 am; Saturday, a day off, is home from the 3 am the charge ended.
+        expect(win(1, 7, 3)).toEqual({ k: 0, from: 3, hours: 4 });
+        expect(win(1, 7, 3, 1)).toEqual({ k: 1, from: 25, hours: 6 });
+    });
+
+    it('the same hour twice is open all day: from when the car is home, to that hour', () => {
+        expect(win(7, 7, 18)).toEqual({ k: 0, from: 18, hours: 13 });
+    });
+});
+
+describe('a night starts when the car is home, not when the window opens', () => {
+    // 240 V · 16 A (3.84 kW) into 75 kWh: 4.5312% an hour.
+    const kw = 3.84, perHour = kw * 0.885 / 75 * 100;
+    const slow = profile({ home: { kw, eff: 0.885 } });
+    // Home at 18:00 every driving day (the last drive ends then), no stops.
+    const commuter = (over = {}) => settings({ week: 'DDDDDLO', planned: 0, dailyMi: 35, dailyCity: 50, ...over });
+
+    it('plugged in from 3 pm, home at 6 pm: the charge runs 6 pm to ready, and ready is counted from 6 pm', () => {
+        const w = simulateWeek(slow, commuter({ plugFrom: 15, plugUntil: 7 }));
+        const mon = w.days[0];
+        expect(mon.night.from).toBe(18);
+        expect(mon.night.window).toBe(13);
+        // 35 mi at 323 Wh/mi out of 75 kWh, put back.
+        expect(mon.night.added).toBeCloseTo(35 * 323 / 1000 / 75 * 100, 6);
+        expect(mon.night.hours).toBeCloseTo(mon.night.added / perHour, 6);
+        expect(mon.night.fullAt).toBeCloseTo(18 + mon.night.hours, 6);
+        expect(mon.night.fullAt).toBeGreaterThan(21.3);
+        expect(mon.night.fullAt).toBeLessThan(21.4);
+        // The line charges over those hours, from the moment it is home.
+        expect(w.points).toContainEqual([18, mon.homeSoc]);
+        expect(w.points.some(([x]) => Math.abs(x - (18 + mon.night.hours)) < 1e-9)).toBe(true);
+    });
+
+    it('every night has only its own window to add in, and the table\'s spare time and the window drawn on the line agree', () => {
+        const w = simulateWeek(slow, commuter({ plugFrom: 15, plugUntil: 7 }));
+        w.days.slice(0, 5).forEach((d, i) => {
+            expect(d.night.mostAdd).toBeCloseTo(13 * perHour, 6);
+            expect(w.windows[i].from).toBe(i * 24 + 18);
+            expect(w.windows[i].spareFrom - w.windows[i].from).toBeCloseTo(d.night.hours, 6);
+            expect(w.windows[i].to - w.windows[i].from).toBeCloseTo(d.night.window, 6);
+        });
+    });
+
+    it('a night the shorter window cannot finish runs out, though the whole window could have', () => {
+        // One 50 mi drive a week: 21.5% out, and 120 V puts back 1.536% an hour.
+        // Home at 6 pm into a window that ends at 7 am it has 13 h, 19.97%; the 16 h from 3 pm would have been 24.6%.
+        const p = profile(wallOutlet);
+        const w = simulateWeek(p, settings({ week: 'DOOOOOO', planned: 0, dailyMi: 50, plugFrom: 15, plugUntil: 7 }));
+        const mon = w.days[0];
+        expect(mon.night.ranOut).toBe(true);
+        expect(mon.night.fullAt).toBeNull();
+        expect(mon.night.hours).toBeCloseTo(13, 6);
+        expect(mon.night.added).toBeCloseTo(13 * 1.44 * 0.80 / 75 * 100, 6);
+        expect(mon.night.added).toBeLessThan(50 * 323 / 1000 / 75 * 100);
+        // Tuesday has the whole 3 pm to 7 am: it makes up the rest.
+        expect(w.days[1].night.ranOut).toBe(false);
+        expect(w.days[1].night.window).toBe(16);
+    });
+
+    it('a car kept out past plugFrom loses those hours: two long road stops put it home after 10 pm, and 22 → 7 has less than 9 h', () => {
+        // Long days, each with two road stops of two hours' charge, 10 min detour and 5 min to start.
+        const p = profile({ home: { kw, eff: 0.885 }, fast: { basis: 'test', minutes: () => 120 } });
+        const w = simulateWeek(p, settings({ week: 'LLLLLLL', planned: 0, plugFrom: 22, plugUntil: 7 }));
+        for (const d of w.days) {
+            expect(d.stops.length).toBe(2);
+            expect(d.night.from).toBeGreaterThan(22);
+            // The window still ends at 7 am: what is lost is the hours before the car was home.
+            expect(d.night.from + d.night.window).toBeCloseTo(31, 6);
+            expect(d.night.mostAdd).toBeCloseTo(d.night.window * perHour, 6);
+            expect(d.night.mostAdd).toBeLessThan(9 * perHour);
+            expect(d.night.hours).toBeLessThanOrEqual(d.night.window + 1e-9);
+        }
+    });
+
+    it('Ready at counts from when the car was plugged in, not from when the window opened', () => {
+        // Home at 6 pm into a window open from 3 pm: ready is 6 pm plus the charging hours, whatever time the window opened.
+        const w = simulateWeek(slow, commuter({ plugFrom: 15, plugUntil: 7 }));
+        for (const d of w.days.slice(0, 5)) expect(d.night.fullAt).toBeCloseTo((18 + d.night.hours) % 24, 6);
+    });
+
+    it('a window that opens after the car is home is unchanged: 10 pm, the whole 9 hours', () => {
+        const w = simulateWeek(slow, commuter({ plugFrom: 22, plugUntil: 7 }));
+        w.days.slice(0, 5).forEach(d => {
+            expect(d.night.from).toBe(22);
+            expect(d.night.window).toBe(9);
+            expect(d.night.mostAdd).toBeCloseTo(plugHours(settings({ plugFrom: 22, plugUntil: 7 })) * perHour, 6);
+        });
+    });
+});
+
+describe('a window that closed before the car got home', () => {
+    const p = profile();
+    // Drives 7–8 and 17–18, then charges 1 to 7 am the morning after.
+    const s = settings({ week: 'DDDDDOO', planned: 0, plugFrom: 1, plugUntil: 7 });
+
+    it('charges in tomorrow\'s window: 1 am the morning after, never the hours it spent at home before', () => {
+        const w = simulateWeek(p, s);
+        for (const d of w.days) {
+            expect(d.night.from).toBe(25);
+            expect(d.night.window).toBe(6);
+        }
+        // Monday night is Tuesday 1 to 7 am; Sunday night is the start of Monday's week.
+        expect(w.windows[0].from).toBe(25);
+        expect(w.windows[0].to).toBe(31);
+        expect(w.windows.at(-1).from).toBe(1);
+        expect(w.windows.at(-1).to).toBe(7);
+        // Ready between 1 and 7 am, and the day after starts no earlier than that.
+        const mon = w.days[0].night;
+        expect(mon.fullAt).toBeGreaterThan(1);
+        expect(mon.fullAt).toBeLessThan(7);
+    });
+
+    it('no window serves two nights, a day off included', () => {
+        const w = simulateWeek(p, s);
+        const spans = [...w.windows].sort((a, b) => a.from - b.from);
+        for (let i = 1; i < spans.length; i++) expect(spans[i].from).toBeGreaterThanOrEqual(spans[i - 1].to - 1e-9);
+        // Seven nights, seven windows (Sunday's lands wholly in Monday morning, so none is cut in two).
+        expect(w.windows.length).toBe(7);
+    });
+
+    it('the night before a long day still charges to 100% in the window before it', () => {
+        // Friday is a day off, Saturday long; fullBeforeLong asks Friday night for 100%.
+        const week = simulateWeek(p, settings({ week: 'DDDDOLO', planned: 0, plugFrom: 1, plugUntil: 7 }));
+        expect(week.days[4].night.endSoc).toBe(100);
+        // The window it used is Saturday's 1 to 7 am, the one just before the long day.
+        expect(week.days[4].night.from).toBe(25);
+    });
+});
+
+describe('the week as a line, whatever the plug-in window', () => {
+    // The shapes a window takes: wraps midnight, opens before the car is home,
+    // already closed when it is, short, daytime, and all day.
+    const windows = [[22, 7], [15, 7], [1, 7], [0, 6], [19, 23], [23, 5], [7, 22], [7, 7]];
+    const weeks = ['LDLDLDO', 'DDDDDLO', 'OOOOOOO', 'LLLLLLL'];
+    const cars = [profile(), profile(wallOutlet), profile({ usableKwh: 135, home: { kw: 3.84, eff: 0.885 } })];
+
+    it('runs forward in time and ends at the week\'s end', () => {
+        for (const [plugFrom, plugUntil] of windows) for (const week of weeks) for (const p of cars) {
+            const { points } = simulateWeek(p, settings({ week, plugFrom, plugUntil }));
+            for (let i = 1; i < points.length; i++) expect(points[i][0]).toBeGreaterThanOrEqual(points[i - 1][0] - 1e-9);
+            expect(points[0][0]).toBe(0);
+            expect(points.at(-1)[0]).toBe(7 * 24);
+            expect(points[0][1]).toBeCloseTo(points.at(-1)[1], 6);
+        }
+    });
+
+    it('every night\'s window ends at plugUntil, holds its charging hours, and stays inside the week', () => {
+        for (const [plugFrom, plugUntil] of windows) for (const week of weeks) for (const p of cars) {
+            const w = simulateWeek(p, settings({ week, plugFrom, plugUntil }));
+            for (const d of w.days) {
+                const end = d.night.from + d.night.window;
+                expect(((end - plugUntil) % 24 + 24) % 24).toBeLessThan(1e-9);
+                expect(d.night.hours).toBeLessThanOrEqual(d.night.window + 1e-9);
+                expect(d.night.from).toBeGreaterThanOrEqual(plugFrom - 1e-9);
+            }
+            for (const x of w.windows) {
+                expect(x.from).toBeGreaterThanOrEqual(0);
+                expect(x.to).toBeLessThanOrEqual(7 * 24);
+                expect(x.from).toBeLessThanOrEqual(x.spareFrom + 1e-9);
+                expect(x.spareFrom).toBeLessThanOrEqual(x.to + 1e-9);
+            }
+        }
     });
 });
