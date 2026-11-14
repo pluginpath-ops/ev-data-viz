@@ -350,9 +350,24 @@ const CERTIFICATIONS_EMBED = `certifications:epa_certification_test_vehicles(id,
  * Guide candidate check derive from. Shared with the link sweep, so a
  * suggestion is checked against exactly what the EPA tab will read.
  */
-const EPA_LAB_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, mfr_test_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
+const EPA_LAB_COLUMNS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name`;
+const EPA_LAB_FIELDS = `${EPA_LAB_COLUMNS}, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, mfr_test_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
 
 const EPA_TEST_VEHICLE_FIELDS = `${EPA_LAB_FIELDS}, ${CERTIFICATIONS_EMBED}`;
+
+/**
+ * What the startup vehicle read carries of a test vehicle (#501): the label,
+ * the overrides and the tests' headline figures, plus certifications and Guide
+ * rows. These are all that `resolveEpaRange`, the capacity window and the
+ * table's EPA columns read, so no figure on a first load depends on the rest.
+ * The coefficient sets and each test's phases and comments (about a third of
+ * the EPA bytes) come from getEpaDetail, where they are shown.
+ */
+const EPA_SLIM_LAB_FIELDS = `${EPA_LAB_COLUMNS}, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc)`;
+const EPA_STARTUP_FIELDS = `${EPA_SLIM_LAB_FIELDS}, ${CERTIFICATIONS_EMBED}`;
+
+/** What startup leaves out, keyed by test_vehicle_id (see EPA_SLIM_LAB_FIELDS). */
+const EPA_DETAIL_FIELDS = `test_vehicle_id, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, mfr_test_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
 
 class DataService {
   constructor() {
@@ -422,7 +437,7 @@ class DataService {
       .from('vehicles')
       .select(select)
       .order('created_at', { ascending: false });
-    const { data, error } = await query(`${base}, epa_vehicle_mappings(*, epa_test_vehicles(${EPA_TEST_VEHICLE_FIELDS}))`);
+    const { data, error } = await query(`${base}, epa_vehicle_mappings(*, epa_test_vehicles(${EPA_STARTUP_FIELDS}))`);
 
     // Never swallow this. Destructuring only `data` made a failed query look
     // identical to an empty account, which turned a missing migration into a
@@ -496,6 +511,25 @@ class DataService {
       ...v,
       runs: [...v.runs, ...buildInheritedRuns(v, runById, runToVehicle, lineageChargingTests(v, byId))],
     }));
+  }
+
+  /**
+   * The coefficient sets and full tests the startup read leaves out (#501), by
+   * test_vehicle_id. Merged onto a vehicle by utils/epaDetail.
+   */
+  async getEpaDetail(testVehicleIds = []) {
+    const ids = [...new Set(testVehicleIds)].filter(Boolean);
+    if (!this.useSupabase || !ids.length) return {};
+    // In chunks: a few hundred ids in one URL is past what the gateway accepts.
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+    const results = await Promise.all(chunks.map(async (chunk) => {
+      const { data, error } = await getSupabase()
+        .from('epa_test_vehicles').select(EPA_DETAIL_FIELDS).in('test_vehicle_id', chunk);
+      if (error) throw error;
+      return data || [];
+    }));
+    return Object.fromEntries(results.flat().map(r => [r.test_vehicle_id, r]));
   }
 
   // ── Manufacturers ─────────────────────────────────────────────────────────

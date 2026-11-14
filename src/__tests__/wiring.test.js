@@ -1292,11 +1292,11 @@ describe('the seams that broke before', () => {
         const q = svc.slice(svc.indexOf('async getEpaTestVehiclesForAudit'));
         expect(q.slice(0, q.indexOf('\n  }')), 'getEpaTestVehiclesForAudit must select preferred_test_number')
             .toMatch(/preferred_test_number/);
-        const fields = svc.match(/const EPA_LAB_FIELDS = `([^`]*)`/)?.[1] ?? '';
-        expect(fields, 'EPA_TEST_VEHICLE_FIELDS must select preferred_test_number').toMatch(/preferred_test_number/);
+        const fields = svc.match(/const EPA_LAB_COLUMNS = `([^`]*)`/)?.[1] ?? '';
+        expect(fields, 'EPA_LAB_COLUMNS must select preferred_test_number').toMatch(/preferred_test_number/);
         const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
-        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }')), 'getVehicles must read EPA_TEST_VEHICLE_FIELDS')
-            .toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
+        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }')), 'getVehicles must read EPA_STARTUP_FIELDS')
+            .toMatch(/epa_test_vehicles\(\$\{EPA_STARTUP_FIELDS\}\)/);
         expect(read('src/utils/epaRecordFromTestVehicle.js'),
             'the derivation must honor the selection')
             .toMatch(/preferred_test_number/);
@@ -1490,10 +1490,17 @@ describe('the seams that broke before', () => {
         // lists can be held together.
         // The list is EPA_TEST_VEHICLE_FIELDS, which getVehicles reads the record through.
         const svc = read('src/services/DataService.js');
-        const fields = svc.match(/const EPA_LAB_FIELDS = `([^`]*)`/)?.[1] ?? '';
-        const columns = fields.slice(0, fields.indexOf('epa_coefficient_sets'));
+        const columns = svc.match(/const EPA_LAB_COLUMNS = `([^`]*)`/)?.[1] ?? '';
         const vehiclesQuery = svc.slice(svc.indexOf('async getVehicles'));
-        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }'))).toMatch(/epa_test_vehicles\(\$\{EPA_TEST_VEHICLE_FIELDS\}\)/);
+        expect(vehiclesQuery.slice(0, vehiclesQuery.indexOf('\n  }'))).toMatch(/epa_test_vehicles\(\$\{EPA_STARTUP_FIELDS\}\)/);
+        // The startup read is slim (#501): what the figures read stays, and what only
+        // the EPA views read comes from getEpaDetail. A figure must not change
+        // because a column went missing, so the tests keep their headline columns.
+        const slim = svc.match(/const EPA_SLIM_LAB_FIELDS = `([^`]*)`/)?.[1] ?? '';
+        for (const c of ['procedure_code', 'total_dc_energy_kwh', 'ac_recharge_kwh', 'test_date', 'test_number']) {
+            expect(slim, `the startup read must keep epa_tests.${c}`).toMatch(new RegExp(`\\b${c}\\b`));
+        }
+        expect(slim).not.toMatch(/epa_coefficient_sets|epa_test_phases/);
 
         const promo = read('src/utils/feGuidePromotion.js');
         const targets = [...promo.matchAll(/^\s+\w+:\s+'(\w+)',/gm)].map(m => m[1]);
@@ -1507,7 +1514,7 @@ describe('the seams that broke before', () => {
         // dropped the record's own column); without it a linked test vehicle
         // still renders the "link me" picker.
         expect(svc.match(/const CERTIFICATIONS_EMBED = `([^`]*)`/)?.[1]).toMatch(/^certifications:epa_certification_test_vehicles\(id, fe_guide_row_id,/);
-        expect(svc).toMatch(/const EPA_TEST_VEHICLE_FIELDS = `\$\{EPA_LAB_FIELDS\}, \$\{CERTIFICATIONS_EMBED\}`/);
+        expect(svc).toMatch(/const EPA_STARTUP_FIELDS = `\$\{EPA_SLIM_LAB_FIELDS\}, \$\{CERTIFICATIONS_EMBED\}`/);
     });
 
     it('loads the startup queries in parallel', () => {

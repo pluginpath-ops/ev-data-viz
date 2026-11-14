@@ -28,6 +28,7 @@ import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
 import CollapsibleSection from './CollapsibleSection';
+import { useEpaDetail } from '../hooks/useEpaDetail';
 import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE, STANDARD_CONDITIONS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromTestVehicle, NO_RECORD_REASONS } from '../utils/epaRecordFromTestVehicle';
@@ -231,9 +232,12 @@ export default function EpaCurvesView({
 
     // ── Vehicle lists ─────────────────────────────────────────────────────────
 
-    const selectedVehicles = useMemo(() =>
+    const pickedVehicles = useMemo(() =>
         selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
     [vehicles, selectedVehicleIds]);
+    // The startup read leaves out the coefficient sets and phases this chart
+    // models from (#501); only the selected vehicles' are fetched.
+    const { vehicles: selectedVehicles, loading: epaLoading } = useEpaDetail(pickedVehicles);
 
     // What each selected vehicle is called: its curated name, widened only where
     // two selected vehicles would otherwise read the same.
@@ -722,6 +726,8 @@ export default function EpaCurvesView({
     // same for every chart, and PresentedChart only draws with a selection.
 
     // ── Render ────────────────────────────────────────────────────────────────
+    if (epaLoading) return <div className="empty-state"><p>Loading EPA data…</p></div>;
+
     return (
         <div className="chart-layout">
             {/* ── Left rail: the same rig as the four charts beside it. The

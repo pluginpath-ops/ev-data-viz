@@ -28,6 +28,7 @@ import { checkRecordIntegrity } from '../utils/epaIntegrity';
 import LazyBoundary from './LazyBoundary';
 import { EpaPdfImportModal } from './lazyComponents';
 import { useAppContext } from '../context/AppContext';
+import { useEpaDetail } from '../hooks/useEpaDetail';
 
 const CONFIDENCE_COLORS = {
     verified: 'callout is-good',
@@ -437,7 +438,12 @@ function EpaTestVehicleCard({ mapping, vehicle, standing, canEdit, onUnlink, onD
 
 const EPA_SOURCE_URL = 'https://dis.epa.gov/otaqpub/publist1.jsp';
 
-export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehicles, onLink, onCreate, onUnlink, onUpdateConfidence, onSetPrimary, onUpdateDisplayName, onTestVehicleChanged }) {
+export default function EpaVehicleSection({ vehicle: vehicleProp, canEdit, searchEpaTestVehicles, onLink, onCreate, onUnlink, onUpdateConfidence, onSetPrimary, onUpdateDisplayName, onTestVehicleChanged }) {
+    // The startup read leaves out the coefficient sets and test phases the cards
+    // show (#501); this vehicle's come here.
+    const slimVehicle = vehicleProp;
+    const ownVehicle = useMemo(() => (slimVehicle ? [slimVehicle] : []), [slimVehicle]);
+    const { vehicles: [vehicle], loading: detailLoading } = useEpaDetail(ownVehicle);
     const [query, setQuery]               = useState('');
     const [results, setResults]           = useState([]);
     const [searching, setSearching]       = useState(false);
@@ -747,6 +753,8 @@ export default function EpaVehicleSection({ vehicle, canEdit, searchEpaTestVehic
                     No EPA test vehicle linked yet.
                     {canEdit && !showSuggestions && ' Use the search above to assign one.'}
                 </p>
+            ) : detailLoading ? (
+                <p className="text-meta">Loading EPA data…</p>
             ) : (
                 <>
                 {mappings.map(m => (

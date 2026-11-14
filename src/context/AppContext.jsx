@@ -1501,6 +1501,7 @@ export function AppProvider({ children }) {
 
     /** Pass-through: the test vehicles a variant's EPA suggestions are ranked from (#341). */
     const getEpaSuggestionCandidates = (query) => dataService.getEpaSuggestionCandidates(query);
+    const getEpaDetail = (testVehicleIds) => dataService.getEpaDetail(testVehicleIds);
 
     const linkEpaTestVehicle = async (vehicleId, groupId, confidence, notes) => {
         try {
@@ -2315,6 +2316,7 @@ export function AppProvider({ children }) {
         setRunsSession,
         searchEpaTestVehicles,
         getEpaSuggestionCandidates,
+        getEpaDetail,
         linkEpaTestVehicle,
         createAndLinkEpaTestVehicle,
         importEpaCsiTestVehicles,
