@@ -1030,7 +1030,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         const x = axisOptions.find(a => a.value === chartConfig.xAxis)?.label || chartConfig.xAxis;
         if (raceActive) return `${stripUnits(y)} from ${raceThreshold}% SoC`;
         return `${stripUnits(y)} vs ${stripUnits(x)}`
-            + (measuresFromStart ? ` from ${raceThreshold}% SoC` : '');
+            // Set off by a dot: run on, "from" read as part of the X name.
+            + (measuresFromStart ? ` · from ${raceThreshold}% SoC` : '');
     }, [chartConfig.xAxis, chartConfig.yAxis, raceActive, measuresFromStart, raceThreshold, axisOptions]);
 
     // Everything a reader needs to know what the plot was drawn under. It lives

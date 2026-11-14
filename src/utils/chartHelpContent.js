@@ -63,7 +63,7 @@ export const CHART_HELP_DEFAULTS = {
             'Range Rate — miles of range gained per minute (or per hour).\n' +
             'SoC Rate — percent of the battery added per minute.\n' +
             'Range Added — change since one start SoC shared by every curve (by default the lowest SoC every selected curve reaches; set it beside the axes). A test that began above the start is projected back to it; a composite curve is rebuilt from the tests that reach it, and the rest are named. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
-            'Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the range actually logged in the test.',
+            'EPA Range vs Tested Range — EPA-rated range projected from SoC, vs the range actually logged in the test.',
         math_approach:
             'Mostly the raw measured points drawn as-is — no smoothing or curve-fitting. ' +
             'The computed fields are simple arithmetic: C-rate = charge kW ÷ battery kWh; ' +

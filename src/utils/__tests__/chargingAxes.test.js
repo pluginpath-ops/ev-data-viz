@@ -20,7 +20,7 @@ describe('the axes Charging Curves offers', () => {
         const byKey = Object.fromEntries(options.map(o => [o.value, o.label]));
         expect(byKey.rangeRateHr).toBe('Range Rate (mi/hr)');
         expect(byKey.socRate).toBe('SoC Rate (%/min)');
-        expect(byKey.deltaRangeEpa).toBe('Range Added - EPA (mi)');
+        expect(byKey.deltaRangeEpa).toBe('EPA Range Added (mi)');
     });
 
     it('no longer offers Temperature or Frame', () => {
