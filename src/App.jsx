@@ -144,6 +144,7 @@ export default function App() {
         updateVehicleSpecs,
         specCustomFieldSuggestions,
         copyRunToVehicle,
+        moveRunToVehicle,
         units,
         toggleUnits,
     } = useAppContext();
@@ -1308,6 +1309,7 @@ export default function App() {
                             onBack={() => navigateTo('vehicles')}
                             onClose={closeVehicle}
                             onCopyRunToVehicle={(run, targetId) => copyRunToVehicle(currentActiveVehicle.id, run, targetId)}
+                            onMoveRunToVehicle={(run, targetId) => moveRunToVehicle(currentActiveVehicle.id, run, targetId)}
                             subtab={runsSubtab}
                             onSubtabChange={setRunsSubtab}
                             focusRunId={focusRunId}

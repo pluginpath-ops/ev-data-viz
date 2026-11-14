@@ -7,7 +7,7 @@ import RunCurationToggle from './RunCurationToggle';
 import { isUnlisted, isExcluded, hasQualityOverride } from '../../utils/runListing';
 import { sessionFor } from '../../utils/testSessions';
 import { RunKindBadge, FIELD_META, inferRunFlags } from './runDisplay';
-import { filterChargingRuns, defaultChargingRun, runKindFrom } from '../../utils/runUtils';
+import { filterChargingRuns, defaultChargingRun, runKindFrom, isCompositeRun } from '../../utils/runUtils';
 
 /**
  * One test, as it is read rather than edited (#235, re-skin phase 8 step 1).
@@ -100,7 +100,7 @@ export default function RunCard({
     toggleRunVote, setRunsSession, createTestSession, updateTestSession,
     deleteTestSession, setPairedChargingRun, clearDefaultRun, onSetDefaultRun,
     handleEditRun, restoreItem, queueDelete, handleExportCsv, handleDuplicateRun,
-    setCopyToRun, setCopyingToVehicleId, handleUpdateData, onUpdateRun,
+    setCopyToRun, setMoveToRun, setCopyingToVehicleId, handleUpdateData, onUpdateRun,
     handleCheckKwh,
 }) {
     const kindLabel = runKindFrom(run) === 'range' ? 'range' : 'charging';
@@ -266,6 +266,15 @@ export default function RunCard({
                                     className="btn btn-toggle"
                                 >
                                     ↪ Copy to…
+                                </button>
+                            )}
+                            {copyTargetVehicles.length > 0 && !isCompositeRun(run) && (
+                                <button
+                                    onClick={() => { setMoveToRun(run); setCopyingToVehicleId(''); }}
+                                    title="Move this test to another vehicle, for example up to the first vehicle in its lineage so the variants below inherit it"
+                                    className="btn btn-toggle"
+                                >
+                                    ⇪ Move to…
                                 </button>
                             )}
                             <button
