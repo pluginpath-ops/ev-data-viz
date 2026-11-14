@@ -201,10 +201,19 @@ export function chartTheme() {
 
 /**
  * A chart theme color at an opacity, for a wash drawn behind the data.
- * Takes the `rgb(r, g, b)` a token resolves to; anything else is returned
- * unchanged rather than guessed at.
+ * `rgb(r, g, b)` and `#rrggbb` are rewritten directly. Any other CSS color goes through
+ * `color-mix`, which canvas accepts — never returned as-is, which would paint
+ * a wash at full strength.
  */
 export function fade(color, opacity) {
     const m = /^rgb\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)\s*\)$/.exec(color ?? '');
-    return m ? `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${opacity})` : color;
+    if (m) return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${opacity})`;
+    // The production build's CSS minifier rewrites rgb(...) to hex, so hex is
+    // what a token reads as on the live site.
+    const h = /^#([0-9a-f]{6})$/i.exec(color ?? '');
+    if (h) {
+        const n = parseInt(h[1], 16);
+        return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${opacity})`;
+    }
+    return color ? `color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)` : color;
 }
