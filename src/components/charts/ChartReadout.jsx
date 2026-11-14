@@ -86,7 +86,11 @@ export default function ChartReadout({ store }) {
     // the pointer moves as the active row changes.
     useLayoutEffect(() => {
         const box = boxRef.current, layer = layerRef.current;
-        if (!box || !layer || s.mode === 'off' || sheet) return;
+        if (!box || !layer || s.mode === 'off') return;
+        // A sheet is placed by the stylesheet (fixed to the bottom). The hover
+        // box was placed inline just before, and that inline top would win over
+        // the sheet's `bottom: 0` — pinning it to the top of the page.
+        if (sheet) { box.style.left = ''; box.style.top = ''; placedFor.current = null; return; }
 
         const detail = detailRef.current;
         if (fixed) {
@@ -110,7 +114,11 @@ export default function ChartReadout({ store }) {
         let left = s.xPx + GAP;
         if (host.left + left + w > window.innerWidth - MARGIN) left = s.xPx - GAP - w;
         left = Math.max(MARGIN - host.left, Math.min(left, window.innerWidth - MARGIN - w - host.left));
-        const top = Math.max(MARGIN - host.top, Math.min(s.area.top + 6, window.innerHeight - MARGIN - h - host.top));
+        // Kept on screen, but never out of its chart: on a short or narrow
+        // window the screen clamp alone pushed a tall box up to the top of the
+        // viewport, which is the top of the page once the chart is scrolled.
+        const onScreen = Math.max(MARGIN - host.top, Math.min(s.area.top + 6, window.innerHeight - MARGIN - h - host.top));
+        const top = Math.max(0, Math.min(onScreen, host.height - h));
         box.style.left = `${left}px`;
         box.style.top = `${top}px`;
     });
