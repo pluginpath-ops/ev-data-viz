@@ -3053,7 +3053,8 @@ describe('the vehicle table can be a featured comparison\'s panel (#448)', () =>
 
     it('its rows are the comparison\'s vehicles, in the comparison\'s order', () => {
         expect(presented).toMatch(/vehiclesInOrder\(vehicleIds, vehicles\)/);
-        expect(presented).toMatch(/ordered\.map\(v => byId\.get\(String\(v\.id\)\)\)/);
+        // Rows are built for those vehicles alone (#500), and come back in their order.
+        expect(presented).toMatch(/only: ordered/);
     });
 
     it('opening it hands the real table the saved link whole and an unfiltered fleet', () => {

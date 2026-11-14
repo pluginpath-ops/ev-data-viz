@@ -50,14 +50,11 @@ export default function PresentedVehicleTable({ vehicleIds, search, correctionTa
     }, [wantsPerformance, idsKey]);
     const { data: performance, loading } = useAsyncResource(loadPerformance, [loadPerformance]);
 
-    const rows = useMemo(() => {
-        const all = buildVehicleRows(vehicles, {
-            performance, assumptions, units, platformsById, correctionTarget, correctionMode,
-            sessionOf: r => sessionFor(testSessions, r),
-        });
-        const byId = new Map(all.map(r => [String(r.id), r]));
-        return ordered.map(v => byId.get(String(v.id))).filter(Boolean);
-    }, [vehicles, performance, assumptions, units, platformsById, testSessions, correctionTarget, correctionMode, ordered]);
+    // Only this comparison's vehicles get rows (#500); the fleet is the lookup for inherited specs.
+    const rows = useMemo(() => buildVehicleRows(vehicles, {
+        only: ordered, performance, assumptions, units, platformsById, correctionTarget, correctionMode,
+        sessionOf: r => sessionFor(testSessions, r),
+    }), [vehicles, ordered, performance, assumptions, units, platformsById, testSessions, correctionTarget, correctionMode]);
 
     const cols = useMemo(
         () => columns.map(vehicleColumnByKey).filter(Boolean)

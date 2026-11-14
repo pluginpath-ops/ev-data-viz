@@ -744,6 +744,11 @@ const present = (v) => (v === '' || v === undefined ? null : v);
  * One row per vehicle, each value resolved once.
  *
  * @param {Array} vehicles  as AppContext provides them (resolved figures attached)
+ *        — the fleet, which spec inheritance looks the source vehicle up in
+ * @param {Array} [opts.only]  build rows for just these vehicles of the fleet, matched by id (#500).
+ *        A row is the same either way, `index` included: it is the vehicle's place
+ *        in `vehicles`. Everything else a row reads is its own, so a view that
+ *        shows a few vehicles need not build the fleet's.
  * @param {Object} [opts.performance]  groupPerformanceByVehicle output, or null
  *        while it loads — tested columns are then empty, not zero
  * @param {Object} [opts.assumptions]  the reader's inputs to calculated columns
@@ -757,9 +762,13 @@ const present = (v) => (v === '' || v === undefined ? null : v);
  *          `notes` holds the basis or source shown beneath a figure; `tests`
  *          the test behind it, where one is (testDetails.js TestReference)
  */
-export function buildVehicleRows(vehicles = [], { performance = null, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', platformsById = null, sessionOf = () => null, correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE } = {}) {
+export function buildVehicleRows(vehicles = [], { only = null, performance = null, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', platformsById = null, sessionOf = () => null, correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE } = {}) {
     const calcContext = assumptionContext(assumptions, units, correctionTarget, correctionMode);
-    return vehicles.map((vehicle, index) => vehicleRow(vehicle, index, vehicles, calcContext, { performance, units, platformsById, sessionOf }));
+    const build = (vehicle, index) => vehicleRow(vehicle, index, vehicles, calcContext, { performance, units, platformsById, sessionOf });
+    if (!only) return vehicles.map(build);
+    // Matched by id: a view's vehicles may be its own copies of the fleet's.
+    const place = new Map(vehicles.map((v, i) => [v.id, i]));
+    return only.filter(v => place.has(v.id)).map(v => { const i = place.get(v.id); return build(vehicles[i], i); });
 }
 
 /**
