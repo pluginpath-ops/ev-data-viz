@@ -19,14 +19,14 @@ One state, shared by every sub-tab and kept when switching between them.
 
 | Group | Settings (default) |
 |---|---|
-| Home charging | charger level: 120 V · 12 A, 240 V · 16 / 24 / 32 / **48** / 80 A (no 40 or 64 A — dropped for simplicity); plugged in from **10 pm** until **7 am**; charge to **80**%; 100% the night before a long day (**on**); home price **$0.17**/kWh |
+| Home charging | charger level: 120 V · 12 A, 240 V · 16 / 24 / 32 / **48** / 80 A (no 40 or 64 A — dropped for simplicity); plugged in from **10 pm** until **7 am**; charge to **80**%; 100% the night before a long day (**on**); home price **$0.17**/kWh (free to $1) |
 | Your week | seven days, each **Daily**, **Long day** or **Off** (default L D L D L D Off); a **planned fast charge** on any days (default Sunday); Daily: **45** mi, highway at **70** mph, city share **40**%; Long day: **220** mi, **70** mph, **15**% |
-| Fast charging | detour to a charger **10** min (5–30, as miles at 40 mph, energy too); stop to charge by **30**% (10–50); charge no higher than **70**%; keep battery above **10**%; time to start and pay **5** min; fast price **$0.48**/kWh |
+| Fast charging | detour to a charger **10** min (0–30, as miles at 40 mph, energy too); stop to charge by **25**% (10–50); charge no higher than **70**%; keep battery above **10**%; time to start and pay **5** min; fast price **$0.42**/kWh (free to $1.50) |
 | Season | shown: summer / **winter**; summer **75**°F, winter **15**°F; winter lasts **4** months; elevation **800** ft |
 | Your gas car | city **18** mpg, highway **24** mpg, **$4.00**/gal (one click picks an F-150, Civic, RAV4, X3 or Pilot and fills in its EPA mpg and tank; editing mpg or tank makes it the reader's own car, named in the Custom field — "Custom" while blank; the charts call the gas car by that name), tank **26** gal, fill up at **15**% left, each fill-up **5** min (about 1 to start the pump, 2–3 to fill, ½–2 to pay; the station on the way). Its mpg drops in the cold: 15% city and 7% highway at 20°F, a straight line to none at 75°F (`GAS_COLD_LOSS`; fueleconomy.gov's cold-weather figures) |
 | Efficiency from | **Tested + EPA** / EPA only |
 
-Prices default to `vehicleTable.DEFAULT_ASSUMPTIONS` (0.17 / 0.48) so the two
+Prices default to `vehicleTable.DEFAULT_ASSUMPTIONS` (0.17 / 0.42) so the two
 places agree until a reader moves one.
 
 ## The model (pure, `src/utils/costToDrive.js`)
@@ -86,7 +86,7 @@ winter months with summer ones.
 
 ## The link
 
-`?tab=cost&m=<sub-tab>&v=<vehicle ids>&cd=3.<key>`.
+`?tab=cost&m=<sub-tab>&v=<vehicle ids>&cd=4.<key>`.
 
 `v` stays the readable vehicle parameter every tab shares. Every setting above
 is packed into ONE versioned parameter, `cd` — **the Cost to Drive key**, not
@@ -109,6 +109,14 @@ meant to be read (owner, 2026-11-07). `src/utils/costToDriveKey.js`:
   are written as version 3; version-1 and -2 keys open on the old week (long
   days between short ones, 220 mi, a planned Sunday stop) when they left it
   out.
+- Version 4 (2026-11-12): "stop to charge by" now defaults to 25% (was 30)
+  and the fast price to $0.42 (was $0.48), and three limits were loosened:
+  home price to $0–1, fast price to $0–1.50, detour to 0–30 min. A number is
+  stored as its steps above the field's MINIMUM, so a lower minimum shifts
+  every index — versions 1–3 read those three fields against the minimums they
+  were written with (`V3_MINS`) and their frozen defaults. Keys are written
+  as version 4. The rule for the next change: a moved default or a lowered
+  minimum is a new version, never an edit to a frozen table.
 - All defaults → no `cd` at all. A key that cannot be read falls back to the
   defaults and says so.
 - The short link (`k=`) carries `cd` as a string: append `cd` to `NAMES_V1`

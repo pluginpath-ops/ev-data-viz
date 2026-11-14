@@ -513,25 +513,25 @@ describe('EPA efficiency and electricity cost (#335)', () => {
         it('takes the assumed AC loss out of the label, then adds the DC session loss, and says the DC loss is an assumed average', () => {
             const [r] = buildVehicleRows([labeled]);
             const battery = 3 / ASSUMED_CHARGER_EFF;
-            expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (battery * (1 - DC_FAST_LOSS)));
+            expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.42 * 100 / (battery * (1 - DC_FAST_LOSS)));
             expect(r.notes['calc.costPer100Fast']).toBe('est.');
         });
 
         it('takes out the cert\'s own measured charging efficiency where it has one', () => {
             const [r] = buildVehicleRows([withCharger(0.9)]);
-            expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 / 0.9 * (1 - DC_FAST_LOSS)));
+            expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.42 * 100 / (3 / 0.9 * (1 - DC_FAST_LOSS)));
             expect(r.notes['calc.costPer100Fast']).toBe('est.');
         });
 
         it('costs less than the wall basis it replaced, and the home figure keeps the wall basis', () => {
             const [r] = buildVehicleRows([labeled]);
-            expect(r.values['calc.costPer100Fast']).toBeLessThan(0.48 * 100 / 3);
+            expect(r.values['calc.costPer100Fast']).toBeLessThan(0.42 * 100 / 3);
             expect(r.values['calc.costPer100Home']).toBeCloseTo(0.17 * 100 / 3);
         });
 
         it('prices an unlabeled vehicle on range ÷ battery, grossed up by the DC loss alone', () => {
             const [r] = buildVehicleRows([unlabeled]);
-            expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.48 * 100 / (3 * (1 - DC_FAST_LOSS)));
+            expect(r.values['calc.costPer100Fast']).toBeCloseTo(0.42 * 100 / (3 * (1 - DC_FAST_LOSS)));
             expect(r.notes['calc.costPer100Fast']).toBe('est.');
         });
 
@@ -671,7 +671,7 @@ describe('the charge window (#335)', () => {
         // Held to the sliders: the ends cannot cross, a price stays a price.
         expect(decodeVehicleTableParams('vt_win=70-30').assumptions).toMatchObject({ windowFrom: 40, windowTo: 50 });
         expect(decodeVehicleTableParams('vt_win=junk&vt_home=-3').assumptions)
-            .toMatchObject({ windowFrom: 10, windowTo: 80, homePrice: 0.05 });
+            .toMatchObject({ windowFrom: 10, windowTo: 80, homePrice: 0 });
     });
 });
 

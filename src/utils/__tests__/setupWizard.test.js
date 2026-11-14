@@ -3,7 +3,7 @@ import { AXIS_LIMIT_FIELDS } from '../axisLimits';
 import { describe, it, expect } from 'vitest';
 import {
     planFromAnswers, planSummary, starterSetIds, isCompleteVehicle, matchesRule, harderSeason,
-    sanitizeAnswers, skippedCount, seasonText, flipSeason, fill, EMPTY_ANSWERS, STEP_ANSWERS, RULE_FIELDS, RULE_OPS,
+    sanitizeAnswers, skippedCount, seasonText, flipSeason, fill, EMPTY_ANSWERS, STARTING_ANSWERS, STEP_ANSWERS, RULE_FIELDS, RULE_OPS,
     visibleSteps, askedQuestions, askedAnswers,
 } from '../setupWizard';
 import { sanitizeReview } from '../setupWizardStorage';
@@ -407,5 +407,20 @@ describe('planSummary', () => {
 
     it('fills templates and leaves an unknown placeholder visible', () => {
         expect(fill('{a} and {b}', { a: 1 })).toBe('1 and {b}');
+    });
+});
+
+describe('STARTING_ANSWERS — the number boxes hold real values', () => {
+    it('start at Cost & Time\'s own defaults, and nothing else is answered', () => {
+        expect(STARTING_ANSWERS).toMatchObject({ dailyMi: 35, homePrice: 0.17, gasMpg: 21, gasPrice: 4 });
+        expect(STARTING_ANSWERS.goals).toEqual([]);
+        expect(STARTING_ANSWERS.cars).toBeNull();
+    });
+    it('sit inside their boxes\' limits, so the first spinner click is valid', () => {
+        for (const [q, f] of [['dailyMi', SETUP_WIZARD.driving.dailyMi], ['homePrice', SETUP_WIZARD.money.homePrice],
+            ['gasMpg', SETUP_WIZARD.money.gasMpg], ['gasPrice', SETUP_WIZARD.money.gasPrice]]) {
+            expect(STARTING_ANSWERS[q], q).toBeGreaterThanOrEqual(f.min);
+            expect(STARTING_ANSWERS[q], q).toBeLessThanOrEqual(f.max);
+        }
     });
 });

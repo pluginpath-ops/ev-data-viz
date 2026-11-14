@@ -45,7 +45,8 @@
  *                 `mountains.ft` is the altitude "Mountains" means.
  *   money         home charging (each option's `level` is an index into
  *                 HOME_LEVELS in constants/costToDrive.js; 6 = no home charging)
- *                 and the number fields' limits and hints.
+ *                 and the number fields' limits. Their starting values are Cost & Time's own
+ *                 defaults (STARTING_ANSWERS in utils/setupWizard.js).
  *   summary       the labels on the last screen.
  *   reviewBar     the bar after Apply that lists the chosen charts, with
  *                 Next, Change answers and a close ×. Its season switch is
@@ -132,7 +133,7 @@ export const SETUP_WIZARD = {
     },
 
     driving: {
-        dailyMi: { label: 'Miles on a normal day', labelMetric: 'Kilometers on a normal day', min: 5, max: 400, step: 5, hint: 40 },
+        dailyMi: { label: 'Miles on a normal day', labelMetric: 'Kilometers on a normal day', min: 5, max: 400, step: 5 },
         commuterWeek: 'DDDDDOO',
         highway: {
             label: 'Where',
@@ -166,9 +167,9 @@ export const SETUP_WIZARD = {
                 { key: 'none',      label: 'No home charging',  detail: 'Public chargers only', level: 6 },
             ],
         },
-        homePrice: { label: 'Electricity at home',    min: 0.05, max: 0.60, step: 0.01, hint: 0.17, prefix: '$', unit: '/ kWh' },
-        gasMpg:    { label: "Your gas car's mileage", min: 5,    max: 60,   step: 1,    hint: 25,   unit: 'mpg' },
-        gasPrice:  { label: 'Gas price',              min: 1,    max: 8,    step: 0.01, hint: 3.20, prefix: '$', unit: '/ gal' },
+        homePrice: { label: 'Electricity at home',    min: 0,    max: 1,    step: 0.01, prefix: '$', unit: '/ kWh' },
+        gasMpg:    { label: "Your gas car's mileage", min: 5,    max: 60,   step: 1,    unit: 'mpg' },
+        gasPrice:  { label: 'Gas price',              min: 1,    max: 8,    step: 0.01, prefix: '$', unit: '/ gal' },
     },
 
     summary: {

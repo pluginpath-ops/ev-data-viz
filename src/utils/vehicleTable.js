@@ -297,7 +297,7 @@ const WINDOW_TIME_COLUMN = {
  * menu only offers the ones a shown column reads — a table without a cost
  * column has no price to set.
  */
-export const DEFAULT_ASSUMPTIONS = { addDistance: 150, windowFrom: 10, windowTo: 80, homePrice: 0.17, fastPrice: 0.48, rangeBasis: 'tested' };
+export const DEFAULT_ASSUMPTIONS = { addDistance: 150, windowFrom: 10, windowTo: 80, homePrice: 0.17, fastPrice: 0.42, rangeBasis: 'tested' };
 
 /**
  * What "Time to add" prices a percent of charge at (`vt_basis`): what the
@@ -312,15 +312,15 @@ const RANGE_BASES = ['tested', 'epa'];
  * 40% and To starts at 50%.
  *
  * The price defaults are round figures near US averages in 2026 — about 17¢
- * residential and 48¢ at a DC fast charger — and the Assumptions menu says
+ * residential and 42¢ at a DC fast charger — and the Assumptions menu says
  * they are assumptions, not quotes.
  */
 export const ASSUMPTION_RANGES = {
     addDistance: { min: 50,   max: 300,  step: 25 },
     windowFrom:  { min: 0,    max: 40,   step: 5 },
     windowTo:    { min: 50,   max: 100,  step: 5 },
-    homePrice:   { min: 0.05, max: 0.60, step: 0.01 },
-    fastPrice:   { min: 0.15, max: 1.00, step: 0.01 },
+    homePrice:   { min: 0,    max: 1.00, step: 0.01 },
+    fastPrice:   { min: 0,    max: 1.50, step: 0.01 }
 };
 
 /** A value held to its slider: in range, on a step, and the default when it is not a number. */
