@@ -592,8 +592,6 @@ describe('compositeFrom — measured from a start SoC (#408)', () => {
     it('keeps the two-test floor where the composite itself is decided', () => {
         expect(buildComposite([{ run: run(1), points: test({ kwAt: car }) }])).toBeNull();
         expect(buildComposite([{ run: run(1), points: test({ kwAt: car }) }], { minTests: 1 })).not.toBeNull();
-        // With no start given it still measures from where two tests have begun.
-        expect(compositeFrom([{ run: run(1), points: test({ from: 5, kwAt: car }) }])).toBeNull();
     });
 
     it('carries the mean of the tests\' own range readings', () => {
@@ -615,7 +613,7 @@ describe('compositeFrom — measured from a start SoC (#408)', () => {
         expect(c.points.every(p => p.time == null)).toBe(true);
     });
 
-    it('with no start, measures from as far back as two of its tests reach', () => {
+    it('from its earliest start, measures from as far back as two of its tests reach', () => {
         const tests = [
             { run: run(1), points: test({ from: 5, kwAt: car }) },
             { run: run(2), points: test({ from: 12, kwAt: car }) },
@@ -624,7 +622,7 @@ describe('compositeFrom — measured from a start SoC (#408)', () => {
         const reach = earliestStart(tests);
         expect(reach).toBeGreaterThanOrEqual(12);
         expect(reach).toBeLessThan(30);
-        const c = compositeFrom(tests);
+        const c = compositeFrom(tests, reach);
         expect(c.start).toBe(reach);
         expect(c.points[0]).toMatchObject({ soc: reach, time: 0 });
         expect(c.left).toEqual([{ runId: 3, name: 'test 3' }]);
@@ -636,7 +634,6 @@ describe('compositeFrom — measured from a start SoC (#408)', () => {
 
     it('has no earliest start with fewer than two tests to count', () => {
         expect(earliestStart([{ run: run(1), points: test({ from: 5, kwAt: car }) }])).toBeNull();
-        expect(compositeFrom([{ run: run(1), points: test({ from: 5, kwAt: car }) }])).toBeNull();
     });
 });
 
