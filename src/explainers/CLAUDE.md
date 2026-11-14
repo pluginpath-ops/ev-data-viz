@@ -42,8 +42,9 @@ claim has a test that shows it. `::: modeled <EPA link ids> [y=..] <caption>`
 does the same for Modeled Efficiency: each link's curve at standard conditions,
 its range tests corrected to them, and a link into the chart with them
 overlaid. The ids are the chart's `epa_m=`. Labs are
-registered in `ExplainerPage.jsx` (`LABS`); a figure with no component yet
-renders as a labeled placeholder.
+registered in `ExplainerPage.jsx` (`LABS`), figures with a component in
+`FIGURES` (`figures/`); a figure with no component yet renders as a labeled
+placeholder.
 
 **Explainers are written in public** (owner, 2026-09-28). `status: DRAFT`
 pages are readable on the site, tagged Draft on the landing page, with every

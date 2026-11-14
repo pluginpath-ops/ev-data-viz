@@ -461,3 +461,20 @@
 .explainer-diagram-charger { fill: var(--color-surface-sunken); stroke: var(--color-border-strong); }
 .explainer-diagram-cells { fill: var(--color-surface-sunken); stroke: var(--color-accent-violet); stroke-width: 1.5; }
 .explainer-diagram-wire path { fill: none; stroke: var(--color-text-secondary); stroke-width: 2; }
+
+/* Charging loss against charging time (figures/OutletLossFigure.jsx): one color
+   and one symbol per source, so a reader can tell them apart in either theme. */
+.explainer-loss-kw { stroke: var(--color-chart-grid); stroke-width: 1; stroke-dasharray: 2 3; }
+.explainer-loss-line, .explainer-loss-line line { stroke-width: 2; }
+.explainer-loss-line.is-thin { stroke-width: 1.25; stroke-dasharray: 4 3; }
+.explainer-loss-line .is-extended { stroke-dasharray: 6 4; }
+.explainer-loss-line.is-adac  { stroke: var(--color-accent-blue); }
+.explainer-loss-line.is-inl   { stroke: var(--color-accent-green); }
+.explainer-loss-line.is-sears { stroke: var(--color-accent-orange); }
+.explainer-loss-point { stroke: var(--color-card); stroke-width: 1; }
+.explainer-loss-point.is-adac   { fill: var(--color-accent-blue); }
+.explainer-loss-point.is-inl    { fill: var(--color-accent-green); }
+.explainer-loss-point.is-evbench { fill: var(--color-accent-violet); }
+.explainer-loss-point.is-ring { fill: var(--color-card); stroke: var(--color-accent-orange); stroke-width: 2; }
+.explainer-loss-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.explainer-loss-key { display: inline-flex; align-items: center; gap: 6px; }

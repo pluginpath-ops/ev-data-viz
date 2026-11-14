@@ -10,6 +10,7 @@ import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS } from '../../constants/epa';
 import { percentText } from '../../utils/costToDrive';
 import { DriveNumberField, DriveSlider, DriveChoice, DriveCheckbox, PlugWindow } from './DriveFields';
 import HomeLevelPicker from './HomeLevelPicker';
+import ExplainerLink from '../../explainers/ExplainerLink';
 import WeekPicker from './WeekPicker';
 import PackWarmingNote from './PackWarmingNote';
 
@@ -139,7 +140,7 @@ export function EfficiencyFields({ settings, onChange }) {
             </span>
             <span className="text-meta">
                 Charging losses: at 240 V, each car&rsquo;s own EPA figure, else {percentText(ASSUMED_CHARGER_EFF)} reaches the pack ·
-                120 V that × {percentText(WALL_OUTLET_CHARGER_EFF)} ÷ {percentText(ASSUMED_CHARGER_EFF)} ·
+                120 V that × {percentText(WALL_OUTLET_CHARGER_EFF)} ÷ {percentText(ASSUMED_CHARGER_EFF)} (<ExplainerLink topic="wall-outlet-charging-loss">why lower</ExplainerLink>) ·
                 DC fast {percentText(DC_FAST_LOSS)} lost after the port
             </span>
         </>
