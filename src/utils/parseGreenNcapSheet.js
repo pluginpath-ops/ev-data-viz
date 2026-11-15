@@ -61,15 +61,17 @@ const TEST_KEYS = [
 ];
 
 // Column header (+ its unit row) → field. The 2020–21 sheet repeats "from
-// grid" in Wh/s for the congestion rows, so the unit decides.
+// grid" in Wh/s for the congestion rows, so the unit decides. Wordings seen:
+// the 2020 Kona and ZOE say plain "Energy Consumption" for from-grid; the 2022
+// Q4 e-tron says "Gross Battery Capacity (from grid)" for recharged energy.
 const COLUMNS = [
-    { re: /from grid/,                      unit: /kwh\/100 ?km/, field: 'fromGridKwh100km' },
+    { re: /from grid|^energy consumption$/, unit: /kwh\/100 ?km/, field: 'fromGridKwh100km' },
     { re: /board comp\.? energy/,           unit: /kwh\/100 ?km/, field: 'boardComputerKwh100km' },
     { re: /driving range \(electr/,         unit: /^km$/,         field: 'rangeKm' },
-    { re: /recharged electric energy/,      unit: /kwh/,          field: 'rechargedKwh' },
+    { re: /recharged electric energy|gross battery capacity \(from grid\)/, unit: /kwh/, field: 'rechargedKwh' },
     { re: /net(to)? battery capacity/,      unit: /kwh/,          field: 'netBatteryKwh' },
     { re: /grid to battery/,                unit: /.*/,           field: 'gridToBattery' },
-    { re: /energy consumpt\. from battery/, unit: /kwh\/100 ?km/, field: 'fromBatteryKwh100km' },
+    { re: /(consumpt\.|consumption) from battery/, unit: /kwh\/100 ?km/, field: 'fromBatteryKwh100km' },
 ];
 
 function findCell(rows, pred) {
@@ -110,9 +112,16 @@ function readMainResults(rows, warnings) {
 
         const fig = {};
         for (const [field, c] of Object.entries(cols)) fig[field] = num(row[c]);
-        if (fig.rechargedKwh != null) battery.rechargedKwh = fig.rechargedKwh;
-        if (fig.netBatteryKwh != null) battery.netBatteryKwh = fig.netBatteryKwh;
-        if (fig.gridToBattery != null) battery.gridToBattery = fig.gridToBattery;
+        // First figure wins, and a "kWh" under 2 is not one: the 2022 Q4 e-tron
+        // has its efficiency (0.88) typed into the net-capacity column a row down.
+        for (const f of ['rechargedKwh', 'netBatteryKwh']) {
+            if (fig[f] == null || battery[f] != null) continue;
+            if (fig[f] < 2) warnings.push(`${f} ${fig[f]} on "${label}" is not a kWh figure; ignored`);
+            else battery[f] = fig[f];
+        }
+        // Stored as 0.874 in most sheets, 88.7 (a bare percent) in some.
+        if (fig.gridToBattery != null && battery.gridToBattery == null)
+            battery.gridToBattery = fig.gridToBattery > 1.5 ? fig.gridToBattery / 100 : fig.gridToBattery;
         delete fig.rechargedKwh; delete fig.netBatteryKwh; delete fig.gridToBattery;
         if (Object.values(fig).every(v => v == null)) continue; // a row the car was not put through
 
@@ -225,7 +234,8 @@ const usFigures = t => ({
 export function parseGreenNcapSheet(sheets) {
     const warnings = [];
     const resultsName = ['TEST_RESULTS', 'RESULTS'].find(n => sheets[n]);
-    const layout = resultsName === 'TEST_RESULTS' ? '2025' : sheets.RESULTS && findCell(sheets.RESULTS, t => /recharged electric energy/.test(t)) ? '2022' : '2020';
+    // 2022 is told from 2020 by the measured battery figures, read below.
+    let layout = resultsName === 'TEST_RESULTS' ? '2025' : '2020';
     if (!resultsName) warnings.push('No RESULTS or TEST_RESULTS sheet');
 
     const identity = readSpecs(sheets.SPECS ?? []);
@@ -238,6 +248,7 @@ export function parseGreenNcapSheet(sheets) {
         if (battery.rechargedKwh == null && /^measured recharged/.test(label)) battery.rechargedKwh = num(row[1]);
         if (battery.netBatteryKwh == null && /^measured netto? battery/.test(label)) battery.netBatteryKwh = num(row[1]);
     }
+    if (layout === '2020' && battery.netBatteryKwh != null) layout = '2022';
     if (battery.rechargedKwh != null && battery.netBatteryKwh != null) {
         const computed = battery.netBatteryKwh / battery.rechargedKwh;
         if (battery.gridToBattery == null) battery.gridToBattery = computed;

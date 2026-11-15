@@ -100,6 +100,24 @@ describe('parseGreenNcapSheet, 2020 layout', () => {
     });
 });
 
+describe('parseGreenNcapSheet, 2022 layout quirks', () => {
+    const results = [
+        at({ 1: 'MAIN RESULTS 1', 17: 'Energy Consumption from Grid', 25: 'Driving Range (electr. mode)',
+             26: 'Gross Battery Capacity (from grid)', 27: 'Measured Netto Battery Capacity',
+             28: 'Efiiciency grid to battery output', 29: 'Energy Consumption from Battery' }),
+        at({ 17: 'kWh/100km', 25: 'km', 26: 'kWh', 27: 'kWh', 28: '%', 29: 'kWh/100km' }),
+        at({ 1: 'Laboratory Tests', 3: 'WLTC+ cold engine (23°C)', 17: 16.5, 25: 414.4, 26: 68.5, 27: 61.0, 28: 89.08, 29: 14.72 }),
+        at({ 3: 'WLTC+ CAT (-7°C)', 17: 28.5, 25: 240.6, 27: 0.88, 29: 25.36 }),
+    ];
+    const car = parseGreenNcapSheet(odsSheets(xml(sheet('RESULTS', results))));
+
+    it('reads the other wordings, a bare percent, and keeps the first battery figure', () => {
+        expect(car.layout).toBe('2022');
+        expect(car.battery).toEqual({ rechargedKwh: 68.5, netBatteryKwh: 61, gridToBattery: 0.8908 });
+        expect(car.tests.map(t => [t.key, t.tempC, t.fromBatteryKwh100km])).toEqual([['wltc_cold', 23, 14.72], ['wltc_cat_cold', -7, 25.36]]);
+    });
+});
+
 describe('vinModelYear', () => {
     it('decodes position 10 near the test year, and declines a far one', () => {
         expect(vinModelYear('KNAAE8150R6011117', 2025)).toBe(2024);
