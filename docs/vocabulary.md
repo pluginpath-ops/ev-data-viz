@@ -337,6 +337,16 @@ voltage range (GM files full charge). Never compare it across makers or copy
 it into `battery_nominal_voltage_v` unchecked. Evidence:
 `epa-voltage-points-differ` in `src/explainers/facts.json`.
 
+### Green NCAP
+
+European lab and road tests, imported per car ([plan](green-ncap-plan.md)).
+
+| Thing | Call it | Lives in |
+|---|---|---|
+| One car Green NCAP tested, with its results sheet | **a Green NCAP assessment** — Green NCAP's own word. Not "rating" (that is its star score) or "certification" (EPA's) | [parseGreenNcapSheet.js](../src/utils/parseGreenNcapSheet.js), `scripts/fetchGreenNcap.mjs` |
+| One row of its results ("BAB130 Motorway", "WLTC+ Warm") | **a Green NCAP test**, named as printed. Its key (`bab130`, `wltc_warm`) is code only. Never "run" | `tests[].key` |
+| Its "Driving Range" | **computed range** — net battery capacity ÷ the test's consumption; Green NCAP does not drive the lab tests to empty | `rangeBasis` |
+
 ### Listed, unlisted, excluded
 
 Two questions: does a viewer see it (listed), and does it count (excluded). All
