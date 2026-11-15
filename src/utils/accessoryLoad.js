@@ -5,9 +5,10 @@
  * Two tests are not comparable if one ran a heater at 20°F and the other did
  * not. No test records its HVAC use, so the load is ASSUMED from the weather:
  * DEFAULT_ACCESSORY_W while the cabin holds itself (a comfort band around
- * 65°F), plus a straight line of watts per degree outside it. One line for
- * every car — a heat pump draws roughly half a resistive heater, and this
- * cannot tell them apart. See the explainer, "heating-cooling-and-range".
+ * 65°F), plus a heater below it — a straight line of watts per degree — or A/C
+ * above it, which rises with the square of the degrees: it barely runs at 75°F
+ * and works hard in the 90s. One load for every car — a heat pump draws
+ * roughly half a resistive heater, and this cannot tell them apart. See the explainer, "heating-cooling-and-range".
  *
  * ── Why watts become miles per kWh through speed ─────────────────────────────
  *
@@ -39,7 +40,7 @@
  */
 import {
     DEFAULT_ACCESSORY_W, ACCESSORY_COMFORT_BAND_F, ACCESSORY_HEAT_W_PER_F,
-    ACCESSORY_COOL_W_PER_F, ASSUMED_TEST_CONSUMPTION_WH_MI,
+    ACCESSORY_COOL_W_AT_95F, ACCESSORY_COOL_ANCHOR_F, ASSUMED_TEST_CONSUMPTION_WH_MI,
 } from '../constants/epa';
 import { val } from './calcTrace';
 
@@ -53,7 +54,7 @@ export function assumedAccessoryW(temperatureF, {
     baseW = DEFAULT_ACCESSORY_W,
     comfortBand = ACCESSORY_COMFORT_BAND_F,
     heatWPerF = ACCESSORY_HEAT_W_PER_F,
-    coolWPerF = ACCESSORY_COOL_W_PER_F,
+    coolWAt95F = ACCESSORY_COOL_W_AT_95F,
     trace = null,
 } = {}) {
     const t = Number(temperatureF);
@@ -64,22 +65,26 @@ export function assumedAccessoryW(temperatureF, {
         });
         return baseW;
     }
-    const watts = baseW
-        + heatWPerF * Math.max(0, comfortBand[0] - t)
-        + coolWPerF * Math.max(0, t - comfortBand[1]);
+    // The A/C is quoted at 95°F and scales with the square of the degrees above
+    // the band, so the anchor holds wherever the band's top edge is moved.
+    const coolSpan = ACCESSORY_COOL_ANCHOR_F - comfortBand[1];
+    const cooling = coolSpan > 0
+        ? coolWAt95F * (Math.max(0, t - comfortBand[1]) / coolSpan) ** 2
+        : 0;
+    const watts = baseW + heatWPerF * Math.max(0, comfortBand[0] - t) + cooling;
     trace?.step('Accessory load assumed from temperature', {
-        formula: 'P = P_base + heat × max(0, T_lo − T) + cool × max(0, T − T_hi)',
+        formula: 'P = P_base + heat × max(0, T_lo − T) + P_95 × (max(0, T − T_hi) / (95 − T_hi))²',
         values: {
             comfort_band: val(comfortBand, '°F', 'knob:ACCESSORY_COMFORT_BAND_F'),
             P_base: val(baseW, 'W', 'knob:DEFAULT_ACCESSORY_W'),
             heat: val(heatWPerF, 'W/°F', 'knob:ACCESSORY_HEAT_W_PER_F'),
-            cool: val(coolWPerF, 'W/°F', 'knob:ACCESSORY_COOL_W_PER_F'),
+            P_95: val(coolWAt95F, 'W', 'knob:ACCESSORY_COOL_W_AT_95F'),
             T_lo: val(comfortBand[0], '°F', 'knob:ACCESSORY_COMFORT_BAND_F'),
             T_hi: val(comfortBand[1], '°F', 'knob:ACCESSORY_COMFORT_BAND_F'),
             T: val(t, '°F'),
         },
         result: watts, unit: 'W', assumed: true,
-        note: 'no test records its heating or cooling; one line for every car',
+        note: 'no test records its heating or cooling; one load for every car',
     });
     return watts;
 }

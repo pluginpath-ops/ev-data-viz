@@ -1668,7 +1668,7 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         const knobs = read('src/constants/knobs.js');
         const epa = read('src/constants/epa.js');
         for (const key of ['DEFAULT_ACCESSORY_W', 'ACCESSORY_COMFORT_BAND_F', 'ACCESSORY_HEAT_W_PER_F',
-                           'ACCESSORY_COOL_W_PER_F', 'ASSUMED_TEST_CONSUMPTION_WH_MI']) {
+                           'ACCESSORY_COOL_W_AT_95F', 'ASSUMED_TEST_CONSUMPTION_WH_MI']) {
             expect(knobs, `${key} is tunable but absent from the Admin knobs`).toContain(`key: '${key}'`);
             expect(epa, `${key} is not resolved through the override layers`).toMatch(new RegExp(`resolve\\('${key}'`));
         }

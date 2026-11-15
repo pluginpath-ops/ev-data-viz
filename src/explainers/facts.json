@@ -2137,25 +2137,26 @@
     },
     {
       "id": "evbench-accessory-load-curve",
-      "claim": "The assumed load rises in a straight line: 50 W for each °F below 60 °F and 70 W for each °F above 70 °F, the same for every car. That is 2,300 W at 20 °F, 3,300 W at 0 °F, 1,000 W at 80 °F and 2,400 W at 100 °F.",
+      "claim": "The assumed heater rises in a straight line, 50 W for each °F below 60 °F; the assumed A/C rises with the square of the degrees above 70 °F, to 1,000 W at 95 °F. Both are the same for every car. With the 300 W base that is 2,300 W at 20 °F, 3,300 W at 0 °F, 460 W at 80 °F, 1,300 W at 95 °F and 1,740 W at 100 °F.",
       "value": {
         "heat_w_per_f": 50,
-        "cool_w_per_f": 70,
+        "cool_w_at_95f": 1000,
         "w_at_20f": 2300,
         "w_at_0f": 3300,
-        "w_at_80f": 1000,
-        "w_at_100f": 2400
+        "w_at_80f": 460,
+        "w_at_95f": 1300,
+        "w_at_100f": 1740
       },
       "sources": [
         {
           "rank": "C",
-          "title": "EVBench constants ACCESSORY_HEAT_W_PER_F and ACCESSORY_COOL_W_PER_F in src/constants/epa.js; owner's starting point, 2026-10-25, to be tuned (issue #475); figures by arithmetic",
+          "title": "EVBench constants ACCESSORY_HEAT_W_PER_F and ACCESSORY_COOL_W_AT_95F in src/constants/epa.js; heating the owner's starting point, 2026-10-25; cooling curve the owner's, 2026-11-15, read from same-car hot and mild repeats; to be tuned (issue #475); figures by arithmetic",
           "url": null,
-          "accessed": "2026-10-25"
+          "accessed": "2026-11-15"
         }
       ],
       "status": "verified",
-      "note": "A starting point, not a fit. The owner's view is that the truth probably depends heavily on a car's size and shape."
+      "note": "A starting point, not a fit. The cooling curve replaced a straight 70 W/°F, which over-corrected hot tests. The owner's view is that the truth probably depends heavily on a car's size and shape."
     },
     {
       "id": "evbench-test-cabin-setpoint",
@@ -2194,9 +2195,9 @@
     },
     {
       "id": "evbench-accessory-worked-hot",
-      "claim": "A 95 °F test at 70 mph using 300 Wh/mi, corrected to 70 °F, gains about 5.7% once its assumed A/C is taken out, where air density alone would take about 3.1% off.",
+      "claim": "A 95 °F test at 70 mph using 300 Wh/mi, corrected to 70 °F, gains about 1.8% once its assumed A/C is taken out, where air density alone would take about 3.1% off.",
       "value": {
-        "with_accessory": 0.057,
+        "with_accessory": 0.018,
         "air_density_only": -0.031,
         "wh_per_mi": 300,
         "mph": 70,
@@ -2207,7 +2208,7 @@
           "rank": "C",
           "title": "EVBench correction model at the 0.70 aero fraction; arithmetic",
           "url": null,
-          "accessed": "2026-10-25"
+          "accessed": "2026-11-15"
         }
       ],
       "status": "verified",
