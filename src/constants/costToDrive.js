@@ -40,25 +40,11 @@ export const HOME_LEVEL_ORDER = [NO_HOME_LEVEL, ...HOME_LEVELS.map((_, i) => i).
 export const levelKw = (level) => (level.volts * level.amps) / 1000;
 
 /**
- * What reaches the pack from a 120 V wall outlet, for a car at the site-wide
- * 240 V figure (ASSUMED_CHARGER_EFF). Lower: the car's own electronics draw a
- * fixed few hundred watts whatever the rate, and at 1.4 kW that is a large
- * share. A round figure, not a measurement; the page says it is assumed.
- *
- * A car with its own EPA 240 V figure gets this scaled by it — its figure ×
- * this ÷ the site-wide one (owner, 2026-11-08): the same charger and battery
- * do the work on either outlet, so a car that does well on one does well on
- * the other. Ratio or a fixed gap differ by under half a point across the
- * real range.
- */
-export const WALL_OUTLET_CHARGER_EFF = 0.80;
-
-/**
  * Below this, parked outside, a car warms its battery before it charges and
- * before it drives — energy not priced here. Above it, or in a garage, the
- * battery warms itself as it charges and the cost is small. The owner's own
- * experience (2026-11-08), not a measurement; it only decides when the page
- * warns.
+ * before it drives. Each home charge buys BATTERY_WARMING_KWH (constants/epa.js,
+ * a guess) per kWh of pack per °F below it; at or above it, or in a garage,
+ * the battery warms itself as it charges and the cost is small. The owner's
+ * own experience (2026-11-08), not a measurement.
  */
 export const PACK_WARMING_BELOW_F = 40;
 

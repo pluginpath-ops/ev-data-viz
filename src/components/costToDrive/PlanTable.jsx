@@ -60,10 +60,8 @@ const ROWS = [
 const FAST_KEYS = ROWS.filter(r => r.fast).map(r => r.key);
 
 export default function PlanTable({ week, settings }) {
-    // A night's cost: the week's home cost by its share of what the nights
-    // added, since every night is bought at one price through one charger.
-    const nightsAdded = week.days.reduce((t, d) => t + d.night.added, 0);
-    const homeCost = (night) => (nightsAdded > 0 ? week.homeCost * night.added / nightsAdded : 0);
+    // A night's cost: what it bought at the wall, battery warming in, at the home price.
+    const homeCost = (night) => night.homeKwh * settings.homePrice;
     const cols = [
         { key: 'figure', label: '', holds: 'noted-figures' },
         ...week.days.map(d => ({ key: d.day, label: d.day, numeric: true })),

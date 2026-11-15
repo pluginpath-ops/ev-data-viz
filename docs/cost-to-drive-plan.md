@@ -41,19 +41,23 @@ temperature, elevation and accessory correction at the HWFET average speed —
 EPA's city figure flatters an EV with regen in a way a real commute does not.
 "EPA only" prices both from that EPA figure. A car with no range test uses EPA
 for both and says so. Winter is a floor: the correction prices denser air and
-cabin heat, not battery warming or cold tires, and the page says so. No new
-cold knobs.
+cabin heat (battery warming is priced at home, below), not cold tires, and the page says so. No new
+cold knobs in the correction.
 
 **Home charging.** Power is the lesser of the level and the car's `max_ac_kw`
 (an assumed 11.5 kW when the spec is blank, said so). What reaches the pack:
-at 240 V, the car's own EPA certification figure (DC ÷ AC recharge, measured
+η_ref is the car's own EPA certification figure (DC ÷ AC recharge, measured
 or pinned; `epaRange.chargerEfficiency`, as the vehicle table uses), else
-`ASSUMED_CHARGER_EFF`; at 120 V, that × `WALL_OUTLET_CHARGER_EFF` (0.80) ÷
-`ASSUMED_CHARGER_EFF`, so a car good on 240 V is good on 120 V too (owner,
-2026-11-08). Home Charger lists each car's 240 V figure and where it came from.
-Below `PACK_WARMING_BELOW_F` (40°F) the Season settings and Home Charger warn
-that a car parked outside warms its battery before charging and driving,
-unpriced, worst on 120 V.
+`ASSUMED_CHARGER_EFF`, taken at the car's full AC power P_ref. Below it the
+car's fixed draw (`FIXED_DRAW_W`, 200 W, one value for every car) is a larger
+share: η = η_ref − P₀(1/P − 1/P_ref), P₀ = 0.2 kW (owner, 2026-11-15; it
+replaced a flat 0.80 on 120 V). A default car: 76.3% at 120 V/12 A, 85.0% at
+16 A, 87.6% at 32 A, 88.5% at 48 A and up. Home Charger lists each car's
+full-power figure and where it came from.
+Below `PACK_WARMING_BELOW_F` (40°F) each home charge buys battery warming,
+`BATTERY_WARMING_KWH` (0.002, a guess) × usable kWh × °F below, bought through
+η; assumed parked outside. Energy and cost only: it does not lengthen the night
+or take from what it adds. The Season settings and Home Charger say so.
 The window is the plug-in hours; a night that runs out says so.
 
 **Fast stops — the rule.** A stop is on the route, not a dash at the end:

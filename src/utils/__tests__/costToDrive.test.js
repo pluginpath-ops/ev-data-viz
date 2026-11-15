@@ -4,8 +4,8 @@ import {
     weekSummary, gasCarName, chargerText, chargingText, homeCostCeiling, plugHours, plugWindows,
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
-import { DEFAULT_COST_TO_DRIVE, GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
-import { ASSUMED_CHARGER_EFF } from '../../constants/epa';
+import { DEFAULT_COST_TO_DRIVE, GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME, MIN_STOP_ADD, STRETCH_CAP_TO, PACK_WARMING_BELOW_F, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
+import { ASSUMED_CHARGER_EFF, BATTERY_WARMING_KWH, FIXED_DRAW_W } from '../../constants/epa';
 
 // A Model Y-ish profile with fixed numbers, so the rule is tested apart from
 // how a vehicle record resolves: 75 kWh, 340 Wh/mi on a long day in winter.
@@ -14,6 +14,8 @@ const profile = (over = {}) => ({
     missing: null,
     whPerMi: { winter: { D: 323, L: 332 }, summer: { D: 250, L: 260 } },
     home: { kw: 11.5, eff: 0.885 },
+    // Battery warming at the default guess for a 75 kWh pack.
+    warmKwhPerF: 0.002 * 75,
     fast: { basis: 'maxDc', minutes: (a, b) => taperMinutes(75, 170, a, b) },
     ...over,
 });
@@ -266,16 +268,55 @@ describe('a vehicle record', () => {
         expect(costToDriveVehicle(vehicle, settings({ longMph: 80 })).whPerMi.summer.L).toBe(p.whPerMi.summer.L);
     });
 
-    it("uses the car's own EPA 240 V figure, and scales 120 V by it", () => {
+    // η(P) = η_ref − P₀(1/P − 1/P_ref), P₀ = FIXED_DRAW_W / 1000.
+    const effAt = (effRef, kw, refKw) => effRef - (FIXED_DRAW_W / 1000) * (1 / kw - 1 / refKw);
+    const effOf = (v, level) => costToDriveVehicle(v, settings({ level })).home.eff;
+
+    it('lowers the charger efficiency below the car\'s full AC power, by its fixed draw', () => {
+        // The default car: 11.5 kW onboard, the site-wide 88.5%, 200 W.
+        expect(FIXED_DRAW_W).toBe(200);
+        expect(ASSUMED_CHARGER_EFF).toBe(0.885);
+        expect(effOf(vehicle, 0)).toBeCloseTo(0.7635, 4);  // 120 V · 12 A
+        expect(effOf(vehicle, 1)).toBeCloseTo(0.850, 3);   // 240 V · 16 A
+        expect(effOf(vehicle, 3)).toBeCloseTo(0.876, 3);   // 240 V · 32 A
+        expect(effOf(vehicle, 4)).toBeCloseTo(0.885, 3);   // 48 A: 11.52 kW, capped at 11.5
+        expect(effOf(vehicle, 5)).toBe(0.885);             // 80 A, capped at P_ref
+        for (const level of [0, 1, 2, 3]) {
+            const kw = HOME_LEVELS[level].volts * HOME_LEVELS[level].amps / 1000;
+            expect(effOf(vehicle, level)).toBeCloseTo(effAt(0.885, kw, 11.5), 12);
+        }
+    });
+
+    it('a car charging at its own onboard charger\'s power gets its full-power figure', () => {
+        const at7 = { ...vehicle, specs: { charging: { max_ac_kw: 7.68 } } };
+        expect(effOf(at7, 3)).toBeCloseTo(0.885, 12);       // 32 A = 7.68 kW
+        expect(effOf(at7, 5)).toBeCloseTo(0.885, 12);       // 80 A, capped
+        expect(effOf(at7, 1)).toBeCloseTo(effAt(0.885, 3.84, 7.68), 12);
+    });
+
+    it('takes 11.5 kW as the full power when max AC kW is blank', () => {
+        const blank = { ...vehicle, specs: {} };
+        expect(costToDriveVehicle(blank, settings({ level: 0 })).home.onboardKw).toBe(11.5);
+        expect(effOf(blank, 0)).toBeCloseTo(effAt(0.885, 1.44, 11.5), 12);
+        expect(effOf(blank, 5)).toBeCloseTo(0.885, 12);
+    });
+
+    it("starts from the car's own EPA figure where it has one", () => {
         const own = { ...vehicle, epaRange: { ...vehicle.epaRange, chargerEfficiency: 0.91 } };
-        const at240 = costToDriveVehicle(own, settings({ level: 4 })).home;
-        expect(at240.eff).toBe(0.91);
-        expect(at240.effFrom).toBe('epa');
-        expect(costToDriveVehicle(own, settings({ level: 0 })).home.eff).toBeCloseTo(0.91 * WALL_OUTLET_CHARGER_EFF / ASSUMED_CHARGER_EFF, 9);
-        const site = costToDriveVehicle(vehicle, settings({ level: 4 })).home;
-        expect(site.eff).toBe(ASSUMED_CHARGER_EFF);
+        const full = costToDriveVehicle(own, settings({ level: 5 })).home;
+        expect(full.eff).toBe(0.91);
+        expect(full.effRef).toBe(0.91);
+        expect(full.effFrom).toBe('epa');
+        expect(effOf(own, 0)).toBeCloseTo(effAt(0.91, 1.44, 11.5), 12);
+        const site = costToDriveVehicle(vehicle, settings({ level: 5 })).home;
+        expect(site.effRef).toBe(ASSUMED_CHARGER_EFF);
         expect(site.effFrom).toBe('assumed');
-        expect(costToDriveVehicle(vehicle, settings({ level: 0 })).home.eff).toBeCloseTo(WALL_OUTLET_CHARGER_EFF, 9);
+    });
+
+    it('no home charging keeps the full-power figure and buys nothing at home', () => {
+        const p = costToDriveVehicle(vehicle, settings({ level: NO_HOME_LEVEL }));
+        expect(p.home.eff).toBe(0.885);
+        expect(simulateWeek(p, settings({ level: NO_HOME_LEVEL })).homeKwh).toBe(0);
     });
 
     it('takes the lesser of the charger and the onboard charger, and an assumed one when the spec is blank', () => {
@@ -287,7 +328,11 @@ describe('a vehicle record', () => {
         const blank = costToDriveVehicle({ ...vehicle, specs: {} }, settings({ level: 0 }));
         expect(blank.home.onboardAssumed).toBe(true);
         expect(blank.home.kw).toBeCloseTo(1.44, 6);
-        expect(blank.home.eff).toBe(0.80);
+    });
+
+    it('battery warming scales with the usable pack', () => {
+        expect(costToDriveVehicle(vehicle, settings()).warmKwhPerF).toBeCloseTo(BATTERY_WARMING_KWH * 75, 12);
+        expect(costToDriveVehicle({ ...vehicle, socWindowKwh: 135 }, settings()).warmKwhPerF).toBeCloseTo(BATTERY_WARMING_KWH * 135, 12);
     });
 
     it('cannot be priced without a usable capacity or any efficiency figure', () => {
@@ -413,16 +458,55 @@ describe('no home charging', () => {
     });
 });
 
+describe('battery warming', () => {
+    // What a night bought at the wall beyond its charge, back on the pack side.
+    const warmingOf = (p, s) => {
+        const w = simulateWeek(p, s);
+        const charged = w.days.filter(d => d.night.added > 0);
+        expect(charged.length).toBeGreaterThan(0);
+        return { w, perNight: charged.map(d => d.night.homeKwh * p.home.eff - d.night.added / 100 * p.usableKwh), nights: charged.length };
+    };
+
+    it('is none at or above 40°F', () => {
+        expect(PACK_WARMING_BELOW_F).toBe(40);
+        for (const winterF of [40, 45]) {
+            for (const kwh of warmingOf(profile(), settings({ winterF })).perNight) expect(kwh).toBeCloseTo(0, 9);
+        }
+        for (const kwh of warmingOf(profile(), settings({ season: 'summer' })).perNight) expect(kwh).toBeCloseTo(0, 9);
+    });
+
+    it('is charged once a night the charger runs, by pack and degrees below 40°F', () => {
+        for (const kwh of warmingOf(profile(), settings({ winterF: 15 })).perNight) expect(kwh).toBeCloseTo(BATTERY_WARMING_KWH * 75 * 25, 9);
+        for (const kwh of warmingOf(profile(), settings({ winterF: 30 })).perNight) expect(kwh).toBeCloseTo(BATTERY_WARMING_KWH * 75 * 10, 9);
+        const big = profile({ warmKwhPerF: BATTERY_WARMING_KWH * 150 });
+        for (const kwh of warmingOf(big, settings({ winterF: 15 })).perNight) expect(kwh).toBeCloseTo(BATTERY_WARMING_KWH * 150 * 25, 9);
+    });
+
+    it('is bought through the charger efficiency, and is in the week\'s home energy and cost', () => {
+        const s = settings({ winterF: 15 });
+        const cold = profile({ home: { kw: 1.44, eff: 0.76 } });
+        const warm = profile({ home: { kw: 1.44, eff: 0.76 }, warmKwhPerF: 0 });
+        const { w, nights } = warmingOf(cold, s);
+        const plain = simulateWeek(warm, s);
+        // The same nights charge the same: v1 takes nothing from what a night adds.
+        expect(w.days.map(d => d.night.added)).toEqual(plain.days.map(d => d.night.added));
+        expect(w.homeKwh - plain.homeKwh).toBeCloseTo(nights * BATTERY_WARMING_KWH * 75 * 25 / 0.76, 9);
+        expect(w.homeKwh).toBeCloseTo(w.days.reduce((t, d) => t + d.night.homeKwh, 0), 9);
+        expect(w.homeCost).toBeCloseTo(w.homeKwh * s.homePrice, 9);
+    });
+});
+
 describe('the most home charging could cost', () => {
+    // Summer at 75°F: no battery warming, so the ceiling is the charger alone.
     it('is the charger at full power through the plug-in window every night, a month of them, at the home price', () => {
         // 48 A: 11.52 kW × 9 h (10 pm to 7 am) × 7 nights × 52 ÷ 12 × $0.17.
-        const p = costToDriveVehicle({ socWindowKwh: 75, epaRange: { mi: 290 }, specs: { charging: { max_ac_kw: 19.2 } } }, settings({ level: 4 }));
-        expect(homeCostCeiling(p, settings({ level: 4 }))).toBeCloseTo(11.52 * 9 * 7 * (52 / 12) * 0.17, 6);
+        const p = costToDriveVehicle({ socWindowKwh: 75, epaRange: { mi: 290 }, specs: { charging: { max_ac_kw: 19.2 } } }, settings({ level: 4, season: 'summer' }));
+        expect(homeCostCeiling(p, settings({ level: 4, season: 'summer' }))).toBeCloseTo(11.52 * 9 * 7 * (52 / 12) * 0.17, 6);
     });
 
     it('stops at the onboard charger where the car cannot take the charger\'s power', () => {
-        const car = (kw) => costToDriveVehicle({ socWindowKwh: 75, epaRange: { mi: 290 }, specs: { charging: { max_ac_kw: kw } } }, settings({ level: 5 }));
-        const s = settings({ level: 5 });
+        const car = (kw) => costToDriveVehicle({ socWindowKwh: 75, epaRange: { mi: 290 }, specs: { charging: { max_ac_kw: kw } } }, settings({ level: 5, season: 'summer' }));
+        const s = settings({ level: 5, season: 'summer' });
         expect(homeCostCeiling(car(7.7), s)).toBeCloseTo(perMonth(7 * 7.7 * 9 * 0.17), 6);
         expect(homeCostCeiling(car(7.7), s)).toBeLessThan(homeCostCeiling(car(11.5), s));
     });
@@ -432,11 +516,17 @@ describe('the most home charging could cost', () => {
         expect(plugHours(settings({ plugFrom: 22, plugUntil: 7 }))).toBe(9);
         expect(plugHours(settings({ plugFrom: 7, plugUntil: 22 }))).toBe(15);
         expect(plugHours(settings({ plugFrom: 7, plugUntil: 7 }))).toBe(24);
-        expect(homeCostCeiling(p, settings({ plugFrom: 20, plugUntil: 7, homePrice: 0.2 })))
+        expect(homeCostCeiling(p, settings({ plugFrom: 20, plugUntil: 7, homePrice: 0.2, season: 'summer' })))
             .toBeCloseTo(perMonth(7 * 11.5 * 11 * 0.2), 6);
     });
 
-    it('is none with no home charging', () => {
+        it('adds each night\'s battery warming in the cold, bought through the charger efficiency', () => {
+        const p = profile();
+        const cold = settings({ winterF: 15 }), warm = settings({ winterF: 15, season: 'summer' });
+        expect(homeCostCeiling(p, cold) - homeCostCeiling(p, warm)).toBeCloseTo(perMonth(7 * BATTERY_WARMING_KWH * 75 * 25 / 0.885 * 0.17), 6);
+    });
+
+it('is none with no home charging', () => {
         expect(homeCostCeiling({ home: { kw: 0, eff: 0.885, none: true } }, settings())).toBeNull();
     });
 

@@ -11,12 +11,14 @@
  * Pure module — no React.
  */
 import {
-    HOME_LEVELS, levelKw, WALL_OUTLET_CHARGER_EFF, ASSUMED_ONBOARD_AC_KW, DETOUR_MPH,
+    HOME_LEVELS, levelKw, ASSUMED_ONBOARD_AC_KW, PACK_WARMING_BELOW_F, DETOUR_MPH,
     MIN_STOP_ADD, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS, PLANNED_HOUR,
     SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, GAS_COLD_AT_F, GAS_COLD_LOSS, WEEKDAYS, ENOUGH_MARGIN_MIN,
     GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME,
 } from '../constants/costToDrive';
-import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, HWFET_AVG_MPH, STANDARD_CONDITIONS } from '../constants/epa';
+import {
+    ASSUMED_CHARGER_EFF, FIXED_DRAW_W, BATTERY_WARMING_KWH, DC_FAST_LOSS, HWFET_AVG_MPH, STANDARD_CONDITIONS,
+} from '../constants/epa';
 import { correctionFactor } from './conditionCorrection';
 import { compositeRange } from './compositeRange';
 import { chargeTimeSession } from './chargeWindows';
@@ -232,11 +234,14 @@ function dayWhPerMi(vehicle, usableKwh, { mph, cityShare, temperatureF, altitude
  *   whPerMi: { summer: {D, L}, winter: {D, L} },
  *   highwayFrom: 'tested'|'epa'|null, cityFrom: 'epa'|'highway'|null,
  *   home: { kw: number, chargerKw: number, onboardKw: number, onboardAssumed: boolean, capped: boolean,
- *           eff: number, eff240: number, effFrom: 'epa'|'assumed' },
+ *           eff: number, effRef: number, effFrom: 'epa'|'assumed' },
+ *   warmKwhPerF: number|null,
  *   fast: { basis: string, run: Object|null, minutes: Function },
  * }}  `missing` says why the vehicle cannot be priced, when it cannot. `home.eff`
- *   is what reaches the pack at this level; `eff240` the car's 240 V figure,
- *   from its EPA certification (measured or pinned) or the site-wide one.
+ *   is what reaches the pack at this level (chargerEffAt); `effRef` the car's
+ *   figure at its full AC power, from its EPA certification (measured or
+ *   pinned) or the site-wide one. `warmKwhPerF` is the battery warming a home
+ *   charge buys, pack side, per °F below PACK_WARMING_BELOW_F.
  */
 export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, sessionOf = () => null, trace = null } = {}) {
     const usableKwh = finite(vehicle?.socWindowKwh) ? Number(vehicle.socWindowKwh) : null;
@@ -249,22 +254,23 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
     const onboardKw = onboardAssumed ? ASSUMED_ONBOARD_AC_KW : Number(specs.charging.max_ac_kw);
     const chargerKw = levelKw(level);
     const epaEff = finite(vehicle?.epaRange?.chargerEfficiency) ? Number(vehicle.epaRange.chargerEfficiency) : null;
-    const eff240 = epaEff ?? ASSUMED_CHARGER_EFF;
+    const effRef = epaEff ?? ASSUMED_CHARGER_EFF;
+    const kw = Math.min(chargerKw, onboardKw);
     const home = {
-        kw: Math.min(chargerKw, onboardKw),
+        kw,
         chargerKw, onboardKw, onboardAssumed,
         // A 48 A circuit is 11.52 kW at the wall against an 11.5 kW onboard
         // charger: equal for any reader, so not "capped".
         capped: onboardKw < chargerKw - CAPPED_TOLERANCE_KW,
         // No home charging has no charger and buys nothing at home; it takes
-        // the 240 V efficiency only so nothing divides by an outlet's.
-        eff: level.volts < 200 && !level.none ? eff240 * WALL_OUTLET_CHARGER_EFF / ASSUMED_CHARGER_EFF : eff240,
-        eff240,
+        // the full-power efficiency only so nothing divides by zero.
+        eff: level.none ? effRef : chargerEffAt(effRef, kw, onboardKw),
+        effRef,
         effFrom: epaEff != null ? 'epa' : 'assumed',
         none: !!level.none,
     };
-    if (trace) {
-        const h = trace.group('Home charging');
+    const h = trace?.group('Home charging');
+    if (h) {
         h.step('Charger at the wall', { formula: 'P_wall = V × A / 1000', values: { V: val(level.volts, 'V', 'setting'), A: val(level.amps, 'A', 'setting') }, result: chargerKw, unit: 'kW' });
         h.step('Home charging power', {
             formula: 'P_home = min(P_wall, P_onboard)',
@@ -272,20 +278,38 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
             result: home.kw, unit: 'kW', assumed: onboardAssumed,
             note: onboardAssumed ? 'no max AC kW in the specs: the onboard charger is assumed' : null,
         });
-        const η240 = val(eff240, null, epaEff != null ? 'data' : 'knob:ASSUMED_CHARGER_EFF');
-        const outlet = level.volts < 200 && !level.none;
-        h.step('Wall-to-pack efficiency', {
-            formula: outlet ? 'η_home = η_240 × η_outlet / η_site' : 'η_home = η_240',
-            values: outlet
-                ? { η_240: η240, η_outlet: val(WALL_OUTLET_CHARGER_EFF, null, 'code:WALL_OUTLET_CHARGER_EFF'), η_site: val(ASSUMED_CHARGER_EFF, null, 'knob:ASSUMED_CHARGER_EFF') }
-                : { η_240: η240 },
-            result: home.eff, assumed: epaEff == null,
-            note: level.none ? 'no home charging: nothing is bought at home'
-                : `${outlet ? 'a 120 V outlet, scaled from ' : ''}${epaEff != null ? "the car's EPA certification" : 'the site-wide figure (no EPA certification)'}`,
-        });
+        h.step('Wall-to-pack efficiency', level.none
+            ? { formula: 'η_home = η_ref', values: { η_ref: val(effRef, null, epaEff != null ? 'data' : 'knob:ASSUMED_CHARGER_EFF') }, result: home.eff, note: 'no home charging: nothing is bought at home' }
+            : {
+                formula: 'η_home = η_ref − P₀ × (1 / P − 1 / P_ref)',
+                values: {
+                    η_ref: val(effRef, null, epaEff != null ? 'data' : 'knob:ASSUMED_CHARGER_EFF'),
+                    'P₀': val(FIXED_DRAW_W / 1000, 'kW', 'knob:FIXED_DRAW_W'),
+                    P: val(kw, 'kW'),
+                    P_ref: val(onboardKw, 'kW', onboardAssumed ? 'code:ASSUMED_ONBOARD_AC_KW' : 'data'),
+                },
+                result: home.eff, assumed: epaEff == null,
+                note: `η_ref is ${epaEff != null ? "the car's EPA certification" : 'the site-wide figure (no EPA certification)'}, at the car's full AC power; below it the car's fixed draw is a larger share, so less reaches the pack`,
+            });
     }
     if (!usableKwh) {
-        return { usableKwh: null, missing: 'no usable battery capacity', whPerMi: null, highwayFrom: null, cityFrom: null, home, fast: null };
+        return { usableKwh: null, missing: 'no usable battery capacity', whPerMi: null, highwayFrom: null, cityFrom: null, home, warmKwhPerF: null, fast: null };
+    }
+    // Battery warming a home charge buys, pack side, per °F below PACK_WARMING_BELOW_F.
+    const warmKwhPerF = BATTERY_WARMING_KWH * BATTERY_WARMING_CAR_FACTOR * usableKwh;
+    if (h && !level.none) {
+        const temperatureF = settings.season === 'summer' ? settings.summerF : settings.winterF;
+        h.step('Battery warming per charge', {
+            formula: 'E_warm = k × f_car × E_usable × max(0, T_warm − T)',
+            values: {
+                k: val(BATTERY_WARMING_KWH, 'kWh/kWh/°F', 'knob:BATTERY_WARMING_KWH'),
+                f_car: val(BATTERY_WARMING_CAR_FACTOR, null, 'code:BATTERY_WARMING_CAR_FACTOR'),
+                E_usable: val(usableKwh, 'kWh', 'data'), T_warm: val(PACK_WARMING_BELOW_F, '°F', 'code:PACK_WARMING_BELOW_F'),
+                T: val(temperatureF, '°F', 'setting'),
+            },
+            result: batteryWarmingKwh(warmKwhPerF, temperatureF), unit: 'kWh', assumed: true,
+            note: `a guess, parked outside (less in a garage); the ${settings.season}. Added to each night the charger runs, bought through η_home`,
+        });
     }
     const whPerMi = { summer: {}, winter: {} };
     let highwayFrom = null, cityFrom = null;
@@ -307,13 +331,32 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
         }
     }
     if (!(whPerMi.winter.L > 0)) {
-        return { usableKwh, missing: 'no range test and no EPA highway figure', whPerMi: null, highwayFrom: null, cityFrom: null, home, fast: null };
+        return { usableKwh, missing: 'no range test and no EPA highway figure', whPerMi: null, highwayFrom: null, cityFrom: null, home, warmKwhPerF, fast: null };
     }
-    return { usableKwh, missing: null, whPerMi, highwayFrom, cityFrom, home, fast: fastChargeOf(vehicle, specs, usableKwh, trace?.group('Fast charging')) };
+    return { usableKwh, missing: null, whPerMi, highwayFrom, cityFrom, home, warmKwhPerF, fast: fastChargeOf(vehicle, specs, usableKwh, trace?.group('Fast charging')) };
 }
 
 /** How far below the wall's kW an onboard charger must be before it is said to cap it. */
 const CAPPED_TOLERANCE_KW = 0.25;
+
+/**
+ * What reaches the pack at `kw`, for a car whose charger efficiency is `effRef`
+ * at its onboard charger's full power `refKw`: η = η_ref − P₀(1/P − 1/P_ref).
+ * The car's fixed draw (FIXED_DRAW_W: standby, electronics, pumps) is the same
+ * at any rate, so it is a larger share of a slower charge. At full power it is
+ * η_ref; a level the onboard charger caps runs at full power.
+ */
+const chargerEffAt = (effRef, kw, refKw) => effRef - (FIXED_DRAW_W / 1000) * (1 / kw - 1 / refKw);
+
+/**
+ * The per-car share of BATTERY_WARMING_KWH, f_car. 1 for every car: a slot
+ * held open with a dummy value until real per-car figures exist (heater type,
+ * pack, insulation all differ). No spec field or UI yet. Revisit 2027-03-01.
+ */
+const BATTERY_WARMING_CAR_FACTOR = 1;
+
+/** Battery warming one home charge buys at `temperatureF`, pack side, kWh: none at or above PACK_WARMING_BELOW_F. */
+const batteryWarmingKwh = (warmKwhPerF, temperatureF) => warmKwhPerF * Math.max(0, PACK_WARMING_BELOW_F - temperatureF);
 
 // ── The week ─────────────────────────────────────────────────────────────────
 
@@ -389,6 +432,10 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
         },
         result: nightKwh.addPct, unit: '%', note: `plugged in ${s.plugFrom}:00 to ${s.plugUntil}:00, to ${s.chargeTo}% (100% before a Long day: ${s.fullBeforeLong ? 'yes' : 'no'})`,
     });
+    // Battery warming, pack side, once for each night the charger runs. v1 is
+    // energy and cost only: it neither lengthens the night nor takes from what
+    // the night adds (the warming a cold charge needs takes time too; not modeled).
+    const warmKwh = batteryWarmingKwh(profile.warmKwhPerF, season === 'summer' ? s.summerF : s.winterF);
     trace?.note(`Three weeks are driven (SETTLE_WEEKS = ${SETTLE_WEEKS} to settle) and the last reported, so Monday starts from what Sunday night left`);
     // The first stop of the reported week is written out as the example.
     let exampleStop = trace;
@@ -397,7 +444,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     let sundayNight = null;
     // Hours into today the last night's charging ran: the day starts no earlier.
     let morning = 0;
-    const out = { points: [], stops: [], days: [], miles: 0, usedKwh: 0, fastPackKwh: 0, homePackKwh: 0, fastMinutes: 0 };
+    const out = { points: [], stops: [], days: [], miles: 0, usedKwh: 0, fastPackKwh: 0, homePackKwh: 0, homeCharges: 0, fastMinutes: 0 };
 
     for (let w = 0; w <= SETTLE_WEEKS; w++) {
         const rec = w === SETTLE_WEEKS;
@@ -524,7 +571,8 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             const homeSoc = soc;
             const limit = s.fullBeforeLong && s.week[(d + 1) % 7] === 'L' ? 100 : s.chargeTo;
             // `hours` the charger ran; `mostAdd` what a night's whole window could add at full power, % of the pack (the home ceiling).
-            const night = { added: 0, endSoc: soc, fullAt: null, ranOut: false, hours: 0, mostAdd: nightKwh.addPct };
+            // `homeKwh` what the night bought at the wall, battery warming in.
+            const night = { added: 0, endSoc: soc, fullAt: null, ranOut: false, hours: 0, mostAdd: nightKwh.addPct, homeKwh: 0 };
             const plugIn = Math.max(s.plugFrom, clock);
             if (rec) out.points.push([base + plugIn, soc]);
             // No home charging: nothing is added overnight, so every kWh comes
@@ -537,9 +585,11 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                 night.hours = hours;
                 night.fullAt = night.ranOut ? null : (s.plugFrom + hours) % 24;
                 soc += add;
+                night.homeKwh = (add / 100 * usable + warmKwh) / profile.home.eff;
                 if (rec) {
                     out.points.push([base + plugIn + hours, soc]);
                     out.homePackKwh += add / 100 * usable;
+                    out.homeCharges += 1;
                     if (d === 6) sundayNight = { from: base + plugIn, hours, startSoc: soc - add, add };
                 }
             }
@@ -562,7 +612,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     }
 
     const fastKwh = out.fastPackKwh / (1 - DC_FAST_LOSS);
-    const homeKwh = out.homePackKwh / profile.home.eff;
+    const homeKwh = (out.homePackKwh + out.homeCharges * warmKwh) / profile.home.eff;
     if (trace) {
         const days = trace.group('The reported week, day by day');
         for (const day of out.days) {
@@ -574,7 +624,17 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             });
         }
         trace.step('Fast charging bought', { formula: 'E_fast = E_pack_all / (1 − loss)', values: { E_pack_all: val(out.fastPackKwh, 'kWh'), loss: val(DC_FAST_LOSS, null, 'knob:DC_FAST_LOSS') }, result: fastKwh, unit: 'kWh' });
-        trace.step('Home charging bought', { formula: 'E_home = E_pack_all / η_home', values: { E_pack_all: val(out.homePackKwh, 'kWh'), η_home: val(profile.home.eff) }, result: homeKwh, unit: 'kWh' });
+        trace.step('Battery warming bought', {
+            formula: 'E_warm_all = n × E_warm / η_home',
+            values: { n: val(out.homeCharges, 'nights'), E_warm: val(warmKwh, 'kWh'), η_home: val(profile.home.eff) },
+            result: out.homeCharges * warmKwh / profile.home.eff, unit: 'kWh', assumed: true,
+            note: `a guess: once each night the charger runs, parked outside; none at or above ${PACK_WARMING_BELOW_F}°F`,
+        });
+        trace.step('Home charging bought', {
+            formula: 'E_home = (E_pack_all + n × E_warm) / η_home',
+            values: { E_pack_all: val(out.homePackKwh, 'kWh'), n: val(out.homeCharges, 'nights'), E_warm: val(warmKwh, 'kWh'), η_home: val(profile.home.eff) },
+            result: homeKwh, unit: 'kWh',
+        });
         trace.step('Fast cost a week', { formula: 'cost_fast = E_fast × price_fast', values: { E_fast: val(fastKwh, 'kWh'), price_fast: val(s.fastPrice, '$/kWh', 'setting') }, result: fastKwh * s.fastPrice, unit: '$' });
         trace.step('Home cost a week', { formula: 'cost_home = E_home × price_home', values: { E_home: val(homeKwh, 'kWh'), price_home: val(s.homePrice, '$/kWh', 'setting') }, result: homeKwh * s.homePrice, unit: '$' });
         trace.step('Fast-charging time a week', { formula: 'the sum of every t_stop', result: out.fastMinutes, unit: 'min', note: `${out.stops.length} stop${out.stops.length === 1 ? '' : 's'}` });
@@ -886,14 +946,18 @@ export const perMonth = (weekly) => weekly * WEEKS_PER_MONTH;
  * of the charger and the car's onboard charger, at full power for the whole
  * plug-in window, every night (the day off too), at the home price. Energy
  * bought at the wall, losses in, so it is directly comparable to the `homeCost`
- * the week is priced at, which never exceeds it. Null with no home charging.
+ * the week is priced at, which never exceeds it. Each night's battery warming
+ * (at the season shown) is added on top, since v1 prices it without taking it
+ * from the night's charging. Null with no home charging.
  *
- * @param {Object} profile   costToDriveVehicle's answer (`home.kw`, `home.none`)
+ * @param {Object} profile   costToDriveVehicle's answer (`home`, `warmKwhPerF`)
  * @param {Object} settings  normalized settings
  */
-export const homeCostCeiling = (profile, settings) => (
-    profile.home.none ? null : perMonth(7 * profile.home.kw * plugHours(settings) * settings.homePrice)
-);
+export function homeCostCeiling(profile, settings) {
+    if (profile.home.none) return null;
+    const warmKwh = batteryWarmingKwh(profile.warmKwhPerF, settings.season === 'summer' ? settings.summerF : settings.winterF);
+    return perMonth(7 * (profile.home.kw * plugHours(settings) + warmKwh / profile.home.eff) * settings.homePrice);
+}
 
 /**
  * One vehicle against the gas car, for the season shown and across a year
