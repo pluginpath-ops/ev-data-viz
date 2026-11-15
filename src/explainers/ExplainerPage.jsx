@@ -110,7 +110,7 @@ function SourceItem({ id }) {
     if (!fact) return <li id={`src-${id}`} className="is-unverified">Unknown fact: {id}</li>;
     return (
         <li id={`src-${id}`} className={`is-${fact.status}`}>
-            <span className="explainer-source-claim">{fact.claim}</span>
+            <span className="explainer-source-claim">{fact.summary ?? fact.claim}</span>
             {fact.status === 'unverified' && <span className="explainer-unverified-tag">unverified</span>}
             {UNSOURCED_TAG[fact.status] && (
                 <span className="explainer-source">
@@ -119,10 +119,15 @@ function SourceItem({ id }) {
                 </span>
             )}
             {fact.sources.map((s, n) => (
+                // A source with a label shows just that; its full title and access
+                // date move to the hover. One without keeps the long form.
                 <span key={n} className="explainer-source">
                     <span className="explainer-rank" title={RANK_NAMES[s.rank]}>{s.rank}</span>
-                    {s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a> : s.title}
-                    <span className="text-meta"> · accessed {s.accessed}</span>
+                    {s.url
+                        ? <a href={s.url} target="_blank" rel="noopener noreferrer"
+                            title={s.label ? `${s.title} · accessed ${s.accessed}` : undefined}>{s.label ?? s.title}</a>
+                        : <span title={s.label ? s.title : undefined}>{s.label ?? s.title}</span>}
+                    {!s.label && <span className="text-meta"> · accessed {s.accessed}</span>}
                 </span>
             ))}
         </li>
@@ -343,7 +348,7 @@ function Citation({ id, ctx }) {
     const suffix = status === 'verified' ? '' : ` (${UNSOURCED_TAG[status] ?? 'unverified'})`;
     return (
         <sup className={`explainer-cite is-${status === 'observed' ? 'accepted' : status}`}>
-            <a href={`#src-${id}`} onClick={jumpTo} title={fact ? `${fact.claim}${suffix}` : `Unknown fact ${id}`}>
+            <a href={`#src-${id}`} onClick={jumpTo} title={fact ? `${fact.summary ?? fact.claim}${suffix}` : `Unknown fact ${id}`}>
                 {ctx.citeNo.get(id)}
             </a>
         </sup>

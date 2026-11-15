@@ -140,7 +140,7 @@ export function EfficiencyFields({ settings, onChange }) {
             </span>
             <span className="text-meta">
                 Charging losses: at 240 V, each car&rsquo;s own EPA figure, else {percentText(ASSUMED_CHARGER_EFF)} reaches the pack ·
-                120 V that × {percentText(WALL_OUTLET_CHARGER_EFF)} ÷ {percentText(ASSUMED_CHARGER_EFF)} (<ExplainerLink topic="wall-outlet-charging-loss">why lower</ExplainerLink>) ·
+                120 V that × {percentText(WALL_OUTLET_CHARGER_EFF)} ÷ {percentText(ASSUMED_CHARGER_EFF)} (<ExplainerLink topic="evbench-charging-energy">why lower</ExplainerLink>) ·
                 DC fast {percentText(DC_FAST_LOSS)} lost after the port
             </span>
         </>

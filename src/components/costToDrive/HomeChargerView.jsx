@@ -401,7 +401,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                     </table>
                                     <p className="text-note plan-table-footnote">
                                         <span className="is-enough">Bold</span> — No further time or cost savings with a faster home charger.
-                                        <br />At 240 V, reaching the pack: {columns.map(c => `${vehicleLabel(c.vehicle)} ${percentText(c.profile.home.eff240)} (${c.profile.home.effFrom === 'epa' ? 'EPA' : 'site-wide'})`).join(' · ')}. On 120 V, each × {percentText(WALL_OUTLET_CHARGER_EFF)} ÷ {percentText(ASSUMED_CHARGER_EFF)}. <ExplainerLink topic="wall-outlet-charging-loss" />
+                                        <br />At 240 V, reaching the pack: {columns.map(c => `${vehicleLabel(c.vehicle)} ${percentText(c.profile.home.eff240)} (${c.profile.home.effFrom === 'epa' ? 'EPA' : 'site-wide'})`).join(' · ')}. On 120 V, each × {percentText(WALL_OUTLET_CHARGER_EFF)} ÷ {percentText(ASSUMED_CHARGER_EFF)}. <ExplainerLink topic="evbench-charging-energy" />
                                         {cappedBy.length > 0 && (
                                             <><br /><span title={`Onboard chargers: ${cappedBy.join(', ')}`}>^ — Limited by vehicle charger</span></>
                                         )}

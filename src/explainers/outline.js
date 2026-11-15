@@ -49,8 +49,10 @@ export const OUTLINE = [
               children: [
                   { slug: 'dc-fast-charging-loss', title: 'How much energy does DC fast charging lose?',
                     blurb: 'Why the label’s charging loss is an AC figure, what a fast charge loses instead, and how EVBench came to 9%.' },
-                  { slug: 'wall-outlet-charging-loss', title: 'Why does a 120 V wall outlet lose more?',
-                    blurb: 'The car’s electronics draw the same few hundred watts at any rate, so a slow charge pays more of them. What the measurements say, and EVBench’s 80%.' },
+                  { slug: 'charging-speed-and-energy', title: 'How does charging speed impact energy consumption?',
+                    blurb: 'Where the energy goes on a home charge, and why a slower charge takes more of it.' },
+                  { slug: 'evbench-charging-energy', title: 'How does EVBench calculate charging energy consumption?',
+                    blurb: 'One fixed draw added to each car’s EPA figure, and how well that fits the measurements.' },
               ] },
         ],
     },

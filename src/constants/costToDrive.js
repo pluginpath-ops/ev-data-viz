@@ -45,7 +45,7 @@ export const levelKw = (level) => (level.volts * level.amps) / 1000;
  * fixed few hundred watts whatever the rate, and at 1.4 kW that is a large
  * share. A round figure, not a measurement; the page says it is assumed.
  * The evidence behind it, and how far it holds: the explainer
- * `wall-outlet-charging-loss` (src/explainers/content/).
+ * `evbench-charging-energy` (src/explainers/content/).
  *
  * A car with its own EPA 240 V figure gets this scaled by it — its figure ×
  * this ÷ the site-wide one (owner, 2026-11-08): the same charger and battery
