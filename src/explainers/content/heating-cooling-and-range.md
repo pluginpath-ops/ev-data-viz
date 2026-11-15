@@ -18,9 +18,11 @@ The guess is simple. EVBench assumes every test ran with a base accessory load o
 electronics and a cabin that is holding itself at a comfortable temperature
 [[fact:evbench-assumed-test-accessory-load]]. That is about right when it is 60 to 70 °F outside: most range tests
 are run with the cabin at 68 to 72 °F [[fact:evbench-test-cabin-setpoint]], which a car manages on its own at about
-65 °F. Outside that band the assumed load climbs in a straight line, 50 W for every °F colder than 60 and 70 W
-for every °F hotter than 70 [[fact:evbench-accessory-load-curve]]. So a test at 20 °F is assumed to have run a
-2,300 W heater alongside its base load, and one at 95 °F about 1,750 W of air conditioning on top of it.
+65 °F. Below that band the assumed heater climbs in a straight line, 50 W for every °F colder than 60. Above it
+the air conditioning climbs faster the hotter it gets, with the square of the degrees over 70, to 1,000 W at 95 °F
+[[fact:evbench-accessory-load-curve]]: it barely runs on a warm day and works hard on a hot one. So a test at 20 °F
+is assumed to have run a 2,000 W heater alongside its base load, one at 80 °F about 160 W of air conditioning, and
+one at 95 °F about 1,000 W.
 
 ## Why does a heater cost more miles on a slow day?
 
@@ -43,13 +45,13 @@ the reader asked for. Two worked cases, both for a test at 70 mph:
 | The test | Corrected to | Air density alone | With the assumed load |
 |---|---|---|---|
 | 20 °F, 350 Wh/mi | 70 °F | +7.3% | +16.7% [[fact:evbench-accessory-worked-cold]] |
-| 95 °F, 300 Wh/mi | 70 °F | −3.1% | +5.7% [[fact:evbench-accessory-worked-hot]] |
+| 95 °F, 300 Wh/mi | 70 °F | −3.1% | +1.8% [[fact:evbench-accessory-worked-hot]] |
 
 The hot case is the surprising one. Warm air is thinner [[fact:physics-air-density-drag]], which flatters a test, so air density alone would say
 the car was helped by the weather and take about 3% off its range. But the car was also running its air
 conditioning, and once that is allowed for the same test looks harder, not easier, than a 70 °F one.
 
-The slider works the other way too. If a reader corrects a mild-weather test to 20 °F, the 2,300 W heater is
+The slider works the other way too. If a reader corrects a mild-weather test to 20 °F, the 2,000 W heater is
 added back in, and the range drops accordingly. The Accessory Load slider on the correction target follows the
 temperature slider until the reader moves it; after that it stays where they put it, and its "auto" button
 hands it back.
@@ -95,15 +97,20 @@ EVBench uses one straight line for every car. That is a convenience, and a rough
   need conditioning, and tires and regeneration behave differently; EVBench does not model any of that. EVBench lets
   you correct to 0 °F, and includes tests down to 0 °F in a composite, because you asked or because that is the
   data; it just does not claim the answer is precise.
-- **Car size and shape.** A larger cabin and more glass take more to heat and cool. The slopes are a starting
-  point rather than a fit, and the owner's own view is that the truth probably depends heavily on the vehicle.
+- **Car size and shape.** A larger cabin and more glass take more to heat and cool. The heating slope and the
+  cooling curve are a starting point rather than a fit, and the owner's own view is that the truth probably depends heavily on the vehicle.
   Checking the corrections against actual tests is a separate piece of work (#475).
-- **Time stopped, soak and pull-down.** The line is a steady-state average for a moving car. EVBench does not model the pull-down of a hot-soaked
+- **What cars actually draw.** A few cars show the split on their own energy screen. On the three range tests
+  recorded so far, climate drew about 290 to 710 W in mild weather and the electronics about 450 to 610 W
+  [[fact:measured-accessory-loads]]. So the base load is low for some cars, and the heating and cooling are never
+  quite zero; that part cancels in a correction, because the test and the target both carry it. None of the three
+  was hot, so the A/C figure is not measured yet.
+- **Time stopped, soak and pull-down.** The assumed load is a steady-state average for a moving car. EVBench does not model the pull-down of a hot-soaked
   cabin, which draws much more at first.
 - **The reference table.** The accessory-load table behind the slider's ⓘ lists heat-pump, resistive, A/C,
   battery-conditioning and lighting draws by temperature [[fact:evbench-accessory-reference-table]]. Its figures
-  have no source recorded yet, which is why this page is still a draft. The assumed line was read against the
-  table, not derived from it.
+  have no source recorded yet, which is why this page is still a draft. The assumed heating line was read against
+  the table, not derived from it.
 
 ## How to read a corrected cold figure
 
@@ -123,7 +130,8 @@ density and wind), and a target load P* at target speed v*:
     k = C / C_target
 
 and k multiplies efficiency and range, as every correction factor does. P(T) is the base 300 W plus
-50 W/°F below 60 °F and 70 W/°F above 70 °F [[fact:evbench-accessory-load-curve]]; P* is the same function of the
+50 W/°F below 60 °F, and above 70 °F the A/C term 1,000 W × ((T − 70) / 25)², which is 1,000 W at 95 °F
+[[fact:evbench-accessory-load-curve]]; P* is the same function of the
 target temperature unless the reader sets it. A mixed cycle's own average speed is used for v, since the heater
 runs on whatever the car does; a test that recorded no energy is taken as 300 Wh/mi and its note says so. If the
 assumed accessory share ever exceeds the test's whole consumption, the accessory term is skipped and the note

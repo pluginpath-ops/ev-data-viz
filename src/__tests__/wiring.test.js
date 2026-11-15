@@ -1668,7 +1668,7 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         const knobs = read('src/constants/knobs.js');
         const epa = read('src/constants/epa.js');
         for (const key of ['DEFAULT_ACCESSORY_W', 'ACCESSORY_COMFORT_BAND_F', 'ACCESSORY_HEAT_W_PER_F',
-                           'ACCESSORY_COOL_W_PER_F', 'ASSUMED_TEST_CONSUMPTION_WH_MI']) {
+                           'ACCESSORY_COOL_W_AT_95F', 'ASSUMED_TEST_CONSUMPTION_WH_MI']) {
             expect(knobs, `${key} is tunable but absent from the Admin knobs`).toContain(`key: '${key}'`);
             expect(epa, `${key} is not resolved through the override layers`).toMatch(new RegExp(`resolve\\('${key}'`));
         }
@@ -1699,6 +1699,26 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         const ledger = JSON.parse(read('src/explainers/facts.json')).facts.find(f => f.id === 'dc-fast-round-trip-pairs');
         expect(epa, 'the default must be the ledger\'s').toContain(`DC_FAST_LOSS: ${ledger.value.evbench_default},`);
         expect(read('src/explainers/content/dc-fast-charging-loss.md'), 'and the explainer must cite the round trip').toContain('[[fact:dc-fast-round-trip-pairs]]');
+    });
+
+    it('keeps the measured accessory loads tied to the cooling default, and each reading self-consistent (#449)', () => {
+        // The owner adds a row whenever a test shows the split; a row whose watts
+        // do not follow from its own kWh and hours is a typo, not a reading.
+        const ledger = JSON.parse(read('src/explainers/facts.json')).facts.find(f => f.id === 'measured-accessory-loads');
+        expect(read('src/constants/epa.js'), 'the default must be the ledger\'s').toMatch(
+            new RegExp(`ACCESSORY_COOL_W_AT_95F:\\s+${ledger.value.evbench_cool_w_at_95f},`));
+        for (const r of ledger.value.readings) {
+            for (const k of ['climate', 'electronics']) {
+                expect(r[`${k}_w`], `${r.car}: ${k}_w must be ${k}_kwh ÷ hours`)
+                    .toBeCloseTo(r[`${k}_kwh`] * 1000 / r.hours, -1);
+                if (r[`${k}_pct`] != null) {
+                    expect(r[`${k}_kwh`], `${r.car}: ${k}_kwh must be ${k}_pct × total`)
+                        .toBeCloseTo(r[`${k}_pct`] / 100 * r.total_kwh, 1);
+                }
+            }
+        }
+        expect(read('src/explainers/content/heating-cooling-and-range.md'), 'and the explainer must cite them')
+            .toContain('[[fact:measured-accessory-loads]]');
     });
 
     it('offers the accessory load on the correction target, and writes it to the link only when set (#449)', () => {

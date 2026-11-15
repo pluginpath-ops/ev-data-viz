@@ -218,19 +218,37 @@ export const EPA_DEFAULTS = {
     // The heating and cooling a range test is assumed to have run with (#449).
     // No test records its HVAC use, so the load is a stand-in: DEFAULT_ACCESSORY_W
     // while the cabin holds itself, plus a heater or A/C once the weather leaves
-    // the comfort band. One straight line each way, for every car, whatever
-    // heats it — a heat pump draws roughly half a resistive heater, and the
-    // line cannot tell them apart. The slopes are a starting point, not a fit
-    // (owner, 2026-10-25), read against the reference table in
-    // AccessoryLoadReference.jsx, whose own figures are unsourced: heating at
-    // 50 W/°F is 1,700 W at 32°F (between its heat-pump and resistive columns)
-    // and 3,300 W at 0°F (inside the heat pump's); cooling at 70 W/°F is 1,000 W
-    // at 80°F, the low end of its A/C column. The truth is probably very much
-    // vehicle size and shape dependent; #475 will compare predicted corrections
-    // with actual tests before anything is fitted.
-    ACCESSORY_COMFORT_BAND_F: [60, 70],   // °F: no heating or cooling inside it
-    ACCESSORY_HEAT_W_PER_F:   50,         // W for each °F below the band
-    ACCESSORY_COOL_W_PER_F:   70,         // W for each °F above the band
+    // the comfort band. One load for every car, whatever heats it — a heat pump
+    // draws roughly half a resistive heater, and the model cannot tell them
+    // apart. The truth is probably very much vehicle size and shape dependent;
+    // #475 compares predicted corrections with actual tests before anything is
+    // fitted.
+    //
+    // Heating is a straight line, 50 W/°F: 1,700 W at 32°F (between the heat-pump
+    // and resistive columns of AccessoryLoadReference.jsx, whose own figures are
+    // unsourced) and 3,300 W at 0°F. A starting point (owner, 2026-10-25), and the
+    // two cold-ish screens below put it about right.
+    //
+    // Cooling is a CURVE, the square of the degrees above the band, anchored at
+    // 1,000 W at 95°F (owner, 2026-11-15): 160 W at 80°F, 1,250 W at 98°F. It
+    // was a straight 70 W/°F, which credited 700 W at 80°F and 1,960 W at 98°F,
+    // and that over-corrected hot tests. Same-car repeats under the same
+    // procedure, corrected to 70°F (mi/kWh, hot test against its mild twin):
+    //   R1S Dual Max 96°F vs 66°F       line 2.68 vs 2.58   curve 2.60 vs 2.58
+    //   Model Y Performance 98°F vs
+    //     Model Y L 80°F (owner expects the Performance slightly worse)
+    //                                   line 4.07 vs 4.00   curve 3.91 vs 3.88
+    //   Gravity GT 80°F vs 66°F         line 3.00 vs 3.07   curve 2.93 vs 3.07
+    // The Gravity pair pulls the other way, inside the ~5% that repeats of one
+    // car spread by. The curve's shape is the owner's: A/C barely works at 75°F
+    // and works hard in the 90s. Measured climate and electronics draws, read
+    // off in-car energy screens, are kept in facts.json as
+    // `measured-accessory-loads` — add to it as more turn up. So far they say
+    // mild-weather HVAC is a per-car floor, which cancels in a correction, and
+    // none was hot, so the 95°F anchor is a read of the pairs above.
+    ACCESSORY_COMFORT_BAND_F:  [60, 70],  // °F: no heating or cooling inside it
+    ACCESSORY_HEAT_W_PER_F:    50,        // W for each °F below the band
+    ACCESSORY_COOL_W_AT_95F:   1000,      // W of A/C at 95°F; rises with the square of °F above the band
     // What a range test is taken to have used, in Wh/mi, when it records no
     // energy — the load in watts is turned into range through the test's OWN
     // consumption, and a blank has to be taken as something.
@@ -415,8 +433,10 @@ export const ACCESSORY_COMFORT_BAND_F =
     resolve('ACCESSORY_COMFORT_BAND_F', EPA_DEFAULTS.ACCESSORY_COMFORT_BAND_F);
 export const ACCESSORY_HEAT_W_PER_F =
     resolve('ACCESSORY_HEAT_W_PER_F', EPA_DEFAULTS.ACCESSORY_HEAT_W_PER_F);
-export const ACCESSORY_COOL_W_PER_F =
-    resolve('ACCESSORY_COOL_W_PER_F', EPA_DEFAULTS.ACCESSORY_COOL_W_PER_F);
+export const ACCESSORY_COOL_W_AT_95F =
+    resolve('ACCESSORY_COOL_W_AT_95F', EPA_DEFAULTS.ACCESSORY_COOL_W_AT_95F);
+/** The temperature ACCESSORY_COOL_W_AT_95F is quoted at. Fixed: it is the knob's unit, not a setting. */
+export const ACCESSORY_COOL_ANCHOR_F = 95;
 export const ASSUMED_TEST_CONSUMPTION_WH_MI =
     resolve('ASSUMED_TEST_CONSUMPTION_WH_MI', EPA_DEFAULTS.ASSUMED_TEST_CONSUMPTION_WH_MI);
 
