@@ -241,11 +241,11 @@ export const EPA_DEFAULTS = {
     //   Gravity GT 80°F vs 66°F         line 3.00 vs 3.07   curve 2.93 vs 3.07
     // The Gravity pair pulls the other way, inside the ~5% that repeats of one
     // car spread by. The curve's shape is the owner's: A/C barely works at 75°F
-    // and works hard in the 90s. Measured screens (climate, average over the
-    // test) say mild-weather HVAC is never zero but is a per-car floor, which
-    // cancels in a correction: R2 ~290 W at 58–68°F, iX3 ~475 W at 50–55°F,
-    // iX5 ~700 W at 63–70°F. None was hot, so the 95°F anchor is still a read
-    // of the pairs above, not a measurement.
+    // and works hard in the 90s. Measured climate and electronics draws, read
+    // off in-car energy screens, are kept in facts.json as
+    // `measured-accessory-loads` — add to it as more turn up. So far they say
+    // mild-weather HVAC is a per-car floor, which cancels in a correction, and
+    // none was hot, so the 95°F anchor is a read of the pairs above.
     ACCESSORY_COMFORT_BAND_F:  [60, 70],  // °F: no heating or cooling inside it
     ACCESSORY_HEAT_W_PER_F:    50,        // W for each °F below the band
     ACCESSORY_COOL_W_AT_95F:   1000,      // W of A/C at 95°F; rises with the square of °F above the band

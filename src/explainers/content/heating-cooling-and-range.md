@@ -100,6 +100,11 @@ EVBench uses one straight line for every car. That is a convenience, and a rough
 - **Car size and shape.** A larger cabin and more glass take more to heat and cool. The heating slope and the
   cooling curve are a starting point rather than a fit, and the owner's own view is that the truth probably depends heavily on the vehicle.
   Checking the corrections against actual tests is a separate piece of work (#475).
+- **What cars actually draw.** A few cars show the split on their own energy screen. On the three range tests
+  recorded so far, climate drew about 290 to 710 W in mild weather and the electronics about 450 to 610 W
+  [[fact:measured-accessory-loads]]. So the base load is low for some cars, and the heating and cooling are never
+  quite zero; that part cancels in a correction, because the test and the target both carry it. None of the three
+  was hot, so the A/C figure is not measured yet.
 - **Time stopped, soak and pull-down.** The assumed load is a steady-state average for a moving car. EVBench does not model the pull-down of a hot-soaked
   cabin, which draws much more at first.
 - **The reference table.** The accessory-load table behind the slider's ⓘ lists heat-pump, resistive, A/C,
