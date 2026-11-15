@@ -5,8 +5,8 @@
  * page, the sidebar stacks them (`compact`), so the two ways in cannot drift
  * apart. Names: docs/vocabulary.md, Cost to Drive.
  */
-import { COST_TO_DRIVE_PRESETS, DETOUR_MPH, MIN_STOP_ADD, STRETCH_CAP_TO, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
-import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS } from '../../constants/epa';
+import { COST_TO_DRIVE_PRESETS, DETOUR_MPH, MIN_STOP_ADD, STRETCH_CAP_TO } from '../../constants/costToDrive';
+import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, FIXED_DRAW_W } from '../../constants/epa';
 import { percentText } from '../../utils/costToDrive';
 import { DriveNumberField, DriveSlider, DriveChoice, DriveCheckbox, PlugWindow } from './DriveFields';
 import HomeLevelPicker from './HomeLevelPicker';
@@ -119,8 +119,8 @@ export function SeasonFields({ settings, onChange }) {
                 <DriveNumberField {...props} field="elevationFt" label="Elevation" unit="ft" />
             </div>
             <span className="text-note">
-                Priced as denser air plus cabin heating or cooling. Battery warming and cold tires are
-                not, so winter is a floor.
+                Priced as denser air plus cabin heating or cooling, and battery warming as a guess. Cold
+                tires are not, so winter is a floor.
             </span>
             <PackWarmingNote settings={settings} />
         </>
@@ -138,8 +138,8 @@ export function EfficiencyFields({ settings, onChange }) {
                 your speed, temperature and elevation. A car with no range test uses EPA for both, and says so.
             </span>
             <span className="text-meta">
-                Charging losses: at 240 V, each car&rsquo;s own EPA figure, else {percentText(ASSUMED_CHARGER_EFF)} reaches the pack ·
-                120 V that × {percentText(WALL_OUTLET_CHARGER_EFF)} ÷ {percentText(ASSUMED_CHARGER_EFF)} ·
+                Charging losses: at the car&rsquo;s full AC power, its own EPA figure, else {percentText(ASSUMED_CHARGER_EFF)} reaches the pack ·
+                below it, less: an assumed {FIXED_DRAW_W} W fixed draw is a larger share of a slower charge ·
                 DC fast {percentText(DC_FAST_LOSS)} lost after the port
             </span>
         </>

@@ -37,8 +37,8 @@ import SortHeader from '../tables/SortHeader';
 import TableCell from '../tables/TableCell';
 import CostToDriveSidebar from './CostToDriveSidebar';
 import { levelLabel } from './HomeLevelPicker';
-import { HOME_LEVEL_ORDER, WALL_OUTLET_CHARGER_EFF } from '../../constants/costToDrive';
-import { ASSUMED_CHARGER_EFF } from '../../constants/epa';
+import { HOME_LEVEL_ORDER } from '../../constants/costToDrive';
+import { FIXED_DRAW_W } from '../../constants/epa';
 import { hourText } from './DriveFields';
 import PackWarmingNote from './PackWarmingNote';
 
@@ -400,7 +400,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                     </table>
                                     <p className="text-note plan-table-footnote">
                                         <span className="is-enough">Bold</span> — No further time or cost savings with a faster home charger.
-                                        <br />At 240 V, reaching the pack: {columns.map(c => `${vehicleLabel(c.vehicle)} ${percentText(c.profile.home.eff240)} (${c.profile.home.effFrom === 'epa' ? 'EPA' : 'site-wide'})`).join(' · ')}. On 120 V, each × {percentText(WALL_OUTLET_CHARGER_EFF)} ÷ {percentText(ASSUMED_CHARGER_EFF)}.
+                                        <br />At full AC power, reaching the pack: {columns.map(c => `${vehicleLabel(c.vehicle)} ${percentText(c.profile.home.effRef)} (${c.profile.home.effFrom === 'epa' ? 'EPA' : 'site-wide'})`).join(' · ')}. Below it, less: an assumed {FIXED_DRAW_W} W fixed draw is a larger share of a slower charge.
                                         {cappedBy.length > 0 && (
                                             <><br /><span title={`Onboard chargers: ${cappedBy.join(', ')}`}>^ — Limited by vehicle charger</span></>
                                         )}
