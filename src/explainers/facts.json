@@ -2146,26 +2146,116 @@
       "note": "An EVBench modeling assumption, not a measurement of any car. The base load is an Admin setting; the published value on the site may differ from the compiled 300 W."
     },
     {
+      "id": "measured-accessory-loads",
+      "claim": "On the three range tests whose in-car screen split out the energy, climate drew about 290–710 W on average in mild weather (50–70 °F), and the car's own electronics about 450–610 W. Battery conditioning was zero where it was shown.",
+      "value": {
+        "unit": "kWh as the screen showed (or its % × total); W = kWh ÷ hours driving",
+        "how_to_add": "One row per test. Copy the screen's figures as shown; put a % in *_pct and its kWh in *_kwh. hours is the screen's duration; if it shows none, give hours_basis and estimate from miles ÷ speed. W are kWh × 1000 ÷ hours, rounded. run_id is the EVBench test, if it is in the database.",
+        "readings": [
+          {
+            "car": "Rivian R2",
+            "run_id": 380,
+            "tester": "State of Charge",
+            "temp_f": [
+              58,
+              68
+            ],
+            "conditions": "day; battery warm from charging just before",
+            "hours": 4.5,
+            "hours_basis": "screen",
+            "miles": 272,
+            "total_kwh": 87.4,
+            "climate_kwh": 1.3,
+            "electronics_kwh": 2.5,
+            "electronics_label": "Vehicle",
+            "battery_kwh": null,
+            "climate_w": 289,
+            "electronics_w": 556,
+            "url": "https://www.youtube.com/watch?v=GaAyuPKW40c"
+          },
+          {
+            "car": "BMW iX3 50 xDrive",
+            "run_id": 348,
+            "tester": "Out of Spec",
+            "temp_f": [
+              50,
+              55
+            ],
+            "conditions": "night",
+            "hours": 4.917,
+            "hours_basis": "screen (4 h 55 min)",
+            "miles": 335.8,
+            "total_kwh": 111.5,
+            "climate_pct": 2.1,
+            "climate_kwh": 2.34,
+            "electronics_pct": 2.0,
+            "electronics_kwh": 2.23,
+            "battery_pct": 0.0,
+            "battery_kwh": 0,
+            "climate_w": 476,
+            "electronics_w": 454,
+            "url": "https://www.youtube.com/watch?v=TGzCDy1Fogw"
+          },
+          {
+            "car": "BMW iX5 60 xDrive (2027)",
+            "run_id": 434,
+            "tester": "Out of Spec",
+            "temp_f": [
+              63,
+              70
+            ],
+            "conditions": "70 °F falling to about 63 °F",
+            "hours": 5.87,
+            "hours_basis": "estimated: 410.8 mi at 70 mph; the screen shows no duration",
+            "miles": 410.8,
+            "total_kwh": 148.2,
+            "climate_pct": 2.8,
+            "climate_kwh": 4.15,
+            "electronics_pct": 2.4,
+            "electronics_kwh": 3.56,
+            "battery_pct": 0.0,
+            "battery_kwh": 0,
+            "climate_w": 707,
+            "electronics_w": 606,
+            "url": "https://www.youtube.com/watch?v=Fyxbe1JswH8"
+          }
+        ],
+        "evbench_cool_w_at_95f": 1000
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "In-car energy screens shown in each tester's range-test video (linked per reading in the value); figures as read from the screen by the owner",
+          "url": "https://www.youtube.com/watch?v=GaAyuPKW40c",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "observed",
+      "rationale": "The owner read each split from the car's own energy screen in the video, 2026-11-15. EVBench has not re-derived them from the footage, and each maker draws its own line between climate, electronics and battery conditioning (Rivian's \"Vehicle\" may include thermal pumps). None was hot, so ACCESSORY_COOL_W_AT_95F is a read of same-car hot and mild repeats, not of these. It would become verified with a timestamp per figure.",
+      "note": "Mild-weather HVAC is never zero but is a per-car floor, which cancels in a correction. Add a row whenever a test shows the split, hot tests most of all."
+    },
+    {
       "id": "evbench-accessory-load-curve",
-      "claim": "The assumed load rises in a straight line: 50 W for each °F below 60 °F and 70 W for each °F above 70 °F, the same for every car. That is 2,300 W at 20 °F, 3,300 W at 0 °F, 1,000 W at 80 °F and 2,400 W at 100 °F.",
+      "claim": "The assumed heater rises in a straight line, 50 W for each °F below 60 °F; the assumed A/C rises with the square of the degrees above 70 °F, to 1,000 W at 95 °F. Both are the same for every car. With the 300 W base that is 2,300 W at 20 °F, 3,300 W at 0 °F, 460 W at 80 °F, 1,300 W at 95 °F and 1,740 W at 100 °F.",
       "value": {
         "heat_w_per_f": 50,
-        "cool_w_per_f": 70,
+        "cool_w_at_95f": 1000,
         "w_at_20f": 2300,
         "w_at_0f": 3300,
-        "w_at_80f": 1000,
-        "w_at_100f": 2400
+        "w_at_80f": 460,
+        "w_at_95f": 1300,
+        "w_at_100f": 1740
       },
       "sources": [
         {
           "rank": "C",
-          "title": "EVBench constants ACCESSORY_HEAT_W_PER_F and ACCESSORY_COOL_W_PER_F in src/constants/epa.js; owner's starting point, 2026-10-25, to be tuned (issue #475); figures by arithmetic",
+          "title": "EVBench constants ACCESSORY_HEAT_W_PER_F and ACCESSORY_COOL_W_AT_95F in src/constants/epa.js; heating the owner's starting point, 2026-10-25; cooling curve the owner's, 2026-11-15, read from same-car hot and mild repeats; to be tuned (issue #475); figures by arithmetic",
           "url": null,
-          "accessed": "2026-10-25"
+          "accessed": "2026-11-15"
         }
       ],
       "status": "verified",
-      "note": "A starting point, not a fit. The owner's view is that the truth probably depends heavily on a car's size and shape."
+      "note": "A starting point, not a fit. The cooling curve replaced a straight 70 W/°F, which over-corrected hot tests. The owner's view is that the truth probably depends heavily on a car's size and shape."
     },
     {
       "id": "evbench-test-cabin-setpoint",
@@ -2204,9 +2294,9 @@
     },
     {
       "id": "evbench-accessory-worked-hot",
-      "claim": "A 95 °F test at 70 mph using 300 Wh/mi, corrected to 70 °F, gains about 5.7% once its assumed A/C is taken out, where air density alone would take about 3.1% off.",
+      "claim": "A 95 °F test at 70 mph using 300 Wh/mi, corrected to 70 °F, gains about 1.8% once its assumed A/C is taken out, where air density alone would take about 3.1% off.",
       "value": {
-        "with_accessory": 0.057,
+        "with_accessory": 0.018,
         "air_density_only": -0.031,
         "wh_per_mi": 300,
         "mph": 70,
@@ -2217,7 +2307,7 @@
           "rank": "C",
           "title": "EVBench correction model at the 0.70 aero fraction; arithmetic",
           "url": null,
-          "accessed": "2026-10-25"
+          "accessed": "2026-11-15"
         }
       ],
       "status": "verified",

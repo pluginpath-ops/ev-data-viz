@@ -19,14 +19,14 @@ One state, shared by every sub-tab and kept when switching between them.
 
 | Group | Settings (default) |
 |---|---|
-| Home charging | charger level: 120 V · 12 A, 240 V · 16 / 24 / 32 / **48** / 80 A (no 40 or 64 A — dropped for simplicity); plugged in from **10 pm** until **7 am**; charge to **80**%; 100% the night before a long day (**on**); home price **$0.17**/kWh |
+| Home charging | charger level: 120 V · 12 A, 240 V · 16 / 24 / 32 / **48** / 80 A (no 40 or 64 A — dropped for simplicity); plugged in from **10 pm** until **7 am**; charge to **80**%; 100% the night before a long day (**on**); home price **$0.17**/kWh (free to $1) |
 | Your week | seven days, each **Daily**, **Long day** or **Off** (default L D L D L D Off); a **planned fast charge** on any days (default Sunday); Daily: **45** mi, highway at **70** mph, city share **40**%; Long day: **220** mi, **70** mph, **15**% |
-| Fast charging | detour to a charger **10** min (5–30, as miles at 40 mph, energy too); stop to charge by **30**% (10–50); charge no higher than **70**%; keep battery above **10**%; time to start and pay **5** min; fast price **$0.48**/kWh |
+| Fast charging | detour to a charger **10** min (0–30, as miles at 40 mph, energy too); stop to charge by **25**% (10–50); charge no higher than **70**%; keep battery above **10**%; time to start and pay **5** min; fast price **$0.42**/kWh (free to $1.50) |
 | Season | shown: summer / **winter**; summer **75**°F, winter **15**°F; winter lasts **4** months; elevation **800** ft |
 | Your gas car | city **18** mpg, highway **24** mpg, **$4.00**/gal (one click picks an F-150, Civic, RAV4, X3 or Pilot and fills in its EPA mpg and tank; editing mpg or tank makes it the reader's own car, named in the Custom field — "Custom" while blank; the charts call the gas car by that name), tank **26** gal, fill up at **15**% left, each fill-up **5** min (about 1 to start the pump, 2–3 to fill, ½–2 to pay; the station on the way). Its mpg drops in the cold: 15% city and 7% highway at 20°F, a straight line to none at 75°F (`GAS_COLD_LOSS`; fueleconomy.gov's cold-weather figures) |
 | Efficiency from | **Tested + EPA** / EPA only |
 
-Prices default to `vehicleTable.DEFAULT_ASSUMPTIONS` (0.17 / 0.48) so the two
+Prices default to `vehicleTable.DEFAULT_ASSUMPTIONS` (0.17 / 0.42) so the two
 places agree until a reader moves one.
 
 ## The model (pure, `src/utils/costToDrive.js`)
@@ -41,19 +41,23 @@ temperature, elevation and accessory correction at the HWFET average speed —
 EPA's city figure flatters an EV with regen in a way a real commute does not.
 "EPA only" prices both from that EPA figure. A car with no range test uses EPA
 for both and says so. Winter is a floor: the correction prices denser air and
-cabin heat, not battery warming or cold tires, and the page says so. No new
-cold knobs.
+cabin heat (battery warming is priced at home, below), not cold tires, and the page says so. No new
+cold knobs in the correction.
 
 **Home charging.** Power is the lesser of the level and the car's `max_ac_kw`
 (an assumed 11.5 kW when the spec is blank, said so). What reaches the pack:
-at 240 V, the car's own EPA certification figure (DC ÷ AC recharge, measured
+η_ref is the car's own EPA certification figure (DC ÷ AC recharge, measured
 or pinned; `epaRange.chargerEfficiency`, as the vehicle table uses), else
-`ASSUMED_CHARGER_EFF`; at 120 V, that × `WALL_OUTLET_CHARGER_EFF` (0.80) ÷
-`ASSUMED_CHARGER_EFF`, so a car good on 240 V is good on 120 V too (owner,
-2026-11-08). Home Charger lists each car's 240 V figure and where it came from.
-Below `PACK_WARMING_BELOW_F` (40°F) the Season settings and Home Charger warn
-that a car parked outside warms its battery before charging and driving,
-unpriced, worst on 120 V.
+`ASSUMED_CHARGER_EFF`, taken at the car's full AC power P_ref. Below it the
+car's fixed draw (`FIXED_DRAW_W`, 200 W, one value for every car) is a larger
+share: η = η_ref − P₀(1/P − 1/P_ref), P₀ = 0.2 kW (owner, 2026-11-15; it
+replaced a flat 0.80 on 120 V). A default car: 76.3% at 120 V/12 A, 85.0% at
+16 A, 87.6% at 32 A, 88.5% at 48 A and up. Home Charger lists each car's
+full-power figure and where it came from.
+Below `PACK_WARMING_BELOW_F` (40°F) each home charge buys battery warming,
+`BATTERY_WARMING_KWH` (0.002, a guess) × usable kWh × °F below, bought through
+η; assumed parked outside. Energy and cost only: it does not lengthen the night
+or take from what it adds. The Season settings and Home Charger say so.
 The window is the plug-in hours; a night that runs out says so.
 
 **Fast stops — the rule.** A stop is on the route, not a dash at the end:
@@ -86,7 +90,7 @@ winter months with summer ones.
 
 ## The link
 
-`?tab=cost&m=<sub-tab>&v=<vehicle ids>&cd=3.<key>`.
+`?tab=cost&m=<sub-tab>&v=<vehicle ids>&cd=4.<key>`.
 
 `v` stays the readable vehicle parameter every tab shares. Every setting above
 is packed into ONE versioned parameter, `cd` — **the Cost to Drive key**, not
@@ -109,6 +113,14 @@ meant to be read (owner, 2026-11-07). `src/utils/costToDriveKey.js`:
   are written as version 3; version-1 and -2 keys open on the old week (long
   days between short ones, 220 mi, a planned Sunday stop) when they left it
   out.
+- Version 4 (2026-11-12): "stop to charge by" now defaults to 25% (was 30)
+  and the fast price to $0.42 (was $0.48), and three limits were loosened:
+  home price to $0–1, fast price to $0–1.50, detour to 0–30 min. A number is
+  stored as its steps above the field's MINIMUM, so a lower minimum shifts
+  every index — versions 1–3 read those three fields against the minimums they
+  were written with (`V3_MINS`) and their frozen defaults. Keys are written
+  as version 4. The rule for the next change: a moved default or a lowered
+  minimum is a new version, never an edit to a frozen table.
 - All defaults → no `cd` at all. A key that cannot be read falls back to the
   defaults and says so.
 - The short link (`k=`) carries `cd` as a string: append `cd` to `NAMES_V1`

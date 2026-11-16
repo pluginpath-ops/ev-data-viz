@@ -131,7 +131,6 @@ function DailyDistance({ answers, onChange, units }) {
             max={toShown(f.max)}
             step={metric ? 5 : f.step}
             unit={metric ? 'km' : 'mi'}
-            placeholder={String(toShown(f.hint))}
         />
     );
 }
@@ -202,7 +201,6 @@ export function MoneyStep({ answers, onChange, asked }) {
                 step={f.step}
                 prefix={f.prefix}
                 unit={f.unit}
-                placeholder={String(f.hint)}
             />
         );
     };

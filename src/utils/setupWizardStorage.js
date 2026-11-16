@@ -7,11 +7,11 @@
  *     so it survives a reload until closed or replaced by the next Apply.
  *
  * A convenience only: storage can be missing or refuse (a private window,
- * blocked site data), and then the wizard starts empty and the bar is gone on
+ * blocked site data), and then the wizard starts from STARTING_ANSWERS and the bar is gone on
  * reload. What is read back is checked, so a removed option or chart reads as
  * nothing.
  */
-import { sanitizeAnswers } from './setupWizard';
+import { sanitizeAnswers, STARTING_ANSWERS } from './setupWizard';
 import { ALL_CHART_MODES } from '../constants/chartNav';
 
 const ANSWERS_KEY = 'evbench.setupWizard.answers';
@@ -32,7 +32,11 @@ const writeJson = (key, value) => {
     } catch { /* not remembered */ }
 };
 
-export const readSetupAnswers = () => sanitizeAnswers(readJson(ANSWERS_KEY));
+/** The last answers, or the starting ones when none were saved. */
+export const readSetupAnswers = () => {
+    const saved = readJson(ANSWERS_KEY);
+    return saved ? sanitizeAnswers(saved) : { ...STARTING_ANSWERS };
+};
 export const writeSetupAnswers = (answers) => writeJson(ANSWERS_KEY, answers);
 
 const isSeason = (s) => s && ['summer', 'winter'].includes(s.season) && Number.isFinite(s.tempF);

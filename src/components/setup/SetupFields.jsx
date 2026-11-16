@@ -61,7 +61,7 @@ export function SegmentedChoice({ label, options, value, onChange }) {
 }
 
 /** A number with its unit; empty is skipped. */
-export function NumberAnswer({ label, value, onChange, min, max, step, unit, prefix, placeholder }) {
+export function NumberAnswer({ label, value, onChange, min, max, step, unit, prefix }) {
     return (
         <label className="setup-field">
             <span className="text-label">{label}</span>
@@ -75,7 +75,6 @@ export function NumberAnswer({ label, value, onChange, min, max, step, unit, pre
                     max={max}
                     step={step}
                     allowEmpty
-                    placeholder={placeholder}
                 />
                 {unit && <span className="text-meta">{unit}</span>}
             </span>

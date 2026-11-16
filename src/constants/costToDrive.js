@@ -40,27 +40,11 @@ export const HOME_LEVEL_ORDER = [NO_HOME_LEVEL, ...HOME_LEVELS.map((_, i) => i).
 export const levelKw = (level) => (level.volts * level.amps) / 1000;
 
 /**
- * What reaches the pack from a 120 V wall outlet, for a car at the site-wide
- * 240 V figure (ASSUMED_CHARGER_EFF). Lower: the car's own electronics draw a
- * fixed few hundred watts whatever the rate, and at 1.4 kW that is a large
- * share. A round figure, not a measurement; the page says it is assumed.
- * The evidence behind it, and how far it holds: the explainer
- * `evbench-charging-energy` (src/explainers/content/).
- *
- * A car with its own EPA 240 V figure gets this scaled by it — its figure ×
- * this ÷ the site-wide one (owner, 2026-11-08): the same charger and battery
- * do the work on either outlet, so a car that does well on one does well on
- * the other. Ratio or a fixed gap differ by under half a point across the
- * real range.
- */
-export const WALL_OUTLET_CHARGER_EFF = 0.80;
-
-/**
  * Below this, parked outside, a car warms its battery before it charges and
- * before it drives — energy not priced here. Above it, or in a garage, the
- * battery warms itself as it charges and the cost is small. The owner's own
- * experience (2026-11-08), not a measurement; it only decides when the page
- * warns.
+ * before it drives. Each home charge buys BATTERY_WARMING_KWH (constants/epa.js,
+ * a guess) per kWh of pack per °F below it; at or above it, or in a garage,
+ * the battery warms itself as it charges and the cost is small. The owner's
+ * own experience (2026-11-08), not a measurement.
  */
 export const PACK_WARMING_BELOW_F = 40;
 
@@ -190,7 +174,9 @@ export const COST_TO_DRIVE_FIELDS = [
     { key: 'plugUntil',      kind: 'num',  min: 0,    max: 23,   step: 1,    def: 7 },
     { key: 'chargeTo',       kind: 'num',  min: 50,   max: 100,  step: 5,    def: 80 },
     { key: 'fullBeforeLong', kind: 'bool', def: true },
-    { key: 'homePrice',      kind: 'num',  min: 0.05, max: 0.60, step: 0.01, def: 0.17 },
+    // Free overnight charging exists, so 0 (owner request, 2026-11-12); the ceiling
+    // covers the dearest on-peak rates. Both widened in key version 4.
+    { key: 'homePrice',      kind: 'num',  min: 0,    max: 1.00, step: 0.01, def: 0.17 },
     // The week's defaults are the Commuter week (owner, 2026-11-10): an
     // untouched page is the commonest reader, not the hardest case.
     { key: 'week',           kind: 'week', def: 'DDDDDLO' },
@@ -201,12 +187,14 @@ export const COST_TO_DRIVE_FIELDS = [
     { key: 'longMi',         kind: 'num',  min: 5,    max: 400,  step: 1,    def: 80, spin: 5 },
     { key: 'longMph',        kind: 'num',  min: 45,   max: 85,   step: 5,    def: 70 },
     { key: 'longCity',       kind: 'num',  min: 0,    max: 100,  step: 5,    def: 20 },
-    { key: 'detourMin',      kind: 'num',  min: 5,    max: 30,   step: 1,    def: 10 },
-    { key: 'stopBy',         kind: 'num',  min: 10,   max: 50,   step: 5,    def: 30 },
+    { key: 'detourMin',      kind: 'num',  min: 0,    max: 30,   step: 1,    def: 10 },
+    { key: 'stopBy',         kind: 'num',  min: 10,   max: 50,   step: 5,    def: 25 },
     { key: 'capTo',          kind: 'num',  min: 50,   max: 90,   step: 5,    def: 70 },
     { key: 'keepAbove',      kind: 'num',  min: 5,    max: 30,   step: 1,    def: 10 },
     { key: 'startMin',       kind: 'num',  min: 0,    max: 15,   step: 1,    def: 5 },
-    { key: 'fastPrice',      kind: 'num',  min: 0.15, max: 1.00, step: 0.01, def: 0.48 },
+    // $0.42 from key version 4 (owner, 2026-11-12). Free fast charging is real
+    // (a carmaker's or network's offer), and some chargers pass a dollar.
+    { key: 'fastPrice',      kind: 'num',  min: 0,    max: 1.50, step: 0.01, def: 0.42 },
     { key: 'season',         kind: 'enum', values: ['winter', 'summer'], def: 'winter' },
     { key: 'summerF',        kind: 'num',  min: 40,   max: 110,  step: 5,    def: 75 },
     { key: 'winterF',        kind: 'num',  min: -20,  max: 50,   step: 5,    def: 15 },

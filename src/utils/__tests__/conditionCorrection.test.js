@@ -183,8 +183,9 @@ describe('the heating and cooling a test is assumed to have run (#449)', () => {
         // 20°F, 350 Wh/mi: +16.7%, against +7.3% for density alone.
         expect(f({ ...STD, temperatureF: 20, whPerMile: 350 })).toBeCloseTo(1.1667, 3);
         // 95°F, 300 Wh/mi: density alone says the warm air flattered the test
-        // (−3.1%); the A/C it is assumed to have run says it was harder (+5.7%).
-        expect(f({ ...STD, temperatureF: 95, whPerMile: 300 })).toBeCloseTo(1.0572, 3);
+        // (−3.1%); the 1,000 W of A/C it is assumed to have run says it was
+        // harder (+1.8%).
+        expect(f({ ...STD, temperatureF: 95, whPerMile: 300 })).toBeCloseTo(1.0176, 3);
     });
 
     it('prices a reader’s cold target against a mild test, and a heavier override harder', () => {

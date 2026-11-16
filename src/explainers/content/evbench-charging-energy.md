@@ -183,8 +183,7 @@ Owner, 2026-11-15: the rule replaced WALL_OUTLET_CHARGER_EFF. Fixed draw ~200 W 
 fit 134–503 W, median 218; best single value 215 W; Sears cars ~120 W; R1T systems 146 W after the charger). Battery
 warming as a pack-size × degrees-below-40 °F term with placeholder values and a per-car factor of 1. The rule is on
 main (PR #580, merged). Owner, 2026-11-16: the page was split in two (this one and charging-speed-and-energy); the
-Home Charger and Your Driving links now point here, but this branch still carries main's older footnote lines, so
-merging main will conflict there: keep #580's text with this page's slug. Not in the ledger by the owner's choice: the
+Home Charger and Your Driving footnotes keep #580's text and link here. Not in the ledger by the owner's choice: the
 owner's own 120 V charge at about 20 °F, which added about 2 kWh in 24 hours, the rest to warming and overhead.
 Owner's reading, 2026-11-15: higher voltage helps the charger at the same power (four cars for, two against); the
 rule still leaves voltage out, and whether to add a 120 V penalty on top of the time cost is open. Owner's

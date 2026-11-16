@@ -18,6 +18,7 @@
  */
 import { SETUP_WIZARD } from '../constants/setupWizard';
 import { STANDARD_CONDITIONS } from '../constants/epa';
+import { DEFAULT_COST_TO_DRIVE } from '../constants/costToDrive';
 import { categoryForMode, labelForMode } from '../constants/chartNav';
 import { specProvenance } from './specHelpers';
 import { vehicleDataCategories } from './vehicleDataCategories';
@@ -52,6 +53,21 @@ export const EMPTY_ANSWERS = Object.freeze({
     homePrice: null,
     gasMpg: null,
     gasPrice: null,
+});
+
+/**
+ * What a reader opening the wizard for the first time starts with: the number
+ * questions already hold Cost & Time's own defaults, shown in their boxes as
+ * real values, so a spinner moves from them (owner, 2026-11-12). The one mpg
+ * covers city and highway, so it starts at their mean. Clearing a box, or Skip,
+ * leaves that setting as it is.
+ */
+export const STARTING_ANSWERS = Object.freeze({
+    ...EMPTY_ANSWERS,
+    dailyMi: DEFAULT_COST_TO_DRIVE.dailyMi,
+    homePrice: DEFAULT_COST_TO_DRIVE.homePrice,
+    gasMpg: Math.round((DEFAULT_COST_TO_DRIVE.gasCity + DEFAULT_COST_TO_DRIVE.gasHwy) / 2),
+    gasPrice: DEFAULT_COST_TO_DRIVE.gasPrice,
 });
 
 /** The answers each step asks, so Skip clears just those. */
