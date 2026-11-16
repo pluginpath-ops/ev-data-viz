@@ -69,6 +69,8 @@ it.
 | Of a climate's two seasons, the one that costs more range by the correction model | **the harder season** — what the wizard corrects the charts to; the review bar names it and toggles to the other | `harderSeason`, `flipSeason` |
 | The bar at the foot of the window after the wizard's Apply: the chosen charts, Next, the season, Change answers, × | **the review bar**; its title in UI text is **Your charts**. Kept until × or the next Apply. Not a "toast" or notice (those time out) | [SetupReviewBar.jsx](../src/components/setup/SetupReviewBar.jsx), `reviewBar` in constants/setupWizard.js |
 | An article on how something works, with diagrams | **an explainer**. Not "guide" (the Fuel Economy Guide) or "glossary" | `src/explainers/` |
+| A fact's one-line, plain-language version, shown in an explainer's Sources list and its citation hover | **a summary** — under one sentence; the ledger's **claim** stays the full statement | `facts[].summary`, [explainers.test.js](../src/explainers/__tests__/explainers.test.js) |
+| A source's short name, shown as its link ("ADAC, 2026") | **a label** — a few words; the full **title** and access date move to the link's hover | `facts[].sources[].label` |
 
 ### Home and featured comparisons
 

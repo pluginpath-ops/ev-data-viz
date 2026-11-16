@@ -1150,6 +1150,7 @@
     {
       "id": "epa-mpge-at-the-wall",
       "claim": "EPA MPGe and kWh/100 mi are measured at the wall: they assume Level 2 AC charging and include the charging losses.",
+      "summary": "EPA’s MPGe counts energy at the wall, so it includes charging loss.",
       "value": {
         "basis": "AC, wall"
       },
@@ -1157,12 +1158,14 @@
         {
           "rank": "A",
           "title": "EPA, \"Fuel Economy and EV Range Testing\" (last updated 1 Jul 2026)",
+          "label": "EPA, 2026",
           "url": "https://www.epa.gov/greenvehicles/fuel-economy-and-ev-range-testing",
           "accessed": "2026-09-29"
         },
         {
           "rank": "A",
           "title": "EPA (D. Good), \"EPA Test Procedures for Electric Vehicles and Plug-in Hybrids\", draft summary, 14 Nov 2017",
+          "label": "EPA, 2017",
           "url": "https://www.fueleconomy.gov/feg/pdfs/EPA%20test%20procedure%20for%20EVs-PHEVs-11-14-2017.pdf",
           "accessed": "2026-09-29"
         }
@@ -1173,11 +1176,15 @@
     {
       "id": "epa-charger-efficiency-is-ac",
       "claim": "The ratio of the certification's DC energy to its AC recharge energy is an AC (Level 2) charging efficiency, measured over a recharge that includes the manufacturer's onboard charger. It is not a DC fast-charging figure, which bypasses the onboard charger.",
+      "summary": "EPA’s charger efficiency is a Level 2 figure, battery output ÷ wall energy.",
       "value": {
         "basis": "AC, outlet to pack output",
         "evbench_assumed": 0.885,
         "median_efficiency": 0.885,
-        "quartiles": [0.872, 0.894],
+        "quartiles": [
+          0.872,
+          0.894
+        ],
         "min": 0.805,
         "max": 0.918,
         "n": 174,
@@ -1187,18 +1194,21 @@
         {
           "rank": "A",
           "title": "EPA (D. Good), \"EPA Test Procedures for Electric Vehicles and Plug-in Hybrids\", draft summary, 14 Nov 2017",
+          "label": "EPA, 2017",
           "url": "https://www.fueleconomy.gov/feg/pdfs/EPA%20test%20procedure%20for%20EVs-PHEVs-11-14-2017.pdf",
           "accessed": "2026-09-29"
         },
         {
           "rank": "C",
           "title": "EVBench: deriveChargerEfficiency (epaDerivations.js) divides total_dc_energy_kwh by ac_recharge_kwh; the 0.885 default is the fleet median below; it was 0.855, from the Rivian R2 (85.5%) and Ford Lightning ER (85.6%) records",
+          "label": "EVBench code",
           "url": null,
           "accessed": "2026-10-26"
         },
         {
           "rank": "B",
           "title": "EVBench Certification Statistics, \"Charger efficiency by class\", per certification record, model year 2025, n = 174 of 212 test vehicles (30 could not be derived and 8 were set aside as impossible): median 0.885, lower and upper quartiles 0.872 and 0.894, range 0.805 to 0.918",
+          "label": "EVBench certification stats",
           "url": null,
           "accessed": "2026-10-26"
         }
@@ -2906,6 +2916,1757 @@
       "sources": [],
       "status": "accepted",
       "rationale": "How standby power is permitted in the US: NEC Article 702 optional standby systems with transfer equipment are not parallel with the utility, and UL 1741 SB / IEEE 1547 apply only to equipment that operates in parallel. Upgrade with an NEC or utility interconnection-handbook source."
+    },
+    {
+      "id": "ac-level1-vs-level2-sears-2014",
+      "claim": "Logging 114 charges on two Chevrolet Volts and two Nissan Leafs in Vermont, June to November 2013, Level 2 (240 V) charging put 89.4% of the energy into the battery and Level 1 (120 V) 83.8%. On charges under 4 kWh it was 87.2% against 74.2%. Heat above 70 °F lowered Level 1 to 81.4%; cold below 50 °F did not (83.0%), and Level 2 was unaffected by temperature between 25 and 88 °F.",
+      "summary": "Vermont, 2013: two Volts and two Leafs got 83.8% on 120 V and 89.4% on 240 V.",
+      "value": {
+        "n_charges": 114,
+        "n_level1": 63,
+        "n_level2": 51,
+        "vehicles": "2 Chevrolet Volt, 2 Nissan Leaf",
+        "period": "Jun–Nov 2013",
+        "temp_f": [
+          25,
+          88
+        ],
+        "mean_temp_f": 54,
+        "basis": "into the battery",
+        "mean_eff": 0.857,
+        "level1_eff": 0.838,
+        "level1_sd": 0.08,
+        "level2_eff": 0.894,
+        "level2_sd": 0.05,
+        "under_4kwh": {
+          "level1_eff": 0.742,
+          "level1_sd": 0.12,
+          "n_level1": 11,
+          "level2_eff": 0.872,
+          "level2_sd": 0.06,
+          "n_level2": 13
+        },
+        "below_50f": {
+          "level1_eff": 0.83,
+          "level1_sd": 0.09,
+          "n_level1": 32,
+          "level2_eff": 0.906,
+          "level2_sd": 0.04,
+          "n_level2": 9
+        },
+        "above_70f": {
+          "level1_eff": 0.814,
+          "level1_sd": 0.09,
+          "n_level1": 23,
+          "level2_eff": 0.899,
+          "level2_sd": 0.04,
+          "n_level2": 10
+        },
+        "from_8kwh_read_by_eye": {
+          "level1_eff": 0.86,
+          "level1_range": [
+            0.83,
+            0.88
+          ],
+          "level2_eff": 0.88,
+          "level2_range": [
+            0.86,
+            0.89
+          ]
+        },
+        "prior_volt_research": {
+          "level2_gain_pct": 2.7,
+          "level2_gain_under_2kwh_grid_pct": 12.8
+        },
+        "ratio_l1_to_l2": 0.937,
+        "lowest_level1_read_by_eye": {
+          "eff": 0.49,
+          "temp_f": 36
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "J. Sears, D. Roberts, K. Glitman, \"A comparison of electric vehicle Level 1 and Level 2 charging efficiency\", 2014 IEEE Conference on Technologies for Sustainability (SusTech), pp. 255–258, doi:10.1109/SusTech.2014.7046253: Tables I and II, Figures 1 and 2, and the Results text",
+          "label": "Sears et al., 2014",
+          "url": "https://ieeexplore.ieee.org/document/7046253",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Read from the full paper (the owner's copy, LocalDev/explainers/Reference Docs/). Efficiency = energy taken up by the battery ÷ energy drawn from the grid, per charge event: energy into the battery, not back out of it as EPA counts. Method differs by car: the Volts' FleetCarma loggers read energy received from the EVSE and taken up by the battery (so EVSE losses are left out); the Leafs combined a WattsLeft battery monitor with a Watts Up meter on the EVSE (grid side). Table I gives n = 114 (the abstract says 115). Temperature, from the Results: \"high ambient temperatures (> 70°F) reduced charging efficiency of Level 1 charges to 81.4%, but there was no similar effect observed for cold temperatures (< 50°F). Ambient temperature did not appear to affect the efficiency of Level 2 charge events\"; too few events below 40 °F to judge. The abstract's \"efficiency gains of Level 2 charging also increased under low and high temperatures\" is about the gap (Table II: 7.6% below 50 °F, 8.5% above 70 °F, 5.6% overall), which below 50 °F rose because Level 2 read higher, not because Level 1 read lower. from_8kwh_read_by_eye is EVBench's reading of Figure 1 (efficiency against kWh per charge), not a figure the paper states: charges from about 8 kWh up cluster near 86% (83–88) on Level 1 and 88% (86–89) on Level 2, so on full-size charges the gap is about 2–3 points; ±2 points. Several Level 2 events read 97–100%, so single small events are noisy. prior_volt_research is the paper's citation of earlier Volt work (its ref. [2], Hilshey): Level 2 2.7% more efficient on average, 12.8% on events drawing under 2 kWh. Both cars' Level 2 power is not given; the Volt's charger is rated 3.3 kW on 240 V (volt-onboard-charger-inl-2012). ratio_l1_to_l2 is EVBench's arithmetic: 83.8 ÷ 89.4. From Figure 2 by eye: the lowest Level 1 events (about 49%, 60% and 66%) sit between about 31 and 36 °F; two near 72 °F read about 65–66%."
+    },
+    {
+      "id": "ac-socket-vs-wallbox-adac-2026",
+      "claim": "ADAC charged five 2025–26 cars from 10 to 90% with the battery at 20–30 °C and counted the electricity that did not land in the battery: from a single-phase 230 V household socket at 2.3 kW they lost 12.7 to 24.2% (median 14.2%), on a three-phase wallbox at 4.1 kW 8.0 to 12.8% (median 9.4%), and at 11 kW, also three-phase, 5.1 to 7.0% (median 6.9%).",
+      "summary": "ADAC: five 2026 cars lost 13 to 24% on a socket, 5 to 7% on an 11 kW wallbox.",
+      "value": {
+        "unit": "% of energy drawn, lost before the battery",
+        "socket_kw": 2.3,
+        "socket": "230 V, single-phase, 1 × 10 A",
+        "low_kw": 4.1,
+        "low": "three-phase, 3 × 6 A (solar-surplus setting)",
+        "wallbox_kw": 11,
+        "cars": [
+          {
+            "car": "Mercedes CLA 350 EQ",
+            "socket": 24.2,
+            "low": 12.8,
+            "wallbox_11": 6.9
+          },
+          {
+            "car": "Renault R5 E-Tech",
+            "socket": 13.7,
+            "low": 8,
+            "wallbox_11": 5.1
+          },
+          {
+            "car": "Tesla Model Y",
+            "socket": 12.7,
+            "low": 9.4,
+            "wallbox_11": 6.1
+          },
+          {
+            "car": "Volvo EX30",
+            "socket": 14.2,
+            "low": 9.1,
+            "wallbox_11": 7,
+            "wallbox_22": 6.7
+          },
+          {
+            "car": "VW ID.7",
+            "socket": 15.3,
+            "low": 10.6,
+            "wallbox_11": 6.9
+          }
+        ],
+        "median": {
+          "socket": 14.2,
+          "low": 9.4,
+          "wallbox_11": 6.9
+        },
+        "mean": {
+          "socket": 16,
+          "wallbox_11": 6.4
+        },
+        "wallbox": "three-phase, 11 kW (22 kW for the EX30)",
+        "basis": "into the battery"
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "ADAC (W. Rudschies), \"Ladeverluste beim Elektroauto: Wie hoch sind sie wirklich?\", 6 Aug 2026, table \"AC-Ladeverluste an der Steckdose am höchsten\"",
+          "label": "ADAC, 2026",
+          "url": "https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste-elektroauto-studie/",
+          "accessed": "2026-11-12"
+        },
+        {
+          "rank": "B",
+          "title": "ADAC press release, \"Strom, der verpufft\", 6 Aug 2026",
+          "label": "ADAC press release, 2026",
+          "url": "https://presse.adac.de/meldungen/adac-ev/technik/strom-der-verpufft.html",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Basis: energy into the battery, not out of it. The press release describes the CLA's loss as the share of electricity that \"nicht im Akku landete\" (did not land in the battery); ADAC does not say how it measured the battery side. EPA's charging figure is energy back out of the battery ÷ energy from the wall (epa-charger-efficiency-is-ac), so it also carries the battery's own loss, and ADAC's levels sit above it. Phases: the study lists the socket as 1 × 10 A and the reduced wallbox charge as 3 × 6 A, and says home wallbox charging is normally three-phase; the 11 and 22 kW charges are three-phase. So the socket-to-wallbox gap mixes power with phase count. Measured between 10 and 90% SoC to leave out end-of-charge balancing and battery heating or cooling; battery 20–30 °C at the start of each charge. The CLA's onboard charger takes only 8 A from the socket, not 10 A, which ADAC blames for its outlier. The press release gives the reduced wallbox charge as 4.2 kW, the study page 4.1 kW; this ledger uses the study page. Medians and means are EVBench's arithmetic on the table."
+    },
+    {
+      "id": "charging-control-electronics-draw",
+      "claim": "While a car charges, its control units draw 100 to 300 W just to run the charge, so the longer it sits on a slow outlet, the more that adds up. Most of the AC charging loss is this and the onboard charger's conversion; the cable, the high-voltage wiring and the battery lose little, and a socket charge usually needs no battery heating or cooling.",
+      "summary": "A charging car keeps its control units awake, drawing 100 to 300 W.",
+      "value": {
+        "control_w": [
+          100,
+          300
+        ]
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "ADAC (W. Rudschies), \"Ladeverluste beim Elektroauto: Wie hoch sind sie wirklich?\", 6 Aug 2026, section \"Wie sind Ladeverluste zu erklären?\"",
+          "label": "ADAC, 2026",
+          "url": "https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste-elektroauto-studie/",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "ADAC (German): \"Allein 100 bis 300 Watt werden für den Betrieb von Komponenten für die Steuerung des Ladevorgangs benötigt\" (100 to 300 W go to the components that control the charge alone). It also says the house wiring to a socket may lose up to 4% under DIN VDE 0100, so a long, old run can add to the loss."
+    },
+    {
+      "id": "onboard-charger-loss-dtu-2016",
+      "claim": "DTU measured the onboard chargers of a Peugeot iOn, Nissan Leaf and Renault Zoe at 19–22 °C, with the 12 V draw while charging subtracted: 49–77% efficient. The two single-phase cars did worse at 3.7 kW than at 2.3 kW (iOn 77% to 75%, Leaf 74% to 70%); the Zoe managed 49% on single-phase 2.3 kW and 63–65% on three-phase 11, 22 and 43 kW. The iOn's pack showed 0.38 Ω of internal resistance, about 7.2 W of heat on a 10 A, 230 V charge.",
+      "summary": "DTU measured three older cars’ chargers at 49 to 77% efficient.",
+      "value": {
+        "method3_eff": {
+          "ion": {
+            "2.3_kw_1ph": 0.77,
+            "3.7_kw_1ph": 0.75
+          },
+          "leaf": {
+            "2.3_kw_1ph": 0.74,
+            "3.7_kw_1ph": 0.7
+          },
+          "zoe": {
+            "2.3_kw_1ph": 0.49,
+            "11_kw_3ph": 0.64,
+            "22_kw_3ph": 0.65,
+            "43_kw_3ph": 0.63
+          }
+        },
+        "method1_eff_ion": {
+          "2.3_kw_1ph": 0.79,
+          "3.7_kw_1ph": 0.77
+        },
+        "ion_pack_resistance_ohm": 0.38,
+        "ion_pack_heat_w_at_10a": 7.2,
+        "ion_pack_heat_share_at_2_3_kw": 0.003,
+        "ion_dcdc_eff": 0.98,
+        "temp_c": [
+          19,
+          22
+        ],
+        "soc_window": [
+          80,
+          100
+        ],
+        "odometer_km": [
+          10000,
+          20000
+        ]
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "A. Kieldsen, A. Thingvad, S. Martinenas, T. M. Sørensen, \"Efficiency Test Method for Electric Vehicle Chargers\", Proceedings of EVS29, 2016 (peer-reviewed version, DTU Orbit): Table 1, sections 1, 3.4 and 4.3, Fig. 12",
+          "label": "DTU, 2016",
+          "url": "https://orbit.dtu.dk/en/publications/efficiency-test-method-for-electric-vehicle-chargers",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Read in full from the owner's copy (LocalDev/explainers/Reference Docs/efficiency_paper.pdf). Method 3 (η3, Table 1): discharge the pack 100→80% through the 12 V system with metered energy, recharge 80→100% from metered AC, and subtract the 12 V draw during the charge: η3 = E_discharge ÷ (E_AC − E_12V,charge). So it leaves out the fixed draw, runs a round trip through the DC/DC converter, and covers 80–100% SoC, where the charge tapers to balance cells. Method 1 (η1, iOn only) measures both sides of the charger directly; η3 read 2% below it, which the paper puts down to battery heat, the DC/DC converter (~98%) and inverter standby. CAN-bus readings (η2) were judged unreliable (Leaf spikes above 100%). Battery, section 3.4.1: the iOn's pack voltage rose 2.5 V for a 6.5 A step, \"an internal resistance of 0.38 Ω, which is quite small and only result in a heat dissipation of P_loss = I²·R_internal = 7.2 W, when charging with 10 A 230 V\". 7.2 W of 2.3 kW is 0.3% (EVBench's arithmetic); the paper squares the 10 A AC current, so the pack-side figure would be smaller. Charger range, sections 1 and 4.4: chargers are tuned to an input range and lose efficiency outside it (Fig. 12, iOn efficiency against AC current); the paper cites a 95% converter losing about 10 points at half power. Three-phase, section 4.3: \"A 3-phased charger can use the system voltage of 400 V and use a buck converter to step it down to the MAIN voltage. When only one phase of the charger is used, the line voltage is 230 V and that causes a larger loss in the rectifier and means that a boost converter is needed\", the paper's explanation of the Zoe's single-phase result. The Zoe's comparison changes power and phase together. Cars had driven 10–20,000 km; tests were run in a temperature-controlled room."
+    },
+    {
+      "id": "tessie-level1-level2-figures",
+      "claim": "Tessie, an app that logs Tesla charging from the car's own readings, gives about 70% charging efficiency on a 120 V outlet and about 90% on 240 V.",
+      "summary": "Tessie, a Tesla app, quotes about 70% on 120 V and 90% on 240 V.",
+      "value": {
+        "level1_eff": 0.7,
+        "level2_eff": 0.9
+      },
+      "sources": [
+        {
+          "rank": "D",
+          "title": "Tessie Help Center, \"About Charging Efficiency\"",
+          "label": "Tessie help page",
+          "url": "https://help.tessie.com/article/49-charging-efficiency",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Rank D: round figures with no method or sample given. Its efficiency is the car's \"energy added\" ÷ the car's own reading of the charger's voltage and current, so it counts neither the wall wiring nor anything the car's meters miss. The same page puts DC fast charging at ~100%, which is not a loss figure EVBench uses (see dc-fast-round-trip-pairs)."
+    },
+    {
+      "id": "physics-fixed-draw-share",
+      "claim": "A draw that stays about the same in watts however fast the car charges is a larger share of a slow charge than a fast one, and it runs for longer: the same 200 W is 14% of 1.44 kW and under 2% of 11.5 kW.",
+      "summary": "A fixed 200 W is 14% of a 1.44 kW charge but under 2% of 11.5 kW.",
+      "value": {
+        "fixed_w": 200,
+        "share_at_1_44_kw": 0.139,
+        "share_at_11_52_kw": 0.017
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Arithmetic: share = fixed watts ÷ charging watts, and energy = watts × hours. The 200 W is EVBench's fixed draw (evbench-charging-loss-by-rate), inside ADAC's 100–300 W (charging-control-electronics-draw). Widely treated as the reason slow charging loses more, by ADAC and Sears et al. among others."
+    },
+    {
+      "id": "physics-ac-cable-loss-share",
+      "claim": "Resistive loss in a cable is I²R, so as a share of the power it is I·R ÷ V. House wiring: 50 ft of 14 AWG copper (about 0.25 Ω out and back) at 12 A and 120 V loses about 36 W, 2.5%; 50 ft of 6 AWG (about 0.04 Ω) at 48 A and 240 V about 91 W, 0.8%. Charging cord: 20 ft of 8 AWG at 12 A loses under 4 W, 0.25% (14 AWG about 1%); 20 ft of 6 AWG at 48 A about 36 W, 0.3%.",
+      "summary": "Thin 120 V house wiring can lose over 2%, a proper 240 V circuit under 1%.",
+      "value": {
+        "r_ohm_per_kft": {
+          "14awg": 2.525,
+          "8awg": 0.628,
+          "6awg": 0.395
+        },
+        "house_50ft": {
+          "l1_w": 36,
+          "l1_share": 0.025,
+          "l2_w": 91,
+          "l2_share": 0.008
+        },
+        "cord_20ft": {
+          "l1_8awg_w": 3.6,
+          "l1_8awg_share": 0.0025,
+          "l1_14awg_share": 0.01,
+          "l2_6awg_w": 36,
+          "l2_6awg_share": 0.0031
+        }
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Joule heating and Ohm's law (arithmetic), with copper's resistance per length from the standard AWG tables at room temperature (14 AWG ≈ 2.5 Ω and 6 AWG ≈ 0.4 Ω per 1,000 ft). 14 AWG is the smallest copper the NEC allows on a common 15 A outlet circuit. A worked example, not a measurement; the cord gauges are the owner's estimate (2026-11-12) and a lighter one for portable cords: real runs differ in length and gauge, and warm wire resists more. Upgrade with NEC Chapter 9 Table 8."
+    },
+    {
+      "id": "onboard-charger-light-load",
+      "claim": "An onboard charger is often a little less efficient on 120 V than on 240 V at the same power: it draws twice the current, and boosts a lower input voltage up to the pack's. Four of the six cars measured at equal power show it, by 2 to 3 points; two go the other way.",
+      "summary": "Four of six cars lost 2 to 3 points more on 120 V than on 240 V at the same power.",
+      "value": {
+        "for": {
+          "bolt_2017_at_1_44_kw": {
+            "120V": 14.6,
+            "240V": 12.2
+          },
+          "i3_2014_near_1_35_kw": {
+            "120V": 10.4,
+            "240V": 8.6
+          },
+          "leaf_2012_near_1_3_kw": {
+            "120V": 13.6,
+            "208V": 11.4
+          },
+          "leaf_2015_near_1_4_kw": {
+            "120V": 21.6,
+            "208V": 18.5
+          }
+        },
+        "against": {
+          "volt_2012": "120 V above 208 V near 1.2–1.4 kW",
+          "b_class_2015_near_1_4_to_1_6_kw": {
+            "120V": 15.3,
+            "240V": 20.2
+          }
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "M. Duoba, A. Fernandez Canosa et al., \"Development and Evaluation of Distributed Energy Resource Device Models: Electric Vehicles, Electric Water Heaters, and Commercial Refrigeration Systems\", NREL/TP-5500-75323 (Argonne, NREL, Oak Ridge), July 2020, Part 1 (Argonne): sections 1.2.2, 1.3.2, 1.5.2.2, Tables 1–4, Figures 15–18",
+          "label": "Argonne, 2020",
+          "url": "https://docs.nlr.gov/docs/fy20osti/75323.pdf",
+          "accessed": "2026-11-15"
+        },
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory, \"Steady State Vehicle Charging Fact Sheet\" series (INL/EXT-15-34055): 2012 Chevrolet Volt, 2012 and 2015 Nissan Leaf, 2014 BMW i3, 2015 Mercedes B-Class",
+          "label": "INL steady-state sheets",
+          "url": "https://inldigitallibrary.inl.gov/sites/sti/sti/6597432.pdf",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Values are % lost. The Bolt's are from Argonne's loss fits (anl-charging-loss-fits-2020), plug to battery terminals with standby included; the rest are INL's charger-only readings (inl-steady-state-volt-2012, inl-steady-state-leaf-2012, inl-steady-state-leaf-2015, inl-steady-state-i3-2014, inl-steady-state-b-class-2015). The Bolt also lost about ½ point more on 208 V than on 240 V from 3 to 7 kW. Against it: the Volt's 120 V points sit above its 208 V points at about the same power, and the B-Class's efficiency follows current, not voltage, so its 120 V reads higher at equal power; near 1 kW the Bolt's 120 V and 240 V fits agree. Mechanism, from DTU for single-phase 230 V against three-phase 400 V (onboard-charger-loss-dtu-2016): a lower line voltage means more loss in the rectifier and a boost stage up to the pack's voltage; conduction losses also rise with input current, about double on 120 V for the same power. Upgraded from accepted to verified, 2026-11-15, owner's reading of the INL and Argonne data."
+    },
+    {
+      "id": "volt-onboard-charger-inl-2012",
+      "claim": "Idaho National Laboratory measured a 2012 Chevrolet Volt's onboard charger at 91.7% efficient on 208 V between 3.0 and 3.3 kW, and 90.6% on 120 V near 1.3 kW; with the EVSE included, 90.8% on Level 2 and 88.8% on Level 1.",
+      "value": {
+        "obcm_208v": 0.917,
+        "obcm_208v_kw": [
+          3.0,
+          3.3
+        ],
+        "obcm_120v": 0.906,
+        "obcm_120v_kw": 1.3,
+        "overall_l2": 0.908,
+        "overall_l1": 0.888,
+        "vehicle": "2012 Chevrolet Volt",
+        "full_power_kw": {
+          "level1": [
+            1.2,
+            1.4
+          ],
+          "level2": [
+            3.0,
+            3.3
+          ]
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "R. B. Carlson, \"Advanced Vehicle Testing Activity: Benchmark Testing of the Chevrolet Volt Onboard Charger\", Idaho National Laboratory, INL/EXT-12-25761, April 2012",
+          "url": "https://inldigitallibrary.inl.gov/sites/sti/sti/5436981.pdf",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "Summary: \"Charging with Level 2 EVSE at 208 VAC input … 91.7% efficient … Charging with Level 1 EVSE at 120 VAC input … 90.6% efficient while operating near 1.3 AC kW.\" Efficiency is the charger's combined DC output (high and low voltage) ÷ its AC input, read from the car's CAN data with the key off. The two points differ in both voltage and power, so the 1.1-point gap is not voltage alone. It leaves out the rest of the car's draw while charging (pumps, controllers fed from the pack), so it is not a wall-to-battery figure. The Volt's charger is rated 3.3 kW on 240 V and 1.2 kW on 120 V (its Table 1). Section 3.3: full power is 3.0–3.3 AC kW on Level 2 and 1.2–1.4 AC kW on Level 1, drawn for more than 99% of a typical charge. Not used as an efficiency (owner, 2026-11-15): a steady-state reading of the charger alone, well above the whole-session figures for the same car from Sears et al. (ac-level1-vs-level2-sears-2014) and EPA's certification recharge of the 2011-era Volt (about 80% out of the battery at 240 V), and it misses what a real session spends on top-off, balancing and pack conditioning. Its charging powers (full_power_kw) are still used. INL's 2015 steady-state sheet for a 2012 Volt (inl-steady-state-volt-2012) reads 3 to 4 points lower than this report."
+    },
+    {
+      "id": "evse-efficiency-inl",
+      "claim": "INL found most Level 2 EVSE more than 99% efficient above 3 kW, and a Level 1 EVSE 98% efficient above 1.25 kW.",
+      "summary": "INL found a Level 2 charging station over 99% efficient, a Level 1 98%.",
+      "value": {
+        "level2": ">0.99",
+        "level1": 0.98
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "R. B. Carlson, \"Advanced Vehicle Testing Activity: Benchmark Testing of the Chevrolet Volt Onboard Charger\", Idaho National Laboratory, INL/EXT-12-25761, April 2012",
+          "label": "INL, 2012",
+          "url": "https://inldigitallibrary.inl.gov/sites/sti/sti/5436981.pdf",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "verified",
+      "note": "From the same report's summary and footnotes: \"most Level 2 EVSE are greater than 99% efficient when operating above 3.0 kW (208 to 240 VAC) and Level 1 EVSE are 98% efficient when operating above 1.25 AC kW (120 VAC)\". The Level 1 figure is one unit, tested by INL but \"not yet published\" when the report was written. EVSE efficiency covers the whole unit (its relay, control board and cord), not the cord alone."
+    },
+    {
+      "id": "physics-three-phase-cable-loss",
+      "claim": "Balanced three-phase power puts a third of the current in each of three conductors, so over the same wire it loses about a sixth of what single-phase loses at the same power and phase voltage.",
+      "summary": "Three-phase wiring loses about a sixth of what single-phase does at the same power.",
+      "value": {
+        "ratio": 0.167
+      },
+      "sources": [],
+      "status": "accepted",
+      "rationale": "Arithmetic from Joule heating: single-phase loss 2·I²R (out and back); balanced three-phase 3·(I/3)²R = I²R/3, with no neutral current. Textbook power engineering, not any one product's figure."
+    },
+    {
+      "id": "onboard-charger-three-phase-designs",
+      "claim": "Three-phase home charging is common in Europe, Australia and New Zealand. Three-phase power flows steadily rather than pulsing twice a cycle as single-phase does, which eases an onboard charger's filtering; chargers that take it are built either as three single-phase stages, one per phase, or around a single three-phase rectifier.",
+      "summary": "Three-phase power flows more smoothly, but many chargers just use three single-phase stages.",
+      "sources": [],
+      "status": "accepted",
+      "rationale": "General power-engineering knowledge: balanced three-phase instantaneous power is constant, single-phase power pulses at twice the line frequency, so a single-phase charger needs more energy storage on its DC link. Both charger layouts appear in silicon makers' onboard-charger reference designs. An argument that three-phase is probably a little more efficient, not a measurement; the page says so. Upgrade with a measurement of one car at equal power on one phase and three. DTU gives the input-voltage mechanism for one car, the Renault Zoe (onboard-charger-loss-dtu-2016): three-phase 400 V lets the charger step down to the pack, while single-phase 230 V needs a boost stage and loses more in the rectifier."
+    },
+    {
+      "id": "sears-cars-level2-3-3-kw",
+      "claim": "The 2013 Chevrolet Volts and Nissan Leafs in the Vermont study charged at about 3.3 kW on Level 2.",
+      "value": {
+        "level2_kw": 3.3
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "For the Volt: R. B. Carlson, INL/EXT-12-25761, Table 1 (3.3 kW maximum high-voltage output on 240 VAC; 3.0–3.3 AC kW at full power)",
+          "url": "https://inldigitallibrary.inl.gov/sites/sti/sti/5436981.pdf",
+          "accessed": "2026-11-12"
+        }
+      ],
+      "status": "observed",
+      "rationale": "The owner's knowledge of both cars (2026-11-12): the Volt and the Leaf of that era both charge at 3.3 kW on Level 2. The Volt's figure is sourced (INL); the Leaf's is not, and the Sears et al. paper does not give either. Upgrade with a Nissan specification for the 2013 Leaf's charger fitted to the study cars. Used only to place the study's Level 2 results on the loss-against-time figure."
+    },
+    {
+      "id": "leaf-2011-csi-charger-and-pack",
+      "claim": "On EPA certification testing of the 2011 Nissan Leaf, about 87% of the energy drawn from the wall reached the battery, and about 96–97% of what went into the battery came back out, so EPA-basis charging efficiency (out of the battery ÷ from the wall) was about 84–85%.",
+      "summary": "EPA’s 2011 Leaf test: 87% reached the battery, 84 to 85% came back out.",
+      "value": {
+        "unit": "Wh/mi as reported; efficiencies are ratios",
+        "highway": {
+          "test": "BNSX10011455",
+          "date": "2010-09-10",
+          "ac_recharge": 258.1,
+          "dc_into_pack": 225.2,
+          "net_dc_out": 217.2,
+          "charger_eff": 0.873,
+          "pack_round_trip": 0.964,
+          "epa_basis_eff": 0.842
+        },
+        "city": {
+          "test": "BNSX10011454",
+          "date": "2010-09-09",
+          "ac_recharge": 217.9,
+          "dc_into_pack": 190.4,
+          "net_dc_out": 184.8,
+          "charger_eff": 0.874,
+          "pack_round_trip": 0.971,
+          "epa_basis_eff": 0.848
+        },
+        "recharge_kwh_from_wall": {
+          "highway": 25.06,
+          "city": 24.78
+        },
+        "net_kwh_out": {
+          "highway": 21.09,
+          "city": 21.01
+        }
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA Certification Summary Information (CSI), 2011 Nissan Leaf: tests BNSX10011455 (procedure 63, highway range, 2010-09-10) and BNSX10011454 (procedure 62, urban range, 2010-09-09). Rows: Total AC Energy and Total DC Energy - Charge Batteries After Test, Net DC Expended, All-Electric Range.",
+          "label": "EPA certification, 2011 Leaf",
+          "url": "https://dis.epa.gov/otaqpub/display_file.jsp?docid=23909&flag=1",
+          "accessed": "2026-11-15"
+        },
+        {
+          "rank": "C",
+          "title": "Ratios and per-test kWh (Wh/mi × all-electric range: 97.1 mi highway, 113.7 mi city) are arithmetic on the sheet",
+          "label": "EVBench arithmetic",
+          "url": null,
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "The 2011 sheet reports DC energy into the pack on recharge; current sheets report only the AC recharge and DC discharged, so this split is not available for newer cars. The sheet gives one recharge per test and not its rate or outlet, so it cannot show how loss changes with charging power. Pack round trip covers losses inside the pack on charge and discharge plus any drain over the soak, not charge-side loss alone. The city test prints Total DC Energy Output as 73.9, a copy of its regen input; net expended (184.8) implies about 258.7. Only net expended is used here."
+    },
+    {
+      "id": "volt-2011-csi-charge-depleting",
+      "claim": "On EPA certification testing of the first-generation Chevrolet Volt, the energy taken out of the battery over a charge-depleting test was 80–82% of the energy drawn from a 240 V outlet to recharge it.",
+      "summary": "EPA’s first-generation Volt test: 80 to 82% of the wall energy came back out.",
+      "value": {
+        "basis": "DC out of the battery ÷ AC recharge (EPA basis)",
+        "reading": "Each bag lists cumulative amp-hours under both Integrated Amp-hours and System Start/End State of Charge Watt-hours; energy per bag = Ah × that bag's Average System Voltage",
+        "city_first": {
+          "bags": 9,
+          "ac_recharge_kwh": 13.819,
+          "dc_out_kwh": 11.08,
+          "eff": 0.802,
+          "engine_bags": [
+            8,
+            9
+          ]
+        },
+        "city_confirmatory": {
+          "test": "BGMX10012223",
+          "procedure": 81,
+          "date": "2010-11-18",
+          "lab": "EPA",
+          "ac_recharge_kwh": 12.79,
+          "dc_out_kwh": 10.36,
+          "eff": 0.81,
+          "engine_bags": [
+            7,
+            8
+          ]
+        },
+        "highway": {
+          "bags": 6,
+          "ac_recharge_kwh": 12.567,
+          "dc_out_kwh": 10.3,
+          "eff": 0.819,
+          "engine_bags": [
+            5,
+            6
+          ]
+        },
+        "recharge_voltage": 240
+      },
+      "sources": [
+        {
+          "rank": "A",
+          "title": "EPA Certification Summary Information (CSI) application, Chevrolet Volt: charge-depleting UDDS and highway tests, Recharge Event Energy and per-bag Integrated Amp-hours and Average System Voltage. The 120K tests carry the comments \"120K CDEM TEST - CONFIRMATORY AT EPA\" and \"120K CDHW TEST\".",
+          "label": "EPA certification, Volt",
+          "url": "https://dis.epa.gov/otaqpub/display_file.jsp?docid=29806&flag=1",
+          "accessed": "2026-11-15"
+        },
+        {
+          "rank": "C",
+          "title": "Energy out = Σ (Ah × average system voltage) over the bags; efficiency = energy out ÷ recharge energy (arithmetic on the sheet)",
+          "label": "EVBench arithmetic",
+          "url": null,
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Read from the owner's excerpts of the application, 2026-11-15; the first city test's number was not in the excerpt. The sheet labels the cumulative values Watt-hours, but they are amp-hours: about 4 Ah per 7.47-mile city bag at 350–390 V is about 200 Wh/mi, right for a Volt; read as Wh they make no sense. Bags where the engine runs are included, because the recharge refills all the net charge drawn. Bag 9 of the first city test starts at 30.2 Ah where bag 8 ended at 30.29 (about 0.03 kWh). The 120K tests are of a car aged to 120,000 miles, which fits its smaller total (about 10.3 kWh against 11.1). Each test has one recharge at an unstated current, so it says nothing about how loss changes with charging power. The confirmatory test's date points to model year 2011. Compare INL's steady-state 90.8% for the same car's charger and EVSE (volt-onboard-charger-inl-2012), which EVBench does not use."
+    },
+    {
+      "id": "ac-socket-vs-wallbox-adac-2022",
+      "claim": "In ADAC's 2022 measurements of four electric cars, charging from a household socket at 2.3 kW lost 12.7–24.2% of the energy drawn, an 11 kW wallbox 6.3–9.7%, and a wallbox turned down to 3.5–5.5 kW in between.",
+      "summary": "ADAC: four 2022 cars lost 13 to 24% on a socket, 6 to 10% on an 11 kW wallbox.",
+      "value": {
+        "unit": "% of energy drawn, lost before the battery",
+        "basis": "into the battery (calibrated meter against the battery management system’s stored energy)",
+        "charge": "20% of the battery added per measurement, same conditions each time",
+        "socket_kw": 2.3,
+        "wallbox_kw": 11,
+        "cars": [
+          {
+            "car": "Renault Zoe",
+            "socket": 24.2,
+            "wallbox_11": 9.7,
+            "reduced": null
+          },
+          {
+            "car": "VW ID.3",
+            "socket": 13.6,
+            "wallbox_11": 9,
+            "reduced": {
+              "kw": 5.5,
+              "loss": 9.2
+            }
+          },
+          {
+            "car": "Tesla Model 3",
+            "socket": 15.2,
+            "wallbox_11": 7.7,
+            "reduced": {
+              "kw": 3.5,
+              "loss": 11.4
+            }
+          },
+          {
+            "car": "Fiat 500e",
+            "socket": 12.7,
+            "wallbox_11": 6.3,
+            "reduced": {
+              "kw": 3.6,
+              "loss": 13.9
+            }
+          }
+        ],
+        "reduced_by": "vehicle setting"
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "ADAC, \"Elektroauto und Ladeverluste: So können Sie Kosten vermeiden\", W. Rudschies, technical advice L. Kalb (ADAC Technik Zentrum), 2022-09-13; archived copy of the page ADAC has since replaced with its 2026 study",
+          "label": "ADAC, 2022",
+          "url": "https://web.archive.org/web/20231204060024/https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste-elektroauto-studie/",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Method, from the page: each battery was charged by 20% under the same conditions, and the energy from a calibrated meter was compared with the energy stored according to the battery management system. So it is into the battery, like the 2026 round (ac-socket-vs-wallbox-adac-2026), not out of it as EPA counts. The page does not say how many phases the reduced-power charges used: 3.5 kW and 5.5 kW fit three-phase at 5 A and 8 A, and 3.6 kW fits one phase at 16 A, but that is EVBench's inference. The Fiat lost more at 3.6 kW than on the 2.3 kW socket, so its charger does not follow the trend at that setting. ADAC also reports that adding 20% or 50% of the battery made no meaningful difference to the losses. Different cars from the 2026 round; the Zoe's 24.2% and the Fiat's 12.7% equal the 2026 CLA's and Model Y's socket figures by coincidence, which has confused some secondary reports."
+    },
+    {
+      "id": "r1t-charging-systems-draw-roamer",
+      "claim": "Over a year of AC charging, the owner's 2022 Rivian R1T spent about 150 W on its own systems for every hour it charged, plus about 50 Wh per charge; heating the battery took 1.5% of the energy over the year, almost all of it in winter.",
+      "summary": "The owner’s R1T used about 150 W on its own systems for each hour it charged.",
+      "value": {
+        "vehicle": "2022 Rivian R1T, Large pack, Gen 1",
+        "period": [
+          "2026-01-16",
+          "2026-11-14"
+        ],
+        "sessions": {
+          "all": 211,
+          "used": 203,
+          "excluded": "3 flagged corrupted by Roamer, 5 under 1 kWh"
+        },
+        "systems_fit": {
+          "w_per_charging_hour": 146,
+          "w_se": 4,
+          "wh_per_session": 52,
+          "wh_se": 13,
+          "rmse_wh": 94
+        },
+        "systems_vs_plugged_in_hours_w": 6,
+        "systems_w_per_session": {
+          "p10": 129,
+          "median": 164,
+          "p90": 193,
+          "n": 151,
+          "min_hours": 2
+        },
+        "systems_by_season": {
+          "jan_mar": {
+            "w": 133,
+            "se": 6,
+            "n": 42
+          },
+          "jun_sep": {
+            "w": 181,
+            "se": 6,
+            "n": 82
+          }
+        },
+        "thermal": {
+          "share_of_year_energy": 0.015,
+          "sessions_with_any": 54,
+          "w_per_charging_hour_jan": 473,
+          "w_per_charging_hour_may_oct": "0–9",
+          "per_charge_kwh_when_cold": [
+            1,
+            5.3
+          ],
+          "per_charge_note": "28 charges with 1 kWh or more, all near 7 kW: barely related to how long the charge ran (5.3 kWh in 2.1 h on 2026-01-25, 5.2 kWh in 10.4 h on 2026-01-29)"
+        },
+        "year": {
+          "energy_kwh": 4570,
+          "pack_share": 0.963,
+          "systems_share": 0.022,
+          "thermal_share": 0.015,
+          "charging_hours": 633
+        },
+        "off_home_power": [
+          {
+            "date": "2026-01-30",
+            "kw": 9.7,
+            "hours": 10.15,
+            "systems_kwh": 1.4,
+            "thermal_kwh": 1.9
+          },
+          {
+            "date": "2026-04-23",
+            "kw": 11.1,
+            "hours": 3.24,
+            "systems_kwh": 0.6,
+            "thermal_kwh": 0.3
+          }
+        ],
+        "example_charges": [
+          {
+            "date": "2026-05-28",
+            "avg_kw": 7.4,
+            "energy_kwh": 44.2,
+            "pack_kwh": 43.2,
+            "systems_kwh": 1,
+            "thermal_kwh": 0,
+            "where": "home"
+          },
+          {
+            "date": "2026-06-24",
+            "avg_kw": 7.4,
+            "energy_kwh": 25.2,
+            "pack_kwh": 24.8,
+            "systems_kwh": 0.4,
+            "thermal_kwh": 0,
+            "where": "home"
+          },
+          {
+            "date": "2026-09-08",
+            "avg_kw": 7.4,
+            "energy_kwh": 24.1,
+            "pack_kwh": 23.5,
+            "systems_kwh": 0.6,
+            "thermal_kwh": 0,
+            "where": "home"
+          },
+          {
+            "date": "2026-01-30",
+            "avg_kw": 9.7,
+            "energy_kwh": 98.5,
+            "pack_kwh": 95.2,
+            "systems_kwh": 1.4,
+            "thermal_kwh": 1.9,
+            "where": "away"
+          },
+          {
+            "date": "2026-04-23",
+            "avg_kw": 11.1,
+            "energy_kwh": 36,
+            "pack_kwh": 35.1,
+            "systems_kwh": 0.6,
+            "thermal_kwh": 0.3,
+            "where": "away"
+          }
+        ],
+        "pack_kwh_per_100_pct": {
+          "median": 132.7,
+          "n": 146
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Roamer (evroamer.com) CSV export of every Level 2 charge of the owner's R1T, 2026-01-16 to 2026-11-14: Rivian's per-charge energy breakdown into pack, thermal, outlets and systems, with average power and start and end charge",
+          "label": "Owner’s Roamer export",
+          "url": null,
+          "accessed": "2026-11-15"
+        },
+        {
+          "rank": "C",
+          "title": "Least-squares fit of systems kWh against charging hours (energy ÷ average power), one point per charge (arithmetic on the export)",
+          "label": "EVBench fit",
+          "url": null,
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "observed",
+      "rationale": "The owner's own truck, as Rivian reports each charge and Roamer records it; export saved in LocalDev/explainers/Reference Docs/charge_sessions.csv (2026-11-15). The breakdown sums exactly to the energy added, and pack energy over the change in charge gives a median 132.7 kWh, so it is the DC side of the onboard charger: the charger's own conversion loss and the wall-side energy are not in it. So this is the truck's fixed draw downstream of the charger, a floor on its whole fixed draw. Systems energy follows hours spent charging (146 W), not hours plugged in (6 W), so it stops when charging stops. The per-charge 52 Wh is about 20 minutes of that draw, small beside a typical 3-hour top-up's 0.4 kWh. Systems ran higher in summer (181 W) than winter (133 W) while thermal was near zero, so some cooling seems to be booked as systems. Almost every charge was at 7.0–7.4 kW on the home wallbox; the 9.7 and 11.1 kW charges ran 138 and 185 W, but two points cannot show whether the draw changes with power, and there is nothing below 6.4 kW but blips under 1 kWh, so no 120 V comparison. Upgrade with a wall-metered charge of the same truck at 120 V and 240 V."
+    },
+    {
+      "id": "adac-per-car-fixed-draw-fit",
+      "claim": "Fitting each of ADAC's nine cars (2022 and 2026) as a fixed draw plus a share of the power gives fixed draws of 134 to 503 W, median 218 W, and the size of a car's loss at 11 kW barely predicts its fixed draw.",
+      "summary": "ADAC’s nine cars draw 134 to 503 W while charging, median 218 W.",
+      "value": {
+        "model": "loss = P₀ ÷ P + k, through each car’s 2.3 kW socket and 11 kW wallbox results",
+        "cars": [
+          {
+            "car": "Mercedes CLA 350 EQ",
+            "year": 2026,
+            "wallbox_11": 6.9,
+            "p0_w": 503,
+            "k_pct": 2.3
+          },
+          {
+            "car": "Renault R5 E-Tech",
+            "year": 2026,
+            "wallbox_11": 5.1,
+            "p0_w": 250,
+            "k_pct": 2.8
+          },
+          {
+            "car": "Tesla Model Y",
+            "year": 2026,
+            "wallbox_11": 6.1,
+            "p0_w": 192,
+            "k_pct": 4.4
+          },
+          {
+            "car": "Volvo EX30",
+            "year": 2026,
+            "wallbox_11": 7,
+            "p0_w": 209,
+            "k_pct": 5.1
+          },
+          {
+            "car": "VW ID.7",
+            "year": 2026,
+            "wallbox_11": 6.9,
+            "p0_w": 244,
+            "k_pct": 4.7
+          },
+          {
+            "car": "Renault Zoe",
+            "year": 2022,
+            "wallbox_11": 9.7,
+            "p0_w": 422,
+            "k_pct": 5.9
+          },
+          {
+            "car": "VW ID.3",
+            "year": 2022,
+            "wallbox_11": 9,
+            "p0_w": 134,
+            "k_pct": 7.8
+          },
+          {
+            "car": "Tesla Model 3",
+            "year": 2022,
+            "wallbox_11": 7.7,
+            "p0_w": 218,
+            "k_pct": 5.7
+          },
+          {
+            "car": "Fiat 500e",
+            "year": 2022,
+            "wallbox_11": 6.3,
+            "p0_w": 186,
+            "k_pct": 4.6
+          }
+        ],
+        "p0_w": {
+          "min": 134,
+          "median": 218,
+          "max": 503
+        },
+        "r_wallbox_loss_vs_p0": 0.19
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench arithmetic on the per-car tables in ac-socket-vs-wallbox-adac-2022 and ac-socket-vs-wallbox-adac-2026: P₀ = (socket loss − wallbox loss) ÷ (1/2.3 − 1/11) kW, k = wallbox loss − P₀/11",
+          "label": "EVBench arithmetic",
+          "url": null,
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Both points are into the battery. The socket is single-phase and the 11 kW wallbox three-phase, so k absorbs any three-phase gain and P₀ any extra single-phase loss. Most of a car's loss at 11 kW is k, which is why it says little about P₀: the ID.3 lost the most at 11 kW (9.0%) and has the smallest fixed draw. Deriving P₀ from the 11 kW figure with a shared k would miss the ID.3 by about 300 W. The fit is two points per car, so it assumes the model's shape; the 2026 cars' 4.1 kW points test it in adac-rate-rule-tested."
+    },
+    {
+      "id": "adac-rate-rule-tested",
+      "claim": "Predicting each slower charge from the same car's fast one, with one fixed draw of 200 W for every car, misses ADAC's 2022 and 2026 measurements by 2.0 points on average, against 6.2 for EVBench's old 120 V rule; it does worse than the old rule on the 2013 Vermont cars, whose own fit is about 120 W.",
+      "summary": "EVBench’s rule misses ADAC’s slower charges by about 2 points on average.",
+      "value": {
+        "unit": "mean absolute error, points of loss",
+        "cases": {
+          "adac_2026": 11,
+          "adac_2022": 7,
+          "sears": 3
+        },
+        "by_set": {
+          "adac_both": {
+            "old_rule": 6.16,
+            "p0_140": 2.94,
+            "p0_200": 2.02,
+            "best": {
+              "p0_w": 215,
+              "mae": 1.96
+            }
+          },
+          "adac_2026": {
+            "old_rule": 6.03,
+            "p0_200": 1.79,
+            "best": {
+              "p0_w": 240,
+              "mae": 1.64
+            }
+          },
+          "adac_2022": {
+            "old_rule": 6.36,
+            "p0_200": 2.38,
+            "best": {
+              "p0_w": 190,
+              "mae": 2.37
+            }
+          },
+          "sears": {
+            "old_rule": 4.69,
+            "p0_200": 4.91,
+            "best": {
+              "p0_w": 120,
+              "mae": 3.67
+            }
+          },
+          "all": {
+            "old_rule": 5.95,
+            "p0_200": 2.43
+          }
+        },
+        "leave_one_out": {
+          "adac_2026": {
+            "fit_w": 185,
+            "mae": 2
+          },
+          "adac_2022": {
+            "fit_w": 210,
+            "mae": 2.4
+          },
+          "sears": {
+            "fit_w": 215,
+            "mae": 5.14
+          }
+        }
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench arithmetic: predicted loss = fast loss + P₀ × (1/P − 1/P_fast), against every slower result in ac-socket-vs-wallbox-adac-2022, ac-socket-vs-wallbox-adac-2026 and ac-level1-vs-level2-sears-2014 (script rate-model-test.mjs in the session notes)",
+          "label": "EVBench arithmetic",
+          "url": null,
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Tests the shape of the rule, not EPA's level: each case starts from the source's own fast result, since none of these cars has an EPA charger figure in the ledger. The old rule changed only a 120 V outlet (by 0.80 ÷ 0.885), so it predicted no change at ADAC's 3.5–5.5 kW. Sears' Level 1 results sit at the Volt's 1.3 kW and Level 2 at 3.3 kW (sears-cars-level2-3-3-kw), which Sears does not state per charge. Leave-one-out: fitting on the other sources and predicting the held-out one."
+    },
+    {
+      "id": "evbench-charging-loss-by-rate",
+      "claim": "EVBench prices home charging from the car's own EPA charging efficiency at its top AC rate, lowered at slower rates by a fixed draw of 200 W that is the same for every car.",
+      "summary": "EVBench starts from each car’s EPA figure and adds a fixed 200 W draw.",
+      "value": {
+        "formula": "η(P) = η_ref − P₀ × (1/P − 1/P_ref)",
+        "p0_w": 200,
+        "p_ref": "the car’s max AC kW, else 11.5",
+        "eta_ref": "the car’s EPA charging efficiency, else 0.885",
+        "example_default_car": {
+          "120V_12A": 0.763,
+          "240V_16A": 0.85,
+          "240V_32A": 0.876,
+          "240V_48A": 0.885
+        }
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench: FIXED_DRAW_W (src/constants/epa.js, a Model Constants knob) and chargerEffAt in costToDriveVehicle (src/utils/costToDrive.js), branch feature/charging-loss-by-rate",
+          "label": "EVBench code",
+          "url": null,
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Replaces WALL_OUTLET_CHARGER_EFF (0.80 on 120 V only, a round figure). Owner's choice of about 200 W, 2026-11-15, from adac-per-car-fixed-draw-fit and adac-rate-rule-tested. P is the charging power at the wall, capped at P_ref. One P₀ for every car because measured cars range 134–503 W with no pattern by efficiency or size."
+    },
+    {
+      "id": "evbench-battery-warming",
+      "claim": "Below 40°F, EVBench adds an amount of energy to each home charge for warming the battery, in proportion to the usable pack and to the degrees below 40°F; the rate is a guess, the same for every car.",
+      "summary": "Below 40 °F, EVBench adds a rough guess for warming the battery.",
+      "value": {
+        "formula": "E_warm = k × f_car × E_usable × max(0, 40°F − T)",
+        "k_kwh_per_kwh_per_f": 0.002,
+        "f_car": 1,
+        "below_f": 40,
+        "example": "100 kWh usable at 20°F: 4 kWh per charge, bought through the charging efficiency"
+      },
+      "sources": [
+        {
+          "rank": "C",
+          "title": "EVBench: BATTERY_WARMING_KWH (src/constants/epa.js, a Model Constants knob), PACK_WARMING_BELOW_F (src/constants/costToDrive.js) and the per-car factor in src/utils/costToDrive.js, branch feature/charging-loss-by-rate",
+          "label": "EVBench code",
+          "url": null,
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Owner's design, 2026-11-15: a per-charge energy scaled by pack size and by temperature below 40°F, with placeholder values. 0.002 is loosely the owner's R1T (about 5 kWh on a cold-night charge, ~135 kWh pack, ~20°F; r1t-charging-systems-draw-roamer). f_car is 1 for every car until per-car figures exist. Energy and cost only: it does not lengthen a night's charging. Assumes the car is parked outside."
+    },
+    {
+      "id": "inl-baseline-recharge-2013",
+      "claim": "Idaho National Laboratory recharged four 2013 plug-in cars at 240 V after each of three constant-speed range tests and metered both ends: the onboard chargers put 81 to 91% of the AC from the charging station into the battery, the batteries returned 88 to 100% of it on the next drive (mostly 95 to 98%), and overall 77 to 89% of the AC came back out of the battery.",
+      "summary": "INL’s 2013 plug-ins returned 77 to 89% of the wall energy, EPA’s way.",
+      "value": {
+        "basis": "overall_eff is energy out of the battery ÷ AC from the charging station, the same basis as EPA; charger_eff is into the battery",
+        "cars": [
+          {
+            "car": "2013 Nissan Leaf SV",
+            "avg_kw": [
+              5.77,
+              4.89,
+              4.9
+            ],
+            "tests": [
+              {
+                "test_mph": 45,
+                "ac_kwh": 22.6,
+                "dc_in_kwh": 19.6,
+                "dc_out_kwh": 19.2,
+                "charge_time": "03:55",
+                "charger_eff": 0.87,
+                "round_trip": 0.98,
+                "overall_eff": 0.85,
+                "charge_ambient_c": 18
+              },
+              {
+                "test_mph": 60,
+                "ac_kwh": 22.5,
+                "dc_in_kwh": 19.4,
+                "dc_out_kwh": 18.5,
+                "charge_time": "04:36",
+                "charger_eff": 0.86,
+                "round_trip": 0.95,
+                "overall_eff": 0.82,
+                "charge_ambient_c": 25
+              },
+              {
+                "test_mph": 70,
+                "ac_kwh": 22.7,
+                "dc_in_kwh": 19.6,
+                "dc_out_kwh": 18.6,
+                "charge_time": "04:38",
+                "charger_eff": 0.86,
+                "round_trip": 0.95,
+                "overall_eff": 0.82,
+                "charge_ambient_c": 24
+              }
+            ]
+          },
+          {
+            "car": "2013 Ford Focus Electric",
+            "onboard_charger_kw": 6.6,
+            "avg_kw": [
+              5.98,
+              5.6,
+              5.62
+            ],
+            "tests": [
+              {
+                "test_mph": 45,
+                "ac_kwh": 25.4,
+                "dc_in_kwh": 20.5,
+                "dc_out_kwh": 19.5,
+                "charge_time": "04:15",
+                "charger_eff": 0.81,
+                "round_trip": 0.95,
+                "overall_eff": 0.77,
+                "charge_ambient_c": 31
+              },
+              {
+                "test_mph": 60,
+                "ac_kwh": 25,
+                "dc_in_kwh": 20.5,
+                "dc_out_kwh": 19.7,
+                "charge_time": "04:28",
+                "charger_eff": 0.82,
+                "round_trip": 0.96,
+                "overall_eff": 0.79,
+                "charge_ambient_c": 36
+              },
+              {
+                "test_mph": 70,
+                "ac_kwh": 24.8,
+                "dc_in_kwh": 20.3,
+                "dc_out_kwh": 19.4,
+                "charge_time": "04:25",
+                "charger_eff": 0.82,
+                "round_trip": 0.96,
+                "overall_eff": 0.78,
+                "charge_ambient_c": 34
+              }
+            ]
+          },
+          {
+            "car": "2013 Ford Fusion Energi",
+            "avg_kw": [
+              3,
+              3,
+              3.09
+            ],
+            "tests": [
+              {
+                "test_mph": 45,
+                "ac_kwh": 6.9,
+                "dc_in_kwh": 5.8,
+                "dc_out_kwh": 5.8,
+                "charge_time": "02:18",
+                "charger_eff": 0.84,
+                "round_trip": 1,
+                "overall_eff": 0.84,
+                "charge_ambient_c": 23
+              },
+              {
+                "test_mph": 60,
+                "ac_kwh": 7.1,
+                "dc_in_kwh": 6,
+                "dc_out_kwh": 5.7,
+                "charge_time": "02:22",
+                "charger_eff": 0.85,
+                "round_trip": 0.95,
+                "overall_eff": 0.8,
+                "charge_ambient_c": 30
+              },
+              {
+                "test_mph": 70,
+                "ac_kwh": 7.2,
+                "dc_in_kwh": 6,
+                "dc_out_kwh": 5.9,
+                "charge_time": "02:20",
+                "charger_eff": 0.83,
+                "round_trip": 0.98,
+                "overall_eff": 0.82,
+                "charge_ambient_c": 27
+              }
+            ]
+          },
+          {
+            "car": "2013 Chevrolet Volt",
+            "avg_kw": [
+              3.04,
+              3.06,
+              3.06
+            ],
+            "soc_window": [
+              18.3,
+              83.5
+            ],
+            "tests": [
+              {
+                "test_mph": 45,
+                "ac_kwh": 12.3,
+                "dc_in_kwh": 11.2,
+                "dc_out_kwh": 11,
+                "charge_time": "04:03",
+                "charger_eff": 0.91,
+                "round_trip": 0.98,
+                "overall_eff": 0.89,
+                "charge_ambient_c": 13
+              },
+              {
+                "test_mph": 60,
+                "ac_kwh": 11.8,
+                "dc_in_kwh": 10.7,
+                "dc_out_kwh": 10.2,
+                "charge_time": "03:51",
+                "charger_eff": 0.91,
+                "round_trip": 0.95,
+                "overall_eff": 0.86,
+                "charge_ambient_c": 16
+              },
+              {
+                "test_mph": 70,
+                "ac_kwh": 12.5,
+                "dc_in_kwh": 11.3,
+                "dc_out_kwh": 10,
+                "charge_time": "04:05",
+                "charger_eff": 0.9,
+                "round_trip": 0.88,
+                "overall_eff": 0.8,
+                "charge_ambient_c": 17
+              }
+            ]
+          }
+        ],
+        "range": {
+          "charger_eff": [
+            0.81,
+            0.91
+          ],
+          "round_trip": [
+            0.88,
+            1
+          ],
+          "overall_eff": [
+            0.77,
+            0.89
+          ]
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory / Intertek, \"2013 Nissan Leaf, Advanced Vehicle Testing – Baseline Testing Results\", U.S. DOE Vehicle Technologies Program fact sheet, p. 3",
+          "label": "INL, 2013 Leaf",
+          "url": "https://www.energy.gov/sites/prod/files/2015/01/f19/fact2013nissanleaf.pdf",
+          "accessed": "2026-11-15"
+        },
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory / Intertek, \"2013 Ford Focus Electric, Advanced Vehicle Testing – Baseline Testing Results\", INL/MIS-15-34211, January 2015, p. 3",
+          "label": "INL, 2013 Focus Electric",
+          "url": "https://www.energy.gov/sites/prod/files/2015/02/f19/fact2013fordfocus.pdf",
+          "accessed": "2026-11-15"
+        },
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory / Intertek, \"2013 Ford Fusion Energi, Advanced Vehicle Testing – Baseline Vehicle Testing Results\", INL/MIS-15-34211, January 2015, p. 3",
+          "label": "INL, 2013 Fusion Energi",
+          "url": "https://www.energy.gov/sites/default/files/2015/02/f19/fact2013fordfusionenergi.pdf",
+          "accessed": "2026-11-15"
+        },
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory / ECOtality, \"2013 Chevrolet Volt, Advanced Vehicle Testing – Baseline Testing Results\", U.S. DOE Vehicle Technologies Program fact sheet, p. 3",
+          "label": "INL, 2013 Volt",
+          "url": "https://www.energy.gov/sites/prod/files/2014/02/f7/2013_chevrolet_volt_fs.pdf",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Each sheet's \"Constant-Speed Range and Charge Testing\" table: (C) \"Post-test charge AC energy from EVSE @ 240 V to onboard charger\", (D) \"Post-test charge DC energy into battery from onboard charger\", (A+) total DC energy out of the battery including the drives to and from the test (A for the Volt). On-Board Charger Efficiency is D/C, Battery Roundtrip Efficiency A+/D, Overall Trip Efficiency A+/C. The AC is metered at the charging station's output, so the station's own loss (about 1%, evse-efficiency-inl) is left out, and nothing is subtracted for what the car uses while charging, so A+/C is EPA's basis (epa-charger-efficiency-is-ac). Each charge follows a range test, so it runs from nearly empty to full (the Volt's from about 20% to 83.5%, where it switches to the engine). avg_kw is EVBench's arithmetic, C ÷ charge time, so it includes the taper at the end. charge_ambient_c is the sheet's average ambient during the charge. The Focus's 6.6 kW charger is from its specifications; the others' are not given. Battery temperatures during the charges were 24 to 47 °C. The Volt's 70 mph test returned only 88% from its battery after a hot test (no reason given). Both Ford sheets carry the same report number, INL/MIS-15-34211; the Leaf and Volt sheets carry none. One power per car, at 240 V only, so these cannot show how loss changes with power; they show where whole charges of that era landed on EPA's basis. The i3 and B-Class sheets of the series are on avt.inl.gov, which refuses EVBench's machine; not read."
+    },
+    {
+      "id": "inl-steady-state-volt-2012",
+      "claim": "Idaho National Laboratory measured a 2012 Chevrolet Volt's onboard charger in steady state from 0.65 to 1.38 kW on 120 V, 84.2 to 86.6% efficient, and from 1.15 to 3.14 kW on 208 V, 82.2 to 88.5%; efficiency fell as the charge rate fell, and at about the same power the 120 V readings sat above the 208 V ones.",
+      "summary": "The 2012 Volt’s charger alone: 84 to 87% on 120 V, 82 to 89% on 208 V.",
+      "value": {
+        "level1_120v": {
+          "min": {
+            "kw": 0.65,
+            "eff": 0.842
+          },
+          "max": {
+            "kw": 1.38,
+            "eff": 0.866
+          }
+        },
+        "level2_208v": {
+          "min": {
+            "kw": 1.15,
+            "eff": 0.822
+          },
+          "max": {
+            "kw": 3.14,
+            "eff": 0.885
+          }
+        },
+        "basis": "charging station output to onboard charger output, steady state"
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "D. Scoffield, \"Steady State Vehicle Charging Fact Sheet: 2012 Chevrolet Volt\", Idaho National Laboratory, INL/EXT-15-34055, January 2015, pp. 1–2",
+          "label": "INL, 2012 Volt sheet",
+          "url": "https://inldigitallibrary.inl.gov/sites/sti/sti/6597432.pdf",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Measurement points: \"AC Input: EVSE Output\", \"DC Output: On Board Charge Module Output\". Steady state means \"the RMS current magnitude is not changing and the voltage source is close to nominal\", so this is the charger alone at constant current: no fixed draw from the rest of the car, no end-of-charge taper, no charging station loss. Page 2: \"As the vehicle charge rate decreases, efficiency decreases … the decrease in efficiency … is not negligible and should be avoided when possible.\" The equal-power comparison is read from the page 2 chart: near 1.2 to 1.4 kW the 120 V points sit at about 86 to 86.6% and the 208 V points at about 82 to 85%. The same lab's 2012 report on a 2012 Volt (volt-onboard-charger-inl-2012) gave 91.7% on 208 V and 90.6% on 120 V, 3 to 4 points higher than this sheet. Added at the owner's request, 2026-11-15, as charger-only context, not as a whole-charge efficiency."
+    },
+    {
+      "id": "inl-steady-state-i3-2014",
+      "claim": "Idaho National Laboratory measured a 2014 BMW i3's onboard charger in steady state from 0.66 to 1.33 kW on 120 V, 84.1 to 89.6% efficient, and from 1.38 to 7.22 kW on 240 V, 91.4 to 93.8%; at about the same power, 120 V read about 2 points below 240 V.",
+      "summary": "The i3’s charger alone: 84 to 90% on 120 V, 91 to 94% on 240 V.",
+      "value": {
+        "level1_120v": {
+          "min": {
+            "kw": 0.66,
+            "eff": 0.841
+          },
+          "max": {
+            "kw": 1.33,
+            "eff": 0.896
+          }
+        },
+        "level2_208v": {
+          "min": {
+            "kw": 1.18,
+            "eff": 0.909
+          },
+          "max": {
+            "kw": 6.47,
+            "eff": 0.934
+          }
+        },
+        "level2_240v": {
+          "min": {
+            "kw": 1.38,
+            "eff": 0.914
+          },
+          "max": {
+            "kw": 7.22,
+            "eff": 0.938
+          }
+        },
+        "basis": "charging station output to the high-voltage and 12 V outputs, steady state",
+        "curve": {
+          "level1_120v": [[0.67, 0.844], [0.69, 0.859], [0.79, 0.863], [0.89, 0.874], [1, 0.881], [1.1, 0.887], [1.2, 0.891], [1.31, 0.895], [1.33, 0.898]],
+          "level2_208v": [[1.18, 0.909], [1.21, 0.908], [1.38, 0.918], [1.41, 0.917], [1.6, 0.925], [1.79, 0.929], [2, 0.932], [2.2, 0.935], [2.39, 0.936], [2.68, 0.929], [2.88, 0.932], [3.08, 0.933], [3.28, 0.934], [3.49, 0.935], [3.69, 0.936], [3.88, 0.936], [4.1, 0.937], [4.3, 0.937], [4.5, 0.937], [4.7, 0.937], [4.91, 0.937], [5.1, 0.937], [5.31, 0.937], [5.52, 0.936], [5.73, 0.935], [5.93, 0.935], [6.46, 0.934], [6.48, 0.934]],
+          "level2_240v": [[1.38, 0.913], [1.62, 0.922], [1.84, 0.926], [2.07, 0.932], [2.3, 0.934], [2.52, 0.937], [2.83, 0.93], [3.06, 0.933], [3.3, 0.935], [3.53, 0.936], [3.75, 0.937], [3.98, 0.939], [4.02, 0.939], [4.22, 0.94], [4.4, 0.94], [4.43, 0.941], [4.64, 0.94], [4.87, 0.941], [5.1, 0.941], [5.33, 0.941], [5.55, 0.941], [5.78, 0.941], [6.01, 0.94], [6.27, 0.94], [6.5, 0.94], [6.75, 0.939], [7.19, 0.938], [7.21, 0.938]]
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory, \"Steady State Vehicle Charging Fact Sheet: 2014 BMW i3\", Advanced Vehicle Testing Activity (footer INL/EXT-15-34055), pp. 1–3",
+          "label": "INL, 2014 i3 sheet",
+          "url": "https://avt.inl.gov/sites/default/files/pdf/fsev/SteadyStateLoadCharacterization2014BMWi3.pdf",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Read from the owner's copy, pulled through the Internet Archive because avt.inl.gov refuses EVBench's machine (LocalDev/explainers/Reference Docs/SteadyStateLoadCharacterization2014BMWi3.pdf). Measurement points: \"AC Input: EVSE Output\", \"DC Output: Powertrain Electrical Distribution Module high voltage and 12 volt output\"; page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Because the 12 V output counts as output, what the car's systems use while charging is not counted as loss. Key insight, page 1: \"The Level 2 efficiency is not strongly influenced by the charge rate.\" Page 2: \"For Level 2 charging, there is a step change in efficiency, power factor and total harmonic distortion at 13 amps or 3 kW.\" The 120 V maximum is the most a 12 A circuit allows; the 240 V maximum a 32 A circuit. The sheet's footer repeats the Volt sheet's report number. Added at the owner's request, 2026-11-15, as charger-only context. The curve is read from the sheet’s page-2 efficiency chart, which is drawn as vectors: each marker’s center, calibrated to the chart’s own tick marks, with readings within 0.03 kW merged (INL drew two markers per setting and dozens at the top rate). It agrees with the sheet’s table to 0.3 points."
+    },
+    {
+      "id": "dtu-2016-car-reported-efficiency",
+      "claim": "DTU also read what reached the battery from the car's own data, against a meter at the wall: the Nissan Leaf put 85% into its battery at 2.3 kW and 90% at 3.7 kW, the Peugeot iOn 70% and 69%; DTU judged these the least precise of its three methods.",
+      "summary": "DTU, from the cars’ own data: a Leaf got 85 to 90%, a Peugeot iOn about 70%.",
+      "value": {
+        "method2_eff": {
+          "leaf": {
+            "2.3_kw_1ph": 0.85,
+            "3.7_kw_1ph": 0.9
+          },
+          "ion": {
+            "2.3_kw_1ph": 0.7,
+            "3.7_kw_1ph": 0.69
+          }
+        },
+        "basis": "into the battery, as the car reports it, against metered AC",
+        "supply": "230 V single-phase, 10 A and 16 A"
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "A. Kieldsen, A. Thingvad, S. Martinenas, T. M. Sørensen, \"Efficiency Test Method for Electric Vehicle Chargers\", Proceedings of EVS29, 2016 (peer-reviewed version, DTU Orbit): sections 3.2, 4.1–4.3, Table 1, section 5",
+          "label": "DTU, 2016",
+          "url": "https://orbit.dtu.dk/en/publications/efficiency-test-method-for-electric-vehicle-chargers",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Method 2 (η2 = V_D·I_D ÷ P_A): power into the main battery from the car's CAN bus, point D, over AC power from the charging station, point A, averaged over the charge (equation 5). Section 4.1: \"the power is decreased when the consumption at point B is increased. This indicates that the EV measures the total flow to and from the MAIN\", so the car's own draw while charging counts as loss, as in ADAC's method of comparing a wall meter with the battery management system's stored energy (ac-socket-vs-wallbox-adac-2022). Precision: the Leaf's current is reported in 0.5 A steps, which gave \"spikes exceeding 100 % efficiency\" before filtering; on the iOn, η2 read 8 to 9 points below the direct measurement (η1), where DTU expected it to read above, which it puts down to \"the unknown measure points of the internal measuring network\". Both charges ran from 80 to 100% SoC at 19–22 °C (onboard-charger-loss-dtu-2016), so they include the end-of-charge taper."
+    },
+    {
+      "id": "anl-charging-loss-fits-2020",
+      "claim": "Argonne metered the AC at the plug and the DC at the battery terminals on a 2017 Chevrolet Bolt, a 2014 BMW i3 and a 2012 Nissan Leaf, counting the car's standby draw as loss, and fitted the loss to the power: at no power the fits start at 151 W for the Bolt on 240 V (177 W on 120 V), 218 W for the i3 and 80 W for the Leaf. At about 1.4 kW the Bolt lost about 2 points more on 120 V than on 240 V, and from 3 to 7 kW about ½ point more on 208 V than on 240 V.",
+      "summary": "Argonne measured a Bolt, i3 and Leaf, wall to battery, at many charging rates.",
+      "value": {
+        "model": "P_AC − P_DC = β0 + β1·P_AC + β2·P_AC² (W), steady state",
+        "fits": {
+          "bolt_2017": {
+            "120V": {
+              "b0": 176.61,
+              "b1": -0.1066,
+              "b2": 0.00009047,
+              "r2": 0.812,
+              "tested_kw": [
+                0.85,
+                1.45
+              ]
+            },
+            "208V": {
+              "b0": 145.62,
+              "b1": 0.01498,
+              "b2": 0.000006322,
+              "r2": 0.99,
+              "tested_kw": [
+                1.25,
+                6.25
+              ]
+            },
+            "240V": {
+              "b0": 150.56,
+              "b1": 0.008407,
+              "b2": 0.000006121,
+              "r2": 0.941,
+              "tested_kw": [
+                1.5,
+                7.3
+              ]
+            }
+          },
+          "i3_rex_2014": {
+            "208V": {
+              "b0": 217.67,
+              "b1": 0.0413186532,
+              "b2": 0.00000397614852,
+              "r2": 0.988,
+              "tested_kw": [
+                1.05,
+                6
+              ]
+            }
+          },
+          "leaf_2012": {
+            "208V": {
+              "b0": 80.4,
+              "b1": 0.1211,
+              "b2": 0,
+              "r2": 0.987,
+              "tested_kw": [
+                1.25,
+                3.75
+              ]
+            }
+          }
+        },
+        "loss_pct_from_fits": {
+          "bolt_120V": {
+            "1.0": 16.1,
+            "1.44": 14.6
+          },
+          "bolt_208V": {
+            "1.44": 12.5,
+            "3.0": 8.3,
+            "7.0": 8
+          },
+          "bolt_240V": {
+            "1.0": 16.5,
+            "1.44": 12.2,
+            "1.5": 11.8,
+            "3.0": 7.7,
+            "7.2": 7.3
+          },
+          "i3_208V": {
+            "1.2": 22.8,
+            "3.0": 12.6,
+            "6.0": 10.2
+          },
+          "leaf_208V": {
+            "1.25": 18.5,
+            "3.77": 14.2
+          }
+        },
+        "rule_check": {
+          "bolt": {
+            "from": "7.3% at 7.2 kW, 240 V",
+            "predicts_at_1_44": 18.5,
+            "fit_120V": 14.6
+          },
+          "i3": {
+            "from": "10.2% at 6.0 kW",
+            "predicts_at_1_2": 23.5,
+            "fit": 22.8
+          },
+          "leaf": {
+            "from": "14.2% at 3.77 kW",
+            "predicts_at_1_25": 24.9,
+            "fit": 18.5
+          }
+        },
+        "rated_charger_kw": {
+          "bolt_2017": 7.4,
+          "i3_rex_2014": 7.7,
+          "leaf_2012": 3.3
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "M. Duoba, A. Fernandez Canosa et al., \"Development and Evaluation of Distributed Energy Resource Device Models: Electric Vehicles, Electric Water Heaters, and Commercial Refrigeration Systems\", NREL/TP-5500-75323 (Argonne, NREL, Oak Ridge), July 2020, Part 1 (Argonne): sections 1.2.2, 1.3.2, 1.5.2.2, Tables 1–4, Figures 15–18",
+          "label": "Argonne, 2020",
+          "url": "https://docs.nlr.gov/docs/fy20osti/75323.pdf",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Read in full from the owner's copy (LocalDev/explainers/Reference Docs/75323.pdf). Section 1.2.2: P_AC is \"the total AC power flowing into the charger from the plug\", P_DC \"the total DC power flowing to the battery\", and \"The total losses in the onboard charger and from the vehicle standby losses are lumped as a single 'charging loss'\"; section 1.3.2: \"All standby idle power consumed (not going to the battery) is accounted for in the 'charger' losses model\". So it is into the battery, with the car's own draw while charging counted as loss, ADAC's basis. Section 1.5.2.2: \"Only steady-state power tests were analyzed\"; the spread is \"likely from temperature and SoC effects\" (neither is stated). Only the Bolt was tested at 120 V and 240 V; the i3 and Leaf at 208 V only. tested_kw is read from Figures 15–17. loss_pct_from_fits and rule_check are EVBench's arithmetic on the fits, inside each tested range. The 120 V fit is loose (R² 0.81) and its points spread from about 180 to 270 W at 1.4 kW in Figure 16; near 1 kW the 120 V and 240 V fits agree, so the voltage gap shows only near the top of 120 V's range. β0 is where each fit meets zero power: a fixed draw plus whatever the charger loses at no load. rule_check runs EVBench's rule (evbench-charging-loss-by-rate, 200 W) from each car's fastest point: it lands within a point on the i3, and overshoots the Bolt by about 4 points and the Leaf by about 6. Section 1.5.2.2 notes the ranking \"follows the vehicles age\", the newest losing least."
+    },
+    {
+      "id": "inl-steady-state-leaf-2012",
+      "claim": "Idaho National Laboratory measured a 2012 Nissan Leaf's onboard charger in steady state from 0.69 to 1.38 kW on 120 V, 84.5 to 86.4% efficient, and from 1.21 to 3.71 kW on 208 V, 88.6 to 88.7%; the charge rate made little difference, and at about the same power 208 V read about 2 points above 120 V.",
+      "summary": "The 2012 Leaf’s charger alone: 85 to 86% on 120 V, 89% on 208 V.",
+      "value": {
+        "level1_120v": {
+          "min": {
+            "kw": 0.69,
+            "eff": 0.845
+          },
+          "max": {
+            "kw": 1.38,
+            "eff": 0.864
+          }
+        },
+        "level2_208v": {
+          "min": {
+            "kw": 1.21,
+            "eff": 0.886
+          },
+          "max": {
+            "kw": 3.71,
+            "eff": 0.887
+          }
+        },
+        "basis": "charging station output to onboard charger output, steady state",
+        "curve": {
+          "level1_120v": [[0.7, 0.847], [0.8, 0.863], [0.89, 0.865], [0.92, 0.864], [0.99, 0.862], [1.04, 0.863], [1.09, 0.863], [1.15, 0.863], [1.27, 0.864], [1.37, 0.862]],
+          "level2_208v": [[1.22, 0.887], [1.29, 0.889], [1.33, 0.89], [1.39, 0.891], [1.43, 0.891], [1.46, 0.892], [1.53, 0.893], [1.57, 0.894], [1.62, 0.894], [1.67, 0.894], [1.72, 0.895], [1.76, 0.895], [1.83, 0.895], [1.87, 0.895], [1.91, 0.896], [1.97, 0.896], [2.02, 0.896], [2.08, 0.896], [2.13, 0.896], [2.16, 0.896], [2.22, 0.896], [2.27, 0.896], [2.33, 0.896], [2.37, 0.896], [2.44, 0.896], [2.48, 0.896], [2.52, 0.896], [2.58, 0.895], [2.62, 0.895], [2.67, 0.895], [2.73, 0.895], [2.76, 0.895], [2.83, 0.894], [2.87, 0.894], [2.91, 0.894], [2.97, 0.893], [3.02, 0.893], [3.08, 0.893], [3.13, 0.892], [3.17, 0.892], [3.23, 0.892], [3.27, 0.892], [3.34, 0.891], [3.38, 0.891], [3.42, 0.89], [3.49, 0.89], [3.55, 0.889], [3.59, 0.889], [3.7, 0.888]]
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory, \"Steady State Vehicle Charging Fact Sheet: 2012 Nissan Leaf\", Advanced Vehicle Testing Activity (footer INL/EXT-15-34055), pp. 1–3",
+          "label": "INL, 2012 Leaf sheet",
+          "url": "https://avt.inl.gov/sites/default/files/pdf/fsev/SteadyStateLoadCharacterization2012Leaf.pdf",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/SteadyStateLoadCharacterization2012Leaf.pdf); avt.inl.gov refuses EVBench's machine. Measurement points: \"AC Input: EVSE Output\", \"DC Output: On Board Charge Module Output\", the Volt sheet's points. \"Vehicle charging is considered to be in steady state when the RMS current magnitude is not changing and the voltage source is close to nominal.\" Page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Key insight, page 1: \"Nissan Leaf Charging efficiency and power quality are not strongly influenced by the charge rate.\" Page 2's chart: the 208 V points run about 88.6 to 89.6%, peaking near 2 kW; the 120 V points about 84.5 to 86.5%. The equal-power comparison is the table's 120 V maximum (1.38 kW) against its 208 V minimum (1.21 kW). The 3.3 kW charger's 208 V maximum is 3.71 kW. The curve is read from the sheet’s page-2 efficiency chart, which is drawn as vectors: each marker’s center, calibrated to the chart’s own tick marks, with readings within 0.03 kW merged (INL drew two markers per setting and dozens at the top rate). It agrees with the sheet’s table to 0.3 points."
+    },
+    {
+      "id": "inl-steady-state-leaf-2015",
+      "claim": "Idaho National Laboratory measured a 2015 Nissan Leaf's onboard charger in steady state from 0.75 to 1.38 kW on 120 V, 61.8 to 78.4% efficient, and from 1.41 to 6.16 kW on 208 V, 81.5 to 90.5%; efficiency fell steeply as the rate fell, and at about 1.4 kW 208 V read about 3 points above 120 V.",
+      "summary": "The 2015 Leaf’s charger alone: 62 to 78% on 120 V, 82 to 91% on 208 V.",
+      "value": {
+        "level1_120v": {
+          "min": {
+            "kw": 0.75,
+            "eff": 0.618
+          },
+          "max": {
+            "kw": 1.38,
+            "eff": 0.784
+          }
+        },
+        "level2_208v": {
+          "min": {
+            "kw": 1.41,
+            "eff": 0.815
+          },
+          "max": {
+            "kw": 6.16,
+            "eff": 0.905
+          }
+        },
+        "basis": "charging station output to the high-voltage and 12 V outputs, steady state",
+        "curve": {
+          "level1_120v": [[0.75, 0.618], [0.8, 0.635], [0.84, 0.649], [0.92, 0.679], [0.95, 0.691], [0.98, 0.702], [1.05, 0.723], [1.09, 0.733], [1.15, 0.748], [1.2, 0.756], [1.26, 0.767], [1.36, 0.782]],
+          "level2_208v": [[1.41, 0.816], [1.52, 0.828], [1.73, 0.844], [1.83, 0.851], [1.93, 0.856], [2.15, 0.867], [2.18, 0.869], [2.25, 0.87], [2.47, 0.876], [2.57, 0.878], [2.67, 0.882], [2.88, 0.884], [2.99, 0.887], [3.1, 0.889], [3.28, 0.891], [3.3, 0.893], [3.52, 0.896], [3.72, 0.897], [3.77, 0.897], [3.95, 0.899], [4.06, 0.901], [4.19, 0.9], [4.23, 0.901], [4.27, 0.903], [4.49, 0.902], [4.6, 0.903], [4.67, 0.905], [4.92, 0.905], [5.02, 0.904], [5.14, 0.904], [5.25, 0.905], [5.35, 0.905], [5.39, 0.905], [5.59, 0.905], [5.68, 0.906], [5.79, 0.907], [6.13, 0.905], [6.17, 0.907], [6.2, 0.908]]
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory, \"Steady State Vehicle Charging Fact Sheet: 2015 Nissan Leaf\", Advanced Vehicle Testing Activity (footer INL/EXT-15-34055), pp. 1–3",
+          "label": "INL, 2015 Leaf sheet",
+          "url": "https://avt.inl.gov/sites/default/files/pdf/fsev/SteadyStateLoadCharacterization2015Leaf.pdf",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/SteadyStateLoadCharacterization2015Leaf.pdf); avt.inl.gov refuses EVBench's machine. Measurement points: \"AC Input: EVSE Output\", \"DC Output: Powertrain Electrical Distribution Module high voltage and 12 volt output\", the i3's points, so the car's 12 V draw counts as output, not loss. \"Vehicle charging is considered to be in steady state when the RMS current magnitude is not changing and the voltage source is close to nominal.\" Page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Key insights, page 1: \"Level 2 charging should be used instead of Level 1 charging whenever possible. Level 2 charging is much more efficient than Level 1 charging.\" Page 2: \"As the vehicle charge rate decreases, efficiency decreases … the decrease in efficiency … is not negligible and should be avoided when possible.\" The equal-power comparison is the table's 120 V maximum (1.38 kW, 78.4%) against its 208 V minimum (1.41 kW, 81.5%). This Leaf has the 6.6 kW charger; the 2012 has 3.3 kW. The curve is read from the sheet’s page-2 efficiency chart, which is drawn as vectors: each marker’s center, calibrated to the chart’s own tick marks, with readings within 0.03 kW merged (INL drew two markers per setting and dozens at the top rate). It agrees with the sheet’s table to 0.3 points."
+    },
+    {
+      "id": "inl-steady-state-b-class-2015",
+      "claim": "Idaho National Laboratory measured a 2015 Mercedes B-Class Electric Drive's onboard charger in steady state from 0.69 to 1.38 kW on 120 V, 77.4 to 84.7% efficient, and from 1.56 to 7.10 kW on 240 V, 79.8 to 91.4%; at about the same power, 120 V read about 5 points above 240 V, and at the same current the two matched.",
+      "summary": "The B-Class’s charger alone: 77 to 85% on 120 V, 80 to 91% on 240 V.",
+      "value": {
+        "level1_120v": {
+          "min": {
+            "kw": 0.69,
+            "eff": 0.774
+          },
+          "max": {
+            "kw": 1.38,
+            "eff": 0.847
+          }
+        },
+        "level2_240v": {
+          "min": {
+            "kw": 1.56,
+            "eff": 0.798
+          },
+          "max": {
+            "kw": 7.1,
+            "eff": 0.914
+          }
+        },
+        "basis": "charging station output to the high-voltage and 12 V outputs, steady state",
+        "curve": {
+          "level1_120v": [[0.69, 0.774], [0.81, 0.798], [0.92, 0.814], [1.03, 0.827], [1.15, 0.836], [1.26, 0.843], [1.38, 0.847]],
+          "level2_240v": [[1.56, 0.798], [1.78, 0.817], [2.03, 0.833], [2.24, 0.848], [2.49, 0.854], [2.74, 0.857], [2.96, 0.865], [3.22, 0.87], [3.46, 0.872], [3.56, 0.912], [3.8, 0.913], [4.03, 0.914], [4.24, 0.915], [4.51, 0.915], [4.75, 0.917], [4.98, 0.917], [5.22, 0.916], [5.45, 0.917], [5.67, 0.916], [5.91, 0.916], [6.14, 0.915], [6.42, 0.916], [6.66, 0.915], [6.86, 0.916], [7.09, 0.914]]
+        }
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory, \"Steady State Vehicle Charging Fact Sheet: 2015 Mercedes B-Class\", Advanced Vehicle Testing Activity (footer INL/EXT-15-34055), pp. 1–3",
+          "label": "INL, 2015 B-Class sheet",
+          "url": "https://avt.inl.gov/sites/default/files/pdf/fsev/SteadyStateVehicleChargingFactSheet_2015MercedesBClass.pdf",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/SteadyStateVehicleChargingFactSheet_2015MercedesBClass.pdf); avt.inl.gov refuses EVBench's machine. Measurement points as the 2015 Leaf's and i3's (12 V output counted as output). \"Vehicle charging is considered to be in steady state when the RMS current magnitude is not changing and the voltage source is close to nominal.\" Page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Key insight, page 1: \"The Level 2 efficiency is not strongly influenced by the charge rates when the Level 2 current is greater than 16 amps.\" Page 2's charts: on 240 V, efficiency climbs from about 80% at 1.6 kW to about 87% near 3.5 kW, then steps to about 91% from about 15 A (3.6 kW) up; against current, the 120 V points lie on the 240 V curve from 6 to 12 A, so at equal power 120 V, at twice the current, reads higher. The equal-power comparison is the table's 120 V maximum (1.38 kW, 84.7%) against its 240 V minimum (1.56 kW, 79.8%). This is the opposite of the Leafs, the i3 and the Bolt. The curve is read from the sheet’s page-2 efficiency chart, which is drawn as vectors: each marker’s center, calibrated to the chart’s own tick marks, with readings within 0.03 kW merged (INL drew two markers per setting and dozens at the top rate). It agrees with the sheet’s table to 0.3 points."
+    },
+    {
+      "id": "inl-baseline-recharge-2014-2015",
+      "claim": "Idaho National Laboratory's baseline tests of a 2014 BMW i3 and a 2015 Mercedes B-Class, recharged at 240 V after constant-speed range tests: the i3's charger put 82 to 91% of the AC into the battery and 84 to 87% came back out; the B-Class, charged at 16 A, 80 to 86% in and 80 to 85% out.",
+      "summary": "INL’s i3 returned 84 to 87% of the wall energy, the B-Class 80 to 85%.",
+      "value": {
+        "basis": "overall_eff is energy out of the battery ÷ AC from the charging station, the same basis as EPA; charger_eff is into the battery",
+        "cars": [
+          {
+            "car": "2014 BMW i3",
+            "onboard_charger_kw": 7.4,
+            "tests": [
+              {
+                "test_mph": 45,
+                "ac_kwh": 21.6,
+                "dc_in_kwh": 19.3,
+                "dc_out_kwh": 18.7,
+                "charge_time": "04:17",
+                "charger_eff": 0.89,
+                "round_trip": 0.97,
+                "overall_eff": 0.86,
+                "charge_ambient_c": 23
+              },
+              {
+                "test_mph": 60,
+                "ac_kwh": 21.2,
+                "dc_in_kwh": 19.2,
+                "dc_out_kwh": 18.4,
+                "charge_time": "04:12",
+                "charger_eff": 0.91,
+                "round_trip": 0.96,
+                "overall_eff": 0.87,
+                "charge_ambient_c": 18
+              },
+              {
+                "test_mph": 70,
+                "ac_kwh": 22.4,
+                "dc_in_kwh": 18.4,
+                "dc_out_kwh": 18.8,
+                "charge_time": "04:22",
+                "charger_eff": 0.82,
+                "round_trip": 1.02,
+                "overall_eff": 0.84,
+                "charge_ambient_c": 18
+              }
+            ]
+          },
+          {
+            "car": "2015 Mercedes B-Class Electric Drive",
+            "onboard_charger_kw": 10,
+            "evse_a": 16,
+            "tests": [
+              {
+                "mode": "normal",
+                "test_mph": 45,
+                "ac_kwh": 36.1,
+                "dc_in_kwh": null,
+                "dc_out_kwh": 29.3,
+                "charge_time": "09:56",
+                "charger_eff": 0.8,
+                "round_trip": null,
+                "overall_eff": 0.81,
+                "charge_ambient_c": 15
+              },
+              {
+                "mode": "normal",
+                "test_mph": 60,
+                "ac_kwh": 35.6,
+                "dc_in_kwh": 30.7,
+                "dc_out_kwh": 29.7,
+                "charge_time": "09:48",
+                "charger_eff": 0.86,
+                "round_trip": 0.97,
+                "overall_eff": 0.83,
+                "charge_ambient_c": 19
+              },
+              {
+                "mode": "normal",
+                "test_mph": 70,
+                "ac_kwh": 35.8,
+                "dc_in_kwh": 30.4,
+                "dc_out_kwh": 28.6,
+                "charge_time": "09:50",
+                "charger_eff": 0.85,
+                "round_trip": 0.94,
+                "overall_eff": 0.8,
+                "charge_ambient_c": 18
+              },
+              {
+                "mode": "range_plus",
+                "test_mph": 45,
+                "ac_kwh": 40.3,
+                "dc_in_kwh": null,
+                "dc_out_kwh": 34.4,
+                "charge_time": "11:06",
+                "charger_eff": 0.84,
+                "round_trip": null,
+                "overall_eff": 0.85,
+                "charge_ambient_c": 20
+              },
+              {
+                "mode": "range_plus",
+                "test_mph": 60,
+                "ac_kwh": 40.4,
+                "dc_in_kwh": 32.8,
+                "dc_out_kwh": 32.7,
+                "charge_time": "09:51",
+                "charger_eff": 0.81,
+                "round_trip": 1,
+                "overall_eff": 0.81,
+                "charge_ambient_c": 15
+              },
+              {
+                "mode": "range_plus",
+                "test_mph": 70,
+                "ac_kwh": 40.2,
+                "dc_in_kwh": 33.5,
+                "dc_out_kwh": 33,
+                "charge_time": "11:00",
+                "charger_eff": 0.83,
+                "round_trip": 0.99,
+                "overall_eff": 0.82,
+                "charge_ambient_c": 13
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory / Intertek CECET, \"2014 BMW i3, Advanced Vehicle Testing – Baseline Vehicle Testing Results\", INL/MIS-15-34211, 5/10/2016, p. 3",
+          "label": "INL, 2014 i3",
+          "url": "https://avt.inl.gov/sites/default/files/pdf/fsev/fact2014bmwi3ev.pdf",
+          "accessed": "2026-11-15"
+        },
+        {
+          "rank": "B",
+          "title": "Idaho National Laboratory / Intertek CECET, \"2015 Mercedes B-Class Electric Drive, Advanced Vehicle Testing – Baseline Vehicle Testing Results\", INL/MIS-15-34211, 6/20/2017, pp. 4–5",
+          "label": "INL, 2015 B-Class",
+          "url": "https://avt.inl.gov/sites/default/files/pdf/fsev/fact2015mercedesbclass.pdf",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/fact2014bmwi3ev.pdf and fact2015mercedesbclass.pdf); avt.inl.gov refuses EVBench's machine. Same method as inl-baseline-recharge-2013: (C) \"Post-test charge AC energy from EVSE @ 240 V to onboard charger\", (D) \"Post-test charge DC energy into battery from onboard charger\", (A+) total DC energy out of the battery; charger_eff = D/C, round_trip = A+/D, overall_eff = A+/C. The i3's 70 mph charge: note 16, \"The battery roundtrip efficiency being greater than 100% is a result of the BMS allowing less energy to be input in the subsequent charge event than it allowed to output during the range test\", so its 82% charger figure is low for the same reason. B-Class, note 11: \"Vehicle was charged with an EVSE current setting of 16 A (AC) due to facility limitations\", about 3.8 kW against its 10 kW charger; its 45 mph D was not recorded (N/A), so overall_eff there is from the sheet. Range Plus widens the battery's operating window (\"using RANGE PLUS shortens the service life of the battery\"). Battery temperature was not collected for either car."
+    },
+    {
+      "id": "car-and-driver-model-3-level1-level2-2021",
+      "claim": "Car and Driver's long-term 2019 Tesla Model 3 Long Range Dual Motor averaged 95% charging efficiency on a Tesla 240 V wall connector; staff charging on 120 V outlets saw at best 85%, and as little as 60% in very cold weather.",
+      "summary": "Car and Driver’s Model 3: 95% on 240 V, at best 85% on 120 V.",
+      "value": {
+        "level2_240v": 0.95,
+        "level1_120v_best": 0.85,
+        "level1_120v_cold_low": 0.6,
+        "dc_supercharger": 0.99
+      },
+      "sources": [
+        {
+          "rank": "D",
+          "title": "J. Voelcker, \"EVs Explained: Charging Losses\", Car and Driver, April 10, 2021 (syndicated on Yahoo Autos)",
+          "label": "Car and Driver, 2021",
+          "url": "https://autos.yahoo.com/evs-explained-charging-losses-160100480.html",
+          "accessed": "2026-11-15"
+        }
+      ],
+      "status": "verified",
+      "note": "Read in the built-in browser (the fetch tool got a 403). Quote: \"Our long-term 2019 Tesla Model 3 Long Range Dual Motor test car is currently averaging 95 percent efficiency from a Level 2 Tesla 240-volt wall connector. Staffers charging at home using a typical 120-volt wall outlet saw efficiency from, at best, 85 percent, and it dropped to as little as 60 percent in very cold weather, when charging the battery requires expending significant energy to keep it warm.\" Rank D by the owner's choice, 2026-11-15: the method, charging current and number of charges are not stated, and the 120 V figures are staff's own home charges. It reads as into the battery (likely the car's reported energy added against a meter), ADAC's basis: the same article gives 99% at a Supercharger, which only a meter downstream of the DC conversion would show. The 2019 Long Range's onboard charger is not stated in the article. Owner's reading: the about 10-point drop from Level 2 to 120 V fits the rule; from 95% at the car's top rate the rule gives about 83% at 1.44 kW, 1 to 2 points below the staff's best. The cold low is battery warming, which EVBench prices separately (evbench-battery-warming). The article also cites the 2021 Model Y Long Range's EPA certification, 87.868 kWh from the wall for 77.702 kWh (\"a 13 percent overage\"), on EPA's basis."
     }
   ]
 }

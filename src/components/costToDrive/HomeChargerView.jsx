@@ -41,6 +41,7 @@ import { HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import { FIXED_DRAW_W } from '../../constants/epa';
 import { hourText } from './DriveFields';
 import PackWarmingNote from './PackWarmingNote';
+import ExplainerLink from '../../explainers/ExplainerLink';
 
 const DASH = '—';
 const kwText = (kw) => `${Math.round(kw * 10) / 10} kW`;
@@ -400,7 +401,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                     </table>
                                     <p className="text-note plan-table-footnote">
                                         <span className="is-enough">Bold</span> — No further time or cost savings with a faster home charger.
-                                        <br />At full AC power, reaching the pack: {columns.map(c => `${vehicleLabel(c.vehicle)} ${percentText(c.profile.home.effRef)} (${c.profile.home.effFrom === 'epa' ? 'EPA' : 'site-wide'})`).join(' · ')}. Below it, less: an assumed {FIXED_DRAW_W} W fixed draw is a larger share of a slower charge.
+                                        <br />At full AC power, reaching the pack: {columns.map(c => `${vehicleLabel(c.vehicle)} ${percentText(c.profile.home.effRef)} (${c.profile.home.effFrom === 'epa' ? 'EPA' : 'site-wide'})`).join(' · ')}. Below it, less: an assumed {FIXED_DRAW_W} W fixed draw is a larger share of a slower charge. <ExplainerLink topic="evbench-charging-energy" />
                                         {cappedBy.length > 0 && (
                                             <><br /><span title={`Onboard chargers: ${cappedBy.join(', ')}`}>^ — Limited by vehicle charger</span></>
                                         )}

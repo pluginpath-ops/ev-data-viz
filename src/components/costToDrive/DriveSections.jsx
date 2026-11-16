@@ -10,6 +10,7 @@ import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, FIXED_DRAW_W } from '../../constants
 import { percentText } from '../../utils/costToDrive';
 import { DriveNumberField, DriveSlider, DriveChoice, DriveCheckbox, PlugWindow } from './DriveFields';
 import HomeLevelPicker from './HomeLevelPicker';
+import ExplainerLink from '../../explainers/ExplainerLink';
 import WeekPicker from './WeekPicker';
 import PackWarmingNote from './PackWarmingNote';
 
@@ -139,7 +140,7 @@ export function EfficiencyFields({ settings, onChange }) {
             </span>
             <span className="text-meta">
                 Charging losses: at the car&rsquo;s full AC power, its own EPA figure, else {percentText(ASSUMED_CHARGER_EFF)} reaches the pack ·
-                below it, less: an assumed {FIXED_DRAW_W} W fixed draw is a larger share of a slower charge ·
+                below it, less: an assumed {FIXED_DRAW_W} W fixed draw is a larger share of a slower charge (<ExplainerLink topic="evbench-charging-energy">why</ExplainerLink>) ·
                 DC fast {percentText(DC_FAST_LOSS)} lost after the port
             </span>
         </>
