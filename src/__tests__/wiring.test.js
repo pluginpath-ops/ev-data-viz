@@ -1019,7 +1019,9 @@ describe('the seams that broke before', () => {
         expect(nav, 'Tests & Data is no longer a tab').not.toMatch(/key: 'runs'/);
         expect(nav).toMatch(/className="opened-vehicle"/);
         expect(nav, 'and survives the collapse as a menu item').toMatch(/label: `↳ \$\{openedVehicle\.name\}`/);
-        expect(read('src/components/RunsView.jsx')).toMatch(/className="vehicle-page-close"/);
+        const page = read('src/components/RunsView.jsx');
+        expect(page, 'Close vehicle is on the page').toMatch(/onClick=\{onClose\}>\s*× Close vehicle/);
+        expect(page, 'the summary card selects the vehicle, as a card does').toMatch(/vehicle-card vehicle-summary[\s\S]{0,80}\s+onClick=\{\(\) => toggleVehicleSelection\(vehicle\.id\)\}/);
     });
 
     it('gives Reference a tab, a sub-nav and a URL, with stubs for #354 and #355 (#338)', () => {

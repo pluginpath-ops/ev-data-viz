@@ -1828,7 +1828,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     return (
         <div className={barVisible ? 'pb-20' : ''}>
             {/* The vehicle's page, inside Vehicles & Specs (#338): the way back,
-                and a large way out. Closing takes the vehicle out of the
+                and a way out. Closing takes the vehicle out of the
                 header too; the breadcrumb only goes back and keeps it open. */}
             {(onBack || onClose) && (
                 <div className="vehicle-page-bar">
@@ -1844,7 +1844,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             the same toggle as a card's click. */}
                         <button
                             type="button"
-                            className={`btn btn-toggle${isSelected ? ' active' : ''}`}
+                            className={`btn btn-secondary vehicle-select-toggle${isSelected ? ' is-selected' : ''}`}
                             onClick={() => toggleVehicleSelection(vehicle.id)}
                             aria-pressed={isSelected}
                             title={isSelected ? 'Remove this vehicle from the selection' : 'Add this vehicle to the selection'}
@@ -1852,16 +1852,20 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                             {isSelected ? '✓ Selected' : '＋ Add to selection'}
                         </button>
                         {onClose && (
-                            <button type="button" className="vehicle-page-close" onClick={onClose}>
-                                <span aria-hidden="true" className="vehicle-page-close-x">×</span>
-                                Close vehicle
+                            <button type="button" className="btn btn-secondary" onClick={onClose}>
+                                × Close vehicle
                             </button>
                         )}
                     </div>
                 </div>
             )}
-            {/* Vehicle summary header */}
-            <div className="card py-3 px-4 flex items-center gap-4 mb-6">
+            {/* Vehicle summary header. Clicking it selects the vehicle, as a
+                card on Vehicles & Specs does, and it wears the same mark. */}
+            <div
+                className={`vehicle-card vehicle-summary${isSelected ? ' is-selected' : ''}`}
+                onClick={() => toggleVehicleSelection(vehicle.id)}
+                title={isSelected ? 'Selected — click to remove from the selection' : 'Click to add to the selection'}
+            >
                 <div className="list-thumbnail">
                     {displayImageUrl(vehicle)
                         ? <img src={displayImageUrl(vehicle)} alt={vehicle.name} decoding="async" className="w-full h-full object-cover" />
@@ -1900,7 +1904,8 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         )}
                     </div>
                 </div>
-                <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28">
+                {/* Its own controls, not a click on the card. */}
+                <div className="flex flex-col gap-1 flex-shrink-0 items-stretch w-28" onClick={e => e.stopPropagation()}>
                     {(() => {
                         const isPublic = vehicle.visibility === 'public';
                         // The same badge the vehicle card wears, off its photograph.

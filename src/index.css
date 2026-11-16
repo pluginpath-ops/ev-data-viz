@@ -593,9 +593,9 @@
 
    Two levels, two signals, and the rule the rest of the re-skin obeys: blue
    says which section you are in, orange says which view inside it is live. */
-/* The top of a vehicle's page (#338): a breadcrumb back to Vehicles & Specs
-   and Close vehicle, a target big enough to find without looking. The
-   breadcrumb, .page-crumb, is shared with a platform's page. */
+/* The top of a vehicle's page (#338): a breadcrumb back to Vehicles & Specs,
+   then Add to selection and Close vehicle. The breadcrumb, .page-crumb, is
+   shared with a platform's page. */
 .vehicle-page-bar {
     display: flex;
     align-items: center;
@@ -613,22 +613,23 @@
 }
 .page-crumb a { color: var(--color-text-link); }
 .page-crumb [aria-current] { color: var(--color-text-secondary); }
-.vehicle-page-close {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: none;
-    min-height: 44px;
-    padding: 0 18px;
-    border-radius: var(--radius-control);
-    border: 1px solid var(--color-border-strong);
-    background-color: var(--color-surface-sunken);
-    color: var(--color-text-primary);
-    font-weight: 600;
-    cursor: pointer;
+/* Add to selection on a vehicle's page: a plain button until the vehicle is
+   selected, then orange, the selected color (.vehicle-card.is-selected). */
+.vehicle-select-toggle.is-selected {
+    --btn-wash: var(--color-accent-orange-surface);
+    --btn-edge: var(--color-accent-orange);
+    --btn-ink: var(--color-accent-orange-text);
 }
-.vehicle-page-close:hover { background-color: var(--color-hover-lift); }
-.vehicle-page-close-x { font-size: calc(var(--fs-body) * 1.4286); line-height: 1; }
+/* The vehicle summary at the top of its page: a .vehicle-card laid out in a
+   row, so it selects, and shows it, the way a card does. Two classes, to win
+   over .vehicle-card, which comes later in this file. */
+.vehicle-card.vehicle-summary {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+}
 
 /* A platform's page (#354): three cards across — what it is and provides,
    its notes, the vehicles on it — one column when narrow. */
