@@ -346,6 +346,7 @@ European lab and road tests, imported per car ([plan](green-ncap-plan.md)).
 | One car Green NCAP tested, with its results sheet | **a Green NCAP assessment** — Green NCAP's own word. Not "rating" (that is its star score) or "certification" (EPA's) | [parseGreenNcapSheet.js](../src/utils/parseGreenNcapSheet.js), `scripts/fetchGreenNcap.mjs` |
 | One row of its results ("BAB130 Motorway", "WLTC+ Warm") | **a Green NCAP test**, named as printed. Its key (`bab130`, `wltc_warm`) is code only. Never "run" | `tests[].key` |
 | Its "Driving Range" | **computed range** — net battery capacity ÷ the test's consumption; Green NCAP does not drive the lab tests to empty | `rangeBasis` |
+| The EVBench vehicle an assessment belongs to, before the owner confirms it | **a proposed match**, graded **match / check / none**; once confirmed, the assessment is **linked** to the vehicle, as an EPA Certification is | [matchGreenNcap.js](../src/utils/matchGreenNcap.js), `matches.csv` |
 
 ### Listed, unlisted, excluded
 

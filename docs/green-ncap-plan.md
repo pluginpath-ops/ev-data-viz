@@ -30,9 +30,17 @@ Facts that shape the import:
 - **Range is computed, not driven.** "Driving Range" = measured net battery
   capacity ÷ the test's from-battery consumption (EV9 BAB130: 95.37 kWh ÷
   30.72 kWh/100 km = 310.5 km).
-- **BAB130** runs at 23 °C on a chassis dynamometer, peaks at 130 km/h with
-  hard 80→130 km/h accelerations: a mixed cycle, not a steady speed. Its
-  average speed is not in the sheet.
+- **BAB130** runs at 23 °C (±5 °C) on a chassis dynamometer. After an
+  unmeasured warm-up, two identical 270 s phases are measured and averaged.
+  Each holds 130 km/h with three dips to 110 km/h and an 80→130 km/h
+  restart, every acceleration at full throttle (kick-down). It is an
+  aggressive mixed cycle, not a steady speed. Battery-electric cars start it at
+  no more than 90% SoC. Source: *GNT BAB Motorway Test Procedure v3.0.0*
+  (June 2025), saved in `LocalDev/explainers/Reference Docs/`.
+- **BAB130 average speed is 124.9 km/h (77.6 mph)**, from the procedure's
+  speed table. The measured phases cover 9.37 km each; the procedure rounds
+  this to 10 km. That is the target trace. A real car takes a few
+  seconds to make the 80→130 km/h step, so it runs a little slower.
 - **Grid to battery output** = net capacity ÷ recharged energy — the same
   ratio as EPA's DC energy ÷ AC recharge in `deriveChargerEfficiency`. The
   sheet does not give the AC charging rate.
@@ -59,12 +67,16 @@ Facts that shape the import:
 
 In order; each a PR.
 
-1. **Matching review file.** `scripts/matchGreenNcap.mjs` reads
-   `LocalDev/green-ncap/parsed.json` and a vehicles dump and writes
-   `LocalDev/green-ncap/matches.csv`: car, proposed vehicle (make, model,
-   drive, battery within 5%, model year from the VIN or test year), the
-   reason, and an empty `confirm` column. No guessing past that: an EU-only
-   pack or trim is left unmatched for the owner.
+1. **Matching review file — built.** `node scripts/matchGreenNcap.mjs` reads
+   the manifest (all 77 cars, sheet or not) and `parsed.json`, takes the
+   live vehicles (or `--vehicles <file>`), and writes
+   `LocalDev/green-ncap/matches.csv`. Each car gets a proposed vehicle,
+   matched on brand and model, then ranked by drive, battery (usable within
+   5%, else gross) and year (VIN model year, else test year), plus the whole
+   trim named in the variant. Each is graded **match**, **check** (the doubt
+   is in `reason`) or **none**. In `confirm`, the owner writes `y`, a
+   different vehicle id, or `n`; a rerun keeps it. An EU-only pack or trim
+   stays `check` or `none` rather than being forced onto a US vehicle.
 2. **Migration: the record.** `green_ncap_assessments` (one row per car:
    slug, reference, make/model/variant as printed, test year, VIN, declared
    figures, measured recharged + net capacity, grid to battery, source URLs,
@@ -75,7 +87,7 @@ In order; each a PR.
    BAB130 range test: `kind 'range'`, `source 'Green NCAP'`, `source_url` the
    car's page, `start_soc 100`, `end_soc 0`, `energy_kwh` the net capacity,
    `distance_miles` the computed range, `temperature_f 73.4`,
-   `speed_basis 'mixed'`. Being mixed, the composite range leaves it out — it
+   `speed_basis 'mixed'`, `speed_mph 77.6` (the trace average). Being mixed, the composite range leaves it out — it
    is a quoted test, not an aggregated one.
 4. **Charger efficiency fallback** in the vehicle figures, with the basis.
 5. **DC curves as charging tests**, points from `fastCharging.points`.
@@ -85,7 +97,8 @@ In order; each a PR.
 
 - **Terms of reuse.** The publication-guidelines page did not render as text
   from a script; the owner reads it before any import goes live.
-- **BAB130 average speed**, for the range test's `speed_mph`. Null until a
-  Green NCAP source gives it.
+- **Is 77.6 mph the right `speed_mph`?** It is the target trace's average; a
+  real car runs a little slower. The range test should still say "mixed", so
+  nothing reads it as a steady 77.6.
 - **What a fast-charging test's power is measured at** (charger or port) —
   decides whether it is comparable with the other charging tests.
