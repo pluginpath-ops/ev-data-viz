@@ -79,7 +79,7 @@ session and lost 11.6%, between two Rivians, which is not what a story about pow
 do not log, the ambient temperature, the starting state of charge and the charger's actual power curve, are things that
 could move a car's thermal load, so we cannot separate "this car loses more" from "that was a colder day"
 [[fact:dc-fast-round-trip-pairs]]. Rather than fit a value to each platform from nine unlogged videos, EVBench uses
-one for all of them: 9%, the round number at the centre. It is a knob in Admin → Model Constants, so it can move.
+one for all of them: 9%, the round number at the center. It is a knob in Admin → Model Constants, so it can move.
 
 A 15-minute stop starting from low charge may also be the hard case, with the heating a stop needs paid up front, so a
 longer stop, 10 to 80%, could lose a smaller share. That is a guess; we have not seen the data that would show it. The test that would answer it is a 10 to 80% charge with a range test of the same car

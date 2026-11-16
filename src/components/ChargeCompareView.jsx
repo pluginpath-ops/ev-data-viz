@@ -9,7 +9,7 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { convDistance, distanceLabel, fmtSpeed, speedBasisNote, fmtTemp, MI_TO_KM } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
-import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { pairRangeSource, epaRangeOption, defaultRangeRun } from '../utils/rangeSource';
 import { figureSources, epaCredits } from '../utils/vehicleFigures';
 import { useSourceLine } from '../hooks/useSourceLine';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
@@ -27,10 +27,11 @@ import { DEFAULT_COMPARE_ORIENTATION } from '../utils/chartUrlState';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, resolvePairColors, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
+import ChargeStopMath from './calcTrace/ChargeStopMath';
 import PlotFrame from './charts/PlotFrame';
 import { useChartPng } from '../hooks/useChartPng';
 import SpeedBadge from './charts/SpeedBadge';
-import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults, fade } from '../utils/chartTheme';
 import NumberInput from './NumberInput';
 import { wrapCanvasText } from '../utils/wrapCanvasText';
 import { countParts } from '../utils/plotCaption';
@@ -443,9 +444,8 @@ export default function ChargeCompareView({
                     // The range side is always explicit here — it IS the row — so
                     // the resolver is entered at rank 1 and its fallbacks only
                     // matter when the chosen test carries no usable data.
-                    const rangeSrc = resolveRangeSource(chargingRun, {
+                    const rangeSrc = pairRangeSource(chargingRun, rangeRun, {
                         vehicle,
-                        explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
                         correction: { mode: correctionMode, target: correctionTarget },
                         session: sessionFor(testSessions, rangeRun),
                     });
@@ -568,7 +568,7 @@ export default function ChargeCompareView({
     });
 
     // Name each bar by what distinguishes it from the OTHER BARS ON SCREEN, so
-    // the labels answer the comparison you are actually looking at. Minimising
+    // the labels answer the comparison you are actually looking at. Minimizing
     // over every resolved pair instead would let a deselected run lengthen the
     // labels of the ones you kept.
     //
@@ -832,11 +832,14 @@ export default function ChargeCompareView({
         if (flatRuns.length === 0) return null;
 
         const yLabel   = chartType === 'range_added' ? `Range Added (${distanceLabel(units)})` : 'Time (min)';
+        // A run with no data draws a gray stub in the tick color, so it holds
+        // on either theme's panel.
+        const { tick: noDataGray } = chartTheme();
         const datasets = [{
             label:           yLabel,
             data:            flatRuns.map(r => r._yValue),
-            backgroundColor: flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.35)' : r.color),
-            borderColor:     flatRuns.map(r => r._noData ? 'rgba(180,180,180,0.6)'  : r.color),
+            backgroundColor: flatRuns.map(r => r._noData ? fade(noDataGray, 0.35) : r.color),
+            borderColor:     flatRuns.map(r => r._noData ? fade(noDataGray, 0.6)  : r.color),
             borderRadius: 2,
             borderSkipped:   false,
         }];
@@ -954,7 +957,7 @@ export default function ChargeCompareView({
                                 {/* ── SCENARIO ──
                   * The three numbers that define the question both charts
                   * answer. They were a wrapping row of "Label: [input]" pairs
-                  * that read as a form; as a labelled group of short rows they
+                  * that read as a form; as a labeled group of short rows they
                   * read as the parameters they are. */}
                 <div className="chart-rail-group">
                     <span className="text-micro">Scenario</span>
@@ -1103,9 +1106,9 @@ export default function ChargeCompareView({
                                 <button
                                     onClick={png1.copyPng}
                                     className={`chart-copy-btn ${png1.copied ? 'chart-copy-btn-active' : ''}`}
-                                    title="Copy the framed chart as a PNG"
+                                    title="Copy the framed chart as an image (PNG)"
                                 >
-                                    {png1.copied ? '✓ Copied' : 'PNG'}
+                                    {png1.copied ? '✓ Image copied' : 'Image'}
                                 </button>
                             </>
                         )}
@@ -1128,9 +1131,9 @@ export default function ChargeCompareView({
                                 <button
                                     onClick={png2.copyPng}
                                     className={`chart-copy-btn ${png2.copied ? 'chart-copy-btn-active' : ''}`}
-                                    title="Copy the framed chart as a PNG"
+                                    title="Copy the framed chart as an image (PNG)"
                                 >
-                                    {png2.copied ? '✓ Copied' : 'PNG'}
+                                    {png2.copied ? '✓ Image copied' : 'Image'}
                                 </button>
                             )}
                         >
@@ -1142,6 +1145,7 @@ export default function ChargeCompareView({
                 </>
             )}
 
+            {!presentationMode && <ChargeStopMath pairs={activePairs} mode={correctionMode} target={correctionTarget} />}
             {!presentationMode && <ChartInfoBubble chartKey="compare" />}
 
             </div>{/* .chart-main */}

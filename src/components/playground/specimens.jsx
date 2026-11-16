@@ -6,8 +6,8 @@
  * that says "this filter would leave nothing". Same for a plot frame, a
  * distribution bar, a stat cell.
  *
- * Kept OUT of `catalogue.js` on purpose: that file is imported by
- * `scripts/health.js` in plain node, which cannot parse JSX. The catalogue
+ * Kept OUT of `catalog.js` on purpose: that file is imported by
+ * `scripts/health.js` in plain node, which cannot parse JSX. The catalog
  * names a composite by key and this file supplies the markup, so the data and
  * the rendering stay on opposite sides of that line.
  */
@@ -149,7 +149,7 @@ export const COMPOSITES = {
                     several values (#338). */}
                 <div className="guide-facet-panel-head">
                     <span className="text-nano">Match</span>
-                    <span className="stats-segmented guide-facet-match" role="group" aria-label="Match">
+                    <span className="segmented guide-facet-match" role="group" aria-label="Match">
                         <button type="button" className="active">any</button>
                         <button type="button">all</button>
                     </span>
@@ -170,7 +170,7 @@ export const COMPOSITES = {
                         <button type="button" className="guide-facet-exclude active" aria-pressed="true">not</button>
                     </div>
                     {/* Disabled, not hidden: a make vanishing reads as a bug,
-                        where a greyed one reads as an answer. */}
+                        where a grayed one reads as an answer. */}
                     <label className="guide-facet-option">
                         <input type="checkbox" disabled readOnly />
                         <span className="guide-facet-option-name">Lotus</span>
@@ -194,11 +194,26 @@ export const COMPOSITES = {
                 </div>
                 <div className="account-row">
                     <span className="text-nano">Units</span>
-                    <div className="account-segmented">
+                    <div className="segmented">
                         <button type="button" className="active">Imperial</button>
                         <button type="button">Metric</button>
                     </div>
                 </div>
+                <div className="account-row">
+                    <span className="text-nano">Theme</span>
+                    <div className="segmented">
+                        <button type="button">Light</button>
+                        <button type="button">Dark</button>
+                        <button type="button" className="active">System</button>
+                    </div>
+                </div>
+                <label className="account-opt-in">
+                    <input type="checkbox" />
+                    <span className="flex flex-col gap-0.5">
+                        <span className="account-opt-in-label">Email me</span>
+                        <span className="text-caption">Rare emails about major changes, at most once a quarter.</span>
+                    </span>
+                </label>
                 <button type="button" className="btn btn-secondary account-action">Sign out</button>
             </div>
         </div>
@@ -245,8 +260,8 @@ export const COMPOSITES = {
                 <button type="button" className="popover-close" aria-label="Close">×</button>
             </div>
             <div>
-                <p>The curve default is the modelled steady-state draw; these are the
-                   figures to reach for when modelling a specific ambient.</p>
+                <p>The curve default is the modeled steady-state draw; these are the
+                   figures to reach for when modeling a specific ambient.</p>
             </div>
         </div>
     ),

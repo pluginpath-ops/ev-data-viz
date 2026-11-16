@@ -75,6 +75,21 @@ export const CHART_CATEGORIES = [
         ],
     },
     {
+        // Cost to Drive (docs/cost-to-drive-plan.md): a reader's own week of
+        // driving priced against their gas car. Each layer of the build adds its
+        // sub-tab here; Your Driving, the landing, is every setting on one page.
+        key: 'cost',
+        // Its label was "Cost to Drive" through the build; renamed by the owner
+        // before merging (2026-11-07). The key, `cost`, never changed.
+        label: 'Cost & Time',
+        modes: [
+            { key: 'drivesetup', label: 'Your Driving' },
+            { key: 'drivecost', label: 'Compare' },
+            { key: 'driveplan', label: 'Weekly Charging Plan' },
+            { key: 'drivecharger', label: 'Home Charger' },
+        ],
+    },
+    {
         // EPA Curves, renamed (#338) and moved under the EPA tab. It stays a
         // chart mode — the selected vehicles' modeled efficiency with EVBench's
         // range tests laid over it — so it keeps the chips, pop-out and URL

@@ -47,14 +47,14 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
         return {
             unit:      UNITS.some(u => u.key === p.get('u')) ? p.get('u') : DEFAULT_UNIT,
             dimension: DIMENSIONS.some(d => d.key === p.get('d')) ? p.get('d') : 'body_class',
-            // Validated against both catalogues; which dataset OWNS the key
+            // Validated against both catalogs; which dataset OWNS the key
             // does not need deciding here, because `measure` below resolves
             // that against the active tab. Null when unknown, so the dataset's
             // own default answers rather than the guide's always answering.
             measure:   isKnownMeasure(p.get('ms')) ? p.get('ms') : null,
             // `key:dir` in one parameter — two would let a link carry half a
             // sort, and there is no sensible reading of a direction with no
-            // column. Anything unrecognised falls back whole.
+            // column. Anything unrecognized falls back whole.
             sort: (() => {
                 const [key, dir] = String(p.get('so') ?? '').split(':');
                 return SORT_KEYS.includes(key) && (dir === 'asc' || dir === 'desc')
@@ -136,7 +136,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     // rows — so a multi-year "what is typical" counts those cars more than
     // once. Selecting several is allowed and sometimes wanted; the view says
     // what it costs rather than refusing.
-    // Memoised because the fallback allocates. As a bare expression it built a
+    // Memoized because the fallback allocates. As a bare expression it built a
     // new array on every render, so the `rows` memo below saw a changed
     // dependency each time and re-filtered all 1,175 rows for nothing.
     const selectedYears = useMemo(
@@ -240,7 +240,7 @@ export default function EpaStatsView({ subtab = 'labelstats', dataset = 'guide' 
     const coverage = useMemo(() => ds.coverage(plotted, measure), [ds, plotted, measure]);
 
     const summary = useMemo(
-        () => ds.summarise(plotted, { unit, dimension, measure, minN: MIN_N, sort }),
+        () => ds.summarize(plotted, { unit, dimension, measure, minN: MIN_N, sort }),
         [ds, plotted, unit, dimension, measure, sort],
     );
     const corpus = useMemo(() => ds.corpus(plotted, { unit, measure }), [ds, plotted, unit, measure]);

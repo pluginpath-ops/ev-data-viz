@@ -254,7 +254,7 @@ function BandEvidence({ evidence, band }) {
  * A curator setting a band from the evidence beside it needs to know whether
  * they are looking at their own sandbox, at what the site publishes, or at the
  * shipped default — the same question `overrideSource` answers on a curator
- * field, and for the same reason: an unlabelled number invites you to assume
+ * field, and for the same reason: an unlabeled number invites you to assume
  * it is the one everyone else sees.
  */
 function SourceBadge({ source }) {

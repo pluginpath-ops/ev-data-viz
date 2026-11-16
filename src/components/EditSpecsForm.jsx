@@ -369,7 +369,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                 const allOpen = openCategories.size === SPEC_CATEGORIES.length;
                                 setOpenCategories(allOpen ? new Set() : new Set(SPEC_CATEGORIES.map(c => c.key)));
                             }}
-                            className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0 ml-4"
+                            className="text-xs link-button underline flex-shrink-0 ml-4"
                         >
                             {openCategories.size === SPEC_CATEGORIES.length ? 'Collapse All' : 'Expand All'}
                         </button>
@@ -450,7 +450,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                                                         <button
                                                             type="button"
                                                             onClick={() => removeCustomField(cat.key, key)}
-                                                            className="text-red-400 hover:text-red-600 text-sm px-1"
+                                                            className="status-text is-danger text-sm px-1"
                                                             title="Remove field"
                                                         >
                                                             ×
@@ -503,7 +503,7 @@ export default function EditSpecsForm({ vehicle, specCustomFieldSuggestions, onS
                 {/* Footer */}
                 <div className="modal-footer flex-col gap-2 items-stretch">
                     {importError && (
-                        <p className="text-xs text-red-500 w-full">{importError}</p>
+                        <p className="text-xs status-text is-danger w-full">{importError}</p>
                     )}
                     <div className="flex justify-between w-full">
                         <div className="flex gap-2 items-center">

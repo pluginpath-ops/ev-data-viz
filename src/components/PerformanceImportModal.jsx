@@ -112,7 +112,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                 </div>
 
                 {testType === 'braking' && (
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mb-2">
+                    <p className="text-[11px] status-text is-warning mb-2">
                         Braking exports haven’t been seen yet, so the parser is written against the
                         acceleration layout. If the import looks wrong, enter the figures by hand as
                         speed windows instead.
@@ -126,11 +126,11 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                     className="form-input w-full"
                 />
                 {fileName && <p className="text-[11px] text-meta mt-1">{fileName}</p>}
-                {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+                {error && <p className="text-xs status-text is-danger mt-2">{error}</p>}
 
                 {match && (
-                    <div className="mt-3 border rounded-xs p-3 border-amber-500/40 bg-amber-500/5">
-                        <div className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-1">
+                    <div className="mt-3 border rounded-xs p-3 callout is-warning">
+                        <div className="text-sm font-semibold mb-1">
                             These runs are already here
                         </div>
                         <p className="text-xs text-secondary">
@@ -142,7 +142,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                             re-importing the same file changes nothing.
                         </p>
                         {match.unmatched.length > 0 && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                            <p className="text-xs status-text is-warning mt-1">
                                 {match.unmatched.length} run(s) in this file have no match and will be
                                 left out — import them separately if they belong to another session.
                             </p>
@@ -208,7 +208,7 @@ export default function PerformanceImportModal({ vehicle, onImport, onMerge, onC
                         </p>
 
                         {parsed.warnings.length > 0 && (
-                            <ul className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 list-disc list-inside">
+                            <ul className="mt-2 text-[11px] status-text is-warning list-disc list-inside">
                                 {parsed.warnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
                         )}

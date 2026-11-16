@@ -53,7 +53,7 @@ const num = (v) => {
  * `badge` is the row-level short form, and it lives HERE rather than in the
  * picker because the picker used to map the tiers by hand with a three-way
  * ternary over four tiers: a `corrected` subject — which measured its own
- * capacity and CAN plot range — fell through the else and was labelled
+ * capacity and CAN plot range — fell through the else and was labeled
  * `no range`, which is not a shorter way of saying its tier, it is false.
  */
 export const CURVE_TIERS = [
@@ -147,7 +147,7 @@ export function curveSubjects(testVehicles) {
         .sort((a, b) => rank[a.tier] - rank[b.tier] || a.label.localeCompare(b.label));
 }
 
-// ── Chart labelling ──────────────────────────────────────────────────────────
+// ── Chart labeling ──────────────────────────────────────────────────────────
 
 /**
  * Display names, disambiguated only where they collide.

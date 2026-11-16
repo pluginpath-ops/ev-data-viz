@@ -38,7 +38,7 @@ const pointLabelPlugin = {
         const fonts = chartFonts();
         ctx.save();
         ctx.font = `${fonts.badge}px ${fonts.sans}`;
-        ctx.fillStyle = '#6b7280';
+        ctx.fillStyle = chartTheme().tick;
         ctx.textBaseline = 'middle';
         const area = chart.chartArea;
         const maxW = (area.right - area.left) * 0.4;
@@ -72,7 +72,7 @@ const pointLabelPlugin = {
  *
  * Props:
  *   xPlot, yPlot  {object}  plotValues() of each column
- *   xCol, yCol    {object}  the table columns, labelled
+ *   xCol, yCol    {object}  the table columns, labeled
  *   colorOf       {(vehicleId) => string}
  *   units         {string}
  */
@@ -144,7 +144,7 @@ export default function SpecsScatterView({ xPlot, yPlot, xCol, yCol, colorOf, un
             label:       'Trend',
             data:        trendData,
             type:        'line',
-            borderColor: 'rgba(156,163,175,0.6)',
+            borderColor: chartTheme().axis,
             borderWidth: 1.5,
             borderDash:  [5, 4],
             pointRadius: 0,
@@ -240,9 +240,9 @@ export default function SpecsScatterView({ xPlot, yPlot, xCol, yCol, colorOf, un
                     <button
                         onClick={copyPng}
                         className={`chart-copy-btn ${imageCopied ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy the framed chart as a PNG"
+                        title="Copy the framed chart as an image (PNG)"
                     >
-                        {imageCopied ? '✓ Copied' : 'PNG'}
+                        {imageCopied ? '✓ Image copied' : 'Image'}
                     </button>
                 </>
             )}

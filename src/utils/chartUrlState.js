@@ -31,6 +31,7 @@
  *                 (written before the optimizer had its own tab) opens here.
  *   specs         sf (the field charted)
  *   specscatter   scx scy
+ *   drivecharger  hc (the chart: written only for 'time', absent is the cost chart)
  *   epacurves     epa_ya epa_m epa_ov
  *   specstable    vt_* (carried over, written by the table itself) and filters
  *
@@ -42,10 +43,10 @@
  *   written out       the defaults put back (`withDefaultsWrittenOut`), for
  *                     what must not change when a default does: a featured
  *                     comparison's saved chart, and the input to …
- *   the short link    `?k=1.…`, the toolbar's URL button (`chartShortLink`,
+ *   the short link    `?k=1.…`, the toolbar's Link button (`chartShortLink`,
  *                     utils/shortLink.js) — the written-out form, packed.
  */
-import { ALL_CHART_MODES, DEFAULT_CHART_MODE } from '../constants/chartNav';
+import { ALL_CHART_MODES, DEFAULT_CHART_MODE, categoryForMode } from '../constants/chartNav';
 import { decodeCorrection, encodeCorrection } from './correctionSettings';
 import { encodePairings, decodePairings } from './pairings';
 import { isChargingAxis } from './chargingAxes';
@@ -59,6 +60,7 @@ import {
     defaultCompareConfig, defaultRoadTripConfig,
 } from './chartDefaults';
 import { encodeShortLink } from './shortLink';
+import { COST_TO_DRIVE_PARAM, encodeCostToDriveKey, encodeGasCarKey } from './costToDriveKey';
 
 // The defaults live with the rest of a fresh page's settings (chartDefaults.js);
 // re-exported because the views have always found them here.
@@ -66,6 +68,10 @@ export { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIE
 
 /** Road Trip X axes that are sweeps: Trip Optimizer's charts since it got its own tab. */
 const ROAD_TRIP_SWEEPS = ['speed', 'tripDist'];
+
+/** Home Charger's charts: the cost per month, or the minutes of fast charging. */
+export const HOME_CHARGER_CHARTS = ['cost', 'time'];
+export const DEFAULT_HOME_CHARGER_CHART = 'cost';
 
 /** Trip Optimizer's charts. */
 export const OPTIMIZER_CHARTS = ['speed', 'tripDist', 'map'];
@@ -145,6 +151,7 @@ export function parseChartUrl(search) {
 
     const rangeChartType = p.get('rc');
     const effUnit = p.get('eff');
+    const homeChart = p.get('hc');
     // A stale or hand-edited ?m= would otherwise fall through to the charging
     // chart with no indication why.
     const linkedMode = ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE;
@@ -178,6 +185,7 @@ export function parseChartUrl(search) {
         // be handed a chart type it has no entry for.
         rangeChartType: RANGE_CHART_TYPES.includes(rangeChartType) ? rangeChartType : null,
         effUnit:        EFFICIENCY_UNITS.includes(effUnit) ? effUnit : null,
+        homeChargerChart: HOME_CHARGER_CHARTS.includes(homeChart) ? homeChart : null,
         correction:    decodeCorrection(p.toString()),
     };
 
@@ -227,6 +235,9 @@ export function parseChartUrl(search) {
     const some = o => Object.keys(o).length > 0;
     return {
         chart,
+        // Cost to Drive's key, still packed: App decodes it (costToDriveKey.js),
+        // so a key that cannot be read can say so where the reader sees it.
+        costToDrive: p.get(COST_TO_DRIVE_PARAM),
         compare:  some(compare) ? compare : null,
         pairings: pairsParam ? decodePairings(pairsParam) : null,
         roadTrip: some(roadTrip) ? roadTrip : null,
@@ -274,6 +285,8 @@ export function chartConfigFromParsed(chart, base) {
         ...((s.chartMode === 'specs' || s.chartMode === 'specscatter') && { specScope: s.specScope ?? 'selection' }),
         ...(s.rangeChartType && { rangeChartType: s.rangeChartType }),
         ...(s.effUnit       && { effUnit: s.effUnit }),
+        // A link names its chart either way: absent means the cost chart.
+        ...(s.chartMode === 'drivecharger' && { homeChargerChart: s.homeChargerChart ?? DEFAULT_HOME_CHARGER_CHART }),
         correctionMode:   s.correction.mode,
         correctionTarget: s.correction.target,
     };
@@ -314,7 +327,7 @@ export function vehicleIdsOfLink(chart, vehicles) {
 export function buildChartParams({
     view, chartMode, chartConfig, selectedVehicles, vehicles,
     compareConfig, roadTripConfig, epaConfig, pairings,
-    vehicleFilters, currentSearch = '',
+    vehicleFilters, currentSearch = '', costToDrive = null,
 }) {
     const p = new URLSearchParams();
     p.set('tab', view);
@@ -366,6 +379,9 @@ export function buildChartParams({
         if (chartConfig.rangeChartType && chartConfig.rangeChartType !== DEFAULT_RANGE_CHART_TYPE) p.set('rc', chartConfig.rangeChartType);
         if (chartConfig.effUnit && chartConfig.effUnit !== DEFAULT_EFFICIENCY_UNIT) p.set('eff', chartConfig.effUnit);
     }
+
+    // Home Charger's chart: the minutes view only; absent is the cost chart.
+    if (chartMode === 'drivecharger' && chartConfig.homeChargerChart === 'time') p.set('hc', 'time');
 
     // Charge Stop
     if (chartMode === 'compare') {
@@ -424,6 +440,22 @@ export function buildChartParams({
         }
     }
 
+    // Cost to Drive: every setting in one key, written on each of its sub-tabs
+    // so switching between them keeps the week (and an untouched week, none).
+    if (categoryForMode(chartMode).key === 'cost' && costToDrive) {
+        const key = encodeCostToDriveKey(costToDrive);
+        if (key) p.set(COST_TO_DRIVE_PARAM, key);
+    }
+
+    // Road Trip and Trip Optimizer draw the gas car Cost & Time prices, so a
+    // link to them carries it: the picked car and anything set on it, in the
+    // same `cd` key and only the car's part of it (#555). Written only when it
+    // is not the default car, so an untouched chart keeps its short link.
+    if ((chartMode === 'roadtrip' || chartMode === 'optimizer') && costToDrive) {
+        const key = encodeGasCarKey(costToDrive);
+        if (key) p.set(COST_TO_DRIVE_PARAM, key);
+    }
+
     // The vehicle table writes its own columns, sort and filters (vt_*);
     // carry them over rather than wiping them on every selection change.
     if (chartMode === 'specstable') {
@@ -479,7 +511,7 @@ export const chartQueryString = (p) => p.toString().replace(/%2C/gi, ',').replac
 
 /**
  * The short link for a chart's query: its defaults written out, then packed
- * (utils/shortLink.js). What the toolbar's URL button copies.
+ * (utils/shortLink.js). What the toolbar's Link button copies.
  *
  * @param {string} search  a query string, with or without the leading `?`
  * @returns {string} the key, `1.…`

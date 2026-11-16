@@ -14,7 +14,8 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { MI_TO_KM, convDistance, distanceLabel, fmtSpeed, fmtTemp, speedLabel } from '../utils/unitConversions';
 import { filterChargingRuns, filterRangeRuns, isRangeRun, pairedChargingRun } from '../utils/runUtils';
-import { resolveRangeSource, pricedAtSpeedMph, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
+import { efficiencyAtSpeed, sourceBasis, towingBasis } from '../utils/tripEfficiency';
+import { resolveRangeSource, epaRangeOption, defaultRangeRun, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { figureSources, epaCredits } from '../utils/vehicleFigures';
 import { useSourceLine } from '../hooks/useSourceLine';
 import { pairKey, parsePairKey, partnersFor, addPartner, replacePartner, removePartner } from '../utils/pairings';
@@ -31,13 +32,13 @@ import { useChartZoom } from '../hooks/useChartZoom';
 import {
     simulateRoadTrip, segmentsToChartPoints, segmentsToChartPointsChargeTime,
     segmentsToChartPointsByTest,
-    formatTime, speedCorrectionFactor, untimedSpans,
+    formatTime, untimedSpans,
 } from '../utils/roadTripSimulation';
 import { useRunSelection } from '../hooks/useRunSelection';
 import ChartLoading from './charts/ChartLoading';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
-import { seriesRowsOf, resolvePairColors, DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
-import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
+import { seriesRowsOf, resolvePairColors, DEFAULT_SERIES_PALETTE, LEGACY_PALETTE, SERIES_NEUTRAL } from '../utils/colorUtils';
+import { chartTheme, chartFonts, applyChartDefaults, fade } from '../utils/chartTheme';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import PlotFrame from './charts/PlotFrame';
@@ -60,6 +61,9 @@ import FeatureChartButton from './home/FeatureChartButton';
 import CopyPngButton from './charts/CopyPngButton';
 import CopyLinkButton from './charts/CopyLinkButton';
 import { loadRunPoints, runsByIdString } from '../utils/runPoints';
+import { gasTripLegs, gasCarName } from '../utils/costToDrive';
+import { DEFAULT_COST_TO_DRIVE } from '../constants/costToDrive';
+import RoadTripGasCar from './RoadTripGasCar';
 
 Chart.register(ZoomPlugin);
 
@@ -93,7 +97,7 @@ const SPEED_SWEEP_MPH  = Array.from(
 
 // ── Leg-distance sweep constants (mi between charging stops) ─────────────────
 const LEG_SWEEP_MIN  = 60;   // miles between charges
-const LEG_SWEEP_MAX  = 260;  // miles between charges
+const LEG_SWEEP_MAX  = 500;  // miles between charges
 const LEG_SWEEP_STEP = 20;   // miles
 const LEG_SWEEP_MI   = Array.from(
     { length: Math.floor((LEG_SWEEP_MAX - LEG_SWEEP_MIN) / LEG_SWEEP_STEP) + 1 },
@@ -244,7 +248,7 @@ function segmentLines(seg, sim, units, dl) {
             `Duration: ${formatTime(seg.endTime - seg.startTime)}`,
         ];
     }
-    const rangeAdded = (seg.endSoc - seg.startSoc) / 100 * sim._batteryKwh * sim._correctedMiPerKwh;
+    const rangeAdded = (seg.endSoc - seg.startSoc) / 100 * sim._batteryKwh * sim.miPerKwh;
     return [
         `Charging: ${seg.startSoc}% → ${seg.endSoc}%`,
         `+${Math.round(convDistance(rangeAdded, units))} ${dl} range`,
@@ -287,7 +291,7 @@ const DEST_SOC_NOTE = 'What to arrive with. Independent of the en-route minimum,
 
 /**
  * The correction target fields Road Trip offers: no speed, because a trip is
- * corrected to the speed it is driven (see tripTarget in the view).
+ * corrected to the speed it is driven (utils/tripEfficiency.js).
  */
 const TRIP_CORRECTION_FIELDS = ['temperatureF', 'altitudeFt', 'accessoryW'];
 
@@ -298,6 +302,45 @@ function tripCorrectionSummary(mode, target, units) {
     if (target.accessoryW != null) parts.push(accessoryText(target.accessoryW));
     return `to ${parts.join(' · ')}`;
 }
+
+/**
+ * A row's simulation inputs under the scenario, less the efficiency and the
+ * speed: what its line, its sweeps, its optimizer grid and its spread traces
+ * share. A sweep or the optimizer overrides the field it searches.
+ */
+function tripInputs(config, entry, chargingData) {
+    const ov = config.perRun?.[entry.key] || {};
+    return {
+        batteryKwh:        entry.batteryKwh,
+        chargingData,
+        startSoc:          config.startSoc,
+        minSoc:            ov.minSoc ?? config.minSoc,
+        destinationMinSoc: config.destinationMinSoc,
+        legDistanceMi:     ov.legDistance ?? config.legDistance,
+        totalDistanceMi:   config.totalDistance,
+        chargeTimeMinutes: ov.chargeTime ?? config.chargeTime,
+        overheadMinutes:   config.overhead,
+        mode:              config.mode,
+    };
+}
+
+/**
+ * One trip on an efficiency already priced at its speed. `priced` rides along
+ * for the table: the efficiency driven on and the factor that got it there.
+ * Every simulation on this chart runs through here — the optimizer prices each
+ * speed once and simulates many stop plans on it, so the two steps are apart.
+ */
+const simulateAt = (priced, speedMph, inputs) =>
+    ({ ...simulateRoadTrip({ ...inputs, miPerKwh: priced.miPerKwh, speedMph }), priced });
+
+/** One trip: the basis priced at its travel speed (utils/tripEfficiency.js), then simulated. */
+const simulateTrip = (basis, speedMph, correction, inputs) =>
+    simulateAt(efficiencyAtSpeed(basis, speedMph, correction), speedMph, inputs);
+
+/** What a row's trip is priced from: its range test, or, towing, the one towing figure every row shares. */
+const rowBasis = (entry, config) => (config.towingMode
+    ? towingBasis(config.towingEfficiency, config.towingRefSpeedMph)
+    : entry.basis);
 
 const SIM_MODES = [
     { value: 'distance',     mode: 'distance', towing: false, label: 'Fixed charging range' },
@@ -370,7 +413,7 @@ const TRIP_Y_AXES = [
 
 /**
  * Y over a sweep, from a trip's total minutes at a speed. The one formula for
- * the EV lines, the ICE line and the test spread. Average speed is the trip's
+ * the EV lines, the gas car's line and the test spread. Average speed is the trip's
  * distance over its whole time, stops included — the figure people compare
  * cars on — in the reader's units.
  */
@@ -388,33 +431,26 @@ const SWEEP_Y_TITLES = {
     chargeTime: 'Charge + Stop Time', avgSpeed: 'Average Speed (incl. stops)',
 };
 
-/** Compute ICE total trip time at a given travel speed (used for speed-sweep ICE line). */
-function calcIceTotalTimeAtSpeed(speedMph, totalDistanceMi, overheadMin) {
-    const ICE_DRIVE_INTERVAL_MIN = 180;
-    let t = 0, d = 0, iter = 0;
-    while (d < totalDistanceMi && iter < 100) {
-        iter++;
-        const rem = totalDistanceMi - d;
-        const driveMi = Math.min((speedMph * ICE_DRIVE_INTERVAL_MIN) / 60, rem);
-        t += (driveMi / speedMph) * 60;
-        d += driveMi;
-        if (d >= totalDistanceMi - 0.01) break;
-        t += overheadMin;
-    }
-    return t;
-}
+/**
+ * The gas car's trip at a travel speed: where it stops for fuel and how long it
+ * takes (utils/costToDrive.js `gasTripLegs`), on what this view holds for the
+ * car — its shared settings and, while the trip is corrected, the temperature
+ * it is corrected to. One call for the timeline, the table's gap, and each
+ * speed and stop plan of the sweeps and the optimizer, so they cannot disagree.
+ *
+ * Where Road Trip differs from Cost & Time (#555): its stops are the car's own
+ * fill-up minutes, never the EV `overhead`; it prices no fuel (time only,
+ * owner 2026-11-12); and the cold loss follows the correction target's
+ * temperature instead of a season, none when no correction is on.
+ */
+const gasTripAt = (gas, distanceMi, speedMph) =>
+    gasTripLegs(gas.settings, { distanceMi, speedMph, temperatureF: gas.temperatureF });
 
 // Efficiency derivation moved to utils/rangeSource.js, shared with Charge
 // Compare. The mi/kWh math is unchanged (measured energy preferred, SoC-delta
 // estimate as fallback); what changed is that choosing WHICH range test to
 // derive from is now one ranked, user-overridable decision instead of two
 // views each guessing separately.
-
-// ── Default vehicle colors ───────────────────────────────────────────────────
-const PALETTE = [
-    '#6366f1', '#f59e0b', '#10b981', '#ef4444',
-    '#3b82f6', '#a855f7', '#ec4899', '#14b8a6',
-];
 
 // ── Per-row routing overrides panel ───────────────────────────────────────────
 //
@@ -428,7 +464,7 @@ const PALETTE = [
 // Dedicated collapsible section listing the selected rows with per-row overrides
 // of the charging strategy: en-route Charger Arrival SoC (minSoc) and the
 // mode-dependent charge amount (leg distance / charge time). Blank shows the
-// global value greyed as a placeholder; typing overrides just that run.
+// global value grayed as a placeholder; typing overrides just that run.
 function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, dl, onChange, onReset }) {
     const [open, setOpen] = useState(false);
     if (!entries.length) return null;
@@ -533,7 +569,7 @@ function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, d
 }
 
 // ── Chart.js plugin: charging badges + finish labels ─────────────────────────
-function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo) {
+function makeRoadTripPlugin(simResults, units, yAxis, gasTimeMin, gasByTestInfo, gasName) {
     // Read once per plugin build, like the palette above it: the plugin is
     // rebuilt whenever the chart is, so this follows a scale change without
     // re-measuring on every frame.
@@ -550,7 +586,8 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             ctx.beginPath();
             ctx.rect(left, top, right - left, bottom - top);
             ctx.clip();
-            ctx.fillStyle = 'rgba(134,239,172,0.22)'; // green-300 at low opacity
+            // A wash of the success green, so it reads on either theme's panel.
+            ctx.fillStyle = fade(chartTheme().good, 0.22);
 
             // EV charge regions
             simResults.forEach((sim, runIndex) => {
@@ -565,9 +602,9 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                 }
             });
 
-            // ICE gas stop regions
-            if (iceByTestInfo) {
-                const { laneIndex, gasStops } = iceByTestInfo;
+            // The gas car's fill-up regions
+            if (gasByTestInfo) {
+                const { laneIndex, gasStops } = gasByTestInfo;
                 const yTop    = chart.scales.y.getPixelForValue(laneIndex + 1);
                 const yBottom = chart.scales.y.getPixelForValue(laneIndex);
                 for (const stop of gasStops) {
@@ -583,11 +620,11 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
         afterDatasetsDraw(chart) {
             const ctx = chart.ctx;
 
-            // ── byTest mode: draw elapsed-time + vs-ICE callout at end of each run ──
+            // ── byTest mode: draw elapsed-time + vs-the-gas-car callout at end of each run ──
             if (yAxis === 'byTest') {
                 let simIdx = 0;
                 chart.data.datasets.forEach((ds, di) => {
-                    if (ds._isIce || ds._spread) return;
+                    if (ds._isGas || ds._spread) return;
                     const sim = simResults[simIdx++];
                     if (!sim || !ds.data.length) return;
                     const meta   = chart.getDatasetMeta(di);
@@ -595,10 +632,10 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                     if (!lastPt) return;
 
                     const timeLabel = sim.completed === false ? 'did not finish' : formatTime(sim.totalTimeMin);
-                    const deltaMin  = (sim.completed !== false && iceTimeMin != null) ? sim.totalTimeMin - iceTimeMin : null;
+                    const deltaMin  = (sim.completed !== false && gasTimeMin != null) ? sim.totalTimeMin - gasTimeMin : null;
                     const absDelta  = deltaMin != null ? Math.abs(deltaMin) : null;
-                    const vsIce     = absDelta != null
-                        ? (deltaMin > 0 ? `+${formatTime(absDelta)} vs ICE` : `−${formatTime(absDelta)} vs ICE`)
+                    const vsGas     = absDelta != null
+                        ? (deltaMin > 0 ? `+${formatTime(absDelta)} vs ${gasName}` : `−${formatTime(absDelta)} vs ${gasName}`)
                         : null;
 
                     ctx.save();
@@ -613,11 +650,11 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                     ctx.fillStyle = ds.borderColor;
                     ctx.fillText(timeLabel, lastPt.x + 6, labelY);
 
-                    // vs ICE delta below, in amber (slower) or green (faster)
-                    if (vsIce) {
+                    // vs the gas car, below, in amber (slower) or green (faster)
+                    if (vsGas) {
                         ctx.font      = `${fonts.micro}px ${fonts.sans}`;
-                        ctx.fillStyle = deltaMin > 0 ? '#d97706' : '#16a34a'; // amber-600 / green-600
-                        ctx.fillText(vsIce, lastPt.x + 6, labelY + 13);
+                        ctx.fillStyle = deltaMin > 0 ? chartTheme().caution : chartTheme().good;
+                        ctx.fillText(vsGas, lastPt.x + 6, labelY + 13);
                     }
 
                     // PROTOTYPE test spread: the finish range across the range tests.
@@ -625,25 +662,25 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                     if (f) {
                         ctx.font      = `${fonts.micro}px ${fonts.sans}`;
                         ctx.fillStyle = chartTheme().tick;
-                        ctx.fillText(`${f.n} tests: ${formatTime(f.lo)}–${formatTime(f.hi)}`, lastPt.x + 6, labelY + (vsIce ? 26 : 13));
+                        ctx.fillText(`${f.n} tests: ${formatTime(f.lo)}–${formatTime(f.hi)}`, lastPt.x + 6, labelY + (vsGas ? 26 : 13));
                     }
                     ctx.restore();
                 });
 
-                // ICE callout
-                if (iceByTestInfo) {
-                    const iceDsIdx = chart.data.datasets.findIndex(d => d._isIce);
-                    if (iceDsIdx >= 0) {
-                        const iceMeta = chart.getDatasetMeta(iceDsIdx);
-                        const lastPt  = iceMeta.data[iceMeta.data.length - 1];
+                // The gas car's own callout
+                if (gasByTestInfo) {
+                    const gasDsIdx = chart.data.datasets.findIndex(d => d._isGas);
+                    if (gasDsIdx >= 0) {
+                        const gasMeta = chart.getDatasetMeta(gasDsIdx);
+                        const lastPt  = gasMeta.data[gasMeta.data.length - 1];
                         if (lastPt) {
                             const labelY = lastPt.y - 13;
                             ctx.save();
                             ctx.font         = `600 ${fonts.badge}px ${fonts.sans}`;
-                            ctx.fillStyle    = '#6b7280'; // gray-500
+                            ctx.fillStyle    = chartTheme().tick;
                             ctx.textAlign    = 'left';
                             ctx.textBaseline = 'middle';
-                            ctx.fillText(`ICE — ${formatTime(iceByTestInfo.totalTimeMin)}`, lastPt.x + 6, labelY);
+                            ctx.fillText(`${gasName} — ${formatTime(gasByTestInfo.totalTimeMin)}`, lastPt.x + 6, labelY);
                             ctx.restore();
                         }
                     }
@@ -656,7 +693,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             // ── Pass 1: charging segment badges (EV lines only) ───────────
             let simIdx = 0;
             chart.data.datasets.forEach((ds, di) => {
-                if (ds._isIce || ds._spread) return;
+                if (ds._isGas || ds._spread) return;
                 const sim = simResults[simIdx++];
                 if (!sim) return;
 
@@ -674,7 +711,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                             const midX = (startPt.x + endPt.x) / 2;
                             const midY = (startPt.y + endPt.y) / 2 - 12;
                             const rangeAdded = seg.endSoc !== seg.startSoc
-                                ? Math.round((seg.endSoc - seg.startSoc) / 100 * sim._batteryKwh * sim._correctedMiPerKwh)
+                                ? Math.round((seg.endSoc - seg.startSoc) / 100 * sim._batteryKwh * sim.miPerKwh)
                                 : 0;
                             const chargeMin = Math.round(seg.endTime - seg.startTime);
                             const label = `${seg.startSoc}→${seg.endSoc}% +${Math.round(convDistance(rangeAdded, units))}${distanceLabel(units)} ${chargeMin}m`;
@@ -705,7 +742,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                 }
             });
 
-            // ── Pass 2: collect all finish labels (EV + ICE) ─────────────
+            // ── Pass 2: collect all finish labels (EV + gas car) ─────────
             const finishLabels = [];
             let si = 0;
             chart.data.datasets.forEach((ds, di) => {
@@ -717,11 +754,11 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
                 const lastPt = pts[pts.length - 1];
                 if (!lastPt) return;
 
-                if (ds._isIce) {
+                if (ds._isGas) {
                     const lastRaw = ds.data[ds.data.length - 1];
                     if (lastRaw) finishLabels.push({
                         x: lastPt.x, y: lastPt.y,
-                        text: `ICE Reference — ${formatTime(lastRaw.x)}`,
+                        text: `${gasName} — ${formatTime(lastRaw.x)}`,
                         color: ds.borderColor,
                     });
                 } else {
@@ -739,7 +776,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             // ── Pass 3: conflict-group spread + draw with leader lines ────
             if (!finishLabels.length) return;
 
-            const LABEL_H = 16; // minimum px between label centres
+            const LABEL_H = 16; // minimum px between label centers
 
             // Sort by natural Y position; break ties by finish time (faster → top)
             finishLabels.sort((a, b) => a.y - b.y || a.x - b.x);
@@ -747,7 +784,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, iceTimeMin, iceByTestInfo)
             const { top, bottom } = chart.chartArea;
 
             // Build adjusted Y positions by finding conflict groups and spreading
-            // only within each group. Labels with no close neighbours stay put.
+            // only within each group. Labels with no close neighbors stay put.
             const adjYs = finishLabels.map(l => l.y); // start at natural positions
             let gi = 0;
             while (gi < finishLabels.length) {
@@ -826,6 +863,12 @@ export default function RoadTripView({
     correctionMode = 'none',
     correctionTarget = undefined,
     setChartConfig = null,
+    // The gas car the EVs are timed against: Cost & Time's settings, shared
+    // (#555) — the one `costToDrive` state in App, so a car picked in either
+    // tab is the car in the other, the pop-out and the chart link. Read-only
+    // here when no `onGasCarChange` comes (the pop-out, a Home panel).
+    gasCar = DEFAULT_COST_TO_DRIVE,
+    onGasCarChange = null,
 }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
@@ -885,7 +928,7 @@ export default function RoadTripView({
     // ── One entry per (range test × charging test) pair — structure only ──────
     // Range-primary, matching Charge Compare: a charging curve is a property of
     // the car and varies little, while a range test is a property of the day —
-    // wind, temperature, HVAC, tyres, elevation, load. Each pair is its own trip
+    // wind, temperature, HVAC, tires, elevation, load. Each pair is its own trip
     // simulation, so the same car under two conditions is two comparable rows.
     //
     // A Map, not an object: insertion order is the display order, and the keys
@@ -896,16 +939,27 @@ export default function RoadTripView({
     // it before resolving colors is the only order that isn't circular. See
     // "Resolve chart colors" below for the pass that attaches `.color`.
     // A trip is priced at the speed it is driven, so the correction's speed is
-    // the trip's, never the reader's target speed. Correcting to the target
-    // and letting the simulation re-price from there did not cancel out: the
-    // correction prices the accessory load and air density at its speed, the
-    // simulation's speedCorrectionFactor knows neither, so the target speed
-    // leaked into every trip. Road Trip offers no speed slider for that reason.
-    const tripSpeed = roadTripConfig.speed;
-    const tripTarget = useMemo(
-        () => ({ ...normalizeCorrectionTarget(correctionTarget), speedMph: tripSpeed }),
-        [correctionTarget, tripSpeed],
+    // the trip's, never the reader's target speed: every trip goes through
+    // utils/tripEfficiency.js, which corrects straight to its travel speed.
+    // Road Trip offers no speed slider for that reason.
+    const correction = useMemo(
+        () => ({ mode: correctionMode, target: normalizeCorrectionTarget(correctionTarget) }),
+        [correctionMode, correctionTarget],
     );
+
+    // The gas car, as this chart draws it: its four trip settings, its name, and
+    // the temperature to cut its mpg by (gasTripAt). The temperature is the
+    // correction target's, and only while a correction is on: the EVs are then
+    // corrected to it, so the gas car is cut by the same cold. With none, the
+    // EVs run as tested, each at its own temperature, and there is no one to
+    // cut the gas car by. Memoized on its fields, not the shared settings'
+    // identity, so a Cost & Time-only change does not rebuild the chart.
+    const { gasHwy, gasTank, gasFillAt, gasFillMin } = gasCar;
+    const gasName = gasCarName(gasCar);
+    const gasTemperatureF = correctionMode !== 'none' ? correction.target.temperatureF : null;
+    const gas = useMemo(
+        () => ({ settings: { gasHwy, gasTank, gasFillAt, gasFillMin }, temperatureF: gasTemperatureF, name: gasName }),
+        [gasHwy, gasTank, gasFillAt, gasFillMin, gasTemperatureF, gasName]);
 
     const pairStructure = useMemo(() => {
         const map = new Map();
@@ -929,15 +983,16 @@ export default function RoadTripView({
                     // The range side is explicit — it is the row — so the resolver
                     // enters at rank 1 and its fallbacks only matter when the chosen
                     // test carries no usable data.
-                    const resolveAt = speedMph => resolveRangeSource(chargingRun, {
+                    //
+                    // Resolved UNCORRECTED: each trip is corrected at its own
+                    // travel speed (utils/tripEfficiency.js), the speed sweep and
+                    // the optimizer at every speed they drive.
+                    const src = resolveRangeSource(chargingRun, {
                         vehicle,
                         batteryKwh: vehicle.socWindowKwh,
                         explicitPairing: isEpaPartnerId(rangeRun.id) ? EPA_PARTNER_ID : rangeRun,
-                        correction: { mode: correctionMode, target: { ...tripTarget, speedMph } },
-                        session: sessionFor(testSessions, rangeRun),
                     });
-                    const src = resolveAt(tripSpeed);
-                    const ownSpeedMph = rangeRun.speed_mph ?? src.sourceRun?.speed_mph ?? null;
+                    const basis = sourceBasis(src, sessionFor(testSessions, src.sourceRun ?? rangeRun));
 
                     const key = pairKey(rangeRun.id, partnerId);
                     map.set(key, {
@@ -954,19 +1009,11 @@ export default function RoadTripView({
                         label:          rows.length > 1
                             ? `${rangeRun.name} × ${chargingRun.name}`
                             : rangeRun.name,
-                        miPerKwh:       src.miPerKwh,
-                        // The speed miPerKwh is priced at, which the simulation
-                        // re-prices from: the test's own, or the standard speed
-                        // once correction has already moved it there. Assume
-                        // 70 mph if neither the range test nor its source says.
-                        testSpeedMph:   pricedAtSpeedMph(src, ownSpeedMph),
-                        // The speed sweep drives at every speed, so it prices
-                        // each one there rather than from the trip speed.
-                        priceAt: speedMph => {
-                            if (correctionMode === 'none') return { miPerKwh: src.miPerKwh, testSpeedMph: pricedAtSpeedMph(src, ownSpeedMph) };
-                            const at = resolveAt(speedMph);
-                            return { miPerKwh: at.miPerKwh, testSpeedMph: pricedAtSpeedMph(at, ownSpeedMph) };
-                        },
+                        // As measured, at the test's own speed (null when it
+                        // recorded none, and the trip assumes one).
+                        miPerKwh:       basis?.miPerKwh ?? null,
+                        testSpeedMph:   basis?.conditions.speedMph ?? null,
+                        basis,
                         batteryKwh:     vehicle.socWindowKwh,
                         efficiencyNote: src.note,
                     });
@@ -974,7 +1021,7 @@ export default function RoadTripView({
             }
         }
         return map;
-    }, [selectedVehicles, pairings, correctionMode, tripTarget, tripSpeed, testSessions]);
+    }, [selectedVehicles, pairings, testSessions]);
 
     // Selection lives in the shared hook (hooks/useRunSelection.js), the same one
     // Charge Compare uses. Previously this view had its own copy, whose bootstrap
@@ -1074,7 +1121,7 @@ export default function RoadTripView({
         for (const entry of pairStructure.values()) {
             map.set(entry.key, {
                 ...entry,
-                color: colorMap[entry.rangeRun.id] || PALETTE[colorIdx % PALETTE.length],
+                color: colorMap[entry.rangeRun.id] || LEGACY_PALETTE[colorIdx % LEGACY_PALETTE.length],
             });
             colorIdx++;
         }
@@ -1193,112 +1240,45 @@ export default function RoadTripView({
     }, [validEntries, runDataCache, roadTripConfig.minSoc]);
 
     // ── Run simulation for each entry ─────────────────────────────────────────
-    const simResults = useMemo(() => {
-        const {
-            startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance, speed, mode, overhead,
-            towingMode, towingEfficiency, towingRefSpeedMph,
-        } = roadTripConfig;
-
-        const perRun = roadTripConfig.perRun || {};
-
-        return validEntries.map(entry => {
-            const chargingData = runDataCache[entry.run.id];
-            if (!chargingData || chargingData.length === 0) return null;
-
-            const ov = perRun[entry.key] || {};
-            const result = simulateRoadTrip({
-                batteryKwh:        entry.batteryKwh,
-                // Towing: all vehicles share the same system efficiency; battery still varies per vehicle
-                miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
-                testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
-                chargingData,
-                startSoc,
-                minSoc:            ov.minSoc ?? minSoc,
-                destinationMinSoc,
-                legDistanceMi:     ov.legDistance ?? legDistance,
-                totalDistanceMi:   totalDistance,
-                speedMph:          speed,
-                chargeTimeMinutes: ov.chargeTime ?? chargeTime,
-                overheadMinutes:   overhead,
-                mode,
-                towingMode,
-            });
-
-            // Attach helper fields for the plugin
-            result._batteryKwh        = entry.batteryKwh;
-            result._correctedMiPerKwh = result.correctedMiPerKwh;
-
-            return result;
-        });
-    }, [validEntries, runDataCache, roadTripConfig]);
+    const simResults = useMemo(() => validEntries.map(entry => {
+        const chargingData = runDataCache[entry.run.id];
+        if (!chargingData || chargingData.length === 0) return null;
+        const result = simulateTrip(rowBasis(entry, roadTripConfig), roadTripConfig.speed, correction,
+            tripInputs(roadTripConfig, entry, chargingData));
+        // Attach helper fields for the plugin
+        result._batteryKwh = entry.batteryKwh;
+        return result;
+    }), [validEntries, runDataCache, roadTripConfig, correction]);
 
     // ── Speed sweep: run simulation at every speed in SPEED_SWEEP_MPH ─────────
     const speedSweepResults = useMemo(() => {
         if (roadTripConfig.xAxis !== 'speed') return null;
-        const {
-            startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance, mode, overhead,
-            towingMode, towingEfficiency, towingRefSpeedMph,
-        } = roadTripConfig;
-        const perRun = roadTripConfig.perRun || {};
         return validEntries.map(entry => {
-            const chargingData = runDataCache[entry.run.id] ?? [];
-            const ov = perRun[entry.key] || {};
-            return SPEED_SWEEP_MPH.map(speedMph => {
-              const priced = entry.priceAt(speedMph);
-              return simulateRoadTrip({
-                batteryKwh:        entry.batteryKwh,
-                miPerKwh:          towingMode ? towingEfficiency : priced.miPerKwh,
-                testSpeedMph:      towingMode ? towingRefSpeedMph : (priced.testSpeedMph || 70),
-                chargingData,
-                startSoc, minSoc: ov.minSoc ?? minSoc, destinationMinSoc,
-                legDistanceMi:     ov.legDistance ?? legDistance,
-                totalDistanceMi:   totalDistance,
-                speedMph,
-                chargeTimeMinutes: ov.chargeTime ?? chargeTime,
-                overheadMinutes:   overhead,
-                mode,
-                towingMode,
-              });
-            });
+            const inputs = tripInputs(roadTripConfig, entry, runDataCache[entry.run.id] ?? []);
+            const basis = rowBasis(entry, roadTripConfig);
+            return SPEED_SWEEP_MPH.map(speedMph => simulateTrip(basis, speedMph, correction, inputs));
         });
-    }, [validEntries, runDataCache, roadTripConfig]);
+    }, [validEntries, runDataCache, roadTripConfig, correction]);
 
     // ── Per-stop sweep: the leg or the charge time, whichever the sim holds ──
     const stopSweepResults = useMemo(() => {
         if (roadTripConfig.xAxis !== 'tripDist') return null;
-        const {
-            startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance, speed, mode, overhead,
-            towingMode, towingEfficiency, towingRefSpeedMph,
-        } = roadTripConfig;
-        const { xs, param } = stopSweepFor(mode);
-        const perRun = roadTripConfig.perRun || {};
+        const { xs, param } = stopSweepFor(roadTripConfig.mode);
         return validEntries.map(entry => {
-            const chargingData = runDataCache[entry.run.id] ?? [];
-            const ov = perRun[entry.key] || {};
+            const inputs = tripInputs(roadTripConfig, entry, runDataCache[entry.run.id] ?? []);
+            // One speed, so one price for every step.
+            const priced = efficiencyAtSpeed(rowBasis(entry, roadTripConfig), roadTripConfig.speed, correction);
             // The swept field comes last, so a per-run override of it doesn't apply.
-            return xs.map(x => simulateRoadTrip({
-                batteryKwh:        entry.batteryKwh,
-                miPerKwh:          towingMode ? towingEfficiency : entry.miPerKwh,
-                testSpeedMph:      towingMode ? towingRefSpeedMph : (entry.testSpeedMph || 70),
-                chargingData,
-                startSoc, minSoc: ov.minSoc ?? minSoc, destinationMinSoc,
-                legDistanceMi:     ov.legDistance ?? legDistance,
-                totalDistanceMi:   totalDistance,
-                speedMph:          speed,
-                chargeTimeMinutes: ov.chargeTime ?? chargeTime,
-                overheadMinutes:   overhead,
-                mode,
-                towingMode,
-                [param]:           x,
-            }));
+            return xs.map(x => simulateAt(priced, roadTripConfig.speed, { ...inputs, [param]: x }));
         });
-    }, [validEntries, runDataCache, roadTripConfig]);
+    }, [validEntries, runDataCache, roadTripConfig, correction]);
 
     // ── Trip Optimizer: every speed against every stop plan ──────────────────
     // One simulation per cell, about 1,200 a vehicle at tens of microseconds
     // each (utils/tripOptimizer). Totals only: the best cell is simulated again
     // for its charge window rather than holding every trip. A per-run override
     // of the stop plan does not apply — the stop plan is what is searched.
+    // Priced once per speed, not per cell: the price depends on the speed alone.
     const {
         startSoc: gStartSoc, minSoc: gMinSoc, destinationMinSoc: gDestSoc, legDistance: gLeg,
         chargeTime: gChargeTime, totalDistance: gTotal, mode: gMode, overhead: gOverhead,
@@ -1307,28 +1287,20 @@ export default function RoadTripView({
     const optimizerSearch = useMemo(() => {
         if (!optimizer) return null;
         const { values: allStops, param } = stopAxisFor(gMode);
+        const config = {
+            startSoc: gStartSoc, minSoc: gMinSoc, destinationMinSoc: gDestSoc, legDistance: gLeg,
+            chargeTime: gChargeTime, totalDistance: gTotal, mode: gMode, overhead: gOverhead,
+            towingMode: gTowing, towingEfficiency: gTowEff, towingRefSpeedMph: gTowRef, perRun: gPerRun,
+        };
         return validEntries.map(entry => {
             const chargingData = runDataCache[entry.run.id];
             if (!chargingData?.length) return null;
-            const ov = (gPerRun || {})[entry.key] || {};
-            const simAt = (mph, priced, stop) => simulateRoadTrip({
-                batteryKwh:        entry.batteryKwh,
-                miPerKwh:          gTowing ? gTowEff : priced.miPerKwh,
-                testSpeedMph:      gTowing ? gTowRef : (priced.testSpeedMph || 70),
-                chargingData,
-                startSoc: gStartSoc, minSoc: ov.minSoc ?? gMinSoc, destinationMinSoc: gDestSoc,
-                legDistanceMi:     gLeg,
-                totalDistanceMi:   gTotal,
-                speedMph:          mph,
-                chargeTimeMinutes: gChargeTime,
-                overheadMinutes:   gOverhead,
-                mode:              gMode,
-                towingMode:        gTowing,
-                [param]:           stop,
-            });
-            const priced = OPT_SPEED_MPH.map(mph => entry.priceAt(mph));
+            const inputs = tripInputs(config, entry, chargingData);
+            const basis = rowBasis(entry, config);
+            const priced = OPT_SPEED_MPH.map(mph => efficiencyAtSpeed(basis, mph, correction));
+            const simAt = (si, stop) => simulateAt(priced[si], OPT_SPEED_MPH[si], { ...inputs, [param]: stop });
             const full = OPT_SPEED_MPH.map((mph, si) => allStops.map(stop => {
-                const sim = simAt(mph, priced[si], stop);
+                const sim = simAt(si, stop);
                 return isSimUnrealistic(sim) ? null : sim.totalTimeMin;
             }));
             // The stop plans past the longest a full stop can use before 95%
@@ -1338,9 +1310,9 @@ export default function RoadTripView({
             const keep = usefulStopCount(full);
             const totals = full.map(row => row.slice(0, keep));
             const stops = allStops.slice(0, keep);
-            return { totals, stops, trimmed: keep < allStops.length, simCell: (si, ti) => simAt(OPT_SPEED_MPH[si], priced[si], stops[ti]) };
+            return { totals, stops, trimmed: keep < allStops.length, simCell: (si, ti) => simAt(si, stops[ti]) };
         });
-    }, [optimizer, validEntries, runDataCache, gStartSoc, gMinSoc, gDestSoc, gLeg, gChargeTime, gTotal,
+    }, [optimizer, validEntries, runDataCache, correction, gStartSoc, gMinSoc, gDestSoc, gLeg, gChargeTime, gTotal,
         gMode, gOverhead, gTowing, gTowEff, gTowRef, gPerRun]);
 
     // What the grid says, held to the reader's speed range: the BEST plan is the
@@ -1379,22 +1351,18 @@ export default function RoadTripView({
 
     // ── PROTOTYPE: test spread on the sweeps ─────────────────────────────────
     // The same sweep, once per range test of the vehicle, with the row's own
-    // charging curve held fixed. See utils/roadTripSpread.
+    // charging curve held fixed. See utils/roadTripSpread. Each test is priced
+    // at each speed the way the row's own line is (simulateTrip).
     // Towing overrides every test with one efficiency, so there is nothing to spread.
     const spreadInputs = useMemo(() => {
         if (!showTestSpread || roadTripConfig.towingMode) return null;
         return validEntries.map(entry => spreadTestsFor(entry.vehicle, {
-            correctionMode,
-            correctionTarget: tripTarget,
             sessionOf: r => sessionFor(testSessions, r),
         }));
-    }, [showTestSpread, roadTripConfig.towingMode, validEntries, correctionMode, tripTarget, testSessions]);
+    }, [showTestSpread, roadTripConfig.towingMode, validEntries, testSessions]);
 
     const spreadSweep = useMemo(() => {
-        const {
-            xAxis, startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance,
-            speed, mode, overhead, sweepYAxis,
-        } = roadTripConfig;
+        const { xAxis, totalDistance, speed, mode, sweepYAxis } = roadTripConfig;
         if (!spreadInputs || (xAxis !== 'speed' && xAxis !== 'tripDist')) return null;
         // A best-plan line would need the whole grid once per test; the spread
         // is drawn on the plain sweep, where the other setting is held.
@@ -1402,39 +1370,16 @@ export default function RoadTripView({
         const isSpeed = xAxis === 'speed';
         const stopSweep = stopSweepFor(mode);
         const xs = isSpeed ? SPEED_SWEEP_MPH : stopSweep.xs;
-        const perRun = roadTripConfig.perRun || {};
         return validEntries.map((entry, i) => {
             const chargingData = runDataCache[entry.run.id];
             if (!chargingData?.length) return null;
             const tests = spreadInputs[i];
             if (tests.length < 2) return { tests: tests.length, steps: null };
-            const ov = perRun[entry.key] || {};
-            // On the speed sweep each test is priced at each speed, as the
-            // main line is (tripTarget); spreadTestsFor keeps the tests' order.
-            const testsAt = isSpeed
-                ? xs.map(x => spreadTestsFor(entry.vehicle, {
-                    correctionMode,
-                    correctionTarget: { ...tripTarget, speedMph: x },
-                    sessionOf: r => sessionFor(testSessions, r),
-                }))
-                : null;
-            const perTest = tests.map((t0, ti) => xs.map((x, xi) => {
+            const inputs = tripInputs(roadTripConfig, entry, chargingData);
+            const perTest = tests.map(t => xs.map(x => {
                 const mph = isSpeed ? x : speed;
-                const t = testsAt?.[xi][ti] ?? t0;
-                const sim = simulateRoadTrip({
-                    batteryKwh:        entry.batteryKwh,
-                    miPerKwh:          t.miPerKwh,
-                    testSpeedMph:      t.testSpeedMph,
-                    chargingData,
-                    startSoc, minSoc: ov.minSoc ?? minSoc, destinationMinSoc,
-                    legDistanceMi:     ov.legDistance ?? legDistance,
-                    totalDistanceMi:   totalDistance,
-                    speedMph:          mph,
-                    chargeTimeMinutes: ov.chargeTime ?? chargeTime,
-                    overheadMinutes:   overhead,
-                    mode,
-                    ...(isSpeed ? {} : { [stopSweep.param]: x }),
-                });
+                const sim = simulateTrip(t.basis, mph, correction,
+                    isSpeed ? inputs : { ...inputs, [stopSweep.param]: x });
                 return isSimUnrealistic(sim) ? null : Math.round(sweepY(sim.totalTimeMin, mph, totalDistance, sweepYAxis, units));
             }));
             return {
@@ -1444,40 +1389,24 @@ export default function RoadTripView({
                 steps: sweepSpread(perTest),
             };
         });
-    }, [spreadInputs, validEntries, runDataCache, roadTripConfig, correctionMode, tripTarget, testSessions, optimizer, units]);
+    }, [spreadInputs, validEntries, runDataCache, roadTripConfig, correction, optimizer, units]);
 
     // The timeline: each test's whole trip under the current scenario, and the
     // area between the furthest-along and the least at every minute. In the
     // SoC lanes ('byTest') an area would tangle, so there the trips are kept
     // as traces and only the finish is bracketed.
     const spreadTimeline = useMemo(() => {
-        const {
-            xAxis, yAxis, startSoc, minSoc, destinationMinSoc, legDistance, chargeTime, totalDistance,
-            speed, mode, overhead,
-        } = roadTripConfig;
+        const { xAxis, yAxis, speed } = roadTripConfig;
         if (!spreadInputs || (xAxis !== 'totalTime' && xAxis !== 'driveTime')) return null;
         const driveX = xAxis === 'driveTime';
-        const perRun = roadTripConfig.perRun || {};
         return validEntries.map((entry, i) => {
             const chargingData = runDataCache[entry.run.id];
             if (!chargingData?.length) return null;
-            const ov = perRun[entry.key] || {};
+            const inputs = tripInputs(roadTripConfig, entry, chargingData);
             // A test whose trip cannot be finished has no finish to spread.
-            const done = spreadInputs[i].map(t => ({ t, sim: simulateRoadTrip({
-                batteryKwh:        entry.batteryKwh,
-                miPerKwh:          t.miPerKwh,
-                testSpeedMph:      t.testSpeedMph,
-                chargingData,
-                startSoc,
-                minSoc:            ov.minSoc ?? minSoc,
-                destinationMinSoc,
-                legDistanceMi:     ov.legDistance ?? legDistance,
-                totalDistanceMi:   totalDistance,
-                speedMph:          speed,
-                chargeTimeMinutes: ov.chargeTime ?? chargeTime,
-                overheadMinutes:   overhead,
-                mode,
-            }) })).filter(d => d.sim.completed);
+            const done = spreadInputs[i]
+                .map(t => ({ t, sim: simulateTrip(t.basis, speed, correction, inputs) }))
+                .filter(d => d.sim.completed);
             const sims = done.map(d => d.sim);
             if (sims.length < 2) return { tests: sims.length, steps: null };
             const finishes = sims.map(sim => sim.totalTimeMin);
@@ -1495,12 +1424,12 @@ export default function RoadTripView({
                 : segmentsToChartPoints(sim.segments, units, driveX)));
             return { tests: sims.length, ...timelineSpread(lines), finish };
         });
-    }, [spreadInputs, validEntries, runDataCache, roadTripConfig, units]);
+    }, [spreadInputs, validEntries, runDataCache, roadTripConfig, correction, units]);
 
     // ── Build & render chart ──────────────────────────────────────────────────
     useEffect(() => {
         if (!canvasRef.current) return;
-        const { totalDistance, yAxis, xAxis, sweepYAxis, overhead, speed, mode } = roadTripConfig;
+        const { totalDistance, yAxis, xAxis, sweepYAxis, speed, mode } = roadTripConfig;
         const isSpeedMode      = xAxis === 'speed';
         const isTripDistMode   = xAxis === 'tripDist';
         const isSweepMode      = isSpeedMode || isTripDistMode;
@@ -1555,7 +1484,7 @@ export default function RoadTripView({
         const yTicks = isAvgSpeedY
             ? { color: tickColor, callback: val => `${val}` }
             : { stepSize: 30, callback: val => formatTime(val), color: tickColor };
-        // Times start half an hour under the ICE line, on the hour; a speed is left to Chart.js.
+        // Times start half an hour under the gas car's line, on the hour; a speed is left to Chart.js.
         const yFloor = data => (isAvgSpeedY ? undefined
             : Math.floor((Math.min(...data.map(d => d.y)) - 30) / 60) * 60);
         const dispSpeed = mph => (units === 'metric' ? Math.round(mph * MI_TO_KM) : mph);
@@ -1775,21 +1704,21 @@ export default function RoadTripView({
             speedDatasets.push(...spreadDatasets(validEntries, spreadSweep,
                 SPEED_SWEEP_MPH.map(mph => (units === 'metric' ? Math.round(mph * MI_TO_KM) : mph))));
 
-            // ICE reference line
-            const iceSpeedData = SPEED_SWEEP_MPH.map(mph => (
-                { x: dispSpeed(mph), y: yOf(calcIceTotalTimeAtSpeed(mph, totalDistance, overhead), mph) }));
-            const iceSpeedYMin = yFloor(iceSpeedData);
+            // The gas car's line
+            const gasSpeedData = SPEED_SWEEP_MPH.map(mph => (
+                { x: dispSpeed(mph), y: yOf(gasTripAt(gas, totalDistance, mph).totalMin, mph) }));
+            const gasSpeedYMin = yFloor(gasSpeedData);
             speedDatasets.unshift({
-                label: 'ICE Reference',
-                data: iceSpeedData,
-                borderColor: '#9ca3af',
+                label: gasName,
+                data: gasSpeedData,
+                borderColor: SERIES_NEUTRAL,
                 backgroundColor: 'transparent',
                 borderWidth: 1.5,
                 borderDash: [6, 4],
                 tension: 0.3,
                 pointRadius: 2,
                 fill: false,
-                _isIce: true,
+                _isGas: true,
             });
 
             const speedReadout = sweepReadout({ xTitle: `Travel Speed (${sl})`, yTitle: speedYLabel, formatY });
@@ -1812,7 +1741,7 @@ export default function RoadTripView({
                             grid: { color: gridColor },
                         },
                         y: {
-                            min: yLimit(axisLimits.yMin) ?? iceSpeedYMin,
+                            min: yLimit(axisLimits.yMin) ?? gasSpeedYMin,
                             max: yLimit(axisLimits.yMax) ?? undefined,
                             title: { display: true, text: speedYLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: yTicks,
@@ -1845,7 +1774,6 @@ export default function RoadTripView({
             const stopXs = stopSweepFor(mode).xs;
             const toDisplay = v => (isChargeTimeSweep || units !== 'metric' ? v : Math.round(v * MI_TO_KM));
             const stopMinDisplay  = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_MIN  : LEG_SWEEP_MIN);
-            const stopMaxDisplay  = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_MAX  : LEG_SWEEP_MAX);
             const stopStepDisplay = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_STEP : LEG_SWEEP_STEP);
             const stopXTitle = isChargeTimeSweep ? 'Charge Minutes per Stop' : `${dl} Between Charges`;
 
@@ -1882,28 +1810,39 @@ export default function RoadTripView({
             }).filter(Boolean);
             distDatasets.push(...spreadDatasets(validEntries, spreadSweep, stopXs.map(toDisplay)));
 
-            // ICE reference line — ICE stops every 3 hrs whatever the EV's stops are.
-            // Held to the same speeds as the EVs: with best plan on, each EV
-            // point may drive anywhere in the legal range, so the ICE car drives
-            // the top of it — its stops do not lengthen with speed, so that is
-            // its best plan. At the trip speed instead it lost to an iX3 doing
-            // 80 while it did 70. Best plan off, everyone holds the trip speed.
-            const iceRange = bestPlanOn ? optimizerGrids?.find(Boolean)?.range : null;
-            const iceMph = iceRange ? OPT_SPEED_MPH[iceRange[1]] : speed;
-            const iceDistData = stopXs.map(x => (
-                { x: toDisplay(x), y: yOf(calcIceTotalTimeAtSpeed(iceMph, totalDistance, overhead), iceMph) }));
-            const iceDistYMin = yFloor(iceDistData);
+            // The sweep runs to the longest leg any pack could manage, but the
+            // axis stops one step past the last leg any plotted vehicle can
+            // finish, so smaller cars aren't squeezed into the left edge.
+            const sweepMaxDisplay = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_MAX : LEG_SWEEP_MAX);
+            const reachX = Math.max(0, ...distDatasets.flatMap(d => (
+                d._isGas || d._spread ? [] : d.data.filter(p => p.y != null).map(p => p.x))));
+            const stopMaxDisplay = reachX > 0 && !isChargeTimeSweep
+                ? Math.min(sweepMaxDisplay, reachX + stopStepDisplay) : sweepMaxDisplay;
+
+            // The gas car's line — it stops where its tank says, whatever the EV's
+            // stops are, so it is flat across the stop plans. Held to the same
+            // speeds as the EVs: with best plan on, each EV point may drive
+            // anywhere in the legal range, so the gas car drives the top of it —
+            // its stops fall at the same miles whatever the speed, so a faster
+            // car is only ever quicker, and that is its best plan. At the trip
+            // speed instead it lost to an iX3 doing 80 while it did 70. Best
+            // plan off, everyone holds the trip speed.
+            const gasRange = bestPlanOn ? optimizerGrids?.find(Boolean)?.range : null;
+            const gasMph = gasRange ? OPT_SPEED_MPH[gasRange[1]] : speed;
+            const gasDistData = stopXs.map(x => (
+                { x: toDisplay(x), y: yOf(gasTripAt(gas, totalDistance, gasMph).totalMin, gasMph) }));
+            const gasDistYMin = yFloor(gasDistData);
             distDatasets.unshift({
-                label: 'ICE Reference',
-                data: iceDistData,
-                borderColor: '#9ca3af',
+                label: gasName,
+                data: gasDistData,
+                borderColor: SERIES_NEUTRAL,
                 backgroundColor: 'transparent',
                 borderWidth: 1.5,
                 borderDash: [6, 4],
                 tension: 0.3,
                 pointRadius: 2,
                 fill: false,
-                _isIce: true,
+                _isGas: true,
             });
 
             const distReadout = sweepReadout({
@@ -1929,7 +1868,7 @@ export default function RoadTripView({
                             grid: { color: gridColor },
                         },
                         y: {
-                            min: yLimit(axisLimits.yMin) ?? iceDistYMin,
+                            min: yLimit(axisLimits.yMin) ?? gasDistYMin,
                             max: yLimit(axisLimits.yMax) ?? undefined,
                             title: { display: true, text: sweepLabel, font: { size: fonts.axis }, color: legendColor },
                             ticks: yTicks,
@@ -1992,82 +1931,80 @@ export default function RoadTripView({
             ? laneSpreadDatasets(validEntries, spreadTimeline)
             : spreadDatasets(validEntries, spreadTimeline, null, { tension: 0 })));
 
-        // ── ICE reference line ───────────────────────────────────────────
-        const ICE_DRIVE_INTERVAL_MIN = 180; // 3 hours between stops
-        const ICE_STOP_MIN  = overhead;     // same overhead tax as EV stops
-        const ICE_MIN_SOC   = 35;           // % "fuel level" at end of a 3h drive
-        const iceLane       = validEntries.length; // byTest lane index for ICE
+        // ── The gas car's line ───────────────────────────────────────────
+        // It drives its tank down to the fill-up level, stops for the fill-up's
+        // own minutes (not the EVs' stop time), and goes on (gasTripAt). In the
+        // By test lane the line is its fuel gauge: full after each stop, down to
+        // the fill-up level at the next, and to what is left at the finish.
+        const gasLane = validEntries.length; // byTest lane index for the gas car
+        const gasTrip = gasTripAt(gas, roadTripConfig.totalDistance, roadTripConfig.speed);
 
-        const icePoints       = [];  // distance / chargeTime mode
-        const iceByTestPoints = [];  // byTest mode (SoC lane)
-        const iceGasStopSegs  = [];  // gas stop intervals for byTest green boxes
-        let iceTime = 0, iceDist = 0, iceCumStop = 0, iceCumDrive = 0, iceIter = 0;
+        const gasPoints       = [];  // distance / chargeTime mode
+        const gasByTestPoints = [];  // byTest mode (fuel lane)
+        const gasStopSegs     = [];  // fill-up intervals for byTest green boxes
+        let gasTime = 0, gasDist = 0, gasCumStop = 0, gasCumDrive = 0;
 
-        while (iceDist < roadTripConfig.totalDistance && iceIter < 100) {
-            iceIter++;
-            const remainingMi = roadTripConfig.totalDistance - iceDist;
-            const maxDriveMi  = (roadTripConfig.speed * ICE_DRIVE_INTERVAL_MIN) / 60;
-            const driveMi     = Math.min(maxDriveMi, remainingMi);
-            const driveMin    = (driveMi / roadTripConfig.speed) * 60;
+        gasTrip.legs.forEach((leg, li) => {
+            const { driveMi, driveMin, fuelLeft } = leg;
 
             // X values: drive time or total time
-            const xDS = isDriveTimeXAxis ? Math.round(iceCumDrive)            : Math.round(iceTime);
-            const xDE = isDriveTimeXAxis ? Math.round(iceCumDrive + driveMin) : Math.round(iceTime + driveMin);
+            const xDS = isDriveTimeXAxis ? Math.round(gasCumDrive)            : Math.round(gasTime);
+            const xDE = isDriveTimeXAxis ? Math.round(gasCumDrive + driveMin) : Math.round(gasTime + driveMin);
             if (isChargeTimeMode) {
-                icePoints.push({ x: xDS, y: Math.round(iceCumStop) });
-                icePoints.push({ x: xDE, y: Math.round(iceCumStop) });
+                gasPoints.push({ x: xDS, y: Math.round(gasCumStop) });
+                gasPoints.push({ x: xDE, y: Math.round(gasCumStop) });
             } else {
-                icePoints.push({ x: xDS, y: convDistance(iceDist,           units) });
-                icePoints.push({ x: xDE, y: convDistance(iceDist + driveMi, units) });
+                gasPoints.push({ x: xDS, y: convDistance(gasDist,           units) });
+                gasPoints.push({ x: xDE, y: convDistance(gasDist + driveMi, units) });
             }
             // byTest always uses total time on X
-            iceByTestPoints.push({ x: Math.round(iceTime),            y: iceLane + 1.0            });
-            iceByTestPoints.push({ x: Math.round(iceTime + driveMin), y: iceLane + ICE_MIN_SOC / 100 });
+            gasByTestPoints.push({ x: Math.round(gasTime),            y: gasLane + 1.0      });
+            gasByTestPoints.push({ x: Math.round(gasTime + driveMin), y: gasLane + fuelLeft });
 
-            iceTime      += driveMin;
-            iceCumDrive  += driveMin;
-            iceDist      += driveMi;
-            if (iceDist >= roadTripConfig.totalDistance - 0.01) break;
+            gasTime      += driveMin;
+            gasCumDrive  += driveMin;
+            gasDist      += driveMi;
+            if (li === gasTrip.legs.length - 1) return;
 
             // X values for stop: drive time stays flat; only total time advances
-            const xSS = isDriveTimeXAxis ? Math.round(iceCumDrive) : Math.round(iceTime);
-            const xSE = isDriveTimeXAxis ? Math.round(iceCumDrive) : Math.round(iceTime + ICE_STOP_MIN);
+            const xSS = isDriveTimeXAxis ? Math.round(gasCumDrive) : Math.round(gasTime);
+            const xSE = isDriveTimeXAxis ? Math.round(gasCumDrive) : Math.round(gasTime + gasTrip.stopMin);
             if (isChargeTimeMode) {
-                icePoints.push({ x: xSS, y: Math.round(iceCumStop) });
-                icePoints.push({ x: xSE, y: Math.round(iceCumStop + ICE_STOP_MIN) });
+                gasPoints.push({ x: xSS, y: Math.round(gasCumStop) });
+                gasPoints.push({ x: xSE, y: Math.round(gasCumStop + gasTrip.stopMin) });
             } else {
-                icePoints.push({ x: xSS, y: convDistance(iceDist, units) });
-                icePoints.push({ x: xSE, y: convDistance(iceDist, units) });
+                gasPoints.push({ x: xSS, y: convDistance(gasDist, units) });
+                gasPoints.push({ x: xSE, y: convDistance(gasDist, units) });
             }
             // byTest always uses total time on X
-            iceGasStopSegs.push({ startTime: iceTime, endTime: iceTime + ICE_STOP_MIN });
-            iceByTestPoints.push({ x: Math.round(iceTime),                y: iceLane + ICE_MIN_SOC / 100 });
-            iceByTestPoints.push({ x: Math.round(iceTime + ICE_STOP_MIN), y: iceLane + 1.0              });
+            gasStopSegs.push({ startTime: gasTime, endTime: gasTime + gasTrip.stopMin });
+            gasByTestPoints.push({ x: Math.round(gasTime),                   y: gasLane + fuelLeft });
+            gasByTestPoints.push({ x: Math.round(gasTime + gasTrip.stopMin), y: gasLane + 1.0      });
 
-            iceTime    += ICE_STOP_MIN;
-            iceCumStop += ICE_STOP_MIN;
-            // iceCumDrive does NOT advance during ICE stops
-        }
+            gasTime    += gasTrip.stopMin;
+            gasCumStop += gasTrip.stopMin;
+            // gasCumDrive does NOT advance during gas stops
+        });
 
         if (isByTestMode) {
             datasets.push({
-                label: 'ICE Reference',
-                data: iceByTestPoints,
-                borderColor: '#9ca3af',
+                label: gasName,
+                data: gasByTestPoints,
+                borderColor: SERIES_NEUTRAL,
                 backgroundColor: 'transparent',
                 borderWidth: 1.5,
                 borderDash: [6, 4],
                 tension: 0,
                 pointRadius: 0,
                 fill: false,
-                _isIce: true,
-                _lane: iceLane,
+                _isGas: true,
+                _lane: gasLane,
             });
         } else {
             datasets.unshift({
-                label: 'ICE Reference',
-                data: icePoints,
-                borderColor: '#9ca3af',
+                label: gasName,
+                data: gasPoints,
+                borderColor: SERIES_NEUTRAL,
                 backgroundColor: 'transparent',
                 borderWidth: 1.5,
                 borderDash: [6, 4],
@@ -2075,17 +2012,17 @@ export default function RoadTripView({
                 pointRadius: 0,
                 fill: false,
                 order: 1,
-                _isIce: true,
+                _isGas: true,
             });
         }
 
         const validSims = simResults.filter(Boolean);
-        const maxTime = Math.max(...validSims.map(s => s.totalTimeMin), iceTime, 60);
+        const maxTime = Math.max(...validSims.map(s => s.totalTimeMin), gasTime, 60);
         const maxChargeTime = isChargeTimeMode
             ? Math.max(...validSims.map(s =>
                 s.segments.filter(seg => seg.type === 'charge')
                           .reduce((sum, seg) => sum + (seg.endTime - seg.startTime), 0)
-              ), iceCumStop, 30)
+              ), gasCumStop, 30)
             : 0;
 
         // In drive-time X mode, the max X is the total pure driving time
@@ -2093,7 +2030,7 @@ export default function RoadTripView({
             ? Math.max(...validSims.map(s =>
                 s.segments.filter(seg => seg.type === 'drive')
                           .reduce((sum, seg) => sum + (seg.endTime - seg.startTime), 0)
-              ), iceCumDrive, 60)
+              ), gasCumDrive, 60)
             : 0;
 
         const autoXMax = isDriveTimeXAxis ? maxDriveTime * 1.15 : maxTime * 1.15;
@@ -2161,7 +2098,7 @@ export default function RoadTripView({
                     y: isByTestMode ? {
                         reverse: false,
                         min: axisLimits.yMin ?? 0,
-                        max: axisLimits.yMax ?? (validEntries.length + 1), // +1 for ICE lane
+                        max: axisLimits.yMax ?? (validEntries.length + 1), // +1 for the gas car's lane
                         title: { display: false },
                         ticks: {
                             stepSize: 0.5,
@@ -2179,7 +2116,7 @@ export default function RoadTripView({
                                     const idx = Math.floor(val); // lane index
                                     const text = idx >= 0 && idx < validEntries.length
                                         ? entryLabel(validEntries[idx])
-                                        : idx === validEntries.length ? 'ICE Reference' : null;
+                                        : idx === validEntries.length ? gasName : null;
                                     if (text != null) {
                                         // Wrapped to the width and lane height the chart has,
                                         // so the axis fits the wrapped label instead of one
@@ -2199,8 +2136,8 @@ export default function RoadTripView({
                                 const v   = ctx.tick?.value;
                                 const frac = v != null ? (v - Math.floor(v)) : 0;
                                 return Math.abs(frac) < 0.01
-                                    ? 'rgba(0,0,0,0.25)'  // heavy — lane boundary (integer)
-                                    : 'rgba(0,0,0,0.07)'; // light — lane center
+                                    ? chartTheme().axis   // heavy — lane boundary (integer)
+                                    : chartTheme().grid;  // light — lane center
                             },
                             lineWidth: (ctx) => {
                                 const v   = ctx.tick?.value;
@@ -2244,8 +2181,9 @@ export default function RoadTripView({
             },
             plugins: [zoomStatePlugin, readout.plugin(timelineReadout), makeRoadTripPlugin(simResults.map((s, i) => {
                 return datasets.find(d => d._simIndex === i) ? s : null;
-            }).filter(Boolean), units, yAxis, iceTime,
-                isByTestMode ? { laneIndex: iceLane, gasStops: iceGasStopSegs, totalTimeMin: iceTime } : null,
+            }).filter(Boolean), units, yAxis, gasTime,
+                isByTestMode ? { laneIndex: gasLane, gasStops: gasStopSegs, totalTimeMin: gasTime } : null,
+                gasName,
             )],
         });
 
@@ -2253,7 +2191,7 @@ export default function RoadTripView({
             chartRef.current?.destroy();
             chartRef.current = null;
         };
-    }, [simResults, speedSweepResults, stopSweepResults, optimizerGrids, spreadSweep, spreadTimeline, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, roadTripConfig.mode, roadTripConfig.bestPlan, roadTripConfig.chargeTime, roadTripConfig.legDistance, optimizer, mapKey, axisLimits, isDark]);
+    }, [simResults, speedSweepResults, stopSweepResults, optimizerGrids, spreadSweep, spreadTimeline, validEntries, units, roadTripConfig.totalDistance, roadTripConfig.yAxis, roadTripConfig.xAxis, roadTripConfig.sweepYAxis, roadTripConfig.speed, roadTripConfig.overhead, roadTripConfig.mode, roadTripConfig.bestPlan, roadTripConfig.chargeTime, roadTripConfig.legDistance, optimizer, mapKey, axisLimits, isDark, gas, gasName]);
 
     // ── Config update helper ─────────────────────────────────────────────────
     const setField = (key, value) => setRoadTripConfig(prev => ({ ...prev, [key]: value }));
@@ -2295,21 +2233,10 @@ export default function RoadTripView({
         entryResults => entryResults?.some(sim => isSimUnrealistic(sim))
     ) ?? false;
 
-    // ICE reference total time (for "vs ICE" column)
-    const iceRefTimeMin = useMemo(() => {
-        const ICE_DRIVE_INTERVAL_MIN = 180;
-        let t = 0, d = 0, iter = 0;
-        while (d < totalDistance && iter < 100) {
-            iter++;
-            const rem = totalDistance - d;
-            const driveMi = Math.min((speed * ICE_DRIVE_INTERVAL_MIN) / 60, rem);
-            t += (driveMi / speed) * 60;
-            d += driveMi;
-            if (d >= totalDistance - 0.01) break;
-            t += overhead;
-        }
-        return t;
-    }, [totalDistance, speed, overhead]);
+    // The gas car's total time at the trip speed, for the table's gap to it.
+    const gasRefTimeMin = useMemo(
+        () => gasTripAt(gas, totalDistance, speed).totalMin,
+        [gas, totalDistance, speed]);
 
     // Display values in current units
     // The Sim dropdown's value is the PRODUCT of two config flags, so it is
@@ -2560,7 +2487,8 @@ export default function RoadTripView({
                                 <span className="scenario-unit">{dl}</span>
                             </label>
                             {!optimizer && planRows}
-                            <label className="scenario-row">
+                            <label className="scenario-row"
+                                title="The extra minutes off the route for each charging stop. A gas stop has none: its fill-up minutes, set under Your gas car, are already its whole time off the route.">
                                 <span className="scenario-key">Stop</span>
                                 <NumberInput className="form-input" min={0}
                                     value={overhead}
@@ -2610,7 +2538,7 @@ export default function RoadTripView({
                                         setting, and a knob per end would double the
                                         sidebar's weight for it. */}
                                     <div className="scenario-row is-range"
-                                        title="Your legal range: the slowest and fastest speeds the Fastest legal plan may use. The map still shows faster plans, labelled Fastest, and dims them; Fastest legal and the table keep to this range.">
+                                        title="Your legal range: the slowest and fastest speeds the Fastest legal plan may use. The map still shows faster plans, labeled Fastest, and dims them; Fastest legal and the table keep to this range.">
                                         <span className="scenario-key">Legal</span>
                                         <NumberInput className="form-input" min={1} aria-label="Slowest speed for the fastest legal plan"
                                             value={units === 'metric' ? Math.round((roadTripConfig.optimizerSpeedMin ?? DEFAULT_SPEED_RANGE[0]) * MI_TO_KM) : (roadTripConfig.optimizerSpeedMin ?? DEFAULT_SPEED_RANGE[0])}
@@ -2626,12 +2554,19 @@ export default function RoadTripView({
                         </div>
                     </div>
 
+                    {/* ── YOUR GAS CAR ──
+                      * The car the EVs are timed against: Cost & Time's, over
+                      * the same shared settings (#555). Time only, so it has
+                      * no price and no city mpg here. Absent where nothing can
+                      * change it (the pop-out is a presentation, no sidebar). */}
+                    {onGasCarChange && <RoadTripGasCar settings={gasCar} onChange={onGasCarChange} />}
+
                     {/* ── DISPLAY ──
                       * Towing joins the checkboxes rather than being a lone
                       * accent-filled button in a "Mode" group of one: it is a
                       * thing that is either on or off, which is what every
                       * other control in this region already is. */}
-                    <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={tripCorrectionSummary(correctionMode, tripTarget, units)}>
+                    <SidebarDisplaySection title="Display and corrections" active={correctionMode !== 'none'} summary={tripCorrectionSummary(correctionMode, correction.target, units)}>
                         <div className="display-grid">
                             {setChartConfig && (
                                 <>
@@ -2915,12 +2850,12 @@ export default function RoadTripView({
                                 const arrow = active ? (sortDir === 'asc' ? '↑' : '↓') : '↕';
                                 return (
                                     <th
-                                        className={`px-3 py-2 text-left font-semibold cursor-pointer select-none hover:bg-[var(--color-surface-sunken)] whitespace-nowrap ${active ? 'text-blue-600' : ''} ${className}`}
+                                        className={`px-3 py-2 text-left font-semibold cursor-pointer select-none hover:bg-[var(--color-surface-sunken)] whitespace-nowrap ${active ? 'text-[var(--color-primary-text)]' : ''} ${className}`}
                                         onClick={() => handleSort(col)}
                                     >
                                         <span className="flex items-center gap-1">
                                             {children}
-                                            <span className={`text-xs ${active ? 'text-blue-500' : 'text-meta'}`}>{arrow}</span>
+                                            <span className={`text-xs ${active ? 'text-[var(--color-primary-text)]' : 'text-meta'}`}>{arrow}</span>
                                         </span>
                                     </th>
                                 );
@@ -2938,9 +2873,11 @@ export default function RoadTripView({
                                         ? chargingSegments.reduce((sum, s) => sum + (s.endTime - s.startTime), 0) / chargingSegments.length
                                         : 0;
                                     const speedDiff = entry.testSpeedMph ? Math.abs(speed - entry.testSpeedMph) : 0;
-                                    const adjPct = Math.round((sim.speedFactor - 1) * 100);
-                                    const vsIce = sim.totalTimeMin - iceRefTimeMin;
-                                    return { entry, sim, avgChargeTime, speedDiff, adjPct, vsIce };
+                                    // Consumption up (+) or down (−) from the test to the trip: the travel
+                                    // speed, and whatever else the correction moved.
+                                    const adjPct = Math.round((1 / sim.priced.factor - 1) * 100);
+                                    const vsGas = sim.totalTimeMin - gasRefTimeMin;
+                                    return { entry, sim, avgChargeTime, speedDiff, adjPct, vsGas };
                                 })
                                 .filter(Boolean);
 
@@ -2957,9 +2894,9 @@ export default function RoadTripView({
                                         case 'stops':      av = a.sim.chargeStops;      bv = b.sim.chargeStops;      break;
                                         case 'avgCharge':  av = a.avgChargeTime;        bv = b.avgChargeTime;        break;
                                         case 'efficiency': av = a.entry.miPerKwh;       bv = b.entry.miPerKwh;       break;
-                                        case 'corrEff':    av = a.sim.correctedMiPerKwh; bv = b.sim.correctedMiPerKwh; break;
+                                        case 'corrEff':    av = a.sim.miPerKwh;          bv = b.sim.miPerKwh;          break;
                                         case 'speedAdj':   av = a.adjPct;               bv = b.adjPct;               break;
-                                        case 'vsIce':      av = a.vsIce;                bv = b.vsIce;                break;
+                                        case 'vsGas':      av = a.vsGas;                bv = b.vsGas;                break;
                                         default: return 0;
                                     }
                                     return dir * (av - bv);
@@ -2976,12 +2913,12 @@ export default function RoadTripView({
                                     <SortTh col="avgCharge">Avg Charge</SortTh>
                                     <SortTh col="efficiency">Efficiency</SortTh>
                                     <SortTh col="corrEff">Corrected Eff</SortTh>
-                                    <SortTh col="speedAdj">Speed Adj</SortTh>
-                                    <SortTh col="vsIce">vs ICE</SortTh>
+                                    <SortTh col="speedAdj">Adjustment</SortTh>
+                                    <SortTh col="vsGas">vs {gasName}</SortTh>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y dark:divide-slate-700">
-                                {rows.map(({ entry, sim, avgChargeTime, speedDiff, adjPct, vsIce }) => {
+                            <tbody className="divide-y divide-[var(--color-border)]">
+                                {rows.map(({ entry, sim, avgChargeTime, speedDiff, adjPct, vsGas }) => {
 
                                     return (
                                         <tr key={entry.key}>
@@ -3000,7 +2937,7 @@ export default function RoadTripView({
                                             </td>
                                             <td className="px-3 py-2 font-medium">
                                                 {sim.completed === false
-                                                    ? <span className="text-red-500" title={`Only reached ${Math.round(convDistance(sim.totalDistMi, units))} ${dl} of ${Math.round(convDistance(totalDistance, units))} ${dl}`}>Did not finish</span>
+                                                    ? <span className="status-text is-danger" title={`Only reached ${Math.round(convDistance(sim.totalDistMi, units))} ${dl} of ${Math.round(convDistance(totalDistance, units))} ${dl}`}>Did not finish</span>
                                                     : formatTime(sim.totalTimeMin)}
                                             </td>
                                             <td className="px-3 py-2">{sim.chargeStops}</td>
@@ -3008,8 +2945,8 @@ export default function RoadTripView({
                                             <td className="px-3 py-2">
                                                 {towingMode ? (
                                                     <>
-                                                        <span className="text-amber-700 font-medium">{dispTowingEff} {effLabel}</span>
-                                                        <span className="block text-xs text-amber-500">towing @ {dispTowingRef} {sl}</span>
+                                                        <span className="status-text is-warning font-medium">{dispTowingEff} {effLabel}</span>
+                                                        <span className="block text-xs status-text is-warning">towing @ {dispTowingRef} {sl}</span>
                                                     </>
                                                 ) : (
                                                     <>
@@ -3017,7 +2954,7 @@ export default function RoadTripView({
                                                         {entry.testSpeedMph ? (
                                                             <span className="text-meta ml-1">@ {fmtSpeed(entry.testSpeedMph, units)}</span>
                                                         ) : (
-                                                            <span className="text-amber-500 ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
+                                                            <span className="status-text is-warning ml-1" title="Set Speed (mph) on the run in Tests &amp; Data for accurate speed correction">@ 70 mph (assumed)</span>
                                                         )}
                                                         {entry.efficiencyNote && (
                                                             <span className="block text-xs text-meta">{entry.efficiencyNote}</span>
@@ -3026,7 +2963,7 @@ export default function RoadTripView({
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
-                                                {sim.correctedMiPerKwh.toFixed(1)} {effLabel}
+                                                {sim.miPerKwh.toFixed(1)} {effLabel}
                                             </td>
                                             <td className={`px-3 py-2 ${speedDiff > 5 ? 'roadtrip-warning' : ''}`}>
                                                 {adjPct > 0 ? `+${adjPct}%` : `${adjPct}%`}
@@ -3038,13 +2975,13 @@ export default function RoadTripView({
                                             </td>
                                             <td className="px-3 py-2 font-medium">
                                                 {sim.completed === false ? <span className="text-meta">—</span> : (() => {
-                                                    const absDelta = Math.abs(vsIce);
+                                                    const absDelta = Math.abs(vsGas);
                                                     const h = Math.floor(absDelta / 60);
                                                     const m = Math.round(absDelta % 60);
                                                     const label = h > 0 ? `${h}h ${m}m` : `${m}m`;
-                                                    return vsIce > 0
-                                                        ? <span className="text-amber-600">+{label}</span>
-                                                        : <span className="text-green-600">−{label}</span>;
+                                                    return vsGas > 0
+                                                        ? <span className="status-text is-warning">+{label}</span>
+                                                        : <span className="status-text is-good">−{label}</span>;
                                                 })()}
                                             </td>
                                         </tr>

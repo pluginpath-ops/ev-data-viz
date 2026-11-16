@@ -41,7 +41,7 @@ describe('splitCarlineClass', () => {
     it('handles the classes with no size word', () => {
         expect(bodyClassLabel('Two Seaters')).toBe('Two Seater');
     });
-    it('passes an unrecognised class through rather than bucketing it', () => {
+    it('passes an unrecognized class through rather than bucketing it', () => {
         // A value EPA adds later must not be silently folded into "SUV".
         expect(bodyClassLabel('Hovercraft 4WD')).toBe('Hovercraft');
     });
@@ -330,7 +330,7 @@ describe('driveGroup', () => {
         expect(driveGroup('2-Wheel Drive, Rear')).toBe('Rear Wheel Drive');
         expect(driveGroup('2-Wheel Drive, Front')).toBe('Front Wheel Drive');
     });
-    it('passes an unrecognised description through rather than guessing', () => {
+    it('passes an unrecognized description through rather than guessing', () => {
         expect(driveGroup('Six Wheel Drive')).toBe('Six Wheel Drive');
     });
     it('is null when EPA said nothing', () => {

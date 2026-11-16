@@ -4,7 +4,7 @@
  * A vehicle that inherits from another (`spec_source_vehicle_id`, "Inherits
  * from" on the vehicle form) already falls back to that vehicle's specs field by
  * field, through the whole chain (`resolveEffectiveSpecs`). A variant is the
- * same car with a stated difference, so the things a reader RECOGNISES it by
+ * same car with a stated difference, so the things a reader RECOGNIZES it by
  * come down the same chain:
  *
  *   color   the nearest vehicle in the chain with one set, else the brand's
@@ -348,7 +348,7 @@ export function withInheritance(vehicles = [], manufacturers = []) {
  *                    rescales — copied with its factors, so the variant starts
  *                    out reading exactly as its source does
  *
- * Unlisted runs are included: unlisting is a judgement about the run, and it
+ * Unlisted runs are included: unlisting is a judgment about the run, and it
  * travels with the run.
  *
  * Stored composites are not: the variant builds its own from the tests it

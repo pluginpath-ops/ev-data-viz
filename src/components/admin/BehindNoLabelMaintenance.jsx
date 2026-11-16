@@ -38,7 +38,7 @@ function MarkLine({ entry, name, leftBare }) {
             <span className="font-mono">{test_vehicle_id}</span>
             {name && <span className="text-meta"> · {name}</span>}
             <div className="text-note">{changes.join('; ')}</div>
-            {warnings.map(w => <div key={w} className="text-note data-check-warning">{w}</div>)}
+            {warnings.map(w => <div key={w} className="text-note status-text is-warning">{w}</div>)}
         </li>
     );
 }

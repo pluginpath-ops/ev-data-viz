@@ -1,7 +1,7 @@
 import { describe as suite, it, expect } from 'vitest';
 import { decorateRow } from '../feGuideBrowse';
 import {
-    quantile, describe as summarize1, toObservations, summarise, overall,
+    quantile, describe as summarize1, toObservations, summarize, overall,
     histogram, extremes, observationLabel, UNITS, DEFAULT_UNIT, MEASURES,
     applyStatsFilters, bestCoveredYear, yearsPresent,
 } from '../epaGuideStats';
@@ -22,7 +22,7 @@ const row = (o) => decorateRow({
 }, undefined);
 
 suite('quantile', () => {
-    it('interpolates rather than picking a neighbour', () => {
+    it('interpolates rather than picking a neighbor', () => {
         expect(quantile([1, 2, 3, 4], 0.5)).toBe(2.5);
         expect(quantile([1, 2, 3], 0.5)).toBe(2);
     });
@@ -90,7 +90,7 @@ suite('unit of analysis', () => {
     });
 });
 
-suite('summarise', () => {
+suite('summarize', () => {
     const rows = [
         row({ id: 1, cls: 'Standard Pick-up Trucks 4WD', mpge: 64 }),
         row({ id: 2, cls: 'Standard Pick-up Trucks 2WD', mpge: 70 }),
@@ -103,28 +103,28 @@ suite('summarise', () => {
     it('groups a class across its drivetrain variants', () => {
         // The whole reason splitCarlineClass exists: 4WD and 2WD pickups are
         // one body, and grouping on the raw string reports two classes.
-        const out = summarise(rows, { dimension: 'body_class', measure: 'label_comb_mpge' });
+        const out = summarize(rows, { dimension: 'body_class', measure: 'label_comb_mpge' });
         expect(out.map(b => b.bucket).sort()).toEqual(['Large Car', 'Standard Pickup']);
     });
     it('reports n per bucket', () => {
-        const out = summarise(rows, { dimension: 'body_class', measure: 'label_comb_mpge' });
+        const out = summarize(rows, { dimension: 'body_class', measure: 'label_comb_mpge' });
         expect(out.find(b => b.bucket === 'Standard Pickup').n).toBe(3);
     });
     it('marks thin buckets suppressed instead of dropping them', () => {
         const thin = [...rows, row({ id: 7, cls: 'Two Seaters', mpge: 90 })];
-        const out = summarise(thin, { dimension: 'body_class', measure: 'label_comb_mpge', minN: 3 });
+        const out = summarize(thin, { dimension: 'body_class', measure: 'label_comb_mpge', minN: 3 });
         const seater = out.find(b => b.bucket === 'Two Seater');
         expect(seater.suppressed).toBe(true);
         expect(seater.n).toBe(1);
     });
     it('sinks suppressed buckets below the reportable ones', () => {
         const thin = [...rows, row({ id: 7, cls: 'Two Seaters', mpge: 999 })];
-        const out = summarise(thin, { dimension: 'body_class', measure: 'label_comb_mpge', minN: 3 });
+        const out = summarize(thin, { dimension: 'body_class', measure: 'label_comb_mpge', minN: 3 });
         // Despite the highest median, it must not top the ranking on n=1.
         expect(out[out.length - 1].bucket).toBe('Two Seater');
     });
     it('skips rows with no value for the dimension', () => {
-        const out = summarise([...rows, row({ id: 8, cls: null, mpge: 50 })],
+        const out = summarize([...rows, row({ id: 8, cls: null, mpge: 50 })],
             { dimension: 'body_class', measure: 'label_comb_mpge' });
         expect(out.reduce((s, b) => s + b.n, 0)).toBe(6);
     });
@@ -142,7 +142,7 @@ suite('ordering the table', () => {
         row({ id: 8, cls: 'Midsize Cars', mpge: 84 }),
         row({ id: 9, cls: 'Midsize Cars', mpge: 88 }),
     ];
-    const at = (sort) => summarise(rows, { dimension: 'body_class', measure: 'label_comb_mpge', sort })
+    const at = (sort) => summarize(rows, { dimension: 'body_class', measure: 'label_comb_mpge', sort })
         .map(b => b.bucket);
 
     it('defaults to median, largest first', () => {
@@ -167,11 +167,11 @@ suite('ordering the table', () => {
 
     suite('the footnote is a section, not a rank', () => {
         const thin = [...rows, row({ id: 10, cls: 'Two Seaters', mpge: 999 })];
-        const order = (sort) => summarise(thin,
+        const order = (sort) => summarize(thin,
             { dimension: 'body_class', measure: 'label_comb_mpge', minN: 3, sort }).map(b => b.bucket);
 
         it('keeps suppressed buckets below however the table is sorted', () => {
-            // A bucket already labelled "n too small" must not be crowned by
+            // A bucket already labeled "n too small" must not be crowned by
             // the control meant to help you read the ranking — on max it would
             // otherwise top the table on a single observation.
             for (const sort of [{ key: 'max', dir: 'desc' }, { key: 'n', dir: 'asc' },
@@ -186,7 +186,7 @@ suite('ordering the table', () => {
                 row({ id: 11, cls: 'Two Seaters', mpge: 120 }),
                 row({ id: 12, cls: 'Minivans', mpge: 60 }),
             ];
-            const foot = (dir) => summarise(many,
+            const foot = (dir) => summarize(many,
                 { dimension: 'body_class', measure: 'label_comb_mpge', minN: 3, sort: { key: 'median', dir } })
                 .filter(b => b.suppressed).map(b => b.bucket);
             expect(foot('desc')).toEqual(['Two Seater', 'Minivan']);

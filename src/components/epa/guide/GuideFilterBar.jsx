@@ -49,7 +49,7 @@ const FACETS = [
  * a row of menus that close on an outside click these two stayed open — and
  * their panel sat in the DOM whether open or not, so `.guide-facet-panel`
  * stopped meaning "a menu is open". Same state and the same hook as its
- * neighbours now; the row behaves as one kind of control.
+ * neighbors now; the row behaves as one kind of control.
  */
 function RangeMenu({ label, unit, minKey, maxKey, filters, onChange }) {
     const min = filters[minKey];

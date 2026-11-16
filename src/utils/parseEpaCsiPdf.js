@@ -295,7 +295,7 @@ function endsCoveredName(item) {
  * Every configuration a certificate covers.
  *
  * The Emission Data Vehicle Information page names ONE represented vehicle for
- * the whole certificate. This table names them all, with the wheel or tyre
+ * the whole certificate. This table names them all, with the wheel or tire
  * variant where the manufacturer writes it — `EX90 Twin Motor (21 inch Wheels)`,
  * `R1T Performance Dual Max (20in)` — and those strings match Fuel Economy
  * Guide carlines closely enough to link on (#250).
@@ -566,8 +566,8 @@ function parseTests(items, start, end) {
         // charging efficiency 2.446/119.873 = 2%, which is one cycle measured
         // against a full recharge.
         //
-        // The SoC field is *labelled* Watt-hours but some OEMs report kWh there
-        // (Tesla: 78.688) and others Wh — normalise by magnitude (EV packs are
+        // The SoC field is *labeled* Watt-hours but some OEMs report kWh there
+        // (Tesla: 78.688) and others Wh — normalize by magnitude (EV packs are
         // ~30–250 kWh, so >400 ⇒ value is Wh).
         const endSoc = parseNum(valAfter(items, 'System End State of Charge Watt-hours', ti, tEnd));
         const endSocKwh = endSoc == null ? null : (endSoc > 400 ? endSoc / 1000 : endSoc);
@@ -638,7 +638,7 @@ function parseTests(items, start, end) {
             total_dc_energy_kwh: (!placeholder && total_dc > 0) ? Math.round(total_dc * 1000) / 1000 : null,
             total_distance_mi: (!placeholder && total_dist2 > 0) ? Math.round(total_dist2 * 1000) / 1000 : null,
             // The bags carry the sentinel too — a single-cycle test's one phase
-            // is synthesised from these same totals just above.
+            // is synthesized from these same totals just above.
             phases: placeholder
                 ? effPhases.map(p => ({ ...p, distance_mi: null, dc_energy_kwh: null }))
                 : effPhases,

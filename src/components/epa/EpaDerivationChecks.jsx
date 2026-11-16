@@ -25,7 +25,7 @@
  * the computed range and never above, so a label above it is proof rather than
  * disagreement.
  *
- * Presentational only. Every judgement is made in utils/epaDerivationCheck.
+ * Presentational only. Every judgment is made in utils/epaDerivationCheck.
  */
 import { CHECK_STATUS_LABELS, CHECK_SHAPE_ADVICE } from '../../utils/epaDerivationCheck';
 

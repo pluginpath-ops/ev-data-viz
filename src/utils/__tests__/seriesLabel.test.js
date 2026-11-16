@@ -175,9 +175,9 @@ describe('the shelved free-text override', () => {
         expect(m.get('a')).toMatchObject({ short: 'winter', full: 'winter' });
     });
 
-    it('does not lengthen its neighbours, being already distinct', () => {
+    it('does not lengthen its neighbors, being already distinct', () => {
         expect(shorts([oy('a','2024','70 mph'), oy('b','2024','80 mph'), oy('c','2025','90 mph')],
-            { overrides: { a: 'new tyres' } })).toEqual(['new tyres', '2024', '2025']);
+            { overrides: { a: 'new tires' } })).toEqual(['new tires', '2024', '2025']);
     });
 
     it('ignores a blank override rather than rendering an empty label', () => {

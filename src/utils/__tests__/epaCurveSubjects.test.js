@@ -21,7 +21,7 @@ const derivableTest = {
     // figures have to be mutually consistent: a constant-speed phase that
     // spends less than road load predicts derives an η above 1, and
     // resolveCurveEta declines that and falls through to a corrected value —
-    // which is correct behaviour and made an earlier fixture assert the
+    // which is correct behavior and made an earlier fixture assert the
     // opposite of what it meant.
     epa_test_phases: [...HWY_PHASES,
         { phase_type: 'SS', distance_mi: 280, dc_energy_kwh: 84.52 }],
@@ -138,7 +138,7 @@ describe('labels', () => {
     });
 });
 
-describe('chart labelling', () => {
+describe('chart labeling', () => {
     it('leaves distinct names alone', () => {
         const subs = [
             { key: 'a', label: 'R1S Dual Max', testVehicle: { model_year: 2025 } },

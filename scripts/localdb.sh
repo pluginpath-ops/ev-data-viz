@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # A throwaway Postgres that mirrors production, for testing migrations and
-# role-gated behaviour without touching the live database.
+# role-gated behavior without touching the live database.
 #
 # ── Why ──────────────────────────────────────────────────────────────────────
 #
@@ -227,6 +227,9 @@ cmd_migrate() {
     # applying, which is the entire point of trying it locally first.
     psql_raw -q -d "$DB" -v ON_ERROR_STOP=1 -f "$file"
   done
+  # A running PostgREST caches the schema: without this, a new column reads
+  # through `select=*` but every write naming it fails with PGRST204.
+  psql_raw -q -d "$DB" -c "NOTIFY pgrst, 'reload schema'"
   say "ok"
 }
 

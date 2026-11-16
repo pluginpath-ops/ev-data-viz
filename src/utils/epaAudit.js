@@ -158,7 +158,7 @@ export function auditTestVehicle(testVehicle) {
  *
  * A row gets one verdict because the list is sorted by it, and a row that could
  * sort under two places sorts under neither usefully. The order below is the
- * order of the AUDIT_VERDICTS list and is the whole judgement this module makes.
+ * order of the AUDIT_VERDICTS list and is the whole judgment this module makes.
  */
 function verdictFor({ record, integrity, rangeCheck, mpgeCheck, invariant, notes }) {
     if (integrity.worst === 'error' || invariant?.violated) return 'impossible';

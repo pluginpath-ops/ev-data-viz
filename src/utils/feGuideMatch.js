@@ -26,14 +26,14 @@
  * our 16 makes match a division exactly and all 16 match once punctuation and
  * case are dropped and containment is allowed either way.
  */
-export function normaliseMake(value) {
+export function normalizeMake(value) {
     return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 /** Do these two name the same manufacturer? Containment either way. */
 export function sameMake(a, b) {
-    const x = normaliseMake(a);
-    const y = normaliseMake(b);
+    const x = normalizeMake(a);
+    const y = normalizeMake(b);
     if (!x || !y) return false;
     return x === y || x.includes(y) || y.includes(x);
 }
@@ -112,7 +112,7 @@ export function rankFeCandidates(testVehicle, feRows = []) {
  * TIED. A clear winner means strictly better than the runner-up. Our
  * `epa_carline_name` is often just `Ioniq 5`, which scores identically against
  * `Ioniq 5 N`, `Ioniq 5 RWD` and every other variant — and those are 221 and
- * ~300 miles apart. Any tie-break there is arbitrary dressed as a judgement;
+ * ~300 miles apart. Any tie-break there is arbitrary dressed as a judgment;
  * the first version picked the shortest name and proposed the 221-mile N for a
  * test vehicle that was almost certainly neither.
  *

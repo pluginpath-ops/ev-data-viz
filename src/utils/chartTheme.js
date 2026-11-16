@@ -138,14 +138,16 @@ export function applyChartDefaults(Chart) {
 
 /** The dark palette, for when no stylesheet can be read. */
 const FALLBACK = {
-    tick:       'rgb(139, 149, 165)',
-    legend:     'rgb(168, 178, 193)',
+    tick:       'rgb(156, 166, 181)',
+    legend:     'rgb(192, 201, 214)',
     ink:        'rgb(242, 245, 249)',
     grid:       'rgb(26, 33, 44)',
     axis:       'rgb(61, 74, 90)',
     accent:     'rgb(45, 127, 249)',
     callout:    'rgb(242, 139, 60)',
     background: 'rgb(17, 22, 31)',
+    good:       'rgb(95, 214, 168)',
+    caution:    'rgb(245, 176, 119)',
 };
 
 /**
@@ -160,6 +162,7 @@ const FALLBACK = {
  *   accent     — the site's blue, for canvas text that is branding rather than data
  *   background — the flat fill a PNG export is composited onto
  *   callout    — the orange a reference mark drawn OVER the plot is called out in
+ *   good, caution — canvas text that says better or worse than a reference
  */
 export function chartTheme() {
     if (typeof document === 'undefined' || !document.documentElement) {
@@ -189,5 +192,28 @@ export function chartTheme() {
         // of the plot — a reference speed, a median. Distinct from `accent`,
         // which is the brand blue the wordmark is drawn in.
         callout:    read('--color-accent-orange', FALLBACK.callout),
+        // Canvas TEXT that says better or worse (a time saved or lost against
+        // a reference). The status text tints, so they read on the panel.
+        good:       read('--color-success-text', FALLBACK.good),
+        caution:    read('--color-warning-text', FALLBACK.caution),
     };
+}
+
+/**
+ * A chart theme color at an opacity, for a wash drawn behind the data.
+ * `rgb(r, g, b)` and `#rrggbb` are rewritten directly. Any other CSS color goes through
+ * `color-mix`, which canvas accepts — never returned as-is, which would paint
+ * a wash at full strength.
+ */
+export function fade(color, opacity) {
+    const m = /^rgb\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)\s*\)$/.exec(color ?? '');
+    if (m) return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${opacity})`;
+    // The production build's CSS minifier rewrites rgb(...) to hex, so hex is
+    // what a token reads as on the live site.
+    const h = /^#([0-9a-f]{6})$/i.exec(color ?? '');
+    if (h) {
+        const n = parseInt(h[1], 16);
+        return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${opacity})`;
+    }
+    return color ? `color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)` : color;
 }

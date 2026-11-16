@@ -5,9 +5,10 @@
  * Two tests are not comparable if one ran a heater at 20°F and the other did
  * not. No test records its HVAC use, so the load is ASSUMED from the weather:
  * DEFAULT_ACCESSORY_W while the cabin holds itself (a comfort band around
- * 65°F), plus a straight line of watts per degree outside it. One line for
- * every car — a heat pump draws roughly half a resistive heater, and this
- * cannot tell them apart. See the explainer, "heating-cooling-and-range".
+ * 65°F), plus a heater below it — a straight line of watts per degree — or A/C
+ * above it, which rises with the square of the degrees: it barely runs at 75°F
+ * and works hard in the 90s. One load for every car — a heat pump draws
+ * roughly half a resistive heater, and this cannot tell them apart. See the explainer, "heating-cooling-and-range".
  *
  * ── Why watts become miles per kWh through speed ─────────────────────────────
  *
@@ -39,8 +40,9 @@
  */
 import {
     DEFAULT_ACCESSORY_W, ACCESSORY_COMFORT_BAND_F, ACCESSORY_HEAT_W_PER_F,
-    ACCESSORY_COOL_W_PER_F, ASSUMED_TEST_CONSUMPTION_WH_MI,
+    ACCESSORY_COOL_W_AT_95F, ACCESSORY_COOL_ANCHOR_F, ASSUMED_TEST_CONSUMPTION_WH_MI,
 } from '../constants/epa';
+import { val } from './calcTrace';
 
 /**
  * The load a test (or a reader's target) is assumed to carry at an outside
@@ -52,14 +54,39 @@ export function assumedAccessoryW(temperatureF, {
     baseW = DEFAULT_ACCESSORY_W,
     comfortBand = ACCESSORY_COMFORT_BAND_F,
     heatWPerF = ACCESSORY_HEAT_W_PER_F,
-    coolWPerF = ACCESSORY_COOL_W_PER_F,
+    coolWAt95F = ACCESSORY_COOL_W_AT_95F,
+    trace = null,
 } = {}) {
-    if (temperatureF == null || temperatureF === '') return baseW;
     const t = Number(temperatureF);
-    if (!Number.isFinite(t)) return baseW;
-    return baseW
-        + heatWPerF * Math.max(0, comfortBand[0] - t)
-        + coolWPerF * Math.max(0, t - comfortBand[1]);
+    if (temperatureF == null || temperatureF === '' || !Number.isFinite(t)) {
+        trace?.step('Accessory load (no temperature)', {
+            formula: 'P = P_base', values: { P_base: val(baseW, 'W', 'knob:DEFAULT_ACCESSORY_W') },
+            result: baseW, unit: 'W', assumed: true,
+        });
+        return baseW;
+    }
+    // The A/C is quoted at 95°F and scales with the square of the degrees above
+    // the band, so the anchor holds wherever the band's top edge is moved.
+    const coolSpan = ACCESSORY_COOL_ANCHOR_F - comfortBand[1];
+    const cooling = coolSpan > 0
+        ? coolWAt95F * (Math.max(0, t - comfortBand[1]) / coolSpan) ** 2
+        : 0;
+    const watts = baseW + heatWPerF * Math.max(0, comfortBand[0] - t) + cooling;
+    trace?.step('Accessory load assumed from temperature', {
+        formula: 'P = P_base + heat × max(0, T_lo − T) + P_95 × (max(0, T − T_hi) / (95 − T_hi))²',
+        values: {
+            comfort_band: val(comfortBand, '°F', 'knob:ACCESSORY_COMFORT_BAND_F'),
+            P_base: val(baseW, 'W', 'knob:DEFAULT_ACCESSORY_W'),
+            heat: val(heatWPerF, 'W/°F', 'knob:ACCESSORY_HEAT_W_PER_F'),
+            P_95: val(coolWAt95F, 'W', 'knob:ACCESSORY_COOL_W_AT_95F'),
+            T_lo: val(comfortBand[0], '°F', 'knob:ACCESSORY_COMFORT_BAND_F'),
+            T_hi: val(comfortBand[1], '°F', 'knob:ACCESSORY_COMFORT_BAND_F'),
+            T: val(t, '°F'),
+        },
+        result: watts, unit: 'W', assumed: true,
+        note: 'no test records its heating or cooling; one load for every car',
+    });
+    return watts;
 }
 
 /**
@@ -68,8 +95,15 @@ export function assumedAccessoryW(temperatureF, {
  * "auto" and is never stored as the number it resolves to, so the load keeps
  * following the temperature slider until the reader overrides it.
  */
-export const effectiveAccessoryW = (target, opts) =>
-    target?.accessoryW ?? assumedAccessoryW(target?.temperatureF, opts);
+export const effectiveAccessoryW = (target, opts) => {
+    if (target?.accessoryW != null) {
+        opts?.trace?.step('Accessory load, set by you', {
+            values: { P: val(target.accessoryW, 'W', 'setting') }, result: target.accessoryW, unit: 'W',
+        });
+        return target.accessoryW;
+    }
+    return assumedAccessoryW(target?.temperatureF, opts);
+};
 
 /** Watt-hours a steady accessory draw costs per mile at a speed. */
 export const accessoryWhPerMile = (watts, speedMph) => watts / speedMph;
@@ -92,16 +126,36 @@ export const accessoryWhPerMile = (watts, speedMph) => watts / speedMph;
  *   then keeps the aero-only factor and says so.
  */
 export function accessoryFactor({
-    consumptionWhMi, runW, runSpeedMph, targetW, targetSpeedMph, tractionScale,
+    consumptionWhMi, runW, runSpeedMph, targetW, targetSpeedMph, tractionScale, trace = null,
 }) {
     const measured = Number(consumptionWhMi);
     const known = consumptionWhMi != null && consumptionWhMi !== '' && Number.isFinite(measured) && measured > 0;
     const c = known ? measured : ASSUMED_TEST_CONSUMPTION_WH_MI;
-    const traction = c - accessoryWhPerMile(runW, runSpeedMph);
+    const runAccWhMi = accessoryWhPerMile(runW, runSpeedMph);
+    const traction = c - runAccWhMi;
+    trace?.step('Traction share of the test\'s consumption', {
+        formula: 'D_run = C_run − P_run / v_run',
+        values: {
+            C_run: known ? val(c, 'Wh/mi', 'data') : val(c, 'Wh/mi', 'knob:ASSUMED_TEST_CONSUMPTION_WH_MI'),
+            P_run: val(runW, 'W'), v_run: val(runSpeedMph, 'mph'),
+        },
+        result: traction, unit: 'Wh/mi', assumed: !known,
+        note: known ? 'C_run is the test\'s own energy ÷ distance' : 'the test recorded no energy, so C_run is assumed',
+    });
     if (!(traction > 0)) {
         return { factor: null, assumedConsumptionWhMi: null, skipped: 'more than the test used' };
     }
-    const atTarget = traction * tractionScale + accessoryWhPerMile(targetW, targetSpeedMph);
+    const targetAccWhMi = accessoryWhPerMile(targetW, targetSpeedMph);
+    const atTarget = traction * tractionScale + targetAccWhMi;
+    trace?.step('Consumption at the target', {
+        formula: 'C_target = D_run × s + P_target / v_target',
+        values: { D_run: val(traction, 'Wh/mi'), s: tractionScale, P_target: val(targetW, 'W'), v_target: val(targetSpeedMph, 'mph', 'setting') },
+        result: atTarget, unit: 'Wh/mi', note: 's = L_target / L_run, the aero model\'s re-pricing of traction',
+    });
+    trace?.step('Correction factor', {
+        formula: 'k = C_run / C_target', values: { C_run: val(c, 'Wh/mi'), C_target: val(atTarget, 'Wh/mi') },
+        result: c / atTarget, note: 'multiplies range and efficiency alike',
+    });
     return {
         factor: c / atTarget,
         assumedConsumptionWhMi: known ? null : c,

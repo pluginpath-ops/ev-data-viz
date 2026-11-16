@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+    desaturate,
     resolvePairColors, seriesColorNote, DEFAULT_RUN_COLOR, OKABE_ITO_SET,
     hexToHsl, hslToHex, rotatePaletteFrom, paletteSlotOf, rampFrom, seedPreview,
     seriesRowsOf, expandPalette, OKABE_ITO, SERIES_NEUTRAL, resolveChartColors, seedPlot,
-    SERIES_PALETTES, HOUSE_PALETTE,
+    SERIES_PALETTES, HOUSE_PALETTE, HOUSE_PALETTE_LIGHT, housePalette,
     VEHICLE_PALETTE,
     paletteColorsById, withAlpha
 } from '../colorUtils';
@@ -37,7 +38,7 @@ describe('pair colors', () => {
         expect(dist(out.a, out.b)).toBeLessThan(dist(out.a, out.c));
     });
 
-    it('leaves an unrelated primary unaffected by a neighbour being shaded', () => {
+    it('leaves an unrelated primary unaffected by a neighbor being shaded', () => {
         const out = resolvePairColors([r('a', 1, '#0072B2'), r('b', 1, '#0072B2'), r('c', 2, '#D55E00')]);
         expect(out.c).toBe('#D55E00');
     });
@@ -98,7 +99,7 @@ describe('HSL round trip', () => {
         }
     });
 
-    it('keeps a grey at zero saturation rather than inventing a hue', () => {
+    it('keeps a gray at zero saturation rather than inventing a hue', () => {
         expect(hexToHsl('#9ca3af').s).toBeLessThan(20);
         expect(hexToHsl('#808080').s).toBe(0);
     });
@@ -250,10 +251,10 @@ describe('extending the palette past its length', () => {
     it('does not breed the neutral slot', () => {
         // Varying a color with no hue only makes more colors with no hue, and
         // they collide with every other pale variant. Measured: the worst pair
-        // in a 16-series set used to be two pale variants of the grey.
+        // in a 16-series set used to be two pale variants of the gray.
         const set = expandPalette(OKABE_ITO_SET, 30);
-        const greys = set.filter(c => hexToHsl(c).s < 20);
-        expect(greys).toEqual([SERIES_NEUTRAL]);
+        const grays = set.filter(c => hexToHsl(c).s < 20);
+        expect(grays).toEqual([SERIES_NEUTRAL]);
     });
 
     it('keeps every color clear of pure white and black', () => {
@@ -283,7 +284,7 @@ describe('a vehicle color is the family base (#308)', () => {
     // Color moved from the run to the vehicle. These replace the suite that
     // covered `run.color` and its clash nudge — a stored run color was often
     // incidental, so two of them sharing a hex was an accident worth correcting;
-    // a curated VEHICLE color is a deliberate statement and is honoured exactly.
+    // a curated VEHICLE color is a deliberate statement and is honored exactly.
     const at = (id, day) => ({ id, created_at: `2026-01-${String(day).padStart(2, '0')}` });
     const vehicle = (id, color, runs) => ({ id, color, runs });
 
@@ -530,7 +531,7 @@ describe('the palettes on offer', () => {
 
     it('every palette can grow to twenty without repeating', () => {
         // Including the monochromes, which have no hue to nudge — expandPalette
-        // has to vary the greys when varying them is all there is.
+        // has to vary the grays when varying them is all there is.
         for (const p of SERIES_PALETTES) {
             const set = expandPalette(p.colors, 20);
             expect(set.length, p.id).toBe(20);
@@ -546,7 +547,7 @@ describe('the palettes on offer', () => {
             // channels, so the less saturated the color the fewer units carry
             // it and the coarser the rounding — mono-orange spans 1 degree at
             // s=88, mono-ice spans 3 at s=37. Five is still nowhere near a
-            // different color: the palette's own neighbours sit 40 apart.
+            // different color: the palette's own neighbors sit 40 apart.
             const hues = hsl.map(c => c.h);
             expect(Math.max(...hues) - Math.min(...hues), p.id).toBeLessThan(5);
             for (let i = 1; i < hsl.length; i++) {
@@ -572,6 +573,16 @@ describe('the palettes on offer', () => {
         for (const token of ['#2d7ff9', '#f28b3c', '#23b47e', '#9b8cf0', '#6b7a8f', '#f2f5f9']) {
             expect(HOUSE_PALETTE.map(c => c.toLowerCase())).toContain(token);
         }
+    });
+
+    it('has a light set that changes only the near-white slot', () => {
+        // The default palette's third slot is the theme's text color. On a
+        // white plot the dark set's #f2f5f9 cannot be seen; nothing else moves.
+        expect(HOUSE_PALETTE_LIGHT).toHaveLength(HOUSE_PALETTE.length);
+        const changed = HOUSE_PALETTE_LIGHT.map((c, i) => [HOUSE_PALETTE[i], c]).filter(([a, b]) => a !== b);
+        expect(changed).toEqual([['#f2f5f9', '#11161f']]);
+        // No document here, so the dark set.
+        expect(housePalette()).toBe(HOUSE_PALETTE);
     });
 });
 
@@ -618,5 +629,18 @@ describe('withAlpha', () => {
     it('leaves anything it cannot read unchanged', () => {
         expect(withAlpha('rebeccapurple', 0.2)).toBe('rebeccapurple');
         expect(withAlpha(null, 0.2)).toBeNull();
+    });
+});
+
+describe('desaturate', () => {
+    it('takes out saturation and keeps hue and lightness', () => {
+        const before = hexToHsl('#db0606'), after = hexToHsl(desaturate('#db0606'));
+        expect(after.s).toBeCloseTo(before.s * 0.3, 0);
+        expect(after.l).toBeCloseTo(before.l, 0);
+        expect(after.h).toBeCloseTo(before.h, 0);
+    });
+    it('leaves anything it cannot read unchanged', () => {
+        expect(desaturate('rgba(1, 2, 3, 0.5)')).toBe('rgba(1, 2, 3, 0.5)');
+        expect(desaturate(null)).toBeNull();
     });
 });

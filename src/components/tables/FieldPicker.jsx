@@ -18,7 +18,7 @@ import { groupColumns, tableScopedColumns } from '../../utils/specChart';
  * table is one query away without switching. The column plotted now is always
  * in the list.
  *
- * @param {Array}    columns      every column the chart may offer (labelled, unit-aware)
+ * @param {Array}    columns      every column the chart may offer (labeled, unit-aware)
  * @param {string[]} tableKeys    the keys the table is showing, in its order
  * @param {Function} unitOf       a column's unit as shown
  * @param {'single'|'dual'} mode  one column, or an X and a Y
@@ -56,7 +56,7 @@ export default function FieldPicker({ columns, tableKeys, unitOf, mode = 'single
                     className="form-input guide-facet-panel-search"
                 />
             )}
-            <div className="stats-segmented" role="group" aria-label="Fields listed">
+            <div className="segmented" role="group" aria-label="Fields listed">
                 {[['table', 'In the table'], ['all', 'All fields']].map(([key, label]) => (
                     <button
                         key={key}

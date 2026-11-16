@@ -82,7 +82,7 @@ export function derived5CycleCrossoverFe(cycle) {
  * 1/intercept — about 307 MPGe city — no matter how efficient the vehicle is.
  * The flat 0.7 factor has no such ceiling.
  *
- * The consequence is that the regression penalises efficient vehicles and the
+ * The consequence is that the regression penalizes efficient vehicles and the
  * flat factor does not. They agree around 76 MPGe unadjusted city; by 154 —
  * roughly where the R2 sits — the regression is ~15% harsher. A manufacturer
  * with an efficient BEV therefore has a real reason to prefer the two-cycle
@@ -166,7 +166,7 @@ export function cityConsumptionFromPhases(uddsPhases, totalEnergyWh) {
     if (!uddsPhases?.length || !(totalEnergyWh > 0)) return null;
     // Complete cycles only — see isCompleteCycle. Applied to city as well as
     // highway: the partial bag lands wherever the run happens to end, and there
-    // is no reason it favours one cycle.
+    // is no reason it favors one cycle.
     const complete = uddsPhases.filter(isCompleteCycle);
     if (!complete.length) return null;
 
@@ -315,7 +315,7 @@ const SIGNATURE_PHRASE = {
  * factor is the MPGe ratio of ONE cycle pair, and this model applies one factor
  * to both, which a per-cycle row does not do. What produces those rows is
  * unexplained (0 of 106 match the published regression), so it is reported, not
- * modelled.
+ * modeled.
  */
 export function describeAdjustment(adj) {
     if (!adj || !Number.isFinite(adj.value)) return null;
@@ -408,8 +408,8 @@ export function buildMethodologyModel(record) {
         blendAgreeing: labelBlendAgreement(record.labeledRangeMi, combinedMi, combinedHarmMi),
         combinedMpge,
         labeledMi,
-        // How far the manufacturer labelled below what the test computed. Not an
-        // error term: labelling low is permitted and labelling high is not.
+        // How far the manufacturer labeled below what the test computed. Not an
+        // error term: labeling low is permitted and labeling high is not.
         deratePct: (labeledMi > 0 && combinedMi > 0)
             ? ((combinedMi - labeledMi) / combinedMi) * 100
             : null,

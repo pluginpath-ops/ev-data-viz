@@ -38,7 +38,7 @@ export default function PerformanceCompareChart({
 
     // The caption the export carries. `title` was an <h3> above the card and the
     // measure lived in a <select> beside it, so a pasted PNG was a row of bars
-    // labelled with vehicle names and a bare axis — no statement of which
+    // labeled with vehicle names and a bare axis — no statement of which
     // metric, in which mode. No vehicle count: the bars show it (#443).
     const plotSubtitle = useMemo(() => {
         const parts = [];
@@ -227,9 +227,9 @@ export default function PerformanceCompareChart({
                     <button
                         onClick={copyPng}
                         className={`chart-copy-btn ${copied ? 'chart-copy-btn-active' : ''}`}
-                        title="Copy the framed chart as a PNG"
+                        title="Copy the framed chart as an image (PNG)"
                     >
-                        {copied ? '✓ Copied' : 'PNG'}
+                        {copied ? '✓ Image copied' : 'Image'}
                     </button>
                     </>
                 )}

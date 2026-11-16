@@ -1,9 +1,9 @@
 /**
- * The catalogue of controls the site is allowed to draw with.
+ * The catalog of controls the site is allowed to draw with.
  *
  * Data, not markup, and deliberately so. It is read twice: `Playground.jsx`
  * renders it, and `playground.test.js` checks the stylesheet against it. That
- * second reader is the point — a catalogue nobody verifies drifts out of date
+ * second reader is the point — a catalog nobody verifies drifts out of date
  * within a month and then actively misleads, which is worse than not having one.
  *
  * ── What this is for ────────────────────────────────────────────────────────
@@ -16,19 +16,19 @@
  *   2. CHOOSING. A menu. "Use the filter pill, not a fourth kind of button" is
  *      a sentence you can only say if there is a list to point at.
  *   3. CONSTRAINING. A new class in an owned family fails the coverage test
- *      until it is catalogued or explicitly excused, so the list stays true and
+ *      until it is cataloged or explicitly excused, so the list stays true and
  *      additions stay deliberate.
  *
  * ── Owned families ─────────────────────────────────────────────────────────
  *
  * Coverage is asserted only within `OWNED_FAMILIES`. The stylesheet has ~411
  * classes and most are layout, tables and chart internals that need real data
- * to mean anything — cataloguing them would be a list of empty boxes. The
+ * to mean anything — cataloging them would be a list of empty boxes. The
  * families here are the ones a feature actually picks FROM, which is the
  * decision this page exists to inform. Widen them as later sections land.
  */
 
-/** A class is expected in the catalogue when it matches one of these. */
+/** A class is expected in the catalog when it matches one of these. */
 export const OWNED_FAMILIES = [
     { id: 'buttons', label: 'Buttons', match: (n) => /^btn(-|$)/.test(n) },
     { id: 'pills',   label: 'Pills, chips & badges',
@@ -51,17 +51,17 @@ export const OWNED_FAMILIES = [
  * appearance of their own — a specimen of them would be an empty box that
  * teaches nothing — or variants whose parent is already shown.
  */
-export const NOT_CATALOGUED = {
-    'color-source-note': 'Not a menu — a line of secondary text at the top of the run picker (ColorSourceNote), matched here only by its color- prefix. It holds the applied dot, which is catalogued with the section band, and a .color-source-link.',
+export const NOT_CATALOGED = {
+    'color-source-note': 'Not a menu — a line of secondary text at the top of the run picker (ColorSourceNote), matched here only by its color- prefix. It holds the applied dot, which is cataloged with the section band, and a .color-source-link.',
     'color-source-link': 'The underlined text button inside .color-source-note (Use each vehicle\'s own color, Clear picks): primary color, no box. Shown with the note it sits in.',
-    'featured-vehicle-chip': 'The same pill as .selected-vehicle-chip (one rule, two names) where Home and the featured comparison editor name a comparison\'s vehicles. It reports a set, so it is not the selection. The selection chip is catalogued.',
+    'featured-vehicle-chip': 'The same pill as .selected-vehicle-chip (one rule, two names) where Home and the featured comparison editor name a comparison\'s vehicles. It reports a set, so it is not the selection. The selection chip is cataloged.',
     'featured-chip-button': 'The ‹ › × buttons inside a .featured-vehicle-chip in the editor (move earlier, move later, remove): inherit the chip\'s color, dim on hover and when unavailable.',
-    'selected-vehicle-chip-name': 'The name inside .selected-vehicle-chip, drawn as a button: inherits the chip\'s color and only underlines on hover. The chip is catalogued.',
-    'info-icon':        'Layout wrapper — an inline-flex span holding the glyph. The glyph is catalogued.',
+    'selected-vehicle-chip-name': 'The name inside .selected-vehicle-chip, drawn as a button: inherits the chip\'s color and only underlines on hover. The chip is cataloged.',
+    'info-icon':        'Layout wrapper — an inline-flex span holding the glyph. The glyph is cataloged.',
     'popover-foot-gap': 'A flex spacer inside the action row — it has no appearance at '
-        + 'all, it is the gap that keeps Auto away from Apply. The row is catalogued.',
-    'popover--anchored': 'Position and layer only, no appearance: it carries the `fixed` that lets a panel leave a scrolling sidebar. Its two tiers are catalogued.',
-    'cert-chips':        'Layout wrapper — a flex row that holds chips. The chips are catalogued.',
+        + 'all, it is the gap that keeps Auto away from Apply. The row is cataloged.',
+    'popover--anchored': 'Position and layer only, no appearance: it carries the `fixed` that lets a panel leave a scrolling sidebar. Its two tiers are cataloged.',
+    'cert-chips':        'Layout wrapper — a flex row that holds chips. The chips are cataloged.',
     'tag-filter-bar':    'Layout wrapper for the filter row.',
     'tag-filter-legend': 'The "AND / OR / NOT" key beside the bar, not a control.',
     'run-stat-badges':   'Layout wrapper — a flex row of badges.',
@@ -80,50 +80,24 @@ export const NOT_CATALOGUED = {
         + 'the facet-menu composite only when the list is long enough to need it.',
     'guide-facet-label': 'Superseded by the menu button — a leftover of the chip wall 5a '
         + 'replaced, still styling one label in the stats controls.',
-    'guide-facet-values': 'Layout wrapper for a row of chips. The chips are catalogued.',
+    'guide-facet-values': 'Layout wrapper for a row of chips. The chips are cataloged.',
     'guide-facet-search': 'Layout wrapper for the search input beside a facet row.',
     'guide-facet-columns': 'Layout wrapper — a grid of facet columns.',
     'fixed-action-bar':
         'position: fixed. A specimen of it would leave the stage and pin itself to the '
-        + 'bottom of the window, over the page it is meant to be illustrating. Its three '
-        + 'intents are the same success / warning / danger triad the state panel shows.',
+        + 'bottom of the window, over the page it is meant to be illustrating. Its four '
+        + 'intents are the success / warning / danger triads the state panel shows, and '
+        + 'the brand one the callout shows as info.',
     'selected-chip-scroll':
         'The capped, scrolling box the selected-vehicle chips sit in. It is a '
         + 'height budget for the sticky header, not a control — a specimen of it '
-        + 'would be an empty 60px rectangle. The chips inside it are catalogued.',
+        + 'would be an empty 60px rectangle. The chips inside it are cataloged.',
     'btn-toggle-clear':  'The × inside an active .btn-toggle; shown as part of that specimen.',
     'vehicle-media-badge':
         'Absolutely positioned over a vehicle photograph, on a dark plate that only '
         + 'makes sense against one. A specimen on the flat playground surface would '
         + 'show the plate and not the thing it exists to survive.',
 };
-
-/**
- * Classes styled by a `[data-theme="dark"] .foo` override rather than by tokens.
- *
- * These CANNOT scope to a subtree. The selector is a descendant of the document
- * root, so a `.badge-default` inside a `[data-theme="light"]` pane is still
- * inside `html[data-theme="dark"]` and keeps the dark styling — light-mode
- * background under dark-mode text, at 1.38:1. The side-by-side view is telling
- * the truth about the CSS and lying about the theme.
- *
- * So it is marked rather than hidden. This list IS the migration backlog for
- * #277: a class drawn from tokens works in both panes and under any future
- * reskin; one of these works only at the document root. `playground.test.js`
- * keeps it honest against the stylesheet, so the list shrinks as classes move
- * and cannot silently grow.
- */
-export const DARK_OVERRIDE_CLASSES = new Set([
-    'chart-copy-btn-active',
-    'guide-row', 'guide-tested-note',
-    'merge-target-banner', 'stats-suppressed-flag',
-    'sweep-batch'
-]);
-
-/** Whether a specimen's class list contains one that cannot scope. */
-export function hasDarkOverride(cls) {
-    return cls.split(/\s+/).some(c => DARK_OVERRIDE_CLASSES.has(c));
-}
 
 /**
  * The specimens, by section.
@@ -154,6 +128,17 @@ export const SECTIONS = [
             { cls: 'drop-zone', as: 'span', label: 'Drop a CSV here' },
             { cls: 'drop-zone is-over', as: 'span', label: 'Drop a CSV here', note: 'While a file is over it.' },
             { cls: 'empty-state', as: 'span', label: 'No configurations match these filters.' },
+            { cls: 'callout is-warning px-2 py-1', as: 'span', label: 'How to prepare the file',
+              note: 'Color only — the status triad on whatever shape the call site draws (a panel, a strip, a badge). The edge shows once the call site adds `border`.' },
+            { cls: 'callout is-danger px-2 py-1', as: 'span', label: '⚠ Could not load test vehicles.' },
+            { cls: 'callout is-good px-2 py-1', as: 'span', label: 'verified' },
+            { cls: 'callout is-info px-2 py-1', as: 'span', label: '12 test vehicles found',
+              note: 'The brand surface: nothing is wrong.' },
+            { cls: 'status-text is-danger', as: 'span', label: 'Error: could not save.',
+              note: 'Text that reports a status, on no surface of its own. Color only; size stays with the call site.' },
+            { cls: 'status-text is-warning', as: 'span', label: 'assumed' },
+            { cls: 'status-text is-good', as: 'span', label: 'measured' },
+            { cls: 'status-text is-info', as: 'span', label: '∗ feeds a derived calculation' },
         ],
     },
     {
@@ -172,7 +157,7 @@ export const SECTIONS = [
               note: 'The base every floating surface uses — one fill, one radius, one shadow, one layer. Width comes from --popover-w, placement from a --<placement> modifier.' },
             { composite: 'facet-panel', label: 'Facet menu, open',
               covers: ['menu-button', 'popover--stretch', 'popover--end', 'guide-facet-panel', 'guide-facet-panel-head', 'guide-facet-panel-list', 'guide-facet-panel-foot', 'guide-facet-option', 'guide-facet-option-name', 'guide-facet-option-count', 'guide-facet-btn-value', 'guide-facet-caret', 'guide-facet-option-row', 'guide-facet-exclude', 'guide-facet-match'],
-              note: 'A value that would leave nothing is disabled rather than hidden: a make vanishing reads as a bug, a greyed one reads as an answer.' },
+              note: 'A value that would leave nothing is disabled rather than hidden: a make vanishing reads as a bug, a grayed one reads as an answer.' },
             { cls: 'nav-menu-icon', as: 'span', label: '☰',
               note: 'The mark before a collapsed bar\'s current name (#338): three bars on the main nav, a bulleted list on the sub-nav, so the two menus never look alike. The real ones are inline SVG in the label\'s color.' },
             { cls: 'nav-menu-icon-dot', as: 'span', label: '•',
@@ -185,7 +170,7 @@ export const SECTIONS = [
             { cls: 'account-btn signed-in', as: 'button', label: 'G',
               note: 'Signed in reads differently from signed out at a glance: filled and lettered vs outlined and generic.' },
             { composite: 'account-menu', label: 'Account menu, open',
-              covers: ['account-menu', 'account-panel', 'account-identity', 'account-email', 'account-row', 'account-segmented', 'account-action'],
+              covers: ['account-menu', 'account-panel', 'account-identity', 'account-email', 'account-row', 'account-opt-in', 'account-opt-in-label', 'account-action'],
               note: 'What used to sit beside it in the nav bar: the signed-in email, the role, and the unit system. The Sign In button it replaced cost 111px of a 375px phone bar.' },
             { cls: 'info-icon-glyph', as: 'button', label: 'ⓘ',
               note: 'A real button, not a glyph in a span: before the popover pass there was no keyboard route to any of the 21 of them, and the four carrying a reference table had no accessible name at all.' },
@@ -260,6 +245,8 @@ export const SECTIONS = [
             { cls: 'btn btn-danger',    as: 'button', label: 'Danger',    note: 'Destructive. Delete, Remove.' },
             { cls: 'btn-icon-danger',   as: 'button', label: 'Danger · icon',
               note: 'A destructive glyph that stays quiet until you approach it — a row × , a clear-column ×.' },
+            { cls: 'link-button',       as: 'button', label: '＋ Add phase',
+              note: 'A button that reads as a link: link color, underlined on hover. No box — for small actions inside a curator panel.' },
             { cls: 'btn-symbol',        as: 'span',   label: '⌧',
               note: 'A text symbol leading a button label — ⌧ on the chips row\'s Clear. Text, not an image, so it takes the button\'s color in either theme.' },
             { cls: 'btn-tab',        as: 'button', label: 'Nav tab',   note: 'Top-level navigation. Add `.active` for the current one.' },
@@ -368,13 +355,13 @@ export const SECTIONS = [
     },
 ];
 
-/** Every class this catalogue claims to show, flattened. */
-export function cataloguedClasses() {
+/** Every class this catalog claims to show, flattened. */
+export function catalogedClasses() {
     const out = new Set();
     for (const section of SECTIONS) {
         for (const s of section.specimens) {
             // Only the semantic classes count — a `py-1` in a specimen is
-            // demonstrating an override, not claiming to catalogue a utility.
+            // demonstrating an override, not claiming to catalog a utility.
             //
             // The size utilities are listed WHOLE rather than as a prefix with
             // a trailing hyphen: `text-xs` has no hyphen after `xs`, so a
@@ -384,7 +371,7 @@ export function cataloguedClasses() {
             // in specimens.jsx, out of reach of `scripts/health.js`, which
             // imports this in plain node. So it DECLARES what it shows. That
             // is a list to keep in step, and deliberately so: the alternative
-            // is a composite quietly claiming to catalogue whatever it happens
+            // is a composite quietly claiming to catalog whatever it happens
             // to contain today.
             for (const c of (s.cls ?? (s.covers ?? []).join(' ')).split(/\s+/).filter(Boolean)) {
                 const isUtility = /^(p|px|py|m|mx|my|w|h)-[\d.]/.test(c)

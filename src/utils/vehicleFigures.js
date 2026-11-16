@@ -83,6 +83,12 @@ export const EPA_RANGE_BASIS = {
     estimated:   { label: 'Est.',         note: 'An estimate: vehicles.range, which no EPA label confirms.' },
 };
 
+/** Each charger efficiency basis, as it is shown. */
+export const CHARGER_EFF_BASIS = {
+    epa:          { label: 'EPA',        note: "The EPA certification's own recharge test, or a curator's pinned figure." },
+    'green-ncap': { label: 'Green NCAP', note: "Green NCAP's measured recharge: net battery ÷ energy from the grid." },
+};
+
 /**
  * Does EPA tested agree with the manufacturer's labels, under a rule?
  *
@@ -150,6 +156,27 @@ function measuredChargerEfficiency(testVehicle) {
 }
 
 /**
+ * The AC charger efficiency a reader should use, and whose it is: the EPA
+ * certification's (measured or pinned), else a linked Green NCAP
+ * assessment's grid to battery — the same ratio, net battery ÷ wall energy
+ * (docs/green-ncap-plan.md, step 4). Null when neither has one; the reader
+ * falls back to ASSUMED_CHARGER_EFF itself.
+ *
+ * CHARGER_EFF_BAND does not apply to Green NCAP: it catches the EPA's
+ * mismatched cycle ratios, and Green NCAP measures both ends of one recharge.
+ *
+ * @returns {{ value: number|null, basis: 'epa'|'green-ncap'|null }}
+ */
+export function resolveChargerEfficiency(vehicle, epaRange = vehicle?.epaRange) {
+    if (epaRange?.chargerEfficiency > 0) return { value: epaRange.chargerEfficiency, basis: 'epa' };
+    // Newest test first: a later sheet is the car as sold now.
+    const gn = (vehicle?.green_ncap ?? [])
+        .filter(a => Number(a.grid_to_battery) > 0)
+        .sort((a, b) => (b.test_year ?? 0) - (a.test_year ?? 0))[0];
+    return gn ? { value: Number(gn.grid_to_battery), basis: 'green-ncap' } : { value: null, basis: null };
+}
+
+/**
  * The vehicle's EPA range, and where it came from.
  *
  * @returns {{
@@ -186,10 +213,10 @@ export function resolveEpaRange(vehicle, vehicles = []) {
     if (pick) {
         if (positive(pick.mapping.epaTestVehicle.label_range_published)) return fromLabel(pick.mapping.epaTestVehicle);
     } else {
-        const labelled = links.filter(m => positive(m.epaTestVehicle.label_range_published));
-        const values = [...new Set(labelled.map(m => positive(m.epaTestVehicle.label_range_published)))].sort((a, b) => a - b);
+        const labeled = links.filter(m => positive(m.epaTestVehicle.label_range_published));
+        const values = [...new Set(labeled.map(m => positive(m.epaTestVehicle.label_range_published)))].sort((a, b) => a - b);
         // Every configuration reads the same: there is nothing to choose.
-        if (values.length === 1) return fromLabel(labelled[0].epaTestVehicle);
+        if (values.length === 1) return fromLabel(labeled[0].epaTestVehicle);
         if (values.length > 1) spanMi = [values[0], values[values.length - 1]];
     }
 
@@ -283,6 +310,7 @@ export function fieldFigureSource(vehicle, fieldKey, units = 'imperial') {
  *   epaTestedKwh                     its EPA tested, used or set aside
  *   epaRangeMi, epaRangeBasis        from resolveEpaRange
  *   epaRange                         the whole range answer (city, highway, span)
+ *   chargerEfficiency                from resolveChargerEfficiency
  */
 export function withVehicleFigures(vehicles = []) {
     return vehicles.map(vehicle => {
@@ -298,6 +326,7 @@ export function withVehicleFigures(vehicles = []) {
             epaRangeMi: range.mi,
             epaRangeBasis: range.basis,
             epaRange: range,
+            chargerEfficiency: resolveChargerEfficiency(vehicle, range),
             // The best 5/10/15-minute charge rate across the vehicle's own
             // charging sessions (#346). Chosen here, on every change to its
             // runs, and never stored — see chargeWindows.js. Across the listed

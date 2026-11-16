@@ -121,7 +121,7 @@ function testLink(ref, onOpenTest) {
 
 
 /**
- * @param {Array}  cols        the columns, labelled (labelledColumn)
+ * @param {Array}  cols        the columns, labeled (labeledColumn)
  * @param {{ key, dir, onSort }|null} sort   null: headers do not sort and show no caret
  * @param {{ dragProps, dragClass }|null} drag   null: headers do not drag
  * @param {{ enabled, onPlot }|null} plot   null: headers carry no chart icon (#450)

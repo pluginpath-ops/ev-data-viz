@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { withVehicleFigures } from '../utils/vehicleFigures';
 import { withInheritance, variantLinkPlan } from '../utils/vehicleInheritance';
-import { listedFor } from '../utils/vehicleListing';
+import { listedFor, isListedVehicle } from '../utils/vehicleListing';
 import { withPlatforms } from '../utils/platforms';
 import { toPreconditioned } from '../utils/runPreconditioning';
 import { toChargerClass } from '../utils/runChargerClass';
@@ -39,6 +39,7 @@ export function AppProvider({ children }) {
     const [tags, setTags] = useState([]);
     const [user, setUser] = useState(null);
     const [userRole, setUserRole] = useState(null); // 'admin'|'contributor'|'user'|null
+    const [emailOptIn, setEmailOptInState] = useState(null); // boolean, or null when unknown
     const [loading, setLoading] = useState(true);
     const [headerImageUrl, setHeaderImageUrl] = useState('');
     const [appNotification, setAppNotification] = useState(null); // { message, type: 'error'|'success', action?: { label, onClick } }
@@ -103,6 +104,7 @@ export function AppProvider({ children }) {
         await dataService.initialize();
         setUser(dataService.user);
         setUserRole(dataService.role);
+        setEmailOptInState(dataService.emailOptIn ?? null);
 
         // These queries are independent of one another. Awaiting them in sequence
         // cost ~900ms of round-trip latency on a warm load — six of the seven
@@ -501,6 +503,32 @@ export function AppProvider({ children }) {
         }
     };
 
+    // ── Move run to a different vehicle ───────────────────────────────────────
+
+    /**
+     * A test moves up the lineage (or anywhere): its composites change on both
+     * ends, and on every variant that reads it, before or after. The heirs are
+     * worked out on the fleet as it stood, then again on the one re-read after
+     * the write, so a vehicle that gains the test and one that loses it are both
+     * rebuilt.
+     */
+    const moveRunToVehicle = async (sourceVehicleId, run, targetVehicleId) => {
+        const feeds = feedsComposites(sourceVehicleId, run.id);
+        const before = feeds ? inheritorsOf(run.id) : [];
+        try {
+            await dataService.moveRunToVehicle(run.id, targetVehicleId);
+            const fleet = await softRefreshVehicles();
+            showSuccess(`Test moved to ${vehicles.find(v => v.id === targetVehicleId)?.name || 'vehicle'}`);
+            if (!feeds) return;
+            const after = [targetVehicleId, ...lineageInheritors(targetVehicleId, fleet)];
+            const affected = new Set([sourceVehicleId, ...before, ...after]);
+            await Promise.all([...affected].map(id => refreshComposites(id, { fleet })));
+        } catch (error) {
+            logIfUnauthorized('move_run', 'run', run.id, error);
+            showError('Error moving test: ' + error.message);
+        }
+    };
+
     const duplicateRun = async (vehicleId, runId) => {
         try {
             const vehicle = vehicles.find(v => v.id === vehicleId);
@@ -570,6 +598,7 @@ export function AppProvider({ children }) {
                     case 'chargerCurrentClass': normalized.charger_current_class_a = toChargerCurrent(v); break;
                     case 'altitudeFt':      normalized.altitude_ft       = toNum(v);  break;
                     case 'elevationGainFt': normalized.elevation_gain_ft  = toNum(v);  break;
+                    case 'windSpeedMph':    normalized.avg_wind_speed_mph = toNum(v);  break;
                     case 'sourceUrl':       normalized.source_url         = v;         break;
                     default:                normalized[k] = v;                         break;
                 }
@@ -1257,7 +1286,7 @@ export function AppProvider({ children }) {
             await dataService.updateTag(id, name);
             setTags(prev => prev.map(t => t.id === id ? { ...t, name } : t)
                                 .sort((a, b) => a.name.localeCompare(b.name)));
-            // Tags are denormalised onto each vehicle for the cards, so a rename
+            // Tags are denormalized onto each vehicle for the cards, so a rename
             // has to reach them too or the old label survives until a reload.
             setVehicles(prev => prev.map(v => ({
                 ...v,
@@ -1369,17 +1398,22 @@ export function AppProvider({ children }) {
 
     // Can this user edit a vehicle or run record?
     // resource: { user_id } for vehicles; for runs pass the parent vehicle
+    // Mirrors can_write_vehicle (migration 099): a viewer owns their vehicle
+    // only until a curator lists it.
+    const ownsUnlisted = (resource) =>
+        resource?.user_id === user.id && !isListedVehicle(resource);
+
     const canEdit = (resource) => {
         if (!user) return false;
         if (isContributor) return true;        // admin + contributor can edit anything
-        return resource?.user_id === user.id;  // user can only edit their own
+        return ownsUnlisted(resource);
     };
 
     // Can this user delete a record?
     const canDelete = (resource) => {
         if (!user) return false;
         if (isAdmin) return true;              // only admin can delete others' items
-        return resource?.user_id === user.id;
+        return ownsUnlisted(resource);
     };
 
     // Can this user toggle public/private visibility?
@@ -1494,6 +1528,7 @@ export function AppProvider({ children }) {
 
     /** Pass-through: the test vehicles a variant's EPA suggestions are ranked from (#341). */
     const getEpaSuggestionCandidates = (query) => dataService.getEpaSuggestionCandidates(query);
+    const getEpaDetail = (testVehicleIds) => dataService.getEpaDetail(testVehicleIds);
 
     const linkEpaTestVehicle = async (vehicleId, groupId, confidence, notes) => {
         try {
@@ -1936,7 +1971,7 @@ export function AppProvider({ children }) {
                 // "it said it worked but nothing appeared" can't happen again.
                 const why =
                     res.runsMatched === 0   ? 'none of the runs in this file matched by timestamp'
-                  : res.splitsSeen === 0    ? 'no splits were found in the file — the format may not be recognised'
+                  : res.splitsSeen === 0    ? 'no splits were found in the file — the format may not be recognized'
                   : res.alreadyPresent > 0  ? 'every split in this file is already on these runs'
                   : 'the file produced no new splits';
                 showError(`Nothing was added: ${why}.`);
@@ -2150,6 +2185,18 @@ export function AppProvider({ children }) {
         }
     };
 
+    // Optimistic: the box flips at once and flips back if the write fails.
+    const setEmailOptIn = async (value) => {
+        const previous = emailOptIn;
+        setEmailOptInState(value);
+        try {
+            setEmailOptInState(await dataService.setEmailOptIn(value));
+        } catch (error) {
+            setEmailOptInState(previous);
+            showError('Could not save your email choice: ' + error.message);
+        }
+    };
+
     const signOut = async () => {
         await dataService.signOut();
         window.location.reload();
@@ -2204,6 +2251,8 @@ export function AppProvider({ children }) {
         selectedVehicles,
         user,
         userRole,
+        emailOptIn,
+        setEmailOptIn,
         isAdmin,
         isContributor,
         canCreate,
@@ -2215,6 +2264,7 @@ export function AppProvider({ children }) {
         appNotification,
         clearNotification,
         showUndoable,
+        showSuccess,
         showError,
         uploadHeaderImage,
         publishModelConstant,
@@ -2231,6 +2281,7 @@ export function AppProvider({ children }) {
         createVariant,
         deleteVehicle,
         copyRunToVehicle,
+        moveRunToVehicle,
         duplicateRun,
         addRun,
         updateRun,
@@ -2293,6 +2344,7 @@ export function AppProvider({ children }) {
         setRunsSession,
         searchEpaTestVehicles,
         getEpaSuggestionCandidates,
+        getEpaDetail,
         linkEpaTestVehicle,
         createAndLinkEpaTestVehicle,
         importEpaCsiTestVehicles,

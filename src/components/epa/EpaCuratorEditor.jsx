@@ -41,7 +41,7 @@ function FuelEconomyLookup({ testVehicle, vehicle }) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-2 normal-case tracking-normal font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+            className="ml-2 normal-case tracking-normal font-medium link-button"
             title="Opens a fueleconomy.gov search for this year, make and model. It returns a results page even when the combination matches nothing, so check the listing names before trusting it."
         >
             look up on fueleconomy.gov ↗
@@ -164,7 +164,7 @@ export default function EpaCuratorEditor({ testVehicleId, canEdit, onDirtyChange
     );
 
     if (loading) return <p className="text-xs text-meta italic py-2">Loading curator data…</p>;
-    if (error)   return <p className="text-xs text-red-500 py-2">Error: {error}</p>;
+    if (error)   return <p className="text-xs status-text is-danger py-2">Error: {error}</p>;
     if (!testVehicle)  return null;
 
     const primary    = (testVehicle.epa_coefficient_sets || []).find(s => s.is_primary)    || (testVehicle.epa_coefficient_sets || [])[0]    || null;
@@ -290,7 +290,7 @@ export default function EpaCuratorEditor({ testVehicleId, canEdit, onDirtyChange
                     href="https://dis.epa.gov/otaqpub/publist1.jsp"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap shrink-0"
+                    className="text-[11px] link-button whitespace-nowrap shrink-0"
                     title="EPA Annual Certification Data — source of truth for Test Groups, coefficients, and lab reports"
                 >
                     EPA source data ↗
@@ -314,11 +314,11 @@ export default function EpaCuratorEditor({ testVehicleId, canEdit, onDirtyChange
             {/* Save / Discard — fixed bottom action bar (shown only when dirty),
                 matching the app's delete-queue paradigm. */}
             {canEdit && dirty && (
-                <div className="fixed-action-bar z-50 bg-amber-50 dark:bg-slate-800 border-t-2 border-amber-200 dark:border-slate-600">
+                <div className="fixed-action-bar is-warning z-50">
                     <div className="page-container py-3 flex items-center gap-4">
-                        <span className="font-medium flex-1 text-amber-800 dark:text-amber-300">
+                        <span className="font-medium flex-1">
                             ✎ Unsaved curator edits
-                            <span className="font-normal text-amber-700/70 dark:text-slate-400 text-sm ml-2">
+                            <span className="font-normal text-[var(--color-text-secondary)] text-sm ml-2">
                                 (adding/removing tests &amp; phases saves immediately)
                             </span>
                         </span>
@@ -451,7 +451,7 @@ export default function EpaCuratorEditor({ testVehicleId, canEdit, onDirtyChange
                 <DerivedValues testVehicle={testVehicle} />
             </div>
             <p className="text-[10px] text-meta mt-1">
-                <span className="text-indigo-500">∗</span> feeds a derived calculation below.
+                <span className="status-text is-info">∗</span> feeds a derived calculation below.
             </p>
 
             {/* Audit trail */}

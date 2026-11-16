@@ -21,7 +21,7 @@ import { DEFAULT_ACCESSORY_W } from '../constants/epa';
  * caveats sit behind ⓘ: they matter once, not every time the sidebar is open.
  *
  * The accessory load is the one slider that moves by itself. On AUTO it follows
- * the temperature slider (accessoryLoad.js) and is drawn grey, like a control
+ * the temperature slider (accessoryLoad.js) and is drawn gray, like a control
  * nobody has touched; the moment the reader drags it, it is theirs, it turns
  * the primary color, and a line beneath says "set by you" with an "auto"
  * action to give it back. That line is under the last row, so it appearing

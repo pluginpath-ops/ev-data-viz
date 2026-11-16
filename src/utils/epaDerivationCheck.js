@@ -14,7 +14,7 @@
  * ── Why the UNADJUSTED figure, and not the label ────────────────────────────
  *
  * The adjusted MPGe embeds the adjustment factor. Comparing it would test the
- * factor and the derivation together, and pass whenever their errors cancelled —
+ * factor and the derivation together, and pass whenever their errors canceled —
  * which is not hypothetical: a wrong factor and a wrong efficiency pull the same
  * number in opposite directions. The unadjusted figure is upstream of the
  * factor, so a mismatch there is unambiguously ours.
@@ -33,7 +33,7 @@
 /**
  * Agreement bands, as fractions.
  *
- * EPA publishes unadjusted MPGe to one decimal, so at ~150 MPGe the quantisation
+ * EPA publishes unadjusted MPGe to one decimal, so at ~150 MPGe the quantization
  * alone is ~0.1%. Anything inside 1% is therefore exact for our purposes — the
  * R2 lands at 0.03%. Beyond 5% the difference is larger than any plausible
  * accumulation of rounding and something is genuinely wrong.
@@ -182,7 +182,7 @@ export const RANGE_AGREEMENT_TOLERANCE = 0.01;
  * it works on every imported test vehicle.
  *
  * It is the epic's validation gate #1 — "recompute from bags, must match
- * reported" — and it localises a fault to one cycle. The Model Y Performance
+ * reported" — and it localizes a fault to one cycle. The Model Y Performance
  * record states a 412.88 mi highway range; we derived ~378 from its bags, and
  * that 8% gap was diagnosed only after working backwards from MPGe.
  *

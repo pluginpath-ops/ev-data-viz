@@ -29,7 +29,7 @@ export default function PresetPicker({ presets, activeKey = null, modifiedKey = 
             >
                 Compare for
             </span>
-            <div className="stats-segmented" role="group" aria-label="Compare for (presets)">
+            <div className="segmented" role="group" aria-label="Compare for (presets)">
                 {presets.map(p => {
                     const state = p.key === activeKey ? 'active' : p.key === modifiedKey ? 'modified' : '';
                     return (

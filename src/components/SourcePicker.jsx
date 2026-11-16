@@ -4,7 +4,7 @@
  *
  * `value` is `{ sourceId, newName }`; `utils/sources.pickedSource` turns it
  * into the source to write. Until something is chosen, a link typed alongside
- * suggests its source by domain — shown as selected, and labelled as coming
+ * suggests its source by domain — shown as selected, and labeled as coming
  * from the link, because it is a default the curator can change.
  */
 import { findSource } from '../utils/sources';

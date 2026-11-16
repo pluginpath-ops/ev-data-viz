@@ -18,8 +18,8 @@ describe('which clicks are counted', () => {
 });
 
 describe('the events', () => {
-    it('are four, named for what they say', () => {
-        expect(Object.values(SITE_EVENTS).sort()).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view']);
+    it('are nine, named for what they say (four for Home, five for the setup wizard)', () => {
+        expect(Object.values(SITE_EVENTS).sort()).toEqual(['chart_view', 'featured_open', 'featured_reset', 'home_view', 'season_toggle', 'setup_apply', 'setup_close', 'setup_jump', 'setup_open']);
     });
 
     it('keys a once-per-tab event by the event and the comparison', () => {

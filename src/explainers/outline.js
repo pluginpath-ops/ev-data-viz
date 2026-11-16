@@ -4,7 +4,7 @@
  * its frontmatter. Titles here are for topics not yet written; a written
  * page's own title wins (topics.js).
  *
- * The roots are hubs: pages that summarise the ones under them, written
+ * The roots are hubs: pages that summarize the ones under them, written
  * last (build step 6). "Hub" is a word for code and these notes only; the
  * page shows a hub by its title.
  */
@@ -49,6 +49,10 @@ export const OUTLINE = [
               children: [
                   { slug: 'dc-fast-charging-loss', title: 'How much energy does DC fast charging lose?',
                     blurb: 'Why the label’s charging loss is an AC figure, what a fast charge loses instead, and how EVBench came to 9%.' },
+                  { slug: 'charging-speed-and-energy', title: 'How does charging speed impact energy consumption?',
+                    blurb: 'Where the energy goes on a home charge, and why a slower charge takes more of it.' },
+                  { slug: 'evbench-charging-energy', title: 'How does EVBench calculate charging energy consumption?',
+                    blurb: 'One fixed draw added to each car’s EPA figure, and how well that fits the measurements.' },
               ] },
         ],
     },

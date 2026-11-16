@@ -106,7 +106,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                                 href={shown('source_url')}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                                className="text-[11px] link-button"
                             >
                                 source ↗
                             </a>
@@ -115,7 +115,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                             <button
                                 type="button"
                                 onClick={() => setEditingSource(true)}
-                                className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                                className="text-[11px] link-button"
                             >
                                 edit
                             </button>
@@ -197,7 +197,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
             <button
                 type="button"
                 onClick={() => setOpen(o => !o)}
-                className="mt-2 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                className="mt-2 text-[11px] font-medium link-button"
             >
                 {open ? '▾ Hide individual runs' : `▸ Show all ${runs.length} runs`}
             </button>
@@ -243,7 +243,7 @@ export default function PerformanceSessionCard({ session, canEdit, onDelete, onS
                         </tbody>
                     </table>
                     <p className="text-[10px] text-meta mt-1">
-                        Grade is signed: + is uphill. Runs on a steeper grade flatter or penalise
+                        Grade is signed: + is uphill. Runs on a steeper grade flatter or penalize
                         the result and are flagged when used as a measured figure.
                     </p>
                 </div>

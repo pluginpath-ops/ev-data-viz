@@ -65,6 +65,8 @@ export function defaultChartConfig() {
         // the view, so a link — and the pop-out — draw the chart the sender saw.
         rangeChartType: DEFAULT_RANGE_CHART_TYPE,
         effUnit:        DEFAULT_EFFICIENCY_UNIT,
+        // Home Charger's chart ('cost' or 'time'), held here so a link and the pop-out draw it.
+        homeChargerChart: 'cost',
         scatterXField:  null,   // selected X column key for the spec chart's scatter
         scatterYField:  null,   // selected Y column key for the spec chart's scatter
         // The reader's correction (utils/correctionSettings.js): what every
@@ -90,7 +92,7 @@ export function defaultRoadTripConfig() {
         mode: 'distance', startSoc: 90, minSoc: 10, destinationMinSoc: 10,
         legDistance: 150, chargeTime: 30,
         totalDistance: 500, speed: 70,
-        overhead: 5,              // per-stop overhead minutes (applies to EV and ICE)
+        overhead: 5,              // per-stop overhead minutes, EV charging stops only (the gas car's stop is its own fill-up, #555)
         yAxis: 'chargeTime',      // 'distance' | 'chargeTime' | 'byTest'
         xAxis: 'totalTime',       // 'totalTime' | 'driveTime' — Road Trip's timeline
         sweepYAxis: 'totalTime',  // 'totalTime' | 'driveTime' | 'chargeTime' | 'avgSpeed' (Trip Optimizer)
@@ -102,7 +104,7 @@ export function defaultRoadTripConfig() {
         optimizerChart: 'map',    // 'map' | 'speed' | 'tripDist' (charge per stop)
         bestPlan: true,           // each sweep point takes the best of the other setting
         // The speeds the BEST plan may use. The fastest is still drawn, and
-        // labelled as such: 95 mph wins on a fast charger, and nobody should
+        // labeled as such: 95 mph wins on a fast charger, and nobody should
         // be told to drive it.
         optimizerSpeedMin: 55,
         optimizerSpeedMax: 80,

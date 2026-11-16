@@ -2,10 +2,6 @@ import { interpolate } from './interpolate';
 import { convDistance, roundTo } from './unitConversions';
 
 // ── Constants ────────────────────────────────────────────────────────────────
-// Moved to constants/epa.js when condition correction (#188) became a second
-// consumer: two modules disagreeing about the aero share would make the same
-// test read differently on two charts.
-import { AERO_FRACTION, TOWING_AERO_FRACTION, REFERENCE_SPEED_MPH as REFERENCE_SPEED } from '../constants/epa';
 const MAX_ITERATIONS       = 200;  // safety guard against infinite loops (≈ enough stops for any trip)
 const MIN_DRIVE_MI         = 0.1;  // minimum driveable distance before bailing
 const TAIL_END_KW          = 5;    // assumed charging power at 100% SoC for the synthetic tail
@@ -102,25 +98,6 @@ export function buildChargeTail(sortedBySoc, batteryKwh) {
     return tail;
 }
 
-// ── Speed correction ─────────────────────────────────────────────────────────
-
-/**
- * Physics-based speed correction factor for efficiency.
- * Models energy ∝ aeroFraction×(v/v_ref)² + (1−aeroFraction).
- * Returns a multiplier on Wh/mi (>1 = worse, <1 = better).
- *
- * @param {number} travelMph  Actual travel speed
- * @param {number} testMph    Speed at which efficiency was measured
- * @param {number} [aeroFraction]  Fraction of energy from aero drag at ref speed.
- *   Use TOWING_AERO_FRACTION (~0.85) when towing, AERO_FRACTION (~0.70) unladen.
- */
-export function speedCorrectionFactor(travelMph, testMph, aeroFraction = AERO_FRACTION) {
-    if (!testMph || testMph <= 0) return 1;
-    const travelTerm = aeroFraction * (travelMph / REFERENCE_SPEED) ** 2 + (1 - aeroFraction);
-    const testTerm   = aeroFraction * (testMph   / REFERENCE_SPEED) ** 2 + (1 - aeroFraction);
-    return travelTerm / testTerm;
-}
-
 // ── Simulation ───────────────────────────────────────────────────────────────
 
 /**
@@ -128,8 +105,9 @@ export function speedCorrectionFactor(travelMph, testMph, aeroFraction = AERO_FR
  *
  * @param {Object} params
  * @param {number}  params.batteryKwh       Usable battery capacity
- * @param {number}  params.miPerKwh         Tested efficiency (mi/kWh)
- * @param {number}  params.testSpeedMph     Speed the range test was conducted at
+ * @param {number}  params.miPerKwh         Efficiency AT the travel speed (mi/kWh), already
+ *   priced there by tripEfficiency.efficiencyAtSpeed. The simulation does no speed
+ *   pricing of its own: one speed model, in one place.
  * @param {Array}   params.chargingData     Charging run data points (sorted by frame)
  * @param {number}  params.startSoc         Starting SoC (0–100)
  * @param {number}  params.minSoc           Minimum SoC before charging en route (0–100)
@@ -141,15 +119,14 @@ export function speedCorrectionFactor(travelMph, testMph, aeroFraction = AERO_FR
  * @param {number}  params.chargeTimeMinutes Fixed charge duration per stop (mode B)
  * @param {'distance'|'time'} params.mode   Simulation mode
  * @param {number}  [params.overheadMinutes] Per-stop overhead (default 5)
- * @param {boolean} [params.towingMode]      When true, use higher aero fraction for speed correction
  *
- * @returns {{ segments, totalTimeMin, totalDistMi, chargeStops, warnings, speedFactor, correctedMiPerKwh, completed }}
+ * @returns {{ segments, totalTimeMin, totalDistMi, chargeStops, warnings, miPerKwh, completed }}
  */
 export function simulateRoadTrip({
-    batteryKwh, miPerKwh, testSpeedMph, chargingData,
+    batteryKwh, miPerKwh, chargingData,
     startSoc, minSoc, destinationMinSoc, legDistanceMi, totalDistanceMi,
     speedMph, chargeTimeMinutes = 30, mode = 'distance',
-    overheadMinutes = 5, towingMode = false,
+    overheadMinutes = 5,
 }) {
     const warnings = [];
     const segments = [];
@@ -175,11 +152,6 @@ export function simulateRoadTrip({
     // stopped short and charged a single point at a time to creep the rest.
     const destFloor = (destinationMinSoc != null && !isNaN(destinationMinSoc)) ? destinationMinSoc : minSoc;
 
-    // Speed correction — use higher aero fraction when towing (trailer raises Cd×A of system)
-    const aeroFrac = towingMode ? TOWING_AERO_FRACTION : AERO_FRACTION;
-    const factor = speedCorrectionFactor(speedMph, testSpeedMph, aeroFrac);
-    const correctedMiPerKwh = miPerKwh / factor;
-
     // Prepare charging curve sorted by SoC, extended with a synthetic high-SoC tail
     // so charging past the measured data tapers realistically instead of via slope
     // extrapolation. Both lookup orders share the augmented curve.
@@ -195,9 +167,9 @@ export function simulateRoadTrip({
     const curveByTime = [...curveBySoc].sort((a, b) => a.time - b.time);
 
     // Range (mi) available driving from `soc` down to a given floor.
-    const rangeFrom = (soc, floor) => batteryKwh * (soc - floor) / 100 * correctedMiPerKwh;
+    const rangeFrom = (soc, floor) => batteryKwh * (soc - floor) / 100 * miPerKwh;
     // SoC needed now to cover `mi` of driving.
-    const socForMiles = mi => (mi / (batteryKwh * correctedMiPerKwh)) * 100;
+    const socForMiles = mi => (mi / (batteryKwh * miPerKwh)) * 100;
 
     let currentSoc  = startSoc;
     let currentDist = 0;
@@ -388,8 +360,7 @@ export function simulateRoadTrip({
         totalDistMi:  currentDist,
         chargeStops,
         warnings,
-        speedFactor: factor,
-        correctedMiPerKwh,
+        miPerKwh,
         completed,
     };
 }

@@ -12,16 +12,16 @@ import InfoIcon from '../InfoIcon';
 import { EPA_EXPLAINERS } from '../../utils/epaExplainers';
 
 const SOURCE_LABEL = {
-    measured:            { text: 'measured',  cls: 'text-green-600 dark:text-green-400' },
-    'measured-fallback': { text: 'measured (proc 84)', cls: 'text-green-600 dark:text-green-400' },
-    assumed:             { text: 'assumed',   cls: 'text-amber-600 dark:text-amber-400' },
-    estimated:           { text: 'estimated', cls: 'text-amber-600 dark:text-amber-400' },
-    manual:              { text: 'manual',    cls: 'text-indigo-600 dark:text-indigo-400' },
-    computed:            { text: 'computed',  cls: 'text-green-600 dark:text-green-400' },
+    measured:            { text: 'measured',  cls: 'status-text is-good' },
+    'measured-fallback': { text: 'measured (proc 84)', cls: 'status-text is-good' },
+    assumed:             { text: 'assumed',   cls: 'status-text is-warning' },
+    estimated:           { text: 'estimated', cls: 'status-text is-warning' },
+    manual:              { text: 'manual',    cls: 'status-text is-info' },
+    computed:            { text: 'computed',  cls: 'status-text is-good' },
     // Amber, with the others that are not this vehicle's own measurement. A
     // corrected η is a real highway measurement scaled by a fleet constant —
     // better than the highway figure for a cruise curve, and still borrowed.
-    corrected:           { text: 'corrected', cls: 'text-amber-600 dark:text-amber-400' },
+    corrected:           { text: 'corrected', cls: 'status-text is-warning' },
 };
 
 function DerivedRow({ label, tooltip, result, format }) {
@@ -39,7 +39,7 @@ function DerivedRow({ label, tooltip, result, format }) {
                 </span>
                 {source && <span className={`text-[10px] ${meta.cls}`}>{meta.text}</span>}
                 {flags.length > 0 && value != null && (
-                    <span title={flags.join(', ')} className="text-amber-500 text-xs">⚠</span>
+                    <span title={flags.join(', ')} className="status-text is-warning text-xs">⚠</span>
                 )}
             </span>
         </div>

@@ -6,10 +6,9 @@ const LINEAR_CURVE = [{ soc: 0, time: 0 }, { soc: 100, time: 100 }];
 
 const baseParams = {
     batteryKwh: 100,
-    miPerKwh: 1,
-    testSpeedMph: 65,
+    miPerKwh: 1,        // at the travel speed: the simulation prices no speed itself
     chargingData: LINEAR_CURVE,
-    speedMph: 65,       // == testSpeedMph, so the speed-correction factor is 1
+    speedMph: 65,
     overheadMinutes: 0,
 };
 
@@ -214,7 +213,6 @@ describe('destination SoC requirement (road trip)', () => {
                 ...baseParams,
                 batteryKwh: 82,
                 miPerKwh: 3.8,
-                testSpeedMph: 70,
                 speedMph: 70,
                 overheadMinutes: 5,
                 startSoc: 90,
@@ -243,7 +241,6 @@ describe('destination SoC requirement (road trip)', () => {
                 ...baseParams,
                 batteryKwh: 82,
                 miPerKwh: 3.8,
-                testSpeedMph: 70,
                 speedMph: 70,
                 overheadMinutes: 5,
                 startSoc: 90,
@@ -274,7 +271,6 @@ describe('destination SoC requirement (road trip)', () => {
             ...baseParams,
             batteryKwh: 82,
             miPerKwh: 3.8,
-            testSpeedMph: 70,
             speedMph: 70,
             overheadMinutes: 5,
             startSoc: 90,

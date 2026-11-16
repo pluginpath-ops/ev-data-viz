@@ -87,7 +87,7 @@ describe('alignSeries', () => {
 
     it('interpolates the crossing rather than snapping to the next sample', () => {
         // The real failure: 5 coarse points, so the first sample at/above 10%
-        // is 25% — the old behaviour drew this from t=0 as if it started at 10.
+        // is 25% — the old behavior drew this from t=0 as if it started at 10.
         const r = alignSeries(pts2([0, 0], [25, 10], [50, 20]), 10);
         expect(r.interpolated).toBe(true);
         expect(r.offset).toBeCloseTo(4, 6);            // 10/25 of the way from 0→10 min
@@ -313,7 +313,7 @@ describe('the opening ramp is kept out of the slope', () => {
 
     it('trims nothing when power was never logged', () => {
         // The SoC slope alone cannot tell a ramp from coarse sampling, and
-        // guessing would penalise every run that simply logs sparsely.
+        // guessing would penalize every run that simply logs sparsely.
         expect(rampLength(pts([25, 0], [26, 1], [40, 10]))).toBe(0);
     });
 

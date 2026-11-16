@@ -40,10 +40,11 @@ const CSS = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8');
  */
 function tokensFor(theme) {
     // Anchored to the start of a line, and not allowed to cross `;` or `}`.
-    // Line 4 declares `@variant dark (&:where([data-theme="dark"], …))`, so a
-    // pattern that may skip any characters up to the next `{` matches THERE and
-    // then runs on into the light block — handing back the light palette
-    // labelled as dark. The selector list itself is matched loosely, since
+    // The stylesheet once declared `@variant dark (&:where([data-theme="dark"],
+    // …))` near the top, and a pattern that could skip any characters up to the
+    // next `{` matched THERE and ran on into the light block — handing back the
+    // light palette labeled as dark. The variant is gone (#296); the anchor
+    // stays, so any other mention of the selector cannot do the same. The selector list itself is matched loosely, since
     // light is `:root, [data-theme="light"]` and pinning the exact text broke
     // twenty assertions when that gained a second selector.
     // The FIRST matching block is not reliably the palette. `:root` is declared
@@ -114,7 +115,7 @@ const PAIRINGS = [
     ['--color-success-text', '--color-card'],
 
     // ── The re-skin's tiers ────────────────────────────────────────────────
-    // The design handoff runs eight greys where the palette ran four. Each new
+    // The design handoff runs eight grays where the palette ran four. Each new
     // one is listed against the surfaces its screens actually paint it on.
     //
     // The handoff's own ninth value — a #5a6474 micro-label — is deliberately
@@ -180,9 +181,9 @@ describe('the token blocks were actually found', () => {
         expect(THEMES.dark['--color-card']).not.toBe(THEMES.light['--color-card']);
     });
 
-    it('does not mistake the @variant declaration for the dark block', () => {
-        // Line 4 is `@variant dark (&:where([data-theme="dark"], …))`, which
-        // contains the dark selector but declares no tokens.
+    it('does not mistake another mention of the dark selector for the dark block', () => {
+        // The `@variant dark` line that used to sit above the palette contained
+        // the dark selector but declared no tokens. See tokensFor().
         expect(THEMES.dark['--color-text-primary']).not.toBe(THEMES.light['--color-text-primary']);
     });
 });
@@ -274,10 +275,28 @@ describe('the two themes declare the same tokens', () => {
         const onlyLight = Object.keys(tokensFor('light')).filter(k => !(k in tokensFor('dark')));
         expect(
             { onlyDark, onlyLight },
-            'Add the missing token to the other theme block. If it is a re-skin '
-            + 'addition, give light a provisional value and mark it '
-            + '`/* provisional — light pass */` so the light pass can find it.',
+            'Add the missing token to the other theme block.',
         ).toEqual({ onlyDark: [], onlyLight: [] });
+    });
+});
+
+describe('tint text never sits on its own solid', () => {
+    // `--color-primary-text` is made to be read on the WASH (`-surface`,
+    // `-light`). On the solid `--color-primary` it is blue on blue: 2.2:1 in
+    // dark and 1.7:1 in light, which is how every segmented control's active
+    // option shipped unreadable. The pair sweep above cannot see it, because
+    // it checks pairs someone listed; this reads the rules.
+    it('no rule pairs a status -text token with that status as a fill', () => {
+        const rules = CSS.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g);
+        const bad = [];
+        for (const [, selector, body] of rules) {
+            for (const hue of ['primary', 'warning', 'danger', 'success']) {
+                const fill = new RegExp(`background(?:-color)?:\\s*var\\(--color-${hue}\\)`).test(body);
+                const text = new RegExp(`(?<![-\\w])color:\\s*var\\(--color-${hue}-text[,)]`).test(body);
+                if (fill && text) bad.push(selector.trim());
+            }
+        }
+        expect(bad, `Use the wash (-surface or -light) under the tint text: ${bad.join(', ')}`).toEqual([]);
     });
 });
 
@@ -314,12 +333,15 @@ function jsxFiles(dir, acc = []) {
 }
 
 /**
- * A light background written inline, with no dark counterpart.
+ * A light background written inline.
  *
  * `bg-amber-50` and `bg-white` are fixed light colors. In dark mode the text
  * on them is light too, and the result is the invisible-input bug. A
- * `dark:bg-…` beside it means someone thought about it; nothing beside it means
- * nobody did.
+ * `dark:bg-…` beside one used to excuse it; it no longer can. The `dark:`
+ * variant was keyed to `data-theme` until the curator screens moved onto
+ * tokens (#296), and was then deleted — Tailwind's own `dark:` follows the
+ * device, not the theme picker, so a pair written with it is wrong whenever
+ * the two differ.
  */
 const LIGHT_BG = /\bbg-(?:white|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200))\b/g;
 
@@ -329,8 +351,7 @@ function offenders() {
         const src = readFileSync(file, 'utf8');
         for (const line of src.split('\n')) {
             const hits = line.match(LIGHT_BG);
-            // A dark: variant anywhere on the line means the pair was considered.
-            if (hits && !/\bdark:bg-/.test(line)) {
+            if (hits) {
                 found.push(`${relative(ROOT, file)}: ${hits.join(' ')}`);
             }
         }
@@ -366,7 +387,7 @@ describe('hardcoded light surfaces', () => {
         expect(
             now.length,
             now.length > KNOWN_OFFENDERS
-                ? `New hardcoded light background with no dark: variant. Use a token — `
+                ? `New hardcoded light background. Use a token — `
                   + `--color-warning-surface / --color-danger-surface / --color-success-surface, `
                   + `or --color-surface-muted for plain chrome.\n${now.join('\n')}`
                 : `${KNOWN_OFFENDERS - now.length} fixed — lower KNOWN_OFFENDERS to ${now.length}.`,

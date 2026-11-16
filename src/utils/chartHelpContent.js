@@ -62,15 +62,15 @@ export const CHART_HELP_DEFAULTS = {
             'C-rate — charge power ÷ battery size (kW ÷ kWh); ~1C ≈ adding a full pack in an hour, regardless of car size.\n' +
             'Range Rate — miles of range gained per minute (or per hour).\n' +
             'SoC Rate — percent of the battery added per minute.\n' +
-            'Range Added — change since the start of the plotted window. A composite curve is rebuilt from the tests that reach its start — race mode’s start SoC, or otherwise as far back as two of its tests reach. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
-            'Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the range actually logged in the test.',
+            'Range Added — change since one start SoC shared by every curve (by default the lowest SoC every selected curve reaches; set it beside the axes). A test that began above the start is projected back to it; a composite curve is rebuilt from the tests that reach it, and the rest are named. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
+            'EPA Range vs Tested Range — EPA-rated range projected from SoC, vs the range actually logged in the test.',
         math_approach:
             'Mostly the raw measured points drawn as-is — no smoothing or curve-fitting. ' +
             'The computed fields are simple arithmetic: C-rate = charge kW ÷ battery kWh; ' +
             'range rate = (rated miles ÷ battery kWh) × charge kW ÷ 60 per minute, or without ' +
             'the ÷ 60 per hour; SoC rate = charge kW ÷ battery kWh × 100 ÷ 60; EPA range = ' +
-            '(SoC ÷ 100) × the car’s rated miles; the “added” fields subtract the first ' +
-            'reading in view. The optional range backfill matches each SoC to the range ' +
+            '(SoC ÷ 100) × the car’s rated miles; the “added” fields subtract the reading ' +
+            'at the start SoC. The optional range backfill matches each SoC to the range ' +
             'from the vehicle’s range test by linear interpolation.',
     },
 
@@ -189,11 +189,12 @@ export const CHART_HELP_DEFAULTS = {
             'directly (distance ÷ energy) or estimated from the SoC drop × battery size. ' +
             'You set the trip: total distance, travel speed, miles between charging stops ' +
             '(or a target charge time), start/min SoC, and a per-stop overhead. A dashed ' +
-            'grey “ICE Reference” line models a gas car for comparison.',
+            'gray line models a gas car for comparison: the car picked in the sidebar, the same one ' +
+            'Cost & Time uses, labeled with its name (“Your gas car” until you pick or name one).',
         how_to_read:
             'Read it as a race against the clock (and against gas). The default view plots ' +
             'distance covered vs elapsed time; flat steps are charging stops, and each ' +
-            'car’s total trip time — and how it compares to ICE — is labelled at the ' +
+            'car’s total trip time — and how it compares to the gas car — is labeled at the ' +
             'finish. You can also chart cumulative charge time or per-car SoC “lanes”; the ' +
             'Trip Optimizer tab searches travel speed and stop plan for the sweet spot. Because ' +
             'charging follows each car’s actual curve, a faster-charging car can win a long ' +
@@ -203,16 +204,22 @@ export const CHART_HELP_DEFAULTS = {
             'SoC — battery %.\n' +
             'mi/kWh — driving efficiency.\n' +
             'Leg / distance between charges — how far you drive before each stop.\n' +
-            'Overhead — fixed minutes added per stop (park, plug in, break).\n' +
-            'ICE Reference — a gas car driving 3-hour legs with the same per-stop overhead.\n' +
-            'Charge stop — modelled from the real charging curve between your start and minimum SoC.',
+            'Overhead — the extra minutes off the route for each charging stop (park, plug in, break). ' +
+            'A gas stop has none: its fill-up minutes are already its whole time off the route.\n' +
+            'The gas car — the one picked under Your gas car, set once for here and Cost & Time. ' +
+            'It stops when its tank runs down to the fill-up level, and each stop takes the fill-up’s ' +
+            'minutes, the total time off the route with nothing added. This chart times it; it ' +
+            'prices no fuel.\n' +
+            'Charge stop — modeled from the real charging curve between your start and minimum SoC.',
         math_approach:
             'For each car it steps through drive legs and charge stops: a leg drains the ' +
             'battery at the speed-corrected efficiency; a stop adds energy by following the ' +
             'measured charging curve for the set time (or until there’s enough range for ' +
             'the next leg). Efficiency is scaled for travel speed (faster = less ' +
             'efficient). Trip time = driving time + charging time + per-stop overhead. The ' +
-            'ICE line drives fixed 3-hour legs with the same overhead. It’s a model — real ' +
+            'gas car line drives its tank down to the fill-up level at its highway mpg (cut for ' +
+            'cold when the trip is corrected to a temperature under 75°F), then stops for its ' +
+            'fill-up minutes (the total time off the route). It’s a model — real ' +
             'charger availability, weather and traffic will vary.',
     },
 
@@ -232,7 +239,7 @@ export const CHART_HELP_DEFAULTS = {
             'setting, so the lowest point of a line is that car’s best trip; off, the other ' +
             'setting is held at what you entered. On a fast charger the fastest plan is ' +
             'often a speed nobody should drive, so the fastest legal plan keeps to the legal range ' +
-            'you set under Your plan (55–80 mph to start) and the fastest is shown apart, labelled as such. ' +
+            'you set under Your plan (55–80 mph to start) and the fastest is shown apart, labeled as such. ' +
             'The table names each car’s fastest legal plan, the charge window it implies (arrive ' +
             'at, leave with), what it saves over your own plan, and every plan within 2% ' +
             'of its trip time — the optimum is usually broad, and the span is the useful ' +
@@ -253,6 +260,114 @@ export const CHART_HELP_DEFAULTS = {
             'within the grid’s steps, so read it to the nearest step, not exactly. The ' +
             'charge-per-stop axis ends at the longest stop a full charge from your Min SoC ' +
             'to 95% can use: past it every plan is blank or the same trip as the row below.',
+    },
+
+    drivecost: {
+        title: 'About Compare',
+        data_source:
+            'Prices the week you set on Your Driving (or in the sidebar) for each selected ' +
+            'vehicle, and the same week in your gas car. Highway miles are priced from ' +
+            'EVBench’s range tests, corrected to your speed, season and elevation; city ' +
+            'miles from the EPA highway figure, corrected the same way. A car with no ' +
+            'range test is priced from EPA for both, and says so. Fast-stop minutes come ' +
+            'from the car’s own charging curve where EVBench has one.',
+        how_to_read:
+            'Each card gives a car’s two answers against your gas car: what it saves (or ' +
+            'costs) a month, and the time it adds (or saves) a month, with its fast stops. Everything here is a month: the simulated week × 52 ÷ 12. The first chart stacks ' +
+            'home charging (solid) and fast charging (striped) per car beside the gas bill; the second sets fast-charging ' +
+            'minutes against fill-up minutes. Months are for the season shown; the card’s ' +
+            'year line blends winter months with summer ones. Winter is a floor: denser air ' +
+            'and cabin heat are priced, battery warming and cold tires are not. The gas car ' +
+            'loses mpg in the cold too: about 15% city and 7% highway at 20°F, none from 75°F up.',
+        key_terms:
+            'Fast stop — a stop on the route, when a day runs short of home charging.\n' +
+            'Stop to charge by — the battery level a stop is made at.\n' +
+            'Charge no higher than — where a stop ends, stretched to 80% when that saves a second stop.\n' +
+            'Keep battery above — the floor the whole day stays over.\n' +
+            'Planned fast charge — a day you fast charge anyway, topping up to the cap.',
+        math_approach:
+            'The week is simulated hour by hour, three times over so Monday starts from a ' +
+            'settled battery, and the third week is reported. Home charging is the lesser ' +
+            'of your charger and the car’s onboard charger, through the window you plug in, ' +
+            'with charger losses. A stop’s minutes are the curve’s, plus the detour and the ' +
+            'time to start and pay; fast energy is bought with its charging loss. A month is ' +
+            'the week × 52 ÷ 12.',
+    },
+
+    driveplan: {
+        title: 'About the Weekly Charging Plan',
+        data_source:
+            'One selected vehicle through the week you set on Your Driving (or in the ' +
+            'sidebar), priced the same way as Compare: highway miles from EVBench’s ' +
+            'range tests, city miles from the EPA highway figure, both corrected to your ' +
+            'speed, season and elevation; fast-stop minutes from the car’s own charging ' +
+            'curve where EVBench has one.',
+        how_to_read:
+            'Pick the chart above it. "Day by day" goes in time order. Each day’s gray bar ' +
+            'is the day out, from that morning’s battery (the tick) to where the car ' +
+            'gets home. A fast stop on the route sits inside it, striped orange, at the ' +
+            'levels it charged between; a planned fast charge is solid orange. The bar in ' +
+            'the car’s color is the night at home, up to the next morning, where a dashed ' +
+            'line hands over to the next day. The gray bar is how far the battery fell, so ' +
+            'a day with a stop used more than it shows; hover a day for both. "Charge in and ' +
+            'used" draws the same figures from zero: charge in above, driving below. The dashed tick on ' +
+            'a night’s bar is the most that night could have added, with your charger at full power for the whole ' +
+            'plug-in window: the gap above the bar is the charger’s margin, and no gap means the window cut the ' +
+            'night short. A tick above the top of the chart sits on its edge with an arrow.\n' +
+            '"The week as a line" is range left, in miles on the left and the battery’s percent on the ' +
+            'right, from Monday midnight to Sunday night. It falls as you drive and climbs ' +
+            'at home overnight. Each orange band is a fast stop, labeled with its minutes ' +
+            '(detour and time to start and pay in); a lighter one is a planned fast charge. ' +
+            'The dashed lines at 10% and 80% mark the everyday range. The gray shading is your plug-in ' +
+            'window each night; where the line has leveled off, the darker end of the shading is time to spare. Under the chart, ' +
+            'the week as a table, a column a day: the fast-charging rows (stops, time, ' +
+            'cost) are outlined in orange, and "Ready at" gives the time the night filled ' +
+            'the battery, or the end of your plug-in window when it ran out. "Spare plug-in time" is the window left after that, "None" when it ran out. Compare with the other ' +
+            'season or another home charger in a second chart below, and open your gas ' +
+            'car’s week to see its fill-ups.',
+        key_terms:
+            'Fast stop — a stop on the route, when a day runs short of home charging.\n' +
+            'Planned fast charge — a day you fast charge anyway; skipped when already above the cap.\n' +
+            'Home adds — what the night’s window put back, through your charger and the car’s onboard charger.\n' +
+            'Ready at — where the battery stands when the next day starts.',
+        math_approach:
+            'Three weeks are simulated and the third shown, so Monday starts from what ' +
+            'Sunday night left. Long days drive 7 am to 6 pm, ordinary days an hour each ' +
+            'way. A stop is made at “stop to charge by” (later, when the day starts below ' +
+            'it) and adds enough to finish the day above “keep battery above”. Range in ' +
+            'miles is the week’s miles per percent of battery, detours in.',
+    },
+
+    drivecharger: {
+        title: 'About Home Charger',
+        data_source:
+            'The week you set on Your Driving, priced for each selected vehicle at every ' +
+            'home charger level, everything else as you set it. Priced the same way as ' +
+            'the Compare sub-tab.',
+        how_to_read:
+            'The Cost chart: each column is what a car costs a month with that charger at home (the week × 52 ÷ 12, as on Compare): home ' +
+            'charging underneath in its color, fast charging on top striped in it over a muted ' +
+            'shade, the total over it, and the home figure on the home part when there is fast charging too. The faster the charger, the more the night ' +
+            'covers and the smaller the fast part. The Time chart switches the same figures to minutes: one column a car, ' +
+            'its fast charging per month at each charger (home charging is overnight, so it is not counted). The table has a column a charger and, ' +
+            'for each car, its minutes of fast charging and its home, fast and total cost ' +
+            'per month. The bold orange cell is “enough from here”: the smallest charger past ' +
+            'which a bigger one saves less than five minutes a week (about 20 a month). A ^ means the car’s own ' +
+            'onboard charger, not the wall, sets the pace, so a bigger charger buys nothing. ' +
+            'The dashed line over a column is the most home charging could cost that month, a ceiling the home part never passes. A ceiling above the top of the chart ' +
+            'sits on its edge with an arrow, and does not stretch the scale; hover a column for its figure.',
+        key_terms:
+            'Home charger — 120 V on a wall outlet, or 240 V at the amps the circuit allows.\n' +
+            'Onboard charger — the car’s own AC charger; it limits how fast any home charger can fill it.\n' +
+            'Most it could cost at home — the charger (or the onboard charger, if lower) at full power the whole time you are plugged in, every night, at your home price.\n' +
+            'Enough from here — where a bigger charger stops making a difference you would notice.',
+        math_approach:
+            'Power at home is the lesser of volts × amps and the car’s onboard charger ' +
+            '(11.5 kW assumed when the spec is blank), with charger losses: at 240 V the car’s ' +
+            'own EPA certification figure where it has one, else the site-wide one; on a 120 V ' +
+            'outlet that scaled down to 80% for a car at the site-wide figure. Each level runs ' +
+            'the whole week simulation again. Winter below 40°F, parked outside, costs more than ' +
+            'shown: the car warms its battery before it charges, which is not priced.',
     },
 
     perfcompare: {
@@ -364,7 +479,7 @@ export const CHART_HELP_DEFAULTS = {
             'selected vehicle — to reveal relationships (e.g. battery size vs range, power vs ' +
             'price). Both axes are the table’s own figures; only numeric fields are offered.',
         how_to_read:
-            'Each dot is a vehicle (X = one field, Y = another); the dashed grey line is a ' +
+            'Each dot is a vehicle (X = one field, Y = another); the dashed gray line is a ' +
             'best-fit trend across all plotted vehicles. Use it to spot correlations and ' +
             'outliers — a car well above the line is doing better than its peers on the Y ' +
             'field for its X value. Vehicles missing either value aren’t plotted; a note ' +
@@ -377,7 +492,7 @@ export const CHART_HELP_DEFAULTS = {
         math_approach:
             'Dots are the table’s values (unit-converted for display). The trend line ' +
             'is an ordinary least-squares regression (the slope and intercept that ' +
-            'minimise squared vertical error), drawn from the lowest to the highest X. ' +
+            'minimize squared vertical error), drawn from the lowest to the highest X. ' +
             'It’s descriptive only — it doesn’t imply causation, and a few vehicles can ' +
             'swing the slope.',
     },

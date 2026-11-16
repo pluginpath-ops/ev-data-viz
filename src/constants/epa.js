@@ -19,7 +19,7 @@ export const US06_AVG_MPH     = 48.4;
 export const HIGHWAY_BAND_MPH = [65, 75];    // reference band drawn on the curve
 // The single speed the curve screens call out: the midpoint of the band above,
 // and the one number a reader compares vehicles at. Named because it is drawn,
-// labelled AND read back in the legend — three places that must agree.
+// labeled AND read back in the legend — three places that must agree.
 export const CURVE_REFERENCE_MPH = 70;
 
 // EPA label arithmetic (#206). Regulatory definitions, so they live up here with
@@ -153,6 +153,21 @@ export const EPA_DEFAULTS = {
     // two records above both sit below its lower quartile, so they were a low
     // read of the fleet (#506). Refresh it as the data grows.
     ASSUMED_CHARGER_EFF: 0.885,
+    // The car's own fixed draw while it AC charges, watts: onboard charger
+    // standby, electronics, pumps. It is the same whatever the rate, so slower
+    // charging loses more: Cost & Time takes a car's charger efficiency
+    // (above, or its EPA figure) at its onboard charger's full power and
+    // lowers it by this below that, η = η_ref − P₀(1/P − 1/P_ref). One value
+    // for every car: ADAC's per-car fits run about 130–500 W with no pattern
+    // by efficiency or size (r ≈ 0.19 against the full-power loss). 200 W is
+    // the owner's figure (2026-11-15), near the ADAC fit of 210 W.
+    FIXED_DRAW_W: 200,
+    // Battery warming a home charge buys, parked outside: kWh per kWh of
+    // usable pack per °F below PACK_WARMING_BELOW_F (constants/costToDrive.js).
+    // A GUESS (owner, 2026-11-15), loosely one Rivian R1T: about 5 kWh on a
+    // ~20°F night with a ~135 kWh pack. Real cars vary a lot by heater, pack
+    // and insulation; less in a garage.
+    BATTERY_WARMING_KWH: 0.002,
     // What a DC fast session loses between the car's port and the pack's DC
     // output (what the inverter draws), as a fraction of the energy the
     // station bills (#506). The same span the AC figure above covers, so the
@@ -167,7 +182,7 @@ export const EPA_DEFAULTS = {
     // 9.4%, median 9.3%, as the owner read them from the videos. The only
     // measurement that stops at the battery (ADAC, four cars) is 1–6%
     // preconditioned, which leaves the pack's internal losses out. 9% is the
-    // round number at the centre; it is one value on purpose, since the spread
+    // round number at the center; it is one value on purpose, since the spread
     // does not follow maker or platform in any way the unlogged conditions
     // do not also explain. Sources and the gaps: explainers/facts.json,
     // `dc-fast-round-trip-pairs`.
@@ -203,19 +218,37 @@ export const EPA_DEFAULTS = {
     // The heating and cooling a range test is assumed to have run with (#449).
     // No test records its HVAC use, so the load is a stand-in: DEFAULT_ACCESSORY_W
     // while the cabin holds itself, plus a heater or A/C once the weather leaves
-    // the comfort band. One straight line each way, for every car, whatever
-    // heats it — a heat pump draws roughly half a resistive heater, and the
-    // line cannot tell them apart. The slopes are a starting point, not a fit
-    // (owner, 2026-10-25), read against the reference table in
-    // AccessoryLoadReference.jsx, whose own figures are unsourced: heating at
-    // 50 W/°F is 1,700 W at 32°F (between its heat-pump and resistive columns)
-    // and 3,300 W at 0°F (inside the heat pump's); cooling at 70 W/°F is 1,000 W
-    // at 80°F, the low end of its A/C column. The truth is probably very much
-    // vehicle size and shape dependent; #475 will compare predicted corrections
-    // with actual tests before anything is fitted.
-    ACCESSORY_COMFORT_BAND_F: [60, 70],   // °F: no heating or cooling inside it
-    ACCESSORY_HEAT_W_PER_F:   50,         // W for each °F below the band
-    ACCESSORY_COOL_W_PER_F:   70,         // W for each °F above the band
+    // the comfort band. One load for every car, whatever heats it — a heat pump
+    // draws roughly half a resistive heater, and the model cannot tell them
+    // apart. The truth is probably very much vehicle size and shape dependent;
+    // #475 compares predicted corrections with actual tests before anything is
+    // fitted.
+    //
+    // Heating is a straight line, 50 W/°F: 1,700 W at 32°F (between the heat-pump
+    // and resistive columns of AccessoryLoadReference.jsx, whose own figures are
+    // unsourced) and 3,300 W at 0°F. A starting point (owner, 2026-10-25), and the
+    // two cold-ish screens below put it about right.
+    //
+    // Cooling is a CURVE, the square of the degrees above the band, anchored at
+    // 1,000 W at 95°F (owner, 2026-11-15): 160 W at 80°F, 1,250 W at 98°F. It
+    // was a straight 70 W/°F, which credited 700 W at 80°F and 1,960 W at 98°F,
+    // and that over-corrected hot tests. Same-car repeats under the same
+    // procedure, corrected to 70°F (mi/kWh, hot test against its mild twin):
+    //   R1S Dual Max 96°F vs 66°F       line 2.68 vs 2.58   curve 2.60 vs 2.58
+    //   Model Y Performance 98°F vs
+    //     Model Y L 80°F (owner expects the Performance slightly worse)
+    //                                   line 4.07 vs 4.00   curve 3.91 vs 3.88
+    //   Gravity GT 80°F vs 66°F         line 3.00 vs 3.07   curve 2.93 vs 3.07
+    // The Gravity pair pulls the other way, inside the ~5% that repeats of one
+    // car spread by. The curve's shape is the owner's: A/C barely works at 75°F
+    // and works hard in the 90s. Measured climate and electronics draws, read
+    // off in-car energy screens, are kept in facts.json as
+    // `measured-accessory-loads` — add to it as more turn up. So far they say
+    // mild-weather HVAC is a per-car floor, which cancels in a correction, and
+    // none was hot, so the 95°F anchor is a read of the pairs above.
+    ACCESSORY_COMFORT_BAND_F:  [60, 70],  // °F: no heating or cooling inside it
+    ACCESSORY_HEAT_W_PER_F:    50,        // W for each °F below the band
+    ACCESSORY_COOL_W_AT_95F:   1000,      // W of A/C at 95°F; rises with the square of °F above the band
     // What a range test is taken to have used, in Wh/mi, when it records no
     // energy — the load in watts is turned into range through the test's OWN
     // consumption, and a blank has to be taken as something.
@@ -225,7 +258,7 @@ export const EPA_DEFAULTS = {
     // Temperature is corrected for air density and for the assumed heating and
     // cooling load (ACCESSORY_*), so the band can be wide. Its edges still
     // matter: below freezing the error in that load (battery conditioning, cold
-    // tyres, heat pump against resistive heater) is comparable to the effect
+    // tires, heat pump against resistive heater) is comparable to the effect
     // itself, and hot-soak A/C pull-down is not in the line either. The owner
     // chose [0, 100] on 2026-10-25 knowing that. Speed is corrected fully,
     // but the further a test is from the target the more the single
@@ -236,14 +269,14 @@ export const EPA_DEFAULTS = {
 
     // How far the EPA label range may sit from the vehicle's spec range before
     // the curator form flags it. NOT a tie between the fields: one vehicle trim
-    // legitimately maps to several EPA configurations — different wheels, tyres
+    // legitimately maps to several EPA configurations — different wheels, tires
     // or a carry-over year — and those differ by a few miles without either
     // number being wrong.
     //
     // 5% tolerates that (a few miles on a 300-mile car) while still catching the
     // failure worth catching: a link to the wrong pack or a mistyped figure,
     // which are usually tens of miles out. Tunable because the right threshold
-    // is a curation judgement, not a fact.
+    // is a curation judgment, not a fact.
     LABEL_RANGE_TOLERANCE_PCT: 5,
 
     // sanity bands (Section-8 flags) + curve extent
@@ -306,7 +339,7 @@ export const EPA_DEFAULTS = {
 
     // ── Data Checks (#321) ──────────────────────────────────────────────────
     // The limits Admin → Data Checks measures each vehicle against. Curation
-    // judgements rather than facts, set from the 2026-09-10 corpus, and tried
+    // judgments rather than facts, set from the 2026-09-10 corpus, and tried
     // live on that panel before anything is kept.
 
     // How far apart one vehicle's linked EPA configurations may read on range
@@ -385,6 +418,8 @@ export const DEFAULT_SS_ETA      = resolve('DEFAULT_SS_ETA',      EPA_DEFAULTS.D
 export const DEFAULT_ACCESSORY_W = resolve('DEFAULT_ACCESSORY_W', EPA_DEFAULTS.DEFAULT_ACCESSORY_W);
 export const ACCESSORY_LOAD_KW   = DEFAULT_ACCESSORY_W / 1000;  // derived (kW)
 export const ASSUMED_CHARGER_EFF = resolve('ASSUMED_CHARGER_EFF', EPA_DEFAULTS.ASSUMED_CHARGER_EFF);
+export const FIXED_DRAW_W        = resolve('FIXED_DRAW_W',        EPA_DEFAULTS.FIXED_DRAW_W);
+export const BATTERY_WARMING_KWH = resolve('BATTERY_WARMING_KWH', EPA_DEFAULTS.BATTERY_WARMING_KWH);
 export const DC_FAST_LOSS        = resolve('DC_FAST_LOSS',        EPA_DEFAULTS.DC_FAST_LOSS);
 export const AERO_FRACTION        = resolve('AERO_FRACTION',        EPA_DEFAULTS.AERO_FRACTION);
 export const TOWING_AERO_FRACTION = resolve('TOWING_AERO_FRACTION', EPA_DEFAULTS.TOWING_AERO_FRACTION);
@@ -409,8 +444,10 @@ export const ACCESSORY_COMFORT_BAND_F =
     resolve('ACCESSORY_COMFORT_BAND_F', EPA_DEFAULTS.ACCESSORY_COMFORT_BAND_F);
 export const ACCESSORY_HEAT_W_PER_F =
     resolve('ACCESSORY_HEAT_W_PER_F', EPA_DEFAULTS.ACCESSORY_HEAT_W_PER_F);
-export const ACCESSORY_COOL_W_PER_F =
-    resolve('ACCESSORY_COOL_W_PER_F', EPA_DEFAULTS.ACCESSORY_COOL_W_PER_F);
+export const ACCESSORY_COOL_W_AT_95F =
+    resolve('ACCESSORY_COOL_W_AT_95F', EPA_DEFAULTS.ACCESSORY_COOL_W_AT_95F);
+/** The temperature ACCESSORY_COOL_W_AT_95F is quoted at. Fixed: it is the knob's unit, not a setting. */
+export const ACCESSORY_COOL_ANCHOR_F = 95;
 export const ASSUMED_TEST_CONSUMPTION_WH_MI =
     resolve('ASSUMED_TEST_CONSUMPTION_WH_MI', EPA_DEFAULTS.ASSUMED_TEST_CONSUMPTION_WH_MI);
 

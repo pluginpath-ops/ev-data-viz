@@ -7,7 +7,7 @@
 -- ends up with NO WORKING RLS — which is the one thing this database exists to
 -- test.
 --
--- ── Fidelity: stub the identity, not the authorisation ──────────────────────
+-- ── Fidelity: stub the identity, not the authorization ──────────────────────
 --
 -- `auth.uid()` is faked. `public.current_user_role()` is NOT — it arrives from
 -- the dump exactly as migration 001 defines it:
@@ -15,7 +15,7 @@
 --     SELECT role FROM public.profiles WHERE id = auth.uid();
 --
 -- and every RLS policy that calls it is the real one too. So a test exercises
--- the actual authorisation logic and only lies about who is asking. Replacing
+-- the actual authorization logic and only lies about who is asking. Replacing
 -- current_user_role() instead would have been easier and would have tested
 -- nothing: the policies would be running against a function production does not
 -- have.

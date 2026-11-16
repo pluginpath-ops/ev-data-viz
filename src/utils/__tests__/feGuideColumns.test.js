@@ -25,7 +25,7 @@ describe('resolveColumns', () => {
     it('finds a column under the same name apart from case, spacing and punctuation', () => {
         const r = resolveColumns(['division', 'Car line', 'Comb Range  (miles)'], wanted);
         expect(r.missing).toEqual([]);
-        expect(r.renamed.map(x => x.how)).toEqual(['normalised', 'normalised', 'normalised']);
+        expect(r.renamed.map(x => x.how)).toEqual(['normalized', 'normalized', 'normalized']);
         expect(r.found.Carline).toBe('Car line');
     });
 
@@ -63,7 +63,7 @@ describe('suggestColumns', () => {
 });
 
 describe('headerSimilarity', () => {
-    it('is 1 for the same name once normalised and falls as they diverge', () => {
+    it('is 1 for the same name once normalized and falls as they diverge', () => {
         expect(headerSimilarity('Fuel 2', 'Fuel2')).toBe(1);
         expect(headerSimilarity('Division', 'Carline')).toBeLessThan(0.5);
     });

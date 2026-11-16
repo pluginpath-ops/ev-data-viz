@@ -126,7 +126,7 @@ describe('MCT — Rivian R2', () => {
         close(m.cycles.hwy.mpge,   88.37, 0.05);
         close(m.combinedMpge,      98.16, 0.05);
 
-        // The uncorrected value, stated so a regression is recognisable rather
+        // The uncorrected value, stated so a regression is recognizable rather
         // than merely a failing number.
         expect(m.combinedMpge).toBeLessThan(114);
     });
@@ -198,7 +198,7 @@ describe('degenerate records', () => {
 });
 
 describe('derived 5-cycle vs the flat 0.7 factor', () => {
-    // The claim being checked: the regression penalises efficient vehicles and
+    // The claim being checked: the regression penalizes efficient vehicles and
     // the flat factor does not, because the regression's intercept is a fixed
     // cost in the inverse domain and so does not scale with efficiency.
     //

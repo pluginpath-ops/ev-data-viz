@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 
 /**
- * A section band: the full-width labelled divider that opens and closes a
+ * A section band: the full-width labeled divider that opens and closes a
  * section of a chart's sidebar (docs/vocabulary.md).
  *
  * The run selector, Road Trip's routing overrides, the performance run picker
@@ -40,7 +40,7 @@ export default function SectionBand({ open, onToggle, label, count = null, activ
         >
             <span aria-hidden="true" className="collapsible-caret" style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
             {/* The note sits under the label, not under the caret, so it reads
-                as part of the section it summarises. */}
+                as part of the section it summarizes. */}
             <span className="section-band-text">
                 <span className="flex items-center gap-2">
                     <span className="text-micro">{label}</span>

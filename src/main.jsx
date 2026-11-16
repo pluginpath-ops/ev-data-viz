@@ -14,7 +14,7 @@
  * error, only wrong numbers.
  */
 import './index.css';
-import { applyStoredTheme } from './styles/themeBootstrap';
+import { startTheme } from './styles/themeBootstrap';
 import { applyTypographyOverrides } from './styles/typographyKnobs';
 import { fetchSiteSettingsForBootstrap, MODEL_CONSTANTS_KEY } from './services/siteSettings';
 import { seedSiteConstants, parseSiteConstants } from './constants/overrides';
@@ -31,10 +31,10 @@ if (shortLink) {
         `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`);
 }
 
-// Set data-theme before first paint. useTheme applies it too, but not until
-// React has mounted — until then :root (light) wins and the page paints white
-// before flipping, which with dark as the default is a flash on every cold load.
-applyStoredTheme();
+// Set data-theme before first paint, and keep it in step with the device and
+// with the reader's choice in another window. Until this runs :root (light)
+// wins, so a reader in dark would see the page flash white on every cold load.
+startTheme();
 
 // Apply per-browser typography overrides before first paint (no-op if none set).
 applyTypographyOverrides();

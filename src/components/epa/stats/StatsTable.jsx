@@ -192,7 +192,7 @@ export default function StatsTable({ rows, measureDef, overall, dimensionLabel, 
 
                 </tbody>
             </table>
-            {rows.length === 0 && <div className="empty-state">Nothing to summarise for this selection.</div>}
+            {rows.length === 0 && <div className="empty-state">Nothing to summarize for this selection.</div>}
         </div>
     );
 }

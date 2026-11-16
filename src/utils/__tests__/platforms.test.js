@@ -41,7 +41,7 @@ describe('matchPlatform', () => {
 });
 
 describe('describing a platform', () => {
-    it('summarises only the charging hardware that is not the default', () => {
+    it('summarizes only the charging hardware that is not the default', () => {
         expect(electricalSummary(P[1])).toBe('800 V · motor boost on 400 V');
         expect(electricalSummary(P[3])).toBe('400 V');
         expect(electricalSummary(P[0])).toBeNull();                  // mechanical

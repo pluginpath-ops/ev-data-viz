@@ -47,7 +47,7 @@ import { SPEC_CATEGORIES } from './vehicleSpecSchema';
 import { specProvenance, vehicleLabel } from './specHelpers';
 import { convValue, fmtSpeed, MI_TO_KM, LBS_TO_KG, HP_TO_KW } from './unitConversions';
 import { deriveTested } from './performanceDerivations';
-import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from './vehicleFigures';
+import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS, CHARGER_EFF_BASIS } from './vehicleFigures';
 import { sortByColumn, barMaximaOf, barPercentOf } from './tableColumns';
 import { VEHICLE_TABLE_PRESETS } from './vehicleTablePresets';
 import { CHARGE_WINDOWS, chargeTimeSession, minutesBetween } from './chargeWindows';
@@ -62,6 +62,7 @@ import { correctionFactor, runConditions } from './conditionCorrection';
 import { vehiclePlatforms, resolveVoltageClass } from './platforms';
 import { preconditionedNote } from './runPreconditioning';
 import { isCompositeRun } from './runUtils';
+import { val } from './calcTrace';
 
 // ── Units ───────────────────────────────────────────────────────────────────
 //
@@ -163,6 +164,16 @@ const FIGURE_COLUMNS = [
     { key: 'figures.epaEfficiency', label: 'EPA efficiency', unit: 'mi/kWh', metric: ['km/kWh', MI_TO_KM],
       group: 'Battery & range', numeric: true, better: 'higher', bar: true, digits: 2, scale: 'efficiency',
       hint: 'The EPA label’s combined MPGe ÷ 33.705: miles per kWh from the wall, charging losses included, so it reads below Efficiency, which divides by the battery. The MPGe is shown beneath.' },
+    // The share of wall energy that reaches the pack: the loss inside EPA
+    // efficiency, on its own. The EPA cert's (or a curator's pinned figure),
+    // else Green NCAP's; the basis is shown beneath. Blank when neither has
+    // one — the assumed figure is only named in the note beneath, so it never
+    // sorts or reads as data.
+    // The key keeps its old name: presets and short links store it.
+    { key: 'figures.chargerEfficiency', label: 'Charger eff.', unit: '%',
+      labelFor: () => 'Charger eff.', fullLabelFor: () => 'Charger efficiency',
+      group: 'Battery & range', numeric: true, better: 'higher', digits: 1,
+      hint: 'AC charging: the share of wall energy that reaches the battery (battery energy ÷ wall energy). From the EPA certification’s own recharge test or a curator’s pinned figure, else Green NCAP’s measured recharge; the source is shown beneath. Blank where neither measured it, with the figure the calculations assume instead beneath. Not DC fast charging, which has its own loss.' },
 ];
 
 const TESTED_COLUMNS = [
@@ -287,7 +298,7 @@ const WINDOW_TIME_COLUMN = {
  * menu only offers the ones a shown column reads — a table without a cost
  * column has no price to set.
  */
-export const DEFAULT_ASSUMPTIONS = { addDistance: 150, windowFrom: 10, windowTo: 80, homePrice: 0.17, fastPrice: 0.48, rangeBasis: 'tested' };
+export const DEFAULT_ASSUMPTIONS = { addDistance: 150, windowFrom: 10, windowTo: 80, homePrice: 0.17, fastPrice: 0.42, rangeBasis: 'tested' };
 
 /**
  * What "Time to add" prices a percent of charge at (`vt_basis`): what the
@@ -302,15 +313,15 @@ const RANGE_BASES = ['tested', 'epa'];
  * 40% and To starts at 50%.
  *
  * The price defaults are round figures near US averages in 2026 — about 17¢
- * residential and 48¢ at a DC fast charger — and the Assumptions menu says
+ * residential and 42¢ at a DC fast charger — and the Assumptions menu says
  * they are assumptions, not quotes.
  */
 export const ASSUMPTION_RANGES = {
     addDistance: { min: 50,   max: 300,  step: 25 },
     windowFrom:  { min: 0,    max: 40,   step: 5 },
     windowTo:    { min: 50,   max: 100,  step: 5 },
-    homePrice:   { min: 0.05, max: 0.60, step: 0.01 },
-    fastPrice:   { min: 0.15, max: 1.00, step: 0.01 },
+    homePrice:   { min: 0,    max: 1.00, step: 0.01 },
+    fastPrice:   { min: 0,    max: 1.50, step: 0.01 }
 };
 
 /** A value held to its slider: in range, on a step, and the default when it is not a number. */
@@ -356,7 +367,7 @@ function assumptionContext(assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial'
  * A column as a header shows it: a column whose name carries an assumption
  * ("Time to add 150 mi", "Charge 10→80%") is named from it.
  */
-export function labelledColumn(col, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE) {
+export function labeledColumn(col, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE) {
     if (!col?.labelFor) return col;
     const ctx = assumptionContext(assumptions, units, correctionTarget, correctionMode);
     // `fullLabelFor` names the column in full where the header's name is cut
@@ -483,6 +494,7 @@ const CALCULATED_COLUMNS = [
       better: 'higher', digits: 2, scale: 'efficiency',
       inputs: ['figures.epaRangeMi', 'figures.socWindowKwh'],
       calc: ([range, kwh]) => ratio(range, kwh),
+      traceStep: ([range, kwh]) => ({ formula: 'e = R_EPA / E_pack', values: { R_EPA: val(range, 'mi', 'data'), E_pack: val(kwh, 'kWh', 'data') } }),
       hint: 'EPA range ÷ battery. An estimate from the label range and the resolved battery capacity, not a measured figure. Battery-side: EPA efficiency, from the wall, reads lower.' },
     { key: 'calc.rangePerChargeMin', label: 'Range per minute', unit: 'mi/min', metric: ['km/min', MI_TO_KM],
       better: 'higher', digits: 1, assumption: ['window', 'rangeBasis', 'conditions'], charging: true,
@@ -490,6 +502,11 @@ const CALCULATED_COLUMNS = [
       calc: ([epaRange, min, compositeRange, testedRange], { windowShare, rangeBasis }) => {
           const { range } = pricedRange(rangeBasis, { epaRange, compositeRange, testedRange });
           return ratio(range == null ? null : range * windowShare, min);
+      },
+      traceStep: ([epaRange, min, compositeRange, testedRange], { windowShare, rangeBasis }) => {
+          const { range, basis } = pricedRange(rangeBasis, { epaRange, compositeRange, testedRange });
+          return { formula: 'rate = R × w / t_window', values: { R: val(range, 'mi'), w: val(windowShare, null, 'setting'), t_window: val(min, 'min') },
+              note: `R is the ${basis ?? 'missing'} range; w the charge window; t_window from the Charge column` };
       },
       note: ([epaRange, , compositeRange, testedRange], { rangeBasis }) =>
           pricedRange(rangeBasis, { epaRange, compositeRange, testedRange }).basis && `${pricedRange(rangeBasis, { epaRange, compositeRange, testedRange }).basis} range`,
@@ -499,6 +516,14 @@ const CALCULATED_COLUMNS = [
       labelFor: ({ addDistance, units }) => `Time to add ${addDistance} ${units === 'metric' ? 'km' : 'mi'}`,
       inputs: ['figures.epaRangeMi', 'tested.charge_window_min', 'tested.composite_range_mi', 'tested.range_mi'],
       calc: (inputs, ctx, extra) => timeToAdd(inputs, ctx, extra).value,
+      traceStep: ([epaRange, , compositeRange, testedRange], { addMi, windowFrom, rangeBasis }, { addSummary, specMin }) => {
+          const { range, basis } = pricedRange(rangeBasis, { epaRange, compositeRange, testedRange });
+          return addSummary
+              ? { formula: 't = t(SoC_end) − t(SoC_from),  SoC_end = SoC_from + add / (R / 100)', values: { SoC_from: val(windowFrom, '%', 'setting'), add: val(addMi, 'mi', 'setting'), R: val(range, 'mi') },
+                  note: `${basis} range; t(…) is read off the charging test's curve` }
+              : { formula: 't = add / (R × 0.7 / t_spec)', values: { add: val(addMi, 'mi', 'setting'), R: val(range, 'mi'), t_spec: val(specMin, 'min', 'data') },
+                  note: `${basis} range; no test covers the stop, so the spec's 10→80% average rate (0.7 = 70% of the pack)` };
+      },
       note: (inputs, ctx, extra) => timeToAdd(inputs, ctx, extra).note ?? null,
       hint: 'Minutes from the start of the charge window to add the distance set under Assumptions, pricing each percent at the composite range (else the reported range test, else EPA), or at the EPA range, as set under Assumptions. Read off the vehicle’s own charging curve where it has one; else at the average rate of the spec’s 10→80% time, and blank where that stop adds less.' },
     { key: 'calc.avgChargeKw', label: 'Avg charge', unit: 'kW',
@@ -506,11 +531,13 @@ const CALCULATED_COLUMNS = [
       labelFor: ({ windowFrom, windowTo }) => `Avg charge ${windowFrom}→${windowTo}%`,
       inputs: ['figures.socWindowKwh', 'tested.charge_window_min'],
       calc: ([kwh, min], { windowShare }) => ratio(kwh == null ? null : kwh * windowShare, min == null ? null : min / 60),
+      traceStep: ([kwh, min], { windowShare }) => ({ formula: 'P = E_pack × w / (t_window / 60)', values: { E_pack: val(kwh, 'kWh', 'data'), w: val(windowShare, null, 'setting'), t_window: val(min, 'min') } }),
       hint: 'Battery × the charge window ÷ the time to charge across it: the average power over the stop, which says more than the peak.' },
     { key: 'calc.peakCRate', label: 'Peak C-rate', unit: 'C',
       better: 'higher', digits: 2,
       inputs: ['charging.max_dc_kw', 'figures.socWindowKwh'],
       calc: ([kw, kwh]) => ratio(kw, kwh),
+      traceStep: ([kw, kwh]) => ({ formula: 'C = P_max / E_pack', values: { P_max: val(kw, 'kW', 'data'), E_pack: val(kwh, 'kWh', 'data') } }),
       hint: 'Max DC charge rate ÷ battery: how hard the pack is pushed at peak, for its size. A nerd stat — it compares packs, not how quickly a stop ends.' },
     // Over the COMPOSITE range, not the reported test: testedRange.js explains
     // why one test against EPA is not a comparison across vehicles, and the
@@ -519,16 +546,20 @@ const CALCULATED_COLUMNS = [
       better: 'higher', digits: 0, assumption: ['conditions'], notesFrom: 'tested.composite_range_mi',
       inputs: ['tested.composite_range_mi', 'figures.epaHwyMi'],
       calc: ([composite, hwy]) => { const r = ratio(composite, hwy); return r == null ? null : r * 100; },
+      traceStep: ([composite, hwy]) => ({ formula: 'pct = R_comp / R_hwy × 100', values: { R_comp: val(composite, 'mi'), R_hwy: val(hwy, 'mi', 'data') },
+          note: 'R_comp is the composite range above, corrected to your target' }),
       hint: 'Composite range ÷ EPA hwy range: the vehicle’s steady-state tests, corrected to the conditions under Assumptions, against its label’s highway figure. EPA’s highway figure is not a 70 mph figure — its cycle averages about 48 mph before the label adjustment — so 100% is a reference point, not a pass mark.' },
     { key: 'calc.pricePerMile', label: 'Price ÷ range', unit: '$/mi', metric: ['$/km', 1 / MI_TO_KM],
       better: 'lower', digits: 0,
       inputs: ['pricing.base_price_usd', 'figures.epaRangeMi'],
       calc: ([price, range]) => ratio(price, range),
+      traceStep: ([price, range]) => ({ formula: 'x = price / R_EPA', values: { price: val(price, '$', 'data'), R_EPA: val(range, 'mi', 'data') } }),
       hint: 'Advertised base price ÷ EPA range.' },
     { key: 'calc.pricePerKwh', label: 'Price per kWh', unit: '$/kWh',
       better: 'lower', digits: 0,
       inputs: ['pricing.base_price_usd', 'figures.socWindowKwh'],
       calc: ([price, kwh]) => ratio(price, kwh),
+      traceStep: ([price, kwh]) => ({ formula: 'x = price / E_pack', values: { price: val(price, '$', 'data'), E_pack: val(kwh, 'kWh', 'data') } }),
       hint: 'Advertised base price ÷ battery.' },
     { key: 'calc.costPer100Home', label: 'Cost/100 mi, home', unit: '$', metric: ['$', 1 / MI_TO_KM],
       better: 'lower', digits: 2, assumption: ['homePrice'],
@@ -536,6 +567,9 @@ const CALCULATED_COLUMNS = [
       fullLabelFor: ({ units }) => `Cost per 100 ${units === 'metric' ? 'km' : 'mi'}, home`,
       inputs: ['figures.epaEfficiency', 'calc.efficiency'],
       calc: (inputs, { homePrice }) => costPer100(homePrice)(inputs),
+      traceStep: ([epa, battery], { homePrice }) => (epa != null
+          ? { formula: 'cost = price × 100 / e_EPA', values: { price: val(homePrice, '$/kWh', 'setting'), e_EPA: val(epa, 'mi/kWh', 'data') }, note: 'EPA efficiency is from the wall' }
+          : { formula: 'cost = price × 100 / (e × η)', values: { price: val(homePrice, '$/kWh', 'setting'), e: val(battery, 'mi/kWh'), η: val(ASSUMED_CHARGER_EFF, null, 'knob:ASSUMED_CHARGER_EFF') }, note: 'no EPA label: the battery-side estimate less the charging loss' }),
       note: costNote,
       hint: 'The home electricity price set under Assumptions × 100 ÷ EPA efficiency, which counts charging losses. Where the vehicle has no EPA label, Efficiency less the assumed charging loss, marked as an estimate.' },
     { key: 'calc.costPer100Fast', label: 'Cost/100 mi, fast', unit: '$', metric: ['$', 1 / MI_TO_KM],
@@ -544,9 +578,20 @@ const CALCULATED_COLUMNS = [
       fullLabelFor: ({ units }) => `Cost per 100 ${units === 'metric' ? 'km' : 'mi'}, DC fast`,
       inputs: ['figures.epaEfficiency', 'calc.efficiency'],
       calc: (inputs, { fastPrice }, { chargerEff }) => costPer100Fast(inputs, fastPrice, chargerEff),
+      traceStep: ([epa, battery], { fastPrice }, { chargerEff }) => ({
+          formula: epa != null ? 'cost = price × 100 / (e_EPA / η_chg × (1 − loss))' : 'cost = price × 100 / (e × (1 − loss))',
+          values: {
+              price: val(fastPrice, '$/kWh', 'setting'),
+              ...(epa != null
+                  ? { e_EPA: val(epa, 'mi/kWh', 'data'), η_chg: chargerEff != null ? val(chargerEff, null, 'data') : val(ASSUMED_CHARGER_EFF, null, 'knob:ASSUMED_CHARGER_EFF') }
+                  : { e: val(battery, 'mi/kWh') }),
+              loss: val(DC_FAST_LOSS, null, 'knob:DC_FAST_LOSS'),
+          },
+          note: 'battery-side efficiency, grossed up by the DC fast charging loss',
+      }),
       note: fastCostNote,
       noteLink: fastCostNoteLink,
-      hint: 'The DC fast-charging price set under Assumptions × 100 ÷ the battery-side efficiency, grossed up by the DC fast charging loss (Admin → Model Constants): what a session loses between the car’s port and the pack’s output, cooling, auxiliary draw and the pack’s own losses among it. A DC session bypasses the onboard charger, so it does not pay the AC charging loss the home cost carries, and the station’s own conversion is not billed. Battery-side: the label’s efficiency with the charging loss taken back out (the certification’s own where it measured one, else the fleet median), or range ÷ battery without a label. Every figure is marked est., since the session loss is an assumed average; the mark links to the page that explains it. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
+      hint: 'The DC fast-charging price set under Assumptions × 100 ÷ the battery-side efficiency, grossed up by the DC fast charging loss (Admin → Model Constants): what a session loses between the car’s port and the pack’s output, cooling, auxiliary draw and the pack’s own losses among it. A DC session bypasses the onboard charger, so it does not pay the AC charging loss the home cost carries, and the station’s own conversion is not billed. Battery-side: the label’s efficiency with the charging loss taken back out (the certification’s own where it measured one, else Green NCAP’s, else the fleet median), or range ÷ battery without a label. Every figure is marked est., since the session loss is an assumed average; the mark links to the page that explains it. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
     { key: 'calc.weightPerHp', label: 'Weight per hp', unit: 'lb/hp', metric: ['kg/kW', LBS_TO_KG / HP_TO_KW],
       better: 'lower', digits: 1,
       // The cells are kg/kW in metric, so the name follows the unit.
@@ -554,17 +599,20 @@ const CALCULATED_COLUMNS = [
       fullLabelFor: ({ units }) => `Weight per ${units === 'metric' ? 'kilowatt' : 'horsepower'}`,
       inputs: ['performance.weight_lbs', 'powertrain.horsepower_hp'],
       calc: ([lb, hp]) => ratio(lb, hp),
+      traceStep: ([lb, hp]) => ({ formula: 'x = W / P', values: { W: val(lb, 'lb', 'data'), P: val(hp, 'hp', 'data') } }),
       hint: 'Curb weight ÷ horsepower. Lower is quicker, all else equal.' },
     { key: 'calc.totalCargo', label: 'Total cargo', unitGroup: 'volume', digits: 1,
       inputs: ['interior.cargo_cuft', 'interior.frunk_cuft'],
       // A missing frunk figure is not a missing frunk, so it does not blank
       // the total — the note beneath says the frunk is not counted.
       calc: ([cargo, frunk]) => (cargo == null ? null : cargo + (frunk ?? 0)),
+      traceStep: ([cargo, frunk]) => ({ formula: 'V = V_cargo + V_frunk', values: { V_cargo: val(cargo, 'cu ft', 'data'), V_frunk: val(frunk ?? 0, 'cu ft', frunk == null ? 'assumed' : 'data') } }),
       note: ([cargo, frunk]) => (cargo != null && frunk == null ? 'no frunk figure' : null),
       hint: 'Cargo volume + frunk, seats up.' },
     { key: 'calc.batteryBuffer', label: 'Battery buffer', unit: '%', digits: 1,
       inputs: ['charging.battery_usable_kwh', 'powertrain.battery_gross_kwh'],
       calc: ([usable, gross]) => (usable != null && gross > 0 && usable <= gross ? (1 - usable / gross) * 100 : null),
+      traceStep: ([usable, gross]) => ({ formula: 'buffer = (1 − E_usable / E_gross) × 100', values: { E_usable: val(usable, 'kWh', 'data'), E_gross: val(gross, 'kWh', 'data') } }),
       hint: 'The share of the gross pack held back from use: (gross − usable) ÷ gross. No better direction — a bigger buffer costs range and protects the cells.' },
 ].map(c => ({ ...c, group: 'Calculated', numeric: c.type !== 'boolean', bar: !!c.better }));
 
@@ -640,6 +688,9 @@ export const VEHICLE_COLUMNS = [
 const BY_KEY = new Map(VEHICLE_COLUMNS.map(c => [c.key, c]));
 export const vehicleColumnByKey = (key) => BY_KEY.get(key) ?? null;
 
+/** Whether "Show the math" can work a column through: the tested range columns and every calculated one. */
+export const isTracedColumn = (key) => key.startsWith('calc.') || RANGE_TESTED_COLUMNS.some(c => c.key === key);
+
 /**
  * Column keys that were renamed, to the key that replaced them, so a saved
  * link keeps the column rather than dropping it. #352 moved 400 V charging
@@ -694,6 +745,11 @@ const present = (v) => (v === '' || v === undefined ? null : v);
  * One row per vehicle, each value resolved once.
  *
  * @param {Array} vehicles  as AppContext provides them (resolved figures attached)
+ *        — the fleet, which spec inheritance looks the source vehicle up in
+ * @param {Array} [opts.only]  build rows for just these vehicles of the fleet, matched by id (#500).
+ *        A row is the same either way, `index` included: it is the vehicle's place
+ *        in `vehicles`. Everything else a row reads is its own, so a view that
+ *        shows a few vehicles need not build the fleet's.
  * @param {Object} [opts.performance]  groupPerformanceByVehicle output, or null
  *        while it loads — tested columns are then empty, not zero
  * @param {Object} [opts.assumptions]  the reader's inputs to calculated columns
@@ -707,9 +763,34 @@ const present = (v) => (v === '' || v === undefined ? null : v);
  *          `notes` holds the basis or source shown beneath a figure; `tests`
  *          the test behind it, where one is (testDetails.js TestReference)
  */
-export function buildVehicleRows(vehicles = [], { performance = null, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', platformsById = null, sessionOf = () => null, correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE } = {}) {
+export function buildVehicleRows(vehicles = [], { only = null, performance = null, assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', platformsById = null, sessionOf = () => null, correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE } = {}) {
     const calcContext = assumptionContext(assumptions, units, correctionTarget, correctionMode);
-    return vehicles.map((vehicle, index) => {
+    const build = (vehicle, index) => vehicleRow(vehicle, index, vehicles, calcContext, { performance, units, platformsById, sessionOf });
+    if (!only) return vehicles.map(build);
+    // Matched by id: a view's vehicles may be its own copies of the fleet's.
+    const place = new Map(vehicles.map((v, i) => [v.id, i]));
+    return only.filter(v => place.has(v.id)).map(v => { const i = place.get(v.id); return build(vehicles[i], i); });
+}
+
+/**
+ * One row, built by the same code as the table's, with a calculation trace
+ * (calcTrace.js) of the worked-out columns among `columns` ("Show the math").
+ * Takes buildVehicleRows' options, so the figures are the table's.
+ */
+export function traceVehicleRow(vehicle, vehicles, { assumptions = DEFAULT_ASSUMPTIONS, units = 'imperial', correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE, ...opts } = {}, { trace, columns }) {
+    const calcContext = assumptionContext(assumptions, units, correctionTarget, correctionMode);
+    const index = vehicles.indexOf(vehicle);
+    return vehicleRow(vehicle, index, vehicles, calcContext, { units, ...opts }, { trace, columns: new Set(columns) });
+}
+
+/**
+ * A traced group for a column the reader shows, else null. Called only as
+ * `trace && traceGroup(…)`, so an untraced row builds nothing for it.
+ */
+const traceGroup = (trace, columns, keys, label) => (keys.some(k => columns.has(k)) ? trace.group(label) : null);
+
+function vehicleRow(vehicle, index, vehicles, calcContext, { performance = null, units = 'imperial', platformsById = null, sessionOf = () => null }, { trace = null, columns = null } = {}) {
+    // A traced group for a column the reader shows; nothing otherwise.
         // AppContext attaches the platform rows (withPlatforms); a caller that
         // passes only the list gets the same resolution.
         const withRows = vehicle.platforms || !platformsById ? vehicle : { ...vehicle, platforms: vehiclePlatforms(vehicle, platformsById) };
@@ -767,9 +848,17 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         const mpge = vehicle.epaRange?.combinedMpge ?? null;
         values['figures.epaEfficiency'] = mpge ? mpge / MPG_E_CONVERSION : null;
         notes['figures.epaEfficiency'] = mpge ? `${Math.round(mpge)} MPGe` : null;
+        const chargerEff = vehicle.chargerEfficiency;
+        values['figures.chargerEfficiency'] = chargerEff?.value > 0 ? chargerEff.value * 100 : null;
+        // Without one, the cell stays blank and the note says what the
+        // calculations use instead, so the assumed figure never sorts as data.
+        notes['figures.chargerEfficiency'] = CHARGER_EFF_BASIS[chargerEff?.basis]?.label
+            ?? `${Math.round(ASSUMED_CHARGER_EFF * 1000) / 10}% assumed`;
 
-        const whenNew = whenNewRange(vehicle);
-        const range = testedRangeSummary(vehicle);
+        const whenNewTrace = trace && traceGroup(trace, columns, ['tested.when_new_range_mi', 'tested.capacity_retention'], 'When-new range and capacity retention');
+        const whenNew = whenNewRange(vehicle, whenNewTrace);
+        const rangeTrace = trace && traceGroup(trace, columns, ['tested.range_mi'], 'Tested range');
+        const range = testedRangeSummary(vehicle, rangeTrace);
         // Corrected to the site-wide target, as the composite is: a figure that
         // leans on one test's speed, altitude and weather is not comparable
         // until it is re-priced. The conditions it was TESTED at stay beneath it.
@@ -777,26 +866,38 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         // off these are the test's own figures. The composite does NOT follow
         // it — an uncorrected mean of tests at different conditions is the
         // comparison it exists to replace (compositeRange.js).
-        const correct = (run) => run && calcContext.correctionMode !== 'none'
-            ? correctionFactor(runConditions(run, sessionOf(run)), { mode: calcContext.correctionMode, target: calcContext.conditions }).factor
-            : 1;
-        const rangeFactor = correct(range?.run);
+        const correct = (run, t = null) => {
+            if (!run || calcContext.correctionMode === 'none') {
+                t?.note('Correction off: as measured');
+                return 1;
+            }
+            return correctionFactor(runConditions(run, sessionOf(run)), t
+                ? { mode: calcContext.correctionMode, target: calcContext.conditions, trace: t.group('Correction factor') }
+                : { mode: calcContext.correctionMode, target: calcContext.conditions }).factor;
+        };
+        const rangeFactor = correct(range?.run, rangeTrace);
         const rangeRaw = range?.fullPackMi ?? (range?.isFullPack ? range.distanceMi : null);
         values['tested.range_mi'] = rangeRaw != null ? rangeRaw * rangeFactor : null;
+        rangeTrace?.step('Tested range, corrected', { formula: 'R = R_test × k', values: { R_test: val(rangeRaw, 'mi'), k: rangeFactor }, result: values['tested.range_mi'], unit: 'mi' });
         notes['tested.range_mi'] = range ? [rangeTestNote(range, units, {
             window: range.isScaled ? 'scaled from' : range.fullPackMi == null && !range.isFullPack ? 'only' : null,
         }), rangeRaw != null ? correctedNote(rangeFactor) : null].filter(Boolean).join(' · ') : null;
         tests['tested.range_mi'] = rangeTestReference(vehicle, range, units, 'range', whenNew);
-        const efficiency = testedEfficiency(vehicle);
-        const efficiencyFactor = correct(efficiency?.run);
+        const efficiencyTrace = trace && traceGroup(trace, columns, ['tested.efficiency_mi_kwh'], 'Tested efficiency');
+        const efficiency = testedEfficiency(vehicle, efficiencyTrace);
+        const efficiencyFactor = correct(efficiency?.run, efficiencyTrace);
         values['tested.efficiency_mi_kwh'] = efficiency ? efficiency.miPerKwh * efficiencyFactor : null;
+        efficiencyTrace?.step('Tested efficiency, corrected', { formula: 'e = e_test × k', values: { e_test: val(efficiency?.miPerKwh ?? null, 'mi/kWh'), k: efficiencyFactor }, result: values['tested.efficiency_mi_kwh'], unit: 'mi/kWh' });
         notes['tested.efficiency_mi_kwh'] = efficiency
             ? [rangeTestNote(efficiency, units, { window: efficiency.isRepresentative ? null : 'over' }),
                 efficiency.estimated ? 'est. from SoC' : null, correctedNote(efficiencyFactor)].filter(Boolean).join(' · ')
             : null;
         tests['tested.efficiency_mi_kwh'] = rangeTestReference(vehicle, efficiency, units, 'efficiency');
 
-        const composite = compositeRange(vehicle, { target: calcContext.conditions, sessionOf });
+        const composite = compositeRange(vehicle, {
+            target: calcContext.conditions, sessionOf,
+            trace: trace && traceGroup(trace, columns, ['tested.composite_range_mi', 'tested.composite_efficiency_mi_kwh', 'calc.pctOfEpaHwy'], 'Composite range and efficiency'),
+        });
         values['tested.composite_range_mi'] = composite?.rangeMi ?? null;
         notes['tested.composite_range_mi'] = compositeNote(composite, 'range');
         values['tested.composite_efficiency_mi_kwh'] = composite?.miPerKwh ?? null;
@@ -805,6 +906,10 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             ? `${whenNew.impliedKwh.toFixed(1)} of ${whenNew.capacityKwh} kWh (${SOC_WINDOW_BASIS[whenNew.capacityBasis]?.label})`
             : null;
         values['tested.when_new_range_mi'] = whenNew ? whenNew.whenNewMi * correct(whenNew.run) : null;
+        if (whenNewTrace && whenNew) {
+            const k = correct(whenNew.run, whenNewTrace);
+            whenNewTrace.step('When-new range, corrected', { formula: 'R = R_new × k', values: { R_new: val(whenNew.whenNewMi, 'mi'), k }, result: values['tested.when_new_range_mi'], unit: 'mi', note: 'retention is not corrected: it is a ratio of energies' });
+        }
         notes['tested.when_new_range_mi'] = whenNew
             ? [`at ${whenNew.capacityKwh} kWh (${SOC_WINDOW_BASIS[whenNew.capacityBasis]?.label})`, correctedNote(correct(whenNew.run))].filter(Boolean).join(' · ')
             : null;
@@ -857,12 +962,15 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
             chargeSummary: charge.summary,
             addSummary: addTested.run?.charge_summary ?? null,
             specMin: num(specs?.charging?.charge_time_10_to_80_pct_min),
-            chargerEff: num(vehicle.epaRange?.chargerEfficiency),
+            chargerEff: num(vehicle.chargerEfficiency?.value),
         };
         for (const col of CALCULATED_COLUMNS) {
             const inputs = col.inputs.map(k => num(values[k]));
             const value = col.calc(inputs, calcContext, extra);
             values[col.key] = value == null || (typeof value === 'number' && !Number.isFinite(value)) ? null : value;
+            if (trace && columns.has(col.key)) {
+                trace.step(col.label, { ...col.traceStep(inputs, calcContext, extra), result: values[col.key], unit: col.unit ?? null });
+            }
             // A note can explain a blank, too ("more than a 10→80% stop adds").
             // A charging figure worked from a test says "tested"; from the spec it
             // is like every other calculation and says nothing.
@@ -890,7 +998,6 @@ export function buildVehicleRows(vehicles = [], { performance = null, assumption
         const flagged = new Set((vehicle.flagged_specs ?? []).filter(k => BY_KEY.get(k)?.spec));
 
         return { id: vehicle.id, index, vehicle, values, notes, links, tests, flagged, whenNew };
-    });
 }
 
 /**

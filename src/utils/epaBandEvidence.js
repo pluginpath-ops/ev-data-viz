@@ -13,7 +13,7 @@
  *     wrong once the next import lands. A figure printed next to the control is
  *     re-read every time someone opens the panel; a literal in a constants file
  *     is re-read never.
- *   • IT STAYS A JUDGEMENT. A band is a curation decision about how much of a
+ *   • IT STAYS A JUDGMENT. A band is a curation decision about how much of a
  *     tail to call suspect, and the data cannot make that decision. Showing the
  *     observed p5/p95 next to the current bound informs the choice without
  *     making it — which is the same reason the bands are knobs rather than
@@ -41,7 +41,7 @@ export const BAND_EVIDENCE = {
     CHARGER_EFF_BAND: { measure: 'charger_eff', label: 'Charger efficiency' },
     PACK_KWH_BAND:    { measure: 'usable_kwh',  label: 'Usable energy' },
     // Not a band but a single value, and the case for showing evidence is
-    // STRONGER here. A band is a curation judgement informed by data — how much
+    // STRONGER here. A band is a curation judgment informed by data — how much
     // of a tail to call suspect. This is a measurement, the fleet median of a
     // measure, and it should read as one rather than as a literal someone
     // chose. It is also the value most likely to go stale: it was derived from

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VEHICLE_COLUMNS, labelledColumn, DEFAULT_ASSUMPTIONS } from '../vehicleTable';
+import { VEHICLE_COLUMNS, labeledColumn, DEFAULT_ASSUMPTIONS } from '../vehicleTable';
 import { GUIDE_COLUMNS } from '../feGuideBrowse';
 import { DEFAULT_CORRECTION_TARGET } from '../correctionSettings';
 import { tableMetrics, columnWidthRem, linesNeeded, headerLinesNeeded } from './textMetrics';
@@ -39,7 +39,7 @@ function vehicleHeaders() {
         const names = new Set();
         for (const units of ['imperial', 'metric']) {
             for (const a of assumptionSets) {
-                for (const t of targets) names.add(labelledColumn(col, a, units, t).label);
+                for (const t of targets) names.add(labeledColumn(col, a, units, t).label);
             }
         }
         for (const name of names) out.push({ table: 'vehicle table', key: col.key, name, col });

@@ -14,7 +14,7 @@
  *
  * Keyed by the RANGE test, because that is the axis worth enumerating: a
  * charging curve is a property of the car and varies little, while a range test
- * is a property of the day — wind, temperature, HVAC, tyres, elevation,
+ * is a property of the day — wind, temperature, HVAC, tires, elevation,
  * humidity and load all move it, often drastically. So the list shows the
  * variable thing and you pick the stable one for it.
  *
@@ -25,11 +25,11 @@
  *
  * Keys are stringified because run ids arrive as numbers from the database and
  * as strings from the URL, and inherited runs (spec_links) carry synthetic
- * string ids. Normalising once here keeps every consumer from having to care.
+ * string ids. Normalizing once here keeps every consumer from having to care.
  *
  * ── Scope ────────────────────────────────────────────────────────────────────
  *
- * Global to the chart session, never per-view: if Charge Compare honours a
+ * Global to the chart session, never per-view: if Charge Compare honors a
  * pairing while the charging chart's range axis does not, two charts on the
  * same screen disagree about what "range" means.
  *

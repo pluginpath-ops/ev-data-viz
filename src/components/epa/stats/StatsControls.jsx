@@ -24,9 +24,9 @@ const segmentLabel = (label) => {
 
 function Segmented({ label, options, value, onChange }) {
     return (
-        <div className="stats-segmented-group">
+        <div className="segmented-group">
             <span className="text-nano">{label}</span>
-            <div className="stats-segmented">
+            <div className="segmented">
                 {options.map(o => (
                     <button
                         key={o.key}

@@ -87,7 +87,7 @@ export default function EpaAuditSweep() {
     });
 
     if (loading) return <p className="text-secondary">Checking every EPA record…</p>;
-    if (error)   return <p className="text-red-500">{error.message}</p>;
+    if (error)   return <p className="status-text is-danger">{error.message}</p>;
 
     return (
         <div className="card p-4">

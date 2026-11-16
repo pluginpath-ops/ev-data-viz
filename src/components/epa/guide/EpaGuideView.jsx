@@ -52,7 +52,7 @@ export default function EpaGuideView({ subtab = 'browse', onPlotColumn = null })
     const { data: aliases } = useAsyncResource(loadAliases, []);
     const brandIndex = useMemo(() => buildBrandIndex(aliases ?? []), [aliases]);
 
-    // Read the URL once, at mount. A filtered view is the shareable artefact
+    // Read the URL once, at mount. A filtered view is the shareable artifact
     // here, so a pasted link has to arrive already filtered.
     const [initial] = useState(() => decodeGuideParams(window.location.search));
 

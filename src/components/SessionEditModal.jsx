@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { vehiclesInSession, runsInSession } from '../utils/testSessions';
+import { vehiclesInSession, runsInSession, SESSION_COPY_FIELDS, sessionCopyDown } from '../utils/testSessions';
 import { vehicleLabel } from '../utils/specHelpers';
 import { useAppContext } from '../context/AppContext';
 import { useSources } from '../hooks/useSources';
@@ -26,6 +26,8 @@ const FIELDS = [
     { key: 'locationName', label: 'Location',    type: 'text',   placeholder: 'e.g. I-70 loop, Denver' },
     { key: 'temperatureF', label: 'Temp (°F)',   type: 'number', placeholder: 'Session-level reading' },
     { key: 'altitudeFt',   label: 'Altitude (ft)', type: 'number', placeholder: 'Session-level elevation' },
+    { key: 'windSpeedMph', label: 'Avg wind (mph)', type: 'number', placeholder: 'Session-level reading' },
+    { key: 'elevationGainFt', label: 'Elevation gain (ft)', type: 'number', placeholder: 'Net climb of the route' },
     { key: 'url',          label: 'URL',         type: 'url',    placeholder: 'https://…', wide: true },
 ];
 
@@ -38,6 +40,8 @@ function toDraft(session) {
         locationName: session?.location_name ?? '',
         temperatureF: session?.temperature_f ?? '',
         altitudeFt:   session?.altitude_ft ?? '',
+        windSpeedMph:    session?.wind_speed_mph ?? '',
+        elevationGainFt: session?.elevation_gain_ft ?? '',
         // The source is chosen from the source list (#426): null until the
         // picker is touched, when the stored text stands in.
         sourcePick:   null,
@@ -53,9 +57,12 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
     const [draft, setDraft] = useState(() => toDraft(session));
     const [saving, setSaving] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
-    // Result of the last "copy URL down" run, cleared whenever the session
-    // changes or the source URL is edited so a stale count can't linger.
+    // Result of the last copy-down, cleared whenever the session changes or a
+    // field is edited so a stale count can't linger.
     const [copyResult, setCopyResult] = useState(null);
+    // Which of the session's values to pass down. All, to start: filling
+    // blanks is the safe default, and overwriting asks first.
+    const [copyKeys, setCopyKeys] = useState(() => SESSION_COPY_FIELDS.map(f => f.key));
     const [copying, setCopying] = useState(false);
 
     useEffect(() => { setDraft(toDraft(session)); setCopyResult(null); }, [session]);
@@ -83,30 +90,32 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
         finally { setSaving(false); }
     };
 
-    // Bulk-fill runs.source_url from the session's own URL — a one-paste
-    // labour-saver for an outing with several tests, rather than typing the
-    // same link onto every row (#208). Reads session.url, the SAVED value, not
-    // the unsaved draft: the session must be saved first, so this never writes
-    // a URL the session record doesn't actually have.
-    const withUrl    = members.filter(({ run }) => run.source_url).length;
-    const withoutUrl = members.length - withUrl;
+    // Pass the session's values down to its tests — a one-click labor-saver
+    // for an outing with several tests, rather than typing the same link and
+    // conditions onto every row (#208). Reads the SAVED session, not the
+    // unsaved draft: the session must be saved first, so this never writes a
+    // value the session record doesn't actually have.
+    const copyable   = SESSION_COPY_FIELDS.filter(f => session[f.from] != null && session[f.from] !== '');
+    const fillWrites = sessionCopyDown(session, members, copyKeys, false);
+    const allWrites  = sessionCopyDown(session, members, copyKeys, true);
+    const fieldCount = writes => writes.reduce((n, w) => n + Object.keys(w.updates).length, 0);
     const handleCopyDown = async () => {
-        if (!session.url || members.length === 0) return;
-        let targets = members;
-        if (withUrl > 0) {
+        let writes = fillWrites;
+        // More fields change when overwriting: some test holds a different value.
+        if (fieldCount(allWrites) > fieldCount(fillWrites)) {
             const overwrite = window.confirm(
-                `${withUrl} test${withUrl === 1 ? '' : 's'} already ha${withUrl === 1 ? 's' : 've'} a source link. ` +
-                `Overwrite ${withUrl === 1 ? 'it' : 'them'} too? Cancel to only fill in the ` +
-                `${withoutUrl} that ${withoutUrl === 1 ? 'is' : 'are'} missing one.`
+                'Some tests already have a different value for a checked field. ' +
+                'Overwrite those too? Cancel to only fill in the blanks.'
             );
-            if (!overwrite) targets = members.filter(({ run }) => !run.source_url);
+            if (overwrite) writes = allWrites;
         }
+        if (writes.length === 0) { setCopyResult({ copied: 0 }); return; }
         setCopying(true);
         try {
-            for (const { run, vehicle } of targets) {
-                await updateRun(vehicle.id, run.id, { sourceUrl: session.url });
+            for (const { run, vehicle, updates } of writes) {
+                await updateRun(vehicle.id, run.id, updates);
             }
-            setCopyResult({ copied: targets.length, skipped: members.length - targets.length });
+            setCopyResult({ copied: writes.length });
         } finally {
             setCopying(false);
         }
@@ -155,23 +164,41 @@ export default function SessionEditModal({ session, vehicles, onSave, onDelete, 
                         </div>
                         {isContributor && members.length > 0 && (
                             <div className="session-edit-field is-wide">
-                                <span className="text-label">Copy source link</span>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <button
-                                        type="button"
-                                        onClick={handleCopyDown}
-                                        disabled={!session.url || copying}
-                                        title={!session.url ? 'Save a URL on this session first' : undefined}
-                                        className="btn btn-secondary text-sm disabled:opacity-40"
-                                    >
-                                        {copying ? 'Copying…' : 'Copy URL to all tests'}
-                                    </button>
-                                    <span className="text-xs text-secondary">
-                                        {copyResult
-                                            ? `Copied to ${copyResult.copied} test${copyResult.copied === 1 ? '' : 's'}${copyResult.skipped ? `, skipped ${copyResult.skipped}` : ''}.`
-                                            : `${withoutUrl} test${withoutUrl === 1 ? '' : 's'} have no source link · ${withUrl} already ${withUrl === 1 ? 'has' : 'have'} one`}
-                                    </span>
-                                </div>
+                                <span className="text-label">Copy to tests</span>
+                                {copyable.length === 0 ? (
+                                    <span className="text-xs text-secondary">Save a value on this session first.</span>
+                                ) : (
+                                    <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
+                                        {copyable.map(f => (
+                                            <label key={f.key} className="flex items-center gap-1 text-sm">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={copyKeys.includes(f.key)}
+                                                    onChange={e => {
+                                                        setCopyResult(null);
+                                                        setCopyKeys(k => e.target.checked ? [...k, f.key] : k.filter(x => x !== f.key));
+                                                    }}
+                                                />
+                                                {f.label}
+                                            </label>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={handleCopyDown}
+                                            disabled={copying || allWrites.length === 0}
+                                            className="btn btn-secondary text-sm disabled:opacity-40"
+                                        >
+                                            {copying ? 'Copying…' : 'Copy to all tests'}
+                                        </button>
+                                        <span className="text-xs text-secondary">
+                                            {copyResult
+                                                ? `Updated ${copyResult.copied} test${copyResult.copied === 1 ? '' : 's'}.`
+                                                : allWrites.length === 0
+                                                    ? 'Every test already matches.'
+                                                    : `${fillWrites.length} of ${members.length} test${members.length === 1 ? '' : 's'} have blanks to fill`}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         )}
                         <label className="session-edit-field is-wide">

@@ -121,7 +121,8 @@ describe('peakOnCharger', () => {
 describe('topics', () => {
     it('reads every content file, and each has a title', () => {
         expect(TOPICS.map(t => t.slug).sort()).toEqual(['400v-charger-compatibility', '400v-vs-800v',
-            'dc-fast-charging-loss', 'epa-battery-figures', 'epa-drive-cycles', 'epa-test-procedures', 'epa-vs-real-world', 'heating-cooling-and-range',
+            'charging-speed-and-energy', 'dc-fast-charging-loss', 'epa-battery-figures', 'epa-drive-cycles', 'epa-test-procedures',
+            'epa-vs-real-world', 'evbench-charging-energy', 'heating-cooling-and-range',
             'reading-modeled-efficiency', 'v2l-v2h-v2g', 'wind-and-range-tests']);
         for (const t of TOPICS) expect(t.title).not.toBe(t.slug);
     });
@@ -247,5 +248,41 @@ describe('Test Routes Lab', () => {
         const single = FACTS.get('evbench-same-car-to-empty').value;
         expect([CITY_TO_EMPTY_MI, HWY_TO_EMPTY_MI]).toEqual([single.city_mi_median, single.hwy_mi_median]);
         expect(STEADY_MPH).toBe(FACTS.get('j1634-css-65mph').value.mph);
+    });
+});
+
+describe('short sources', () => {
+    // The Sources list shows a fact's summary and each source's label when they
+    // exist; both stay short so the list reads as one line and a link.
+    it('keeps every summary to one short sentence and every label to a few words', () => {
+        for (const f of FACTS.values()) {
+            if (f.summary != null) {
+                expect(f.summary.length, f.id).toBeLessThanOrEqual(100);
+                expect(f.summary.replace(/\.$/, ''), f.id).not.toMatch(/[.;]\s/);
+            }
+            for (const s of f.sources ?? []) if (s.label != null) expect(s.label.length, f.id).toBeLessThanOrEqual(32);
+        }
+    });
+
+    it('gives every source the charging-energy pages cite a summary and labels', () => {
+        for (const slug of ['charging-speed-and-energy', 'evbench-charging-energy']) {
+            for (const id of TOPICS.find(t => t.slug === slug).doc.citations) {
+                const f = FACTS.get(id);
+                expect(f.summary, `${slug}: ${id}`).toBeTruthy();
+                for (const s of f.sources) expect(s.label, `${slug}: ${id}`).toBeTruthy();
+            }
+        }
+    });
+});
+
+describe('sourceKind', () => {
+    it('tags a source by what its link opens', async () => {
+        const { sourceKind } = await import('../sourceKind');
+        expect(sourceKind('https://docs.nlr.gov/docs/fy20osti/75323.pdf')).toBe('PDF');
+        expect(sourceKind('https://example.org/a/report.PDF?download=1')).toBe('PDF');
+        expect(sourceKind('https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste/')).toBe('Web');
+        expect(sourceKind('https://example.org/data.xlsx')).toBe('XLSX');
+        expect(sourceKind('charging-speed-and-energy')).toBe('Explainer');
+        expect(sourceKind(undefined)).toBeNull();
     });
 });

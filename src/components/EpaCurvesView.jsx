@@ -28,11 +28,12 @@ import EpaMethodologyDiagram from './epa/EpaMethodologyDiagram';
 import EpaCertificationPaths from './epa/EpaCertificationPaths';
 import EpaCycleSpeedChart from './epa/EpaCycleSpeedChart';
 import CollapsibleSection from './CollapsibleSection';
+import { useEpaDetail } from '../hooks/useEpaDetail';
 import { TWO_CYCLE_KEYS, CURVE_SPEED_RANGE, STANDARD_CONDITIONS } from '../constants/epa';
 import { buildMethodologyModel } from '../utils/epaMethodology';
 import { epaRecordFromTestVehicle, NO_RECORD_REASONS } from '../utils/epaRecordFromTestVehicle';
 import { methodologyTitle, methodologySubtitle } from '../utils/epaSectionLabels';
-import { chartTheme, chartFonts, applyChartDefaults } from '../utils/chartTheme';
+import { chartTheme, chartFonts, applyChartDefaults, fade } from '../utils/chartTheme';
 import SeriesPaletteSelect from './SeriesPaletteSelect';
 import ColorSourceNote from './ColorSourceNote';
 import { useRunSelection } from '../hooks/useRunSelection';
@@ -56,7 +57,7 @@ const EPA_TESTS = { tests: true };
  * Draws the 65–75 mph highway band after Chart.js renders its datasets.
  * Follows the same afterDraw pattern as barGroupPlugin / makeBarPlugin.
  */
-function makeReferencePlugin(bandMph, units, isDark) {
+function makeReferencePlugin(bandMph, units) {
     return {
         id: 'epaReferenceLines',
         afterDraw(chart) {
@@ -64,8 +65,9 @@ function makeReferencePlugin(bandMph, units, isDark) {
             if (!area || !scales.x) return;
 
             const x = v => scales.x.getPixelForValue(convSpeed(v, units));
-            const textColor = isDark ? 'rgba(226,232,240,0.6)' : 'rgba(107,114,128,0.8)';
-            const bandColor = isDark ? 'rgba(59,130,246,0.07)' : 'rgba(59,130,246,0.06)';
+            // Read at draw time: the chart is rebuilt on a theme flip.
+            const { tick: textColor, accent } = chartTheme();
+            const bandColor = fade(accent, 0.07);
 
             ctx.save();
 
@@ -81,80 +83,6 @@ function makeReferencePlugin(bandMph, units, isDark) {
             ctx.fillText('Hwy', (xBand0 + xBand1) / 2, area.top + 10);
 
             ctx.restore();
-        },
-    };
-}
-
-// ── Speed callout plugin ──────────────────────────────────────────────────────
-
-/**
- * Draws filled dots + range labels on each curve at specified reference speeds.
- * Pass an empty array to disable without removing the code.
- *
- * To re-enable: pass [70, 80] (or any mph values) at the call site.
- */
-function makeCalloutPlugin(calloutMphs, yAxis, units, isDark) {
-    return {
-        id: 'epaCallouts',
-        afterDatasetsDraw(chart) {
-            if (!calloutMphs.length) return;
-            const { ctx, chartArea: area, scales, data } = chart;
-            if (!area || !scales.x || !scales.y) return;
-
-            data.datasets.forEach((ds) => {
-                const curve = ds._curve;
-                if (!curve?.length) return;
-
-                const color = ds.borderColor;
-
-                calloutMphs.forEach((targetMph) => {
-                    const pt = curve.reduce((best, p) =>
-                        Math.abs(p.mph - targetMph) < Math.abs(best.mph - targetMph) ? p : best
-                    , curve[0]);
-                    if (!pt) return;
-
-                    const xVal = convSpeed(targetMph, units);
-                    const yVal = convertYValue(getYValue(pt, yAxis), yAxis, units);
-                    if (yVal == null) return;
-
-                    const px = scales.x.getPixelForValue(xVal);
-                    const py = scales.y.getPixelForValue(yVal);
-                    if (px < area.left || px > area.right || py < area.top || py > area.bottom) return;
-
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-                    ctx.fillStyle = color;
-                    ctx.fill();
-                    ctx.strokeStyle = isDark ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.9)';
-                    ctx.lineWidth = 1.5;
-                    ctx.stroke();
-
-                    if (pt.rangeMi != null) {
-                        const rangeDisplay = units === 'metric'
-                            ? `${(pt.rangeMi * 1.60934).toFixed(0)} km`
-                            : `${pt.rangeMi.toFixed(0)} mi`;
-
-                        const fonts = chartFonts();
-                        ctx.font = `${fonts.micro}px ${fonts.sans}`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'alphabetic';
-
-                        const textW = ctx.measureText(rangeDisplay).width;
-                        const labelY = py - 9;
-                        const padX = 3, padY = 2;
-                        ctx.fillStyle = isDark ? 'rgba(15,23,42,0.82)' : 'rgba(255,255,255,0.88)';
-                        ctx.beginPath();
-                        ctx.roundRect(px - textW / 2 - padX, labelY - 10 - padY, textW + padX * 2, 11 + padY * 2, 3);
-                        ctx.fill();
-
-                        ctx.fillStyle = color;
-                        ctx.fillText(rangeDisplay, px, labelY);
-                    }
-
-                    ctx.restore();
-                });
-            });
         },
     };
 }
@@ -232,7 +160,7 @@ function mappingColor(baseColor, mappingIdx) {
  *   1. Chart Options card  — Y-axis toggles, axis scale controls, collapsible
  *      per-mapping selector with color pickers and metadata
  *   2. Chart card          — canvas
- *   3. Below chart         — legend note, Copy URL, Copy PNG
+ *   3. Below chart         — legend note, Link, Image
  *
  * Props:
  *   vehicles           {Array}    — full vehicles array from context (with epa_mappings)
@@ -304,9 +232,12 @@ export default function EpaCurvesView({
 
     // ── Vehicle lists ─────────────────────────────────────────────────────────
 
-    const selectedVehicles = useMemo(() =>
+    const pickedVehicles = useMemo(() =>
         selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
     [vehicles, selectedVehicleIds]);
+    // The startup read leaves out the coefficient sets and phases this chart
+    // models from (#501); only the selected vehicles' are fetched.
+    const { vehicles: selectedVehicles, loading: epaLoading } = useEpaDetail(pickedVehicles);
 
     // What each selected vehicle is called: its curated name, widened only where
     // two selected vehicles would otherwise read the same.
@@ -367,7 +298,7 @@ export default function EpaCurvesView({
     const shown = useMemo(() => new Set(selectedMappings), [selectedMappings]);
 
     // Colors move into epaConfig for the same reason the selection does — a
-    // pop-out was losing them. Memoised because `?? {}` allocates, and a fresh
+    // pop-out was losing them. Memoized because `?? {}` allocates, and a fresh
     // object every render invalidates every dependency array holding it.
     const mappingColors = useMemo(() => epaConfig.mappingColors ?? {}, [epaConfig.mappingColors]);
     const setMappingColors = useCallback(
@@ -619,14 +550,11 @@ export default function EpaCurvesView({
         const { tick: tickColor, grid: gridColor, legend: legendColor } = chartTheme();
         applyChartDefaults(Chart);
 
-        const refPlugin     = makeReferencePlugin(HIGHWAY_BAND_MPH, units, isDark);
-        // Speed callouts disabled — labels overlap with multiple curves.
-        // Re-enable by restoring [70, 80] (or any mph values) here.
-        const calloutPlugin = makeCalloutPlugin([], yAxis, units, isDark);
+        const refPlugin     = makeReferencePlugin(HIGHWAY_BAND_MPH, units);
 
         chartRef.current = new Chart(canvasRef.current, {
             type: 'line',
-            plugins: [refPlugin, calloutPlugin, readout.plugin({
+            plugins: [refPlugin, readout.plugin({
                 title: (x) => `${readoutNumber(x)} ${speedLabel(units)}`,
                 subtitle: yAxisLabel(yAxis, units),
                 describe: (row) => ({
@@ -703,7 +631,7 @@ export default function EpaCurvesView({
 
     // ── The frame's caption, and its export ─────────────────────────────────
     // The export was a hand-rolled copy of chartToPngDataUrl that drew the
-    // canvas alone: a modelled curve with no statement of what it was modelled
+    // canvas alone: a modeled curve with no statement of what it was modeled
     // AT is not a chart anyone can act on, and the conditions are the whole
     // point of this screen.
     const plotTitle = useMemo(
@@ -798,6 +726,8 @@ export default function EpaCurvesView({
     // same for every chart, and PresentedChart only draws with a selection.
 
     // ── Render ────────────────────────────────────────────────────────────────
+    if (epaLoading) return <div className="empty-state"><p>Loading EPA data…</p></div>;
+
     return (
         <div className="chart-layout">
             {/* ── Left rail: the same rig as the four charts beside it. The
@@ -815,7 +745,7 @@ export default function EpaCurvesView({
                         <span className="text-micro">Axes</span>
                         <div className="axis-rows">
                             {/* Not a disabled <input>. A field box says "you may
-                                type here" and then refuses, and greying it only
+                                type here" and then refuses, and graying it only
                                 turns that into "you may type here later" — this
                                 axis is never anything else. Stated as a value
                                 with the reason beside it. */}
@@ -846,7 +776,7 @@ export default function EpaCurvesView({
                     </div>
 
                     {/* ── OVERLAY ── the vehicle's own measured points, on top of
-                      * the modelled curve. Three states, so a segmented row
+                      * the modeled curve. Three states, so a segmented row
                       * rather than two toggles that can both look off. */}
                     <div className="chart-rail-group">
                         <span className="text-micro">
@@ -887,7 +817,7 @@ export default function EpaCurvesView({
                     {/* The shared correction target, less its speed (speed is
                         this chart's x axis), and Modeled Efficiency's own
                         extras. No "Correct:" dropdown: the sliders always
-                        apply, because a modelled curve has no measured value
+                        apply, because a modeled curve has no measured value
                         to leave uncorrected. The overlay above stays here: it
                         plots a VEHICLE's own range runs, which the
                         certification view has no way to reach. */}
@@ -921,7 +851,7 @@ export default function EpaCurvesView({
                       * collapse, a name competing with four readings on a single
                       * line, and a swatch computed by an expression that could
                       * not agree with the plot. A mapping is not a run, so the
-                      * rows are adapted rather than the component generalised —
+                      * rows are adapted rather than the component generalized —
                       * `selectorVehicles` is the whole of the adapter. */}
                     {vehiclesWithEpa.length > 0 && (
                         <div className="chart-rail-group">

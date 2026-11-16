@@ -70,7 +70,7 @@ export function wheelSizeIn(carline) {
  * A hand-written map over 18 observed values, deliberately. This is NOT the
  * carline-parsing problem — that is unbounded free text written differently by
  * every manufacturer, where this is a small closed vocabulary EPA controls. An
- * unrecognised value passes through as its own body type rather than being
+ * unrecognized value passes through as its own body type rather than being
  * bucketed into something plausible-looking.
  */
 const CLASS_SIZES = ['Small', 'Standard', 'Midsize', 'Compact', 'Subcompact', 'Minicompact', 'Large'];
@@ -118,7 +118,7 @@ export function bodyClassLabel(carlineClass) {
  *
  * The data says so plainly. `Part-time 4-Wheel Drive` is used by exactly ONE
  * manufacturer, Rivian, across all 80 rows; it appears to mean clutch
- * disconnect. But 82 of the 118 rows labelled plain `4-Wheel Drive` are also
+ * disconnect. But 82 of the 118 rows labeled plain `4-Wheel Drive` are also
  * Rivian — the Tri and Quad variants — and those disconnect too. So the same
  * maker, using the same mechanism, is split across two labels. A distinction
  * that does not survive contact with a single manufacturer's own lineup is not
@@ -199,7 +199,7 @@ export function buildBrandIndex(aliases = []) {
  * The brand and corporate parent a raw division resolves to.
  *
  * Falls back to the raw text when nothing claims it. That fallback is the
- * honest behaviour rather than a stopgap: an unmapped division is a decision a
+ * honest behavior rather than a stopgap: an unmapped division is a decision a
  * curator has not made yet, and hiding the configurations until they make it
  * would be worse than showing them under EPA's own spelling. The admin panel
  * is where the unmapped ones are surfaced for deciding.
@@ -287,7 +287,7 @@ export const GUIDE_COLUMNS = [
 
     // Battery
     { key: 'nominal_pack_kwh', label: 'Pack', unit: 'kWh', group: 'Battery', numeric: true, digits: 1, default: true, bar: true,
-      hint: 'GROSS pack energy — voltage × amp-hours. Not usable capacity, which is smaller and is a curator judgement. Reported per Test Group, so every configuration in a Test Group shares one value.' },
+      hint: 'GROSS pack energy — voltage × amp-hours. Not usable capacity, which is smaller and is a curator judgment. Reported per Test Group, so every configuration in a Test Group shares one value.' },
     { key: 'total_voltage_v',  label: 'Voltage', unit: 'V',    group: 'Battery', numeric: true, digits: 0 },
     { key: 'batt_capacity_ah', label: 'Capacity', unit: 'Ah',  group: 'Battery', numeric: true, digits: 0 },
     { key: 'batt_specific_energy_wh_kg', label: 'Specific energy', unit: 'Wh/kg', group: 'Battery', numeric: true, digits: 0 },
@@ -456,7 +456,7 @@ export function sortRows(rows, key, dir = 'asc') {
 /**
  * Filters, sort and page ↔ query string (#235).
  *
- * A filtered view is the shareable artefact here — "2026 pickups by range" is
+ * A filtered view is the shareable artifact here — "2026 pickups by range" is
  * the thing someone sends to someone else — so the state that defines one lives
  * in the URL rather than only in component state.
  *

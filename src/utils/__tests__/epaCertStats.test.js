@@ -32,7 +32,7 @@ describe('dimensions come from the linked guide row', () => {
         expect(o.drive_group).toBe('All Wheel Drive');
     });
     it('buckets them as Unknown when the test vehicle has no guide row', () => {
-        // Not null. `bucketise` skips an observation whose dimension is null,
+        // Not null. `bucketize` skips an observation whose dimension is null,
         // so a null drops the test vehicle out of the table with nothing said — which
         // is how 90 unlinked test vehicles, every GM truck among them, were invisible
         // rather than merely unclassified.

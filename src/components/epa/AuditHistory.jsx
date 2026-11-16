@@ -55,7 +55,7 @@ export default function AuditHistory({ testVehicle, getEpaAuditForTestVehicle })
             {open && (
                 <div className="mt-2 text-[11px]">
                     {loading && <p className="text-meta italic">Loading…</p>}
-                    {error && <p className="text-red-500">Error: {error}</p>}
+                    {error && <p className="status-text is-danger">Error: {error}</p>}
                     {!loading && !error && rows && rows.length === 0 && (
                         <p className="text-meta italic">No edits recorded yet.</p>
                     )}

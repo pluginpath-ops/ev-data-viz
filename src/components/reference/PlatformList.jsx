@@ -24,7 +24,7 @@ export default function PlatformList() {
     return (
         <div className="flex flex-col gap-3">
             <div className="controls-strip">
-                <div className="stats-segmented" role="group" aria-label="Kind of platform">
+                <div className="segmented" role="group" aria-label="Kind of platform">
                     {KIND_FILTERS.map(k => (
                         <button
                             key={k.key}

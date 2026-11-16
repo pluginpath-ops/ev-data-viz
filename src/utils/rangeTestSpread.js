@@ -70,8 +70,8 @@ export function rangeCoverageOk(run) {
  *
  * @returns {{ miPerKwh: number, estimated: boolean, note: string|null } | null}
  */
-export function spreadEfficiency(run, socWindowKwh) {
-    const { miPerKwh, method } = miPerKwhFrom(run, socWindowKwh);
+export function spreadEfficiency(run, socWindowKwh, trace = null) {
+    const { miPerKwh, method } = miPerKwhFrom(run, socWindowKwh, trace);
     if (!(miPerKwh > 0) || !Number.isFinite(miPerKwh)) return null;
     const estimated = method === 'soc-delta-estimate';
     return {
@@ -117,7 +117,7 @@ export function rangeBasesFor(chargingRun, vehicle, { correctionMode = 'none', c
  *
  * @param {CanvasRenderingContext2D} ctx
  * @param {Object} o
- * @param {number}   o.at          the bar's centre, across the bars
+ * @param {number}   o.at          the bar's center, across the bars
  * @param {number[]} o.px          each test's position along the value axis, in pixels
  * @param {boolean}  o.horizontal  bars run along x
  * @param {string}   o.ink         line and dot outline (chartTheme().ink)

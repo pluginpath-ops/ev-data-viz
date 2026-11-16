@@ -93,7 +93,7 @@ const IMAGE_CACHE_SECONDS = 31536000;
  *
  * Migrations are applied by hand in the Supabase SQL editor, so a deploy can
  * lead its schema by hours or days. Features reading a brand-new relation
- * degrade to their un-migrated behaviour instead of erroring — an un-merged
+ * degrade to their un-migrated behavior instead of erroring — an un-merged
  * brand list is a worse page, not a broken one.
  *
  * Deliberately narrow: only "undefined table" (42P01), "undefined function"
@@ -110,8 +110,8 @@ function isMissingRelation(error) {
   return code === '42P01' || code === '42883' || code === 'PGRST202';
 }
 
-/** Normalise a raw data-point object into a clean DB row shape. */
-function normalisePoint(point, runId, frame) {
+/** Normalize a raw data-point object into a clean DB row shape. */
+function normalizePoint(point, runId, frame) {
   return {
     run_id:      runId,
     frame,
@@ -189,7 +189,7 @@ function shapeRun(r) {
     // through, so a read we missed anywhere downstream paints magenta
     // rather than silently keeping the old per-run color alive.
     color: RETIRED_RUN_COLOR,
-    // Normalise DB snake_case to the camelCase used throughout the app.
+    // Normalize DB snake_case to the camelCase used throughout the app.
     isDefault: !!r.is_default,
     // Unlisted (#394: is_hidden narrowed to this in migration 079) and
     // excluded from the statistics — two questions, see utils/runListing.js.
@@ -200,7 +200,7 @@ function shapeRun(r) {
     isExcluded: r.is_excluded === undefined ? !!r.is_hidden : !!r.is_excluded,
     // A curator's "I have looked; count it" (migration 080, runListing).
     qualityOverride: !!r.quality_override,
-    // data_points(count) returns [{ count: N }]; normalise to a plain number.
+    // data_points(count) returns [{ count: N }]; normalize to a plain number.
     // null when the select carried no embed at all: "not counted" is not "none",
     // and utils/runPoints.js skips a fetch only for a counted 0.
     dataPointCount: Array.isArray(r.data_points) ? (r.data_points[0]?.count ?? 0) : null,
@@ -350,9 +350,24 @@ const CERTIFICATIONS_EMBED = `certifications:epa_certification_test_vehicles(id,
  * Guide candidate check derive from. Shared with the link sweep, so a
  * suggestion is checked against exactly what the EPA tab will read.
  */
-const EPA_LAB_FIELDS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, mfr_test_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
+const EPA_LAB_COLUMNS = `test_vehicle_id, test_group, model_year, make, epa_carline_name, drive, transmission, fuel_type, vehicle_config_number, evap_family, useable_kwh, total_voltage, battery_specific_energy, accessory_load_w_override, charger_efficiency_override, label_combined_mpge, label_hwy_mpge, label_range_published, label_city_mpge, label_city_range_mi, label_hwy_range_mi, unadj_city_mpge, unadj_hwy_mpge, adj_city_mpge, adj_hwy_mpge, label_adjustment_factor, label_calc_approach, nominal_pack_kwh, overrides, cd_range_combined_calc, cd_range_hwy_calc, preferred_test_number, derived_5cycle_coefficient, display_name`;
+const EPA_LAB_FIELDS = `${EPA_LAB_COLUMNS}, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, mfr_test_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
 
 const EPA_TEST_VEHICLE_FIELDS = `${EPA_LAB_FIELDS}, ${CERTIFICATIONS_EMBED}`;
+
+/**
+ * What the startup vehicle read carries of a test vehicle (#501): the label,
+ * the overrides and the tests' headline figures, plus certifications and Guide
+ * rows. These are all that `resolveEpaRange`, the capacity window and the
+ * table's EPA columns read, so no figure on a first load depends on the rest.
+ * The coefficient sets and each test's phases and comments (about a third of
+ * the EPA bytes) come from getEpaDetail, where they are shown.
+ */
+const EPA_SLIM_LAB_FIELDS = `${EPA_LAB_COLUMNS}, epa_tests(test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc)`;
+const EPA_STARTUP_FIELDS = `${EPA_SLIM_LAB_FIELDS}, ${CERTIFICATIONS_EMBED}`;
+
+/** What startup leaves out, keyed by test_vehicle_id (see EPA_SLIM_LAB_FIELDS). */
+const EPA_DETAIL_FIELDS = `test_vehicle_id, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, mfr_test_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
 
 class DataService {
   constructor() {
@@ -386,8 +401,12 @@ class DataService {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       this.user = user;
-      const { data: profile } = await getSupabase().from('profiles').select('role').eq('id', user.id).single();
+      // A wildcard, not a column list: naming email_opt_in before migration 097
+      // lands would fail the read and drop the role with it.
+      const { data: profile } = await getSupabase().from('profiles').select('*').eq('id', user.id).single();
       this.role = profile?.role || 'user';
+      // null = the column does not exist yet, so the account menu hides the box.
+      this.emailOptIn = profile?.email_opt_in ?? null;
     }
   }
 
@@ -413,12 +432,16 @@ class DataService {
     //
     // epa_vehicle_mappings is a wildcard for the same reason: `is_primary`
     // arrives with migration 067, and naming it would blank the site until then.
-    const base = '*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*)';
+    //
+    // green_ncap_assessments (migration 100) is named, columns and all: every
+    // database the app reads has it, and its `published` jsonb is not needed
+    // at startup. Only the charger efficiency fallback reads it so far.
+    const base = '*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), green_ncap_assessments(id, slug, test_year, grid_to_battery, page_url)';
     const query = (select) => getSupabase()
       .from('vehicles')
       .select(select)
       .order('created_at', { ascending: false });
-    const { data, error } = await query(`${base}, epa_vehicle_mappings(*, epa_test_vehicles(${EPA_TEST_VEHICLE_FIELDS}))`);
+    const { data, error } = await query(`${base}, epa_vehicle_mappings(*, epa_test_vehicles(${EPA_STARTUP_FIELDS}))`);
 
     // Never swallow this. Destructuring only `data` made a failed query look
     // identical to an empty account, which turned a missing migration into a
@@ -460,6 +483,7 @@ class DataService {
           // the vehicle's year, with that year's Guide figures (#374).
           epaTestVehicle:  viewForVehicle(v.year, m.epa_test_vehicles),
         })),
+        green_ncap: v.green_ncap_assessments || [],
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
         runs:  (v.runs || []).map(shapeRun),
       };
@@ -492,6 +516,25 @@ class DataService {
       ...v,
       runs: [...v.runs, ...buildInheritedRuns(v, runById, runToVehicle, lineageChargingTests(v, byId))],
     }));
+  }
+
+  /**
+   * The coefficient sets and full tests the startup read leaves out (#501), by
+   * test_vehicle_id. Merged onto a vehicle by utils/epaDetail.
+   */
+  async getEpaDetail(testVehicleIds = []) {
+    const ids = [...new Set(testVehicleIds)].filter(Boolean);
+    if (!this.useSupabase || !ids.length) return {};
+    // In chunks: a few hundred ids in one URL is past what the gateway accepts.
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+    const results = await Promise.all(chunks.map(async (chunk) => {
+      const { data, error } = await getSupabase()
+        .from('epa_test_vehicles').select(EPA_DETAIL_FIELDS).in('test_vehicle_id', chunk);
+      if (error) throw error;
+      return data || [];
+    }));
+    return Object.fromEntries(results.flat().map(r => [r.test_vehicle_id, r]));
   }
 
   // ── Manufacturers ─────────────────────────────────────────────────────────
@@ -714,7 +757,7 @@ class DataService {
    *
    * The join rows are removed explicitly rather than relying on a cascade:
    * `tags` and `vehicle_tags` predate this repo's migrations directory, so the
-   * FK's delete behaviour is not stated anywhere we control, and a missing
+   * FK's delete behavior is not stated anywhere we control, and a missing
    * cascade would fail the delete instead of orphaning it.
    */
   async deleteTag(id) {
@@ -870,6 +913,77 @@ class DataService {
     if (!data?.length) {
       throw new Error('The featured comparison was not deleted: it no longer exists, or only an admin may delete one.');
     }
+  }
+
+  // ── Saved selections (096) ────────────────────────────────────────────────
+  //
+  // The signed-in reader's own named vehicle sets; RLS shows each user only
+  // theirs. Signed out, useSavedSelections keeps them in the browser instead.
+  // Raw rows; utils/savedSelections.js normalizes them.
+
+  /**
+   * Resilient like getFeaturedComparisons: a missing table (096 not yet
+   * applied) is null and a console note, so the menu can fall back to the
+   * browser rather than break the chips row.
+   */
+  async getSavedSelections() {
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .select('id, name, vehicle_ids')
+      .order('name');
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205') {
+        console.warn('saved_selections unavailable — is migration 096 applied?', error.message);
+        return null;
+      }
+      throw error;
+    }
+    return data || [];
+  }
+
+  /** Insert one or more { name, vehicleIds }. Returns the saved rows. */
+  async addSavedSelections(entries) {
+    if (!entries.length) return [];
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .insert(entries.map(e => ({ name: e.name, vehicle_ids: e.vehicleIds })))
+      .select('id, name, vehicle_ids');
+    if (error) {
+      if (error.code === '23505') throw new Error('You already have a saved selection with that name.');
+      throw error;
+    }
+    return data;
+  }
+
+  /**
+   * Change one: `fields` is { name?, vehicleIds? }. Raises on 0 rows, as every
+   * RLS-filtered update must (the lesson of 087).
+   */
+  async updateSavedSelection(id, fields) {
+    const row = { updated_at: new Date().toISOString() };
+    if (fields.name != null) row.name = fields.name;
+    if (fields.vehicleIds != null) row.vehicle_ids = fields.vehicleIds;
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .update(row)
+      .eq('id', id)
+      .select('id, name, vehicle_ids');
+    if (error) {
+      if (error.code === '23505') throw new Error('You already have a saved selection with that name.');
+      throw error;
+    }
+    if (!data?.length) throw new Error('The saved selection was not changed: it no longer exists.');
+    return data[0];
+  }
+
+  async deleteSavedSelection(id) {
+    const { data, error } = await getSupabase()
+      .from('saved_selections')
+      .delete()
+      .eq('id', id)
+      .select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('The saved selection was not deleted: it no longer exists.');
   }
 
   // ── Spec links ────────────────────────────────────────────────────────────
@@ -1301,6 +1415,24 @@ class DataService {
   }
 
   /**
+   * Move a test to another vehicle: the same run (points, notes, pairings and
+   * every link FROM other vehicles stay), owned by a new vehicle. The target's
+   * own link to it goes, since it would read its own test, and the run lets go
+   * of "default" so it cannot collide with a default the target already has.
+   * Needs the database: a signed-out browser has no one to move it for.
+   */
+  async moveRunToVehicle(runId, targetVehicleId) {
+    if (!this.useSupabase || !this.user) throw new Error('Sign in to move a test.');
+    const sb = getSupabase();
+    const { error } = await sb.from('runs')
+      .update({ vehicle_id: targetVehicleId, is_default: false }).eq('id', runId);
+    if (error) throw error;
+    const { error: linkError } = await sb.from('spec_links')
+      .delete().eq('target_vehicle_id', targetVehicleId).eq('source_run_id', runId);
+    if (linkError) throw linkError;
+  }
+
+  /**
    * Delete a vehicle, passing its own specs, color, photo and tags to the
    * vehicles that inherit from it and re-pointing them at its source, so none
    * of them changes what it shows (migration 075, utils/vehicleDeletion.js).
@@ -1385,7 +1517,7 @@ class DataService {
       const batchSize = 1000;
       for (let i = 0; i < run.data.length; i += batchSize) {
         const batch = run.data.slice(i, i + batchSize).map((point, j) =>
-          normalisePoint(point, newRun.id, point.frame ?? (i + j))
+          normalizePoint(point, newRun.id, point.frame ?? (i + j))
         );
         const { error: batchError } = await getSupabase().from('data_points').insert(batch);
         if (batchError) throw batchError;
@@ -1605,7 +1737,11 @@ class DataService {
       return;
     }
     const { error } = await getSupabase().from('runs').update({
-      name: updates.name, date: updates.date || null,
+      // Only when given: a partial update (Unlist, a session's copy-down)
+      // sending `date: null` cleared the test's date. Undefined keys drop out
+      // of the JSON on their own; null does not.
+      name: updates.name,
+      ...(updates.date !== undefined ? { date: updates.date || null } : {}),
       software_version: updates.softwareVersion, conditions: updates.conditions,
       ...(updates.calculated_fields !== undefined ? { calculated_fields: updates.calculated_fields } : {}),
       ...(updates.kind !== undefined ? { kind: updates.kind } : {}),
@@ -1774,7 +1910,7 @@ class DataService {
     // A run with no non-null SoC sample is absent from the result rather than
     // present with nulls, which the caller already reads as "no span known".
     for (const r of data || []) {
-      // Coerced because PostgREST may serialise a numeric column as a string,
+      // Coerced because PostgREST may serialize a numeric column as a string,
       // and these are compared and scaled downstream.
       out[r.run_id] = { min: Number(r.min_soc), max: Number(r.max_soc) };
     }
@@ -2302,6 +2438,20 @@ class DataService {
     if (error) throw error;
   }
 
+  // The only profile field a user may write (migration 097). `.single()` makes a
+  // write RLS filtered out an error rather than a silent success.
+  async setEmailOptIn(value) {
+    const { data, error } = await getSupabase()
+      .from('profiles')
+      .update({ email_opt_in: value })
+      .eq('id', this.user.id)
+      .select('email_opt_in')
+      .single();
+    if (error) throw error;
+    this.emailOptIn = data.email_opt_in;
+    return data.email_opt_in;
+  }
+
   // ── Voting ─────────────────────────────────────────────────────────────────
 
   /**
@@ -2324,55 +2474,38 @@ class DataService {
    */
   async getVehicleSpecVouches(vehicleId) {
     if (!this.useSupabase) return { count: 0, myVouch: false };
-    const token = this.getBrowserToken();
     const sb = getSupabase();
 
+    // The token column is not readable (migration 099): counts come from the
+    // table, "did this browser vouch" from my_votes.
     const [{ count }, { data: mine }] = await Promise.all([
       sb.from('votes')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('target_type', 'vehicle_specs')
         .eq('target_id', vehicleId)
         .eq('vote_type', 'vouch'),
-      sb.from('votes')
-        .select('id')
-        .eq('target_type', 'vehicle_specs')
-        .eq('target_id', vehicleId)
-        .eq('vote_type', 'vouch')
-        .eq('browser_token', token)
-        .maybeSingle(),
+      sb.rpc('my_votes', {
+        p_browser_token: this.getBrowserToken(),
+        p_target_type: 'vehicle_specs',
+        p_target_ids: [vehicleId],
+      }),
     ]);
-    return { count: count ?? 0, myVouch: !!mine };
+    return { count: count ?? 0, myVouch: (mine || []).some(r => r.vote_type === 'vouch') };
   }
 
   /**
-   * Toggle a vouch on a vehicle's specs.
-   * If the current browser has already vouched → removes the vouch.
-   * Otherwise → inserts a vouch.
-   * Returns updated { count, myVouch }.
+   * Toggle a vouch on a vehicle's specs: cast_vote takes it back if this
+   * browser already vouched. Returns updated { count, myVouch }.
    */
   async toggleSpecVouch(vehicleId) {
     if (!this.useSupabase) return { count: 0, myVouch: false };
-    const token = this.getBrowserToken();
-    const sb = getSupabase();
-
-    const { data: existing } = await sb.from('votes')
-      .select('id')
-      .eq('target_type', 'vehicle_specs')
-      .eq('target_id', vehicleId)
-      .eq('vote_type', 'vouch')
-      .eq('browser_token', token)
-      .maybeSingle();
-
-    if (existing) {
-      await sb.from('votes').delete().eq('id', existing.id);
-    } else {
-      await sb.from('votes').insert({
-        target_type: 'vehicle_specs',
-        target_id: vehicleId,
-        vote_type: 'vouch',
-        browser_token: token,
-      });
-    }
+    const { error } = await getSupabase().rpc('cast_vote', {
+      p_browser_token: this.getBrowserToken(),
+      p_target_type: 'vehicle_specs',
+      p_target_id: vehicleId,
+      p_vote_type: 'vouch',
+    });
+    if (error) throw error;
     return this.getVehicleSpecVouches(vehicleId);
   }
 
@@ -2382,7 +2515,6 @@ class DataService {
    */
   async getRunVotes(runIds) {
     if (!this.useSupabase || !runIds.length) return {};
-    const token = this.getBrowserToken();
     const sb = getSupabase();
 
     const [{ data: all }, { data: mine }] = await Promise.all([
@@ -2390,11 +2522,11 @@ class DataService {
         .select('target_id, vote_type')
         .eq('target_type', 'run')
         .in('target_id', runIds),
-      sb.from('votes')
-        .select('target_id, vote_type')
-        .eq('target_type', 'run')
-        .in('target_id', runIds)
-        .eq('browser_token', token),
+      sb.rpc('my_votes', {
+        p_browser_token: this.getBrowserToken(),
+        p_target_type: 'run',
+        p_target_ids: runIds,
+      }),
     ]);
 
     const result = {};
@@ -2411,35 +2543,19 @@ class DataService {
   }
 
   /**
-   * Toggle a vouch or flag on a run.
-   * If the browser's current vote matches voteType → removes it (toggle off).
-   * If the browser has a different vote → replaces it.
+   * Toggle a vouch or flag on a run. cast_vote does the rest: the same vote
+   * again takes it back, a different one replaces it.
    * Returns updated { vouch, flag, myVote } for that run.
    */
   async toggleRunVote(runId, voteType) {
     if (!this.useSupabase) return { vouch: 0, flag: 0, myVote: null };
-    const token = this.getBrowserToken();
-    const sb = getSupabase();
-
-    const { data: existing } = await sb.from('votes')
-      .select('id, vote_type')
-      .eq('target_type', 'run')
-      .eq('target_id', runId)
-      .eq('browser_token', token)
-      .maybeSingle();
-
-    if (existing?.vote_type === voteType) {
-      // Same vote — toggle off
-      await sb.from('votes').delete().eq('id', existing.id);
-    } else {
-      if (existing) await sb.from('votes').delete().eq('id', existing.id);
-      await sb.from('votes').insert({
-        target_type: 'run',
-        target_id: runId,
-        vote_type: voteType,
-        browser_token: token,
-      });
-    }
+    const { error } = await getSupabase().rpc('cast_vote', {
+      p_browser_token: this.getBrowserToken(),
+      p_target_type: 'run',
+      p_target_id: runId,
+      p_vote_type: voteType,
+    });
+    if (error) throw error;
     const updated = await this.getRunVotes([runId]);
     return updated[runId] ?? { vouch: 0, flag: 0, myVote: null };
   }
@@ -3771,7 +3887,7 @@ class DataService {
    * Skip a finding, recording the values it was judged on — or clear the skip
    * when `fingerprint` is null.
    *
-   * Skipping again replaces the earlier judgement rather than adding a second:
+   * Skipping again replaces the earlier judgment rather than adding a second:
    * one per (vehicle, check), which is the unique constraint the upsert targets.
    * A skip is kept against its fingerprint, so a finding whose values later
    * change returns on its own; nothing here has to notice.
@@ -4061,7 +4177,7 @@ class DataService {
     const { data, error } = await getSupabase().rpc('fe_guide_summary');
     if (error) throw error;
 
-    // count() returns bigint, which PostgREST may serialise as a string.
+    // count() returns bigint, which PostgREST may serialize as a string.
     return (data || []).map(r => ({
       modelYear: r.model_year,
       rows:      Number(r.row_count),
@@ -4863,7 +4979,7 @@ class DataService {
   // ── Access logging ──────────────────────────────────────────────────────────
 
   /**
-   * Record an unauthorised access attempt (RLS violation or permission error).
+   * Record an unauthorized access attempt (RLS violation or permission error).
    * Writes via a SECURITY DEFINER RPC so anonymous callers can always insert.
    * Errors are silently swallowed — logging must never surface to the user.
    *

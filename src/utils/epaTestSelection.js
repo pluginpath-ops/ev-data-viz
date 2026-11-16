@@ -3,12 +3,12 @@
  *
  * `preferredMctTest` defaults to the most recent, and its own comment is honest
  * that this is "a defensible default and NOT a resolution" — which run
- * represents the vehicle was a curator's judgement, because nothing in the
+ * represents the vehicle was a curator's judgment, because nothing in the
  * record settles it.
  *
  * A linked Fuel Economy Guide row settles it. EPA published one pair of
  * unadjusted figures, those came from a test, and we hold the tests. Comparing
- * each against the published figure turns the judgement into a measurement.
+ * each against the published figure turns the judgment into a measurement.
  *
  * Mercedes' MY2027 CLA 350 is the case: two runs a month apart, and the default
  * picks the WRONG one.
@@ -31,7 +31,7 @@
  * wrong run, because the two sides are not always on the same basis. Our
  * derivation is wall-side. Volvo's published figures are too, so the ratio lands
  * on 1.0. Mercedes' are battery-side, so it lands on that test's charging
- * efficiency instead. Absolute distance then favours whichever test happens to
+ * efficiency instead. Absolute distance then favors whichever test happens to
  * sit nearer the published number for reasons that have nothing to do with which
  * test was used:
  *
@@ -78,7 +78,7 @@ const mctsOf = (tests = []) => tests.filter(t => num(t.procedure_code) === PROC_
  * Lives here rather than inside epaRecordFromTestVehicle because two places need the
  * same answer — the derivation, and the curator picker that has to say which
  * row "Automatic" would land on. A second copy of a tie-break is how the label
- * and the behaviour drift apart.
+ * and the behavior drift apart.
  *
  * Deterministic on purpose: an arbitrary pick that changes between loads is
  * worse than a wrong one that holds still.

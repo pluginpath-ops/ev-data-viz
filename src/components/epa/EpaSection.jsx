@@ -46,7 +46,7 @@ export const DEFAULT_EPA_SUBTAB = 'browse';
 const LEGACY_SUBTABS = { stats: 'labelstats' };
 
 /**
- * Resolve the `sub` parameter to a real sub-tab id, honouring the legacy spelling.
+ * Resolve the `sub` parameter to a real sub-tab id, honoring the legacy spelling.
  *
  * Exported because the state now lives in App.jsx — see the component below.
  */

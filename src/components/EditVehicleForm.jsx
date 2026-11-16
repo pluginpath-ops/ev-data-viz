@@ -334,7 +334,7 @@ export default function EditVehicleForm({
                   * The vehicle's own, not a run's. Color used to be curated per
                   * TEST, which does not survive contact with hundreds of cars at
                   * two to ten tests each — and it was never what a reader wanted
-                  * anyway. What you recognise on a chart is the car.
+                  * anyway. What you recognize on a chart is the car.
                   *
                   * The same picker the chart sidebars use, deliberately: this is
                   * the one place the value is DURABLE, so it gets no scope

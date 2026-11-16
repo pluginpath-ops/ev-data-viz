@@ -36,7 +36,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
             }
             setSessions(parsed);
 
-            // Initialise per-session editable names
+            // Initialize per-session editable names
             const names = {};
             parsed.forEach((s, i) => { names[i] = s.runName; });
             setSessionNames(names);
@@ -171,7 +171,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                 Choose CSV file
                                 <input type="file" accept=".csv" className="hidden" onChange={handleFile} />
                             </label>
-                            {parseError && <p className="text-red-600 text-sm text-center">{parseError}</p>}
+                            {parseError && <p className="status-text is-danger text-sm text-center">{parseError}</p>}
                         </div>
                     )}
 
@@ -239,7 +239,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                 const mappedId      = vehicleMap[raw] || '';
                                 const mappedVehicle = mappedId ? vehicles.find(v => v.id === mappedId) : null;
                                 const existingRuns  = mappedVehicle?.runs || [];
-                                // Dates of sessions for this vehicle (normalised) for clash detection
+                                // Dates of sessions for this vehicle (normalized) for clash detection
                                 const sessionDates  = new Set(vehicleSessions.map(s => normalizeDate(s.date)));
 
                                 return (
@@ -319,7 +319,7 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                                                 return (
                                                                     <li
                                                                         key={run.id}
-                                                                        className={`text-xs ${clash ? 'font-bold text-red-600' : 'text-secondary'}`}
+                                                                        className={`text-xs ${clash ? 'font-bold status-text is-danger' : 'text-secondary'}`}
                                                                     >
                                                                         {clash ? '⚠ ' : '• '}{run.name}
                                                                         {run.date && <span className="ml-1 font-normal opacity-70">({run.date})</span>}
@@ -335,14 +335,14 @@ export default function ImportTableauModal({ vehicles, onImport, onClose }) {
                                 );
                             })}
 
-                            {parseError && <p className="text-red-600 text-sm">{parseError}</p>}
+                            {parseError && <p className="status-text is-danger text-sm">{parseError}</p>}
                         </div>
                     )}
 
                     {/* ── IMPORTING STEP ── */}
                     {step === 'importing' && (
                         <div className="flex flex-col items-center justify-center py-16 gap-4">
-                            <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                            <div className="w-10 h-10 border-4 border-[var(--color-primary-light)] border-t-[var(--color-primary)] rounded-full animate-spin" />
                             <p className="text-secondary">Importing {activeSessions.length} sessions…</p>
                             <p className="text-xs text-meta">This may take a moment for large datasets</p>
                         </div>

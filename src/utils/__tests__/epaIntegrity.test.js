@@ -91,7 +91,7 @@ describe('checkRecordIntegrity — the implausibilities', () => {
         g.nominal_pack_kwh = 3.2;
         const f = checkRecordIntegrity(g);
         expect(f.findings.map(x => x.code)).toContain('pack-energy-implausible');
-        // A band is a judgement, so this is evidence rather than proof.
+        // A band is a judgment, so this is evidence rather than proof.
         expect(f.worst).toBe('warning');
     });
 

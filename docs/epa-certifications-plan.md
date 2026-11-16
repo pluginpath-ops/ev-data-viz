@@ -67,7 +67,7 @@ heading names the source, and its description names the unit it counts.
   (certification data, one point per EPA test vehicle) — the unit goes in each
   tab's description. `epaCertStats` keeps its name; the earlier N1 rename of
   this tab is withdrawn.
-- "EPA Label" is capitalised as a proper noun in UI text, so it never reads as
+- "EPA Label" is capitalized as a proper noun in UI text, so it never reads as
   a form or nav label. The 13 places that say "sticker" or "window sticker"
   become "EPA Label" in layer 1.
 - **A test vehicle's row in one certification** gets no noun of its own:
@@ -525,7 +525,7 @@ moves bucket in Certification Statistics.
   fallback.
 
 **Tests:** wiring (years and From MY… render on both surfaces), contrast,
-playground catalogue; owner's visual sign-off in the browser preview before
+playground catalog; owner's visual sign-off in the browser preview before
 commit; contributor paths against the local DB, since the preview is signed
 out.
 

@@ -31,7 +31,7 @@ export const MARGIN = 8;
  * above only when below genuinely cannot hold it AND above can hold more —
  * `belowRoom >= aboveRoom` rather than a bare fit test, because flipping into a
  * space that is also too small trades one clipped panel for another, and the
- * one below at least opens in the direction the reader is travelling.
+ * one below at least opens in the direction the reader is traveling.
  *
  * When NEITHER side holds it, the chosen side is only a starting point: the
  * panel then slides back up until its bottom edge is on screen, covering its

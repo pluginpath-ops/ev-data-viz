@@ -11,11 +11,11 @@
  * The distances are diagnostic. Each cycle is a fixed trace driven to
  * completion, so a phase is 10.26 mi or 7.45 mi to within a rounding of the
  * dyno's report — these are not free-running measurements that could land
- * anywhere. A steady-state depletion bag is the exception and is recognised by
- * being an order of magnitude longer than its neighbours rather than by any
+ * anywhere. A steady-state depletion bag is the exception and is recognized by
+ * being an order of magnitude longer than its neighbors rather than by any
  * fixed length.
  *
- * ── One phase is recognised by where it sits, not how long it is ────────────
+ * ── One phase is recognized by where it sits, not how long it is ────────────
  *
  * The last bag of a multi-cycle test is the exception to the exception, and it
  * needs `resolvePhaseTypes` rather than a distance to read it. See
@@ -34,8 +34,8 @@
  */
 import { HWFET_MI, UDDS_MI, CYCLE_DIST_TOL } from '../constants/epa';
 
-/** How many times its shortest neighbour a phase must be to read as steady-state. */
-export const SS_NEIGHBOUR_MULTIPLE = 10;
+/** How many times its shortest neighbor a phase must be to read as steady-state. */
+export const SS_NEIGHBOR_MULTIPLE = 10;
 
 const num = (v) => (v == null || v === '' || isNaN(Number(v)) ? null : Number(v));
 
@@ -48,11 +48,11 @@ export function suggestPhaseType(distanceMi, otherDistances = []) {
     const d = num(distanceMi);
     if (d == null || d <= 0) return null;
 
-    // SS first: a depletion bag far longer than its shortest neighbour. Checked
+    // SS first: a depletion bag far longer than its shortest neighbor. Checked
     // before the fixed distances because a long steady-state run has no
-    // characteristic length and could otherwise coincide with one.
+    // characteriztic length and could otherwise coincide with one.
     const others = otherDistances.map(num).filter(x => x != null && x > 0);
-    if (others.length && d >= SS_NEIGHBOUR_MULTIPLE * Math.min(...others)) return 'SS';
+    if (others.length && d >= SS_NEIGHBOR_MULTIPLE * Math.min(...others)) return 'SS';
 
     if (Math.abs(d - HWFET_MI) <= CYCLE_DIST_TOL) return 'HWY';
     if (Math.abs(d - UDDS_MI)  <= CYCLE_DIST_TOL) return 'UDDS';

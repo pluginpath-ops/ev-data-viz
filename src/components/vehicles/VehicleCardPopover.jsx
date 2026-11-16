@@ -1,5 +1,6 @@
 import Popover from '../Popover';
 import VehicleMedia from './VehicleMedia';
+import MediaTitle from './MediaTitle';
 import VehicleCardFigures from './VehicleCardFigures';
 import { CARD_BAND_HEIGHT } from '../../utils/cardBand';
 
@@ -74,10 +75,10 @@ export default function VehicleCardPopover({
                     <div className="vehicle-card-popover" onClick={e => e.stopPropagation()}>
                         <div className={`vehicle-card${selected ? ' is-selected' : ''}`}>
                             <VehicleMedia vehicle={vehicle} height={CARD_BAND_HEIGHT} className="is-card-band">
-                                <div className="vehicle-media-title">
+                                <MediaTitle>
                                     <h3>{vehicle.name}</h3>
                                     <p>{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
-                                </div>
+                                </MediaTitle>
                             </VehicleMedia>
                             <div className="vehicle-card-body">
                                 <VehicleCardFigures

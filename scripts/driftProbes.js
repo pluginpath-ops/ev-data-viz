@@ -4,9 +4,9 @@
  * ── Why a ledger and not a lint rule ────────────────────────────────────────
  *
  * The project already has a ratchet: `KNOWN_OFFENDERS` in
- * `src/__tests__/contrast.test.js`. It watches 61 things, and it reads as
+ * `src/__tests__/contrast.test.js`. It watches nothing now (it is 0), and it once read as
  * though it watches "drift". It does not. It matches one narrow shape — a
- * LIGHT background utility with no `dark:` on the same line — which is about
+ * LIGHT background utility (it used to excuse one with a `dark:` pair) — about
  * 13% of the color drift here and none of the size drift. Everything else
  * has been growing unwatched: 272 `text-<palette>-<shade>`, 102 `text-[Npx]`,
  * 62 raw hex literals.
@@ -38,19 +38,10 @@
  *
  * ── What is NOT here, and why ───────────────────────────────────────────────
  *
- * Two ratchets live elsewhere and are deliberately left there rather than
- * gathered in for tidiness:
- *
- *   - `KNOWN_OFFENDERS` (contrast.test.js) asserts a CONTRAST claim — a fixed
- *     light surface with no dark counterpart is the invisible-input bug — and
- *     Phase 10 owns driving it to zero.
- *   - the `[data-theme="dark"] .foo` cap (playground.test.js) is bound to
- *     `DARK_OVERRIDE_CLASSES` in the playground catalogue, which marks those
- *     specimens in the side-by-side view. Splitting the count from the list it
- *     keeps in step would leave two half-guards.
- *
- * `npm run drift` prints all of it, including those two, so there is still one
- * place to LOOK even though there are three places to edit.
+ * One ratchet lives elsewhere and is deliberately left there: `KNOWN_OFFENDERS`
+ * (contrast.test.js) asserts a CONTRAST claim — a fixed light surface with no
+ * dark counterpart is the invisible-input bug. `npm run drift` prints it too,
+ * so there is still one place to LOOK.
  */
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, dirname, relative } from 'path';
@@ -98,6 +89,20 @@ export const EXEMPT = [
         pattern: /#(?:4285F4|34A853|FBBC05|EA4335)/i,
         why: 'The Google mark. Those four hexes ARE the logo — re-valuing them '
             + 'against our palette would repaint someone else\'s trademark.',
+    },
+    {
+        probe: 'css-color-literal',
+        file: 'src/index.css',
+        pattern: /#(?:ffffff|dadce0|1f1f1f|f8f9fa)\b/i,
+        why: 'The Google sign-in button, to Google\'s own branding rules: white, '
+            + 'their gray edge, their near-black label, in both themes.',
+    },
+    {
+        probe: 'css-color-literal',
+        file: 'src/index.css',
+        pattern: /hsl\(|rgba\(0, 0, 0, 0\.55\)|background-color: #fff;/,
+        why: 'The color picker\'s slider tracks and thumbs. A hue spectrum is the '
+            + 'data being picked, and the thumb must show against every hue.',
     },
     {
         probe: 'off-scale-font-size',
@@ -158,6 +163,24 @@ function scanCss(key, test) {
 }
 
 /**
+ * As scanCss, with comments blanked first (line numbers kept). A probe that
+ * looks for a color cannot tell `#277` in a note from a hex in a rule.
+ */
+function scanCssCode(key, test) {
+    const file = cssFile();
+    const exempts = exemptions(key, file);
+    const code = readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
+    const found = [];
+    code.split('\n').forEach((line, i) => {
+        if (!test(line)) return;
+        if (exempts.some(e => e.pattern.test(line))) return;
+        found.push({ file: 'src/index.css', line: i + 1, hit: line.trim().slice(0, 90) });
+    });
+    return found;
+}
+
+/**
  * The ledger.
  *
  * `count` is the number as of the last time someone looked. `what` says what
@@ -170,7 +193,7 @@ function scanCss(key, test) {
 export const LEDGER = [
     {
         key: 'palette-text',
-        count: 178,
+        count: 0,  // 178 → 0: curator screens moved onto tokens — .status-text, .callout, .link-button (#296)
         scope: 'src/**/*.jsx',
         what: 'Text colors written as Tailwind palette utilities. These sit outside '
             + 'the theme: when the re-skin re-valued the tokens, every one of these '
@@ -181,7 +204,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-bg',
-        count: 34,
+        count: 0,  // 32 → 0: curator screens moved onto tokens (#296)
         scope: 'src/**/*.jsx',
         what: 'Background fills written as palette utilities. The subset of these that '
             + 'are LIGHT fills with no dark counterpart is separately ratcheted as '
@@ -193,7 +216,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-border',
-        count: 29,
+        count: 0,  // 29 → 0: curator screens moved onto tokens (#296)
         scope: 'src/**/*.jsx',
         what: 'Border colors written as palette utilities.',
         fix: '--color-border, --color-border-strong, --color-border-subtle.',
@@ -201,7 +224,7 @@ export const LEDGER = [
     },
     {
         key: 'palette-other',
-        count: 1,
+        count: 0,  // 1 → 0: the Road Trip table's row rules read --color-border (#296)
         scope: 'src/**/*.jsx',
         what: 'Palette colors on the remaining properties — ring, divide, gradient '
             + 'stops, fill, stroke. Small, and kept as its own probe so a new one '
@@ -210,6 +233,18 @@ export const LEDGER = [
         scan: () => scanJsx('palette-other', paletteFor(
             'ring|divide|from|via|to|fill|stroke|outline|decoration|accent|caret|shadow',
         )),
+    },
+    {
+        key: 'dark-variant',
+        count: 0,  // 57 when the curator screens moved onto tokens and the variant was deleted (#296)
+        scope: 'src/**/*.jsx',
+        what: 'Tailwind `dark:` utilities. Held at ZERO. The stylesheet used to key '
+            + '`dark:` to data-theme; that line is gone, and Tailwind\'s own `dark:` '
+            + 'follows the device rather than the theme picker. One written now is '
+            + 'wrong whenever the two differ, and inside a themed subtree always.',
+        fix: 'A token. Both values live in the two token blocks, so one class '
+            + 'serves both themes.',
+        scan: () => scanJsx('dark-variant', /(?<![\w-])dark:[\w[-]+/g),
     },
     {
         key: 'arbitrary-text-size',
@@ -225,7 +260,7 @@ export const LEDGER = [
     },
     {
         key: 'hex-literal',
-        count: 38,  // 44 → 40: the spec chart's hard-coded yes/no greens and reds, and its grey, went when yes/no became vehicle-colored bars (#450); 40 → 38: Road Trip's box-zoom drag, written out at each of its charts, became one ZOOM_DRAG (Trip Optimizer)
+        count: 6,  // 38 → 15: chart text and lines read chartTheme(), and two retyped palettes import the one in colorUtils (#296). 15 → 6: the Admin role badges use the status triads (#296). Left: white labels on bars (4), which sit on a series color, and the zoom drag box (2)
         scope: 'src/**/*.jsx',
         what: 'Raw hex colors in component source. Mostly canvas drawing and the '
             + '`#3b82f6` default series color, repeated at eight call sites rather '
@@ -241,7 +276,7 @@ export const LEDGER = [
     },
     {
         key: 'rgb-literal',
-        count: 20,  // 22 → 20: Road Trip's box-zoom drag, written out at each of its charts, became one ZOOM_DRAG (Trip Optimizer)
+        count: 6,  // 20 → 9: the EPA curve plugin and the Road Trip lane lines read chartTheme() (#296). 9 → 6: Charge Stop's no-data bars and Road Trip's charge-stop wash read chartTheme() (#296). Left: plates under bar labels (4) and the zoom drag box (2)
         scope: 'src/**/*.jsx',
         what: 'rgb()/rgba()/hsl() color literals, almost all of them canvas fills and '
             + 'alpha washes drawn by chart plugins. Canvas cannot take a class — but '
@@ -255,7 +290,7 @@ export const LEDGER = [
         count: 0,
         scope: 'src/**/*.jsx, src/utils/chartUtils.js',
         what: 'Canvas text drawn with a hardcoded font shorthand. Held at ZERO — it '
-            + 'was 15 across seven files, every chart on the site labelling itself in '
+            + 'was 15 across seven files, every chart on the site labeling itself in '
             + '`11px system-ui` while the page around it rendered in Public Sans, and '
             + 'none of them moving when the --ui-scale knob did. This is the one probe '
             + 'that guards a surface already clean, because canvas is where the '
@@ -266,7 +301,7 @@ export const LEDGER = [
     },
     {
         key: 'apply-palette',
-        count: 11,  // 16 → 11: .badge-hidden, the vote buttons and .owner-badge moved onto the status tints (button and pill pass)
+        count: 0,  // 16 → 11 in the button and pill pass; 11 → 0 when light mode came back (#296)
         scope: 'src/index.css',
         what: 'Semantic classes whose @apply line reaches for a palette color. These '
             + 'are the sharpest kind of drift: the class NAME says the right thing, so '
@@ -290,6 +325,22 @@ export const LEDGER = [
             const m = line.match(/font-size\s*:\s*([^;]+);/);
             return !!m && !/var\(\s*--fs-/.test(m[1]);
         }),
+    },
+    {
+        key: 'css-color-literal',
+        count: 19,  // 27 when added (#296). 27 → 19: the media band's scrim and name follow the card color. Left: 9 plates and marks over the vehicle photo, 6 cycle bars, 2 card shadows, the modal overlay, the race-mode knob
+        scope: 'src/index.css',
+        what: 'Color literals in a rule, outside the token blocks. The stylesheet '
+            + 'is where the tokens live, and until light mode came back (#296) '
+            + 'nothing watched the rules beside them. What is left paints over a '
+            + 'photograph (the media band), or is a mark that is dark in both '
+            + 'themes (the cycle bars), or a shadow.',
+        fix: 'A token. A wash wants `-surface`, an edge `-border`. Something that '
+            + 'truly cannot follow the theme goes in EXEMPT with the reason.',
+        scan: () => scanCssCode('css-color-literal', line =>
+            // A token definition is the one place a literal belongs.
+            !/^\s*--[a-z-]+\s*:/.test(line)
+            && /#[0-9a-fA-F]{3,8}\b|\brgba?\(\s*\d|\bhsla?\(/.test(line)),
     },
 ];
 

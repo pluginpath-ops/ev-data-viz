@@ -178,7 +178,7 @@ describe('checkStatedRanges — a record against itself', () => {
         expect(out.worst).toBe('agrees');
     });
 
-    it('localises the real Model Y Performance fault to one cycle', () => {
+    it('localizes the real Model Y Performance fault to one cycle', () => {
         // The record states 457.261 city and 412.88 highway. Its bags derive
         // city correctly and highway around 378 — an 8% gap that took working
         // backwards from MPGe to find. This check names it directly.
@@ -218,7 +218,7 @@ describe('checkLabelInvariant — a label may never exceed the computed range', 
         expect(checkLabelInvariant({ combinedMi: 431.0, labeledMi: 434.0 }).violated).toBe(true);
     });
 
-    it('accepts labelling below the computed value, which is the normal case', () => {
+    it('accepts labeling below the computed value, which is the normal case', () => {
         // A 2.7% derate is permitted and common — the Model Y Premium does it.
         expect(checkLabelInvariant({ combinedMi: 329.9, labeledMi: 321 }).violated).toBe(false);
     });

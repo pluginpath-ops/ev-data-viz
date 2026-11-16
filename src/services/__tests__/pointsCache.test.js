@@ -86,7 +86,7 @@ describe('invalidation: a changed run is never served stale', () => {
         const after = await dataService.getRunDataCached(2);
         expect(after).toHaveLength(1);
         expect(after[0].chargeRate).toBe(77);
-        expect(await dataService.getRunDataCached(1)).toHaveLength(20);   // neighbours stay cached
+        expect(await dataService.getRunDataCached(1)).toHaveLength(20);   // neighbors stay cached
     });
 
     it('mergeRunData', async () => {

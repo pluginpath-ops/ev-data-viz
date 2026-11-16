@@ -37,7 +37,8 @@ export function useStackedStripActions(rowRef, scrollerRef, actionsRef, chipsKey
             const buttons = [...actions.children];
             const actionsWidth = buttons.reduce((sum, b) => sum + b.offsetWidth, 0)
                 + gapOf(actions) * Math.max(0, buttons.length - 1);
-            // Everything on the row but the scroller and the actions: the label.
+            // Everything on the row but the scroller and the actions: the
+            // label, which is the saved selections' button.
             const others = [...row.children]
                 .filter(c => c !== scroller && c !== actions)
                 .reduce((sum, c) => sum + c.offsetWidth, 0);
@@ -48,6 +49,12 @@ export function useStackedStripActions(rowRef, scrollerRef, actionsRef, chipsKey
         measure();
         const observer = new ResizeObserver(measure);
         observer.observe(row);
+        // The other children can change width with the chips unchanged —
+        // the label reads "Selected" one moment and "Mid-size SUVs" the
+        // next — and the row itself does not resize when they do.
+        for (const child of row.children) {
+            if (child !== scrollerRef.current && child !== actions) observer.observe(child);
+        }
         return () => observer.disconnect();
     }, [rowRef, scrollerRef, actionsRef, chipsKey]);
 

@@ -14,7 +14,7 @@ import { readMemory } from '../utils/vehicleTableStorage';
 import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import {
     VEHICLE_COLUMNS, DEFAULT_ASSUMPTIONS, decodeVehicleTableParams, vehicleTableStartSearch,
-    vehicleColumnByKey, labelledColumn,
+    vehicleColumnByKey, labeledColumn,
 } from '../utils/vehicleTable';
 import {
     chartColumns, currentFieldKey, defaultFieldKey, plotValues, isPlottableColumn, isPlottableOnScatter,
@@ -66,7 +66,7 @@ export default function SpecChart({
     const yKey = currentFieldKey(chartConfig.scatterYField);
 
     const label = useCallback(
-        (col) => labelledColumn(col, assumptions, units, correctionTarget, correctionMode),
+        (col) => labeledColumn(col, assumptions, units, correctionTarget, correctionMode),
         [assumptions, units, correctionTarget, correctionMode],
     );
     const allColumns = useMemo(() => chartColumns(VEHICLE_COLUMNS).map(label), [label]);
@@ -77,7 +77,7 @@ export default function SpecChart({
 
     const plottedKeys = (scatter ? [xKey, yKey] : [barKey]).filter(Boolean);
     const { rows, wantsPerformance, performanceLoading } = useVehicleRows({
-        keys: [...plottedKeys, ...tableKeys], assumptions, correctionTarget, correctionMode,
+        keys: [...plottedKeys, ...tableKeys], only: plotted, assumptions, correctionTarget, correctionMode,
     });
     const selectedRows = useMemo(() => {
         const byId = new Map(rows.map(r => [r.id, r]));

@@ -5,7 +5,7 @@ import { auditTestVehicle, auditTestVehicles, auditSummary, auditFindings, AUDIT
  * Mercedes' MY2027 CLA 350 4MATIC (CSI-VMBXV00.0ED7) as the base record — a
  * real, sound multi-cycle test vehicle. Each case corrupts one thing.
  *
- * The point of this suite is that the sweep makes NO judgement of its own. It
+ * The point of this suite is that the sweep makes NO judgment of its own. It
  * calls the four existing checks unchanged and only decides how to order them,
  * so every expectation below is about ORDERING and NAMING, never about whether
  * a given number is acceptable.
@@ -101,7 +101,7 @@ describe('auditTestVehicle — the verdict is the worst thing proven', () => {
     });
 
     it('calls an out-of-band figure suspect rather than wrong', () => {
-        // A band is a curation judgement, so it is evidence and not proof.
+        // A band is a curation judgment, so it is evidence and not proof.
         expect(auditTestVehicle(cla({ nominal_pack_kwh: 3.2 })).verdict).toBe('suspect');
     });
 
@@ -190,7 +190,7 @@ describe('auditTestVehicle — the real CLA 350, whose label is DC-side', () => 
 
     it('reports it as a disagreement rather than an impossibility', () => {
         // Nothing here contradicts itself. Two sources differ, and settling
-        // that needs a judgement this module does not make.
+        // that needs a judgment this module does not make.
         expect(auditTestVehicle(real()).verdict).toBe('disagrees');
     });
 
@@ -281,13 +281,13 @@ describe('auditTestVehicle — a test vehicle holding two multi-cycle tests (#22
     });
 
     it('leaves a test vehicle with one test alone', () => {
-        // Nothing to cross, so no caveat and no behaviour change.
+        // Nothing to cross, so no caveat and no behavior change.
         const r = auditTestVehicle(cla());
         expect(r.notes.some(n => n.includes('re-import'))).toBe(false);
     });
 });
 
-describe('auditTestVehicle — honouring a selected test', () => {
+describe('auditTestVehicle — honoring a selected test', () => {
     const twoRuns = (over = {}) => {
         const g = cla();
         const first = g.epa_tests[0];

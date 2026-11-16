@@ -55,7 +55,7 @@ import { formatYears } from './epaCertifications';
 // passes is one whose EPA tested the calculations actually use.
 import { testedAgreement } from './vehicleFigures';
 import { labelRangeCheck } from './labelRangeCheck';
-import { sameSource, findSource, isYouTubeLink, isPlainYouTubeLink, linkProblem } from './sources';
+import { sameSource, findSource, isYouTubeLink, isPlainYouTubeLink, linkProblem, nameStartsWithSource, sourceAbbreviation } from './sources';
 import { isCompositeRun, isInheritedRunId, filterRangeRuns } from './runUtils';
 import { statisticalRuns } from './runListing';
 import { packOffEpa } from './testedRange';
@@ -257,30 +257,30 @@ const inheritedNote = (ctx, category, field) => {
 function rangeFindings(vehicle, links, ctx, limits) {
     const out = [];
     const range = positive(vehicle.range);
-    const labelled = links.judged.filter(c => c.labelRangeMi);
-    const labels = ascending(labelled.map(c => c.labelRangeMi));
+    const labeled = links.judged.filter(c => c.labelRangeMi);
+    const labels = ascending(labeled.map(c => c.labelRangeMi));
 
     // Only while nothing is primary: once one is, configurations reading
     // differently are the variants the vehicle spans, and the choice is made.
-    if (!links.primary && labelled.length > 1) {
+    if (!links.primary && labeled.length > 1) {
         const spread = spreadPct(labels);
         if (spread > limits.LABEL_SPREAD_PCT) {
             out.push(finding('label-spread',
-                `${labelled.length} linked EPA configurations read ${miSpan(labels)}, `
+                `${labeled.length} linked EPA configurations read ${miSpan(labels)}, `
                 + `${pct(spread)} apart, and none is primary.`,
                 { labels }));
         }
     }
 
-    if (range && labelled.length) {
-        const checks = labelled.map(c => ({ c, check: labelRangeCheck(c.labelRangeMi, range, limits.LABEL_RANGE_TOLERANCE_PCT) }));
+    if (range && labeled.length) {
+        const checks = labeled.map(c => ({ c, check: labelRangeCheck(c.labelRangeMi, range, limits.LABEL_RANGE_TOLERANCE_PCT) }));
         if (checks.every(x => x.check.mismatch)) {
             const { c, check } = checks.reduce((a, b) => (Math.abs(b.check.deltaPct) < Math.abs(a.check.deltaPct) ? b : a));
             const dir = check.deltaMi > 0 ? 'below' : 'above';
             const whose = links.chosen ? 'the EPA label of its primary configuration' : 'the nearest EPA label';
             out.push(finding('range-vs-label',
                 `Range ${mi(range)} is ${pct(Math.abs(check.deltaPct))} ${dir} ${whose}, ${mi(c.labelRangeMi)} on ${c.name}`
-                + (labelled.length > 1 ? `; none of the ${labelled.length} labels is within ${limits.LABEL_RANGE_TOLERANCE_PCT}%.` : '.'),
+                + (labeled.length > 1 ? `; none of the ${labeled.length} labels is within ${limits.LABEL_RANGE_TOLERANCE_PCT}%.` : '.'),
                 { range, labels }));
         }
     }
@@ -288,7 +288,7 @@ function rangeFindings(vehicle, links, ctx, limits) {
     // No `label-no-range`: since #324 the EPA label IS the vehicle's range, so a
     // label with nothing typed beside it is where every vehicle is headed, not a gap.
 
-    if (range && !labelled.length) {
+    if (range && !labeled.length) {
         const text = links.chosen
             ? `Range ${mi(range)}, but its primary configuration, ${links.primary.name}, has no EPA label.`
             : links.all.length
@@ -301,8 +301,8 @@ function rangeFindings(vehicle, links, ctx, limits) {
     // label is used, so a close expectation is harmless; a far one says the
     // expectation, or the link, was wrong.
     const expected = positive(specValue(ctx, 'range', 'expected_epa_mi'));
-    if (expected && labelled.length) {
-        const checks = labelled.map(c => ({ c, check: labelRangeCheck(c.labelRangeMi, expected, limits.LABEL_RANGE_TOLERANCE_PCT) }));
+    if (expected && labeled.length) {
+        const checks = labeled.map(c => ({ c, check: labelRangeCheck(c.labelRangeMi, expected, limits.LABEL_RANGE_TOLERANCE_PCT) }));
         if (checks.every(x => x.check.mismatch)) {
             const { c, check } = checks.reduce((a, b) => (Math.abs(b.check.deltaPct) < Math.abs(a.check.deltaPct) ? b : a));
             const dir = check.deltaMi > 0 ? 'below' : 'above';
@@ -617,7 +617,7 @@ export function overlaySkips(loaded = [], pending = new Map()) {
  *
  *   skipped     a skip exists and its fingerprint matches — hidden by default
  *   resurfaced  a skip exists but the values have changed since — shown, and
- *               marked, because the judgement was about different numbers
+ *               marked, because the judgment was about different numbers
  */
 function applySkips(vehicle, findings, skipsByKey) {
     return findings.map(f => {
@@ -709,7 +709,7 @@ export function checkCounts(rows = []) {
 
 // ── Across the fleet: one source, several spellings ─────────────────────────
 
-// sameSource lives with the source list (sources.js), which uses it to recognise
+// sameSource lives with the source list (sources.js), which uses it to recognize
 // a pasted spelling; this still reports spellings that were never linked.
 
 /**
@@ -764,8 +764,6 @@ function statedWindow(name) {
     const [lo, hi] = [Number(m[1]), Number(m[2])];
     return lo < hi && hi <= 100 ? { lo, hi } : null;
 }
-
-const norm = (s) => String(s ?? '').trim().toLowerCase();
 
 /**
  * A charging session's curve, as far as stored figures can tell it from
@@ -822,11 +820,15 @@ export function testAttribution(vehicles = [], { sources = [], socRanges = {} } 
                 add('source-spelling', `Stored as “${run.source}”; the source is “${canonical}”.`);
             }
 
-            // Its name starts with it.
+            // Its name starts with it — under its name or any spelling it lists,
+            // so "OoS 70mph" is an Out of Spec test (owner, 2026-11-11: names
+            // carry the abbreviation, the source keeps the full name).
             const owner = canonical ?? stored;
             const name = String(run.name ?? '').trim();
-            if (owner && !norm(name).startsWith(norm(owner))) {
-                add('name-not-source', `“${name}” does not start with “${owner}”.`);
+            const spellings = found ? [found.source.name, ...(found.source.aliases ?? [])] : [stored];
+            if (owner && !nameStartsWithSource(name, spellings)) {
+                const short = found ? sourceAbbreviation(found.source) : owner;
+                add('name-not-source', `“${name}” does not start with “${owner}”${short !== owner ? ` or “${short}”` : ''}.`);
             }
 
             // Its link: there, right for the source, and stored one way.

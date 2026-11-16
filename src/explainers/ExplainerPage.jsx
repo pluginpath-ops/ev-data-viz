@@ -1,10 +1,13 @@
 import { Fragment } from 'react';
 import ExplainerLink from './ExplainerLink';
 import { isTopicHref } from './parseExplainer';
+import { sourceKind } from './sourceKind';
 import { FACTS } from './topics';
 import SplitPackLab from './labs/SplitPackLab';
 import DriveCycleLab from './labs/DriveCycleLab';
 import TestRoutesLab from './labs/TestRoutesLab';
+import OutletLossFigure from './figures/OutletLossFigure';
+import InlEfficiencyFigure from './figures/InlEfficiencyFigure';
 import ExplainerToc from './ExplainerToc';
 import { chargingTestsHref, modeledEfficiencyHref } from './evbenchLinks';
 import ChargingPreview from './ChargingPreview';
@@ -23,6 +26,8 @@ import { useModeledEfficiency } from '../hooks/useModeledEfficiency';
  * quietly, on any page: it is a disclosure, not a gap.
  */
 const LABS = { 'split-pack': SplitPackLab, 'drive-cycles': DriveCycleLab, 'test-routes': TestRoutesLab };
+/** Figures with a component; any other `::: figure` id renders as a labeled placeholder. */
+const FIGURES = { 'outlet-loss': OutletLossFigure, 'inl-efficiency': InlEfficiencyFigure };
 
 /**
  * The two ways a fact may publish without a published source, each said
@@ -107,7 +112,9 @@ function SourceItem({ id }) {
     if (!fact) return <li id={`src-${id}`} className="is-unverified">Unknown fact: {id}</li>;
     return (
         <li id={`src-${id}`} className={`is-${fact.status}`}>
-            <span className="explainer-source-claim">{fact.claim}</span>
+            {/* The li stays a list item so its number shows; the column layout is here. */}
+            <div className="explainer-source-body">
+            <span className="explainer-source-claim">{fact.summary ?? fact.claim}</span>
             {fact.status === 'unverified' && <span className="explainer-unverified-tag">unverified</span>}
             {UNSOURCED_TAG[fact.status] && (
                 <span className="explainer-source">
@@ -115,13 +122,25 @@ function SourceItem({ id }) {
                     <span className="text-note">{fact.rationale}</span>
                 </span>
             )}
-            {fact.sources.map((s, n) => (
-                <span key={n} className="explainer-source">
-                    <span className="explainer-rank" title={RANK_NAMES[s.rank]}>{s.rank}</span>
-                    {s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a> : s.title}
-                    <span className="text-meta"> · accessed {s.accessed}</span>
-                </span>
-            ))}
+            {fact.sources.map((s, n) => {
+                // A source with a label shows just that; its full title and access
+                // date move to the hover. One without keeps the long form. The tag
+                // says what the link opens.
+                const kind = sourceKind(s.url);
+                const text = s.label ?? s.title;
+                const hover = s.label ? `${s.title} · accessed ${s.accessed}` : undefined;
+                return (
+                    <span key={n} className="explainer-source">
+                        <span className="explainer-rank" title={RANK_NAMES[s.rank]}>{s.rank}</span>
+                        {kind === 'Explainer' ? <ExplainerLink topic={s.url}>{text}</ExplainerLink>
+                            : s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" title={hover}>{text}</a>
+                            : <span title={s.label ? s.title : undefined}>{text}</span>}
+                        {kind && <span className="text-meta">[{kind}]</span>}
+                        {!s.label && <span className="text-meta"> · accessed {s.accessed}</span>}
+                    </span>
+                );
+            })}
+            </div>
         </li>
     );
 }
@@ -210,7 +229,7 @@ function Block({ block, ctx }) {
                 return <TestsCard runIds={block.id.split(',').filter(Boolean).map(Number)} caption={block.caption}
                     axes={block.options ?? {}} />;
             }
-            const Lab = block.name === 'lab' ? LABS[block.id] : null;
+            const Lab = block.name === 'lab' ? LABS[block.id] : block.name === 'figure' ? FIGURES[block.id] : null;
             if (Lab) return <Lab />;
             return (
                 <figure className="explainer-placeholder">
@@ -328,10 +347,45 @@ function Inline({ nodes, ctx }) {
  * Scroll to a note or source in place. A hash change would reach App's
  * popstate handler as a history entry with no state.
  */
+/**
+ * Mark the entry a jump lands on, so the eye finds it in the middle of the
+ * list: full strength while the page scrolls, half once it lands, gone when
+ * the reader scrolls on. Only reader input clears it (wheel, touch, keys);
+ * the jump's own smooth scroll does not. The timer covers browsers with no
+ * scrollend, and a target already in view (no scroll, so no scrollend).
+ */
+let jumped = null;
+const READER_SCROLL = ['wheel', 'touchmove', 'keydown'];
+function markJumped(target) {
+    jumped?.clear(true);
+    target.classList.add('is-jumped');
+    let landed = false;
+    const land = () => {
+        if (landed) return;
+        landed = true;
+        target.classList.add('is-landed');
+        READER_SCROLL.forEach(t => window.addEventListener(t, leave, { passive: true }));
+    };
+    const leave = () => clear(false);
+    const clear = (now) => {
+        window.removeEventListener('scrollend', land);
+        READER_SCROLL.forEach(t => window.removeEventListener(t, leave));
+        jumped = null;
+        if (now) { target.classList.remove('is-jumped', 'is-landed'); return; }
+        target.classList.add('is-leaving');
+        setTimeout(() => target.classList.remove('is-jumped', 'is-landed', 'is-leaving'), 700);
+    };
+    jumped = { clear };
+    window.addEventListener('scrollend', land, { once: true });
+    setTimeout(land, 900);
+}
+
 function jumpTo(e) {
     e.preventDefault();
-    document.getElementById(e.currentTarget.getAttribute('href').slice(1))
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const target = document.getElementById(e.currentTarget.getAttribute('href').slice(1));
+    if (!target) return;
+    markJumped(target);
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function Citation({ id, ctx }) {
@@ -340,7 +394,7 @@ function Citation({ id, ctx }) {
     const suffix = status === 'verified' ? '' : ` (${UNSOURCED_TAG[status] ?? 'unverified'})`;
     return (
         <sup className={`explainer-cite is-${status === 'observed' ? 'accepted' : status}`}>
-            <a href={`#src-${id}`} onClick={jumpTo} title={fact ? `${fact.claim}${suffix}` : `Unknown fact ${id}`}>
+            <a href={`#src-${id}`} onClick={jumpTo} title={fact ? `${fact.summary ?? fact.claim}${suffix}` : `Unknown fact ${id}`}>
                 {ctx.citeNo.get(id)}
             </a>
         </sup>

@@ -5,14 +5,13 @@ import SourceLine from './SourceLine';
  * The bordered frame a chart lives in — and the boundary a PNG export captures.
  *
  * That equivalence is the point. Before this, the export flattened the canvas
- * alone: a reader who pasted a chart into a thread got unlabelled curves with
+ * alone: a reader who pasted a chart into a thread got unlabeled curves with
  * no title, no conditions, no units and no source. Everything needed to read
  * the image has to be INSIDE the frame, so putting the frame and the export
  * boundary in one component is what stops the two drifting apart.
  *
- * The strip above it says so in as many words, because the alternative is a
- * reader finding out what an export does and does not include only after they
- * have already pasted it somewhere.
+ * The toolbar above it is labeled Share: Link copies the chart view, Image
+ * copies this frame (its tooltip says so).
  *
  * `sourceLine` is who the plotted data came from (useSourceLine); the export
  * draws the same words as text, since a canvas cannot hold a link.
@@ -26,7 +25,7 @@ export default function PlotFrame({ title, subtitle, sourceLine, exportControls,
         <>
             {exportControls && (
                 <div className="chart-export-strip">
-                    <span className="text-micro truncate min-w-0" title="PNG / URL export captures the frame below">PNG / URL export captures the frame below</span>
+                    <span className="text-label truncate min-w-0" title="Link copies this chart view. Image copies the framed chart.">Share</span>
                     <span className="chart-export-rule" />
                     {exportControls}
                 </div>

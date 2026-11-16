@@ -106,7 +106,7 @@ never the database.
 - Panel: `src/components/admin/TypographyKnobs.jsx`
 - `--ui-scale` on the root font-size scales every rem-based size at once
 
-To expose a new tunable: variable-ise the property in the role, then add a knob
+To expose a new tunable: variable-ize the property in the role, then add a knob
 entry to `TYPO_GROUPS`. Color is not a knob — it is theme-specific, and a role
 owning its own color is the point of the one-axis model.
 

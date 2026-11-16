@@ -26,7 +26,7 @@ export const R2_MCT = {
     // assumed here. Corrected, and worth the note: #206 models
     // adjustment_method as DETERMINED BY test_method, and this record is a
     // counter-example. It was multi-cycle tested (the CSI PDF this fixture was
-    // transcribed from) and 5-cycle labelled. The two axes are more independent
+    // transcribed from) and 5-cycle labeled. The two axes are more independent
     // than the issue assumes.
     //
     // EPA's factor for THIS configuration is 0.7051, not 0.700, applied

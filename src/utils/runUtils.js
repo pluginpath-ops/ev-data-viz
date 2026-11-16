@@ -148,7 +148,7 @@ export function detectPopulatedFields(points) {
 //
 // A linked test keeps its link's id even when the lineage also provides it:
 // chart URLs carry run ids, and those links predate the lineage.
-// Centralising the format here means a single change propagates everywhere.
+// Centralizing the format here means a single change propagates everywhere.
 
 const INHERITED_PREFIX = 'inherited_';
 

@@ -24,7 +24,7 @@ import { packOffEpa } from '../utils/testedRange';
  * A band with nothing in it is not rendered, so a charging test with no
  * conditions recorded does not leave an empty rail.
  *
- * ── Every figure is now a LABELLED cell (re-skin phase 8) ────────────────────
+ * ── Every figure is now a LABELED cell (re-skin phase 8) ────────────────────
  *
  * The values used to be bare — `72 °F`, `4,800 ft`, `↗ 1,240 ft gain` — leaning
  * on units and emoji to say what each one was. That works while you already
@@ -188,7 +188,7 @@ export default function RunSpecRows({ run, vehicle, units, socRange, fieldMeta =
     }
 
     // The notes field is literally called `conditions` in the schema, and that is
-    // what it holds — "overnight, 20in AT tyres", "lots of elevation gain/loss".
+    // what it holds — "overnight, 20in AT tires", "lots of elevation gain/loss".
     // It belongs beside the measured conditions rather than on a line of its
     // own, and last because it is the one cell with no fixed shape.
     if (run.conditions) {

@@ -4,7 +4,7 @@
  * Deliberately its own component rather than a reuse of RunSelector. That one
  * is shaped around charging/range runs hanging off `vehicle.runs`, and is being
  * reworked to support pairing a charging test with a range test — coupling to
- * it would mean this chart breaks when that lands, for no shared behaviour
+ * it would mean this chart breaks when that lands, for no shared behavior
  * beyond a checkbox list.
  *
  * It borrows RunSelector's section band (SectionBand) and semantic classes

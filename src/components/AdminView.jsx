@@ -46,7 +46,7 @@ const SUBTITLES = {
     brands:    'One brand list for vehicles and EPA filings. Rename, merge, and map EPA\'s division spellings.',
     constants: 'Tune the EPA model math (local sandbox).',
     interface: 'Site-wide appearance settings.',
-    playground: 'Every catalogued control, live, with its measured contrast. The menu a new feature picks from.',
+    playground: 'Every cataloged control, live, with its measured contrast. The menu a new feature picks from.',
 };
 
 export default function AdminView({ getUsersForAdmin, setUserRole, currentUserId, subtab, onSubtabChange }) {

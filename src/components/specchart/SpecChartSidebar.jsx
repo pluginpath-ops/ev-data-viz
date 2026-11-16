@@ -38,7 +38,7 @@ export default function SpecChartSidebar({
             {canFilter && (
                 <div className="chart-rail-group">
                     <span className="text-micro">Vehicles</span>
-                    <div className="stats-segmented" role="group" aria-label="Vehicles plotted">
+                    <div className="segmented" role="group" aria-label="Vehicles plotted">
                         {[['selection', `Selection · ${selectedCount}`], ['all', `All · ${allVehicles.length}`]].map(([key, label]) => (
                             <button
                                 key={key}

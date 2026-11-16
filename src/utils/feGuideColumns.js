@@ -6,14 +6,14 @@
  * drift in one way: spacing, case and punctuation (`Fuel 2` became `Fuel2`,
  * `(PHEVs only)` became `(PHEV only)`, a double space went), plus the odd real
  * relabel (`Trans Lockup` became `Lockup Torque Converter`). None of the
- * columns the importer reads has moved yet, so the first two defences here are
+ * columns the importer reads has moved yet, so the first two defenses here are
  * cheap and the third is a message, not a guess.
  *
  * Pure module: header names in, a resolution out.
  *
  *   1. EXACT          the name the parser knows.
  *   2. ALIAS          a past name listed in COLUMN_ALIASES.
- *   3. NORMALISED     the same name apart from case, spacing and punctuation.
+ *   3. NORMALIZED     the same name apart from case, spacing and punctuation.
  *   4. SUGGESTED      only when a REQUIRED column is still missing: the closest
  *                     header in the file, named so a human can decide. Never
  *                     applied, because a wrong pairing imports a plausible
@@ -48,7 +48,7 @@ function distance(a, b) {
     return prev[b.length];
 }
 
-/** 1 = identical once normalised, 0 = nothing in common. */
+/** 1 = identical once normalized, 0 = nothing in common. */
 export function headerSimilarity(a, b) {
     const x = normalizeHeader(a);
     const y = normalizeHeader(b);
@@ -89,10 +89,10 @@ export function resolveColumns(headers, wanted, aliases = COLUMN_ALIASES) {
             renamed.push({ column, header: alias, how: 'alias' });
             continue;
         }
-        const normalised = byNormal.get(normalizeHeader(column));
-        if (normalised) {
-            found[column] = normalised;
-            renamed.push({ column, header: normalised, how: 'normalised' });
+        const normalized = byNormal.get(normalizeHeader(column));
+        if (normalized) {
+            found[column] = normalized;
+            renamed.push({ column, header: normalized, how: 'normalized' });
             continue;
         }
         missing.push(column);

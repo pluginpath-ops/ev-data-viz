@@ -1,6 +1,6 @@
 /**
  * One source in a vehicle's stack: the slim card above the vehicle,
- * saying only enough to recognise it — year and friendly name (model +
+ * saying only enough to recognize it — year and friendly name (model +
  * trim), battery and EPA range.
  * The full card is what the fanned-out stack shows.
  *

@@ -405,7 +405,7 @@ export default function EpaPdfImportModal({ targetVehicle = null, onImport, getE
                         </div>
 
                         {warnings.length > 0 && (
-                            <ul className="mt-2 text-xs text-amber-600 dark:text-amber-400 list-disc pl-5">
+                            <ul className="mt-2 text-xs status-text is-warning list-disc pl-5">
                                 {warnings.map((w, i) => <li key={i}>{w}</li>)}
                             </ul>
                         )}

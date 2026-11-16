@@ -2,7 +2,7 @@
  * The routes a manufacturer can take to a label range, and which one each
  * vehicle on screen took (#206).
  *
- * One grid, two labelled rows, fixed-size cells — a table rather than a flow
+ * One grid, two labeled rows, fixed-size cells — a table rather than a flow
  * chart, so the eye compares across a row instead of tracing connectors. The
  * unadjusted city+highway step is deliberately absent: it is the OUTPUT of the
  * first row, not a stage of its own, and drawing it added a box that explained

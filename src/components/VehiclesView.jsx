@@ -1,4 +1,5 @@
 import NewVariantButton from './NewVariantButton';
+import { compareCuratedOrder } from '../utils/vehicleOrder';
 import { ownValues, lineageIndex, lineageRole, vehicleStack, lineageTrees } from '../utils/vehicleInheritance';
 import VehicleStack from './vehicles/VehicleStack';
 import LineageTree from './vehicles/LineageTree';
@@ -12,6 +13,7 @@ import { useAppContext } from '../context/AppContext';
 import { distanceUnit } from '../utils/unitConversions';
 import VehicleCardFigures, { TagPills, epaRangeValue, epaRangeBasisMark, epaRangeTitle } from './vehicles/VehicleCardFigures';
 import VehicleMedia from './vehicles/VehicleMedia';
+import MediaTitle from './vehicles/MediaTitle';
 import PullColorButton from './vehicles/PullColorButton';
 import { CARD_BAND_HEIGHT } from '../utils/cardBand';
 import TestedFigure from './vehicles/TestedFigure';
@@ -231,15 +233,9 @@ export default function VehiclesView({
     // Stage 3: sort
     const sortedFilteredVehicles = [...shownVehicles].sort((a, b) => {
         switch (sortBy) {
-            case 'default': {
-                // Use pending sort_order when available (instant visual feedback before DB save)
-                const aOrder = pendingOrder?.find(u => u.id === a.id)?.sort_order ?? a.sort_order;
-                const bOrder = pendingOrder?.find(u => u.id === b.id)?.sort_order ?? b.sort_order;
-                const aN = aOrder == null, bN = bOrder == null;
-                if (!aN && !bN) return aOrder - bOrder;
-                if (!aN) return -1; if (!bN) return 1;
-                return new Date(b.created_at) - new Date(a.created_at);
-            }
+            // Use pending sort_order when available (instant visual feedback before DB save)
+            case 'default': return compareCuratedOrder(a, b,
+                v => pendingOrder?.find(u => u.id === v.id)?.sort_order ?? v.sort_order);
             case 'date_newest': return new Date(b.created_at) - new Date(a.created_at);
             case 'date_oldest': return new Date(a.created_at) - new Date(b.created_at);
             case 'brand_az':    return (a.make  || '').localeCompare(b.make  || '');
@@ -295,10 +291,10 @@ export default function VehiclesView({
                     full-card background under an 80% wash that
                     made it unreadable AND unlookable-at. */}
                 <VehicleMedia vehicle={vehicle} height={CARD_BAND_HEIGHT} className="is-card-band">
-                    <div className="vehicle-media-title">
+                    <MediaTitle>
                         <h3>{vehicle.name}<LineageIcon role={lineageRole(vehicle, lineage)} /></h3>
                         <p>{[vehicle.make, vehicle.model, vehicle.trim, vehicle.year].filter(Boolean).join(' · ')}</p>
-                    </div>
+                    </MediaTitle>
                     <VisibilityPill vehicle={vehicle} onMedia />
                     {/* The curator's swatch, on the band under the
                         selection mark's corner. It was the first row
@@ -310,7 +306,7 @@ export default function VehiclesView({
                         swatch is a bordered solid chip that reads over
                         anything, and its caption takes the name's
                         shadow. Editing in place is still the point:
-                        coloring a catalogue this size is a
+                        coloring a catalog this size is a
                         scroll-and-click pass. */}
                     {canEdit(vehicle) && (
                         <div className="vehicle-media-color" onClick={e => e.stopPropagation()}>

@@ -3,7 +3,7 @@
  * produce a model.
  */
 import { describe, it, expect } from 'vitest';
-import { suggestPhaseType, resolvePhaseTypes, SS_NEIGHBOUR_MULTIPLE } from '../phaseTypes';
+import { suggestPhaseType, resolvePhaseTypes, SS_NEIGHBOR_MULTIPLE } from '../phaseTypes';
 
 describe('suggestPhaseType', () => {
     it('reads the two fixed cycle distances', () => {
@@ -27,11 +27,11 @@ describe('suggestPhaseType', () => {
         expect(suggestPhaseType('x')).toBeNull();
     });
 
-    it('recognises a steady-state bag by its neighbours, not its length', () => {
-        // An SS depletion run has no characteristic distance, so it is found by
+    it('recognizes a steady-state bag by its neighbors, not its length', () => {
+        // An SS depletion run has no characteriztic distance, so it is found by
         // being an order of magnitude longer than the cycles around it.
         expect(suggestPhaseType(200, [7.45, 10.26])).toBe('SS');
-        expect(suggestPhaseType(7.45 * SS_NEIGHBOUR_MULTIPLE, [7.45])).toBe('SS');
+        expect(suggestPhaseType(7.45 * SS_NEIGHBOR_MULTIPLE, [7.45])).toBe('SS');
     });
 
     it('checks SS before the fixed distances', () => {
@@ -70,9 +70,9 @@ describe('resolvePhaseTypes', () => {
         expect(out.map(p => p.typeSource)).toEqual(['curated', 'inferred', null]);
     });
 
-    it('excludes each phase from its own neighbour comparison', () => {
+    it('excludes each phase from its own neighbor comparison', () => {
         // Comparing a phase against itself makes every phase its own shortest
-        // neighbour, and nothing is ever 10x itself.
+        // neighbor, and nothing is ever 10x itself.
         const out = resolvePhaseTypes([
             { phase_index: 1, distance_mi: 7.45 },
             { phase_index: 2, distance_mi: 300 },

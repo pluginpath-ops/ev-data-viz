@@ -71,7 +71,7 @@ export default function PerformanceSummaryCard({
                     <div className="font-semibold text-sm truncate">
                         {shown('source_name') || <span className="text-meta italic">Unattributed source</span>}
                         {dirty && (
-                            <span className="ml-2 text-amber-500 text-[10px] font-normal" title="Unsaved edits">
+                            <span className="ml-2 status-text is-warning text-[10px] font-normal" title="Unsaved edits">
                                 ● unsaved
                             </span>
                         )}
@@ -142,13 +142,13 @@ export default function PerformanceSummaryCard({
                 <div className="flex gap-3 mt-1">
                     {summary.source_url && (
                         <a href={summary.source_url} target="_blank" rel="noopener noreferrer"
-                            className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">
+                            className="text-[11px] link-button">
                             Open source ↗
                         </a>
                     )}
                     {summary.spreadsheet_url && (
                         <a href={summary.spreadsheet_url} target="_blank" rel="noopener noreferrer"
-                            className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">
+                            className="text-[11px] link-button">
                             Source data ↗
                         </a>
                     )}

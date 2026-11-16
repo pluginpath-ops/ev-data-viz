@@ -39,7 +39,7 @@ describe('Modeled Efficiency under the shared correction target (#449)', () => {
 
     it('moves the accessory load with the temperature while on auto, and with the reader once set', () => {
         expect(at({ temperatureF: 20 }).accessoryDeltaW).toBe(2000);      // 2,300 W against the 300 W standard
-        expect(at({ temperatureF: 90 }).accessoryDeltaW).toBe(1400);
+        expect(at({ temperatureF: 90 }).accessoryDeltaW).toBeCloseTo(640, 6);   // A/C is 1,000 W × (20/25)² at 90°F
         expect(at({ temperatureF: 20, accessoryW: 1000 }).accessoryDeltaW).toBe(700);
         expect(at({ accessoryW: 250 }).accessoryDeltaW).toBe(-50);
     });

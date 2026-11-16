@@ -52,11 +52,11 @@ export function wrapAxisLabel(ctx, font, text, maxWidth, maxLines = 3) {
     }
 }
 
-/** Room a lane-labelled Y axis leaves for the legend, the X axis and its title. */
+/** Room a lane-labeled Y axis leaves for the legend, the X axis and its title. */
 const LANE_AXIS_CHROME_PX = 90;
 
 /**
- * How wide and how many lines a label on a lane-labelled Y axis may take, from
+ * How wide and how many lines a label on a lane-labeled Y axis may take, from
  * the size of the chart rather than a fixed character count — so the same chart
  * wraps tighter at phone width and gives a crowded one fewer lines.
  *

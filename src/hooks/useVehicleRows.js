@@ -7,7 +7,8 @@ import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from '../utils/correct
 import { buildVehicleRows, needsPerformance, DEFAULT_ASSUMPTIONS } from '../utils/vehicleTable';
 
 /**
- * The vehicle table's rows over the whole fleet — the figures a cell shows —
+ * The vehicle table's rows — the figures a cell shows — over the whole fleet,
+ * or just `only` of it (#500) —
  * for whichever view needs them: the table itself, and the spec chart that
  * plots a column of it (#450).
  *
@@ -17,9 +18,12 @@ import { buildVehicleRows, needsPerformance, DEFAULT_ASSUMPTIONS } from '../util
  * Tested results are fetched only while one of `keys` is a tested column:
  * sessions carry every run and split, which is the heaviest read here. Pass
  * every column key the view reads (shown, sorted by, plotted).
+ *
+ * `only`: the vehicles the view shows. Rows are built for them alone, though
+ * tested results still load for the fleet, which the table and the chart share.
  */
 export function useVehicleRows({
-    keys = [], assumptions = DEFAULT_ASSUMPTIONS,
+    keys = [], only = null, assumptions = DEFAULT_ASSUMPTIONS,
     correctionTarget = DEFAULT_CORRECTION_TARGET, correctionMode = DEFAULT_READER_MODE,
 }) {
     const {
@@ -43,10 +47,10 @@ export function useVehicleRows({
     // composite range corrects for.
     const rows = useMemo(
         () => buildVehicleRows(vehicles, {
-            performance, assumptions, units, platformsById, correctionTarget, correctionMode,
+            only, performance, assumptions, units, platformsById, correctionTarget, correctionMode,
             sessionOf: r => sessionFor(testSessions, r),
         }),
-        [vehicles, performance, assumptions, units, platformsById, testSessions, correctionTarget, correctionMode],
+        [vehicles, only, performance, assumptions, units, platformsById, testSessions, correctionTarget, correctionMode],
     );
 
     return { rows, performance, wantsPerformance, performanceLoading };

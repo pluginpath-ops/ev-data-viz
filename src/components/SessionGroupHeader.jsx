@@ -89,7 +89,7 @@ export default function SessionGroupHeader({
                     href={session.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-blue-500 hover:underline"
+                    className="text-xs link-button"
                     onClick={e => e.stopPropagation()}
                     title={session.url}
                 >

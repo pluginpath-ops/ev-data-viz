@@ -1,5 +1,5 @@
 /**
- * Bulk vehicle import parser — turns a CSV or JSON file into normalised rows
+ * Bulk vehicle import parser — turns a CSV or JSON file into normalized rows
  * that buildImportPlan() can diff against the existing vehicle list.
  *
  * The parser is deliberately forgiving about column naming so a spreadsheet
@@ -18,7 +18,7 @@
 import Papa from 'papaparse';
 import { SPEC_CATEGORIES, normalizeCustomKey } from './vehicleSpecSchema';
 
-// ── Header normalisation ─────────────────────────────────────────────────────
+// ── Header normalization ─────────────────────────────────────────────────────
 
 /**
  * Fold a header/key to a comparison form: camelCase split, lowercased, non-word
@@ -159,7 +159,7 @@ const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  *   "Permanent Magnet Synchronous (E-GMP)" → Permanent Magnet
  *
  * An option must match at a word boundary, and exactly one option may match —
- * anything ambiguous or unrecognised is still rejected. A loose match reports
+ * anything ambiguous or unrecognized is still rejected. A loose match reports
  * `coercedFrom` so the import preview can show what it decided.
  */
 function matchEnumOption(raw, options) {

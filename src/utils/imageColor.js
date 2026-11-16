@@ -2,13 +2,13 @@
  * The color of the car in a vehicle's photo (#311).
  *
  * A press shot is a car on a background, often a light studio sweep or sky, so
- * a plain average returns grey every time. This looks only at the middle of the
+ * a plain average returns gray every time. This looks only at the middle of the
  * frame, throws away what has no hue worth borrowing (near-white, near-black,
  * low saturation: white, black and silver cars, glass, tarmac, sweeps) and
  * takes the hue family that holds the most of what is left.
  *
  * The honest answer for a white, black or silver car is NOTHING. `null` and a
- * reason come back rather than a plausible grey, because the caller writes the
+ * reason come back rather than a plausible gray, because the caller writes the
  * result to the vehicle on one click and a confident wrong answer is the
  * failure to avoid. Every threshold below errs toward declining.
  *
@@ -24,9 +24,9 @@ import { hslToHex } from './colorUtils';
 const REGION = { x0: 0.18, x1: 0.82, y0: 0.30, y1: 0.88 };
 
 const MIN_ALPHA = 200;
-const MIN_LIGHTNESS = 0.14;      // below: black, shadow, tyre
+const MIN_LIGHTNESS = 0.14;      // below: black, shadow, tire
 const MAX_LIGHTNESS = 0.86;      // above: white, sweep, glare
-const MIN_SATURATION = 0.28;     // below: silver, grey, glass, tarmac
+const MIN_SATURATION = 0.28;     // below: silver, gray, glass, tarmac
 const HUE_BUCKETS = 24;          // 15 degrees each
 
 /* A mean of shaded paint, highlights and reflections is duller than the paint
@@ -37,7 +37,7 @@ const LIGHTNESS_BOOST = 1.08;
 const MAX_BOOSTED_LIGHTNESS = 0.7;
 
 /* A winning hue must be a real part of the region, and clearly ahead of any
-   other hue that is not its neighbour. Green grass behind a red car, or a blue
+   other hue that is not its neighbor. Green grass behind a red car, or a blue
    sky behind a silver one, must not win by being the only thing with hue. */
 const MIN_SHARE = 0.1;
 
@@ -109,7 +109,7 @@ export function dominantColor({ data, width, height }) {
     }
     if (seen === 0) return { color: null, reason: NO_COLOR_REASONS.unreadable };
 
-    // A hue family is a bucket and its two neighbours: a red car straddles the
+    // A hue family is a bucket and its two neighbors: a red car straddles the
     // 0/360 seam and an orange one straddles two buckets.
     const family = (k) => {
         const parts = [-1, 0, 1].map(d => buckets[(k + d + HUE_BUCKETS) % HUE_BUCKETS]);
@@ -132,7 +132,7 @@ export function dominantColor({ data, width, height }) {
     });
     if (families[best].n < rival * MIN_LEAD) return { color: null, reason: NO_COLOR_REASONS.ambiguous };
 
-    // The color is the mean of the winner's own bucket plus neighbours.
+    // The color is the mean of the winner's own bucket plus neighbors.
     const w = families[best];
     const mean = rgbToHsl(w.r / w.n, w.g / w.n, w.b / w.n);
     return {

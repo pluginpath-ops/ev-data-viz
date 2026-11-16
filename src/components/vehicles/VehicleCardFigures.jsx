@@ -60,7 +60,7 @@ export function TestCountPills({ vehicle, performanceCounts = {}, onOpenSubtab }
     const shown = DATA_CATEGORIES.filter(c => counts[c.key] > 0 || pooled[c.key] > 0);
     if (shown.length === 0) return null;
 
-    // "↯ 4/2": listed tests, then in grey the unlisted ones that still count
+    // "↯ 4/2": listed tests, then in gray the unlisted ones that still count
     // in the statistics (#394, the pool).
     return (
         <div className="flex flex-wrap items-center gap-1.5">

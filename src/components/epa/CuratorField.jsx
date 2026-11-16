@@ -3,7 +3,7 @@
  * and save-on-blur. Reused across every section of the EPA curator form.
  *
  * Override flag (spec cross-cutting requirement): distinguishes
- *   • CSV-imported values (subtle grey "csv")
+ *   • CSV-imported values (subtle gray "csv")
  *   • curator-overridden values (amber "edited")
  * so curators can see at a glance what came from the spreadsheet vs. by hand.
  */
@@ -33,7 +33,7 @@ export default function CuratorField({
         if (draft === null) return;
         const raw = draft.trim();
         setDraft(null);
-        // Normalise to the stored representation for comparison.
+        // Normalize to the stored representation for comparison.
         const next = raw === '' ? null : (type === 'number' ? Number(raw) : raw);
         if (type === 'number' && next !== null && Number.isNaN(next)) return;
         const current = value ?? null;
@@ -50,14 +50,14 @@ export default function CuratorField({
     return (
         <div className="flex items-center justify-between gap-2 py-0.5">
             <span className={`shrink-0 flex items-center gap-1 ${used ? 'text-secondary font-semibold' : 'text-secondary'}`}>
-                {used && <span title="Used in a derived calculation" className="text-indigo-500">∗</span>}
+                {used && <span title="Used in a derived calculation" className="status-text is-info">∗</span>}
                 {label}
                 {tooltip && <InfoIcon text={tooltip} />}
                 {overrideSource === 'pending' && (
-                    <span title="Unsaved edit — click Save changes to commit" className="text-amber-500 text-[9px] font-bold">✎</span>
+                    <span title="Unsaved edit — click Save changes to commit" className="status-text is-warning text-[9px] font-bold">✎</span>
                 )}
                 {overrideSource === 'manual' && (
-                    <span title="Curator-overridden value" className="text-amber-500 text-[9px] font-bold">●</span>
+                    <span title="Curator-overridden value" className="status-text is-warning text-[9px] font-bold">●</span>
                 )}
                 {overrideSource === 'csv' && (
                     <span title="Imported from CSV" className="text-meta text-[9px]">csv</span>

@@ -18,7 +18,7 @@
  * ── Derivations are not recomputed here ─────────────────────────────────────
  *
  * η, charger efficiency and the adjustment factor come from `epaDerivations`,
- * unchanged. The catalogue's rule is that a derivation gets exactly one
+ * unchanged. The catalog's rule is that a derivation gets exactly one
  * implementation — the η back-solve is the heart of the model and a second
  * version written for a statistics page would be free to drift from the one the
  * curves and the curator form use.
@@ -36,7 +36,7 @@ import { bodyClassLabel, driveGroup, resolveBrand } from './feGuideBrowse';
 /**
  * The bucket for a dimension a test vehicle cannot report.
  *
- * A named bucket rather than null, because `bucketise` skips null and the test vehicle
+ * A named bucket rather than null, because `bucketize` skips null and the test vehicle
  * would leave the table without appearing anywhere in it. "Unknown" is an
  * answer; a silently shorter table is not.
  */
@@ -90,7 +90,7 @@ export const CERT_MEASURES = [
     // then how efficiently the car turns energy into miles, then how much
     // energy it holds, then how much is lost putting it there.
     { key: 'rolling_a', label: 'Rolling resistance (A)', unit: 'lbf', digits: 2,
-      hint: 'The speed-independent road-load term: tyres and driveline drag.' },
+      hint: 'The speed-independent road-load term: tires and driveline drag.' },
     { key: 'aero_c', label: 'Aero drag (C)', unit: 'lbf/mph\u00b2', digits: 4,
       hint: 'The road-load coefficient that scales with the square of speed \u2014 the aerodynamic term. Present on 203 of 204 test vehicles, so it is the highest-coverage figure the certification side has.' },
     { key: 'eta', label: 'Drivetrain efficiency (\u03b7, HWFET)', unit: '', axisLabel: '\u03b7', digits: 3, assumedIsNotData: true,
@@ -136,7 +136,7 @@ export function derivedUsableKwh(testVehicle) {
  * the guide's Chevrolet rather than beside it.
  *
  * Class and drivetrain it genuinely does not know, and those read `Unknown`
- * instead of null. Null is not a neutral choice here: `bucketise` skips an
+ * instead of null. Null is not a neutral choice here: `bucketize` skips an
  * observation whose dimension is null, so a null would drop the test vehicle from the
  * table with nothing said, which is the failure this whole change is about.
  *

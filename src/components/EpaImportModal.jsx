@@ -115,7 +115,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                         <div className="flex flex-col items-center">
                             <div
                                 className={`w-full border-2 border-dashed rounded-xs p-12 text-center cursor-pointer transition
-                                    ${dragOver ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' : 'border-[var(--color-border)] hover:border-indigo-400'}`}
+                                    ${dragOver ? 'callout is-info' : 'border-[var(--color-border)] hover:border-[var(--color-primary-border)]'}`}
                                 onClick={() => fileRef.current?.click()}
                                 onDrop={handleDrop}
                                 onDragOver={handleDragOver}
@@ -126,9 +126,9 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 <p className="text-sm text-meta mt-1">Accepts .csv (Excel) or .txt / .tsv (tab-separated) · Pre-filter to your vehicles of interest</p>
                                 <input ref={fileRef} type="file" accept=".txt,.tsv,.csv" className="hidden" onChange={handleFilePick} />
                             </div>
-                            {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+                            {error && <p className="mt-4 text-sm status-text is-danger">{error}</p>}
 
-                            <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xs text-sm text-amber-800 dark:text-amber-300 max-w-lg">
+                            <div className="mt-6 p-4 callout is-warning border rounded-xs text-sm max-w-lg">
                                 <p className="font-semibold mb-1">How to prepare the file</p>
                                 <ol className="list-decimal list-inside space-y-1 text-xs">
                                     <li>Download the EPA Test Car List (testcar_yymmdd.txt) from <span className="font-mono">epa.gov</span></li>
@@ -144,7 +144,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                     {step === 'map' && summary && (
                         <>
                             {/* Summary banner */}
-                            <div className="flex flex-wrap gap-4 mb-4 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 rounded-xs text-sm">
+                            <div className="flex flex-wrap gap-4 mb-4 p-3 callout is-info border rounded-xs text-sm">
                                 <span><strong>{summary.total}</strong> test vehicle{summary.total !== 1 ? 's' : ''} found</span>
                                 {summary.yearMin && <span>MY {summary.yearMin}{summary.yearMax !== summary.yearMin ? `–${summary.yearMax}` : ''}</span>}
                                 <span>{summary.makes.join(', ')}</span>
@@ -154,7 +154,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                 <span className="text-meta">·</span>
                                 <span>File: <span className="font-mono text-xs">{fileName}</span></span>
                                 {summary.isMasterList && (
-                                    <span className="text-amber-700 dark:text-amber-400 font-medium">
+                                    <span className="status-text is-warning font-medium">
                                         ⚠ Master Emissions List — per-cycle kWh/100mi not available; coefficients only
                                     </span>
                                 )}
@@ -225,7 +225,7 @@ export default function EpaImportModal({ vehicles, onImport, onClose }) {
                                                             </div>
                                                         ) : <span className="text-meta">—</span>}
                                                         {cs.target_a == null && a != null && (
-                                                            <div className="text-amber-500 text-[10px]">set only</div>
+                                                            <div className="status-text is-warning text-[10px]">set only</div>
                                                         )}
                                                     </td>
                                                     <td className="py-2 pr-3 whitespace-nowrap">

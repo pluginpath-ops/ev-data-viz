@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sameSource, domainOf, findSource, pickedSource, startingName, runSourceText, storedSourcePick, attributionFor, sourceLineText } from '../sources';
+import { sameSource, domainOf, findSource, pickedSource, startingName, sourceAbbreviation, nameStartsWithSource, runSourceText, storedSourcePick, attributionFor, sourceLineText } from '../sources';
 
 const SOURCES = [
     { id: 1, name: 'Car and Driver', aliases: ['C&D', 'CD'], domains: ['caranddriver.com'], default_rollout_basis: 'rollout' },
@@ -31,18 +31,18 @@ describe('domainOf', () => {
 });
 
 describe('findSource', () => {
-    it('recognises a name, an alias and a spelling', () => {
+    it('recognizes a name, an alias and a spelling', () => {
         expect(findSource(SOURCES, { name: 'car and driver' })).toMatchObject({ source: { id: 1 }, by: 'name' });
         expect(findSource(SOURCES, { name: 'oos' })).toMatchObject({ source: { id: 2 }, by: 'alias' });
         expect(findSource(SOURCES, { name: 'Motor Trend' })).toMatchObject({ source: { id: 3 }, by: 'spelling' });
     });
 
-    it('recognises a link, subdomains included, when no name is given', () => {
+    it('recognizes a link, subdomains included, when no name is given', () => {
         expect(findSource(SOURCES, { url: 'https://www.caranddriver.com/x' })).toMatchObject({ source: { id: 1 }, by: 'domain' });
         expect(findSource(SOURCES, { url: 'https://amp.motortrend.com/x' })).toMatchObject({ source: { id: 3 }, by: 'domain' });
     });
 
-    it('lets a recognised name win over a link to another source', () => {
+    it('lets a recognized name win over a link to another source', () => {
         expect(findSource(SOURCES, { name: 'MotorTrend', url: 'https://www.caranddriver.com/x' })).toMatchObject({ source: { id: 3 }, by: 'name' });
     });
 
@@ -89,10 +89,52 @@ describe('shared hosts', () => {
     });
 });
 
+describe('sourceAbbreviation', () => {
+    it('is the first alias that abbreviates the name', () => {
+        expect(sourceAbbreviation(SOURCES[1])).toBe('OoS');
+        expect(sourceAbbreviation(SOURCES[0])).toBe('C&D');   // "CD" is listed second
+    });
+
+    it('is the name itself when no alias is shorter', () => {
+        expect(sourceAbbreviation(SOURCES[2])).toBe('MotorTrend');
+        // A respelling is no shorter; an alias that is not an abbreviation of the words does not count.
+        expect(sourceAbbreviation({ name: 'Dirty Tesla', aliases: ['DirtyTesla'] })).toBe('Dirty Tesla');
+        expect(sourceAbbreviation({ name: 'Branden Flasch', aliases: ['Flasch'] })).toBe('Branden Flasch');
+        expect(sourceAbbreviation({ name: 'Ever', aliases: ['Ever Cars'] })).toBe('Ever');
+        expect(sourceAbbreviation(null)).toBe('');
+    });
+});
+
+describe('nameStartsWithSource', () => {
+    it('accepts the name or any listed spelling, ignoring case', () => {
+        const spellings = ['Out of Spec', 'OoS', 'Out of Spec Testing'];
+        expect(nameStartsWithSource('OoS 70mph', spellings)).toBe(true);
+        expect(nameStartsWithSource('out of spec 70mph', spellings)).toBe(true);
+        expect(nameStartsWithSource('Out of Spec Testing 0-100%', spellings)).toBe(true);
+        expect(nameStartsWithSource('  oos', spellings)).toBe(true);
+    });
+
+    it('ends the match at a word', () => {
+        expect(nameStartsWithSource('CDC test', ['CD'])).toBe(false);
+        expect(nameStartsWithSource('CD 75mph', ['CD'])).toBe(true);
+        expect(nameStartsWithSource('Bjørnar 10-80%', ['Bjørn'])).toBe(false);
+        expect(nameStartsWithSource('Bjørn Nyland 10-80%', ['Bjørn Nyland'])).toBe(true);
+    });
+
+    it('is false for another source, a blank name, or no spellings', () => {
+        expect(nameStartsWithSource('State of Charge 70mph', ['Out of Spec', 'OoS'])).toBe(false);
+        expect(nameStartsWithSource('', ['OoS'])).toBe(false);
+        expect(nameStartsWithSource('OoS 70mph', [])).toBe(false);
+        expect(nameStartsWithSource('OoS 70mph', ['', null])).toBe(false);
+    });
+});
+
 describe('startingName', () => {
-    it('offers "<source> " for a test with no name yet', () => {
-        expect(startingName('', SOURCES[1])).toBe('Out of Spec ');
-        expect(startingName('   ', SOURCES[1])).toBe('Out of Spec ');
+    it('offers "<source> " for a test with no name yet — the abbreviation when the source lists one', () => {
+        expect(startingName('', SOURCES[1])).toBe('OoS ');
+        expect(startingName('   ', SOURCES[1])).toBe('OoS ');
+        expect(startingName('', SOURCES[0])).toBe('C&D ');
+        expect(startingName('', SOURCES[2])).toBe('MotorTrend ');
     });
 
     it('offers nothing once a name is started, or when there is no listed source', () => {

@@ -39,6 +39,7 @@ import VehicleFilterBar from './vehicles/VehicleFilterBar';
 import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
 import { decodeVehicleFilters } from '../utils/vehicleFilters';
 import ViewSpecsModal from './ViewSpecsModal';
+import TableMath from './calcTrace/TableMath';
 import VehicleCardPopover from './vehicles/VehicleCardPopover';
 import { reorderSelectionBySort } from '../utils/sortSelection';
 import {
@@ -47,7 +48,7 @@ import {
     sortVehicleRows, firstSortDir,
     vehicleBarMaxima, encodeVehicleTableParams, decodeVehicleTableParams,
     vehicleTableStartSearch, vehicleTableMemory, PRESETS, vehiclePresetByKey, presetMatching,
-    labelledColumn, needsAssumptions, assumptionsFor,
+    labeledColumn, needsAssumptions, assumptionsFor,
 } from '../utils/vehicleTable';
 
 /**
@@ -131,7 +132,7 @@ export default function VehicleTable({
         const col = vehicleColumnByKey(key);
         if (!test || !col) return null;
         const unit = cellUnit(unitFor(col, units), row.values[key]);
-        const figure = `${labelledColumn(col, assumptions, units, correctionTarget, correctionMode).label}: ${figureWithUnit(formatVehicleCell(row, col, units), unit)}`;
+        const figure = `${labeledColumn(col, assumptions, units, correctionTarget, correctionMode).label}: ${figureWithUnit(formatVehicleCell(row, col, units), unit)}`;
         return <TestPeek test={test} figure={figure} />;
     }, [rowsById, assumptions, units, correctionTarget, correctionMode]);
     const { tableProps: peekProps, panel: cellPeek } = useCellPeek({ renderPeek });
@@ -156,7 +157,7 @@ export default function VehicleTable({
     // Headers drag the same list the column picker does.
     const { dragProps, dragClass } = useColumnDrag({ visible: columns, fixedKey: 'name', onChange: changeColumns });
     // Named from the assumptions where a name carries one ("Time to add 150 mi").
-    const label    = useCallback((col) => labelledColumn(col, assumptions, units, correctionTarget, correctionMode), [assumptions, units, correctionTarget, correctionMode]);
+    const label    = useCallback((col) => labeledColumn(col, assumptions, units, correctionTarget, correctionMode), [assumptions, units, correctionTarget, correctionMode]);
     const cols     = useMemo(() => columns.map(vehicleColumnByKey).filter(Boolean).map(label), [columns, label]);
     const pickable = useMemo(() => VEHICLE_COLUMNS.map(label), [label]);
     const maxima   = useMemo(() => vehicleBarMaxima(filtered, cols), [filtered, cols]);
@@ -229,6 +230,11 @@ export default function VehicleTable({
                 peekProps={peekProps}
                 peek={cellPeek}
                 emptyText={rows.length ? 'No vehicles match these filters.' : 'No vehicles yet.'}
+            />
+
+            <TableMath
+                selectedRows={selectedRows} bodyRows={bodyRows} columns={columns} selectedIds={selectedVehicles}
+                performance={performance} assumptions={assumptions} correctionTarget={correctionTarget} correctionMode={correctionMode}
             />
 
             {viewing && <ViewSpecsModal vehicle={viewing} onClose={() => setViewing(null)} />}
