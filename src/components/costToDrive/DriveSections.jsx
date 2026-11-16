@@ -40,7 +40,7 @@ function DayTypeFields({ settings, onChange, type }) {
         <div className="day-type">
             <div className="day-type-head">
                 <span className="subsection-title">{type === 'L' ? 'Long day' : 'Daily'}</span>
-                <span className="text-meta">{type === 'L' ? 'sales calls, a friend two towns over' : 'the ordinary commute'}</span>
+                <span className="text-meta">{type === 'L' ? 'a typical long driving day' : 'the ordinary commute'}</span>
             </div>
             <DriveNumberField {...props} field={`${pre}Mi`} label="Miles in the day" unit="mi" />
             <DriveNumberField {...props} field={`${pre}Mph`} label="Highway speed" unit="mph" />
@@ -99,9 +99,10 @@ export function FastChargingFields({ settings, onChange }) {
                 <DriveNumberField {...props} field="fastPrice" label="Fast price" unit="$/kWh" />
             </div>
             <span className="text-note">
-                A detour is off the route and back, its minutes at {DETOUR_MPH} mph, and costs energy too.
-                A stop charges enough, detour included, to finish the day above the floor. It adds at
-                least {MIN_STOP_ADD}%, and goes past the cap to {STRETCH_CAP_TO}% when that saves a second stop.
+                A detour is the time off your route to reach a fast charger and get back; its miles
+                (at {DETOUR_MPH} mph) count in the cost and the time. A stop always adds at least {MIN_STOP_ADD}%, and
+                may go past the cap to {STRETCH_CAP_TO}% when that saves a second stop. If home charging can&rsquo;t
+                bring the battery back by Monday morning, the week&rsquo;s last fast stop charges further.
             </span>
         </>
     );
@@ -120,8 +121,8 @@ export function SeasonFields({ settings, onChange }) {
                 <DriveNumberField {...props} field="elevationFt" label="Elevation" unit="ft" />
             </div>
             <span className="text-note">
-                Priced as denser air plus cabin heating or cooling, and battery warming as a guess. Cold
-                tires are not, so winter is a floor.
+                Temperature and elevation change driving efficiency, through EVBench&rsquo;s estimated heating
+                and cooling loads and the air&rsquo;s density.
             </span>
             <PackWarmingNote settings={settings} />
         </>
@@ -135,8 +136,11 @@ export function EfficiencyFields({ settings, onChange }) {
             <DriveChoice {...props} field="efficiencyFrom" label="Efficiency from"
                 options={[['tested', 'Tested + EPA'], ['epa', 'EPA only']]} />
             <span className="text-note">
-                Highway from EVBench range tests, city from the EPA highway figure, both corrected to
-                your speed, temperature and elevation. A car with no range test uses EPA for both, and says so.
+                Tested + EPA uses EVBench range tests for highway miles and the EPA city figure for city
+                miles. EVBench range tests are mostly steady interstate drives; EPA&rsquo;s highway figure is
+                closer to 50&ndash;60 mph roads with traffic. All are corrected to your temperature and
+                elevation, and range tests to your speed too. A car with no range test uses EPA highway for
+                highway miles; one with no EPA city figure uses its highway figure for city miles.
             </span>
             <span className="text-meta">
                 Charging losses: at the car&rsquo;s full AC power, its own EPA figure, else {percentText(ASSUMED_CHARGER_EFF)} reaches the pack ·

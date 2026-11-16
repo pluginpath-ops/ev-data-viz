@@ -1,7 +1,7 @@
 /**
  * The week day by day, as bars (utils/dayBars.js), in percent of the battery.
  *
- * Owner, 2026-11-07, from the mockups: A3 the default, A behind the toggle —
+ * Owner, 2026-11-07, from the mockups (A the default since 2026-11-16) —
  *  - `day` (A3), in time order: a gray bar for the day out, from the
  *    morning's level (the tick) to where the car gets home; each fast stop on
  *    the route inside it at the levels it charged between, striped orange over
@@ -9,7 +9,12 @@
  *    orange; then the night at home in the series color, up to the next
  *    morning, where a dashed line hands over to the next day.
  *  - `balance` (A): charge in above zero (fast stops striped, a planned
- *    charge solid, the night at home), driving below.
+ *    charge solid, the night at home), driving below; under it, on its own
+ *    shorter axis, the battery's level hour by hour across the same days
+ *    (owner, 2026-11-16: the default, the line beneath the bars sharing the
+ *    x-axis). One chart with two stacked y-axes, so one PNG holds both; the
+ *    line sits on a hidden hourly x-axis (0–168) that spans the same width as
+ *    the days, a day's noon under its bars.
  *
  * Chart.js floating bars in a PlotFrame, so it has the PNG capture, the link
  * button and the source line every chart here has. The stops in `day` are
@@ -40,31 +45,36 @@ const TYPE_NAMES = { D: 'Daily', L: 'Long day', O: 'Off' };
 const NO_SOURCES = {};
 const pctText = (v) => `${Math.round(v)}%`;
 const DRIVE = withAlpha(SERIES_NEUTRAL, 0.75);
+const DRIVING_LABEL = 'Daily driving battery use';
+const HOME_LABEL = 'Energy added charging at home';
+/** Where the everyday battery range ends, dashed on the battery's level. */
+const SOC_GUIDES = [10, 80];
 
 /** A fast stop on the route: orange stripes over the driving's gray. */
 const routeStopFill = (callout) => stripedFill(DRIVE, callout);
 
 /** The datasets, [low, high] per day. `legendOnly` ones carry no bars: the plugin draws them. */
-function datasetsOf(bars, view, { color, callout, striped }) {
+function datasetsOf(bars, view, { color, callout, striped, week }) {
     if (view === 'day') {
         return [
             {
-                label: 'The day out, morning to home', key: 'out', stack: 'out',
+                label: DRIVING_LABEL, key: 'out', stack: 'out',
                 backgroundColor: DRIVE, borderWidth: 0,
                 data: bars.map(b => (b.miles > 0 ? [Math.min(b.start, b.arrive), Math.max(b.start, b.arrive)] : null)),
             },
             { label: 'Fast stop (during the drive)', key: 'fast', legendOnly: true, stack: 'out', backgroundColor: striped, data: bars.map(() => null) },
             { label: 'Planned fast charge', key: 'planned', legendOnly: true, stack: 'out', backgroundColor: callout, data: bars.map(() => null) },
             {
-                label: 'Home overnight, to the next morning', key: 'home', stack: 'home',
+                label: HOME_LABEL, key: 'home', stack: 'home',
                 backgroundColor: color, borderWidth: 0,
                 data: bars.map(b => (b.next > b.arrive + 0.05 ? [b.arrive, b.next] : null)),
             },
         ];
     }
     // Charge in, stacked from zero: fast stops, then the planned charge, then the night.
+    // The bars name `y`: unnamed, Chart.js takes the first y scale, the battery's.
     const charge = (key, label, fill) => ({
-        label, key, stack: 'day', backgroundColor: fill, borderWidth: 0,
+        label, key, stack: 'day', yAxisID: 'y', backgroundColor: fill, borderWidth: 0,
         data: bars.map(b => {
             const base = (key === 'fast' ? 0 : b.fast) + (key === 'home' ? b.planned : 0);
             return b[key] > 0.05 ? [base, base + b[key]] : null;
@@ -73,18 +83,52 @@ function datasetsOf(bars, view, { color, callout, striped }) {
     return [
         charge('fast', 'Fast stops', striped),
         charge('planned', 'Planned fast charge', callout),
-        charge('home', 'Home charging', color),
+        charge('home', HOME_LABEL, color),
         {
-            label: 'Used driving', key: 'used', stack: 'day', backgroundColor: DRIVE, borderWidth: 0,
+            label: DRIVING_LABEL, key: 'used', stack: 'day', yAxisID: 'y', backgroundColor: DRIVE, borderWidth: 0,
             data: bars.map(b => (b.used > 0.05 ? [-b.used, 0] : null)),
+        },
+        {
+            type: 'line', label: 'State of charge', key: 'soc', xAxisID: 'xh', yAxisID: 'ySoc',
+            data: week.points.map(([x, y]) => ({ x, y })),
+            borderColor: color, backgroundColor: withAlpha(color, 0.12), fill: 'origin',
+            borderWidth: 2, pointRadius: 0, tension: 0,
         },
     ];
 }
 
+/** The battery's level under the bars: each night's plug-in window shaded, and the 10% and 80% guides. */
+const socMarks = (week) => ({
+    id: 'socMarks',
+    beforeDatasetsDraw(chart) {
+        const { ctx, scales: { xh, ySoc } } = chart;
+        if (!xh || !ySoc) return;
+        const { tick } = chartTheme();
+        ctx.save();
+        ctx.fillStyle = tick;
+        ctx.globalAlpha = 0.08;
+        // 0–100% only: the axis is padded past both ends, a gap between the plots.
+        const top = ySoc.getPixelForValue(100), bottom = ySoc.getPixelForValue(0);
+        for (const w of week.windows) {
+            const x0 = xh.getPixelForValue(w.from), x1 = xh.getPixelForValue(w.to);
+            ctx.fillRect(x0, top, x1 - x0, bottom - top);
+        }
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = tick;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        for (const v of SOC_GUIDES) {
+            const py = Math.round(ySoc.getPixelForValue(v)) + 0.5;
+            ctx.beginPath(); ctx.moveTo(xh.left, py); ctx.lineTo(xh.right, py); ctx.stroke();
+        }
+        ctx.restore();
+    },
+});
+
 /**
  * Marks over the bars. In `day`: each stop inside the day's bar, a tick at
  * the morning's level, and a dashed hand-over to the next day. In both: the
- * fast minutes over each day.
+ * fast minutes over each day that has any.
  */
 const dayMarks = (bars, view, fills) => ({
     id: 'dayMarks',
@@ -140,13 +184,14 @@ const dayMarks = (bars, view, fills) => ({
         ctx.setLineDash([]);
         ctx.textAlign = 'center';
         ctx.font = `600 ${fonts.badge}px ${fonts.mono}`;
+        ctx.fillStyle = callout;
         bars.forEach((b, i) => {
+            if (!(b.minutes > 0.5)) return;   // a home-only day says nothing
             const [l, r] = span(i);
             const top = view === 'day'
                 ? Math.max(b.start, b.next, ...b.stopBands.map(s => s.to))
                 : b.fast + b.planned + b.home;
-            ctx.fillStyle = b.minutes > 0.5 ? callout : tick;
-            ctx.fillText(b.minutes > 0.5 ? `${Math.round(b.minutes)}m fast` : 'home only',
+            ctx.fillText(`${Math.round(b.minutes)}m fast`,
                 (l + r) / 2, Math.max(a.top + fonts.badge, y.getPixelForValue(top) - 6));
         });
         ctx.restore();
@@ -191,19 +236,20 @@ export default function DayBarsChart({
             // Only what this week has: a stop kind with no stops leaves the legend.
             keep: (item, data) => {
                 const ds = data.datasets[item.datasetIndex];
+                if (ds.key === 'soc') return false;   // the line under its own "Battery (%)" axis needs no key
                 if (!ds.legendOnly) return ds.data.some(Boolean);
                 return bars.some(b => b.stopBands.some(s => s.planned === (ds.key === 'planned')));
             },
             // No home charging, or no night charged: no ceiling drawn, no key.
-            text: bars.some(b => b.mostAdd > 0 && b.home > 0.05) ? 'Most a night could add' : null,
+            text: bars.some(b => b.mostAdd > 0 && b.home > 0.05) ? 'Maximum possible daily charging' : null,
         });
         chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
             type: 'bar',
             data: {
                 labels: bars.map(b => [b.day, b.type === 'O' ? 'Off' : `${TYPE_NAMES[b.type]} · ${b.miles} mi`]),
-                datasets: datasetsOf(bars, view, { color, callout: theme.callout, striped: fills.striped }),
+                datasets: datasetsOf(bars, view, { color, callout: theme.callout, striped: fills.striped, week }),
             },
-            plugins: [dayMarks(bars, view, fills)],
+            plugins: day ? [dayMarks(bars, view, fills)] : [socMarks(week), dayMarks(bars, view, fills)],
             options: {
                 // Room over the plot for a ceiling's arrow.
                 layout: { padding: { top: 14 } },
@@ -218,6 +264,8 @@ export default function DayBarsChart({
                         onClick: ceilingKey.onClick,
                     },
                     tooltip: {
+                        // The bars carry the day's figures; the line is read by eye.
+                        filter: (item) => item.dataset.key !== 'soc',
                         callbacks: {
                             title: (items) => {
                                 const b = bars[items[0]?.dataIndex];
@@ -246,12 +294,26 @@ export default function DayBarsChart({
                 },
                 scales: {
                     x: { stacked: true, grid: { display: false }, ticks: { color: theme.tick, maxRotation: 0 } },
+                    ...(day ? {} : {
+                        // The battery's level, under the bars on its own shorter axis.
+                        // Listed before `y`: a stack is laid out bottom up.
+                        ySoc: {
+                            stack: 'plan', stackWeight: 1.2, offset: true, min: 0, max: 100,
+                            title: { display: true, text: 'Battery (%)', color: theme.legend },
+                            ticks: { color: theme.tick, stepSize: 50, callback: (v) => `${v}%` },
+                            grid: { color: theme.grid },
+                        },
+                        // Hours of the week, spanning the same width as the seven days
+                        // (no bar offset: a day's noon under its bars).
+                        xh: { type: 'linear', min: 0, max: 7 * 24, offset: false, display: false },
+                    }),
                     y: {
                         stacked: false,
                         min: day ? 0 : -max, max,
-                        title: { display: true, text: day ? 'Battery (%)' : 'Charge in ↑ · used driving ↓ (% of the battery)', color: theme.legend },
+                        title: { display: true, text: day ? 'Battery (%)' : 'Charge in ↑ · used ↓ (%)', color: theme.legend },
                         ticks: { color: theme.tick, stepSize: 20, callback: (v) => (day || v <= 0 ? `${v}%` : `+${v}%`) },
                         grid: { color: (c) => (c.tick?.value === 0 && !day ? theme.axis : theme.grid) },
+                        ...(day ? {} : { stack: 'plan', stackWeight: 3 }),
                     },
                 },
             },

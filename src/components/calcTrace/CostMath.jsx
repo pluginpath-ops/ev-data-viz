@@ -9,7 +9,7 @@ import ShowTheMath from './ShowTheMath';
 import MathPass from './MathPass';
 
 /**
- * "Show the math" for Cost & Time › Compare: one vehicle priced by the same
+ * "Show the math" for Cost & Time › Monthly Cost & Time: one vehicle priced by the same
  * call the page makes (useCostToDrive's priceVehicle), with the reader's
  * settings and a trace on.
  */

@@ -395,7 +395,7 @@ export const tempWords = (f, units = 'imperial') => (units === 'metric' ? `${Mat
  * The plan as the summary step says it: `[{ label, text }]`, only what will
  * change, in the reader's units. `names` maps a vehicle id to its name.
  */
-/** A chart mode as the reader finds it: "Cost & Time › Compare". */
+/** A chart mode as the reader finds it: "Cost & Time › Monthly Cost & Time". */
 export const chartName = (mode) => `${categoryForMode(mode).label} › ${labelForMode(mode)}`;
 /** The short form, for the review bar's buttons: "Compare". Long names wrapped the bar. */
 export const chartShortName = (mode) => labelForMode(mode);

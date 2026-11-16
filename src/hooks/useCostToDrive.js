@@ -64,7 +64,7 @@ export function useCostToDrive(vehicles, selectedVehicleIds, settings) {
 }
 
 /**
- * The same, once per home charger level (Home Charger): `[{ level, index,
+ * The same, once per home charger level (Charging Speeds): `[{ level, index,
  * priced }]` in HOME_LEVELS order, every other setting as the reader set it.
  */
 export function useCostToDriveByLevel(vehicles, selectedVehicleIds, settings) {

@@ -1,6 +1,6 @@
 /**
  * Your week: a day button for each weekday that cycles Daily → Long day → Off,
- * and beneath each a planned fast charge (a grocery run, a regular stop).
+ * and beneath each a planned fast charge (a regular stop the reader makes anyway).
  * `compact` is the sidebar's: one-letter days and the planned days as a select.
  */
 import { WEEKDAYS } from '../../constants/costToDrive';
@@ -45,7 +45,7 @@ export default function WeekPicker({ settings, onChange, compact = false }) {
                 <div className="week-days">{days}</div>
                 <span className="text-note">D Daily · L Long day · – Off. Click a day to change it.</span>
                 <label className="drive-field is-wide">
-                    <span className="text-label">Planned fast charge</span>
+                    <span className="text-label">Plan to fast charge</span>
                     <select
                         className="form-input"
                         value={plannedDays.length === 1 ? WEEKDAYS.indexOf(plannedDays[0]) : plannedDays.length ? 'many' : 'none'}
@@ -70,8 +70,7 @@ export default function WeekPicker({ settings, onChange, compact = false }) {
                 <span className="text-label">Day</span>
                 {days}
                 <span className="week-picker-label">
-                    <span className="text-label">Planned fast charge</span>
-                    <span className="text-meta">a grocery run</span>
+                    <span className="text-label">Plan to fast charge</span>
                 </span>
                 {WEEKDAYS.map((name, d) => {
                     const on = (planned & (1 << d)) !== 0;

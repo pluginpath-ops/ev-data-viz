@@ -64,7 +64,7 @@ function DrivePreview({ priced, settings, onOpenMode }) {
             ))}
             {onOpenMode && priced.some(p => !p.missing) && (
                 <div className="drive-presets">
-                    <button type="button" className="btn btn-primary" onClick={() => onOpenMode('drivecost')}>Compare ↘</button>
+                    <button type="button" className="btn btn-primary" onClick={() => onOpenMode('drivecost')}>Monthly Cost &amp; Time ↘</button>
                     <button type="button" className="btn btn-primary" onClick={() => onOpenMode('driveplan')}>Weekly Charging Plan ↘</button>
                 </div>
             )}
@@ -97,7 +97,7 @@ export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings
                 <DriveCard title="Your week" aside={<span className="text-secondary">{weekSummary(settings)}</span>}>
                     <WeekFields {...props} />
                 </DriveCard>
-                <DriveCard title="Fast charging, when a day runs short">
+                <DriveCard title="Fast charging" aside={<span className="text-secondary">used as needed, on top of home charging</span>}>
                     <FastChargingFields {...props} />
                 </DriveCard>
             </div>

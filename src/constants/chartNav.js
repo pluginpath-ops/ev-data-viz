@@ -84,9 +84,9 @@ export const CHART_CATEGORIES = [
         label: 'Cost & Time',
         modes: [
             { key: 'drivesetup', label: 'Your Driving' },
-            { key: 'drivecost', label: 'Compare' },
+            { key: 'drivecost', label: 'Monthly Cost & Time' },
             { key: 'driveplan', label: 'Weekly Charging Plan' },
-            { key: 'drivecharger', label: 'Home Charger' },
+            { key: 'drivecharger', label: 'Charging Speeds' },
         ],
     },
     {

@@ -5,20 +5,25 @@ import {
 } from '../costToDrive';
 import { normalizeCostToDrive } from '../costToDriveKey';
 import { DEFAULT_COST_TO_DRIVE, GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME, MIN_STOP_ADD, STRETCH_CAP_TO, PACK_WARMING_BELOW_F, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
-import { ASSUMED_CHARGER_EFF, BATTERY_WARMING_KWH, FIXED_DRAW_W } from '../../constants/epa';
+import { ASSUMED_CHARGER_EFF, BATTERY_WARMING_KWH, DC_FAST_LOSS, FIXED_DRAW_W } from '../../constants/epa';
 
 // A Model Y-ish profile with fixed numbers, so the rule is tested apart from
 // how a vehicle record resolves: 75 kWh, 340 Wh/mi on a long day in winter.
-const profile = (over = {}) => ({
-    usableKwh: 75,
-    missing: null,
-    whPerMi: { winter: { D: 323, L: 332 }, summer: { D: 250, L: 260 } },
-    home: { kw: 11.5, eff: 0.885 },
-    // Battery warming at the default guess for a 75 kWh pack.
-    warmKwhPerF: 0.002 * 75,
-    fast: { basis: 'maxDc', minutes: (a, b) => taperMinutes(75, 170, a, b) },
-    ...over,
-});
+// Warming's efficiency is the charging one unless a test sets it, so a test
+// reads one figure.
+const profile = (over = {}) => {
+    const p = {
+        usableKwh: 75,
+        missing: null,
+        whPerMi: { winter: { D: 323, L: 332 }, summer: { D: 250, L: 260 } },
+        home: { kw: 11.5, eff: 0.885 },
+        // Battery warming at the default guess for a 75 kWh pack.
+        warmKwhPerF: 0.002 * 75,
+        fast: { basis: 'maxDc', minutes: (a, b) => taperMinutes(75, 170, a, b) },
+        ...over,
+    };
+    return { ...p, home: { warmEff: p.home.eff, ...p.home } };
+};
 // The week these tests were written on: long days between short ones and a
 // planned Sunday stop — the default until 2026-11-10, kept because it
 // exercises every rule. Today's default (Commuter) rarely fast charges.
@@ -57,7 +62,8 @@ describe('the week', () => {
     it('120 V: never more than two stops a day — the cap stretches to 80% instead of a tiny third', () => {
         const w = simulateWeek(profile(wallOutlet), settings());
         expect(Math.max(...w.days.map(d => d.stops.length))).toBeLessThanOrEqual(2);
-        expect(Math.max(...w.stops.map(x => x.toSoc))).toBeLessThanOrEqual(STRETCH_CAP_TO + 1e-9);
+        // A stop that closes the week may charge further.
+        expect(Math.max(...w.stops.filter(x => !x.closesWeek).map(x => x.toSoc))).toBeLessThanOrEqual(STRETCH_CAP_TO + 1e-9);
         expect(w.stopCount).toBeGreaterThan(simulateWeek(profile(), settings()).stopCount);
     });
 
@@ -73,10 +79,69 @@ describe('the week', () => {
     });
 
     it('a planned stop below the cap tops up to it, with no detour', () => {
-        const w = simulateWeek(profile(wallOutlet), settings());
+        // 120 V in summer, Monday not a Long day (so the week starts at 80%):
+        // Sunday night brings 70% back past it, so the planned stop is only that.
+        const w = simulateWeek(profile(wallOutlet), settings({ season: 'summer', week: 'DLDLDLO' }));
         const sunday = w.stops.find(x => x.planned);
+        expect(sunday.closesWeek).toBe(false);
         expect(sunday.toSoc).toBe(70);
         expect(sunday.minutes).toBeCloseTo(sunday.chargeMinutes + 5, 6);
+    });
+
+    describe('closes: Monday morning, the week ends where it started', () => {
+        const mondayAfter = (w) => w.days[6].night.endSoc;
+        const cases = {
+            '48 A': profile(),
+            '120 V': profile(wallOutlet),
+            '120 V, a big pack': profile({ ...wallOutlet, usableKwh: 135, warmKwhPerF: 0.002 * 135 }),
+            'no home charging': profile({ home: { kw: 0, eff: 0.885, none: true } }),
+        };
+        for (const [name, p] of Object.entries(cases)) {
+            it(name, () => {
+                for (const over of [{}, { winterF: -20 }, { season: 'summer' }]) {
+                    const w = simulateWeek(p, settings(over));
+                    const start = w.days[0].startSoc;
+                    expect(mondayAfter(w)).toBeGreaterThanOrEqual(start - 0.5);
+                    // Never with time to spare: within one smallest stop of it.
+                    expect(mondayAfter(w)).toBeLessThanOrEqual(start + MIN_STOP_ADD + 1e-6);
+                    expect(Math.min(...w.points.map(([, soc]) => soc))).toBeGreaterThanOrEqual(10 - 1e-6);
+                }
+            });
+        }
+
+        it('starts Monday at Charge to (100% before a Long Monday), or the cap with no home charging', () => {
+            expect(simulateWeek(profile(), settings()).days[0].startSoc).toBe(100);
+            expect(simulateWeek(profile(), settings({ week: 'DLDLDLO' })).days[0].startSoc).toBe(settings().chargeTo);
+            expect(simulateWeek(profile({ home: { kw: 0, eff: 0.885, none: true } }), settings()).days[0].startSoc).toBe(settings().capTo);
+        });
+
+        it('a week that closes on its own is left alone', () => {
+            const w = simulateWeek(profile(), settings({ season: 'summer' }));
+            expect(w.stops.some(x => x.closesWeek)).toBe(false);
+        });
+
+        it('charges an existing stop further rather than adding one', () => {
+            const s = settings({ winterF: 15 });
+            const p = profile(wallOutlet);
+            const w = simulateWeek(p, s);
+            const closing = w.stops.filter(x => x.closesWeek);
+            expect(closing.length).toBeGreaterThan(0);
+            // The week's last stop, charged further: no stop added.
+            expect(closing).toEqual([w.stops.at(-1)]);
+            // Its charge reaches Monday: every night after it, before Sunday's, ran out.
+            for (let i = closing[0].day; i < 6; i++) expect(w.days[i].night.ranOut).toBe(true);
+        });
+
+        it('with no stop to extend, adds one after a driving day, with the detour', () => {
+            // 48 A with one-hour nights that never refill, and no day low enough to stop.
+            const s = settings({ plugFrom: 1, plugUntil: 2, week: 'DDDDDDD', planned: 0, dailyMi: 60, season: 'summer' });
+            const w = simulateWeek(profile(), s);
+            const closing = w.stops.filter(x => x.closesWeek);
+            expect(closing).toHaveLength(1);
+            expect(closing[0].planned).toBe(false);
+            expect(closing[0].minutes).toBeCloseTo(closing[0].chargeMinutes + s.detourMin + s.startMin, 6);
+            expect(mondayAfter(w)).toBeGreaterThanOrEqual(w.days[0].startSoc - 0.5);
+        });
     });
 
     it('charges to 100% the night before a long day, and says when a night runs out', () => {
@@ -255,8 +320,23 @@ describe('a vehicle record', () => {
         const p = costToDriveVehicle(vehicle, settings());
         expect(p.missing).toBeNull();
         expect(p.highwayFrom).toBe('epa');
-        expect(p.cityFrom).toBe('epa');
+        expect(p.cityFrom).toBe('highway');   // no city figure on this one
         expect(p.fast.basis).toBe('maxDc');
+    });
+
+    it('prices city miles from the EPA city figure, highway miles unchanged', () => {
+        const withCity = { ...vehicle, epaRange: { hwyMi: 290, cityMi: 350 } };
+        const p = costToDriveVehicle(withCity, settings());
+        const q = costToDriveVehicle(vehicle, settings());
+        expect(p.cityFrom).toBe('epa');
+        expect(p.whPerMi.summer.D).toBeLessThan(q.whPerMi.summer.D);
+        // All highway: the city figure plays no part.
+        const allHwy = settings({ dailyCity: 0 });
+        expect(costToDriveVehicle(withCity, allHwy).whPerMi.summer.D).toBeCloseTo(costToDriveVehicle(vehicle, allHwy).whPerMi.summer.D, 9);
+        // All city, at the lab's own conditions: near the city label.
+        const allCity = costToDriveVehicle(withCity, settings({ dailyCity: 100 })).whPerMi.summer.D;
+        expect(allCity / (1000 / (350 / 75))).toBeGreaterThan(0.95);
+        expect(allCity / (1000 / (350 / 75))).toBeLessThan(1.05);
     });
 
     it('winter costs more energy per mile than summer; summer near the label, which is not re-priced for speed', () => {
@@ -487,15 +567,73 @@ describe('battery warming', () => {
 
     it('is bought through the charger efficiency, and is in the week\'s home energy and cost', () => {
         const s = settings({ winterF: 15 });
-        const cold = profile({ home: { kw: 1.44, eff: 0.76 } });
-        const warm = profile({ home: { kw: 1.44, eff: 0.76 }, warmKwhPerF: 0 });
-        const { w, nights } = warmingOf(cold, s);
-        const plain = simulateWeek(warm, s);
-        // The same nights charge the same: v1 takes nothing from what a night adds.
-        expect(w.days.map(d => d.night.added)).toEqual(plain.days.map(d => d.night.added));
-        expect(w.homeKwh - plain.homeKwh).toBeCloseTo(nights * BATTERY_WARMING_KWH * 75 * 25 / 0.76, 9);
+        const { w } = warmingOf(profile(), s);
+        for (const d of w.days.filter(x => x.night.added > 0)) expect(d.night.warmKwh).toBeCloseTo(BATTERY_WARMING_KWH * 75 * 25 / 0.885, 9);
         expect(w.homeKwh).toBeCloseTo(w.days.reduce((t, d) => t + d.night.homeKwh, 0), 9);
         expect(w.homeCost).toBeCloseTo(w.homeKwh * s.homePrice, 9);
+    });
+
+    it('pays the charger\'s conversion only: the fixed draw is heat the car keeps', () => {
+        const car = (level) => costToDriveVehicle({ socWindowKwh: 75, epaRange: { mi: 290 }, specs: { charging: { max_ac_kw: 11.5 } } }, settings({ level }));
+        const want = ASSUMED_CHARGER_EFF + FIXED_DRAW_W / 1000 / 11.5;
+        // The same at every level; charging itself loses more on 120 V.
+        for (const level of [0, 1, 4]) expect(car(level).home.warmEff).toBeCloseTo(want, 12);
+        expect(car(0).home.eff).toBeLessThan(car(0).home.warmEff);
+        // A night buys E_warm / η_warm of warming at the wall.
+        const s = settings({ winterF: 15 });
+        const w = simulateWeek(profile({ home: { kw: 1.44, eff: 0.76, warmEff: 0.9 } }), s);
+        for (const d of w.days.filter(x => x.night.homeKwh > 0)) expect(d.night.warmKwh).toBeCloseTo(BATTERY_WARMING_KWH * 75 * 25 / 0.9, 9);
+    });
+
+    it('comes out of the night\'s window first, at the charger\'s power: it takes time and leaves less to add', () => {
+        const s = settings({ winterF: 15 });
+        const h = plugHours(s);
+        const cold = simulateWeek(profile(wallOutlet), s);
+        const plain = simulateWeek(profile({ ...wallOutlet, warmKwhPerF: 0 }), s);
+        const warmWall = BATTERY_WARMING_KWH * 75 * 25 / 0.80;
+        cold.days.forEach((d, i) => {
+            // The most a night adds is what the window buys less the warming.
+            expect(d.night.mostAdd).toBeCloseTo((1.44 * h - warmWall) * 0.80 / 75 * 100, 9);
+            expect(d.night.mostAdd).toBeLessThan(plain.days[i].night.mostAdd);
+            // Never more at the wall than the charger can deliver in the window.
+            expect(d.night.homeKwh).toBeLessThanOrEqual(1.44 * h + 1e-9);
+            expect(d.night.hours).toBeLessThanOrEqual(h + 1e-9);
+        });
+        // A 120 V night that runs out buys exactly the charger's window.
+        const cut = cold.days.filter(d => d.night.ranOut);
+        expect(cut.length).toBeGreaterThan(0);
+        for (const d of cut) expect(d.night.homeKwh).toBeCloseTo(1.44 * h, 9);
+    });
+
+    it('is bought at a fast charger too: the day\'s first stop, at the fast loss and price', () => {
+        const noHome = { home: { kw: 0, eff: 0.885, none: true } };
+        const s = settings({ winterF: 15 });
+        const w = simulateWeek(profile(noHome), s);
+        const plain = simulateWeek(profile({ ...noHome, warmKwhPerF: 0 }), s);
+        const warm = BATTERY_WARMING_KWH * 75 * 25;
+        // The same stops; only the first of each day buys warming.
+        expect(w.stops.map(x => x.toSoc)).toEqual(plain.stops.map(x => x.toSoc));
+        const days = new Set();
+        for (const st of w.stops) {
+            expect(st.warmKwh).toBeCloseTo(days.has(st.day) ? 0 : warm, 9);
+            days.add(st.day);
+        }
+        expect(days.size).toBeGreaterThan(0);
+        expect(w.fastKwh - plain.fastKwh).toBeCloseTo(days.size * warm / (1 - DC_FAST_LOSS), 9);
+        expect(w.fastCost).toBeCloseTo(w.fastKwh * s.fastPrice, 9);
+        expect(w.fastCost).toBeCloseTo(w.stops.reduce((t, x) => t + x.cost, 0), 9);
+        // None in summer.
+        expect(simulateWeek(profile(noHome), settings({ season: 'summer' })).stops.every(x => x.warmKwh === 0)).toBe(true);
+    });
+
+    it('can take the whole night: then the night adds nothing and buys only the window', () => {
+        const s = settings({ winterF: -20 });
+        // A big pack at -20°F on 120 V: 0.002 × 200 × 60 = 24 kWh, more than 1.44 × 9.
+        const w = simulateWeek(profile({ ...wallOutlet, usableKwh: 200, warmKwhPerF: 0.002 * 200 }), s);
+        for (const d of w.days.filter(x => x.night.homeKwh > 0)) {
+            expect(d.night.added).toBe(0);
+            expect(d.night.homeKwh).toBeCloseTo(1.44 * plugHours(s), 9);
+        }
     });
 });
 
@@ -523,13 +661,23 @@ describe('the most home charging could cost', () => {
             .toBeCloseTo(perMonth(7 * 11.5 * 11 * 0.2), 6);
     });
 
-        it('adds each night\'s battery warming in the cold, bought through the charger efficiency', () => {
+    it('is the charger alone in the cold too: battery warming runs inside the window, not on top', () => {
         const p = profile();
-        const cold = settings({ winterF: 15 }), warm = settings({ winterF: 15, season: 'summer' });
-        expect(homeCostCeiling(p, cold) - homeCostCeiling(p, warm)).toBeCloseTo(perMonth(7 * BATTERY_WARMING_KWH * 75 * 25 / 0.885 * 0.17), 6);
+        expect(homeCostCeiling(p, settings({ winterF: 15 }))).toBeCloseTo(homeCostCeiling(p, settings({ season: 'summer' })), 9);
     });
 
-it('is none with no home charging', () => {
+    it('is the same for every car the charger, not its onboard charger, limits', () => {
+        // 120 V · 12 A in hard cold, cars of every pack size and efficiency.
+        const s = settings({ level: 0, winterF: 15 });
+        const cars = [[60, 0.75], [75, 0.80], [100, 0.78], [135, 0.72]].map(([usableKwh, eff]) => profile({ usableKwh, warmKwhPerF: 0.002 * usableKwh, home: { kw: 1.44, eff } }));
+        const want = perMonth(7 * 1.44 * plugHours(s) * s.homePrice);
+        for (const p of cars) {
+            expect(homeCostCeiling(p, s)).toBeCloseTo(want, 9);
+            expect(perMonth(simulateWeek(p, s).homeCost)).toBeLessThanOrEqual(want + 1e-6);
+        }
+    });
+
+    it('is none with no home charging', () => {
         expect(homeCostCeiling({ home: { kw: 0, eff: 0.885, none: true } }, settings())).toBeNull();
     });
 
@@ -549,8 +697,9 @@ describe('the margin a night has', () => {
     const night = (kw, over = {}) => simulateWeek(profile({ home: { kw, eff: 0.885 } }), settings(over)).days;
 
     it('records the hours the charger ran and the most a night could add at full power', () => {
-        const s = settings();
-        for (const d of night(11.5)) {
+        // Summer: no battery warming, so the window is all charging.
+        const s = settings({ season: 'summer' });
+        for (const d of night(11.5, { season: 'summer' })) {
             expect(d.night.mostAdd).toBeCloseTo(11.5 * plugHours(s) * 0.885 / 75 * 100, 6);
             expect(d.night.hours).toBeLessThanOrEqual(plugHours(s) + 1e-9);
             // What was added is what the hours bought, never more than the most.

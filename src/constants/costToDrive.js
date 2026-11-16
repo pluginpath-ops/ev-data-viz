@@ -30,7 +30,7 @@ export const HOME_LEVELS = [
 export const NO_HOME_LEVEL = HOME_LEVELS.findIndex(l => l.none);
 
 /**
- * The order the levels are shown in, picker and Home Charger alike: no home
+ * The order the levels are shown in, picker and Charging Speeds alike: no home
  * charging first, then the chargers smallest to largest (owner, 2026-11-10).
  * HOME_LEVELS keeps its own order: the key stores a level by its place there.
  */
@@ -84,13 +84,13 @@ export const DAY_SPANS = {
 
 
 /**
- * Home Charger's "enough from here": the first level whose fast-charging time a
+ * Charging Speeds' "enough from here": the first level whose fast-charging time a
  * week is within this many minutes of the best any level manages. Past it, a
  * bigger charger buys nothing the reader would notice.
  */
 export const ENOUGH_MARGIN_MIN = 5;
 
-/** The weeks simulated before the one reported, so Monday starts from a settled state. */
+/** The gas car's weeks simulated before the one reported, so Monday starts from a settled tank. (The EV week closes instead: simulateWeek.) */
 export const SETTLE_WEEKS = 2;
 
 /** The DC rate assumed for a car with no charging test, no 10→80% time and no max DC spec, kW. */
