@@ -507,10 +507,16 @@ describe('EPA efficiency and electricity cost (#335)', () => {
         expect(r.notes['figures.epaEfficiency']).toBe('101 MPGe');
     });
 
-    it('shows the cert\'s charger efficiency as a percent, blank where none was measured', () => {
-        const measured = vehicle({ socWindowKwh: 100, epaRangeMi: 300, epaRange: { chargerEfficiency: 0.9 } });
-        expect(buildVehicleRows([measured])[0].values['figures.chargerEfficiency']).toBeCloseTo(90);
-        expect(buildVehicleRows([unlabeled])[0].values['figures.chargerEfficiency']).toBeNull();
+    it('shows the charger efficiency as a percent with its basis, blank where none was measured', () => {
+        const measured = vehicle({ socWindowKwh: 100, epaRangeMi: 300, chargerEfficiency: { value: 0.9, basis: 'epa' } });
+        const [r] = buildVehicleRows([measured]);
+        expect(r.values['figures.chargerEfficiency']).toBeCloseTo(90);
+        expect(r.notes['figures.chargerEfficiency']).toBe('EPA');
+        const gn = vehicle({ socWindowKwh: 100, epaRangeMi: 300, chargerEfficiency: { value: 0.8745, basis: 'green-ncap' } });
+        expect(buildVehicleRows([gn])[0].notes['figures.chargerEfficiency']).toBe('Green NCAP');
+        const [blank] = buildVehicleRows([unlabeled]);
+        expect(blank.values['figures.chargerEfficiency']).toBeNull();
+        expect(blank.notes['figures.chargerEfficiency']).toBe(`${Math.round(ASSUMED_CHARGER_EFF * 1000) / 10}% assumed`);
     });
 
     it('prices 100 miles at each assumed price, on EPA efficiency where there is one', () => {
@@ -523,7 +529,7 @@ describe('EPA efficiency and electricity cost (#335)', () => {
 
     describe('a DC fast session pays the car\'s own loss, not the AC charging loss (#506)', () => {
         const withCharger = (chargerEfficiency) => vehicle({
-            socWindowKwh: 100, epaRangeMi: 300, epaRange: { combinedMpge: 101.115, chargerEfficiency },
+            socWindowKwh: 100, epaRangeMi: 300, epaRange: { combinedMpge: 101.115 }, chargerEfficiency: { value: chargerEfficiency, basis: 'epa' },
         });
 
         it('takes the assumed AC loss out of the label, then adds the DC session loss, and says the DC loss is an assumed average', () => {

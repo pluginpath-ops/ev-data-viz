@@ -6,8 +6,7 @@ things from it: the **BAB130 motorway test**, to set beside third-party
 highway range tests, and the **measured charger efficiency** (AC energy from
 the grid against measured net battery capacity — EPA's basis).
 
-Agreed with the owner 2026-11-15. Built so far: the downloader and parser
-(this PR). Everything below "To build" is not built.
+Agreed with the owner 2026-11-15. Steps 1–5 are built; step 6 is not.
 
 ## What Green NCAP publishes
 
@@ -121,8 +120,27 @@ In order; each a PR.
    steady test within 15 mph of the 70 mph target and inside the temperature
    band, it **joins the composite range**. For the 11 cars with no other range
    test, it is the composite's only input.
-4. **Charger efficiency fallback** in the vehicle figures, with the basis.
-5. **DC curves as charging tests**, points from `fastCharging.points`.
+4. **Charger efficiency fallback — built.** `resolveChargerEfficiency`
+   (vehicleFigures.js) takes the EPA figure, else the linked assessment's
+   grid to battery (newest test year), and attaches `{ value, basis }` as
+   `vehicle.chargerEfficiency`. The vehicle table's Charger eff. column shows
+   its basis beneath (EPA or Green NCAP); Cost & Time and the fast-charging
+   cost read it too. Still 0.885 assumed with neither. The EPA's
+   CHARGER_EFF_BAND (0.80–0.92) is not applied: it catches EPA's mismatched
+   cycle ratios, and Green NCAP measures one recharge at both ends. The Kona
+   reads 92.1%, just above it. The EPA fleet median (epaCertStats) stays
+   EPA-only. On the 2026-11-16 mirror, 10 of the 16 linked cars take the
+   Green NCAP figure; 6 have their own EPA one.
+5. **DC curves as charging tests — built.** The import also writes a
+   "Green NCAP DC fast charge" charging test per linked assessment with a
+   curve: every published point (every 4–20 s), time in minutes, power as
+   published, `start_soc`/`end_soc` from the curve, and its charge summary
+   (the one addRun writes), so no backfill. Re-import replaces the points.
+   Seven of the linked cars have a curve (EV9, Model Y Standard, CLA, Optiq,
+   EX30, EQE, 6e); 2,402 points. Listed, like the BAB130. They join a
+   composite charging curve after Admin → composite maintenance → Rebuild
+   what needs it. SoC is a whole percent on most sheets, so a curve has
+   several points per percent where others have one.
 6. **Show the record** on the vehicle's page (owner's visual sign-off).
 
 ## Open

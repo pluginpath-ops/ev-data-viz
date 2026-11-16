@@ -1698,7 +1698,8 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         expect(table, 'the home cost stays on wall-side efficiency').toMatch(/costPer100\(homePrice\)\(inputs\)/);
         const figures = read('src/utils/vehicleFigures.js');
         expect(figures, 'the cert\'s own charging efficiency must reach the table').toMatch(/chargerEfficiency: measuredChargerEfficiency/);
-        expect(table, 'and be read from the resolved range').toMatch(/vehicle\.epaRange\?\.chargerEfficiency/);
+        expect(figures, 'and be resolved with the Green NCAP fallback').toMatch(/chargerEfficiency: resolveChargerEfficiency\(vehicle, range\)/);
+        expect(table, 'which the table reads').toMatch(/vehicle\.chargerEfficiency\?\.value/);
         // The estimate note on every fast cell must reach the explainer, with its tooltip.
         expect(table, 'the fast column must carry its note link').toMatch(/noteLink: fastCostNoteLink/);
         expect(table, 'and the table must hand it to the cell').toMatch(/links\[col\.key\] = col\.noteLink\(\)/);

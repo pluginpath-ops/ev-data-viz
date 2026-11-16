@@ -23,6 +23,7 @@ import { correctionFactor } from './conditionCorrection';
 import { compositeRange } from './compositeRange';
 import { chargeTimeSession } from './chargeWindows';
 import { val } from './calcTrace';
+import { CHARGER_EFF_BASIS } from './vehicleFigures';
 
 const WEEKS_PER_MONTH = 52 / 12;
 const finite = (v) => v != null && v !== '' && Number.isFinite(Number(v)) && Number(v) > 0;
@@ -234,7 +235,7 @@ function dayWhPerMi(vehicle, usableKwh, { mph, cityShare, temperatureF, altitude
  *   whPerMi: { summer: {D, L}, winter: {D, L} },
  *   highwayFrom: 'tested'|'epa'|null, cityFrom: 'epa'|'highway'|null,
  *   home: { kw: number, chargerKw: number, onboardKw: number, onboardAssumed: boolean, capped: boolean,
- *           eff: number, effRef: number, effFrom: 'epa'|'assumed' },
+ *           eff: number, effRef: number, effFrom: 'epa'|'green-ncap'|'assumed' },
  *   warmKwhPerF: number|null,
  *   fast: { basis: string, run: Object|null, minutes: Function },
  * }}  `missing` says why the vehicle cannot be priced, when it cannot. `home.eff`
@@ -253,8 +254,11 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
     const onboardAssumed = !finite(specs?.charging?.max_ac_kw);
     const onboardKw = onboardAssumed ? ASSUMED_ONBOARD_AC_KW : Number(specs.charging.max_ac_kw);
     const chargerKw = levelKw(level);
-    const epaEff = finite(vehicle?.epaRange?.chargerEfficiency) ? Number(vehicle.epaRange.chargerEfficiency) : null;
-    const effRef = epaEff ?? ASSUMED_CHARGER_EFF;
+    // The EPA's, else Green NCAP's (vehicleFigures.resolveChargerEfficiency).
+    const measured = vehicle?.chargerEfficiency;
+    const measuredEff = finite(measured?.value) ? Number(measured.value) : null;
+    const effRef = measuredEff ?? ASSUMED_CHARGER_EFF;
+    const effSource = measuredEff != null ? 'data' : 'knob:ASSUMED_CHARGER_EFF';
     const kw = Math.min(chargerKw, onboardKw);
     const home = {
         kw,
@@ -266,7 +270,7 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
         // the full-power efficiency only so nothing divides by zero.
         eff: level.none ? effRef : chargerEffAt(effRef, kw, onboardKw),
         effRef,
-        effFrom: epaEff != null ? 'epa' : 'assumed',
+        effFrom: measuredEff != null ? measured.basis : 'assumed',
         none: !!level.none,
     };
     const h = trace?.group('Home charging');
@@ -279,17 +283,17 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
             note: onboardAssumed ? 'no max AC kW in the specs: the onboard charger is assumed' : null,
         });
         h.step('Wall-to-pack efficiency', level.none
-            ? { formula: 'η_home = η_ref', values: { η_ref: val(effRef, null, epaEff != null ? 'data' : 'knob:ASSUMED_CHARGER_EFF') }, result: home.eff, note: 'no home charging: nothing is bought at home' }
+            ? { formula: 'η_home = η_ref', values: { η_ref: val(effRef, null, effSource) }, result: home.eff, note: 'no home charging: nothing is bought at home' }
             : {
                 formula: 'η_home = η_ref − P₀ × (1 / P − 1 / P_ref)',
                 values: {
-                    η_ref: val(effRef, null, epaEff != null ? 'data' : 'knob:ASSUMED_CHARGER_EFF'),
+                    η_ref: val(effRef, null, effSource),
                     'P₀': val(FIXED_DRAW_W / 1000, 'kW', 'knob:FIXED_DRAW_W'),
                     P: val(kw, 'kW'),
                     P_ref: val(onboardKw, 'kW', onboardAssumed ? 'code:ASSUMED_ONBOARD_AC_KW' : 'data'),
                 },
-                result: home.eff, assumed: epaEff == null,
-                note: `η_ref is ${epaEff != null ? "the car's EPA certification" : 'the site-wide figure (no EPA certification)'}, at the car's full AC power; below it the car's fixed draw is a larger share, so less reaches the pack`,
+                result: home.eff, assumed: measuredEff == null,
+                note: `η_ref is ${measuredEff != null ? `the car's ${CHARGER_EFF_BASIS[measured.basis]?.label ?? 'measured'} figure` : 'the site-wide figure (none measured)'}, at the car's full AC power; below it the car's fixed draw is a larger share, so less reaches the pack`,
             });
     }
     if (!usableKwh) {

@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { vehicleLabel } from '../../utils/specHelpers';
+import { CHARGER_EFF_BASIS } from '../../utils/vehicleFigures';
 import { fastChargingFill } from '../../utils/stripedFill';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
@@ -401,7 +402,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                     </table>
                                     <p className="text-note plan-table-footnote">
                                         <span className="is-enough">Bold</span> — No further time or cost savings with a faster home charger.
-                                        <br />At full AC power, reaching the pack: {columns.map(c => `${vehicleLabel(c.vehicle)} ${percentText(c.profile.home.effRef)} (${c.profile.home.effFrom === 'epa' ? 'EPA' : 'site-wide'})`).join(' · ')}. Below it, less: an assumed {FIXED_DRAW_W} W fixed draw is a larger share of a slower charge. <ExplainerLink topic="evbench-charging-energy" />
+                                        <br />At full AC power, reaching the pack: {columns.map(c => `${vehicleLabel(c.vehicle)} ${percentText(c.profile.home.effRef)} (${CHARGER_EFF_BASIS[c.profile.home.effFrom]?.label ?? 'site-wide'})`).join(' · ')}. Below it, less: an assumed {FIXED_DRAW_W} W fixed draw is a larger share of a slower charge. <ExplainerLink topic="evbench-charging-energy" />
                                         {cappedBy.length > 0 && (
                                             <><br /><span title={`Onboard chargers: ${cappedBy.join(', ')}`}>^ — Limited by vehicle charger</span></>
                                         )}
