@@ -18,6 +18,7 @@
 import { readFile, writeFile, access } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import Papa from 'papaparse';
 import { matchGreenNcapCar, driveOf } from '../src/utils/matchGreenNcap.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -53,23 +54,7 @@ async function liveVehicles() {
 
 const csvCell = v => (v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
 
-function parseCsv(text) {
-    const rows = []; let row = [], cell = '', q = false;
-    for (let i = 0; i < text.length; i++) {
-        const ch = text[i];
-        if (q) {
-            if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
-            else if (ch === '"') q = false;
-            else cell += ch;
-        } else if (ch === '"') q = true;
-        else if (ch === ',') { row.push(cell); cell = ''; }
-        else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
-        else if (ch !== '\r') cell += ch;
-    }
-    if (cell || row.length) { row.push(cell); rows.push(row); }
-    const [head, ...body] = rows;
-    return body.map(r => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ''])));
-}
+const parseCsv = text => Papa.parse(text, { header: true, skipEmptyLines: true }).data;
 
 const label = v => `${v.make} ${v.model}${v.trim ? ' ' + v.trim : ''} [${v.year ?? '?'}]`;
 

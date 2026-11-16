@@ -92,9 +92,21 @@ In order; each a PR.
    tests, because a re-import replaces them. Checked on the local mirror
    (2026-11-16 backup): it runs twice, every role is refused or allowed as
    intended, and the cascade and one-per-kind rule hold.
-3. **Import.** Confirmed matches (`vehicle_id` from `confirm`) + parsed JSON →
-   upsert by slug, tests replaced. Writes the
-   BAB130 range test: `kind 'range'`, `source 'Green NCAP'`, `source_url` the
+3. **Import — built.** `node scripts/importGreenNcap.mjs` writes
+   `LocalDev/green-ncap/import.sql` from `parsed.json` and the `confirm`
+   column, for the owner to run on the mirror and then in production. It is one
+   transaction and safe to run twice. It seeds the Green NCAP source
+   (greenncap.com), upserts every parsed assessment by slug with its
+   confirmed `vehicle_id`, and replaces its tests. On the 2026-11-16 mirror
+   it gives 60 assessments, 17 linked, 434 tests and 15 BAB130 range tests.
+   The Q4 e-tron's 2022 sheet has no from-battery column and the Leaf's 2020
+   sheet has no net battery, so neither gets one. A re-import refreshes a
+   range test's figures and vehicle but never its listed, excluded or default
+   flags. **Listed (owner, 2026-11-16):** 11 of the 15 cars have no other
+   range test, so their card quotes the BAB130 figure, marked mixed cycle; a
+   dated full-pack or default test still wins. The SQL writes the
+   BAB130 range test: named "Green NCAP BAB130", `kind 'range'`,
+   `source 'Green NCAP'`, `source_url` the
    car's page, `start_soc 100`, `end_soc 0`, `energy_kwh` the net capacity,
    `distance_miles` the computed range, `temperature_f 73.4`,
    `speed_basis 'mixed'`, `speed_mph 77.6` (the trace average). Being mixed, the composite range leaves it out — it
