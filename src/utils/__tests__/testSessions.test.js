@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     toSessionRow, sessionLabel, runsInSession, vehiclesInSession, sessionsForPicker,
     sessionDateMismatch, suggestedPairing, summariseSessions, filterSessions,
-    groupRunsBySession, sessionFor, sessionSeedFromRun,
+    groupRunsBySession, sessionFor, sessionSeedFromRun, sessionCopyDown,
 } from '../testSessions';
 
 const car = (id, name, runs, extra = {}) => ({ id, name, runs, ...extra });
@@ -189,19 +189,21 @@ describe('sessionSeedFromRun', () => {
     const SOURCES = [{ id: 2, name: 'Out of Spec', aliases: ['OoS'], domains: [] }];
     const tested = {
         date: '2026-03-14', source: 'OoS', source_url: 'https://www.youtube.com/watch?v=KzzTAAfAN-Y',
-        temperature_f: 41, altitude_ft: 5280, name: 'Out of Spec 70mph',
+        temperature_f: 41, altitude_ft: 5280, avg_wind_speed_mph: 8, name: 'Out of Spec 70mph',
     };
 
     it('starts a session with the test\'s date, source, link and conditions', () => {
         expect(sessionSeedFromRun(tested, SOURCES)).toEqual({
             testedAt: '2026-03-14', sourceName: 'Out of Spec',
             url: 'https://www.youtube.com/watch?v=KzzTAAfAN-Y', temperatureF: 41, altitudeFt: 5280,
+            windSpeedMph: 8, elevationGainFt: null,
         });
     });
 
     it('keeps a source that is not listed as the test has it, and leaves out what the test lacks', () => {
         expect(sessionSeedFromRun({ source: 'Oos Reviews' }, SOURCES)).toEqual({
             testedAt: null, sourceName: 'Oos Reviews', url: null, temperatureF: null, altitudeFt: null,
+            windSpeedMph: null, elevationGainFt: null,
         });
         expect(sessionSeedFromRun({}, [])).toMatchObject({ sourceName: null });
     });
@@ -212,5 +214,39 @@ describe('sessionSeedFromRun', () => {
 
     it('writes through toSessionRow, a zero degrees included', () => {
         expect(toSessionRow(sessionSeedFromRun({ ...tested, temperature_f: 0 }, SOURCES)).temperature_f).toBe(0);
+    });
+});
+
+describe('sessionsForPicker recent', () => {
+    it('lists the newest-added sessions this vehicle is not in, three by default', () => {
+        const sessions = [1, 2, 3, 4, 5].map(id => ({ id, created_at: `2026-11-0${id}` }));
+        const fleet = [car(1, 'A', [run(10, 'range', 5)])];
+        const { used, recent } = sessionsForPicker(sessions, fleet, 1);
+        expect(used.map(s => s.id)).toEqual([5]);
+        expect(recent.map(s => s.id)).toEqual([4, 3, 2]);
+    });
+});
+
+describe('sessionCopyDown', () => {
+    const session = { tested_at: '2026-05-01T00:00:00Z', url: 'https://x', wind_speed_mph: 12, temperature_f: null };
+    const members = [
+        { vehicle: { id: 1 }, run: { id: 10, source_url: null, date: null, avg_wind_speed_mph: 5 } },
+        { vehicle: { id: 2 }, run: { id: 20, source_url: 'https://x', date: '2026-05-01', avg_wind_speed_mph: null } },
+    ];
+
+    it('fills only blanks, with only fields the session has, one write per test', () => {
+        expect(sessionCopyDown(session, members, ['url', 'date', 'windSpeedMph', 'temperatureF'])).toEqual([
+            { ...members[0], updates: { sourceUrl: 'https://x', date: '2026-05-01' } },
+            { ...members[1], updates: { windSpeedMph: 12 } },
+        ]);
+    });
+
+    it('overwrites differing values when asked, and skips ones that already match', () => {
+        const out = sessionCopyDown(session, members, ['url', 'windSpeedMph'], true);
+        expect(out.map(w => w.updates)).toEqual([{ sourceUrl: 'https://x', windSpeedMph: 12 }, { windSpeedMph: 12 }]);
+    });
+
+    it('writes only the checked fields', () => {
+        expect(sessionCopyDown(session, members, ['url'])).toEqual([{ ...members[0], updates: { sourceUrl: 'https://x' } }]);
     });
 });

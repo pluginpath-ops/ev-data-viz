@@ -598,6 +598,7 @@ export function AppProvider({ children }) {
                     case 'chargerCurrentClass': normalized.charger_current_class_a = toChargerCurrent(v); break;
                     case 'altitudeFt':      normalized.altitude_ft       = toNum(v);  break;
                     case 'elevationGainFt': normalized.elevation_gain_ft  = toNum(v);  break;
+                    case 'windSpeedMph':    normalized.avg_wind_speed_mph = toNum(v);  break;
                     case 'sourceUrl':       normalized.source_url         = v;         break;
                     default:                normalized[k] = v;                         break;
                 }

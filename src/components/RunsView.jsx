@@ -426,7 +426,7 @@ const DeriveAxisPanel = ({
 };
 
 export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onMoveRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, editOnFocus = false, onFocused, onBack, onClose }) {
-    const { ensureSourceId, runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, overrideInheritedRun, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
+    const { selectedVehicles, toggleVehicleSelection, ensureSourceId, runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, overrideInheritedRun, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
     // ── Sub-tabs ──────────────────────────────────────────────────────────────
@@ -1349,6 +1349,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     }, [editOnFocus, linkTarget]);
 
     const inheritedRuns    = allDisplayRuns.filter(r => r._inherited);
+    const isSelected       = selectedVehicles.includes(vehicle.id);
     const barVisible       = pendingDeletes.size > 0 || !!undoState;
 
     // The upload wizard. Adding a record opens it at the top of the list;
@@ -1838,12 +1839,25 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <span aria-hidden="true"> / </span>
                         <span aria-current="page">{vehicle.name}</span>
                     </nav>
-                    {onClose && (
-                        <button type="button" className="vehicle-page-close" onClick={onClose}>
-                            <span aria-hidden="true" className="vehicle-page-close-x">×</span>
-                            Close vehicle
+                    <div className="flex items-center gap-2">
+                        {/* Puts this vehicle on the chips, or takes it off:
+                            the same toggle as a card's click. */}
+                        <button
+                            type="button"
+                            className={`btn btn-toggle${isSelected ? ' active' : ''}`}
+                            onClick={() => toggleVehicleSelection(vehicle.id)}
+                            aria-pressed={isSelected}
+                            title={isSelected ? 'Remove this vehicle from the selection' : 'Add this vehicle to the selection'}
+                        >
+                            {isSelected ? '✓ Selected' : '＋ Add to selection'}
                         </button>
-                    )}
+                        {onClose && (
+                            <button type="button" className="vehicle-page-close" onClick={onClose}>
+                                <span aria-hidden="true" className="vehicle-page-close-x">×</span>
+                                Close vehicle
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
             {/* Vehicle summary header */}
