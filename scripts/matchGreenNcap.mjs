@@ -16,15 +16,14 @@
  * The matching is src/utils/matchGreenNcap.js.
  */
 import { readFile, writeFile, access } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { GREEN_NCAP_DIR, mainCheckout } from './mainCheckout.mjs';
 import Papa from 'papaparse';
 import { matchGreenNcapCar, driveOf } from '../src/utils/matchGreenNcap.js';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const flag = name => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : null; };
-const DIR = flag('--dir') ?? join(ROOT, 'LocalDev', 'green-ncap');
+const DIR = flag('--dir') ?? GREEN_NCAP_DIR;
 const vehiclesFile = flag('--vehicles');
 
 const exists = p => access(p).then(() => true, () => false);
@@ -32,7 +31,7 @@ const readJson = async p => JSON.parse(await readFile(p, 'utf8'));
 
 async function env() {
     const out = { ...process.env };
-    const file = join(ROOT, '.env');
+    const file = join(mainCheckout(), '.env');
     if (await exists(file)) {
         for (const line of (await readFile(file, 'utf8')).split('\n')) {
             const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*"?([^"\n]*)"?\s*$/);

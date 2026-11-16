@@ -14,14 +14,14 @@
  */
 import { readFile, writeFile, readdir, access } from 'node:fs/promises';
 import { inflateRawSync } from 'node:zlib';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { GREEN_NCAP_DIR } from './mainCheckout.mjs';
 import { odsSheets } from '../src/utils/odsSheets.js';
 import { parseGreenNcapSheet } from '../src/utils/parseGreenNcapSheet.js';
 
 const args = process.argv.slice(2);
 const flag = name => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : null; };
-const DIR = flag('--dir') ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'LocalDev', 'green-ncap');
+const DIR = flag('--dir') ?? GREEN_NCAP_DIR;
 const printSlug = flag('--print');
 const only = new Set(args.filter(a => !a.startsWith('--')).concat(printSlug ?? []));
 

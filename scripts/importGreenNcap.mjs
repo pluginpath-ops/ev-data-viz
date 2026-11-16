@@ -13,14 +13,14 @@
  * src/utils/greenNcapImportSql.js.
  */
 import { readFile, writeFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { GREEN_NCAP_DIR } from './mainCheckout.mjs';
 import Papa from 'papaparse';
 import { buildGreenNcapImportSql } from '../src/utils/greenNcapImportSql.js';
 
 const args = process.argv.slice(2);
 const flag = name => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : null; };
-const DIR = flag('--dir') ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'LocalDev', 'green-ncap');
+const DIR = flag('--dir') ?? GREEN_NCAP_DIR;
 
 async function main() {
     const cars = JSON.parse(await readFile(join(DIR, 'parsed.json'), 'utf8'));
