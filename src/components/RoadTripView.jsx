@@ -97,7 +97,7 @@ const SPEED_SWEEP_MPH  = Array.from(
 
 // ── Leg-distance sweep constants (mi between charging stops) ─────────────────
 const LEG_SWEEP_MIN  = 60;   // miles between charges
-const LEG_SWEEP_MAX  = 260;  // miles between charges
+const LEG_SWEEP_MAX  = 500;  // miles between charges
 const LEG_SWEEP_STEP = 20;   // miles
 const LEG_SWEEP_MI   = Array.from(
     { length: Math.floor((LEG_SWEEP_MAX - LEG_SWEEP_MIN) / LEG_SWEEP_STEP) + 1 },
@@ -1774,7 +1774,6 @@ export default function RoadTripView({
             const stopXs = stopSweepFor(mode).xs;
             const toDisplay = v => (isChargeTimeSweep || units !== 'metric' ? v : Math.round(v * MI_TO_KM));
             const stopMinDisplay  = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_MIN  : LEG_SWEEP_MIN);
-            const stopMaxDisplay  = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_MAX  : LEG_SWEEP_MAX);
             const stopStepDisplay = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_STEP : LEG_SWEEP_STEP);
             const stopXTitle = isChargeTimeSweep ? 'Charge Minutes per Stop' : `${dl} Between Charges`;
 
@@ -1810,6 +1809,15 @@ export default function RoadTripView({
                 };
             }).filter(Boolean);
             distDatasets.push(...spreadDatasets(validEntries, spreadSweep, stopXs.map(toDisplay)));
+
+            // The sweep runs to the longest leg any pack could manage, but the
+            // axis stops one step past the last leg any plotted vehicle can
+            // finish, so smaller cars aren't squeezed into the left edge.
+            const sweepMaxDisplay = toDisplay(isChargeTimeSweep ? CHARGE_SWEEP_MAX : LEG_SWEEP_MAX);
+            const reachX = Math.max(0, ...distDatasets.flatMap(d => (
+                d._isGas || d._spread ? [] : d.data.filter(p => p.y != null).map(p => p.x))));
+            const stopMaxDisplay = reachX > 0 && !isChargeTimeSweep
+                ? Math.min(sweepMaxDisplay, reachX + stopStepDisplay) : sweepMaxDisplay;
 
             // The gas car's line — it stops where its tank says, whatever the EV's
             // stops are, so it is flat across the stop plans. Held to the same

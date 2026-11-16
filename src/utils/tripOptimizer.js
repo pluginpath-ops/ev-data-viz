@@ -25,8 +25,12 @@ const range = (min, max, step) => Array.from(
 /** Travel speeds searched, mph. Fine, so the envelope and the map read smoothly. */
 export const OPT_SPEED_MPH = range(45, 100, 1);
 
-/** Distance added per stop searched under the fixed-charging-range sim, mi. */
-export const OPT_LEG_MI = range(60, 260, 10);
+/**
+ * Distance added per stop searched under the fixed-charging-range sim, mi. Past
+ * what one charge can cover a cell is null, so the ceiling only has to clear
+ * the longest-legged vehicle: 500 mi, for the 140+ kWh packs.
+ */
+export const OPT_LEG_MI = range(60, 500, 10);
 
 /** Minutes per stop searched under the fixed-charge-time sim. */
 export const OPT_CHARGE_MIN = range(10, 60, 2.5);
