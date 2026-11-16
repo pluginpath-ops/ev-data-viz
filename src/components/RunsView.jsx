@@ -1237,9 +1237,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const closeTransfer = () => { setCopyToRun(null); setMoveToRun(null); setCopyingToVehicleId(''); };
     const handleTransferConfirm = async () => {
         if (!transferRun || !copyingToVehicleId) return;
+        closeTransfer();
+        // Copy… offers this vehicle first: a copy here is a duplicate.
+        if (!moveToRun && String(copyingToVehicleId) === String(vehicle.id)) {
+            await handleDuplicateRun(transferRun);
+            return;
+        }
         const send = moveToRun ? onMoveRunToVehicle : onCopyRunToVehicle;
         await send(transferRun, Number(copyingToVehicleId));
-        closeTransfer();
     };
 
     // Vehicles the current user can edit, excluding the current vehicle
@@ -1345,6 +1350,477 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
 
     const inheritedRuns    = allDisplayRuns.filter(r => r._inherited);
     const barVisible       = pendingDeletes.size > 0 || !!undoState;
+
+    // The upload wizard. Adding a record opens it at the top of the list;
+    // adding data to a test opens it inside that test's card, where the
+    // Upload button was clicked.
+    const uploadPanel = (
+        <div className={uploadMode === 'merge' ? 'run-merge-panel' : 'card mb-6'}>
+            {/* ── Merge-mode banner ── */}
+            {uploadMode === 'merge' && mergeTargetRun && (
+                <div className="merge-target-banner callout is-info">
+                    <div>
+                        <span className="text-sm font-semibold">Adding data to: </span>
+                        <span className="text-sm">{mergeTargetRun.name}</span>
+                    </div>
+                    <button onClick={resetUploadState} className="link-button text-sm">
+                        Cancel
+                    </button>
+                </div>
+            )}
+
+            {uploadStep === 'file' && (
+                <div>
+                    <h3 className="section-title mb-4">
+                        {uploadMode === 'merge' ? 'Upload Additional Data' : 'Add new record'}
+                    </h3>
+                    <div className="space-y-4">
+                        {/* Only show metadata inputs in create mode */}
+                        {uploadMode === 'create' && (
+                            <>
+                                {/* Role — exactly one. A run is a charging test or a range test. */}
+                                <div>
+                                    <p className="text-xs text-secondary mb-1">Data type</p>
+                                    <div className="data-type-flags">
+                                        {DATA_FLAGS.map(({ key, label, desc }) => {
+                                            const active = runMetadata.dataFlags.includes(key);
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    title={desc}
+                                                    onClick={() => setRunMetadata(m => ({ ...m, dataFlags: [key] }))}
+                                                    className={`guide-chip${active ? ' active' : ''}`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Core metadata */}
+                                <input
+                                    placeholder="Name (e.g., Highway Test - Winter 2024)"
+                                    value={runMetadata.name}
+                                    onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
+                                    className="form-input form-input w-full"
+                                    required
+                                />
+                                <input
+                                    type="date"
+                                    value={runMetadata.date}
+                                    onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
+                                    className="form-input form-input w-full"
+                                />
+                                <input
+                                    placeholder="Software Version (e.g., 2024.1.5)"
+                                    value={runMetadata.softwareVersion}
+                                    onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
+                                    className="form-input form-input w-full"
+                                />
+                                <input
+                                    placeholder="Notes (e.g., 20°F, highway speeds)"
+                                    value={runMetadata.conditions}
+                                    onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
+                                    className="form-input form-input w-full"
+                                />
+                                {/* Attribution belongs to the test, not to one of its roles.
+                                    It used to be two fields inside the role panels — a
+                                    charging URL and a range URL — because the schema had two
+                                    columns. Migration 052 made it one. */}
+                                <input
+                                    type="url"
+                                    placeholder="Source URL (where this test was published)"
+                                    value={runMetadata.sourceUrl}
+                                    onChange={(e) => setRunMetadata({...runMetadata, sourceUrl: e.target.value})}
+                                    className="form-input form-input w-full"
+                                />
+                                <SourceField
+                                    sources={sources}
+                                    pick={runMetadata.sourcePick}
+                                    onPick={pick => setRunMetadata(withPickedSource(runMetadata, pick))}
+                                    url={runMetadata.sourceUrl}
+                                />
+
+                                {/* Charging energy field (create mode) */}
+                                {runMetadata.dataFlags.includes('charging') && (
+                                    <div className="data-subpanel p-3">
+                                        <p className="text-sm font-semibold text-secondary mb-2">Charging Energy <span className="font-normal text-meta">(optional)</span></p>
+                                        <input
+                                            type="number"
+                                            placeholder="Energy added (kWh)"
+                                            title="Energy measured at charger or vehicle — energy in"
+                                            value={runMetadata.chargeEnergyKwh}
+                                            onChange={(e) => setRunMetadata({...runMetadata, chargeEnergyKwh: e.target.value})}
+                                            className="form-input form-input w-full"
+                                        />
+                                        <p className="text-xs text-meta mt-1">
+                                            Energy measured at charger or vehicle — <em>energy in</em>
+                                        </p>
+                                        <PreconditionedSelect
+                                            value={runMetadata.preconditioned}
+                                            onChange={v => setRunMetadata({ ...runMetadata, preconditioned: v })}
+                                        />
+                                        <ChargerClassSelect
+                                            value={runMetadata.chargerVoltageClass}
+                                            onChange={v => setRunMetadata({ ...runMetadata, chargerVoltageClass: v })}
+                                        />
+                                        <ChargerCurrentSelect
+                                            value={runMetadata.chargerCurrentClass}
+                                            onChange={v => setRunMetadata({ ...runMetadata, chargerCurrentClass: v })}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Range test fields */}
+                                {runMetadata.dataFlags.includes('range') && (
+                                    <div className="data-subpanel p-4 space-y-3">
+                                        <p className="text-sm font-semibold text-secondary">Range Test Details</p>
+                                        <div className="form-grid gap-3">
+                                            <input
+                                                type="number"
+                                                placeholder="Start SoC (%)"
+                                                value={runMetadata.startSoc}
+                                                onChange={(e) => setRunMetadata({...runMetadata, startSoc: e.target.value})}
+                                                className="form-input form-input"
+                                                min="0" max="100"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="End SoC (%)"
+                                                value={runMetadata.endSoc}
+                                                onChange={(e) => setRunMetadata({...runMetadata, endSoc: e.target.value})}
+                                                className="form-input form-input"
+                                                min="0" max="100"
+                                            />
+                                            {runMetadata.startSoc !== '' && runMetadata.endSoc !== '' &&
+                                             parseFloat(runMetadata.startSoc) < parseFloat(runMetadata.endSoc) && (
+                                                <p className="note-panel col-span-2">
+                                                    ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
+                                                </p>
+                                            )}
+                                            <input
+                                                type="number"
+                                                placeholder="Speed (mph)"
+                                                value={runMetadata.speedMph}
+                                                onChange={(e) => setRunMetadata({...runMetadata, speedMph: e.target.value})}
+                                                className="form-input form-input"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Distance (miles)"
+                                                value={runMetadata.distanceMiles}
+                                                onChange={(e) => setRunMetadata({...runMetadata, distanceMiles: e.target.value})}
+                                                className="form-input form-input"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Energy consumed (kWh)"
+                                                title="Energy consumed on the drive — energy out"
+                                                value={runMetadata.energyKwh}
+                                                onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
+                                                className="form-input form-input"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Ambient temp (°F)"
+                                                value={runMetadata.temperatureF}
+                                                onChange={(e) => setRunMetadata({...runMetadata, temperatureF: e.target.value})}
+                                                className="form-input form-input"
+                                            />
+                                            <select
+                                                value={runMetadata.speedBasis || ''}
+                                                onChange={(e) => setRunMetadata({...runMetadata, speedBasis: e.target.value})}
+                                                className="form-input form-input"
+                                                title="Steady: the car was held at this speed. Mixed: this is an average over a varying-speed cycle, so speed correction is skipped — aero energy goes as the mean of v², not the square of the mean."
+                                            >
+                                                <option value="">Speed basis: unknown</option>
+                                                <option value="steady">Steady — held at setpoint</option>
+                                                <option value="mixed">Mixed cycle — average speed</option>
+                                            </select>
+                                            <input
+                                                type="number"
+                                                placeholder="Test altitude (ft)"
+                                                title="Elevation the test was run at — drives air density and so aero drag. Not the same as elevation gain."
+                                                value={runMetadata.altitudeFt}
+                                                onChange={(e) => setRunMetadata({...runMetadata, altitudeFt: e.target.value})}
+                                                className="form-input form-input"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Elevation gain (ft)"
+                                                title="Net climb over the route — drives the potential-energy term. Not the same as test altitude."
+                                                value={runMetadata.elevationGainFt}
+                                                onChange={(e) => setRunMetadata({...runMetadata, elevationGainFt: e.target.value})}
+                                                className="form-input form-input"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Avg wind speed (mph)"
+                                                value={runMetadata.windSpeedMph}
+                                                onChange={(e) => setRunMetadata({...runMetadata, windSpeedMph: e.target.value})}
+                                                className="form-input form-input"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Wind dir., one heading only"
+                                                title="Only for a test that held one heading: 0° = tailwind, 180° = headwind, 90/270° = crosswind. Leave blank for an out-and-back or a loop, whatever the wind did — the legs cancel except for a cost the wind speed alone records."
+                                                value={runMetadata.windDirectionDeg}
+                                                onChange={(e) => setRunMetadata({...runMetadata, windDirectionDeg: e.target.value})}
+                                                className="form-input form-input"
+                                                min="0" max="360"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        <div>
+                            <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer mb-2">
+                                <input
+                                    type="checkbox"
+                                    checked={noHeaders}
+                                    onChange={e => {
+                                        setNoHeaders(e.target.checked);
+                                        setCsvData(null);
+                                        setCsvText('');
+                                        setFieldMapping({});
+                                        setUploadStep('file');
+                                    }}
+                                    className="rounded-xs"
+                                />
+                                CSV has no header row (use column numbers)
+                            </label>
+                            <div className="csv-drop-zone">
+                                <label className="cursor-pointer">
+                                    <span className="link-button font-medium">Click to upload CSV file</span>
+                                    <span className="block text-xs text-meta mt-1">Optional — attach data points to this record</span>
+                                    <input
+                                        type="file"
+                                        accept=".csv"
+                                        className="hidden"
+                                        onChange={handleFileUpload}
+                                    />
+                                </label>
+                            </div>
+                            <div className="mt-3">
+                                <p className="text-xs text-meta mb-1">Or paste CSV text directly:</p>
+                                <textarea
+                                    rows={4}
+                                    placeholder={"soc,chargeRate,time\n50,100,0\n80,75,15\n…"}
+                                    value={csvText}
+                                    onChange={e => handleCsvTextPaste(e.target.value)}
+                                    className="form-input form-input w-full font-mono resize-y"
+                                />
+                            </div>
+                        </div>
+                        {uploadMode === 'create' && (
+                            <div className="form-actions">
+                                <button
+                                    onClick={handleSaveRecord}
+                                    disabled={!runMetadata.name}
+                                    className="btn btn-commit disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Save record
+                                </button>
+                                <button onClick={resetUploadState} className="btn btn-secondary">
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {uploadStep === 'mapping' && (
+                <div>
+                    <h3 className="section-title mb-4">Map CSV Fields</h3>
+                    <p className="text-secondary mb-4">Match your CSV columns to standard fields. We've auto-detected some for you.</p>
+
+                    {/* In create mode, allow editing metadata here too */}
+                    {uploadMode === 'create' && (
+                        <div className="mb-6 p-4 bg-[var(--color-surface-muted)] rounded-xs">
+                            <h4 className="font-semibold mb-3">Test Metadata</h4>
+                            <div className="space-y-3">
+                                <input
+                                    placeholder="Name (e.g., Highway Test - Winter 2024)"
+                                    value={runMetadata.name}
+                                    onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
+                                    className="form-input form-input w-full"
+                                    required
+                                />
+                                <input
+                                    type="date"
+                                    value={runMetadata.date}
+                                    onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
+                                    className="form-input form-input w-full"
+                                />
+                                <input
+                                    placeholder="Software Version (e.g., 2024.1.5)"
+                                    value={runMetadata.softwareVersion}
+                                    onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
+                                    className="form-input form-input w-full"
+                                />
+                                <input
+                                    placeholder="Notes (e.g., 20°F, highway speeds)"
+                                    value={runMetadata.conditions}
+                                    onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
+                                    className="form-input form-input w-full"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <h4 className="font-semibold mb-3">Field Mapping</h4>
+                    <div className="space-y-3">
+                        {[
+                            ['soc',         'SoC (%)'],
+                            ['chargeRate',  'Charge Rate (kW)'],
+                            ['timestamp',   'Timestamp (wall clock)'],
+                            ['time',        'Elapsed Time (min/s)'],
+                            ['range',       'Range (mi/km)'],
+                            ['temperature', 'Temperature'],
+                            ['frame',       'Frame #'],
+                        ].map(([field, label]) => (
+                            <div key={field} className="field-mapping-row">
+                                <label className="w-44 font-medium">{label}:</label>
+                                <select
+                                    value={fieldMapping[field] || ''}
+                                    onChange={(e) => setFieldMapping({...fieldMapping, [field]: e.target.value})}
+                                    className="form-input form-input flex-1"
+                                >
+                                    <option value="">-- Not mapped --</option>
+                                    {availableFields.map((f, i) => (
+                                        <option key={f} value={f}>
+                                            {noHeaders && f.startsWith('col_') ? `Column ${i + 1}` : f}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Timestamp conversion notice */}
+                    {(() => {
+                        const tsMapped  = !!fieldMapping.timestamp;
+                        const timeMapped = !!fieldMapping.time;
+                        // Peek at first row to detect timestamp strings in the time column
+                        const firstRow  = csvData?.data?.[0];
+                        const timeColTs = timeMapped && firstRow &&
+                            isTimestampValue(firstRow[fieldMapping.time]);
+                        if (!tsMapped && !timeColTs) return null;
+                        return (
+                            <p className="note-panel is-info mt-3">
+                                Timestamps detected — will be converted to elapsed minutes from the first data point
+                                {tsMapped && !timeMapped && ' (Elapsed Time will be derived automatically)'}
+                            </p>
+                        );
+                    })()}
+
+                    {/* ── Derived-column offers ── */}
+                    {offerRangeEstimateTest && (
+                        <div className="mt-5 space-y-3">
+                            {/* Measured range from test data */}
+                            {offerRangeEstimateTest && (
+                                <div className={`estimation-panel ${estimations.range === 'measured' ? 'is-good' : 'is-warning'}`}>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="state-panel-title">
+                                            {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : 'Estimate from measured range test'}
+                                        </p>
+                                        {rangeTestRuns.length > 1 && (
+                                            <select
+                                                value={selectedRangeTestRunId ?? rangeTestRuns[0]?.id ?? ''}
+                                                onChange={e => setSelectedRangeTestRunId(Number(e.target.value))}
+                                                onClick={e => e.stopPropagation()}
+                                                className="form-input mt-1 p-1 w-full max-w-xs"
+                                            >
+                                                {rangeTestRuns.map(r => {
+                                                    const hasSoc = r.start_soc != null && r.end_soc != null;
+                                                    const socDelta = hasSoc ? Math.abs(r.start_soc - r.end_soc) : 100;
+                                                    const eff = Math.round(r.distance_miles * 100 / socDelta);
+                                                    return <option key={r.id} value={r.id}>{r.name} — {eff} mi effective{!hasSoc ? ' (est.)' : ''}</option>;
+                                                })}
+                                            </select>
+                                        )}
+                                        <p className="text-xs mt-0.5">
+                                            {estimations.range === 'measured'
+                                                ? `range = SoC% × ${effectiveRangeFromTest} mi (${selectedRangeTestRun?.name})`
+                                                : `${selectedRangeTestRun?.name}: ${selectedRangeTestRun?.distance_miles} mi @ ${selectedRangeTestRun?.start_soc}→${selectedRangeTestRun?.end_soc}% SoC → ${effectiveRangeFromTest} mi effective`}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setEstimations(prev => ({ ...prev, range: prev.range === 'measured' ? null : 'measured' }))}
+                                        className={`btn btn-toggle shrink-0${estimations.range === 'measured' ? ' active' : ''}`}
+                                    >
+                                        {estimations.range === 'measured' ? 'Undo' : 'Use test data'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Join key selector — merge mode only */}
+                    {uploadMode === 'merge' && (
+                        <div className={`join-key-panel ${missingJoinKey ? 'is-danger' : showJoinSelector ? 'is-warning' : 'is-good'}`}>
+                            {missingJoinKey ? (
+                                <p className="state-panel-title">
+                                    ⚠ Map at least one of <strong>SoC</strong> or <strong>Time</strong> — it's needed to link incoming rows to existing ones.
+                                </p>
+                            ) : showJoinSelector ? (
+                                <>
+                                    <p className="text-sm font-semibold mb-2">
+                                        Both SoC and Time are mapped — which should be used to link rows?
+                                    </p>
+                                    <div className="flex gap-6">
+                                        <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                            <input type="radio" name="joinKey" value="soc" checked={joinKey === 'soc'} onChange={() => setJoinKey('soc')} />
+                                            <span className="font-medium">SoC</span>
+                                            <span className="text-secondary">(charging curves, SoC-based data)</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                            <input type="radio" name="joinKey" value="time" checked={joinKey === 'time'} onChange={() => setJoinKey('time')} />
+                                            <span className="font-medium">Time</span>
+                                            <span className="text-secondary">(time-series, e.g. Time+Power → Time+SoC)</span>
+                                        </label>
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="text-sm">
+                                    ✓ Rows will be linked by <strong>{canJoinBySoc ? 'SoC' : 'Time'}</strong>.
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="form-actions mt-6">
+                        <button
+                            onClick={() => setUploadStep('file')}
+                            className="btn btn-secondary"
+                        >
+                            Back
+                        </button>
+                        {uploadMode === 'create' ? (
+                            <button
+                                onClick={handleImport}
+                                className="btn btn-commit"
+                            >
+                                Import Run
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleMerge}
+                                disabled={merging || missingJoinKey}
+                                className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {merging ? 'Merging…' : 'Merge into Run'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1508,473 +1984,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 )}
             />
 
-            {showUpload && (
-                <div className="card mb-6">
-                    {/* ── Merge-mode banner ── */}
-                    {uploadMode === 'merge' && mergeTargetRun && (
-                        <div className="merge-target-banner callout is-info">
-                            <div>
-                                <span className="text-sm font-semibold">Adding data to: </span>
-                                <span className="text-sm">{mergeTargetRun.name}</span>
-                            </div>
-                            <button onClick={resetUploadState} className="link-button text-sm">
-                                Cancel
-                            </button>
-                        </div>
-                    )}
-
-                    {uploadStep === 'file' && (
-                        <div>
-                            <h3 className="section-title mb-4">
-                                {uploadMode === 'merge' ? 'Upload Additional Data' : 'Add new record'}
-                            </h3>
-                            <div className="space-y-4">
-                                {/* Only show metadata inputs in create mode */}
-                                {uploadMode === 'create' && (
-                                    <>
-                                        {/* Role — exactly one. A run is a charging test or a range test. */}
-                                        <div>
-                                            <p className="text-xs text-secondary mb-1">Data type</p>
-                                            <div className="data-type-flags">
-                                                {DATA_FLAGS.map(({ key, label, desc }) => {
-                                                    const active = runMetadata.dataFlags.includes(key);
-                                                    return (
-                                                        <button
-                                                            key={key}
-                                                            type="button"
-                                                            title={desc}
-                                                            onClick={() => setRunMetadata(m => ({ ...m, dataFlags: [key] }))}
-                                                            className={`guide-chip${active ? ' active' : ''}`}
-                                                        >
-                                                            {label}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-
-                                        {/* Core metadata */}
-                                        <input
-                                            placeholder="Name (e.g., Highway Test - Winter 2024)"
-                                            value={runMetadata.name}
-                                            onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
-                                            className="form-input form-input w-full"
-                                            required
-                                        />
-                                        <input
-                                            type="date"
-                                            value={runMetadata.date}
-                                            onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
-                                            className="form-input form-input w-full"
-                                        />
-                                        <input
-                                            placeholder="Software Version (e.g., 2024.1.5)"
-                                            value={runMetadata.softwareVersion}
-                                            onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
-                                            className="form-input form-input w-full"
-                                        />
-                                        <input
-                                            placeholder="Notes (e.g., 20°F, highway speeds)"
-                                            value={runMetadata.conditions}
-                                            onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
-                                            className="form-input form-input w-full"
-                                        />
-                                        {/* Attribution belongs to the test, not to one of its roles.
-                                            It used to be two fields inside the role panels — a
-                                            charging URL and a range URL — because the schema had two
-                                            columns. Migration 052 made it one. */}
-                                        <input
-                                            type="url"
-                                            placeholder="Source URL (where this test was published)"
-                                            value={runMetadata.sourceUrl}
-                                            onChange={(e) => setRunMetadata({...runMetadata, sourceUrl: e.target.value})}
-                                            className="form-input form-input w-full"
-                                        />
-                                        <SourceField
-                                            sources={sources}
-                                            pick={runMetadata.sourcePick}
-                                            onPick={pick => setRunMetadata(withPickedSource(runMetadata, pick))}
-                                            url={runMetadata.sourceUrl}
-                                        />
-
-                                        {/* Charging energy field (create mode) */}
-                                        {runMetadata.dataFlags.includes('charging') && (
-                                            <div className="data-subpanel p-3">
-                                                <p className="text-sm font-semibold text-secondary mb-2">Charging Energy <span className="font-normal text-meta">(optional)</span></p>
-                                                <input
-                                                    type="number"
-                                                    placeholder="Energy added (kWh)"
-                                                    title="Energy measured at charger or vehicle — energy in"
-                                                    value={runMetadata.chargeEnergyKwh}
-                                                    onChange={(e) => setRunMetadata({...runMetadata, chargeEnergyKwh: e.target.value})}
-                                                    className="form-input form-input w-full"
-                                                />
-                                                <p className="text-xs text-meta mt-1">
-                                                    Energy measured at charger or vehicle — <em>energy in</em>
-                                                </p>
-                                                <PreconditionedSelect
-                                                    value={runMetadata.preconditioned}
-                                                    onChange={v => setRunMetadata({ ...runMetadata, preconditioned: v })}
-                                                />
-                                                <ChargerClassSelect
-                                                    value={runMetadata.chargerVoltageClass}
-                                                    onChange={v => setRunMetadata({ ...runMetadata, chargerVoltageClass: v })}
-                                                />
-                                                <ChargerCurrentSelect
-                                                    value={runMetadata.chargerCurrentClass}
-                                                    onChange={v => setRunMetadata({ ...runMetadata, chargerCurrentClass: v })}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {/* Range test fields */}
-                                        {runMetadata.dataFlags.includes('range') && (
-                                            <div className="data-subpanel p-4 space-y-3">
-                                                <p className="text-sm font-semibold text-secondary">Range Test Details</p>
-                                                <div className="form-grid gap-3">
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Start SoC (%)"
-                                                        value={runMetadata.startSoc}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, startSoc: e.target.value})}
-                                                        className="form-input form-input"
-                                                        min="0" max="100"
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        placeholder="End SoC (%)"
-                                                        value={runMetadata.endSoc}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, endSoc: e.target.value})}
-                                                        className="form-input form-input"
-                                                        min="0" max="100"
-                                                    />
-                                                    {runMetadata.startSoc !== '' && runMetadata.endSoc !== '' &&
-                                                     parseFloat(runMetadata.startSoc) < parseFloat(runMetadata.endSoc) && (
-                                                        <p className="note-panel col-span-2">
-                                                            ⚠ Start SoC is lower than End SoC — for a range test the vehicle depletes, so Start should be higher (e.g. 95% → 5%). Did you swap them?
-                                                        </p>
-                                                    )}
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Speed (mph)"
-                                                        value={runMetadata.speedMph}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, speedMph: e.target.value})}
-                                                        className="form-input form-input"
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Distance (miles)"
-                                                        value={runMetadata.distanceMiles}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, distanceMiles: e.target.value})}
-                                                        className="form-input form-input"
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Energy consumed (kWh)"
-                                                        title="Energy consumed on the drive — energy out"
-                                                        value={runMetadata.energyKwh}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, energyKwh: e.target.value})}
-                                                        className="form-input form-input"
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Ambient temp (°F)"
-                                                        value={runMetadata.temperatureF}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, temperatureF: e.target.value})}
-                                                        className="form-input form-input"
-                                                    />
-                                                    <select
-                                                        value={runMetadata.speedBasis || ''}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, speedBasis: e.target.value})}
-                                                        className="form-input form-input"
-                                                        title="Steady: the car was held at this speed. Mixed: this is an average over a varying-speed cycle, so speed correction is skipped — aero energy goes as the mean of v², not the square of the mean."
-                                                    >
-                                                        <option value="">Speed basis: unknown</option>
-                                                        <option value="steady">Steady — held at setpoint</option>
-                                                        <option value="mixed">Mixed cycle — average speed</option>
-                                                    </select>
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Test altitude (ft)"
-                                                        title="Elevation the test was run at — drives air density and so aero drag. Not the same as elevation gain."
-                                                        value={runMetadata.altitudeFt}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, altitudeFt: e.target.value})}
-                                                        className="form-input form-input"
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Elevation gain (ft)"
-                                                        title="Net climb over the route — drives the potential-energy term. Not the same as test altitude."
-                                                        value={runMetadata.elevationGainFt}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, elevationGainFt: e.target.value})}
-                                                        className="form-input form-input"
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Avg wind speed (mph)"
-                                                        value={runMetadata.windSpeedMph}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, windSpeedMph: e.target.value})}
-                                                        className="form-input form-input"
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Wind dir., one heading only"
-                                                        title="Only for a test that held one heading: 0° = tailwind, 180° = headwind, 90/270° = crosswind. Leave blank for an out-and-back or a loop, whatever the wind did — the legs cancel except for a cost the wind speed alone records."
-                                                        value={runMetadata.windDirectionDeg}
-                                                        onChange={(e) => setRunMetadata({...runMetadata, windDirectionDeg: e.target.value})}
-                                                        className="form-input form-input"
-                                                        min="0" max="360"
-                                                    />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                                <div>
-                                    <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer mb-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={noHeaders}
-                                            onChange={e => {
-                                                setNoHeaders(e.target.checked);
-                                                setCsvData(null);
-                                                setCsvText('');
-                                                setFieldMapping({});
-                                                setUploadStep('file');
-                                            }}
-                                            className="rounded-xs"
-                                        />
-                                        CSV has no header row (use column numbers)
-                                    </label>
-                                    <div className="csv-drop-zone">
-                                        <label className="cursor-pointer">
-                                            <span className="link-button font-medium">Click to upload CSV file</span>
-                                            <span className="block text-xs text-meta mt-1">Optional — attach data points to this record</span>
-                                            <input
-                                                type="file"
-                                                accept=".csv"
-                                                className="hidden"
-                                                onChange={handleFileUpload}
-                                            />
-                                        </label>
-                                    </div>
-                                    <div className="mt-3">
-                                        <p className="text-xs text-meta mb-1">Or paste CSV text directly:</p>
-                                        <textarea
-                                            rows={4}
-                                            placeholder={"soc,chargeRate,time\n50,100,0\n80,75,15\n…"}
-                                            value={csvText}
-                                            onChange={e => handleCsvTextPaste(e.target.value)}
-                                            className="form-input form-input w-full font-mono resize-y"
-                                        />
-                                    </div>
-                                </div>
-                                {uploadMode === 'create' && (
-                                    <div className="form-actions">
-                                        <button
-                                            onClick={handleSaveRecord}
-                                            disabled={!runMetadata.name}
-                                            className="btn btn-commit disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            Save record
-                                        </button>
-                                        <button onClick={resetUploadState} className="btn btn-secondary">
-                                            Cancel
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {uploadStep === 'mapping' && (
-                        <div>
-                            <h3 className="section-title mb-4">Map CSV Fields</h3>
-                            <p className="text-secondary mb-4">Match your CSV columns to standard fields. We've auto-detected some for you.</p>
-
-                            {/* In create mode, allow editing metadata here too */}
-                            {uploadMode === 'create' && (
-                                <div className="mb-6 p-4 bg-[var(--color-surface-muted)] rounded-xs">
-                                    <h4 className="font-semibold mb-3">Test Metadata</h4>
-                                    <div className="space-y-3">
-                                        <input
-                                            placeholder="Name (e.g., Highway Test - Winter 2024)"
-                                            value={runMetadata.name}
-                                            onChange={(e) => setRunMetadata({...runMetadata, name: e.target.value})}
-                                            className="form-input form-input w-full"
-                                            required
-                                        />
-                                        <input
-                                            type="date"
-                                            value={runMetadata.date}
-                                            onChange={(e) => setRunMetadata({...runMetadata, date: e.target.value})}
-                                            className="form-input form-input w-full"
-                                        />
-                                        <input
-                                            placeholder="Software Version (e.g., 2024.1.5)"
-                                            value={runMetadata.softwareVersion}
-                                            onChange={(e) => setRunMetadata({...runMetadata, softwareVersion: e.target.value})}
-                                            className="form-input form-input w-full"
-                                        />
-                                        <input
-                                            placeholder="Notes (e.g., 20°F, highway speeds)"
-                                            value={runMetadata.conditions}
-                                            onChange={(e) => setRunMetadata({...runMetadata, conditions: e.target.value})}
-                                            className="form-input form-input w-full"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            <h4 className="font-semibold mb-3">Field Mapping</h4>
-                            <div className="space-y-3">
-                                {[
-                                    ['soc',         'SoC (%)'],
-                                    ['chargeRate',  'Charge Rate (kW)'],
-                                    ['timestamp',   'Timestamp (wall clock)'],
-                                    ['time',        'Elapsed Time (min/s)'],
-                                    ['range',       'Range (mi/km)'],
-                                    ['temperature', 'Temperature'],
-                                    ['frame',       'Frame #'],
-                                ].map(([field, label]) => (
-                                    <div key={field} className="field-mapping-row">
-                                        <label className="w-44 font-medium">{label}:</label>
-                                        <select
-                                            value={fieldMapping[field] || ''}
-                                            onChange={(e) => setFieldMapping({...fieldMapping, [field]: e.target.value})}
-                                            className="form-input form-input flex-1"
-                                        >
-                                            <option value="">-- Not mapped --</option>
-                                            {availableFields.map((f, i) => (
-                                                <option key={f} value={f}>
-                                                    {noHeaders && f.startsWith('col_') ? `Column ${i + 1}` : f}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Timestamp conversion notice */}
-                            {(() => {
-                                const tsMapped  = !!fieldMapping.timestamp;
-                                const timeMapped = !!fieldMapping.time;
-                                // Peek at first row to detect timestamp strings in the time column
-                                const firstRow  = csvData?.data?.[0];
-                                const timeColTs = timeMapped && firstRow &&
-                                    isTimestampValue(firstRow[fieldMapping.time]);
-                                if (!tsMapped && !timeColTs) return null;
-                                return (
-                                    <p className="note-panel is-info mt-3">
-                                        Timestamps detected — will be converted to elapsed minutes from the first data point
-                                        {tsMapped && !timeMapped && ' (Elapsed Time will be derived automatically)'}
-                                    </p>
-                                );
-                            })()}
-
-                            {/* ── Derived-column offers ── */}
-                            {offerRangeEstimateTest && (
-                                <div className="mt-5 space-y-3">
-                                    {/* Measured range from test data */}
-                                    {offerRangeEstimateTest && (
-                                        <div className={`estimation-panel ${estimations.range === 'measured' ? 'is-good' : 'is-warning'}`}>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="state-panel-title">
-                                                    {estimations.range === 'measured' ? '✓ Range will be estimated (test data)' : 'Estimate from measured range test'}
-                                                </p>
-                                                {rangeTestRuns.length > 1 && (
-                                                    <select
-                                                        value={selectedRangeTestRunId ?? rangeTestRuns[0]?.id ?? ''}
-                                                        onChange={e => setSelectedRangeTestRunId(Number(e.target.value))}
-                                                        onClick={e => e.stopPropagation()}
-                                                        className="form-input mt-1 p-1 w-full max-w-xs"
-                                                    >
-                                                        {rangeTestRuns.map(r => {
-                                                            const hasSoc = r.start_soc != null && r.end_soc != null;
-                                                            const socDelta = hasSoc ? Math.abs(r.start_soc - r.end_soc) : 100;
-                                                            const eff = Math.round(r.distance_miles * 100 / socDelta);
-                                                            return <option key={r.id} value={r.id}>{r.name} — {eff} mi effective{!hasSoc ? ' (est.)' : ''}</option>;
-                                                        })}
-                                                    </select>
-                                                )}
-                                                <p className="text-xs mt-0.5">
-                                                    {estimations.range === 'measured'
-                                                        ? `range = SoC% × ${effectiveRangeFromTest} mi (${selectedRangeTestRun?.name})`
-                                                        : `${selectedRangeTestRun?.name}: ${selectedRangeTestRun?.distance_miles} mi @ ${selectedRangeTestRun?.start_soc}→${selectedRangeTestRun?.end_soc}% SoC → ${effectiveRangeFromTest} mi effective`}
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={() => setEstimations(prev => ({ ...prev, range: prev.range === 'measured' ? null : 'measured' }))}
-                                                className={`btn btn-toggle shrink-0${estimations.range === 'measured' ? ' active' : ''}`}
-                                            >
-                                                {estimations.range === 'measured' ? 'Undo' : 'Use test data'}
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Join key selector — merge mode only */}
-                            {uploadMode === 'merge' && (
-                                <div className={`join-key-panel ${missingJoinKey ? 'is-danger' : showJoinSelector ? 'is-warning' : 'is-good'}`}>
-                                    {missingJoinKey ? (
-                                        <p className="state-panel-title">
-                                            ⚠ Map at least one of <strong>SoC</strong> or <strong>Time</strong> — it's needed to link incoming rows to existing ones.
-                                        </p>
-                                    ) : showJoinSelector ? (
-                                        <>
-                                            <p className="text-sm font-semibold mb-2">
-                                                Both SoC and Time are mapped — which should be used to link rows?
-                                            </p>
-                                            <div className="flex gap-6">
-                                                <label className="flex items-center gap-2 cursor-pointer text-sm">
-                                                    <input type="radio" name="joinKey" value="soc" checked={joinKey === 'soc'} onChange={() => setJoinKey('soc')} />
-                                                    <span className="font-medium">SoC</span>
-                                                    <span className="text-secondary">(charging curves, SoC-based data)</span>
-                                                </label>
-                                                <label className="flex items-center gap-2 cursor-pointer text-sm">
-                                                    <input type="radio" name="joinKey" value="time" checked={joinKey === 'time'} onChange={() => setJoinKey('time')} />
-                                                    <span className="font-medium">Time</span>
-                                                    <span className="text-secondary">(time-series, e.g. Time+Power → Time+SoC)</span>
-                                                </label>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <p className="text-sm">
-                                            ✓ Rows will be linked by <strong>{canJoinBySoc ? 'SoC' : 'Time'}</strong>.
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="form-actions mt-6">
-                                <button
-                                    onClick={() => setUploadStep('file')}
-                                    className="btn btn-secondary"
-                                >
-                                    Back
-                                </button>
-                                {uploadMode === 'create' ? (
-                                    <button
-                                        onClick={handleImport}
-                                        className="btn btn-commit"
-                                    >
-                                        Import Run
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={handleMerge}
-                                        disabled={merging || missingJoinKey}
-                                        className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
-                                    >
-                                        {merging ? 'Merging…' : 'Merge into Run'}
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+            {showUpload && uploadMode !== 'merge' && uploadPanel}
 
             <div className="space-y-4">
                 {runGroups.map(group => {
@@ -2205,22 +2215,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                             />
                                         </div>
                                     )}
-                                </div>
-                                <div className="form-actions mt-4">
-                                    <button
-                                        onClick={() => handleSaveEdit(run.id)}
-                                        disabled={savingData}
-                                        className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
-                                    >
-                                        {savingData ? 'Saving…' : 'Save Changes'}
-                                    </button>
-                                    <button
-                                        onClick={handleCancelEdit}
-                                        disabled={savingData}
-                                        className="btn btn-secondary disabled:opacity-60"
-                                    >
-                                        Cancel
-                                    </button>
                                 </div>
 
                                 {/* Derive charging axis (time / SoC / power) from any two of the three */}
@@ -2474,6 +2468,25 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                         </div>
                                     )}
                                 </div>
+                                {/* Last, under Derive and the data: both feed
+                                    the one save, so the button that commits
+                                    them comes after them. */}
+                                <div className="form-actions mt-4">
+                                    <button
+                                        onClick={() => handleSaveEdit(run.id)}
+                                        disabled={savingData}
+                                        className="btn btn-commit disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        {savingData ? 'Saving…' : 'Save Changes'}
+                                    </button>
+                                    <button
+                                        onClick={handleCancelEdit}
+                                        disabled={savingData}
+                                        className="btn btn-secondary disabled:opacity-60"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
                             </div>
                         ) : isCompositeRun(run) ? (
                             <CompositeRunCard
@@ -2515,7 +2528,6 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 restoreItem={restoreItem}
                                 queueDelete={queueDelete}
                                 handleExportCsv={handleExportCsv}
-                                handleDuplicateRun={handleDuplicateRun}
                                 setCopyToRun={setCopyToRun}
                                 setMoveToRun={setMoveToRun}
                                 setCopyingToVehicleId={setCopyingToVehicleId}
@@ -2524,6 +2536,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 handleCheckKwh={handleCheckKwh}
                             />
                         )}
+                        {showUpload && uploadMode === 'merge' && String(mergeTargetRun?.id) === String(run.id) && uploadPanel}
                     </div>
                   );
                     })}
@@ -3038,11 +3051,11 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                 <div className="modal-overlay">
                     <div className="copy-to-modal-panel">
                         <div className="modal-header px-5 py-4 border-b">
-                            <h3 className="font-semibold text-base">{moveToRun ? 'Move test to another vehicle' : 'Copy test to another vehicle'}</h3>
+                            <h3 className="font-semibold text-base">{moveToRun ? 'Move test to another vehicle' : 'Copy test'}</h3>
                             <p className="text-xs text-secondary mt-0.5">
                                 {moveToRun
                                     ? `"${transferRun.name}" leaves ${vehicle.name} and belongs to the vehicle you pick. Variants below it inherit it.`
-                                    : `"${transferRun.name}" will be copied as an independent run`}
+                                    : `"${transferRun.name}" will be copied as an independent test`}
                             </p>
                         </div>
                         <div className="px-5 py-4">
@@ -3053,6 +3066,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 className="form-input form-input w-full"
                             >
                                 <option value="" disabled>Choose a vehicle…</option>
+                                {!moveToRun && <option value={vehicle.id}>This vehicle — {vehicle.name}</option>}
                                 {copyTargetVehicles.map(v => (
                                     <option key={v.id} value={v.id}>{v.name}</option>
                                 ))}
