@@ -77,13 +77,23 @@ In order; each a PR.
    is in `reason`) or **none**. In `confirm`, the owner writes `y`, a
    different vehicle id, or `n`; a rerun keeps it. An EU-only pack or trim
    stays `check` or `none` rather than being forced onto a US vehicle.
-2. **Migration: the record.** `green_ncap_assessments` (one row per car:
-   slug, reference, make/model/variant as printed, test year, VIN, declared
-   figures, measured recharged + net capacity, grid to battery, source URLs,
-   `vehicle_id` nullable) and `green_ncap_results` (one row per test row:
-   key, label, group, temperature, the four consumption/range figures). Read
-   by all, written by curators, like `epa_certifications`. Local mirror first.
-3. **Import.** Confirmed matches + parsed JSON → upsert by slug. Writes the
+   **Reviewed 2026-11-16:** 17 cars confirmed (two onto a different
+   vehicle: the i4 eDrive35 → 278, the Leaf e+ → 412). The 2021 Mach-E waits
+   for a 2021 Standard Range AWD variant: its VIN says Premium Standard Range,
+   and EVBench has no such vehicle yet.
+2. **Migration 100: the record — built.** `green_ncap_assessments` holds one
+   row per car, keyed by slug, kept as printed: the measured recharged and
+   net capacity and grid to battery, the rest of the identity block in
+   `published`, and the confirmed `vehicle_id`. `green_ncap_tests` holds one
+   row per results row: position, key, label, on road or lab, rated,
+   temperature, the four figures. `runs.green_ncap_assessment_id` marks the
+   tests made from an assessment, at most one per kind, and they are deleted
+   with it. Access follows `epa_certifications`; curators may also delete
+   tests, because a re-import replaces them. Checked on the local mirror
+   (2026-11-16 backup): it runs twice, every role is refused or allowed as
+   intended, and the cascade and one-per-kind rule hold.
+3. **Import.** Confirmed matches (`vehicle_id` from `confirm`) + parsed JSON →
+   upsert by slug, tests replaced. Writes the
    BAB130 range test: `kind 'range'`, `source 'Green NCAP'`, `source_url` the
    car's page, `start_soc 100`, `end_soc 0`, `energy_kwh` the net capacity,
    `distance_miles` the computed range, `temperature_f 73.4`,
