@@ -72,7 +72,7 @@ export function withSpecValues(specs, category, values) {
 export function columnMoves(finding) {
     const e = finding?.evidence ?? {};
 
-    if (finding?.check === 'battery-unsorted' && e.battery) {
+    if (finding?.check === 'battery-estimated' && e.battery) {
         const into = (name, category, field, current) => ({
             key: `battery-${name.toLowerCase()}`,
             // Naming the value it replaces: a manufacturer's label is not

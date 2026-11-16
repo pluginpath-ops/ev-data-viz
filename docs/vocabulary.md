@@ -232,12 +232,13 @@ nothing else. **Green** is data and status, never chrome.
 | Thing | Call it | Lives in |
 |---|---|---|
 | Maker's usable and gross pack capacity | **Usable** / **Gross** | `specs.charging.battery_usable_kwh`, `specs.powertrain.battery_gross_kwh` |
-| DC energy EPA measured on the multi-cycle test | **EPA tested** — never a bare "Tested", which is EVBench's range test on the card | `epa_tests.total_dc_energy_kwh` |
-| Energy between the car's 0% and 100% | **the SoC window** (`socWindowKwh`): EPA tested, else Usable, else Gross, else unsorted. Not the **charge window** | [vehicleFigures.js](../src/utils/vehicleFigures.js) |
+| DC energy EPA measured on the multi-cycle test | **EPA tested** — never a bare "Tested", which is EVBench's range test on the card. Beside a capacity figure, shortened to **EPA** | `epa_tests.total_dc_energy_kwh` |
+| Energy between the car's 0% and 100% | **the SoC window** (`socWindowKwh`): EPA tested, else Usable, else Gross, else `vehicles.battery`. Always meant as usable; marked **EPA** for the first and **Est.** for the rest (owner, 2026-11-06) — Usable and Gross are specs, in Compare Specs, not beside the figure. Not the **charge window** | [vehicleFigures.js](../src/utils/vehicleFigures.js) |
 | Where a resolved figure came from | **its basis** | `socWindowBasis`, `epaRangeBasis`, `.stat-cell-basis` |
-| A vehicle's EPA range as read | **EPA range** — primary configuration's label, else Expected EPA Range, else unsorted | `epaRangeMi` |
+| A vehicle's EPA range as read | **EPA range** — primary configuration's label, else Expected EPA Range, else `vehicles.range` — the last two marked **Est.** | `epaRangeMi` |
 | A curator's figure for a car with no EPA label | **Expected EPA Range**, with a basis (Manufacturer, Independent test) | `specs.range.expected_epa_mi` |
-| A value from `vehicles.battery`/`vehicles.range` no source confirms | **unsorted** — last tier, deleted with its column | |
+| A value from `vehicles.battery`/`vehicles.range` no source confirms | **Est.** (`estimated`) — last tier, deleted with its column. A range reads only **EPA**, **Tested** or **Est.** (owner, 2026-11-06), so an Expected EPA Range shows as Est. too | |
+| The pack a range test implies: measured kWh over the SoC it used, scaled to 100% | **implied pack** — held against EPA tested; past `TEST_PACK_VS_EPA_PCT` (5%) either way, Energy out reads "91 kWh ⚠ 7% below EPA". A caution: cold and an older pack read below too; above usually means the test drove on past 0% at low speed | `impliedPackKwh()`, `packOffEpa()` in [testedRange.js](../src/utils/testedRange.js); [RunSpecRows.jsx](../src/components/RunSpecRows.jsx); Data Check `test-pack-vs-epa` |
 | What a vehicle is built on: body, structure, suspension | **the mechanical platform** | [platforms.js](../src/utils/platforms.js), `platforms.kind = 'mechanical'` |
 | Pack, drive units, power electronics | **the electrical platform**. Not "architecture" alone | `platforms.kind = 'electrical'` |
 | Either, when clear from context | **platform** | [PlatformLine.jsx](../src/components/vehicles/PlatformLine.jsx) |
@@ -412,6 +413,7 @@ it borrows the pinned band.
 | "test group", "certification group", "cert group" for the Vehicle ID record | **EPA test vehicle**; **Test Group** only for EPA's identifier | the record is the car |
 | `epa_test_groups`, `test_group_id`, `testGroupId`, `epaGroup`, `epa_test_family_id` | `epa_test_vehicles`, `test_vehicle_id`, `testVehicleId`, `epaTestVehicle`, `test_group` | renamed in migration 081 |
 | "Hidden" / "Hide" for a test, in UI text | **Unlisted** / Unlist — or **Excluded** for statistics | one word carried two questions |
+| "unsorted", anywhere — and "Expected EPA" as a range basis in UI text | **Est.** (`estimated` in code, `battery-estimated` for the Data Check) | it said nothing about the figure; a range reads EPA, Tested or Est. |
 | "nominal" for a measured curve | composite | *nominal* means rated, as filed |
 | "URL" or "Copy link" on the toolbar button | **Link** (copied: "Link copied") | the row is Share; each button names its format. Say **chart link** / **short link** in prose |
 | "PNG" or "Copy PNG" on the toolbar button | **Image** (copied: "Image copied") | the format matters only in the tooltip and for the file you save |

@@ -46,6 +46,7 @@
 import { isListed, isExcluded } from './runListing';
 import { defaultRangeRun, miPerKwhFrom } from './rangeSource';
 import { speedBasisNote } from './unitConversions';
+import { TEST_PACK_VS_EPA_PCT } from '../constants/epa';
 import { val } from './calcTrace';
 
 /**
@@ -321,7 +322,7 @@ export function testedEfficiency(vehicle, trace = null) {
  *   · A window that covers the practical pack (coversPracticalPack). Efficiency
  *     over 56→10% is real, but the energy of a full pack inferred from it is not.
  *   · A capacity that is a new pack's own: EPA tested, or the manufacturer's
- *     Usable. Gross and unsorted read high, which would charge a healthy car
+ *     Usable. Gross and estimated read high, which would charge a healthy car
  *     with a fade it does not have.
  *
  * Raw here and on the card. The vehicle table corrects it (and the tested
@@ -343,6 +344,43 @@ export const WHEN_NEW_CAPACITY_BASES = ['epa-tested', 'usable'];
  * that prompted this cleared.
  */
 export const CAPACITY_RETENTION_SHOWN_BELOW = 0.95;
+
+/**
+ * The pack a range test implies: its measured energy over the SoC it used,
+ * scaled to 100%. 30.0 kWh over 80→45% is 85.7 kWh.
+ *
+ * Measured energy only, and only a test that saw the practical pack
+ * (coversPracticalPack) — the same two guards as the when-new range, for the
+ * same reasons. Null otherwise.
+ */
+export function impliedPackKwh(run) {
+    if (!(run?.energy_kwh > 0) || !coversPracticalPack(run)) return null;
+    const windowPct = socWindow(run);
+    return windowPct ? run.energy_kwh * 100 / windowPct : null;
+}
+
+/**
+ * A range test whose implied pack sits further than the limit from EPA tested
+ * (owner, 2026-11-06), or null.
+ *
+ * EPA tested is the usable figure read the most consistently, and it is where
+ * calculations start. A test above it usually drove on past 0% at low speed —
+ * energy EPA's test, which stops once 70–75 mph can no longer be held, does not
+ * count. A test below it is a faded pack or a wrong link. Either way a curator
+ * should look; nothing here changes the figure calculations use.
+ *
+ * @param {Object} run
+ * @param {number} epaTestedKwh  the vehicle's EPA tested (`vehicle.epaTestedKwh`)
+ * @returns {{ packKwh: number, epaTestedKwh: number, offPct: number }|null}
+ *   `offPct` is signed: positive when the test drew more than EPA
+ */
+export function packOffEpa(run, epaTestedKwh, tolerancePct = TEST_PACK_VS_EPA_PCT) {
+    if (!(epaTestedKwh > 0)) return null;
+    const packKwh = impliedPackKwh(run);
+    if (packKwh == null) return null;
+    const offPct = (packKwh / epaTestedKwh - 1) * 100;
+    return Math.abs(offPct) > tolerancePct ? { packKwh, epaTestedKwh, offPct } : null;
+}
 
 export function whenNewRange(vehicle, trace = null) {
     return whenNewRangeOfRun(reportedRangeChoice(vehicle, trace).run, vehicle, trace);

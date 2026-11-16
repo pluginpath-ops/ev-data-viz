@@ -56,10 +56,10 @@ const KWH_SOURCE = {
     // 'EPA' is this record's own figure; the rest are the vehicle's
     // socWindowBasis, used when the record has none (vehicleFigures.js).
     EPA:          { short: 'EPA',        note: 'Useable capacity from this record\'s own filing.' },
-    'epa-tested': { short: 'EPA tested', note: 'The vehicle\'s EPA tested energy, from its primary configuration.' },
-    usable:       { short: 'Usable',     note: 'The manufacturer\'s usable capacity, from the vehicle\'s specs.' },
-    gross:        { short: 'Gross',      note: 'No usable capacity on record — the manufacturer\'s GROSS pack is used, so the range axis reads high.', intent: 'is-qualified' },
-    unsorted:     { short: 'unsorted',   note: 'From vehicles.battery, not yet sorted into Usable or Gross.', intent: 'is-qualified' },
+    'epa-tested': { short: 'EPA',  note: 'The vehicle\'s EPA tested energy, from its primary configuration.' },
+    usable:       { short: 'Est.', note: 'The manufacturer\'s Usable capacity, from the vehicle\'s specs.' },
+    gross:        { short: 'Est.', note: 'No usable capacity on record — the manufacturer\'s GROSS pack is used, so the range axis reads high.', intent: 'is-qualified' },
+    estimated:    { short: 'Est.', note: 'An estimate: vehicles.battery, not yet sorted into Usable or Gross.', intent: 'is-qualified' },
 };
 
 export default function EpaRecordMeta({ row }) {

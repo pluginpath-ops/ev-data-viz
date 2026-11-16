@@ -5,8 +5,8 @@ import { DATA_CHECKS } from '../dataChecks';
 const CHECK_KEYS = new Set(DATA_CHECKS.map(c => c.key));
 
 describe('columnMoves', () => {
-    it('sorts an unsorted battery into Usable or Gross, or discards it', () => {
-        const moves = columnMoves({ check: 'battery-unsorted', evidence: { battery: 82, usable: null, gross: null } });
+    it('sorts an estimated battery into Usable or Gross, or discards it', () => {
+        const moves = columnMoves({ check: 'battery-estimated', evidence: { battery: 82, usable: null, gross: null } });
         expect(moves.map(m => m.label)).toEqual(['82 kWh is Usable', '82 kWh is Gross', 'Discard']);
         expect(moves[0]).toMatchObject({ spec: { category: 'charging', values: { battery_usable_kwh: 82 } }, clear: 'battery' });
         expect(moves[1]).toMatchObject({ spec: { category: 'powertrain', values: { battery_gross_kwh: 82 } }, clear: 'battery' });
@@ -15,7 +15,7 @@ describe('columnMoves', () => {
 
     it('names the label a move would overwrite', () => {
         // IONIQ6 Base: battery 63 against Gross 53 and Usable 50.
-        const moves = columnMoves({ check: 'battery-unsorted', evidence: { battery: 63, usable: 50, gross: 53 } });
+        const moves = columnMoves({ check: 'battery-estimated', evidence: { battery: 63, usable: 50, gross: 53 } });
         expect(moves.map(m => m.label)).toEqual(['Replace Usable 50 with 63', 'Replace Gross 53 with 63', 'Discard']);
     });
 

@@ -146,7 +146,7 @@ describe('rankSuggestions', () => {
 });
 
 describe('packLabels', () => {
-    it("reads Usable and Gross through inheritance, and never the unsorted column", () => {
+    it("reads Usable and Gross through inheritance, and never the bare vehicles.battery column", () => {
         const parent = vehicle({ specs: { charging: { battery_usable_kwh: 77.4 }, powertrain: { battery_gross_kwh: 84 } } });
         const child = vehicle({ spec_source_vehicle_id: parent.id, specs: {} });
         expect(packLabels(child, [parent, child])).toEqual([{ name: 'Usable', kwh: 77.4 }, { name: 'Gross', kwh: 84 }]);

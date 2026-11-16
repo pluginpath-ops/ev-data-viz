@@ -10,6 +10,7 @@ const LIMITS = {
     LABEL_RANGE_TOLERANCE_PCT: 5,
     LABEL_SPREAD_PCT: 5,
     TESTED_CAPACITY_TOLERANCE_PCT: 5,
+    TEST_PACK_VS_EPA_PCT: 5,
     TESTED_SPREAD_PCT: 5,
     PACK_BUFFER_PCT_BAND: [3, 10],
     TEST_WEIGHT_OFFSET_LBS_BAND: [0, 600],
@@ -143,7 +144,7 @@ describe('battery capacity', () => {
 
     it('lists a battery figure that is neither Usable nor Gross', () => {
         expect(checksFor(vehicle({ battery: 78, specs: specs(78, 84) }))).toEqual([]);
-        expect(checksFor(vehicle({ battery: 63, specs: specs(50, 53) }))).toContain('battery-unsorted');
+        expect(checksFor(vehicle({ battery: 63, specs: specs(50, 53) }))).toContain('battery-estimated');
         expect(findingsFor(vehicle({ battery: 69 }))[0].text).toMatch(/no Usable or Gross/);
     });
 
@@ -680,5 +681,35 @@ describe('range tests missing conditions', () => {
 
     it('ignores excluded tests', () => {
         expect(findingOf([range({ altitude_ft: null, is_excluded: true })])).toBeUndefined();
+    });
+});
+
+describe('range test pack against EPA tested', () => {
+    // 100 → 0%, so the implied pack is the energy itself.
+    const range = (energy_kwh, over = {}) => ({ id: nextId++, kind: 'range', name: `Test ${energy_kwh}`,
+        distance_miles: 300, energy_kwh, start_soc: 100, end_soc: 0, speed_mph: 70, temperature_f: 70, altitude_ft: 0, ...over });
+    const findingOf = (runs, groups = [group({ epa_tests: [mct(80)] })]) =>
+        runDataChecks([vehicle({ runs }, groups)], { limits: LIMITS })[0].findings.find(f => f.check === 'test-pack-vs-epa');
+
+    it('names each test past the limit, above and below, as one finding', () => {
+        const f = findingOf([range(85), range(74), range(82)]);
+        expect(f.kind).toBe('disagrees');
+        expect(f.text).toContain('Test 85 (85 kWh, 6.3% above)');
+        expect(f.text).toContain('Test 74 (74 kWh, 7.5% below)');
+        expect(f.text).not.toContain('Test 82');
+        expect(f.text).toContain('past 0% at low speed');
+        expect(f.text).toContain('faded pack');
+    });
+
+    it('scales a partial window to a full pack', () => {
+        // 34 kWh over 80 → 40% is an 85 kWh pack.
+        expect(findingOf([range(34, { start_soc: 85, end_soc: 45 })])).toBeUndefined(); // 40 points: not the practical pack
+        expect(findingOf([range(68, { start_soc: 90, end_soc: 10 })]).evidence.tests[0]).toMatch(/:85$/);
+    });
+
+    it('says nothing without EPA tested, measured energy, or a practical window', () => {
+        expect(findingOf([range(90)], [])).toBeUndefined();
+        expect(findingOf([range(null)])).toBeUndefined();
+        expect(findingOf([range(45, { start_soc: 60, end_soc: 10 })])).toBeUndefined();
     });
 });

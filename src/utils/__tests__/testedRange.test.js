@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     testedRangeSummary, testedEfficiency, whenNewRange, reportedRangeRun, socWindow, coversPracticalPack,
+    impliedPackKwh, packOffEpa,
     FULL_WINDOW_MIN_PCT, WINDOW_START_MIN_PCT, WINDOW_END_MAX_PCT, WIDE_SPAN_MIN_PCT,
 } from '../testedRange';
 
@@ -323,7 +324,7 @@ describe('whenNewRange — what the pack holds against a new one', () => {
 
     it('says nothing against a capacity that is not a new pack’s own', () => {
         expect(whenNewRange(aged({}, { socWindowBasis: 'gross' }))).toBeNull();
-        expect(whenNewRange(aged({}, { socWindowBasis: 'unsorted' }))).toBeNull();
+        expect(whenNewRange(aged({}, { socWindowBasis: 'estimated' }))).toBeNull();
         expect(whenNewRange(aged({}, { socWindowBasis: 'usable' }))).not.toBeNull();
         expect(whenNewRange(aged({}, { socWindowKwh: null }))).toBeNull();
     });
@@ -331,5 +332,21 @@ describe('whenNewRange — what the pack holds against a new one', () => {
     it('reads the same test the card reports, and nothing without one', () => {
         expect(whenNewRange(aged()).run.id).toBe(reportedRangeRun(aged()).id);
         expect(whenNewRange(vehicle([], { socWindowKwh: 90, socWindowBasis: 'epa-tested' }))).toBeNull();
+    });
+});
+
+describe('impliedPackKwh and packOffEpa', () => {
+    it('scales measured energy over the SoC used to a full pack', () => {
+        expect(impliedPackKwh(rangeRun({ energy_kwh: 68, start_soc: 90, end_soc: 10 }))).toBe(85);
+        expect(impliedPackKwh(rangeRun({ energy_kwh: null }))).toBeNull();
+        expect(impliedPackKwh(rangeRun({ start_soc: 56, end_soc: 10 }))).toBeNull();
+    });
+
+    it('flags a pack past the limit either way, signed, and nothing within it', () => {
+        expect(packOffEpa(rangeRun({ energy_kwh: 86, start_soc: 100, end_soc: 0 }), 80).offPct).toBeCloseTo(7.5);
+        expect(packOffEpa(rangeRun({ energy_kwh: 75, start_soc: 100, end_soc: 0 }), 80).offPct).toBeCloseTo(-6.25);
+        expect(packOffEpa(rangeRun({ energy_kwh: 83, start_soc: 100, end_soc: 0 }), 80)).toBeNull();
+        expect(packOffEpa(rangeRun({ energy_kwh: 86, start_soc: 100, end_soc: 0 }), null)).toBeNull();
+        expect(packOffEpa(rangeRun({ energy_kwh: 86, start_soc: 100, end_soc: 0 }), 80, 10)).toBeNull();
     });
 });

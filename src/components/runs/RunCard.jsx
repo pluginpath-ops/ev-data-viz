@@ -154,6 +154,7 @@ export default function RunCard({
                         <div className="run-detail-row">
                             <RunSpecRows
                                 run={run}
+                                vehicle={vehicle}
                                 units={units}
                                 socRange={socRange}
                                 fieldMeta={FIELD_META}

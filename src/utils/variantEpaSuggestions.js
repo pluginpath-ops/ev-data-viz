@@ -147,7 +147,7 @@ const positive = (v) => {
  * configuration's EPA tested against: Usable and Gross, whichever exist.
  *
  * Not EPA tested, which may be read from the very configuration being judged.
- * Not the unsorted `vehicles.battery` either: it is Usable on some vehicles and
+ * Not the estimated `vehicles.battery` either: it is Usable on some vehicles and
  * Gross on others, and a ranking that trusted it would push the right
  * configuration down on a figure nobody has confirmed. With neither label, the
  * pack simply does not rank.

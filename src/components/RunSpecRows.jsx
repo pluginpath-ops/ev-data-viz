@@ -1,5 +1,6 @@
 import { fmtSpeed, fmtTemp, fmtDistance, calcEff, effLabel as getEffLabel, speedBasisNote } from '../utils/unitConversions';
 import { runKindFrom } from '../utils/runUtils';
+import { packOffEpa } from '../utils/testedRange';
 
 /**
  * A run's numbers, grouped by what they mean rather than run together.
@@ -64,7 +65,15 @@ function Band({ label, cells }) {
                         title={c.title}
                     >
                         <span className="run-cell-label">{c.label}</span>
-                        <span className="run-cell-value">{c.value}</span>
+                        <span className="run-cell-value">
+                            {c.value}
+                            {c.caution && (
+                                <span className="run-cell-caution">
+                                    <span className="run-cell-caution-glyph" aria-hidden="true">⚠</span>
+                                    {c.caution}
+                                </span>
+                            )}
+                        </span>
                     </div>
                 ))}
             </div>
@@ -72,7 +81,7 @@ function Band({ label, cells }) {
     );
 }
 
-export default function RunSpecRows({ run, units, socRange, fieldMeta = [], calcKwhByRun, onCheckKwh }) {
+export default function RunSpecRows({ run, vehicle, units, socRange, fieldMeta = [], calcKwhByRun, onCheckKwh }) {
     const kind = runKindFrom(run);
     const isRange = kind === 'range';
 
@@ -193,9 +202,25 @@ export default function RunSpecRows({ run, units, socRange, fieldMeta = [], calc
             results.push({ key: 'dist', label: 'Distance', value: fmtDistance(run.distance_miles, units) });
         }
         if (run.energy_kwh != null) {
+            // The pack this energy implies, held against EPA tested (owner,
+            // 2026-11-06) — marked on the figure it is about, as the kWh
+            // cross-check below is. The same judgement is the Data Check
+            // `test-pack-vs-epa`.
+            const off = packOffEpa(run, vehicle?.epaTestedKwh);
+            const above = off?.offPct > 0;
             results.push({
                 key: 'kwh', label: 'Energy out', value: `${run.energy_kwh} kWh`,
-                title: 'Energy out (measured at vehicle)',
+                // A caution, not a warning: below EPA is expected in the cold
+                // and on an older pack, so the figure keeps its own color and
+                // only the triangle is orange (owner, 2026-11-06).
+                caution: off ? `${Math.abs(off.offPct).toFixed(0)}% ${above ? 'above' : 'below'} EPA` : null,
+                title: off
+                    ? `Energy out (measured at vehicle). Over the SoC it used, a ${off.packKwh.toFixed(1)} kWh pack — `
+                        + `${Math.abs(off.offPct).toFixed(1)}% ${above ? 'above' : 'below'} EPA tested ${off.epaTestedKwh.toFixed(1)} kWh. `
+                        + (above
+                            ? 'Usually the test drove on past 0% at low speed, energy EPA does not count.'
+                            : 'Expected in the cold or on an older pack; otherwise a wrong EPA link, or a mistyped energy or SoC.')
+                    : 'Energy out (measured at vehicle)',
             });
         }
         if (run.energy_kwh != null && run.distance_miles != null) {

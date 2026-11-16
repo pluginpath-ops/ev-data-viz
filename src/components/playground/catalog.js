@@ -225,7 +225,7 @@ export const SECTIONS = [
               covers: ['stats-histogram', 'stats-histogram-head', 'stats-histogram-plot', 'stats-histogram-bars', 'stats-histogram-bar', 'stats-histogram-axis', 'stats-histogram-median', 'stats-histogram-median-chip', 'stats-histogram-median-value', 'text-caption'],
               note: 'Four steps of one blue by height; an empty bin gets none of them. The median rides on a chip ABOVE the plot area — never over the bars it measures.' },
             { composite: 'run-band', label: 'Run band',
-              covers: ['run-bands', 'run-band', 'run-band-label', 'run-band-cells', 'run-cell', 'run-cell-label', 'run-cell-value', 'run-cell-missing', 'run-cell-tags', 'run-cell-action'],
+              covers: ['run-bands', 'run-band', 'run-band-label', 'run-band-cells', 'run-cell', 'run-cell-label', 'run-cell-value', 'run-cell-missing', 'run-cell-tags', 'run-cell-action', 'run-cell-caution', 'run-cell-caution-glyph'],
               note: 'A solid label rail and an auto-fit track grid: as many columns as the run actually records, no padding columns.' },
         ],
     },

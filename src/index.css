@@ -6860,6 +6860,29 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-size: calc(var(--fs-body) * var(--fs-step));
     color: var(--color-text-secondary);
 }
+/* A figure held against a reference and found off it — "91 kWh ⚠ 7% below EPA"
+   on a range test's Energy out. Beside the figure, not under it. A caution, not
+   a fault: cold and an older pack both read below EPA, so the figure keeps its
+   color and only the glyph takes the warning hue. The glyph is the readout's
+   size; the words are the data face at the nano size, like the cell's label. */
+.run-cell-caution {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    margin-left: 6px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    color: var(--color-text-value);
+    white-space: nowrap;
+}
+/* Two steps above the readout: at the readout's own size the ⚠ glyph draws
+   noticeably smaller than the digits beside it. Line-height 1 so it does not
+   make the cell taller. */
+.run-cell-caution-glyph {
+    font-size: calc(var(--fs-data, var(--fs-body)) / var(--fs-step) / var(--fs-step));
+    line-height: 1;
+    color: var(--color-warning);
+}
 .run-cell-missing {
     color: var(--color-text-meta);
 }
@@ -8254,7 +8277,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     @apply ml-1 inline-block;
     font-size: 0.5625rem;
 }
-/* Unsorted, it is empty, and its margin alone pushed "Cameras" onto a second
+/* With no sort applied it is empty, and its margin alone pushed "Cameras" onto a second
    line in a short-values column. */
 .guide-sort-caret:empty { display: none; }
 
