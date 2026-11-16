@@ -1,23 +1,27 @@
 /**
  * The SQL that imports parsed Green NCAP assessments (docs/green-ncap-plan.md,
- * step 3). The owner runs it on the local mirror, then in production.
+ * steps 3 and 5). The owner runs it on the local mirror, then in production.
  *
  * Per car, upserted by slug:
  *   - the assessment, as published, with the owner-confirmed vehicle_id (or none)
  *   - its tests, replaced
  *   - the BAB130 range test, when the car is linked and the sheet gives the
  *     net battery and BAB130 figures; otherwise any earlier one is deleted
+ *   - the DC fast-charging test and its points, when the car is linked and the
+ *     sheet has a curve (2025 on); otherwise likewise deleted
  *
- * A re-import refreshes the range test's figures and vehicle but leaves its
+ * A re-import refreshes each test's figures and vehicle but leaves its
  * listed / excluded / default flags alone: those are a curator's judgments.
  * One transaction; safe to run twice.
  *
  * Pure: takes parsed cars (scripts/parseGreenNcap.mjs) and a slug → vehicle id map.
  */
 import { MI_TO_KM } from '../constants/units.js';
+import { summarizeChargeSession } from './chargeWindows.js';
 
 export const GREEN_NCAP_SOURCE = 'Green NCAP';
 export const BAB130_RANGE_TEST_NAME = 'Green NCAP BAB130';
+export const FAST_CHARGE_TEST_NAME = 'Green NCAP DC fast charge';
 // Scored at its 130 km/h cruise, steady, as third-party tests are scored at
 // their target speed (owner, 2026-11-16). The trace averages 77.6 mph; its
 // dips and full-throttle climbs are not modeled (docs/green-ncap-plan.md).
@@ -32,6 +36,7 @@ export function lit(v) {
     if (v == null || (typeof v === 'number' && !Number.isFinite(v))) return 'NULL';
     if (typeof v === 'number') return String(v);
     if (typeof v === 'boolean') return v ? 'true' : 'false';
+    if (Array.isArray(v)) return `ARRAY[${v.map(lit).join(', ')}]`;
     if (typeof v === 'object') return `${lit(JSON.stringify(v))}::jsonb`;
     return `'${String(v).replace(/'/g, "''")}'`;
 }
@@ -54,6 +59,29 @@ export function bab130RangeTest(car) {
         speed_basis: 'steady',
         temperature_f: BAB130_TEMP_F,
         conditions: 'Lab dynamometer, BAB130 motorway cycle: 130 km/h cruise with dips to 110 and full-throttle accelerations (averages 77.6 mph). Range computed: net battery ÷ consumption.',
+    };
+}
+
+/**
+ * The DC fast-charging test (2025 sheets on), or null without a curve. Points
+ * are as published (every ~4–20 s), time in minutes; the summary is the one
+ * DataService.addRun would write, so no backfill is needed.
+ */
+export function fastChargeTest(car) {
+    const points = (car.fastCharging?.points ?? [])
+        .filter(p => Number.isFinite(p.timeS) && Number.isFinite(p.powerKw))
+        .map(p => ({ time: round(p.timeS / 60, 3), soc: Number.isFinite(p.soc) ? p.soc : null, chargeRate: p.powerKw }));
+    if (points.length < 2) return null;
+    const socs = points.map(p => p.soc).filter(s => s != null);
+    return {
+        figures: {
+            start_soc: socs.length ? socs[0] : null,
+            end_soc: socs.length ? socs[socs.length - 1] : null,
+            populated_fields: ['soc', 'chargeRate', 'time'],
+            charge_summary: { ...summarizeChargeSession(points), computedAt: new Date().toISOString() },
+            conditions: 'DC fast charge from the Green NCAP results sheet, power as published.',
+        },
+        points,
     };
 }
 
@@ -94,12 +122,11 @@ function testsSql(car) {
     return out;
 }
 
-function rangeTestSql(car, vehicleId) {
+/** Upsert the assessment's test of one kind, or delete it when figures is null. */
+function runSql(car, kind, name, figures, vehicleId) {
     const slug = car.source.slug;
-    const figures = vehicleId != null ? bab130RangeTest(car) : null;
-    if (!figures) return [`DELETE FROM public.runs WHERE kind = 'range' AND green_ncap_assessment_id = ${bySlug(slug)};`];
-    const row = { vehicle_id: vehicleId, name: BAB130_RANGE_TEST_NAME, kind: 'range', source: GREEN_NCAP_SOURCE,
-        source_url: car.source.url, ...figures };
+    if (vehicleId == null || !figures) return [`DELETE FROM public.runs WHERE kind = ${lit(kind)} AND green_ncap_assessment_id = ${bySlug(slug)};`];
+    const row = { vehicle_id: vehicleId, name, kind, source: GREEN_NCAP_SOURCE, source_url: car.source.url, ...figures };
     const cols = Object.keys(row);
     return [`INSERT INTO public.runs (${cols.join(', ')}, green_ncap_assessment_id)\n`
         + `SELECT ${cols.map(c => lit(row[c])).join(', ')}, a.id FROM public.green_ncap_assessments a WHERE a.slug = ${lit(slug)}\n`
@@ -107,14 +134,29 @@ function rangeTestSql(car, vehicleId) {
         + `DO UPDATE SET ${cols.filter(c => c !== 'kind').map(c => `${c} = EXCLUDED.${c}`).join(', ')}, updated_at = now();`];
 }
 
+const rangeTestSql = (car, vehicleId) => runSql(car, 'range', BAB130_RANGE_TEST_NAME, bab130RangeTest(car), vehicleId);
+
+function fastChargeTestSql(car, vehicleId) {
+    const test = vehicleId != null ? fastChargeTest(car) : null;
+    const out = runSql(car, 'charging', FAST_CHARGE_TEST_NAME, test?.figures, vehicleId);
+    if (!test) return out;
+    const run = `(SELECT id FROM public.runs WHERE kind = 'charging' AND green_ncap_assessment_id = ${bySlug(car.source.slug)})`;
+    const values = test.points.map((p, i) => `(${[i, p.soc, p.chargeRate, p.time].map(lit).join(', ')})`);
+    out.push(`DELETE FROM public.data_points WHERE run_id = ${run};`,
+        `INSERT INTO public.data_points (run_id, frame, soc, charge_rate, time_value)\n`
+        + `SELECT ${run}, v.frame, v.soc::numeric, v.charge_rate, v.time_value FROM (VALUES\n    ${values.join(',\n    ')}\n`
+        + `) v(frame, soc, charge_rate, time_value);`);
+    return out;
+}
+
 /**
  * @param cars       parsed cars (parsed.json)
  * @param vehicleFor Map slug → confirmed vehicle id; absent = not linked
- * @returns {{ sql: string, counts: { assessments, linked, rangeTests } }}
+ * @returns {{ sql: string, counts: { assessments, linked, rangeTests, chargingTests } }}
  */
 export function buildGreenNcapImportSql(cars, vehicleFor = new Map()) {
     const parts = [
-        '-- Green NCAP import (docs/green-ncap-plan.md, step 3). Generated by scripts/importGreenNcap.mjs.',
+        '-- Green NCAP import (docs/green-ncap-plan.md, steps 3 and 5). Generated by scripts/importGreenNcap.mjs.',
         '-- Run on the local mirror first. One transaction; safe to run twice.',
         'BEGIN;',
         '',
@@ -122,14 +164,16 @@ export function buildGreenNcapImportSql(cars, vehicleFor = new Map()) {
         `INSERT INTO public.sources (name, domains)\nSELECT ${lit(GREEN_NCAP_SOURCE)}, ARRAY['greenncap.com']\n`
             + `WHERE NOT EXISTS (SELECT 1 FROM public.sources WHERE lower(name) = lower(${lit(GREEN_NCAP_SOURCE)}));`,
     ];
-    const counts = { assessments: 0, linked: 0, rangeTests: 0 };
+    const counts = { assessments: 0, linked: 0, rangeTests: 0, chargingTests: 0 };
     for (const car of [...cars].sort((a, b) => a.source.slug.localeCompare(b.source.slug))) {
         const vehicleId = vehicleFor.get(car.source.slug) ?? null;
         counts.assessments++;
         if (vehicleId != null) counts.linked++;
         if (vehicleId != null && bab130RangeTest(car)) counts.rangeTests++;
+        if (vehicleId != null && fastChargeTest(car)) counts.chargingTests++;
         parts.push('', `-- ${car.source.slug}${vehicleId != null ? ` → vehicle ${vehicleId}` : ' (not linked)'}`,
-            assessmentSql(car, vehicleId), ...testsSql(car), ...rangeTestSql(car, vehicleId));
+            assessmentSql(car, vehicleId), ...testsSql(car), ...rangeTestSql(car, vehicleId),
+            ...fastChargeTestSql(car, vehicleId));
     }
     parts.push('', 'COMMIT;', '');
     return { sql: parts.join('\n'), counts };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSocWindow, resolveEpaRange, withVehicleFigures, testedAgreement, figureSources, fieldFigureSource } from '../vehicleFigures';
+import { resolveSocWindow, resolveEpaRange, resolveChargerEfficiency, withVehicleFigures, testedAgreement, figureSources, fieldFigureSource } from '../vehicleFigures';
 
 let nextId = 1;
 const testVehicle = (over = {}) => ({
@@ -93,6 +93,25 @@ describe('resolveEpaRange', () => {
         it('is null with no label to resolve', () => {
             const g = testVehicle({ epa_tests: [recharge(89.5, 104.7)] });
             expect(resolveEpaRange(vehicle({ epa_mappings: [link(g)] }), []).chargerEfficiency).toBeNull();
+        });
+    });
+
+    describe('resolveChargerEfficiency: EPA, then Green NCAP', () => {
+        const gn = (grid_to_battery, test_year) => ({ grid_to_battery, test_year });
+        it('takes the EPA figure over Green NCAP', () => {
+            expect(resolveChargerEfficiency({ green_ncap: [gn(0.87, 2025)] }, { chargerEfficiency: 0.9 }))
+                .toEqual({ value: 0.9, basis: 'epa' });
+        });
+        it('falls back to the newest Green NCAP figure', () => {
+            expect(resolveChargerEfficiency({ green_ncap: [gn(0.88, 2022), gn(0.87, 2025), gn(null, 2026)] }, { chargerEfficiency: null }))
+                .toEqual({ value: 0.87, basis: 'green-ncap' });
+        });
+        it('is null with neither, so the reader takes the assumed figure', () => {
+            expect(resolveChargerEfficiency({}, { chargerEfficiency: null })).toEqual({ value: null, basis: null });
+        });
+        it('is attached by withVehicleFigures', () => {
+            const [v] = withVehicleFigures([vehicle({ green_ncap: [gn('0.8745', 2025)] })]);
+            expect(v.chargerEfficiency).toEqual({ value: 0.8745, basis: 'green-ncap' });
         });
     });
 

@@ -47,7 +47,7 @@ import { SPEC_CATEGORIES } from './vehicleSpecSchema';
 import { specProvenance, vehicleLabel } from './specHelpers';
 import { convValue, fmtSpeed, MI_TO_KM, LBS_TO_KG, HP_TO_KW } from './unitConversions';
 import { deriveTested } from './performanceDerivations';
-import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS } from './vehicleFigures';
+import { SOC_WINDOW_BASIS, EPA_RANGE_BASIS, CHARGER_EFF_BASIS } from './vehicleFigures';
 import { sortByColumn, barMaximaOf, barPercentOf } from './tableColumns';
 import { VEHICLE_TABLE_PRESETS } from './vehicleTablePresets';
 import { CHARGE_WINDOWS, chargeTimeSession, minutesBetween } from './chargeWindows';
@@ -165,14 +165,15 @@ const FIGURE_COLUMNS = [
       group: 'Battery & range', numeric: true, better: 'higher', bar: true, digits: 2, scale: 'efficiency',
       hint: 'The EPA label’s combined MPGe ÷ 33.705: miles per kWh from the wall, charging losses included, so it reads below Efficiency, which divides by the battery. The MPGe is shown beneath.' },
     // The share of wall energy that reaches the pack: the loss inside EPA
-    // efficiency, on its own. Blank unless the cert measured it (or a curator
-    // pinned it) — never the 88.5% assumed elsewhere, which would read as data.
-    // Too wide for the default column as "EPA charger efficiency"; the header
-    // tooltip and the column picker say it in full.
+    // efficiency, on its own. The EPA cert's (or a curator's pinned figure),
+    // else Green NCAP's; the basis is shown beneath. Blank when neither has
+    // one — the assumed figure is only named in the note beneath, so it never
+    // sorts or reads as data.
+    // The key keeps its old name: presets and short links store it.
     { key: 'figures.chargerEfficiency', label: 'Charger eff.', unit: '%',
-      labelFor: () => 'Charger eff.', fullLabelFor: () => 'EPA charger efficiency',
+      labelFor: () => 'Charger eff.', fullLabelFor: () => 'Charger efficiency',
       group: 'Battery & range', numeric: true, better: 'higher', digits: 1,
-      hint: 'AC charging: the share of wall energy that reaches the battery, from the EPA certification’s own recharge test (battery energy ÷ wall energy), or a curator’s pinned figure. Blank where the cert did not measure it. Not DC fast charging, which has its own loss.' },
+      hint: 'AC charging: the share of wall energy that reaches the battery (battery energy ÷ wall energy). From the EPA certification’s own recharge test or a curator’s pinned figure, else Green NCAP’s measured recharge; the source is shown beneath. Blank where neither measured it, with the figure the calculations assume instead beneath. Not DC fast charging, which has its own loss.' },
 ];
 
 const TESTED_COLUMNS = [
@@ -590,7 +591,7 @@ const CALCULATED_COLUMNS = [
       }),
       note: fastCostNote,
       noteLink: fastCostNoteLink,
-      hint: 'The DC fast-charging price set under Assumptions × 100 ÷ the battery-side efficiency, grossed up by the DC fast charging loss (Admin → Model Constants): what a session loses between the car’s port and the pack’s output, cooling, auxiliary draw and the pack’s own losses among it. A DC session bypasses the onboard charger, so it does not pay the AC charging loss the home cost carries, and the station’s own conversion is not billed. Battery-side: the label’s efficiency with the charging loss taken back out (the certification’s own where it measured one, else the fleet median), or range ÷ battery without a label. Every figure is marked est., since the session loss is an assumed average; the mark links to the page that explains it. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
+      hint: 'The DC fast-charging price set under Assumptions × 100 ÷ the battery-side efficiency, grossed up by the DC fast charging loss (Admin → Model Constants): what a session loses between the car’s port and the pack’s output, cooling, auxiliary draw and the pack’s own losses among it. A DC session bypasses the onboard charger, so it does not pay the AC charging loss the home cost carries, and the station’s own conversion is not billed. Battery-side: the label’s efficiency with the charging loss taken back out (the certification’s own where it measured one, else Green NCAP’s, else the fleet median), or range ÷ battery without a label. Every figure is marked est., since the session loss is an assumed average; the mark links to the page that explains it. Priced on EPA efficiency, so a highway trip, which uses more per mile, costs somewhat more.' },
     { key: 'calc.weightPerHp', label: 'Weight per hp', unit: 'lb/hp', metric: ['kg/kW', LBS_TO_KG / HP_TO_KW],
       better: 'lower', digits: 1,
       // The cells are kg/kW in metric, so the name follows the unit.
@@ -847,8 +848,12 @@ function vehicleRow(vehicle, index, vehicles, calcContext, { performance = null,
         const mpge = vehicle.epaRange?.combinedMpge ?? null;
         values['figures.epaEfficiency'] = mpge ? mpge / MPG_E_CONVERSION : null;
         notes['figures.epaEfficiency'] = mpge ? `${Math.round(mpge)} MPGe` : null;
-        const chargerEff = vehicle.epaRange?.chargerEfficiency;
-        values['figures.chargerEfficiency'] = chargerEff > 0 ? chargerEff * 100 : null;
+        const chargerEff = vehicle.chargerEfficiency;
+        values['figures.chargerEfficiency'] = chargerEff?.value > 0 ? chargerEff.value * 100 : null;
+        // Without one, the cell stays blank and the note says what the
+        // calculations use instead, so the assumed figure never sorts as data.
+        notes['figures.chargerEfficiency'] = CHARGER_EFF_BASIS[chargerEff?.basis]?.label
+            ?? `${Math.round(ASSUMED_CHARGER_EFF * 1000) / 10}% assumed`;
 
         const whenNewTrace = trace && traceGroup(trace, columns, ['tested.when_new_range_mi', 'tested.capacity_retention'], 'When-new range and capacity retention');
         const whenNew = whenNewRange(vehicle, whenNewTrace);
@@ -957,7 +962,7 @@ function vehicleRow(vehicle, index, vehicles, calcContext, { performance = null,
             chargeSummary: charge.summary,
             addSummary: addTested.run?.charge_summary ?? null,
             specMin: num(specs?.charging?.charge_time_10_to_80_pct_min),
-            chargerEff: num(vehicle.epaRange?.chargerEfficiency),
+            chargerEff: num(vehicle.chargerEfficiency?.value),
         };
         for (const col of CALCULATED_COLUMNS) {
             const inputs = col.inputs.map(k => num(values[k]));

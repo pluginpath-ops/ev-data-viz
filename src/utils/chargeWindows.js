@@ -41,8 +41,8 @@
  *
  * Pure module: no data access, no React.
  */
-import { isUnlisted, isExcluded } from './runListing';
-import { isInheritedRunId, isCompositeRun, nativeComposite } from './runUtils';
+import { isUnlisted, isExcluded } from './runListing.js';
+import { isInheritedRunId, isCompositeRun, nativeComposite } from './runUtils.js';
 
 /**
  * Bump when the calculation changes; stale summaries are then recomputed.

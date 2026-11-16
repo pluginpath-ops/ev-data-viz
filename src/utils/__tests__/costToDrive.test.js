@@ -302,7 +302,7 @@ describe('a vehicle record', () => {
     });
 
     it("starts from the car's own EPA figure where it has one", () => {
-        const own = { ...vehicle, epaRange: { ...vehicle.epaRange, chargerEfficiency: 0.91 } };
+        const own = { ...vehicle, chargerEfficiency: { value: 0.91, basis: 'epa' } };
         const full = costToDriveVehicle(own, settings({ level: 5 })).home;
         expect(full.eff).toBe(0.91);
         expect(full.effRef).toBe(0.91);
@@ -311,6 +311,9 @@ describe('a vehicle record', () => {
         const site = costToDriveVehicle(vehicle, settings({ level: 5 })).home;
         expect(site.effRef).toBe(ASSUMED_CHARGER_EFF);
         expect(site.effFrom).toBe('assumed');
+        const gn = costToDriveVehicle({ ...vehicle, chargerEfficiency: { value: 0.8745, basis: 'green-ncap' } }, settings({ level: 5 })).home;
+        expect(gn.effRef).toBe(0.8745);
+        expect(gn.effFrom).toBe('green-ncap');
     });
 
     it('no home charging keeps the full-power figure and buys nothing at home', () => {

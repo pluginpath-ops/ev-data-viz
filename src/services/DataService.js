@@ -432,7 +432,11 @@ class DataService {
     //
     // epa_vehicle_mappings is a wildcard for the same reason: `is_primary`
     // arrives with migration 067, and naming it would blank the site until then.
-    const base = '*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*)';
+    //
+    // green_ncap_assessments (migration 100) is named, columns and all: every
+    // database the app reads has it, and its `published` jsonb is not needed
+    // at startup. Only the charger efficiency fallback reads it so far.
+    const base = '*, runs(*, data_points(count)), vehicle_tags(tags(id, name)), vehicle_performance(*), manufacturers(id,name,country), spec_links!spec_links_target_vehicle_id_fkey(*), green_ncap_assessments(id, slug, test_year, grid_to_battery, page_url)';
     const query = (select) => getSupabase()
       .from('vehicles')
       .select(select)
@@ -479,6 +483,7 @@ class DataService {
           // the vehicle's year, with that year's Guide figures (#374).
           epaTestVehicle:  viewForVehicle(v.year, m.epa_test_vehicles),
         })),
+        green_ncap: v.green_ncap_assessments || [],
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
         runs:  (v.runs || []).map(shapeRun),
       };

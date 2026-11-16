@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGreenNcapImportSql, bab130RangeTest, lit } from '../greenNcapImportSql';
+import { buildGreenNcapImportSql, bab130RangeTest, fastChargeTest, lit } from '../greenNcapImportSql';
 
 const EV9 = {
     source: { slug: 'kia-ev9-gt-line-2025-0229', url: 'https://www.greenncap.com/assessments/kia-ev9-gt-line-2025-0229/' },
@@ -11,8 +11,12 @@ const EV9 = {
         { key: 'bab130', label: 'BAB130 Motorway', group: 'lab', rated: true, tempC: 23, fromGridKwh100km: 35.13, fromBatteryKwh100km: 30.72, rangeKm: 310.5 },
         { key: 'on_road', label: 'On-Road Drive', group: 'road', rated: true, tempC: null, fromGridKwh100km: 21.72, fromBatteryKwh100km: 19, rangeKm: 502.1 },
     ],
+    fastCharging: { points: [
+        { timeS: 0, soc: 7, powerKw: 0 }, { timeS: 4, soc: 7, powerKw: 180.5 },
+        ...Array.from({ length: 300 }, (_, i) => ({ timeS: 8 + i * 4, soc: 8 + Math.floor(i / 4), powerKw: 200 })),
+    ] },
 };
-const OLD = { ...EV9, source: { slug: 'vw-id3-2021-0060' }, layout: '2020', battery: { netBatteryKwh: null }, identity: { make: 'Volkswagen', model: 'ID.3' } };
+const OLD = { ...EV9, fastCharging: undefined, source: { slug: 'vw-id3-2021-0060' }, layout: '2020', battery: { netBatteryKwh: null }, identity: { make: 'Volkswagen', model: 'ID.3' } };
 
 describe('lit', () => {
     it('quotes text, leaves numbers, writes NULL and jsonb', () => {
@@ -21,6 +25,7 @@ describe('lit', () => {
         expect(lit(null)).toBe('NULL');
         expect(lit(NaN)).toBe('NULL');
         expect(lit({ a: 1 })).toBe(`'{"a":1}'::jsonb`);
+        expect(lit(['soc', 'time'])).toBe("ARRAY['soc', 'time']");
     });
 });
 
@@ -33,11 +38,25 @@ describe('bab130RangeTest', () => {
     });
 });
 
+describe('fastChargeTest', () => {
+    it('keeps every point, time in minutes, and summarizes it as addRun would', () => {
+        const t = fastChargeTest(EV9);
+        expect(t.points).toHaveLength(302);
+        expect(t.points[1]).toEqual({ time: 0.067, soc: 7, chargeRate: 180.5 });
+        expect(t.figures).toMatchObject({ start_soc: 7, end_soc: 82, populated_fields: ['soc', 'chargeRate', 'time'] });
+        expect(t.figures.charge_summary.peakKw).toBe(200);
+        expect(t.figures.charge_summary.windows[10].kw).toBe(200);
+    });
+    it('is null without a curve', () => {
+        expect(fastChargeTest(OLD)).toBe(null);
+    });
+});
+
 describe('buildGreenNcapImportSql', () => {
     const { sql, counts } = buildGreenNcapImportSql([OLD, EV9], new Map([[EV9.source.slug, 27], [OLD.source.slug, 999]]));
 
     it('counts what it writes', () => {
-        expect(counts).toEqual({ assessments: 2, linked: 2, rangeTests: 1 });
+        expect(counts).toEqual({ assessments: 2, linked: 2, rangeTests: 1, chargingTests: 1 });
     });
 
     it('is one transaction that seeds the source once', () => {
@@ -61,6 +80,17 @@ describe('buildGreenNcapImportSql', () => {
         const run = sql.slice(sql.indexOf('INSERT INTO public.runs'));
         expect(run).toMatch(/ON CONFLICT \(green_ncap_assessment_id, kind\) WHERE green_ncap_assessment_id IS NOT NULL/);
         expect(run).not.toMatch(/is_hidden|is_excluded|is_default/);
+    });
+
+    it('upserts the charging test, then replaces its points', () => {
+        const run = sql.slice(sql.indexOf("'Green NCAP DC fast charge'") - 400);
+        expect(run).toMatch(/ON CONFLICT \(green_ncap_assessment_id, kind\)/);
+        expect(sql).toContain("DELETE FROM public.data_points WHERE run_id = (SELECT id FROM public.runs WHERE kind = 'charging' AND green_ncap_assessment_id = (SELECT id FROM public.green_ncap_assessments WHERE slug = 'kia-ev9-gt-line-2025-0229'));");
+        expect(sql).toContain('(1, 7, 180.5, 0.067)');
+    });
+
+    it('deletes any charging test a car can no longer have', () => {
+        expect(sql).toContain("DELETE FROM public.runs WHERE kind = 'charging' AND green_ncap_assessment_id = (SELECT id FROM public.green_ncap_assessments WHERE slug = 'vw-id3-2021-0060');");
     });
 
     it('deletes any range test a car can no longer have', () => {

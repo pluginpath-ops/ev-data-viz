@@ -41,7 +41,7 @@ async function main() {
     const { sql, counts } = buildGreenNcapImportSql(cars, vehicleFor);
     const out = join(DIR, 'import.sql');
     await writeFile(out, sql);
-    console.log(`${counts.assessments} assessments, ${counts.linked} linked, ${counts.rangeTests} BAB130 range tests. Wrote ${out}`);
+    console.log(`${counts.assessments} assessments, ${counts.linked} linked, ${counts.rangeTests} BAB130 range tests, ${counts.chargingTests} fast-charging tests. Wrote ${out}`);
 }
 
 main().catch(e => { console.error(e.message ?? e); process.exit(1); });
