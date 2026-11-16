@@ -57,7 +57,7 @@ import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE, withAlpha } from '../utils/colorUtils';
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
-import { compositeConditions, compositeExplainer, compositeFrom, earliestStart, clockedStart, spreadAlong, THIN_SUPPORT, COMPOSITE_MIN_TESTS } from '../utils/compositeCurve';
+import { compositeConditions, compositeExplainer, compositeFrom, earliestStart, clockedStart, spreadAlong, THIN_SUPPORT } from '../utils/compositeCurve';
 import { statisticalRuns } from '../utils/runListing';
 import { reportedRangeRun } from '../utils/testedRange';
 import { countParts } from '../utils/plotCaption';
@@ -445,11 +445,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // test that began above the start joins it partway up. Whenever the chart
     // measures FROM a SoC — race mode, or any "… Added" axis — each selected
     // composite is rebuilt from its own tests cut at a start SoC
-    // (compositeCurve.compositeFrom). The owner's rule: added is computed back
-    // as far as the chart or the data allows. In race mode the chart sets it —
-    // the race threshold. Outside race mode nothing is common anyway, so each
-    // composite starts as far back as its tests allow (earliestStart), the
-    // way a test outside race mode keeps its own start.
+    // (compositeCurve.compositeFrom). Every curve starts at ONE start SoC
+    // (raceThreshold): race mode's, and on any "… Added" axis too (owner,
+    // 2026-11-14). Each curve from its own lowest point made zero mean a
+    // different SoC per car — 12% for the R2, 2% for the iX3 — so the axis
+    // compared nothing. Tests are cut at the start the same way (alignSeries).
     //
     // The tests' points are fetched once per stored version of the composite;
     // until they arrive, or if they cannot be read, the stored curve stands in.
@@ -460,7 +460,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const spreadOnAdded = ADDED_AXES.has(chartConfig.yAxis) && (raceActive || ADDED_SPREAD_X.has(chartConfig.xAxis));
     const spreadAvailable = SPREAD_AXES.has(chartConfig.yAxis) || spreadOnAdded;
     const spreadShown = spreadOnAdded ? (chartConfig.addedSpread ?? false) : (chartConfig.compositeSpread ?? true);
-    const compositesFromStart = raceActive || plotsAdded;
+    const measuresFromStart = raceActive || plotsAdded;
     const [compositeMembers, setCompositeMembers] = useState({});
     /** Composite id → the typical width of its test spread with every test
      *  counted (from its fullStart), measured by the chart effect, which alone
@@ -468,7 +468,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const [spreadEstimates, setSpreadEstimates] = useState({});
     const membersKey = (run) => `${run.id}:${run.composite?.version ?? ''}:${run.composite?.fingerprint ?? ''}`;
     useEffect(() => {
-        if (!compositesFromStart || !dataService.useSupabase) return;
+        if (!measuresFromStart || !dataService.useSupabase) return;
         const missing = selectedComposites.filter(({ run }) => !(membersKey(run) in compositeMembers));
         if (!missing.length) return;
         (async () => {
@@ -488,7 +488,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             }
             setCompositeMembers(prev => ({ ...prev, ...updates }));
         })();
-    }, [compositesFromStart, selectedComposites]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [measuresFromStart, selectedComposites]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // The lowest SoC every selected run actually reaches. A fixed default —
     // 10% for a long time here — silently drops every run that started above
@@ -501,7 +501,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         let compositesReach = null;
         for (const id of selectedRuns || []) {
             const composite = selectedComposites.find(c => c.run.id === id)?.run;
-            const members = composite && compositesFromStart ? compositeMembers[membersKey(composite)] : null;
+            const members = composite && measuresFromStart ? compositeMembers[membersKey(composite)] : null;
             if (members) {
                 const from = earliestStart(members);
                 if (from != null && (compositesReach == null || from > compositesReach)) compositesReach = from;
@@ -511,7 +511,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         }
         const common = minimumCommonSoc(series);
         return compositesReach == null ? common : Math.max(common ?? compositesReach, compositesReach);
-    }, [selectedRuns, runDataCache, selectedComposites, compositesFromStart, compositeMembers]);
+    }, [selectedRuns, runDataCache, selectedComposites, measuresFromStart, compositeMembers]);
 
     // An explicit choice wins; otherwise follow the data as the selection changes.
     const raceThreshold = chartConfig.raceThreshold ?? commonSoc ?? 10;
@@ -519,11 +519,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     /** Composite id → its live build; null when too few of its tests reach the start. */
     const liveComposites = useMemo(() => {
         const out = {};
-        if (!compositesFromStart) return out;
+        if (!measuresFromStart) return out;
         for (const { run } of selectedComposites) {
             const members = compositeMembers[membersKey(run)];
             if (!members) continue;
-            const built = compositeFrom(members, raceActive ? raceThreshold : null);
+            const built = compositeFrom(members, raceThreshold);
             // Range from the vehicle's range source where one won, as the
             // stored curve has it (rangeAtFor); the tests' own readings otherwise.
             const sourced = new Map((runDataCache[run.id] || [])
@@ -534,7 +534,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             out[run.id] = built;
         }
         return out;
-    }, [compositesFromStart, selectedComposites, compositeMembers, raceActive, raceThreshold, runDataCache]);
+    }, [measuresFromStart, selectedComposites, compositeMembers, raceThreshold, runDataCache]);
 
     // A live composite built from tests that have no clock cannot be drawn
     // against time: it has points and no minutes. Said, with the lowest start
@@ -557,7 +557,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // limit this is a defensible short projection; past it, it is a guess
     // wearing a measurement's clothes and the chart says so.
     const stretchedRuns = useMemo(() => {
-        if (!raceActive) return [];
+        if (!measuresFromStart) return [];
         const out = [];
         for (const vehicle of selectedVehicles) {
             for (const run of vehicle.runs || []) {
@@ -568,10 +568,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             }
         }
         return out;
-    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache, liveComposites]);
+    }, [measuresFromStart, raceThreshold, selectedVehicles, selectedRuns, runDataCache, liveComposites]);
 
     const trimmedRuns = useMemo(() => {
-        if (!raceActive) return [];
+        if (!measuresFromStart) return [];
         const out = [];
         for (const vehicle of selectedVehicles) {
             for (const run of vehicle.runs || []) {
@@ -582,10 +582,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             }
         }
         return out;
-    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache, liveComposites]);
+    }, [measuresFromStart, raceThreshold, selectedVehicles, selectedRuns, runDataCache, liveComposites]);
 
     const excludedRuns = useMemo(() => {
-        if (!raceActive) return [];
+        if (!measuresFromStart) return [];
         const out = [];
         for (const vehicle of selectedVehicles) {
             for (const run of vehicle.runs || []) {
@@ -596,14 +596,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             }
         }
         return out;
-    }, [raceActive, raceThreshold, selectedVehicles, selectedRuns, runDataCache, liveComposites]);
+    }, [measuresFromStart, raceThreshold, selectedVehicles, selectedRuns, runDataCache, liveComposites]);
 
     /**
-     * Returns null if the run can participate in race mode, or a short reason
-     * string if it must be excluded.  Only meaningful when raceActive is true.
+     * Returns null if the run can be drawn from the start SoC, or a short reason
+     * string if it must be left out.  Only meaningful when measuresFromStart.
      */
     const getRaceExclusionReason = (runId) => {
-        if (!raceActive) return null;
+        if (!measuresFromStart) return null;
         return alignmentExclusion(runDataCache[runId], raceThreshold);
     };
 
@@ -624,8 +624,16 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
      * vehicleRange (EPA rated miles) is used to compute on-the-fly EPA range fields.
      */
     const augmentDeltas = (data, vehicleRange) => {
-        const baseRange    = data.find(p => p.range != null)?.range ?? null;
         const baseSoc      = data.find(p => p.soc   != null)?.soc   ?? null;
+        // A start projected below a test's data has a SoC and no range
+        // (socAlignment.backProject). Its range is read back along the test's
+        // own miles per % — otherwise "added" would start at the first logged
+        // range, at a higher SoC than the start the chart claims.
+        const firstRange   = data.find(p => p.range != null);
+        const baseRange    = firstRange == null ? null
+            : firstRange.soc != null && baseSoc != null && firstRange.soc > 0 && firstRange.soc !== baseSoc
+                ? firstRange.range * baseSoc / firstRange.soc
+                : firstRange.range;
         const baseEpaRange = baseSoc != null && vehicleRange
             ? Math.round((baseSoc / 100) * vehicleRange * 10) / 10
             : null;
@@ -717,11 +725,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             const rangeK = rangeFactorFor(run.id);
             const color = colorMap[run.id] || DEFAULT_RUN_COLOR;
 
-            // 1. Apply race-mode trim (slice from anchor; exclude if ineligible)
+            // 1. Cut at the start SoC (slice from anchor; exclude if ineligible)
             let workingData = rawData;
             let timeOffset  = 0;
             // A live composite already starts at the threshold, at minute zero.
-            if (raceActive && !live) {
+            if (measuresFromStart && !live) {
                 // Interpolates the threshold crossing rather than snapping to
                 // the next sample, so every curve is at the same SoC at t = 0
                 // even when a run is coarsely sampled — see alignSeries.
@@ -1020,10 +1028,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const plotTitle = useMemo(() => {
         const y = axisOptions.find(a => a.value === chartConfig.yAxis)?.label || chartConfig.yAxis;
         const x = axisOptions.find(a => a.value === chartConfig.xAxis)?.label || chartConfig.xAxis;
-        return raceActive
-            ? `${stripUnits(y)} from ${raceThreshold}% SoC`
-            : `${stripUnits(y)} vs ${stripUnits(x)}`;
-    }, [chartConfig.xAxis, chartConfig.yAxis, raceActive, raceThreshold, axisOptions]);
+        if (raceActive) return `${stripUnits(y)} from ${raceThreshold}% SoC`;
+        return `${stripUnits(y)} vs ${stripUnits(x)}`
+            // Set off by a dot: run on, "from" read as part of the X name.
+            + (measuresFromStart ? ` · from ${raceThreshold}% SoC` : '');
+    }, [chartConfig.xAxis, chartConfig.yAxis, raceActive, measuresFromStart, raceThreshold, axisOptions]);
 
     // Everything a reader needs to know what the plot was drawn under. It lives
     // in the frame, so it lives in the export — which is the whole argument for
@@ -1132,18 +1141,24 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 {/* Alignment is a property of the time axis, so it belongs with
                     the axis selectors rather than in a panel below the chart
                     that had to be found and switched on. It sits under them and
-                    indented: it modifies X, it is not a fourth axis. */}
-                {isTimeAxis && (
-                    <div className={`race-mode${chartConfig.alignRaw ? '' : ' is-on'}`}>
-                        <label className="race-mode-switch" title="Shift every run so the chosen SoC lands at t = 0, making the curves comparable. Off, each run starts at its own zero.">
-                            <input
-                                type="checkbox"
-                                checked={!chartConfig.alignRaw}
-                                onChange={e => setChartConfig({ ...chartConfig, alignRaw: !e.target.checked })}
-                            />
-                            <span className="race-mode-track" aria-hidden="true" />
-                            <span className="race-mode-label">Race mode</span>
-                        </label>
+                    indented: it modifies X, it is not a fourth axis. An "… Added"
+                    axis always measures from the start, so it shows the start
+                    alone — no switch, as there is nothing to turn off. */}
+                {(isTimeAxis || plotsAdded) && (
+                    <div className={`race-mode${measuresFromStart ? ' is-on' : ''}`}>
+                        {isTimeAxis ? (
+                            <label className="race-mode-switch" title="Shift every run so the chosen SoC lands at t = 0, making the curves comparable. Off, each run starts at its own zero.">
+                                <input
+                                    type="checkbox"
+                                    checked={!chartConfig.alignRaw}
+                                    onChange={e => setChartConfig({ ...chartConfig, alignRaw: !e.target.checked })}
+                                />
+                                <span className="race-mode-track" aria-hidden="true" />
+                                <span className="race-mode-label">Race mode</span>
+                            </label>
+                        ) : (
+                            <span className="race-mode-label">Added from</span>
+                        )}
                         <span className="race-mode-start">
                             {/* Cleared, it follows the data again (commonSoc). */}
                             <NumberInput
@@ -1152,11 +1167,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 value={chartConfig.raceThreshold ?? commonSoc}
                                 placeholder={commonSoc != null ? String(commonSoc) : '10'}
                                 onChange={v => setChartConfig({ ...chartConfig, raceThreshold: v })}
-                                disabled={chartConfig.alignRaw}
+                                disabled={!measuresFromStart}
                                 className="form-input soc-input"
                                 title={commonSoc != null && chartConfig.raceThreshold == null
                                     ? `Lowest SoC every selected run reaches (${commonSoc}%) — no run is dropped at this value.`
-                                    : 'The SoC every run is shifted to line up on'}
+                                    : 'The SoC every curve starts from'}
                             />
                             {/* "% start" rather than "Align start at: … % SoC".
                                 The switch beside it already says what is being
@@ -1277,7 +1292,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                         return (
                             <>
                                 {exclusionReason && (
-                                    <span className="badge-status is-warning" title={`Hidden in race mode: ${exclusionReason}`}>
+                                    <span className="badge-status is-warning" title={`Left out at the start SoC: ${exclusionReason}`}>
                                         ⚠ excluded
                                     </span>
                                 )}
@@ -1303,7 +1318,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 The selector carries a badge, but that only helps someone who
                 opens the selector — and a screenshot shows neither. A chart
                 silently missing a car is the failure worth designing against. */}
-            {raceActive && (excludedRuns.length > 0 || stretchedRuns.length > 0) && (
+            {measuresFromStart && (excludedRuns.length > 0 || stretchedRuns.length > 0) && (
                 <div className="roadtrip-warning mb-3">
                     {excludedRuns.map(({ name, reason }) => (
                         <p key={name}>⚠ {name}: not aligned — {reason}</p>
@@ -1315,12 +1330,12 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     ))}
                     {excludedRuns.length > 0 && (
                         <p className="text-xs mt-1">
-                            Lower “Align start at” to include them, or switch to raw test time.
+                            Lower the start to include them{raceActive ? ', or switch to raw test time' : ''}.
                         </p>
                     )}
                     {stretchedRuns.length > 0 && (
                         <p className="text-xs mt-1">
-                            Raise “Align start at” to stay inside the measured data.
+                            Raise the start to stay inside the measured data.
                         </p>
                     )}
                 </div>
@@ -1331,18 +1346,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 is drawn from that test alone, dotted),
                 and a test that begins above it is left out of the mean. Named
                 for the same reason as the runs above — a screenshot shows
-                neither the selector nor the ⓘ. Outside race mode each
-                composite has its own start, so every one is said. */}
+                neither the selector nor the ⓘ. */}
             {selectedComposites.some(({ run }) => liveComposites[run.id] === null) && (
                 <div className="roadtrip-warning mb-3">
                     {selectedComposites.filter(({ run }) => liveComposites[run.id] === null).map(({ run }) => (
                         <p key={run.id}>
-                            ⚠ {run.name}: {raceActive
-                                ? `none of its tests reach ${raceThreshold}%`
-                                : `fewer than ${COMPOSITE_MIN_TESTS} of its tests can be read`} — not drawn
+                            ⚠ {run.name}: none of its tests reach {raceThreshold}% — not drawn
                         </p>
                     ))}
-                    {raceActive && <p className="text-xs mt-1">Lower the start to include it.</p>}
+                    <p className="text-xs mt-1">Lower the start to include it.</p>
                 </div>
             )}
             {noClockComposites.length > 0 && (
@@ -1362,7 +1374,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 const yUnit = (axisOptions.find(o => o.value === chartConfig.yAxis)?.label ?? '').match(/\(([^)]*)\)\s*$/)?.[1] ?? '';
                 const said = selectedComposites
                     .map(({ run }) => ({ run, live: liveComposites[run.id] }))
-                    .filter(({ live }) => live && (!raceActive || live.left.length > 0));
+                    .filter(({ live }) => live && live.left.length > 0);
                 if (!said.length) return null;
                 return (
                     <p className="text-xs text-meta mb-2">
@@ -1388,7 +1400,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             {/* Points held back from the plot, said plainly. A chart quietly
                 missing its first samples is the same failure as one quietly
                 missing a car. */}
-            {raceActive && trimmedRuns.length > 0 && (
+            {measuresFromStart && trimmedRuns.length > 0 && (
                 <p className="text-xs text-meta mb-2"
                    title="A session opens with the charger and the BMS negotiating power upward, below what the car can take. Those samples describe the plug rather than the car, and they only appear in runs whose logging started at plug-in — so comparing with them in place penalizes exactly those runs.">
                     Opening charge ramp excluded from{' '}
@@ -1450,6 +1462,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                   ? ' — the lowest SoC every selected run reaches.'
                                   : '.')
                             : 'Raw logger time: each run starts at zero whatever SoC it began at, so the curves are not directly comparable.'}
+                    </p>
+                )}
+                {!isTimeAxis && plotsAdded && (
+                    <p className="mt-2 text-xs status-text is-info">
+                        {`Added is measured from ${raceThreshold}% SoC on every curve`
+                          + (chartConfig.raceThreshold == null && commonSoc != null
+                              ? ' — the lowest SoC every selected run reaches.'
+                              : '.')}
                     </p>
                 )}
             </div>}

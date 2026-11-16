@@ -647,9 +647,10 @@ export function fullStart(tests) {
  * tests that do not reach the start are left out and NAMED, and the rest are
  * averaged exactly as the stored composite is (buildComposite).
  *
- * With no start given, it is measured from as far back as its tests allow
- * (earliestStart) — the owner's rule: added is always computed back as far
- * as the data, or the chart's common start, allows.
+ * The chart always passes its one start SoC (owner, 2026-11-14): a curve
+ * measured from its own lowest point made "added" mean a different SoC per
+ * car. The chart's default start is the lowest every selected curve reaches,
+ * which for a composite is earliestStart.
  *
  * A start that only ONE test reaches still draws, from that test alone (owner,
  * 2026-10-26). The two-test floor decides whether a car HAS a composite; this
@@ -663,20 +664,18 @@ export function fullStart(tests) {
  * for the stored composite.
  *
  * @param {Array<{run: Object, points: Array}>} tests  the composite's members
- * @param {number} [startSoc]  omitted or null → earliestStart(tests)
+ * @param {number} startSoc
  * `of` is how many of its tests could count from anywhere, and `fullStart`
  * the start from which all of them do — what a chart needs to say "2 of 4
  * tests; start at 15% to use all 4".
  *
  * @returns {{points: Array, tests: Array, left: Array<{runId, name}>, start: number,
  *   of: number, fullStart: number|null} | null}
- *   null when no test reaches the start (or, with no start given, fewer than
- *   COMPOSITE_MIN_TESTS tests have begun counting at all)
+ *   null when no test reaches the start
  */
-export function compositeFrom(tests, startSoc = null) {
-    const wanted = startSoc ?? earliestStart(tests);
-    if (wanted == null) return null;
-    const start = Math.ceil(Number(wanted));
+export function compositeFrom(tests, startSoc) {
+    if (startSoc == null) return null;
+    const start = Math.ceil(Number(startSoc));
     if (!Number.isFinite(start)) return null;
     const reaching = [], left = [];
     for (const t of tests ?? []) {

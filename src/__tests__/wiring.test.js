@@ -953,8 +953,9 @@ describe('the seams that broke before', () => {
 
     it('measures a composite from the start SoC, built live from its tests (#408)', () => {
         const view = read('src/components/ChargingView.jsx');
-        expect(view, 'an "… Added" axis measures composites from the start').toMatch(/const compositesFromStart = raceActive \|\| plotsAdded/);
-        expect(view, 'built from the tests that reach it').toMatch(/compositeFrom\(members, raceActive \? raceThreshold : null\)/);
+        expect(view, 'an "… Added" axis measures from the start').toMatch(/const measuresFromStart = raceActive \|\| plotsAdded/);
+        expect(view, 'every curve from the one start SoC (owner, 2026-11-14)').toMatch(/compositeFrom\(members, raceThreshold\)/);
+        expect(view, 'tests are cut at the same start').toMatch(/if \(measuresFromStart && !live\)/);
         expect(view, 'a viewer builds from the same tests as a curator').toMatch(/statisticalRuns\(vehicle\)/);
         expect(view, 'the plot draws the live build').toMatch(/live\?\.points \?\? runDataCache\[run\.id\]/);
         expect(view, 'its start, and what it left out, are named').toMatch(/measured from \$\{live\.start\}%/);

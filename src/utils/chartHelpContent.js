@@ -62,15 +62,15 @@ export const CHART_HELP_DEFAULTS = {
             'C-rate — charge power ÷ battery size (kW ÷ kWh); ~1C ≈ adding a full pack in an hour, regardless of car size.\n' +
             'Range Rate — miles of range gained per minute (or per hour).\n' +
             'SoC Rate — percent of the battery added per minute.\n' +
-            'Range Added — change since the start of the plotted window. A composite curve is rebuilt from the tests that reach its start — race mode’s start SoC, or otherwise as far back as two of its tests reach. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
-            'Range – EPA vs Range – Tested — EPA-rated range projected from SoC, vs the range actually logged in the test.',
+            'Range Added — change since one start SoC shared by every curve (by default the lowest SoC every selected curve reaches; set it beside the axes). A test that began above the start is projected back to it; a composite curve is rebuilt from the tests that reach it, and the rest are named. Its test spread there is built from those tests as drawn, and starts off: it is rougher than the charge-rate spread.\n' +
+            'EPA Range vs Tested Range — EPA-rated range projected from SoC, vs the range actually logged in the test.',
         math_approach:
             'Mostly the raw measured points drawn as-is — no smoothing or curve-fitting. ' +
             'The computed fields are simple arithmetic: C-rate = charge kW ÷ battery kWh; ' +
             'range rate = (rated miles ÷ battery kWh) × charge kW ÷ 60 per minute, or without ' +
             'the ÷ 60 per hour; SoC rate = charge kW ÷ battery kWh × 100 ÷ 60; EPA range = ' +
-            '(SoC ÷ 100) × the car’s rated miles; the “added” fields subtract the first ' +
-            'reading in view. The optional range backfill matches each SoC to the range ' +
+            '(SoC ÷ 100) × the car’s rated miles; the “added” fields subtract the reading ' +
+            'at the start SoC. The optional range backfill matches each SoC to the range ' +
             'from the vehicle’s range test by linear interpolation.',
     },
 

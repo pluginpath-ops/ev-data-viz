@@ -26,10 +26,10 @@ export function chargingAxisOptions(units) {
         { group: 'Charging speed', value: 'socRate',      name: 'SoC/min',     unit: '',        label: 'SoC Rate (%/min)' },
         { group: 'Charging speed', value: 'cRate',        name: 'C-rate',      unit: '',        label: 'C-Rate (~kW ÷ battery)' },
         { group: 'Range',          value: 'soc',          name: 'SoC',         unit: '%',       label: 'State of Charge (%)' },
-        { group: 'Range',          value: 'range',        name: 'Tested',      unit: dl,        label: `Range - Tested (${dl})` },
-        { group: 'Range',          value: 'rangeEpa',     name: 'EPA',         unit: dl,        label: `Range - EPA (${dl})` },
-        { group: 'Range added',    value: 'deltaRange',   name: 'Tested',      unit: dl,        label: `Range Added - Tested (${dl})` },
-        { group: 'Range added',    value: 'deltaRangeEpa', name: 'EPA',        unit: dl,        label: `Range Added - EPA (${dl})` },
+        { group: 'Range',          value: 'range',        name: 'Tested',      unit: dl,        label: `Tested Range (${dl})` },
+        { group: 'Range',          value: 'rangeEpa',     name: 'EPA',         unit: dl,        label: `EPA Range (${dl})` },
+        { group: 'Range added',    value: 'deltaRange',   name: 'Tested',      unit: dl,        label: `Tested Range Added (${dl})` },
+        { group: 'Range added',    value: 'deltaRangeEpa', name: 'EPA',        unit: dl,        label: `EPA Range Added (${dl})` },
     ];
 }
 
