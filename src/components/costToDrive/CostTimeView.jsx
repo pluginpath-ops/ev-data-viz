@@ -1,5 +1,5 @@
 /**
- * Compare — the selected vehicles against the reader's gas car (mode
+ * Monthly Cost & Time (was Compare until 2026-11-16) — the selected vehicles against the reader's gas car (mode
  * `drivecost`, docs/cost-to-drive-plan.md).
  *
  * A card per car with the two answers (what it saves a month, the time it costs
@@ -139,7 +139,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
     const redraw = `${signature}|${shown.map(p => p.color).join(',')}|${isDark}`;
 
     // Cost per month: home charging (the full color) under fast charging
-    // (the full color striped over its desaturated shade) per car, the gas car beside. Home Charger draws its columns the same way.
+    // (the full color striped over its desaturated shade) per car, the gas car beside. Charging Speeds draws its columns the same way.
     const costTotals = [...shown.map(p => p.comparison.monthly.ev), gas ? perMonth(gas.cost) : null];
     useBarChart(costRef, costChart, () => {
         if (!shown.length) return null;

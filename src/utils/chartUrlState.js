@@ -69,7 +69,7 @@ export { DEFAULT_RANGE_CHART_TYPE, DEFAULT_EFFICIENCY_UNIT, DEFAULT_COMPARE_ORIE
 /** Road Trip X axes that are sweeps: Trip Optimizer's charts since it got its own tab. */
 const ROAD_TRIP_SWEEPS = ['speed', 'tripDist'];
 
-/** Home Charger's charts: the cost per month, or the minutes of fast charging. */
+/** Charging Speeds' charts: the cost per month, or the minutes of fast charging. */
 export const HOME_CHARGER_CHARTS = ['cost', 'time'];
 export const DEFAULT_HOME_CHARGER_CHART = 'cost';
 
@@ -380,7 +380,7 @@ export function buildChartParams({
         if (chartConfig.effUnit && chartConfig.effUnit !== DEFAULT_EFFICIENCY_UNIT) p.set('eff', chartConfig.effUnit);
     }
 
-    // Home Charger's chart: the minutes view only; absent is the cost chart.
+    // Charging Speeds' chart: the minutes view only; absent is the cost chart.
     if (chartMode === 'drivecharger' && chartConfig.homeChargerChart === 'time') p.set('hc', 'time');
 
     // Charge Stop

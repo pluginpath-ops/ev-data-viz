@@ -1,6 +1,6 @@
 /**
  * The home ceiling's mark on a Chart.js plot, for every chart that draws one
- * (Home Charger: the most a month of home charging could cost; the Weekly
+ * (Charging Speeds: the most a month of home charging could cost; the Weekly
  * Charging Plan's day bars: the most a night could add). One look for all:
  * a dashed line across a bar, and a ceiling above the plot pinned to its top
  * edge with an up-arrow.
@@ -19,7 +19,10 @@ const DASH = [4, 3];
  *   a line across x ± half (pixels) at `value` on the y axis
  */
 export function drawCeilingMarks(chart, marks) {
-    const { ctx, chartArea: a, scales: { y } } = chart;
+    const { ctx, scales: { y } } = chart;
+    // The value axis's own top, not the chart area's: a chart with a subplot
+    // stacked under it (Weekly Charging Plan) shares one chart area.
+    const a = { top: y.top };
     const { ink } = chartTheme();
     ctx.save();
     ctx.strokeStyle = ink;
@@ -56,15 +59,19 @@ export function drawCeilingMarks(chart, marks) {
  *
  * @param {Function} Chart  chart.js's Chart
  * @param {{ keep: (item: Object, data: Object) => boolean, text: string|null,
- *           onClick?: Function }} opts   `onClick` is the chart's own (default: Chart.js's, hide a dataset)
+ *           keys?: Array<{ text: string, fillStyle: string|CanvasPattern }>,
+ *           onClick?: Function }} opts   `keys`: further swatches no one dataset stands for (a
+ *           fill every car shares, as Charging Speeds' striped fast charging), before the
+ *           ceiling's key; `onClick` is the chart's own (default: Chart.js's, hide a dataset)
  */
-export function ceilingLegend(Chart, { keep, text, onClick = Chart.defaults.plugins.legend.onClick }) {
+export function ceilingLegend(Chart, { keep, text, keys = [], onClick = Chart.defaults.plugins.legend.onClick }) {
     return {
         generateLabels: (chart) => {
             const { ink, legend } = chartTheme();
             const items = Chart.defaults.plugins.legend.labels.generateLabels(chart)
                 .filter(item => keep(item, chart.data))
-                .map(item => ({ ...item, pointStyle: 'rect' }));
+                .map(item => ({ ...item, pointStyle: 'rect' }))
+                .concat(keys.map(k => ({ ...k, pointStyle: 'rect', lineWidth: 0, strokeStyle: k.fillStyle, fontColor: legend, hidden: false })));
             if (!text) return items;
             return [...items, { text, pointStyle: 'line', lineDash: DASH, lineWidth: 2, strokeStyle: ink, fillStyle: ink, fontColor: legend, hidden: false }];
         },

@@ -1,5 +1,5 @@
 /**
- * Home Charger — each home charger level against each selected vehicle (mode
+ * Charging Speeds — each home charger level against each selected vehicle (mode
  * `drivecharger`, docs/cost-to-drive-plan.md): what the reader's driving costs a month at
  * every level, home and fast charging stacked in one column a car (owner,
  * 2026-11-07), and how many minutes of fast charging it takes, where a bigger charger stops helping ("enough
@@ -21,6 +21,7 @@ import Chart from 'chart.js/auto';
 import { vehicleLabel } from '../../utils/specHelpers';
 import { CHARGER_EFF_BASIS } from '../../utils/vehicleFigures';
 import { fastChargingFill } from '../../utils/stripedFill';
+import { SERIES_NEUTRAL } from '../../utils/colorUtils';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { drawCeilingMarks, ceilingLegend } from '../../utils/ceilingMark';
@@ -43,6 +44,7 @@ import { FIXED_DRAW_W } from '../../constants/epa';
 import { hourText } from './DriveFields';
 import PackWarmingNote from './PackWarmingNote';
 import ExplainerLink from '../../explainers/ExplainerLink';
+import HomeChargerMath from '../calcTrace/HomeChargerMath';
 
 const DASH = '—';
 const kwText = (kw) => `${Math.round(kw * 10) / 10} kW`;
@@ -163,7 +165,7 @@ const homeCeilings = (ceilingOf) => ({
  *    charger", each car's onboard kW in the line's tooltip.
  */
 /**
- * A week's figures as a month's (the week × 52 ÷ 12), the way Compare shows
+ * A week's figures as a month's (the week × 52 ÷ 12), the way Monthly Cost & Time shows
  * them, so the two tabs read in one unit (owner, 2026-11-07). "Enough" is still
  * found on the week's minutes, which is the same answer.
  */
@@ -225,6 +227,8 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
         const ceilingKey = ceilingLegend(Chart, {
             keep: (item, data) => data.datasets[item.datasetIndex].part === (cost ? 'home' : 'fast'),
             text: cost ? 'Most it could cost at home' : null,
+            // One key for every car's striped part, not each car twice (owner, 2026-11-16).
+            keys: cost ? [{ text: 'Fast charging (striped)', fillStyle: fastChargingFill(SERIES_NEUTRAL) }] : [],
             // Hiding a car hides both its bars.
             onClick: (e, item, leg) => {
                 const ch = leg.chart;
@@ -240,7 +244,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                 labels: shown.map(l => levelLabel(l.level)),
                 // Cost: two bars a car, stacked on the car's own stack — home cost
                 // underneath in the full color, fast cost on top striped in it over
-                // its desaturated shade, the Compare cost chart's style. Time: one
+                // its desaturated shade, the Monthly Cost & Time cost chart's style. Time: one
                 // bar a car, the fast charging alone.
                 datasets: cost
                     ? columns.flatMap((c, ci) => ['home', 'fast'].map(part => ({
@@ -412,6 +416,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                         )}
                     </>
                 )}
+                {!presentationMode && columns.length > 0 && <HomeChargerMath vehicles={vehicles} shown={columns} settings={settings} />}
                 {!presentationMode && <ChartInfoBubble chartKey="drivecharger" />}
             </div>
         </div>

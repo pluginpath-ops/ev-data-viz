@@ -12,8 +12,10 @@ import TraceView from './TraceView';
  *   buildTrace {(id) => { trace, summary }}  runs the page's own call with a trace;
  *                        `summary` is the figure the page shows, for checking
  *   initialId  optional first pick
+ *   picks      {node}   optional further choices beside the pick (Charging Speeds' level);
+ *                        `buildTrace` changes with them
  */
-export default function MathPass({ intro, options, buildTrace, initialId = null }) {
+export default function MathPass({ intro, options, buildTrace, initialId = null, picks = null }) {
     const [picked, setPicked] = useState(initialId);
     const id = options.some(o => o.id === picked) ? picked : options[0]?.id;
     const built = useMemo(() => (id != null ? buildTrace(id) : null), [id, buildTrace]);
@@ -21,13 +23,18 @@ export default function MathPass({ intro, options, buildTrace, initialId = null 
     return (
         <div className="calc-trace-body">
             <p className="text-secondary">{intro}</p>
-            {options.length > 1 && (
-                <label className="calc-trace-pick">
-                    <span className="text-micro">Work through</span>
-                    <select className="form-input w-auto" value={id} onChange={e => setPicked(options.find(o => String(o.id) === e.target.value)?.id ?? null)}>
-                        {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                    </select>
-                </label>
+            {(options.length > 1 || picks) && (
+                <div className="flex flex-wrap items-center gap-4">
+                    {options.length > 1 && (
+                        <label className="calc-trace-pick">
+                            <span className="text-micro">Work through</span>
+                            <select className="form-input w-auto" value={id} onChange={e => setPicked(options.find(o => String(o.id) === e.target.value)?.id ?? null)}>
+                                {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                            </select>
+                        </label>
+                    )}
+                    {picks}
+                </div>
             )}
             {built?.summary && <p className="calc-trace-summary">{built.summary}</p>}
             {built && <TraceView trace={built.trace} />}

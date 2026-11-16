@@ -2,7 +2,7 @@
 slug: evbench-charging-energy
 title: How does EVBench calculate charging energy consumption?
 related: [charging-speed-and-energy, dc-fast-charging-loss, epa-battery-figures, heating-cooling-and-range]
-linked_from: [Cost & Time › Home Charger footnote, Your Driving's charging-losses line]
+linked_from: [Cost & Time › Charging Speeds footnote, Your Driving's charging-losses line]
 status: DRAFT
 ---
 
@@ -42,7 +42,13 @@ A charger faster than the car's own makes no difference - time and efficiency is
 
 **Step 2: battery warming below 40 °F** [[fact:evbench-battery-warming]]. EVBench adds energy to each night's charge.
 The amount grows with the usable pack and with how far below 40 °F it is: 4 kWh for a 100 kWh pack at 20 °F. That
-energy also goes through the charger efficiency, as heating is typically on the battery side of the electrical systems. The actual heating rate is a guess, loosely based on several winter charging essions on the owner's R1T, extrapolated to 
+energy also goes through the charger, as heating is typically on the battery side of the electrical systems. It pays only
+the charger's conversion loss, though, not the fixed draw: the pumps and electronics end up as heat in the car, which is
+what warming wants.
+It runs first, at the charger's power, so it uses up part of the night: a home charger can only deliver so much while
+you are plugged in, and on a 120 V outlet in hard cold the warming can take most of it [[fact:evbench-battery-warming]].
+A cold car warms its battery for a fast charge too, so the day's first fast stop pays for the same amount, at the fast
+price. The actual heating rate is a guess, loosely based on several winter charging essions on the owner's R1T, extrapolated to 
 every car. The [heating and cooling explainer](heating-cooling-and-range) covers the driving side.
 
 
@@ -183,7 +189,7 @@ Owner, 2026-11-15: the rule replaced WALL_OUTLET_CHARGER_EFF. Fixed draw ~200 W 
 fit 134–503 W, median 218; best single value 215 W; Sears cars ~120 W; R1T systems 146 W after the charger). Battery
 warming as a pack-size × degrees-below-40 °F term with placeholder values and a per-car factor of 1. The rule is on
 main (PR #580, merged). Owner, 2026-11-16: the page was split in two (this one and charging-speed-and-energy); the
-Home Charger and Your Driving footnotes keep #580's text and link here. Not in the ledger by the owner's choice: the
+Charging Speeds and Your Driving footnotes keep #580's text and link here. Not in the ledger by the owner's choice: the
 owner's own 120 V charge at about 20 °F, which added about 2 kWh in 24 hours, the rest to warming and overhead.
 Owner's reading, 2026-11-15: higher voltage helps the charger at the same power (four cars for, two against); the
 rule still leaves voltage out, and whether to add a 120 V penalty on top of the time cost is open. Owner's
@@ -206,8 +212,9 @@ uses one P₀ for every car, so k = (1 − η_ref) − P₀ / P_ref and
     η(P) = η_ref − P₀ · (1/P − 1/P_ref),   P = min(charger kW, P_ref),   P₀ = 0.20 kW
 
 For the example car, η(1.44) = 0.870 − 0.20 × (0.694 − 0.130) = 0.757 [[fact:evbench-charging-loss-by-rate]].
-Battery warming per charge is E_warm = 0.002 × f_car × E_usable × max(0, 40 − T °F) kWh, bought as E_warm ÷ η(P),
-with f_car = 1 [[fact:evbench-battery-warming]].
+Battery warming per charge is E_warm = 0.002 × f_car × E_usable × max(0, 40 − T °F) kWh, bought as E_warm ÷ η_warm,
+with f_car = 1 and η_warm = η_ref + P₀ / P_ref, the same at any P [[fact:evbench-battery-warming]]. A night buys at most P × h, the hours plugged in; warming comes out of
+that first, and the rest charges the pack: ΔE_pack ≤ (P × h − E_warm ÷ η_warm) × η(P).
 
 Per-car fits through ADAC's socket (2.3 kW) and 11 kW results, both rounds: P₀ from 134 to 503 W, k from 2.3 to
 7.8%; the correlation between a car's 11 kW loss and its P₀ is about 0.19 [[fact:adac-per-car-fixed-draw-fit]].

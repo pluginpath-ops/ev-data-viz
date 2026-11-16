@@ -30,17 +30,17 @@ export default function GasCarFields({ settings, onChange, compact = false, pick
                 {!timeOnly && <DriveNumberField {...props} field="gasPrice" label="Price" unit="$/gal" />}
                 <DriveNumberField {...ownCar} field="gasTank" label="Tank" unit="gal" />
                 <DriveNumberField {...props} field="gasFillAt" label="Fill up at" unit="% left" />
-                <DriveNumberField {...props} field="gasFillMin" label="Each fill-up" unit="min" />
+                <DriveNumberField {...props} field="gasFillMin" label="Time to fill up" unit="min" />
             </div>
             {/* Road Trip says how the car stops in the ⓘ beside "Car", not in a
                 paragraph under the fields (owner, 2026-11-12). Cost & Time's
                 note stays a caption: it is what that card has always had. */}
             {!timeOnly && (
                 <span className="text-note">
-                    {!compact && 'A car fills in its EPA mpg and tank. Change one and it becomes your own, named as you like. '}
-                    It drives the same week as the EVs. A fill-up&rsquo;s minutes are the total time off the route:
-                    pulling off, pumping, paying and pulling back. Cold costs mpg: about 15% city and
-                    7% highway at 20°F, none from 75°F up. Road Trip reads the same car.
+                    {!compact && 'Pick a car, or enter your own; the name is optional. '}
+                    It drives the same week as the EVs, less the charging detours. Time to fill up includes
+                    getting to the station, filling, paying, and getting back to your route or home. Cold costs
+                    mpg: about 15% city and 7% highway at 20°F, none from 75°F up.
                 </span>
             )}
         </>

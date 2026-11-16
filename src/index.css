@@ -10243,9 +10243,9 @@ a.is-test-link:focus-visible {
    figure. The fast-charging rows are outlined in the chart's stop color. */
 .plan-table .plan-table-label { font-weight: 600; }
 .plan-table-footnote { padding: 6px 10px; }
-/* A vehicle's rows in a transposed table (Home Charger): its name on a row of its own. */
+/* A vehicle's rows in a transposed table (Charging Speeds): its name on a row of its own. */
 .plan-table .plan-table-group > td { font-weight: 600; background-color: var(--color-surface-muted); }
-/* Home Charger: the level where a bigger charger stops helping, in the
+/* Charging Speeds: the level where a bigger charger stops helping, in the
    chart's stop orange so it stands out; the footnote's key uses the same class. */
 .plan-table td.is-enough,
 .plan-table-footnote .is-enough { font-weight: 700; color: var(--color-accent-orange-text); }
@@ -10320,7 +10320,7 @@ a.is-test-link:focus-visible {
 
 /* ── Setup wizard ─────────────────────────────────────────────────────────
    A few skippable questions that set the site up for a new reader
-   (components/setup/). The choice card is the Home Charger picker's radio card
+   (components/setup/). The choice card is the Charging Speeds picker's radio card
    (.home-level) as a button; if the wizard stays, the two want one class. */
 
 .setup-invite {

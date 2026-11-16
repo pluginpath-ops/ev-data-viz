@@ -9,7 +9,7 @@ This file is written for the agents who build it. Every decision below is the
 owner's and was settled over the mockup rounds; do not re-ask them. The
 mockups are a Design canvas (private, owner's account):
 https://claude.ai/artifact/4ay3LFps47wPt4e5fXaurw — boards Your Driving,
-Cost & Time, Weekly Charging Plan, Home Charger, the shared header and the
+Cost & Time, Weekly Charging Plan, Charging Speeds, the shared header and the
 sidebar. Its numbers come from a toy sim with made-up vehicles; the layout and
 wording are what carry over.
 
@@ -36,11 +36,13 @@ Per vehicle, three inputs are resolved, then a week is simulated.
 **Efficiency.** Highway miles are priced from EVBench's range tests: the
 composite (`compositeRange`) corrected to the day's highway speed, the season's
 temperature and the elevation, accessory load on auto. City miles are priced
-from the EPA **highway** figure (label highway range ÷ usable kWh) with the same
-temperature, elevation and accessory correction at the HWFET average speed —
-EPA's city figure flatters an EV with regen in a way a real commute does not.
-"EPA only" prices both from that EPA figure. A car with no range test uses EPA
-for both and says so. Winter is a floor: the correction prices denser air and
+from the EPA **city** figure (label city range ÷ usable kWh) with the same
+temperature, elevation and accessory correction at the UDDS average speed, speed
+itself left alone. (Until 2026-11-16 they used the highway figure, on the worry
+that the city cycle flatters regen; the owner reversed that — the city cycle is
+a fair stand-in for what people call city miles.) "EPA only" prices highway
+miles from the EPA highway figure. A car with no range test uses EPA for both
+and says so; a car with no EPA city figure prices city miles like highway ones. Winter is a floor: the correction prices denser air and
 cabin heat (battery warming is priced at home, below), not cold tires, and the page says so. No new
 cold knobs in the correction.
 
@@ -52,12 +54,22 @@ or pinned; `epaRange.chargerEfficiency`, as the vehicle table uses), else
 car's fixed draw (`FIXED_DRAW_W`, 200 W, one value for every car) is a larger
 share: η = η_ref − P₀(1/P − 1/P_ref), P₀ = 0.2 kW (owner, 2026-11-15; it
 replaced a flat 0.80 on 120 V). A default car: 76.3% at 120 V/12 A, 85.0% at
-16 A, 87.6% at 32 A, 88.5% at 48 A and up. Home Charger lists each car's
+16 A, 87.6% at 32 A, 88.5% at 48 A and up. Charging Speeds lists each car's
 full-power figure and where it came from.
 Below `PACK_WARMING_BELOW_F` (40°F) each home charge buys battery warming,
 `BATTERY_WARMING_KWH` (0.002, a guess) × usable kWh × °F below, bought through
-η; assumed parked outside. Energy and cost only: it does not lengthen the night
-or take from what it adds. The Season settings and Home Charger say so.
+η_warm = η_ref + P₀/P_ref, the charger's conversion only, the same at every
+level: the fixed draw ends up as heat in the car, which is what warming wants
+(owner, 2026-11-16). Assumed parked outside. It runs first each night the charger runs, at the
+charger's power, out of the plug-in window: it lengthens the night and leaves
+less to add, and a night never buys more than P_home × the window (owner,
+2026-11-16; until then it was billed on top, so a cold 120 V night could cost
+more than the charger can deliver). A day's first fast stop buys the same
+warming, at the DC fast loss and the fast price, energy and cost only (the car
+warms on the way in); a later stop that day finds the battery warm (owner,
+2026-11-16: without it, no home charging came out cheaper than 120 V in the
+cold). DC_FAST_LOSS already holds the preconditioning of its mostly mild tests,
+so this is the cold extra, as at home. The Season settings and Charging Speeds say so.
 The window is the plug-in hours; a night that runs out says so.
 
 **Fast stops — the rule.** A stop is on the route, not a dash at the end:
@@ -78,8 +90,17 @@ The window is the plug-in hours; a night that runs out says so.
   drives nearest it — before the drive home on a Daily, after a Long day.
 
 **The week.** Days drive in two spans (Long day 7–12 and 12–18; Daily 7–8 and
-17–18) so a stop has a time and a mile. The sim runs three weeks and reports the
-third, so Monday starts from a settled state.
+17–18) so a stop has a time and a mile. The week **closes** (owner, 2026-11-16,
+"the Monday morning requirement"): it starts Monday morning at Charge to (100%
+before a Long Monday; Charge no higher than with no home charging) and Sunday
+night must bring it back there. Where the nights can't, the week's last fast
+stop charges further, up to 100%, if every night after it ran out of window
+(a night that tops off, or a later stop charging to its own target, would
+absorb the extra); else a stop of its own after the latest driving day whose
+charge reaches Monday, else Sunday. That can be time the week did not
+otherwise need, which is realistic. It replaced three settling weeks, which on
+a slow charger in the cold left the reported week ending lower than it began,
+its missing fast charging uncounted (120 V came out cheaper than 16 A).
 
 **Gas car.** Same miles, same city share, mpg blended per day; fills at the set
 level; minutes per fill-up. Fill-ups per week are reported as an average, since
@@ -136,9 +157,9 @@ are frozen once merged (chartNav.js says why):
 | Mode | Sub-tab | What it is |
 |---|---|---|
 | `drivesetup` | **Your Driving** | the landing: every setting on one page, week buttons after "Start from" in the Your week card (Commuter — the default —, WFH, Supercommuter, On the road, Weekend warrior; each sets every week field, the rest keep) and the gas cars after "Car" in Your gas car — both on this page only, not in the chart sidebars, a live preview of the selected cars against the gas car, links on |
-| `drivecost` | **Compare** ("Cost & Time" until the tab took the name, 2026-11-07) | cards below the charts (chart first); the selected vehicles against the gas car: everything per month (the week × 52 ÷ 12): $/month and extra minutes/month on the cards, stops a month; bars "Cost per month" (home solid, fast striped) and "Time per month"; a stop line per car |
+| `drivecost` | **Monthly Cost & Time** ("Cost & Time" until the tab took the name, 2026-11-07; "Compare" until 2026-11-16) | cards below the charts (chart first); the selected vehicles against the gas car: everything per month (the week × 52 ÷ 12): $/month and extra minutes/month on the cards, stops a month; bars "Cost per month" (home solid, fast striped) and "Time per month"; a stop line per car |
 | `driveplan` | **Weekly Charging Plan** | one vehicle (a dropdown of the selection) and a chart dropdown: **day by day** (default, mockup A3, in time order — a gray bar for the day out from the morning's battery to arriving home, each fast stop inside it at the levels it charged between, striped on the route and solid when planned, then the night at home up to the next morning, a dashed tick on its bar at the night's **home ceiling** — the most the plug-in window could have added at full power, so the gap over the bar is the charger's margin, pinned to the top edge with an arrow where it is off the plot; `utils/dayBars.js`, `utils/ceilingMark.js`), **day by day, charge in and used** (the same figures from zero), or **the week as a line** (range left in miles, SoC on the right, each night's plug-in window a quiet shading with its last stretch, after the charger finished, a shade darker — the spare time — dashed lines at 10% and 80% — fades over 0–10% and 80–100% until the owner found them distracting — stop bands), the day-by-day table under the chart, transposed (a column a day; rows Day type, Home adds, Starts at, Ready at — the time the night filled or the window ended, asterisked and footnoted when the plug-in schedule cut it short — Spare plug-in time — the window less the hours the charger ran, "None*" where the window cut the night short — Home cost, then Fast stops, Fast time and Fast cost outlined in orange; the % in the figure, one plain line a cell), an optional comparison chart (another charger level or the other season) stacked below, and the gas car's chart collapsed by default |
-| `drivecharger` | **Home Charger** | each level against each selected vehicle — everything per month, as on Compare (the week × 52 ÷ 12; owner, 2026-11-07, so the two tabs read in one unit) — a column a car at each level, its cost per month stacked: home underneath in the full color, fast on top striped in the full color over its desaturated shade, as on Compare (the other way round, briefly, left the charts muted; the shade alone read as a faded copy, so stripes, owner 2026-11-08; `utils/stripedFill.js`, shared with the day-by-day fast stops), the total over it and the home figure on the home part where there is fast charging (owner, 2026-11-07; it drew fast minutes until then); a [Cost \| Time] switch above the plot brings the minutes back as a second chart (2026-11-13): one column a car of fast charging per month, time labels (`minutesText`), axis from zero, same level order, colors and legend; home charging is not time the reader spends, so it is not drawn, and neither is the home ceiling below; the choice is `chartConfig.homeChargerChart`, link parameter `hc` (Time only), so the link and pop-out restore it; the table transposed: a column a level (yours marked), per vehicle rows for fast charging, home cost, fast cost and total cost per month, one plain line a cell, notes as marks under the table (bold orange for "enough", ^ for capped) — where "enough" begins (the first level within `ENOUGH_MARGIN_MIN`, 5 min a week, of the best any level manages), where the car's onboard charger caps it (by more than 0.25 kW: a 48 A circuit's 11.52 kW against an 11.5 kW car is not capped); over each car's column a dashed line, its **home ceiling** — the most its home charging could cost a month (the lesser of the charger and the onboard charger, at full power through the whole plug-in window, every night, at the home price; `homeCostCeiling`; owner, 2026-11-11) — one a car, none for no home charging, drawn by a plugin so it never moves the y-axis; one above the plot is pinned to its top edge with an up-arrow, its figure in the tooltip only (a figure on each arrow read as clutter; owner, 2026-11-11) |
+| `drivecharger` | **Charging Speeds** ("Home Charger" until 2026-11-16) | each level against each selected vehicle — everything per month, as on Monthly Cost & Time (the week × 52 ÷ 12; owner, 2026-11-07, so the two tabs read in one unit) — a column a car at each level, its cost per month stacked: home underneath in the full color, fast on top striped in the full color over its desaturated shade, as on Monthly Cost & Time (the other way round, briefly, left the charts muted; the shade alone read as a faded copy, so stripes, owner 2026-11-08; `utils/stripedFill.js`, shared with the day-by-day fast stops), the total over it and the home figure on the home part where there is fast charging (owner, 2026-11-07; it drew fast minutes until then); a [Cost \| Time] switch above the plot brings the minutes back as a second chart (2026-11-13): one column a car of fast charging per month, time labels (`minutesText`), axis from zero, same level order, colors and legend; home charging is not time the reader spends, so it is not drawn, and neither is the home ceiling below; the choice is `chartConfig.homeChargerChart`, link parameter `hc` (Time only), so the link and pop-out restore it; the table transposed: a column a level (yours marked), per vehicle rows for fast charging, home cost, fast cost and total cost per month, one plain line a cell, notes as marks under the table (bold orange for "enough", ^ for capped) — where "enough" begins (the first level within `ENOUGH_MARGIN_MIN`, 5 min a week, of the best any level manages), where the car's onboard charger caps it (by more than 0.25 kW: a 48 A circuit's 11.52 kW against an 11.5 kW car is not capped); over each car's column a dashed line, its **home ceiling** — the most its home charging could cost a month (the lesser of the charger and the onboard charger, at full power through the whole plug-in window, every night, at the home price; `homeCostCeiling`; owner, 2026-11-11) — one a car, none for no home charging, drawn by a plugin so it never moves the y-axis; one above the plot is pinned to its top edge with an up-arrow, its figure in the tooltip only (a figure on each arrow read as clutter; owner, 2026-11-11) |
 
 Your Driving is the PRIMARY place to set things. The analysis sub-tabs keep a
 sidebar with EVERY setting too — the secondary way in, not a summary. Both
@@ -158,7 +179,7 @@ present here exactly as on every other chart tab:
   (`useChartReadout` / `ChartReadout`), `PlotFrame`, `SourceLine`,
   `chartTheme` colors, series colors (`useStickyChartColors`, the vehicle's own
   color) and the pop-out (`useChartSync`, PopoutView).
-- **Tables** (the day-by-day plan, Home Charger's grid) use `components/tables`
+- **Tables** (the day-by-day plan, Charging Speeds' grid) use `components/tables`
   (`SortHeader`, `TableCell`) and the table classes, not new markup.
 - **Inputs**: `NumberInput` for every number, the existing segmented and
   slider classes (`.assumption-slider`, the sidebar's `.chart-rail` groups),
@@ -177,7 +198,7 @@ present here exactly as on every other chart tab:
    placeholder until their layer.
 3. **Cost & Time**.
 4. **Weekly Charging Plan** — the chart.
-5. **Home Charger**.
+5. **Charging Speeds**.
 
 Every layer: `npm test`, `npm run lint`, `npm run drift`, `npm run vocab`,
 `vite build`. New semantic classes in `index.css` from tokens; no inline color
@@ -185,7 +206,7 @@ or size.
 
 ## Open, not blocking
 
-- A car with no usable range test is priced from the EPA highway label, NOT
+- A car with no usable range test is priced from the EPA labels, NOT
   re-priced for speed (re-pricing the cycle's 48 mph to 70 as if held
   double-counts the label adjustment: a Model Y read ~400 Wh/mi at 70 in
   summer). Properly it wants Modeled Efficiency's curve from the car's EPA
