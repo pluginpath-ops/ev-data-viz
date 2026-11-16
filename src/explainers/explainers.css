@@ -228,7 +228,19 @@
     color: var(--color-text-secondary);
 }
 .explainer-notes, .explainer-sources { border-top: 1px solid var(--color-border-subtle); padding-top: 12px; }
-.explainer-sources li { display: flex; flex-direction: column; gap: 2px; }
+.explainer-sources li::marker, .explainer-notes li::marker { color: var(--color-text-secondary); font-weight: 600; }
+.explainer-source-body { display: flex; flex-direction: column; gap: 2px; }
+/* The entry a citation or footnote link lands on (markJumped): full, then
+   half once the scroll lands, then gone when the reader scrolls on. */
+.explainer-sources li, .explainer-notes li { position: relative; isolation: isolate; }
+.explainer-sources li::before, .explainer-notes li::before {
+    content: ""; position: absolute; inset: -4px -6px; z-index: -1; pointer-events: none;
+    border-radius: var(--radius-card); background: var(--color-primary-surface);
+    border: 2px solid var(--color-primary); opacity: 0;
+}
+.explainer-sources li.is-jumped::before, .explainer-notes li.is-jumped::before { opacity: 1; }
+.explainer-sources li.is-landed::before, .explainer-notes li.is-landed::before { opacity: 0.5; transition: opacity 1s ease-out; }
+.explainer-sources li.is-leaving::before, .explainer-notes li.is-leaving::before { opacity: 0; transition: opacity 0.6s ease-out; }
 .explainer-sources li.is-unverified .explainer-source-claim { color: var(--color-warning-text); }
 .explainer-source-claim { color: var(--color-text-primary); }
 .explainer-source { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
@@ -485,5 +497,8 @@
 .explainer-loss-point.is-s3 { fill: var(--color-accent-violet); }
 .explainer-loss-point.is-s4 { fill: var(--color-accent-gray); }
 .explainer-loss-panel { display: flex; flex-direction: column; gap: 4px; }
+/* InlEfficiencyFigure: small multiples, two across when there is room. */
+.explainer-eff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 16px; }
+.explainer-eff-curve { fill: none; }
 .explainer-loss-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .explainer-loss-key { display: inline-flex; align-items: center; gap: 6px; }

@@ -274,3 +274,15 @@ describe('short sources', () => {
         }
     });
 });
+
+describe('sourceKind', () => {
+    it('tags a source by what its link opens', async () => {
+        const { sourceKind } = await import('../sourceKind');
+        expect(sourceKind('https://docs.nlr.gov/docs/fy20osti/75323.pdf')).toBe('PDF');
+        expect(sourceKind('https://example.org/a/report.PDF?download=1')).toBe('PDF');
+        expect(sourceKind('https://www.adac.de/rund-ums-fahrzeug/elektromobilitaet/laden/ladeverluste/')).toBe('Web');
+        expect(sourceKind('https://example.org/data.xlsx')).toBe('XLSX');
+        expect(sourceKind('charging-speed-and-energy')).toBe('Explainer');
+        expect(sourceKind(undefined)).toBeNull();
+    });
+});

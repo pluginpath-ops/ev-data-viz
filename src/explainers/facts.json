@@ -4106,7 +4106,12 @@
             "eff": 0.938
           }
         },
-        "basis": "charging station output to the high-voltage and 12 V outputs, steady state"
+        "basis": "charging station output to the high-voltage and 12 V outputs, steady state",
+        "curve": {
+          "level1_120v": [[0.67, 0.844], [0.69, 0.859], [0.79, 0.863], [0.89, 0.874], [1, 0.881], [1.1, 0.887], [1.2, 0.891], [1.31, 0.895], [1.33, 0.898]],
+          "level2_208v": [[1.18, 0.909], [1.21, 0.908], [1.38, 0.918], [1.41, 0.917], [1.6, 0.925], [1.79, 0.929], [2, 0.932], [2.2, 0.935], [2.39, 0.936], [2.68, 0.929], [2.88, 0.932], [3.08, 0.933], [3.28, 0.934], [3.49, 0.935], [3.69, 0.936], [3.88, 0.936], [4.1, 0.937], [4.3, 0.937], [4.5, 0.937], [4.7, 0.937], [4.91, 0.937], [5.1, 0.937], [5.31, 0.937], [5.52, 0.936], [5.73, 0.935], [5.93, 0.935], [6.46, 0.934], [6.48, 0.934]],
+          "level2_240v": [[1.38, 0.913], [1.62, 0.922], [1.84, 0.926], [2.07, 0.932], [2.3, 0.934], [2.52, 0.937], [2.83, 0.93], [3.06, 0.933], [3.3, 0.935], [3.53, 0.936], [3.75, 0.937], [3.98, 0.939], [4.02, 0.939], [4.22, 0.94], [4.4, 0.94], [4.43, 0.941], [4.64, 0.94], [4.87, 0.941], [5.1, 0.941], [5.33, 0.941], [5.55, 0.941], [5.78, 0.941], [6.01, 0.94], [6.27, 0.94], [6.5, 0.94], [6.75, 0.939], [7.19, 0.938], [7.21, 0.938]]
+        }
       },
       "sources": [
         {
@@ -4118,7 +4123,7 @@
         }
       ],
       "status": "verified",
-      "note": "Read from the owner's copy, pulled through the Internet Archive because avt.inl.gov refuses EVBench's machine (LocalDev/explainers/Reference Docs/SteadyStateLoadCharacterization2014BMWi3.pdf). Measurement points: \"AC Input: EVSE Output\", \"DC Output: Powertrain Electrical Distribution Module high voltage and 12 volt output\"; page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Because the 12 V output counts as output, what the car's systems use while charging is not counted as loss. Key insight, page 1: \"The Level 2 efficiency is not strongly influenced by the charge rate.\" Page 2: \"For Level 2 charging, there is a step change in efficiency, power factor and total harmonic distortion at 13 amps or 3 kW.\" The 120 V maximum is the most a 12 A circuit allows; the 240 V maximum a 32 A circuit. The sheet's footer repeats the Volt sheet's report number. Added at the owner's request, 2026-11-15, as charger-only context."
+      "note": "Read from the owner's copy, pulled through the Internet Archive because avt.inl.gov refuses EVBench's machine (LocalDev/explainers/Reference Docs/SteadyStateLoadCharacterization2014BMWi3.pdf). Measurement points: \"AC Input: EVSE Output\", \"DC Output: Powertrain Electrical Distribution Module high voltage and 12 volt output\"; page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Because the 12 V output counts as output, what the car's systems use while charging is not counted as loss. Key insight, page 1: \"The Level 2 efficiency is not strongly influenced by the charge rate.\" Page 2: \"For Level 2 charging, there is a step change in efficiency, power factor and total harmonic distortion at 13 amps or 3 kW.\" The 120 V maximum is the most a 12 A circuit allows; the 240 V maximum a 32 A circuit. The sheet's footer repeats the Volt sheet's report number. Added at the owner's request, 2026-11-15, as charger-only context. The curve is read from the sheet’s page-2 efficiency chart, which is drawn as vectors: each marker’s center, calibrated to the chart’s own tick marks, with readings within 0.03 kW merged (INL drew two markers per setting and dozens at the top rate). It agrees with the sheet’s table to 0.3 points."
     },
     {
       "id": "dtu-2016-car-reported-efficiency",
@@ -4301,7 +4306,11 @@
             "eff": 0.887
           }
         },
-        "basis": "charging station output to onboard charger output, steady state"
+        "basis": "charging station output to onboard charger output, steady state",
+        "curve": {
+          "level1_120v": [[0.7, 0.847], [0.8, 0.863], [0.89, 0.865], [0.92, 0.864], [0.99, 0.862], [1.04, 0.863], [1.09, 0.863], [1.15, 0.863], [1.27, 0.864], [1.37, 0.862]],
+          "level2_208v": [[1.22, 0.887], [1.29, 0.889], [1.33, 0.89], [1.39, 0.891], [1.43, 0.891], [1.46, 0.892], [1.53, 0.893], [1.57, 0.894], [1.62, 0.894], [1.67, 0.894], [1.72, 0.895], [1.76, 0.895], [1.83, 0.895], [1.87, 0.895], [1.91, 0.896], [1.97, 0.896], [2.02, 0.896], [2.08, 0.896], [2.13, 0.896], [2.16, 0.896], [2.22, 0.896], [2.27, 0.896], [2.33, 0.896], [2.37, 0.896], [2.44, 0.896], [2.48, 0.896], [2.52, 0.896], [2.58, 0.895], [2.62, 0.895], [2.67, 0.895], [2.73, 0.895], [2.76, 0.895], [2.83, 0.894], [2.87, 0.894], [2.91, 0.894], [2.97, 0.893], [3.02, 0.893], [3.08, 0.893], [3.13, 0.892], [3.17, 0.892], [3.23, 0.892], [3.27, 0.892], [3.34, 0.891], [3.38, 0.891], [3.42, 0.89], [3.49, 0.89], [3.55, 0.889], [3.59, 0.889], [3.7, 0.888]]
+        }
       },
       "sources": [
         {
@@ -4313,7 +4322,7 @@
         }
       ],
       "status": "verified",
-      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/SteadyStateLoadCharacterization2012Leaf.pdf); avt.inl.gov refuses EVBench's machine. Measurement points: \"AC Input: EVSE Output\", \"DC Output: On Board Charge Module Output\", the Volt sheet's points. \"Vehicle charging is considered to be in steady state when the RMS current magnitude is not changing and the voltage source is close to nominal.\" Page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Key insight, page 1: \"Nissan Leaf Charging efficiency and power quality are not strongly influenced by the charge rate.\" Page 2's chart: the 208 V points run about 88.6 to 89.6%, peaking near 2 kW; the 120 V points about 84.5 to 86.5%. The equal-power comparison is the table's 120 V maximum (1.38 kW) against its 208 V minimum (1.21 kW). The 3.3 kW charger's 208 V maximum is 3.71 kW."
+      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/SteadyStateLoadCharacterization2012Leaf.pdf); avt.inl.gov refuses EVBench's machine. Measurement points: \"AC Input: EVSE Output\", \"DC Output: On Board Charge Module Output\", the Volt sheet's points. \"Vehicle charging is considered to be in steady state when the RMS current magnitude is not changing and the voltage source is close to nominal.\" Page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Key insight, page 1: \"Nissan Leaf Charging efficiency and power quality are not strongly influenced by the charge rate.\" Page 2's chart: the 208 V points run about 88.6 to 89.6%, peaking near 2 kW; the 120 V points about 84.5 to 86.5%. The equal-power comparison is the table's 120 V maximum (1.38 kW) against its 208 V minimum (1.21 kW). The 3.3 kW charger's 208 V maximum is 3.71 kW. The curve is read from the sheet’s page-2 efficiency chart, which is drawn as vectors: each marker’s center, calibrated to the chart’s own tick marks, with readings within 0.03 kW merged (INL drew two markers per setting and dozens at the top rate). It agrees with the sheet’s table to 0.3 points."
     },
     {
       "id": "inl-steady-state-leaf-2015",
@@ -4340,7 +4349,11 @@
             "eff": 0.905
           }
         },
-        "basis": "charging station output to the high-voltage and 12 V outputs, steady state"
+        "basis": "charging station output to the high-voltage and 12 V outputs, steady state",
+        "curve": {
+          "level1_120v": [[0.75, 0.618], [0.8, 0.635], [0.84, 0.649], [0.92, 0.679], [0.95, 0.691], [0.98, 0.702], [1.05, 0.723], [1.09, 0.733], [1.15, 0.748], [1.2, 0.756], [1.26, 0.767], [1.36, 0.782]],
+          "level2_208v": [[1.41, 0.816], [1.52, 0.828], [1.73, 0.844], [1.83, 0.851], [1.93, 0.856], [2.15, 0.867], [2.18, 0.869], [2.25, 0.87], [2.47, 0.876], [2.57, 0.878], [2.67, 0.882], [2.88, 0.884], [2.99, 0.887], [3.1, 0.889], [3.28, 0.891], [3.3, 0.893], [3.52, 0.896], [3.72, 0.897], [3.77, 0.897], [3.95, 0.899], [4.06, 0.901], [4.19, 0.9], [4.23, 0.901], [4.27, 0.903], [4.49, 0.902], [4.6, 0.903], [4.67, 0.905], [4.92, 0.905], [5.02, 0.904], [5.14, 0.904], [5.25, 0.905], [5.35, 0.905], [5.39, 0.905], [5.59, 0.905], [5.68, 0.906], [5.79, 0.907], [6.13, 0.905], [6.17, 0.907], [6.2, 0.908]]
+        }
       },
       "sources": [
         {
@@ -4352,7 +4365,7 @@
         }
       ],
       "status": "verified",
-      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/SteadyStateLoadCharacterization2015Leaf.pdf); avt.inl.gov refuses EVBench's machine. Measurement points: \"AC Input: EVSE Output\", \"DC Output: Powertrain Electrical Distribution Module high voltage and 12 volt output\", the i3's points, so the car's 12 V draw counts as output, not loss. \"Vehicle charging is considered to be in steady state when the RMS current magnitude is not changing and the voltage source is close to nominal.\" Page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Key insights, page 1: \"Level 2 charging should be used instead of Level 1 charging whenever possible. Level 2 charging is much more efficient than Level 1 charging.\" Page 2: \"As the vehicle charge rate decreases, efficiency decreases … the decrease in efficiency … is not negligible and should be avoided when possible.\" The equal-power comparison is the table's 120 V maximum (1.38 kW, 78.4%) against its 208 V minimum (1.41 kW, 81.5%). This Leaf has the 6.6 kW charger; the 2012 has 3.3 kW."
+      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/SteadyStateLoadCharacterization2015Leaf.pdf); avt.inl.gov refuses EVBench's machine. Measurement points: \"AC Input: EVSE Output\", \"DC Output: Powertrain Electrical Distribution Module high voltage and 12 volt output\", the i3's points, so the car's 12 V draw counts as output, not loss. \"Vehicle charging is considered to be in steady state when the RMS current magnitude is not changing and the voltage source is close to nominal.\" Page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Key insights, page 1: \"Level 2 charging should be used instead of Level 1 charging whenever possible. Level 2 charging is much more efficient than Level 1 charging.\" Page 2: \"As the vehicle charge rate decreases, efficiency decreases … the decrease in efficiency … is not negligible and should be avoided when possible.\" The equal-power comparison is the table's 120 V maximum (1.38 kW, 78.4%) against its 208 V minimum (1.41 kW, 81.5%). This Leaf has the 6.6 kW charger; the 2012 has 3.3 kW. The curve is read from the sheet’s page-2 efficiency chart, which is drawn as vectors: each marker’s center, calibrated to the chart’s own tick marks, with readings within 0.03 kW merged (INL drew two markers per setting and dozens at the top rate). It agrees with the sheet’s table to 0.3 points."
     },
     {
       "id": "inl-steady-state-b-class-2015",
@@ -4379,7 +4392,11 @@
             "eff": 0.914
           }
         },
-        "basis": "charging station output to the high-voltage and 12 V outputs, steady state"
+        "basis": "charging station output to the high-voltage and 12 V outputs, steady state",
+        "curve": {
+          "level1_120v": [[0.69, 0.774], [0.81, 0.798], [0.92, 0.814], [1.03, 0.827], [1.15, 0.836], [1.26, 0.843], [1.38, 0.847]],
+          "level2_240v": [[1.56, 0.798], [1.78, 0.817], [2.03, 0.833], [2.24, 0.848], [2.49, 0.854], [2.74, 0.857], [2.96, 0.865], [3.22, 0.87], [3.46, 0.872], [3.56, 0.912], [3.8, 0.913], [4.03, 0.914], [4.24, 0.915], [4.51, 0.915], [4.75, 0.917], [4.98, 0.917], [5.22, 0.916], [5.45, 0.917], [5.67, 0.916], [5.91, 0.916], [6.14, 0.915], [6.42, 0.916], [6.66, 0.915], [6.86, 0.916], [7.09, 0.914]]
+        }
       },
       "sources": [
         {
@@ -4391,7 +4408,7 @@
         }
       ],
       "status": "verified",
-      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/SteadyStateVehicleChargingFactSheet_2015MercedesBClass.pdf); avt.inl.gov refuses EVBench's machine. Measurement points as the 2015 Leaf's and i3's (12 V output counted as output). \"Vehicle charging is considered to be in steady state when the RMS current magnitude is not changing and the voltage source is close to nominal.\" Page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Key insight, page 1: \"The Level 2 efficiency is not strongly influenced by the charge rates when the Level 2 current is greater than 16 amps.\" Page 2's charts: on 240 V, efficiency climbs from about 80% at 1.6 kW to about 87% near 3.5 kW, then steps to about 91% from about 15 A (3.6 kW) up; against current, the 120 V points lie on the 240 V curve from 6 to 12 A, so at equal power 120 V, at twice the current, reads higher. The equal-power comparison is the table's 120 V maximum (1.38 kW, 84.7%) against its 240 V minimum (1.56 kW, 79.8%). This is the opposite of the Leafs, the i3 and the Bolt."
+      "note": "Read from the owner's copy (LocalDev/explainers/Reference Docs/SteadyStateVehicleChargingFactSheet_2015MercedesBClass.pdf); avt.inl.gov refuses EVBench's machine. Measurement points as the 2015 Leaf's and i3's (12 V output counted as output). \"Vehicle charging is considered to be in steady state when the RMS current magnitude is not changing and the voltage source is close to nominal.\" Page 3: \"The efficiency in this testing is the efficiency of the on-board charge module.\" Key insight, page 1: \"The Level 2 efficiency is not strongly influenced by the charge rates when the Level 2 current is greater than 16 amps.\" Page 2's charts: on 240 V, efficiency climbs from about 80% at 1.6 kW to about 87% near 3.5 kW, then steps to about 91% from about 15 A (3.6 kW) up; against current, the 120 V points lie on the 240 V curve from 6 to 12 A, so at equal power 120 V, at twice the current, reads higher. The equal-power comparison is the table's 120 V maximum (1.38 kW, 84.7%) against its 240 V minimum (1.56 kW, 79.8%). This is the opposite of the Leafs, the i3 and the Bolt. The curve is read from the sheet’s page-2 efficiency chart, which is drawn as vectors: each marker’s center, calibrated to the chart’s own tick marks, with readings within 0.03 kW merged (INL drew two markers per setting and dozens at the top rate). It agrees with the sheet’s table to 0.3 points."
     },
     {
       "id": "inl-baseline-recharge-2014-2015",
