@@ -128,7 +128,9 @@ In order; each a PR.
    cost read it too. Still 0.885 assumed with neither. The EPA's
    CHARGER_EFF_BAND (0.80–0.92) is not applied: it catches EPA's mismatched
    cycle ratios, and Green NCAP measures one recharge at both ends. The Kona
-   reads 92.1%, just above it. The EPA fleet median (epaCertStats) stays
+   reads 92.1%, just above it. With neither, the table cell stays blank and its
+   note names the assumed figure in use (0.87 on this site, a Model Constants
+   setting; 0.885 in code). The EPA fleet median (epaCertStats) stays
    EPA-only. On the 2026-11-16 mirror, 10 of the 16 linked cars take the
    Green NCAP figure; 6 have their own EPA one.
 5. **DC curves as charging tests — built.** The import also writes a
