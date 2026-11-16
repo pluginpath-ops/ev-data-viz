@@ -53,6 +53,22 @@ describe('rows', () => {
         expect(row.values['interior.seating']).toBe(5);
     });
 
+    it('builds only the rows asked for (#500), the same rows the whole fleet gives', () => {
+        const parent = vehicle({ id: 1, specs: { dimensions: { length_in: 200 } } });
+        const child = vehicle({ id: 2, name: 'R1S Dual', spec_source_vehicle_id: 1 });
+        const other = vehicle({ id: 3, name: 'Other' });
+        const fleet = [parent, child, other];
+        const whole = buildVehicleRows(fleet);
+        // Another array of the same vehicles, in another order: matched by id.
+        const some = buildVehicleRows(fleet, { only: [{ ...other }, { ...child }] });
+        expect(some.map(r => r.id)).toEqual([3, 2]);
+        expect(some[1]).toEqual(whole[1]);
+        expect(some[0].index).toBe(2);
+        // The fleet is still the lookup: the child reads its source's length.
+        expect(some[1].values['dimensions.length_in']).toBe(200);
+        expect(buildVehicleRows(fleet, { only: [vehicle({ id: 99 })] })).toEqual([]);
+    });
+
     it('carries the resolved figures with their basis', () => {
         const [row] = buildVehicleRows([vehicle({
             socWindowKwh: 140, socWindowBasis: 'usable', epaRangeMi: 300, epaRangeBasis: 'expected',

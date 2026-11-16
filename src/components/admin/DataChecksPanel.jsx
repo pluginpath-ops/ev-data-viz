@@ -13,6 +13,7 @@ import { vehicleLabel, fallbackSpecs } from '../../utils/specHelpers';
 import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS, nativeFillPlan } from '../../utils/dataCheckFixes';
 import { SpecField } from '../EditSpecsForm';
 import PrimaryConfigurationPicker from '../epa/PrimaryConfigurationPicker';
+import { useEpaDetail } from '../../hooks/useEpaDetail';
 import {
     CHECK_FIGURES, DATA_CHECKS, TESTED_RULES, LIMIT_KEYS, LOADED_LIMITS,
     runDataChecks, checkCounts, sourceNameVariants, groupPerformanceByVehicle,
@@ -368,7 +369,10 @@ export default function DataChecksPanel() {
     } = useAppContext();
     // A range test's session supplies the conditions it omits ('range-test-conditions').
     const sessionOf = useCallback(r => sessionFor(testSessions, r), [testSessions]);
-    const fleet = useMemo(() => vehicles ?? [], [vehicles]);
+    const allVehicles = useMemo(() => vehicles ?? [], [vehicles]);
+    // The test-weight check reads the EPA coefficient sets the startup read
+    // leaves out (#501), so this panel reads them for the whole fleet.
+    const { vehicles: fleet, loading: epaLoading } = useEpaDetail(allVehicles);
 
     // Performance results are not on the vehicle object — getVehicles keeps the
     // performance tables out on purpose — so this page fetches them for itself,
@@ -541,7 +545,7 @@ export default function DataChecksPanel() {
     // not release the held order — that is what made a fixed vehicle vanish and
     // come back.
     const [firstLoadDone, setFirstLoadDone] = useState(false);
-    if (!firstLoadDone && fleet.length > 0 && !perfLoading && !skipsLoading) setFirstLoadDone(true);
+    if (!firstLoadDone && fleet.length > 0 && !perfLoading && !skipsLoading && !epaLoading) setFirstLoadDone(true);
     const loaded = firstLoadDone;
     const listKey = JSON.stringify([limits, rule, only, q, showSkipped]);
     const [order, setOrder] = useState({ key: null, ids: [] });
@@ -720,7 +724,7 @@ export default function DataChecksPanel() {
             {writeError && <div className="note-panel is-danger mb-2">{writeError}</div>}
 
             <div className="flex flex-col gap-1">
-                {shown.map(({ row, findings }) => (
+                {!epaLoading && shown.map(({ row, findings }) => (
                     <VehicleRow
                         key={row.vehicle.id}
                         row={row}
@@ -737,7 +741,7 @@ export default function DataChecksPanel() {
                         onSkipAll={(entries) => skipAll(row.vehicle.id, entries)}
                     />
                 ))}
-                {!shown.length && <p className="text-note">Nothing matches.</p>}
+                {epaLoading ? <p className="text-note">Loading EPA data…</p> : !shown.length && <p className="text-note">Nothing matches.</p>}
             </div>
 
             <h4 className="subsection-title mt-6">Across the fleet</h4>

@@ -77,7 +77,7 @@ export default function SpecChart({
 
     const plottedKeys = (scatter ? [xKey, yKey] : [barKey]).filter(Boolean);
     const { rows, wantsPerformance, performanceLoading } = useVehicleRows({
-        keys: [...plottedKeys, ...tableKeys], assumptions, correctionTarget, correctionMode,
+        keys: [...plottedKeys, ...tableKeys], only: plotted, assumptions, correctionTarget, correctionMode,
     });
     const selectedRows = useMemo(() => {
         const byId = new Map(rows.map(r => [r.id, r]));
