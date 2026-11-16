@@ -42,7 +42,8 @@ function MiniPlot({ series, xLabel, yLabel, color }) {
  * A charging test's own points, small: SoC → kW and time → SoC. Every point,
  * not a sample, since the point is to see a bad one. Read when the card nears
  * the viewport, through the charts' shared cache, and again when the test's
- * point count changes (a merge, an edit).
+ * point count changes (a merge, an edit) or a composite is rebuilt. Used on a
+ * composite curve's card too.
  */
 export default function RunMiniCharts({ run, color }) {
     const [ref, near] = useInView();
@@ -56,7 +57,8 @@ export default function RunMiniCharts({ run, color }) {
             .then(rows => { if (live) setPoints(rows); })
             .catch(() => { if (live) setPoints([]); });
         return () => { live = false; };
-    }, [near, empty, run.id, run.dataPointCount]);
+        // A composite's rebuild can keep the count; its fingerprint moves.
+    }, [near, empty, run.id, run.dataPointCount, run.composite?.fingerprint]);
 
     if (empty) return null;
     const stroke = color || 'var(--color-primary)';
