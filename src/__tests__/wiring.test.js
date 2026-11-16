@@ -613,10 +613,10 @@ describe('the seams that broke before', () => {
         const COLUMN_READ = /(?<!['"`])\b(?:vehicle|v|veh|current|selectedSrc|parent|source|target)\??\.(battery|range)\b/;
         // Where the COLUMN itself is the subject, and why.
         const ALLOWED = {
-            'src/utils/vehicleFigures.js':   'the resolvers — their unsorted tier, deleted with the column',
+            'src/utils/vehicleFigures.js':   'the resolvers — their estimated tier, deleted with the column',
             'src/utils/vehicleForm.js':      'the edit form writes the column until it is retired (#324 step 3, #325)',
             'src/services/DataService.js':   'writes the column',
-            'src/utils/dataChecks.js':       'checks the column itself: battery-unsorted, range-vs-label',
+            'src/utils/dataChecks.js':       'checks the column itself: battery-estimated, range-vs-label',
             'src/context/AppContext.jsx':    'the vehicle import resends the current column values',
             'src/utils/labelRangeCheck.js':  'documents the column it compares',
             'src/components/epa/EpaCuratorEditor.jsx': 'compares the label with the column; goes to Data Checks with the column',

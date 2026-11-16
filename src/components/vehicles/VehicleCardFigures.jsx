@@ -29,11 +29,11 @@ export function epaRangeValue(vehicle, units) {
 
 /**
  * A word beside the range only when it is not this vehicle's own EPA label:
- * an expected or unsorted figure, or a label from another model year's
+ * "Est." for an expected or estimated figure, or a label from another model year's
  * certification — "From MY2024" (#374).
  */
 export function epaRangeBasisMark(vehicle) {
-    if (['expected', 'unsorted'].includes(vehicle.epaRangeBasis)) return vehicle.epaRangeBasis;
+    if (['expected', 'estimated'].includes(vehicle.epaRangeBasis)) return EPA_RANGE_BASIS[vehicle.epaRangeBasis].label;
     return fromYearNote(vehicle.epaRange?.certification)?.short ?? null;
 }
 

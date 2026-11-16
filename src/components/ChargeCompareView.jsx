@@ -686,7 +686,7 @@ export default function ChargeCompareView({
                 _rangeSourceNote: rangeSrc?.note ?? null,
                 _rangeSourceRun:  rangeSrc?.sourceRun?.name ?? null,
                 // An EPA row prices its miles from the vehicle's EPA range, which
-                // may be a label, an expectation or an unsorted figure (#324).
+                // may be a label, an expectation or an estimated figure (#324).
                 // The short series label can elide the row name that says so.
                 _figureSources:  rangeSrc?.source === 'epa'
                     ? figureSources(selectedVehicles.find(v => v.id === rangeRun.vehicleId), { range: true }, units)

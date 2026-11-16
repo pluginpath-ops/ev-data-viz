@@ -205,7 +205,7 @@ export function resolveUseableKwh(epaTestVehicle, vehicle) {
 /**
  * Which source resolveUseableKwh() used. Matches its order exactly.
  *
- * @returns {'EPA'|'epa-tested'|'usable'|'gross'|'unsorted'|null}
+ * @returns {'EPA'|'epa-tested'|'usable'|'gross'|'estimated'|null}
  *          'EPA' is the test vehicle's own figure; the rest are vehicle.socWindowBasis
  */
 export function resolveUseableKwhSource(epaTestVehicle, vehicle) {

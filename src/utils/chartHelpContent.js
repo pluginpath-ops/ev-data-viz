@@ -324,7 +324,7 @@ export const CHART_HELP_DEFAULTS = {
             'order columns from the Columns menu. Bars appear only where more or less is ' +
             'plainly better. Click a row to see its full specs and to vouch for or flag a value.',
         key_terms:
-            'Basis — where a resolved figure came from: EPA tested, Usable, Gross, an EPA label, an Expected EPA Range.\n' +
+            'Basis — where a resolved figure came from: EPA tested, Usable, Gross, an EPA label, or Est. for a figure no label confirms.\n' +
             'Tested — the best published or EVBench result; the source is named beneath it.\n' +
             'Bar cell — a figure drawn against the longest or largest among the rows shown.\n' +
             'Units follow your imperial/metric toggle.',

@@ -248,11 +248,12 @@ status and is never chrome.
 | The chemistries a platform's packs come in | **the platform's chemistries** — a possible set, never a vehicle's value. Offered in the spec editor as **suggestions** for the vehicle's **battery chemistry**, which is one of LFP, LMFP, NMC, NCA, NMCA | — | `platforms.chemistries`, `chemistrySuggestions()`; `specs.charging.battery_chemistry` |
 | What a car can do to warm its battery before a charging stop | **preconditioning** — None, Manual, Automatic (nav-triggered), Both. **None** is an answer; blank is "not recorded" | — | `specs.charging.preconditioning` |
 | Whether one charging test was preconditioned | **preconditioned** — yes, no, or not recorded, and "not preconditioned" is never written for "not recorded" | — | `runs.preconditioned` (migration 073), [runPreconditioning.js](../src/utils/runPreconditioning.js) |
-| The energy between the car's own 0% and 100% — what calculations turn %SoC into kWh with | **the SoC window**, `socWindowKwh` | [vehicleFigures.js](../src/utils/vehicleFigures.js): EPA tested, else Usable, else Gross, else unsorted |
+| The energy between the car's own 0% and 100% — what calculations turn %SoC into kWh with | **the SoC window**, `socWindowKwh` | [vehicleFigures.js](../src/utils/vehicleFigures.js): EPA tested, else Usable, else Gross, else `vehicles.battery`. Always meant as usable; marked **EPA** for the first and **Est.** for the rest (owner, 2026-11-06) — Usable and Gross are specs, shown in Compare Specs, not beside the figure |
 | Where a resolved figure came from | **its basis** — `socWindowBasis`, `epaRangeBasis` | `.stat-cell-basis` |
-| A vehicle's EPA range as the app reads it | **EPA range**, `epaRangeMi` | the primary configuration's label, else Expected EPA Range, else unsorted |
+| The pack a range test implies: its measured kWh over the SoC it used, scaled to 100%. Held against EPA tested; past `TEST_PACK_VS_EPA_PCT` (5%) either way the test is flagged — above usually means it drove on past 0% at low speed | **implied pack** — "⚠ 7% below EPA" under the test card's Energy out — a caution, since cold and an older pack read below too | `impliedPackKwh()`, `packOffEpa()` in [testedRange.js](../src/utils/testedRange.js); [RunSpecRows.jsx](../src/components/RunSpecRows.jsx); Data Check `test-pack-vs-epa` |
+| A vehicle's EPA range as the app reads it | **EPA range**, `epaRangeMi` | the primary configuration's label, else Expected EPA Range, else `vehicles.range` — the last two both shown as Est. |
 | A curator's figure for a vehicle with no EPA label, with its basis (Manufacturer, Independent test) | **Expected EPA Range** | `specs.range.expected_epa_mi`, `expected_epa_basis` |
-| A value from `vehicles.battery` or `vehicles.range`, which no source confirms yet | **unsorted** | the last tier of each resolver, deleted with its column (#324, #325) |
+| A value from `vehicles.battery` or `vehicles.range`, which no source confirms yet | **Est.**, `estimated` | the last tier of each resolver, deleted with its column (#324, #325). A range basis on screen reads only **EPA**, **Tested** or **Est.** (owner, 2026-11-06), so an Expected EPA Range shows as Est. too. Capacity reads **EPA** or **Est.** |
 | The Admin sub-tab listing vehicles that disagree with their own sources | **Data Checks** | [DataChecksPanel.jsx](../src/components/admin/DataChecksPanel.jsx), [dataChecks.js](../src/utils/dataChecks.js) |
 | Two sources for one figure further apart than a limit | **disagrees**, a disagreement | `.data-check-finding.is-disagrees` |
 | Something missing that would let a figure be checked | **a gap** | `.data-check-finding.is-gap` |
@@ -330,7 +331,8 @@ comes back, marked as skipped before. Moving a limit does not bring it back.
 **Say "EPA tested", never a bare "Tested", for capacity.** The vehicle card's
 *Tested* range is an EVBench range test set against EPA
 ([TestedFigure.jsx](../src/components/vehicles/TestedFigure.jsx)). A bare
-"Tested capacity" beside it would use one word for two sources.
+"Tested capacity" beside it would use one word for two sources. Beside a capacity figure the mark is
+just **EPA** — the short form of EPA tested, as on a range — or **Est.**
 
 **A variant is a vehicle record; a wheel or trim variant is not.** EPA prose
 uses "variant" loosely for the configurations one certification covers ("the
@@ -448,6 +450,7 @@ series, so nothing here is a sparkline and the word should not appear.
 | "test group", "certification group" or "cert group" for the Vehicle ID record | **EPA test vehicle** — and **Test Group**, capitalised, only for EPA's certification identifier | the record is the car; EPA's Test Group is the certification (#374) |
 | `epa_test_groups`, `test_group_id`, `testGroupId`, `epaGroup`, `epa_test_family_id` | `epa_test_vehicles`, `test_vehicle_id`, `testVehicleId`, `epaTestVehicle`, `test_group` | renamed through code and database in migration 081 (#374) |
 | "Hidden" / "Hide" for a test, in UI text | **Unlisted** / Unlist — or **Excluded**, if it is the statistics that are meant | one word carried two questions until #394 split them |
+| "unsorted", anywhere — and "Expected EPA" as a range basis in UI text | **Est.** (`estimated` in code, `battery-estimated` for the Data Check) | it said nothing about the figure; the only words beside a range are EPA, Tested and Est. (owner, 2026-11-06). `expected` stays as the code key for an Expected EPA Range |
 
 ## Open names
 

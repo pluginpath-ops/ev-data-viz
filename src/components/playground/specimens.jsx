@@ -376,6 +376,16 @@ export const COMPOSITES = {
                             <button type="button" className="run-cell-action">Compare ↔</button>
                         </span>
                     </div>
+                    <div className="run-cell">
+                        <span className="run-cell-label">Energy out</span>
+                        <span className="run-cell-value">
+                            91 kWh
+                            <span className="run-cell-caution">
+                                <span className="run-cell-caution-glyph" aria-hidden="true">⚠</span>
+                                7% below EPA
+                            </span>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>

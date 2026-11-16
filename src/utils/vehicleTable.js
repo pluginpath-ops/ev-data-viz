@@ -152,7 +152,7 @@ const FIGURE_COLUMNS = [
     // Range columns share one scale: they are one physical quantity, and bars
     // scaled separately would contradict the numbers printed on them.
     { key: 'figures.epaRangeMi', label: 'EPA range', unitGroup: 'distance', group: 'Battery & range', numeric: true, better: 'higher', bar: true, scale: 'range',
-      hint: 'The primary EPA configuration’s label, else an Expected EPA Range, else unsorted. Its basis is shown beneath.' },
+      hint: 'The primary EPA configuration’s label, else an Expected EPA Range or vehicles.range, both shown as Est. Its basis is shown beneath.' },
     { key: 'figures.epaCityMi', label: 'EPA city range', unitGroup: 'distance', group: 'Battery & range', numeric: true, better: 'higher', bar: true, scale: 'range' },
     { key: 'figures.epaHwyMi',  label: 'EPA hwy range',  unitGroup: 'distance', group: 'Battery & range', numeric: true, better: 'higher', bar: true, scale: 'range' },
     // Its own column rather than a value that replaces Efficiency where it

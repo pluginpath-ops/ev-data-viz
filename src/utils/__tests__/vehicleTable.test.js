@@ -59,8 +59,8 @@ describe('rows', () => {
             epaRange: { expectedSource: 'Manufacturer', cityMi: null, hwyMi: null },
         })]);
         expect(row.values['figures.socWindowKwh']).toBe(140);
-        expect(row.notes['figures.socWindowKwh']).toBe('Usable');
-        expect(row.notes['figures.epaRangeMi']).toBe('Expected EPA (Manufacturer)');
+        expect(row.notes['figures.socWindowKwh']).toBe('Est.');
+        expect(row.notes['figures.epaRangeMi']).toBe('Est. (Manufacturer)');
     });
 
     it('takes the best tested figure and names its source; empty until results load', () => {
@@ -449,7 +449,7 @@ describe('tested range columns (#335)', () => {
         const r = aged();
         expect(r.values['tested.when_new_range_mi']).toBeCloseTo(311.1, 1);   // 3.11 mi/kWh × 100 kWh
         expect(r.values['tested.capacity_retention']).toBeCloseTo(90, 5);
-        expect(r.notes['tested.capacity_retention']).toBe('90.0 of 100 kWh (EPA tested)');
+        expect(r.notes['tested.capacity_retention']).toBe('90.0 of 100 kWh (EPA)');
         expect(r.tests['tested.capacity_retention']).toMatchObject({ runId: 7 });
         const estimated = aged({ energy_kwh: null });
         expect(estimated.values['tested.when_new_range_mi']).toBeNull();

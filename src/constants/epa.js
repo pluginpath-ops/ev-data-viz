@@ -323,6 +323,15 @@ export const EPA_DEFAULTS = {
     // linked rather than a pack.
     TESTED_CAPACITY_TOLERANCE_PCT: 5,
 
+    // How far the pack a range test implies (its measured kWh over the SoC it
+    // used, scaled to 100%) may sit from EPA tested before the test is flagged
+    // (owner, 2026-11-06). EPA tested is the usable figure read the most
+    // consistently: what the pack gives while it can still hold 70–75 mph. Tests
+    // that drive on past 0% at low speed draw more than it — some GM packs by
+    // several percent — and a faded pack or a wrong link draws less. Both are
+    // worth a look; neither changes the figure calculations use.
+    TEST_PACK_VS_EPA_PCT: 5,
+
     // How far EPA tested may vary across one vehicle's linked configurations
     // before it reads as two packs on one vehicle row, or a wrong link.
     TESTED_SPREAD_PCT: 5,
@@ -355,6 +364,8 @@ export const LABEL_SPREAD_PCT =
     resolve('LABEL_SPREAD_PCT', EPA_DEFAULTS.LABEL_SPREAD_PCT);
 export const TESTED_CAPACITY_TOLERANCE_PCT =
     resolve('TESTED_CAPACITY_TOLERANCE_PCT', EPA_DEFAULTS.TESTED_CAPACITY_TOLERANCE_PCT);
+export const TEST_PACK_VS_EPA_PCT =
+    resolve('TEST_PACK_VS_EPA_PCT', EPA_DEFAULTS.TEST_PACK_VS_EPA_PCT);
 export const TESTED_SPREAD_PCT =
     resolve('TESTED_SPREAD_PCT', EPA_DEFAULTS.TESTED_SPREAD_PCT);
 export const PACK_BUFFER_PCT_BAND =

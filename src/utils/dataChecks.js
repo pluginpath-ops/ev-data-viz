@@ -58,11 +58,12 @@ import { labelRangeCheck } from './labelRangeCheck';
 import { sameSource, findSource, isYouTubeLink, isPlainYouTubeLink, linkProblem } from './sources';
 import { isCompositeRun, isInheritedRunId, filterRangeRuns } from './runUtils';
 import { statisticalRuns } from './runListing';
+import { packOffEpa } from './testedRange';
 import { deriveTested } from './performanceDerivations';
 import { resolveVoltageClass } from './platforms';
 import {
     LABEL_RANGE_TOLERANCE_PCT, LABEL_SPREAD_PCT,
-    TESTED_CAPACITY_TOLERANCE_PCT, TESTED_SPREAD_PCT, PACK_BUFFER_PCT_BAND,
+    TESTED_CAPACITY_TOLERANCE_PCT, TEST_PACK_VS_EPA_PCT, TESTED_SPREAD_PCT, PACK_BUFFER_PCT_BAND,
     TEST_WEIGHT_OFFSET_LBS_BAND, VOLTAGE_400_CLASS_BAND, VOLTAGE_800_CLASS_BAND,
     CLAIMED_060_GAP_SEC,
 } from '../constants/epa';
@@ -89,9 +90,10 @@ export const DATA_CHECKS = [
     { key: 'range-test-conditions', figure: 'range',    kind: 'gap',       label: 'Range test missing speed, temperature or altitude' },
     { key: 'tested-vs-label',    figure: 'capacity',    kind: 'disagrees', label: 'EPA tested disagrees with Usable/Gross' },
     { key: 'tested-spread',      figure: 'capacity',    kind: 'disagrees', label: 'EPA tested differs across configurations' },
+    { key: 'test-pack-vs-epa',   figure: 'capacity',    kind: 'disagrees', label: 'Range test pack disagrees with EPA tested' },
     { key: 'usable-over-gross',  figure: 'capacity',    kind: 'disagrees', label: 'Usable larger than Gross' },
     { key: 'buffer-outside',     figure: 'capacity',    kind: 'disagrees', label: 'Usable/Gross buffer outside its validity band' },
-    { key: 'battery-unsorted',   figure: 'capacity',    kind: 'gap',       label: 'vehicles.battery is neither Usable nor Gross' },
+    { key: 'battery-estimated',  figure: 'capacity',    kind: 'gap',       label: 'vehicles.battery is neither Usable nor Gross' },
     { key: 'test-weight-offset', figure: 'weight',      kind: 'disagrees', label: 'Curb weight does not fit EPA test weight' },
     { key: 'drive-vs-epa',       figure: 'drive',       kind: 'disagrees', label: 'Drive type disagrees with EPA' },
     { key: 'voltage-vs-epa',     figure: 'voltage',     kind: 'disagrees', label: 'Voltage does not fit EPA pack voltage' },
@@ -118,7 +120,7 @@ export const TESTED_RULES = [
 /** The limits, in the order the panel shows them. Each is a knob in constants/knobs.js. */
 export const LIMIT_KEYS = [
     'LABEL_RANGE_TOLERANCE_PCT', 'LABEL_SPREAD_PCT',
-    'TESTED_CAPACITY_TOLERANCE_PCT', 'TESTED_SPREAD_PCT', 'PACK_BUFFER_PCT_BAND',
+    'TESTED_CAPACITY_TOLERANCE_PCT', 'TEST_PACK_VS_EPA_PCT', 'TESTED_SPREAD_PCT', 'PACK_BUFFER_PCT_BAND',
     'TEST_WEIGHT_OFFSET_LBS_BAND', 'VOLTAGE_400_CLASS_BAND', 'VOLTAGE_800_CLASS_BAND',
     'CLAIMED_060_GAP_SEC',
 ];
@@ -126,7 +128,7 @@ export const LIMIT_KEYS = [
 /** The limits as this page load resolved them — local ∥ site ∥ default. */
 export const LOADED_LIMITS = Object.freeze({
     LABEL_RANGE_TOLERANCE_PCT, LABEL_SPREAD_PCT,
-    TESTED_CAPACITY_TOLERANCE_PCT, TESTED_SPREAD_PCT, PACK_BUFFER_PCT_BAND,
+    TESTED_CAPACITY_TOLERANCE_PCT, TEST_PACK_VS_EPA_PCT, TESTED_SPREAD_PCT, PACK_BUFFER_PCT_BAND,
     TEST_WEIGHT_OFFSET_LBS_BAND, VOLTAGE_400_CLASS_BAND, VOLTAGE_800_CLASS_BAND,
     CLAIMED_060_GAP_SEC,
 });
@@ -378,7 +380,7 @@ function capacityFindings(vehicle, links, ctx, limits, testedRule) {
         // that is the same number.
         const matches = labels.filter(l => Math.abs(l.kwh - battery) < 0.05);
         if (!matches.length) {
-            out.push(finding('battery-unsorted', labels.length
+            out.push(finding('battery-estimated', labels.length
                 ? `vehicles.battery ${kwh(battery)} matches neither ${[usableText, grossText].filter(Boolean).join(' nor ')}.`
                 : `vehicles.battery ${kwh(battery)} has no Usable or Gross figure to be sorted into.`,
                 { battery, usable, gross }));
@@ -537,6 +539,42 @@ function rangeConditionFindings(vehicle, sessionOf) {
         { tests: lacking.map(t => `${t.run.id}:${t.blank.join('+')}`).sort() })];
 }
 
+/**
+ * Range tests whose implied pack sits off EPA tested (owner, 2026-11-06).
+ *
+ * EPA tested is the usable figure read most consistently, so a test is held
+ * against it — not against the figure calculations fell back to when it was
+ * set aside, and not against Usable or Gross. One finding per vehicle naming
+ * each test, as the conditions check does; the test's own Energy out carries
+ * the same mark (RunSpecRows). Against the primary configuration, or the only one;
+ * several with none primary is `no-primary`'s finding.
+ *
+ * Counted tests only, and not composites or inherited copies: they are some
+ * other vehicle's tests, flagged there.
+ */
+function testPackFindings(vehicle, links, limits) {
+    const config = links.primary ?? (links.judged.length === 1 ? links.judged[0] : null);
+    const epa = config?.testedKwh;
+    if (!(epa > 0)) return [];
+    const off = filterRangeRuns(statisticalRuns(vehicle))
+        .filter(r => !isCompositeRun(r) && !isInheritedRunId(r.id))
+        .map(run => ({ run, off: packOffEpa(run, epa, limits.TEST_PACK_VS_EPA_PCT) }))
+        .filter(t => t.off);
+    if (!off.length) return [];
+    const name = (r) => r.name || r.source || `test ${r.id}`;
+    const listed = off.slice(0, LISTED_TESTS).map(({ run, off: o }) =>
+        `${name(run)} (${kwh(o.packKwh)}, ${pct(Math.abs(o.offPct))} ${o.offPct > 0 ? 'above' : 'below'})`);
+    const more = off.length - listed.length;
+    const anyAbove = off.some(t => t.off.offPct > 0);
+    const anyBelow = off.some(t => t.off.offPct < 0);
+    return [finding('test-pack-vs-epa',
+        `${off.length} range test${off.length === 1 ? ' implies a pack' : 's imply packs'} more than `
+        + `${limits.TEST_PACK_VS_EPA_PCT}% from EPA tested ${kwh(epa)}: ${listed.join('; ')}${more ? `; and ${more} more` : ''}.`
+        + (anyAbove ? ' Above usually means the test drove on past 0% at low speed.' : '')
+        + (anyBelow ? ' Below is a faded pack, a wrong link, or a mistyped energy or SoC.' : ''),
+        { epa, tests: off.map(t => `${t.run.id}:${oneDp(t.off.packKwh)}`).sort() })];
+}
+
 // ── The fleet ───────────────────────────────────────────────────────────────
 
 /**
@@ -618,6 +656,7 @@ export function runDataChecks(vehicles = [], {
                 ...rangeFindings(vehicle, links, ctx, limits),
                 ...rangeConditionFindings(vehicle, sessionOf),
                 ...capacityFindings(vehicle, links, ctx, limits, testedRule),
+                ...testPackFindings(vehicle, links, limits),
                 ...weightFindings(links, ctx, limits),
                 ...driveFindings(links, ctx),
                 ...voltageFindings(links, ctx, limits),

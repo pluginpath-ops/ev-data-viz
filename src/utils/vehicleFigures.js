@@ -23,7 +23,7 @@
  *                to its own configuration has its own.
  *   usable       the manufacturer's usable capacity
  *   gross        the manufacturer's gross capacity; reads high
- *   unsorted     `vehicles.battery`, not yet sorted into Usable or Gross (#325).
+ *   estimated     `vehicles.battery`, not yet sorted into Usable or Gross (#325).
  *                Kept so no chart loses a vehicle before curation catches up;
  *                this tier goes when the column does.
  *
@@ -34,7 +34,7 @@
  *                combined MPGe.
  *   expected     no label: a curator's Expected EPA Range, with its basis
  *                (Manufacturer, Independent test)
- *   unsorted     `vehicles.range`, which no EPA label confirms (#324 step 2)
+ *   estimated     `vehicles.range`, which no EPA label confirms (#324 step 2)
  *
  * Several configurations and no primary is not a tier: nothing is picked
  * silently. Their labels come back as `spanMi` for display, and the figure
@@ -63,19 +63,24 @@ const positive = (v) => {
     return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-/** Each capacity basis, as it is shown. */
+/**
+ * Each capacity basis, as it is shown. Two words only, EPA and Est. (owner,
+ * 2026-11-06): the figure is always meant as usable, and the mark says only
+ * whether EPA measured it. Usable and Gross are specs, recorded and shown in
+ * Compare Specs, and named in each note here — not beside the figure.
+ */
 export const SOC_WINDOW_BASIS = {
-    'epa-tested': { label: 'EPA tested', note: 'Energy EPA measured driving the pack from full to shutdown, on the primary configuration.' },
-    usable:       { label: 'Usable',     note: "The manufacturer's usable capacity." },
-    gross:        { label: 'Gross',      note: "The manufacturer's gross capacity. No usable figure is recorded, so calculations from it read high." },
-    unsorted:     { label: 'unsorted',   note: 'From vehicles.battery, not yet sorted into Usable or Gross.' },
+    'epa-tested': { label: 'EPA',  note: 'EPA tested: the energy EPA measured driving the pack from full to shutdown, on the primary configuration.' },
+    usable:       { label: 'Est.', note: "The manufacturer's Usable capacity. No EPA tested figure agrees with it." },
+    gross:        { label: 'Est.', note: "The manufacturer's Gross capacity. No usable figure is recorded, so calculations from it read high." },
+    estimated:    { label: 'Est.', note: 'An estimate: vehicles.battery, not yet sorted into Usable or Gross.' },
 };
 
 /** Each range basis, as it is shown. */
 export const EPA_RANGE_BASIS = {
     'epa-label': { label: 'EPA',          note: "The primary EPA configuration's label." },
-    expected:    { label: 'Expected EPA', note: 'No EPA label yet. A curator’s expected EPA range.' },
-    unsorted:    { label: 'unsorted',     note: 'From vehicles.range, which no EPA label confirms.' },
+    expected:    { label: 'Est.',         note: 'No EPA label yet. A curator’s expected EPA range.' },
+    estimated:   { label: 'Est.',         note: 'An estimate: vehicles.range, which no EPA label confirms.' },
 };
 
 /**
@@ -126,7 +131,7 @@ export function resolveSocWindow(vehicle, vehicles = [], { tolerancePct = TESTED
     if (usable)       return found(usable, 'usable');
     if (gross)        return found(gross, 'gross');
     const legacy = positive(vehicle?.battery);
-    if (legacy)       return found(legacy, 'unsorted');
+    if (legacy)       return found(legacy, 'estimated');
     return found(null, null);
 }
 
@@ -194,7 +199,7 @@ export function resolveEpaRange(vehicle, vehicles = []) {
         return { ...none, mi: expected, basis: 'expected', spanMi, expectedSource: specs.range.expected_epa_basis || null };
     }
     const legacy = positive(vehicle?.range);
-    if (legacy) return { ...none, mi: legacy, basis: 'unsorted', spanMi };
+    if (legacy) return { ...none, mi: legacy, basis: 'estimated', spanMi };
     return { ...none, spanMi };
 }
 
@@ -233,7 +238,7 @@ export function figureSources(vehicle, { capacity = false, range = false } = {},
 /**
  * Which EPA credits a chart's figures earn (the source line). An EPA label
  * range is fueleconomy.gov's; an EPA-tested capacity is from EPA's own test
- * records. An "expected" or unsorted range is neither, so it earns nothing.
+ * records. An "expected" or estimated range is neither, so it earns nothing.
  *
  * @param {Array} vehicles
  * @param {{capacity?: boolean, range?: boolean}} uses  as for figureSources
@@ -275,6 +280,7 @@ export function fieldFigureSource(vehicle, fieldKey, units = 'imperial') {
  * The fleet with both figures attached, as the app reads it.
  *
  *   socWindowKwh, socWindowBasis     from resolveSocWindow
+ *   epaTestedKwh                     its EPA tested, used or set aside
  *   epaRangeMi, epaRangeBasis        from resolveEpaRange
  *   epaRange                         the whole range answer (city, highway, span)
  */
@@ -286,6 +292,9 @@ export function withVehicleFigures(vehicles = []) {
             ...vehicle,
             socWindowKwh: soc.kwh,
             socWindowBasis: soc.basis,
+            // Kept even when set aside for the labels: a range test is flagged
+            // against EPA, not against whatever calculations fell back to.
+            epaTestedKwh: soc.testedKwh,
             epaRangeMi: range.mi,
             epaRangeBasis: range.basis,
             epaRange: range,

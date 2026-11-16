@@ -19,7 +19,7 @@
  *
  * ── What is NOT checked, and why ────────────────────────────────────────────
  *
- * Six of the eleven Retired rows cannot be matched without flagging correct
+ * Six of the twelve Retired rows cannot be matched without flagging correct
  * code, and driftProbes.js already has this project's position on that: "a
  * ledger that counts legitimate code teaches people to ignore it." These stay
  * with the reader, which is what the pledge in CLAUDE.md is for:
@@ -45,7 +45,7 @@
 import { execSync } from 'child_process';
 
 // Straight from the Retired table. A row lands here only if its wrong use can
-// be told from its right use by the token alone — see the header for the five
+// be told from its right use by the token alone — see the header for the six
 // that cannot.
 const RETIRED = [
     {
@@ -79,6 +79,13 @@ const RETIRED = [
         pattern: /\b(certification|cert) groups?\b/gi,
         write:   'EPA test vehicle(s)',
         why:     'the Vehicle ID record is a test vehicle; a certification is a Test Group',
+    },
+    {
+        // A basis that said nothing about the figure (owner, 2026-11-06). The
+        // basis key, the Data Check and every comment were renamed with it.
+        pattern: /\bunsorted\b/gi,
+        write:   'Est. — `estimated` in code, `battery-estimated` for the Data Check',
+        why:     'a range or capacity basis reads EPA, Tested or Est.',
     },
 ];
 

@@ -17,7 +17,7 @@ describe('fullPackRange', () => {
         expect(range.basis).toBe('efficiency');
         expect(Math.round(range.mi)).toBe(358);
         expect(range.miPerKwh).toBeCloseTo(4.0172, 4);
-        expect(range).toMatchObject({ capacityKwh: 89, capacityLabel: 'Usable' });
+        expect(range).toMatchObject({ capacityKwh: 89, capacityLabel: 'Est.' });
     });
 
     it('prefers the SoC window to the efficiency when a test has both', () => {

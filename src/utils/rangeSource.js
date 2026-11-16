@@ -96,9 +96,9 @@ function epaRangeName(vehicle) {
     switch (vehicle?.epaRangeBasis) {
         case 'expected': {
             const source = vehicle.epaRange?.expectedSource;
-            return `Expected EPA range${source ? ` (${source})` : ''}`;
+            return `Est. range${source ? ` (${source})` : ''}`;
         }
-        case 'unsorted': return 'EPA range (unsorted)';
+        case 'estimated': return 'Est. range';
         default:         return 'EPA range';
     }
 }
