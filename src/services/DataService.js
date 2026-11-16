@@ -1410,6 +1410,24 @@ class DataService {
   }
 
   /**
+   * Move a test to another vehicle: the same run (points, notes, pairings and
+   * every link FROM other vehicles stay), owned by a new vehicle. The target's
+   * own link to it goes, since it would read its own test, and the run lets go
+   * of "default" so it cannot collide with a default the target already has.
+   * Needs the database: a signed-out browser has no one to move it for.
+   */
+  async moveRunToVehicle(runId, targetVehicleId) {
+    if (!this.useSupabase || !this.user) throw new Error('Sign in to move a test.');
+    const sb = getSupabase();
+    const { error } = await sb.from('runs')
+      .update({ vehicle_id: targetVehicleId, is_default: false }).eq('id', runId);
+    if (error) throw error;
+    const { error: linkError } = await sb.from('spec_links')
+      .delete().eq('target_vehicle_id', targetVehicleId).eq('source_run_id', runId);
+    if (linkError) throw linkError;
+  }
+
+  /**
    * Delete a vehicle, passing its own specs, color, photo and tags to the
    * vehicles that inherit from it and re-pointing them at its source, so none
    * of them changes what it shows (migration 075, utils/vehicleDeletion.js).

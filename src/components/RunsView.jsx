@@ -425,7 +425,7 @@ const DeriveAxisPanel = ({
     );
 };
 
-export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, editOnFocus = false, onFocused, onBack, onClose }) {
+export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPublish, onAddRun, onUpdateRun, onSetDefaultRun, onDeleteRun, onMergeRunData, onReplaceRunData, onDuplicateRun, onViewChart, onToggleVehicleVisibility, onUpdateVehicle, onDuplicateVehicle, onCreateVariant, onDeleteVehicle, tags, onCreateTag, onSyncVehicleTags, onUploadVehicleImage, onUpdateVehicleSpecs, specCustomFieldSuggestions, vehicles, onCopyRunToVehicle, onMoveRunToVehicle, onViewVehicle, subtab, onSubtabChange, focusRunId = null, editOnFocus = false, onFocused, onBack, onClose }) {
     const { ensureSourceId, runVotes, loadRunVotes, toggleRunVote, units, manufacturers, addManufacturer, isContributor, addSpecLink, overrideInheritedRun, deleteSpecLink, setPairedChargingRun, clearDefaultRun, performanceCounts, testSessions, createTestSession, updateTestSession, deleteTestSession, setRunsSession, refreshComposites, searchEpaTestVehicles, linkEpaTestVehicle, createAndLinkEpaTestVehicle, updateEpaMapping, setPrimaryEpaMapping, unlinkEpaTestVehicle, updateEpaTestVehicle } = useAppContext();
 
     // ── Vehicle edit form state ───────────────────────────────────────────────
@@ -565,6 +565,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     const [duplicatingVehicle, setDuplicatingVehicle] = useState(false);
     const [exportingRunId, setExportingRunId]     = useState(null);
     const [copyToRun, setCopyToRun]               = useState(null);  // run being copied to another vehicle
+    const [moveToRun, setMoveToRun]               = useState(null);  // run being moved to another vehicle
     const [copyingToVehicleId, setCopyingToVehicleId] = useState('');
 
     const {
@@ -1231,11 +1232,14 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
     };
 
     // ── Copy run to another vehicle ───────────────────────────────────────────
-    const handleCopyToConfirm = async () => {
-        if (!copyToRun || !copyingToVehicleId) return;
-        await onCopyRunToVehicle(copyToRun, Number(copyingToVehicleId));
-        setCopyToRun(null);
-        setCopyingToVehicleId('');
+    // One picker serves both: the run is moved when it was opened from "Move to…".
+    const transferRun = moveToRun ?? copyToRun;
+    const closeTransfer = () => { setCopyToRun(null); setMoveToRun(null); setCopyingToVehicleId(''); };
+    const handleTransferConfirm = async () => {
+        if (!transferRun || !copyingToVehicleId) return;
+        const send = moveToRun ? onMoveRunToVehicle : onCopyRunToVehicle;
+        await send(transferRun, Number(copyingToVehicleId));
+        closeTransfer();
     };
 
     // Vehicles the current user can edit, excluding the current vehicle
@@ -2513,6 +2517,7 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                                 handleExportCsv={handleExportCsv}
                                 handleDuplicateRun={handleDuplicateRun}
                                 setCopyToRun={setCopyToRun}
+                                setMoveToRun={setMoveToRun}
                                 setCopyingToVehicleId={setCopyingToVehicleId}
                                 handleUpdateData={handleUpdateData}
                                 onUpdateRun={onUpdateRun}
@@ -3029,12 +3034,16 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
             )}
 
             {/* Copy to vehicle modal */}
-            {copyToRun && (
+            {transferRun && (
                 <div className="modal-overlay">
                     <div className="copy-to-modal-panel">
                         <div className="modal-header px-5 py-4 border-b">
-                            <h3 className="font-semibold text-base">Copy test to another vehicle</h3>
-                            <p className="text-xs text-secondary mt-0.5">"{copyToRun.name}" will be copied as an independent run</p>
+                            <h3 className="font-semibold text-base">{moveToRun ? 'Move test to another vehicle' : 'Copy test to another vehicle'}</h3>
+                            <p className="text-xs text-secondary mt-0.5">
+                                {moveToRun
+                                    ? `"${transferRun.name}" leaves ${vehicle.name} and belongs to the vehicle you pick. Variants below it inherit it.`
+                                    : `"${transferRun.name}" will be copied as an independent run`}
+                            </p>
                         </div>
                         <div className="px-5 py-4">
                             <label className="block text-sm font-medium mb-2">Select destination vehicle</label>
@@ -3052,18 +3061,18 @@ export default function RunsView({ vehicle, canCreate, canEdit, canDelete, canPu
                         <div className="px-5 py-4 border-t flex justify-end gap-2">
                             <button
                                 type="button"
-                                onClick={() => { setCopyToRun(null); setCopyingToVehicleId(''); }}
+                                onClick={closeTransfer}
                                 className="btn btn-secondary text-sm"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
-                                onClick={handleCopyToConfirm}
+                                onClick={handleTransferConfirm}
                                 disabled={!copyingToVehicleId}
                                 className="btn btn-commit text-sm disabled:opacity-40"
                             >
-                                Copy test
+                                {moveToRun ? 'Move test' : 'Copy test'}
                             </button>
                         </div>
                     </div>

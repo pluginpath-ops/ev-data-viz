@@ -503,6 +503,32 @@ export function AppProvider({ children }) {
         }
     };
 
+    // ── Move run to a different vehicle ───────────────────────────────────────
+
+    /**
+     * A test moves up the lineage (or anywhere): its composites change on both
+     * ends, and on every variant that reads it, before or after. The heirs are
+     * worked out on the fleet as it stood, then again on the one re-read after
+     * the write, so a vehicle that gains the test and one that loses it are both
+     * rebuilt.
+     */
+    const moveRunToVehicle = async (sourceVehicleId, run, targetVehicleId) => {
+        const feeds = feedsComposites(sourceVehicleId, run.id);
+        const before = feeds ? inheritorsOf(run.id) : [];
+        try {
+            await dataService.moveRunToVehicle(run.id, targetVehicleId);
+            const fleet = await softRefreshVehicles();
+            showSuccess(`Test moved to ${vehicles.find(v => v.id === targetVehicleId)?.name || 'vehicle'}`);
+            if (!feeds) return;
+            const after = [targetVehicleId, ...lineageInheritors(targetVehicleId, fleet)];
+            const affected = new Set([sourceVehicleId, ...before, ...after]);
+            await Promise.all([...affected].map(id => refreshComposites(id, { fleet })));
+        } catch (error) {
+            logIfUnauthorized('move_run', 'run', run.id, error);
+            showError('Error moving test: ' + error.message);
+        }
+    };
+
     const duplicateRun = async (vehicleId, runId) => {
         try {
             const vehicle = vehicles.find(v => v.id === vehicleId);
@@ -2254,6 +2280,7 @@ export function AppProvider({ children }) {
         createVariant,
         deleteVehicle,
         copyRunToVehicle,
+        moveRunToVehicle,
         duplicateRun,
         addRun,
         updateRun,
