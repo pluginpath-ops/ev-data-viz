@@ -3,6 +3,7 @@ import { compositeExplainer, compositeNote, staleComposites } from '../../utils/
 import { isUnlisted } from '../../utils/runListing';
 import RunListingBadges from './RunListingBadges';
 import RunCurationToggle from './RunCurationToggle';
+import RunMiniCharts from './RunMiniCharts';
 
 /**
  * A vehicle's composite curve in Tests & Data (#313): the stored mean of its
@@ -43,15 +44,22 @@ export default function CompositeRunCard({
                         </span>
                     )}
                 </div>
-                {built.length > 0 && (
-                    <p className="run-meta text-meta"
-                        title={pooled ? `${built.length - pooled} listed tests, and ${pooled} unlisted tests from the pool that still count` : undefined}>
-                        Built from <span className="test-count-n">{built.length - pooled}</span>
-                        {pooled > 0 && <span className="test-count-pool">/{pooled}</span>} {built.length === 1 ? 'test' : 'tests'}
-                        {pooled > 0 && ' (listed/unlisted)'}
-                    </p>
-                )}
-                {note && <p className="run-meta text-meta">{note}</p>}
+                {/* Its points beside what it was built from, as on a test's
+                    card: a bad test pulling the mean shows here first. */}
+                <div className="run-detail-row">
+                    <div>
+                        {built.length > 0 && (
+                            <p className="run-meta text-meta"
+                                title={pooled ? `${built.length - pooled} listed tests, and ${pooled} unlisted tests from the pool that still count` : undefined}>
+                                Built from <span className="test-count-n">{built.length - pooled}</span>
+                                {pooled > 0 && <span className="test-count-pool">/{pooled}</span>} {built.length === 1 ? 'test' : 'tests'}
+                                {pooled > 0 && ' (listed/unlisted)'}
+                            </p>
+                        )}
+                        {note && <p className="run-meta text-meta">{note}</p>}
+                    </div>
+                    <RunMiniCharts run={run} color={vehicle.color} />
+                </div>
             </div>
             {/* Curators only, as on a test's card (RunCard). */}
             {canEdit(vehicle) && (

@@ -1732,7 +1732,11 @@ class DataService {
       return;
     }
     const { error } = await getSupabase().from('runs').update({
-      name: updates.name, date: updates.date || null,
+      // Only when given: a partial update (Unlist, a session's copy-down)
+      // sending `date: null` cleared the test's date. Undefined keys drop out
+      // of the JSON on their own; null does not.
+      name: updates.name,
+      ...(updates.date !== undefined ? { date: updates.date || null } : {}),
       software_version: updates.softwareVersion, conditions: updates.conditions,
       ...(updates.calculated_fields !== undefined ? { calculated_fields: updates.calculated_fields } : {}),
       ...(updates.kind !== undefined ? { kind: updates.kind } : {}),

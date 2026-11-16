@@ -294,8 +294,11 @@ export default function App() {
     // the tab returns there rather than to its first item (#338).
     const lastModeUnderTab = useRef({});
     // A vehicle's page is the last place under Vehicles & Specs while it shows.
+    // The last page shown that was not a vehicle's, for Close vehicle to return to.
+    const lastPageBeforeVehicle = useRef(null);
     useEffect(() => {
         if (view === 'runs') lastModeUnderTab.current.vehicles = 'runs';
+        else lastPageBeforeVehicle.current = view;
     }, [view]);
     // Cards or List (#338): a sub-nav item now, so App owns it.
     // ?tab=vehicles&sub=list|lineage; Cards is the default and writes no `sub`.
@@ -614,11 +617,13 @@ export default function App() {
     /**
      * Close the opened vehicle (#338): it leaves the header, Vehicles & Specs
      * stops returning to it, and if its page is showing, the reader goes back
-     * to Vehicles & Specs.
+     * to the page they opened it from.
      */
     const closeVehicle = () => {
         if (lastModeUnderTab.current.vehicles === 'runs') lastModeUnderTab.current.vehicles = null;
-        if (view === 'runs') navigateTo('vehicles');
+        // Back to the page the reader came from — a chart, EPA, Home — whose
+        // settings are still in state; Vehicles & Specs when there was none.
+        if (view === 'runs') navigateTo(lastPageBeforeVehicle.current ?? 'vehicles');
         setActiveVehicle(null);
     };
 

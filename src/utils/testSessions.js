@@ -30,12 +30,14 @@ const SESSION_COLUMNS = {
     locationName: 'location_name',
     temperatureF: 'temperature_f',
     altitudeFt:   'altitude_ft',
+    windSpeedMph:    'wind_speed_mph',
+    elevationGainFt: 'elevation_gain_ft',
     sourceName:   'source_name',
     url:          'url',
     notes:        'notes',
 };
 
-const NUMERIC = new Set(['temperatureF', 'altitudeFt']);
+const NUMERIC = new Set(['temperatureF', 'altitudeFt', 'windSpeedMph', 'elevationGainFt']);
 
 /** Translate a partial camelCase change set into a database payload. */
 export function toSessionRow(changes = {}) {
@@ -93,8 +95,9 @@ export function vehiclesInSession(vehicles, sessionId) {
  * Sessions ordered for a picker: the ones this vehicle already appears in
  * first, then everything else by date. A curator adding the fourth run of an
  * outing should not have to hunt for the session the first three are in.
+ * `recent` is the `recentCount` most recently added of the others.
  */
-export function sessionsForPicker(sessions, vehicles, vehicleId) {
+export function sessionsForPicker(sessions, vehicles, vehicleId, recentCount = 3) {
     const mine = new Set();
     for (const v of vehicles || []) {
         if (String(v.id) !== String(vehicleId)) continue;
@@ -109,7 +112,12 @@ export function sessionsForPicker(sessions, vehicles, vehicleId) {
     const byDate = (a, b) => String(b.tested_at ?? '').localeCompare(String(a.tested_at ?? ''));
     const used   = (sessions || []).filter(s => mine.has(String(s.id))).sort(byDate);
     const others = (sessions || []).filter(s => !mine.has(String(s.id))).sort(byDate);
-    return { used, others };
+    // The newest sessions on the site, wherever they are: side-by-side tests
+    // are entered one car after another, so the session the last car joined
+    // is usually the one this car wants.
+    const byAdded = (a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')) || Number(b.id) - Number(a.id);
+    const recent = [...others].sort(byAdded).slice(0, recentCount);
+    return { used, others, recent };
 }
 
 /**
@@ -266,5 +274,53 @@ export function sessionSeedFromRun(run, sources = []) {
         url:          run?.source_url || run?.sourceUrl || null,
         temperatureF: run?.temperature_f ?? null,
         altitudeFt:   run?.altitude_ft ?? null,
+        windSpeedMph:    run?.avg_wind_speed_mph ?? null,
+        elevationGainFt: run?.elevation_gain_ft ?? null,
     };
+}
+
+/**
+ * What a session can pass down to its tests, one checkbox each in the session
+ * form: the session column, the test column, and the updateRun key that
+ * writes it. Date is the test's `date`; source is its free-text `source`.
+ */
+export const SESSION_COPY_FIELDS = [
+    { key: 'url',             label: 'URL',            from: 'url',               to: 'source_url',         update: 'sourceUrl' },
+    { key: 'source',          label: 'Source',         from: 'source_name',       to: 'source',             update: 'source' },
+    { key: 'date',            label: 'Date',           from: 'tested_at',         to: 'date',               update: 'date' },
+    { key: 'temperatureF',    label: 'Temp',           from: 'temperature_f',     to: 'temperature_f',      update: 'temperatureF' },
+    { key: 'altitudeFt',      label: 'Altitude',       from: 'altitude_ft',       to: 'altitude_ft',        update: 'altitudeFt' },
+    { key: 'windSpeedMph',    label: 'Wind speed',     from: 'wind_speed_mph',    to: 'avg_wind_speed_mph', update: 'windSpeedMph' },
+    { key: 'elevationGainFt', label: 'Elevation gain', from: 'elevation_gain_ft', to: 'elevation_gain_ft',  update: 'elevationGainFt' },
+];
+
+const blank = v => v == null || v === '';
+
+/**
+ * The writes that pass a session's values down to its tests.
+ *
+ * Only fields the session has a value for, and — unless `overwrite` — only
+ * onto tests where that field is blank. One entry per test that changes, with
+ * every changed field in one update, so a test is written once.
+ *
+ * @param {Object} session        a test_sessions row
+ * @param {Array}  members        runsInSession's [{ run, vehicle }]
+ * @param {string[]} keys         SESSION_COPY_FIELDS keys to pass down
+ * @param {boolean} overwrite     replace values the tests already have
+ * @returns {{ run, vehicle, updates: Object }[]}
+ */
+export function sessionCopyDown(session, members, keys, overwrite = false) {
+    const fields = SESSION_COPY_FIELDS.filter(f => keys.includes(f.key) && !blank(session?.[f.from]));
+    const out = [];
+    for (const { run, vehicle } of members || []) {
+        const updates = {};
+        for (const f of fields) {
+            if (!overwrite && !blank(run[f.to])) continue;
+            const value = f.key === 'date' ? String(session[f.from]).slice(0, 10) : session[f.from];
+            if (String(run[f.to] ?? '') === String(value)) continue;
+            updates[f.update] = value;
+        }
+        if (Object.keys(updates).length) out.push({ run, vehicle, updates });
+    }
+    return out;
 }

@@ -117,8 +117,8 @@ const modeAxes = (mode) => (mode === SPEED_ONLY_MODE
  *
  * A run's own value wins over its session's: the session reading is the
  * shared context of the outing, and a run that states its own knows better.
- * Same rule migration 044 documents for temperature. Wind is the run's alone —
- * a session records no wind.
+ * Same rule migration 044 documents for temperature, and 101 for wind speed.
+ * Wind direction is the run's alone: it is relative to the heading driven.
  */
 export function runConditions(run, session = null) {
     return {
@@ -126,7 +126,7 @@ export function runConditions(run, session = null) {
         speedBasis:   run?.speed_basis,
         altitudeFt:   run?.altitude_ft   ?? session?.altitude_ft,
         temperatureF: run?.temperature_f ?? session?.temperature_f,
-        windMph:      run?.avg_wind_speed_mph,
+        windMph:      run?.avg_wind_speed_mph ?? session?.wind_speed_mph,
         windDirDeg:   run?.wind_direction_deg,
         whPerMile:    consumptionWhPerMile(run),
     };

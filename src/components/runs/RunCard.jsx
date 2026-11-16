@@ -4,6 +4,7 @@ import { RunVoteButtons } from '../VoteButtons';
 import RunSourceLinks from '../RunSourceLinks';
 import RunListingBadges from './RunListingBadges';
 import RunCurationToggle from './RunCurationToggle';
+import RunMiniCharts from './RunMiniCharts';
 import { isUnlisted, isExcluded, hasQualityOverride } from '../../utils/runListing';
 import { sessionFor } from '../../utils/testSessions';
 import { RunKindBadge, FIELD_META, inferRunFlags } from './runDisplay';
@@ -99,7 +100,7 @@ export default function RunCard({
     exportingRunId, duplicatingRunId,
     toggleRunVote, setRunsSession, createTestSession, updateTestSession,
     deleteTestSession, setPairedChargingRun, clearDefaultRun, onSetDefaultRun,
-    handleEditRun, restoreItem, queueDelete, handleExportCsv, handleDuplicateRun,
+    handleEditRun, restoreItem, queueDelete, handleExportCsv,
     setCopyToRun, setMoveToRun, setCopyingToVehicleId, handleUpdateData, onUpdateRun,
     handleCheckKwh,
 }) {
@@ -146,14 +147,21 @@ export default function RunCard({
             <div className="run-card-body">
                 <div className="flex-1 min-w-0">
                     <div className="run-meta">
-                        <RunSpecRows
-                            run={run}
-                            units={units}
-                            socRange={socRange}
-                            fieldMeta={FIELD_META}
-                            calcKwhByRun={calcKwhByRun}
-                            onCheckKwh={handleCheckKwh}
-                        />
+                        {/* A charging test's bands are narrow, so its two plots
+                            sit beside them, and drop under them when the card
+                            is too narrow for both. Inside this column, never
+                            beside it, so they cannot crowd the actions. */}
+                        <div className="run-detail-row">
+                            <RunSpecRows
+                                run={run}
+                                units={units}
+                                socRange={socRange}
+                                fieldMeta={FIELD_META}
+                                calcKwhByRun={calcKwhByRun}
+                                onCheckKwh={handleCheckKwh}
+                            />
+                            {kindLabel === 'charging' && <RunMiniCharts run={run} color={vehicle.color} />}
+                        </div>
                         {canEdit(vehicle) && (
                             <SessionControl
                                 run={run}
@@ -251,23 +259,16 @@ export default function RunCard({
                             >
                                 {exportingRunId === run.id ? '↓ Exporting…' : '↓ CSV'}
                             </button>
+                            {/* One Copy: the picker offers this vehicle first
+                                (a duplicate), then every other one. */}
                             <button
-                                onClick={() => handleDuplicateRun(run)}
+                                onClick={() => { setCopyToRun(run); setCopyingToVehicleId(String(vehicle.id)); }}
                                 disabled={duplicatingRunId !== null}
-                                title="Make a copy of this test on this vehicle"
+                                title="Copy this test, to this vehicle or another"
                                 className="btn btn-toggle disabled:opacity-50"
                             >
-                                {duplicatingRunId === run.id ? '⧉ Copying…' : '⧉ Copy'}
+                                {duplicatingRunId === run.id ? '⧉ Copying…' : '⧉ Copy…'}
                             </button>
-                            {copyTargetVehicles.length > 0 && (
-                                <button
-                                    onClick={() => { setCopyToRun(run); setCopyingToVehicleId(''); }}
-                                    title="Copy this test to another vehicle"
-                                    className="btn btn-toggle"
-                                >
-                                    ↪ Copy to…
-                                </button>
-                            )}
                             {copyTargetVehicles.length > 0 && !isCompositeRun(run) && (
                                 <button
                                     onClick={() => { setMoveToRun(run); setCopyingToVehicleId(''); }}

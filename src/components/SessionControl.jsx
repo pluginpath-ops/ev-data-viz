@@ -16,11 +16,12 @@ import SessionEditModal from './SessionEditModal';
  * UI: four cars round one loop become one session because four runs each picked
  * it, not because anything here knows how to select four cars.
  *
- * The dropdown lists ONLY the sessions this vehicle already appears in. That is
- * the right answer almost every time — a curator is usually adding another run
- * to an outing this car was already on — and it keeps the list short. A flat
- * list of every session was unreadable at 28 and only grows, so everything else
- * lives behind the browser, where it can be searched rather than scrolled.
+ * The dropdown lists the sessions this vehicle already appears in, then the
+ * three most recently added on the site: a curator is usually adding another
+ * run to an outing this car was already on, or entering the next car of a
+ * side-by-side. A flat list of every session was unreadable at 28 and only
+ * grows, so everything else lives behind the browser, where it can be searched
+ * rather than scrolled.
  */
 export default function SessionControl({
     run, vehicle, vehicles, sessions,
@@ -38,7 +39,7 @@ export default function SessionControl({
     const [saving, setSaving] = useState(false);
     const { sources } = useSources();
 
-    const { used } = sessionsForPicker(sessions, vehicles, vehicle.id);
+    const { used, recent } = sessionsForPicker(sessions, vehicles, vehicle.id);
     const current  = (sessions || []).find(s => String(s.id) === String(run.session_id)) ?? null;
     const mismatch = sessionDateMismatch(run, current);
 
@@ -107,11 +108,22 @@ export default function SessionControl({
                 className="form-input form-input"
             >
                 <option value="">— None —</option>
-                {/* Only this vehicle's sessions. Everything else is behind the
-                    browser, where it can be searched rather than scrolled. */}
-                {used.map(s => <option key={s.id} value={s.id}>{sessionLabel(s)}</option>)}
-                {/* A session picked from the browser may not be in `used` yet. */}
-                {current && !used.some(s => String(s.id) === String(current.id)) && (
+                {/* This vehicle's sessions, then the newest few on the site —
+                    side-by-side tests are entered one car after another.
+                    Everything else is behind the browser, where it can be
+                    searched rather than scrolled. */}
+                {used.length > 0 && (
+                    <optgroup label="This vehicle">
+                        {used.map(s => <option key={s.id} value={s.id}>{sessionLabel(s)}</option>)}
+                    </optgroup>
+                )}
+                {recent.length > 0 && (
+                    <optgroup label="Recently added">
+                        {recent.map(s => <option key={s.id} value={s.id}>{sessionLabel(s)}</option>)}
+                    </optgroup>
+                )}
+                {/* A session picked from the browser may be in neither yet. */}
+                {current && ![...used, ...recent].some(s => String(s.id) === String(current.id)) && (
                     <option value={current.id}>{sessionLabel(current)}</option>
                 )}
                 <option value="__new__">+ New session…</option>
