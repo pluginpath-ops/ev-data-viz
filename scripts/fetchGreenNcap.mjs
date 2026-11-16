@@ -22,18 +22,17 @@
  *   - green-ncap.com (with the hyphen) did not resolve from here; greenncap.com does.
  */
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { GREEN_NCAP_DIR } from './mainCheckout.mjs';
 
 const SITE = 'https://www.greenncap.com';
 const UA = 'EVBench data import (non-commercial; one request at a time)';
 const PAUSE_MS = 500;
 
 const args = process.argv.slice(2);
-// --dir <path>: download elsewhere (a worktree's LocalDev/ is not the main checkout's).
+// --dir <path>: download elsewhere. Default: the main checkout's LocalDev/, from a worktree too.
 const dirAt = args.indexOf('--dir');
-const OUT = dirAt >= 0 ? args.splice(dirAt, 2)[1]
-    : join(dirname(fileURLToPath(import.meta.url)), '..', 'LocalDev', 'green-ncap');
+const OUT = dirAt >= 0 ? args.splice(dirAt, 2)[1] : GREEN_NCAP_DIR;
 const refresh = args.includes('--refresh');
 const only = new Set(args.filter(a => !a.startsWith('--')));
 

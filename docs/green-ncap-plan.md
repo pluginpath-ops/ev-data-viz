@@ -33,14 +33,22 @@ Facts that shape the import:
 - **BAB130** runs at 23 °C (±5 °C) on a chassis dynamometer. After an
   unmeasured warm-up, two identical 270 s phases are measured and averaged.
   Each holds 130 km/h with three dips to 110 km/h and an 80→130 km/h
-  restart, every acceleration at full throttle (kick-down). It is an
-  aggressive mixed cycle, not a steady speed. Battery-electric cars start it at
+  restart, every acceleration at full throttle (kick-down). Battery-electric cars start it at
   no more than 90% SoC. Source: *GNT BAB Motorway Test Procedure v3.0.0*
   (June 2025), saved in `LocalDev/explainers/Reference Docs/`.
 - **BAB130 average speed is 124.9 km/h (77.6 mph)**, from the procedure's
   speed table. The measured phases cover 9.37 km each; the procedure rounds
   this to 10 km. That is the target trace. A real car takes a few
   seconds to make the 80→130 km/h step, so it runs a little slower.
+- **Scored as a steady 80.8 mph (130 km/h) — owner, 2026-11-16.**
+  Third-party tests are named by their target cruise speed, not their average
+  or effective speed, so BAB130 is too. A road-load model of the trace (within
+  1% of Green NCAP's EV9 and Model 3 figures) puts about 12% of its energy
+  into the speed changes, and its effective steady speed near 85 mph. So the
+  figure leans pessimistic against a true steady 81. Against the other
+  tests (corrected to 70 mph, 70°F), the Model S BAB130 reads 3.51 mi/kWh
+  against 3.28–3.38, and the Model Y 4.03 against 4.19. The EV9 reads 2.48
+  against a single 47°F test at 2.86.
 - **Grid to battery output** = net capacity ÷ recharged energy — the same
   ratio as EPA's DC energy ÷ AC recharge in `deriveChargerEfficiency`. The
   sheet does not give the AC charging rate.
@@ -92,13 +100,27 @@ In order; each a PR.
    tests, because a re-import replaces them. Checked on the local mirror
    (2026-11-16 backup): it runs twice, every role is refused or allowed as
    intended, and the cascade and one-per-kind rule hold.
-3. **Import.** Confirmed matches (`vehicle_id` from `confirm`) + parsed JSON →
-   upsert by slug, tests replaced. Writes the
-   BAB130 range test: `kind 'range'`, `source 'Green NCAP'`, `source_url` the
+3. **Import — built.** `node scripts/importGreenNcap.mjs` writes
+   `LocalDev/green-ncap/import.sql` from `parsed.json` and the `confirm`
+   column, for the owner to run on the mirror and then in production. It is one
+   transaction and safe to run twice. It seeds the Green NCAP source
+   (greenncap.com), upserts every parsed assessment by slug with its
+   confirmed `vehicle_id`, and replaces its tests. On the 2026-11-16 mirror
+   it gives 60 assessments, 17 linked, 434 tests and 15 BAB130 range tests.
+   The Q4 e-tron's 2022 sheet has no from-battery column and the Leaf's 2020
+   sheet has no net battery, so neither gets one. A re-import refreshes a
+   range test's figures and vehicle but never its listed, excluded or default
+   flags. **Listed (owner, 2026-11-16):** 11 of the 15 cars have no other
+   range test, so their card quotes the BAB130 figure; a dated full-pack or
+   default test still wins. The SQL writes the
+   BAB130 range test: named "Green NCAP BAB130", `kind 'range'`,
+   `source 'Green NCAP'`, `source_url` the
    car's page, `start_soc 100`, `end_soc 0`, `energy_kwh` the net capacity,
    `distance_miles` the computed range, `temperature_f 73.4`,
-   `speed_basis 'mixed'`, `speed_mph 77.6` (the trace average). Being mixed, the composite range leaves it out — it
-   is a quoted test, not an aggregated one.
+   `speed_basis 'steady'`, `speed_mph 80.8` (the 130 km/h cruise). As a
+   steady test within 15 mph of the 70 mph target and inside the temperature
+   band, it **joins the composite range**. For the 11 cars with no other range
+   test, it is the composite's only input.
 4. **Charger efficiency fallback** in the vehicle figures, with the basis.
 5. **DC curves as charging tests**, points from `fastCharging.points`.
 6. **Show the record** on the vehicle's page (owner's visual sign-off).
@@ -107,8 +129,8 @@ In order; each a PR.
 
 - **Terms of reuse.** The publication-guidelines page did not render as text
   from a script; the owner reads it before any import goes live.
-- **Is 77.6 mph the right `speed_mph`?** It is the target trace's average; a
-  real car runs a little slower. The range test should still say "mixed", so
-  nothing reads it as a steady 77.6.
+- **More overlap to check the 80.8 ruling.** Four cars have both a BAB130 and
+  another range test (EV9, Ioniq 6, Model S, Model Y). The owner's 10%
+  Challenge tests would add more.
 - **What a fast-charging test's power is measured at** (charger or port) —
   decides whether it is comparable with the other charging tests.
