@@ -18,8 +18,10 @@ import { MI_TO_KM } from '../constants/units.js';
 
 export const GREEN_NCAP_SOURCE = 'Green NCAP';
 export const BAB130_RANGE_TEST_NAME = 'Green NCAP BAB130';
-// The procedure's speed table: two 270 s phases, 9.37 km each (docs/green-ncap-plan.md).
-export const BAB130_AVERAGE_MPH = 77.6;
+// Scored at its 130 km/h cruise, steady, as third-party tests are scored at
+// their target speed (owner, 2026-11-16). The trace averages 77.6 mph; its
+// dips and full-throttle climbs are not modeled (docs/green-ncap-plan.md).
+export const BAB130_CRUISE_MPH = Math.round((130 / MI_TO_KM) * 10) / 10;
 export const BAB130_TEMP_F = 73.4; // 23 °C
 
 const IDENTITY_COLUMNS = new Set(['make', 'model', 'variant', 'reference', 'vin', 'drivetrain',
@@ -48,10 +50,10 @@ export function bab130RangeTest(car) {
         energy_kwh: net,
         start_soc: 100,
         end_soc: 0,
-        speed_mph: BAB130_AVERAGE_MPH,
-        speed_basis: 'mixed',
+        speed_mph: BAB130_CRUISE_MPH,
+        speed_basis: 'steady',
         temperature_f: BAB130_TEMP_F,
-        conditions: 'Lab dynamometer, BAB130 motorway cycle (to 130 km/h, full-throttle accelerations). Range computed: net battery ÷ consumption.',
+        conditions: 'Lab dynamometer, BAB130 motorway cycle: 130 km/h cruise with dips to 110 and full-throttle accelerations (averages 77.6 mph). Range computed: net battery ÷ consumption.',
     };
 }
 

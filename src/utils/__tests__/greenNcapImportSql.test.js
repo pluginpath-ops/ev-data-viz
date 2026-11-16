@@ -25,8 +25,8 @@ describe('lit', () => {
 });
 
 describe('bab130RangeTest', () => {
-    it('is the computed range on the net battery, mixed at the trace average', () => {
-        expect(bab130RangeTest(EV9)).toMatchObject({ distance_miles: 192.9, energy_kwh: 95.37, start_soc: 100, end_soc: 0, speed_mph: 77.6, speed_basis: 'mixed', temperature_f: 73.4 });
+    it('is the computed range on the net battery, steady at the 130 km/h cruise', () => {
+        expect(bab130RangeTest(EV9)).toMatchObject({ distance_miles: 192.9, energy_kwh: 95.37, start_soc: 100, end_soc: 0, speed_mph: 80.8, speed_basis: 'steady', temperature_f: 73.4 });
     });
     it('is null without a net battery figure', () => {
         expect(bab130RangeTest(OLD)).toBe(null);
