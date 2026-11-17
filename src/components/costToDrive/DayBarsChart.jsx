@@ -8,8 +8,8 @@
  *    the gray since it happened during the drive; a planned fast charge solid
  *    orange; then the night at home in the series color, up to the next
  *    morning, where a dashed line hands over to the next day.
- *  - `balance` (A): charge in above zero (fast stops striped, a planned
- *    charge solid, the night at home), driving below; under it, on its own
+ *  - `balance` (A): charge in above zero (the night at home, then fast stops
+ *    striped and a planned charge solid on top), driving below; under it, on its own
  *    shorter axis, the battery's level hour by hour across the same days
  *    (owner, 2026-11-16: the default, the line beneath the bars sharing the
  *    x-axis). One chart with two stacked y-axes, so one PNG holds both; the
@@ -20,25 +20,27 @@
  * button and the source line every chart here has. The stops in `day` are
  * drawn by the plugin over the day's bar, since two can share one bar.
  *
- * A dashed tick on each night's bar is the night's home ceiling (owner,
- * 2026-11-11): the most the plug-in window could have added at full power,
- * so the gap above the bar is the charger's margin. In `day` it stands on
- * where the car got home, in `balance` on the charge already in. Off the plot
- * it is pinned to the top edge with an arrow (utils/ceilingMark.js).
+ * In `day`, a dashed tick on each night's bar is the night's home ceiling
+ * (owner, 2026-11-11): the most the plug-in window could have added at full
+ * power, stood on where the car got home, so the gap above the bar is the
+ * charger's margin. Off the plot it is pinned to the top edge with an arrow
+ * (utils/ceilingMark.js). `balance` drops it (owner, 2026-11-17).
  */
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { withAlpha, SERIES_NEUTRAL } from '../../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
-import { dayBars } from '../../utils/dayBars';
-import { dollars, minutesText } from '../../utils/costToDrive';
+import { dayBars, dayParts } from '../../utils/dayBars';
+import { minutesText, chargingTiers, homeTierOrder, tierWord } from '../../utils/costToDrive';
+import { drawTierShading } from '../../utils/tierShading';
 import { useChartPng } from '../../hooks/useChartPng';
+import { useChartReadout } from '../../hooks/useChartReadout';
 import { useTheme } from '../../hooks/useTheme';
 import { useSourceLine } from '../../hooks/useSourceLine';
 import PlotFrame from '../charts/PlotFrame';
 import CopyLinkButton from '../charts/CopyLinkButton';
 import PngButton from '../charts/PngButton';
-import { stripedFill } from '../../utils/stripedFill';
+import { stripedFill, homeTierFill } from '../../utils/stripedFill';
 import { drawCeilingMarks, ceilingLegend } from '../../utils/ceilingMark';
 
 const TYPE_NAMES = { D: 'Daily', L: 'Long day', O: 'Off' };
@@ -53,8 +55,32 @@ const SOC_GUIDES = [10, 80];
 /** A fast stop on the route: orange stripes over the driving's gray. */
 const routeStopFill = (callout) => stripedFill(DRIVE, callout);
 
+/**
+ * The home charge's parts, bottom up: the whole night at One price; on a
+ * time-of-use plan the base tier first, then each dearer one (owner,
+ * 2026-11-17: the base plain, the dearer striped and named).
+ */
+const homePart = (b, t) => (t == null ? b.home : b.homeTiers?.[t] ?? 0);
+
+/** The night's home charge as one dataset per part, stacked from `from(b)`. */
+function homeDatasets(bars, { color, theme, tiers, stack, from, yAxisID }) {
+    const order = homeTierOrder(tiers);
+    return order.map((t, k) => ({
+        label: k === 0 ? HOME_LABEL : `Home, ${tierWord(tiers, t)}`,
+        key: k === 0 ? 'home' : `home-${t}`,
+        stack, ...(yAxisID ? { yAxisID } : {}),
+        backgroundColor: homeTierFill(color, t, tiers?.base, theme), borderWidth: 0,
+        data: bars.map(b => {
+            const lo = from(b) + order.slice(0, k).reduce((a, u) => a + homePart(b, u), 0);
+            const v = homePart(b, t);
+            return v > 0.05 ? [lo, lo + v] : null;
+        }),
+    }));
+}
+
 /** The datasets, [low, high] per day. `legendOnly` ones carry no bars: the plugin draws them. */
-function datasetsOf(bars, view, { color, callout, striped, week }) {
+function datasetsOf(bars, view, { color, callout, striped, week, theme }) {
+    const tiers = week.rateTiers;
     if (view === 'day') {
         return [
             {
@@ -64,26 +90,23 @@ function datasetsOf(bars, view, { color, callout, striped, week }) {
             },
             { label: 'Fast stop (during the drive)', key: 'fast', legendOnly: true, stack: 'out', backgroundColor: striped, data: bars.map(() => null) },
             { label: 'Planned fast charge', key: 'planned', legendOnly: true, stack: 'out', backgroundColor: callout, data: bars.map(() => null) },
-            {
-                label: HOME_LABEL, key: 'home', stack: 'home',
-                backgroundColor: color, borderWidth: 0,
-                data: bars.map(b => (b.next > b.arrive + 0.05 ? [b.arrive, b.next] : null)),
-            },
+            ...homeDatasets(bars, { color, theme, tiers, stack: 'home', from: b => b.arrive }),
         ];
     }
-    // Charge in, stacked from zero: fast stops, then the planned charge, then the night.
+    // Charge in, stacked from zero: the night at home, then fast stops, then the
+    // planned charge on top (owner, 2026-11-17).
     // The bars name `y`: unnamed, Chart.js takes the first y scale, the battery's.
     const charge = (key, label, fill) => ({
         label, key, stack: 'day', yAxisID: 'y', backgroundColor: fill, borderWidth: 0,
         data: bars.map(b => {
-            const base = (key === 'fast' ? 0 : b.fast) + (key === 'home' ? b.planned : 0);
+            const base = b.home + (key === 'planned' ? b.fast : 0);
             return b[key] > 0.05 ? [base, base + b[key]] : null;
         }),
     });
     return [
+        ...homeDatasets(bars, { color, theme, tiers, stack: 'day', yAxisID: 'y', from: () => 0 }),
         charge('fast', 'Fast stops', striped),
         charge('planned', 'Planned fast charge', callout),
-        charge('home', HOME_LABEL, color),
         {
             label: DRIVING_LABEL, key: 'used', stack: 'day', yAxisID: 'y', backgroundColor: DRIVE, borderWidth: 0,
             data: bars.map(b => (b.used > 0.05 ? [-b.used, 0] : null)),
@@ -97,13 +120,14 @@ function datasetsOf(bars, view, { color, callout, striped, week }) {
     ];
 }
 
-/** The battery's level under the bars: each night's plug-in window shaded, and the 10% and 80% guides. */
+/** The battery's level under the bars: each night's plug-in window shaded (dearer tiers tinted), and the 10% and 80% guides. */
 const socMarks = (week) => ({
     id: 'socMarks',
     beforeDatasetsDraw(chart) {
         const { ctx, scales: { xh, ySoc } } = chart;
         if (!xh || !ySoc) return;
-        const { tick } = chartTheme();
+        const theme = chartTheme();
+        const { tick } = theme;
         ctx.save();
         ctx.fillStyle = tick;
         ctx.globalAlpha = 0.08;
@@ -113,6 +137,7 @@ const socMarks = (week) => ({
             const x0 = xh.getPixelForValue(w.from), x1 = xh.getPixelForValue(w.to);
             ctx.fillRect(x0, top, x1 - x0, bottom - top);
         }
+        drawTierShading(ctx, xh, top, bottom, chargingTiers(week), theme);
         ctx.globalAlpha = 1;
         ctx.strokeStyle = tick;
         ctx.lineWidth = 1;
@@ -130,16 +155,21 @@ const socMarks = (week) => ({
  * the morning's level, and a dashed hand-over to the next day. In both: the
  * fast minutes over each day that has any.
  */
-const dayMarks = (bars, view, fills) => ({
+const dayMarks = (bars, view, fills, tiers) => ({
     id: 'dayMarks',
     afterDatasetsDraw(chart) {
         const { ctx, chartArea: a, scales: { x, y } } = chart;
         const { ink, tick, callout } = chartTheme();
         const fonts = chartFonts();
         const metas = chart.data.datasets.map((d, i) => ({ key: d.key, meta: chart.getDatasetMeta(i) }));
+        // A dataset's bar on day `i`; 'home' is the night's, whichever tier part it has.
         const slot = (key, i) => {
-            const e = metas.find(m => m.key === key)?.meta.data[i];
-            return e && Number.isFinite(e.x) && e.width ? [e.x - e.width / 2, e.x + e.width / 2] : null;
+            for (const m of metas) {
+                if (m.key !== key && !(key === 'home' && m.key?.startsWith('home-'))) continue;
+                const e = m.meta.data[i];
+                if (e && Number.isFinite(e.x) && e.width) return [e.x - e.width / 2, e.x + e.width / 2];
+            }
+            return null;
         };
         // A day's columns, left to right, from whichever slots it has.
         const span = (i) => {
@@ -184,28 +214,110 @@ const dayMarks = (bars, view, fills) => ({
         ctx.setLineDash([]);
         ctx.textAlign = 'center';
         ctx.font = `600 ${fonts.badge}px ${fonts.mono}`;
-        ctx.fillStyle = callout;
+        // Over each day: the dearest tier its night used above the base
+        // ("peak", else "off-peak"; both read as clutter — owner, 2026-11-17),
+        // and above that its fast minutes. A day with neither says nothing.
         bars.forEach((b, i) => {
-            if (!(b.minutes > 0.5)) return;   // a home-only day says nothing
+            const dearest = tiers && b.homeTiers
+                ? [0, 1].find(t => t < tiers.base && b.homeTiers[t] > 0.05) : undefined;
+            const lines = [
+                b.minutes > 0.5 && { text: `${Math.round(b.minutes)}m fast`, color: callout },
+                dearest != null && { text: tierWord(tiers, dearest), color: ink },
+            ].filter(Boolean);
+            if (!lines.length) return;
             const [l, r] = span(i);
             const top = view === 'day'
                 ? Math.max(b.start, b.next, ...b.stopBands.map(s => s.to))
                 : b.fast + b.planned + b.home;
-            ctx.fillText(`${Math.round(b.minutes)}m fast`,
-                (l + r) / 2, Math.max(a.top + fonts.badge, y.getPixelForValue(top) - 6));
+            const y0 = Math.max(a.top + fonts.badge * lines.length, y.getPixelForValue(top) - 6);
+            lines.forEach((ln, k) => {
+                ctx.fillStyle = ln.color;
+                ctx.fillText(ln.text, (l + r) / 2, y0 - (lines.length - 1 - k) * (fonts.badge + 3));
+            });
         });
         ctx.restore();
-        // The home ceiling over each night's bar, stood on where the night starts.
+        // The home ceiling over each night's bar, stood on where the car got
+        // home. `day` only: in `balance` it read as clutter (owner, 2026-11-17).
+        if (view !== 'day') return;
         const marks = [];
         bars.forEach((b, i) => {
             const home = slot('home', i);
             if (!home || !(b.mostAdd > 0)) return;
-            const base = view === 'day' ? b.arrive : b.fast + b.planned;
-            marks.push({ x: (home[0] + home[1]) / 2, half: (home[1] - home[0]) / 2 + 2, value: base + b.mostAdd });
+            marks.push({ x: (home[0] + home[1]) / 2, half: (home[1] - home[0]) / 2 + 2, value: b.arrive + b.mostAdd });
         });
         drawCeilingMarks(chart, marks);
     },
 });
+
+const FULL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const signedPct = (v) => `${v < 0 ? '−' : '+'}${Math.round(Math.abs(v))}%`;
+const cents = (v) => `$${(v ?? 0).toFixed(2)}`;
+/** A striped part's swatch in the readout, as CSS: the canvas fill cannot go in the DOM. */
+const stripeCss = (base, stripe) => `repeating-linear-gradient(135deg, ${base} 0 3px, ${stripe} 3px 6px)`;
+
+/** How a part looks in the readout: its color, CSS swatch, and canvas fill for the PNG. */
+function partLook(p, { color, theme, tiers, fills }) {
+    if (p.kind === 'home') {
+        if (p.tier == null || p.tier === tiers.base) return { color };
+        const ink = p.tier === 0 ? theme.danger : theme.tick;
+        return { color: ink, swatch: stripeCss(color, ink), fill: homeTierFill(color, p.tier, tiers.base, theme) };
+    }
+    if (p.kind === 'fast') return { color: theme.callout, swatch: stripeCss(DRIVE, theme.callout), fill: fills.striped };
+    if (p.kind === 'planned') return { color: theme.callout };
+    if (p.kind === 'drive') return { color: DRIVE };
+    return { color };
+}
+
+/**
+ * The day under the cursor, in the readout every curve chart has
+ * (useChartReadout): one row per part of its bars, each with its % of the
+ * battery and its cost, then the battery from morning to morning (owner,
+ * 2026-11-17). Click fixes it, and a fixed one goes in the PNG.
+ */
+function readoutConfig({ bars, view, tiers, color, theme, fills }) {
+    return {
+        step: 1,
+        title: (x) => {
+            const b = bars[x];
+            if (!b) return '';
+            return `${FULL_DAYS[x]} · net ${signedPct(b.next - b.start)} · ${cents((b.homeCost ?? 0) + b.cost)}`;
+        },
+        subtitle: 'Charge in and used, % of the battery',
+        rowsAt: (chart, x) => {
+            const i = Math.round(x);
+            const b = bars[i];
+            if (!b) return null;
+            const { y, ySoc } = chart.scales;
+            const rows = dayParts(b, view, tiers).map(p => ({
+                key: p.key, part: p, interpolated: false,
+                pixelY: p.range ? y.getPixelForValue((p.range[0] + p.range[1]) / 2) : (ySoc ?? y).getPixelForValue(b.next),
+                ...partLook(p, { color, theme, tiers, fills }),
+            }));
+            return { x: i, rows };
+        },
+        describe: ({ part: p }, { x }) => {
+            const b = bars[x];
+            switch (p.kind) {
+            case 'home': return {
+                name: p.name, value: signedPct(p.pct), companion: cents(p.cost),
+                detail: [
+                    p.kwh > 0 && `${p.kwh.toFixed(1)} kWh at the wall, ${Math.round(p.cost / p.kwh * 100)}¢/kWh`,
+                    p.warmKwh > 0.05 && `${p.warmKwh.toFixed(1)} kWh of it warming the battery`,
+                    b.mostAdd > 0 && `Most the night could add: ${pctText(b.mostAdd)}`,
+                ].filter(Boolean),
+            };
+            case 'fast':
+            case 'planned': return {
+                name: p.name, value: signedPct(p.pct), companion: `${minutesText(p.minutes)} · ${cents(p.cost)}`,
+                detail: b.stopBands.filter(st => st.planned === (p.kind === 'planned'))
+                    .map(st => `${pctText(st.from)} → ${pctText(st.to)}, ${minutesText(st.minutes)}`),
+            };
+            case 'drive': return { name: p.name, value: signedPct(p.pct), companion: `${p.miles} mi` };
+            default: return { name: p.name, value: `${pctText(b.start)} → ${pctText(b.next)}`, companion: `home at ${pctText(b.arrive)}` };
+            }
+        },
+    };
+}
 
 /**
  * @param {Object} week                 simulateWeek's answer
@@ -220,6 +332,7 @@ export default function DayBarsChart({
     const sourceLine = useSourceLine(sources);
     const canvasRef = useRef(null);
     const chartRef = useRef(null);
+    const readout = useChartReadout();
     const { isDark } = useTheme();
     const redraw = `${signature}|${view}|${color}|${isDark}`;
 
@@ -240,16 +353,20 @@ export default function DayBarsChart({
                 if (!ds.legendOnly) return ds.data.some(Boolean);
                 return bars.some(b => b.stopBands.some(s => s.planned === (ds.key === 'planned')));
             },
-            // No home charging, or no night charged: no ceiling drawn, no key.
-            text: bars.some(b => b.mostAdd > 0 && b.home > 0.05) ? 'Maximum possible daily charging' : null,
+            // `day` only, and only with a night charged: no ceiling drawn, no key.
+            text: day && bars.some(b => b.mostAdd > 0 && b.home > 0.05) ? 'Maximum possible daily charging' : null,
         });
         chartRef.current = new Chart(canvasRef.current.getContext('2d'), {
             type: 'bar',
             data: {
                 labels: bars.map(b => [b.day, b.type === 'O' ? 'Off' : `${TYPE_NAMES[b.type]} · ${b.miles} mi`]),
-                datasets: datasetsOf(bars, view, { color, callout: theme.callout, striped: fills.striped, week }),
+                datasets: datasetsOf(bars, view, { color, callout: theme.callout, striped: fills.striped, week, theme }),
             },
-            plugins: day ? [dayMarks(bars, view, fills)] : [socMarks(week), dayMarks(bars, view, fills)],
+            plugins: [
+                ...(day ? [] : [socMarks(week)]),
+                dayMarks(bars, view, fills, week.rateTiers),
+                readout.plugin(readoutConfig({ bars, view, tiers: week.rateTiers, color, theme, fills })),
+            ],
             options: {
                 // Room over the plot for a ceiling's arrow.
                 layout: { padding: { top: 14 } },
@@ -263,34 +380,9 @@ export default function DayBarsChart({
                         labels: { color: theme.legend, boxWidth: 12, usePointStyle: true, generateLabels: ceilingKey.generateLabels },
                         onClick: ceilingKey.onClick,
                     },
-                    tooltip: {
-                        // The bars carry the day's figures; the line is read by eye.
-                        filter: (item) => item.dataset.key !== 'soc',
-                        callbacks: {
-                            title: (items) => {
-                                const b = bars[items[0]?.dataIndex];
-                                return b ? `${b.day} · starts at ${pctText(b.start)}` : '';
-                            },
-                            label: (ctx) => {
-                                const b = bars[ctx.dataIndex];
-                                switch (ctx.dataset.key) {
-                                case 'out': return `The day out: ${pctText(b.start)} → home at ${pctText(b.arrive)} (driving used ${pctText(b.used)})`;
-                                case 'home': {
-                                    const most = b.mostAdd > 0 ? ` (most it could add: ${pctText(b.mostAdd)})` : '';
-                                    return day ? `Home overnight: +${pctText(b.home)}, to ${pctText(b.next)} next morning${most}` : `Home: +${pctText(b.home)}${most}`;
-                                }
-                                case 'used': return `Driving: −${pctText(b.used)}`;
-                                default: return `${ctx.dataset.label}: +${pctText(b[ctx.dataset.key])}`;
-                                }
-                            },
-                            afterBody: (items) => {
-                                const b = bars[items[0]?.dataIndex];
-                                if (!b?.stops) return '';
-                                return b.stopBands.map(s => `${s.planned ? 'Planned fast charge' : 'Fast stop'}: ${pctText(s.from)} → ${pctText(s.to)}, ${minutesText(s.minutes)}`)
-                                    .concat(`${dollars(b.cost)} fast`);
-                            },
-                        },
-                    },
+                    // The day's readout (below) in its place: the box the Range and
+                    // Charging charts have, with each part's cost (owner, 2026-11-17).
+                    tooltip: { enabled: false },
                 },
                 scales: {
                     x: { stacked: true, grid: { display: false }, ticks: { color: theme.tick, maxRotation: 0 } },
@@ -336,8 +428,9 @@ export default function DayBarsChart({
                 </>
             )}
         >
-            <div style={{ height, position: 'relative' }}>
+            <div className="chart-readout-host" style={{ height }}>
                 <canvas ref={canvasRef} />
+                {readout.overlay}
             </div>
         </PlotFrame>
     );

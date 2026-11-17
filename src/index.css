@@ -10060,15 +10060,17 @@ a.is-test-link:focus-visible {
 }
 /* A note at the foot of a card sits at the bottom, whatever the card beside it holds. */
 .drive-card-body > .text-note:last-child { margin-top: auto; }
-/* Efficiency from: one strip, its parts side by side. */
-.drive-card.is-strip .drive-card-body {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 20px;
+/* Efficiency from: a two-way choice, so a small one, not the card's width
+   (owner, 2026-11-17); its note sits under it. */
+.drive-card.is-efficiency .drive-choice { align-self: flex-start; }
+.drive-card.is-efficiency .text-note { margin-top: 0; }
+/* A setting the reader moves that cannot change a selected car (no EPA city
+   figure for City share): an orange callout box, plain not italic (owner,
+   2026-11-17). Colors from .callout.is-warning. */
+.drive-warning {
+    @apply px-3 py-2 rounded-xs border;
+    font-style: normal;
 }
-.drive-card.is-strip .drive-choice { flex: 0 0 16rem; }
-.drive-card.is-strip .text-note { flex: 1 1 24rem; margin-top: 0; }
 
 .drive-field {
     display: grid;
@@ -10121,6 +10123,53 @@ a.is-test-link:focus-visible {
     border-color: var(--color-primary-border);
 }
 .home-level-text { display: flex; flex-direction: column; }
+
+/* A plug-in window as a sentence: Driving days [10 pm] to [7 am] · 9 h. */
+.plug-window-row {
+    display: grid;
+    grid-template-columns: 6.5rem auto auto auto auto;
+    justify-content: start;
+    gap: 8px;
+    align-items: center;
+}
+
+/* A rate plan's day: 24 cells, midnight first, each its tier's status color —
+   peak in the danger role, the middle tier in the warning role, the cheapest
+   in the success role. */
+.rate-strip {
+    display: grid;
+    grid-template-columns: repeat(24, minmax(0, 1fr));
+    gap: 1px;
+}
+/* A tier: dear red, off-peak neutral, cheap green, each with its letter
+   (P, O, S) so the three never rest on hue alone (owner, 2026-11-17). */
+.rate-cell,
+.rate-swatch {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: var(--fs-nano, calc(var(--fs-body) * 0.6429));
+    font-weight: 600;
+    line-height: 1;
+}
+.rate-cell { height: 22px; }
+button.rate-cell { cursor: pointer; }
+button.rate-cell:hover { border-color: var(--color-text-primary); }
+.rate-cell.is-high,
+.rate-swatch.is-high { background-color: var(--color-danger-surface); border-color: var(--color-danger-border); color: var(--color-danger-text); }
+.rate-cell.is-mid,
+.rate-swatch.is-mid { background-color: var(--color-surface-sunken); border-color: var(--color-border-strong); color: var(--color-text-secondary); }
+.rate-cell.is-low,
+.rate-swatch.is-low { background-color: var(--color-success-surface); border-color: var(--color-success-border); color: var(--color-success-text); }
+.rate-strip-hours { display: flex; justify-content: space-between; }
+.rate-swatch {
+    width: 16px;
+    height: 16px;
+    flex: none;
+}
 
 .week-picker {
     display: grid;

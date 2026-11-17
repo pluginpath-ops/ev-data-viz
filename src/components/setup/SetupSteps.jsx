@@ -8,6 +8,7 @@ import VehicleCombobox from '../VehicleCombobox';
 import { vehicleOption } from '../../utils/specHelpers';
 import { MI_TO_KM } from '../../constants/units';
 import { SETUP_WIZARD as C } from '../../constants/setupWizard';
+import { RATE_PLANS } from '../../constants/ratePlans';
 import { starterSetIds, fill, speedWords, distanceWords, tempWords, altitudeWords } from '../../utils/setupWizard';
 import { ChoiceCards, SegmentedChoice, NumberAnswer } from './SetupFields';
 
@@ -207,7 +208,21 @@ export function MoneyStep({ answers, onChange, asked }) {
     return (
         <div className="setup-step-body">
             {asked.has('home') && <ChoiceCards options={M.home.options} value={answers.home} onChange={home => onChange({ home })} columns={1} />}
-            {answers.home !== 'none' && field('homePrice')}
+            {answers.home !== 'none' && asked.has('rate') && (
+                <ChoiceCards legend={M.rate.legend} options={M.rate.options} value={answers.rate}
+                    onChange={rate => onChange({ rate })} />
+            )}
+            {answers.home !== 'none' && answers.rate === 'tou' && (
+                <label className="flex flex-col gap-1">
+                    <span className="text-label">{M.rate.planLabel}</span>
+                    <select className="form-input" value={answers.ratePlan ?? ''} onChange={e => onChange({ ratePlan: e.target.value || null })}>
+                        <option value="">{M.rate.planPlaceholder}</option>
+                        {RATE_PLANS.map(p => <option key={p.key} value={p.key}>{p.label} · {p.region}</option>)}
+                        <option value="custom">{M.rate.planOwn}</option>
+                    </select>
+                </label>
+            )}
+            {answers.home !== 'none' && answers.rate !== 'tou' && field('homePrice')}
             {field('gasMpg')}
             {field('gasPrice')}
         </div>

@@ -7,21 +7,22 @@
  * month, home and fast charging stacked, and time per month, fast charging against
  * fill-ups. Both charts are Chart.js in a PlotFrame, so the PNG capture, the
  * copy-link button (which carries the Cost to Drive key) and the source line
- * work here exactly as on every other chart.
+ * work here exactly as on every other chart. With None for the gas car
+ * (`gasCompare` off) the gas rows go, and the cards say what each car costs.
  */
 import { useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { vehicleLabel } from '../../utils/specHelpers';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { SERIES_NEUTRAL } from '../../utils/colorUtils';
-import { fastChargingFill } from '../../utils/stripedFill';
+import { fastChargingFill, homeTierFill } from '../../utils/stripedFill';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
 import {
-    dollars, minutesText, savedText, perMonth, weekSummary, gasCarName, chargingText,
+    dollars, minutesText, savedText, perMonth, weekSummary, gasCarName, chargingText, homeTierOrder, tierWord,
 } from '../../utils/costToDrive';
 import { HOME_LEVELS } from '../../constants/costToDrive';
-import { useCostToDrive } from '../../hooks/useCostToDrive';
+import { useCostToDrive, noCityFigure } from '../../hooks/useCostToDrive';
 import { useTheme } from '../../hooks/useTheme';
 import { useChartPng } from '../../hooks/useChartPng';
 import { useSourceLine } from '../../hooks/useSourceLine';
@@ -56,15 +57,25 @@ function CostTimeCard({ entry, settings }) {
                 <span className="drive-dot" style={{ backgroundColor: color }} aria-hidden="true" />
                 <h3 className="section-title truncate">{vehicleLabel(vehicle)}</h3>
             </div>
-            <div className="drive-result-figures">
-                <span className={`drive-figure ${c.monthly.saved >= 0 ? 'is-saving' : 'is-costing'}`}>{savedText(c.monthly.saved)}</span>
-                {/* Less time than the gas car is a saving, green like money saved. */}
-                <span className={`drive-figure ${c.extraMinutesPerWeek < 0 ? 'is-saving' : 'is-time'}`}>{extraMonthText(c.extraMinutesPerWeek)}</span>
-            </div>
+            {settings.gasCompare ? (
+                <div className="drive-result-figures">
+                    <span className={`drive-figure ${c.monthly.saved >= 0 ? 'is-saving' : 'is-costing'}`}>{savedText(c.monthly.saved)}</span>
+                    {/* Less time than the gas car is a saving, green like money saved. */}
+                    <span className={`drive-figure ${c.extraMinutesPerWeek < 0 ? 'is-saving' : 'is-time'}`}>{extraMonthText(c.extraMinutesPerWeek)}</span>
+                </div>
+            ) : (
+                // No gas car (None): what it costs and its fast charging, nothing to save against.
+                <div className="drive-result-figures">
+                    <span className="drive-figure">{dollars(c.monthly.ev)}/mo</span>
+                    <span className="drive-figure">{minutesText(perMonth(c.week.fastMinutes))}/mo fast</span>
+                </div>
+            )}
             <span className="text-secondary">{stopLine(c.week)}</span>
             <span className="text-note">
-                {dollars(c.monthly.ev)}/mo to charge vs {dollars(c.monthly.gas)}/mo in gas, in {settings.season}.
-                Over a year, {dollars(c.yearly.saved)} {c.yearly.saved >= 0 ? 'less' : 'more'}.
+                {settings.gasCompare
+                    ? <>{dollars(c.monthly.ev)}/mo to charge vs {dollars(c.monthly.gas)}/mo in gas, in {settings.season}.
+                        Over a year, {dollars(c.yearly.saved)} {c.yearly.saved >= 0 ? 'less' : 'more'}.</>
+                    : <>{dollars(c.monthly.ev)}/mo to charge in {settings.season}; {dollars(c.yearly.ev)} over a year.</>}
             </span>
         </section>
     );
@@ -126,12 +137,14 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
     const priced = useCostToDrive(vehicles, selectedVehicleIds, settings);
     const shown = useMemo(() => priced.filter(p => !p.missing), [priced]);
     const missing = priced.filter(p => p.missing);
-    const gas = shown[0]?.comparison.gas ?? null;
+    // The gas car's row on each chart; none when the reader picked None.
+    const gas = settings.gasCompare ? shown[0]?.comparison.gas ?? null : null;
+    const withGas = (arr, value) => (gas ? [...arr, value] : arr);
 
     const costRef = useRef(null), costChart = useRef(null);
     const timeRef = useRef(null), timeChart = useRef(null);
 
-    const labels = [...shown.map(p => vehicleLabel(p.vehicle)), gasCarName(settings)];
+    const labels = withGas(shown.map(p => vehicleLabel(p.vehicle)), gasCarName(settings));
     // What is plotted, for the PNG preview's staleness check; with the theme and
     // the series colors, what the charts are rebuilt on.
     const signature = `${labels.join('|')}|${JSON.stringify(settings)}`;
@@ -140,18 +153,29 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
 
     // Cost per month: home charging (the full color) under fast charging
     // (the full color striped over its desaturated shade) per car, the gas car beside. Charging Speeds draws its columns the same way.
-    const costTotals = [...shown.map(p => p.comparison.monthly.ev), gas ? perMonth(gas.cost) : null];
+    // On a time-of-use plan home charging is a part per tier: the base plain,
+    // dearer ones striped; what each cost is in the tooltip, not over the bar
+    // (owner, 2026-11-17: "$13 · $3 off-peak" there was clutter).
+    const costTotals = withGas(shown.map(p => p.comparison.monthly.ev), gas && perMonth(gas.cost));
+    const tiers = shown.find(p => p.comparison.week.rateTiers)?.comparison.week.rateTiers ?? null;
+    const homeOf = (p, t) => perMonth(t == null ? p.comparison.week.homeCost : p.comparison.week.homeTierCost[t]);
     useBarChart(costRef, costChart, () => {
         if (!shown.length) return null;
-        const pad = (arr) => [...arr, null];
+        const pad = (arr) => withGas(arr, null);
+        const theme = chartTheme();
+        const home = homeTierOrder(tiers).map((t, k) => ({
+            label: k === 0 ? 'Home charging' : `Home, ${tierWord(tiers, t)}`,
+            data: pad(shown.map(p => homeOf(p, t))),
+            backgroundColor: pad(shown.map(p => homeTierFill(p.color, t, tiers?.base, theme))),
+        })).filter((d, k) => k === 0 || d.data.some(v => v >= 0.5));
         return {
             type: 'bar',
             data: {
                 labels,
                 datasets: [
-                    { label: 'Home charging', data: pad(shown.map(p => perMonth(p.comparison.week.homeCost))), backgroundColor: pad(shown.map(p => p.color)) },
+                    ...home,
                     { label: 'Fast charging', data: pad(shown.map(p => perMonth(p.comparison.week.fastCost))), backgroundColor: pad(shown.map(p => fastChargingFill(p.color))) },
-                    { label: 'Gas', data: [...shown.map(() => null), perMonth(gas.cost)], backgroundColor: SERIES_NEUTRAL },
+                    ...(gas ? [{ label: 'Gas', data: [...shown.map(() => null), perMonth(gas.cost)], backgroundColor: SERIES_NEUTRAL }] : []),
                 ],
             },
             plugins: [totalLabels(costTotals, dollars)],
@@ -164,7 +188,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
 
     // Time per month: fast-charging minutes per car against fill-ups, the
     // simulated week scaled to a month like the cost (owner, 2026-11-07).
-    const timeTotals = [...shown.map(p => perMonth(p.comparison.week.fastMinutes)), gas ? perMonth(gas.minutesPerWeek) : null];
+    const timeTotals = withGas(shown.map(p => perMonth(p.comparison.week.fastMinutes)), gas && perMonth(gas.minutesPerWeek));
     useBarChart(timeRef, timeChart, () => {
         if (!shown.length) return null;
         return {
@@ -174,7 +198,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
                 datasets: [{
                     label: 'Minutes per month',
                     data: timeTotals,
-                    backgroundColor: [...shown.map(p => p.color), SERIES_NEUTRAL],
+                    backgroundColor: withGas(shown.map(p => p.color), SERIES_NEUTRAL),
                 }],
             },
             plugins: [totalLabels(timeTotals, minutesText)],
@@ -201,8 +225,8 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
 
     const season = settings.season === 'winter' ? `Winter, ${settings.winterF}°F` : `Summer, ${settings.summerF}°F`;
     const subtitle = `${weekSummary(settings)} · ${season} · ${chargingText(settings, HOME_LEVELS[settings.level])}`;
-    const costTitle = `Cost per month, vs ${gasCarName(settings)}`;
-    const timeTitle = 'Time per month: fast charging vs fill-ups';
+    const costTitle = gas ? `Cost per month, vs ${gasCarName(settings)}` : 'Cost per month';
+    const timeTitle = gas ? 'Time per month: fast charging vs fill-ups' : 'Time per month: fast charging';
     const costPng = useChartPng(costChart, { title: costTitle, subtitle, sources: sourceLine.text, signature });
     const timePng = useChartPng(timeChart, { title: timeTitle, subtitle, sources: sourceLine.text, signature });
 
@@ -210,7 +234,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
 
     return (
         <div className="chart-layout">
-            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} />}
+            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} cityless={noCityFigure(priced)} />}
             <div className="chart-main">
                 {missing.length > 0 && (
                     <p className="text-note drive-missing">

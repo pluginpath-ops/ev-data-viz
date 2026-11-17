@@ -22,7 +22,10 @@ function CostMathBody({ vehicles, shown, settings }) {
         const { comparison: c } = priceVehicle(vehicle, vehicles, settings, (r) => sessionFor(testSessions, r), trace);
         return {
             trace,
-            summary: c && `Card: ${savedText(c.monthly.saved)} · ${dollars(c.monthly.ev)}/mo to charge against ${dollars(c.monthly.gas)}/mo in gas · ${minutesText(perMonth(c.week.fastMinutes))} fast charging a month`,
+            // With None for the gas car the card says only what the car costs.
+            summary: c && (settings.gasCompare
+                ? `Card: ${savedText(c.monthly.saved)} · ${dollars(c.monthly.ev)}/mo to charge against ${dollars(c.monthly.gas)}/mo in gas · ${minutesText(perMonth(c.week.fastMinutes))} fast charging a month`
+                : `Card: ${dollars(c.monthly.ev)}/mo to charge · ${minutesText(perMonth(c.week.fastMinutes))} fast charging a month`),
         };
     }, [vehicles, settings, testSessions]);
     return (

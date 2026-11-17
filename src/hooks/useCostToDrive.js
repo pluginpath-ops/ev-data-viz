@@ -7,7 +7,7 @@
 import { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { sessionFor } from '../utils/testSessions';
-import { specProvenance } from '../utils/specHelpers';
+import { specProvenance, vehicleLabel } from '../utils/specHelpers';
 import { costToDriveVehicle, costToDriveComparison } from '../utils/costToDrive';
 import { resolveChartColors, VEHICLE_PALETTE } from '../utils/colorUtils';
 import { HOME_LEVELS } from '../constants/costToDrive';
@@ -77,3 +77,8 @@ export function useCostToDriveByLevel(vehicles, selectedVehicleIds, settings) {
         [vehicles, selectedVehicleIds, settings, testSessions],
     );
 }
+
+/** The priced cars with no EPA city figure, by name: City share cannot move them. */
+export const noCityFigure = (priced) => priced
+    .filter(p => !p.missing && p.profile.cityFrom === 'highway')
+    .map(p => vehicleLabel(p.vehicle));

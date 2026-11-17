@@ -39,6 +39,12 @@
  * above its MINIMUM, so a lower minimum shifts every index: versions 1–3 read
  * their numbers against the minimums they were written with (V3_MINS).
  *
+ * Version 5 (2026-11-17): the home rate plan and the days-off plug-in window
+ * were added (V5_DEFAULTS: One price, today's window), and a new kind, the
+ * hours of a custom plan — 24 tier letters as a base-3 number, midnight the
+ * low digit. Same packing otherwise. Before it shipped it also took the gas
+ * comparison's on/off (`gasCompare`, on by default).
+ *
  * Pure leaf: imports only the constants leaf, so the short link can carry it.
  */
 import { COST_TO_DRIVE_FIELDS, DAY_TYPES } from '../constants/costToDrive';
@@ -46,7 +52,7 @@ import { COST_TO_DRIVE_FIELDS, DAY_TYPES } from '../constants/costToDrive';
 /** The address parameter that carries the key. */
 export const COST_TO_DRIVE_PARAM = 'cd';
 
-export const COST_TO_DRIVE_KEY_VERSION = '4';
+export const COST_TO_DRIVE_KEY_VERSION = '5';
 
 /** The minimums versions 1–3 stored a field against, where today's differ. FROZEN. */
 const V3_MINS = Object.freeze({ homePrice: 0.05, fastPrice: 0.15, detourMin: 5 });
@@ -55,8 +61,11 @@ const V3_MINS = Object.freeze({ homePrice: 0.05, fastPrice: 0.15, detourMin: 5 }
 const withFrozen = (fields, over) => fields.map(f => (over[f.key] ? { ...f, ...over[f.key] } : f));
 const minsOf = (mins) => Object.fromEntries(Object.entries(mins).map(([key, min]) => [key, { min }]));
 
-/** Version 4's fields: the whole list so far. The constants list is append-only, so earlier versions are its prefixes. */
-const FIELDS_V4 = COST_TO_DRIVE_FIELDS.slice(0, 35);
+/** Version 5's fields: the whole list so far. The constants list is append-only, so earlier versions are its prefixes. */
+const FIELDS_V5 = COST_TO_DRIVE_FIELDS.slice(0, 44);
+
+/** Version 4's: version 5's without the rate plan and the days-off window. */
+const FIELDS_V4 = FIELDS_V5.slice(0, 35);
 
 /** Version 3's: the same fields on version 3's minimums. */
 const FIELDS_V3 = withFrozen(FIELDS_V4, minsOf(V3_MINS));
@@ -94,6 +103,16 @@ const V3_DEFAULTS = Object.freeze({
 /** Version 4's defaults, frozen: version 3's with a 25% stop and a 42¢ fast price. */
 const V4_DEFAULTS = Object.freeze({ ...V3_DEFAULTS, stopBy: 25, fastPrice: 0.42 });
 
+/** Version 5's defaults, frozen: version 4's with One price and the days-off window as the driving days'. */
+const V5_DEFAULTS = Object.freeze({
+    ...V4_DEFAULTS,
+    rate: 'flat', rateHours: 'LLLLLLMMMMMMMMMMHHHHHMMM', rateHigh: 0.45, rateMid: 0.25, rateLow: 0.12,
+    rateWeekendOff: true, offFrom: 22, offUntil: 7, gasCompare: true,
+});
+
+/** A tier letter's digit in an `hours` field: H 0, M 1, L 2. */
+const HOUR_TIERS = ['H', 'M', 'L'];
+
 const decimalsOf = (step) => String(step).split('.')[1]?.length ?? 0;
 
 /** One setting held to its slider; the field's default when it cannot be read. */
@@ -103,6 +122,8 @@ function normalizeField(f, raw) {
         return typeof raw === 'boolean' ? raw : f.def;
     case 'enum':
         return f.values.includes(raw) ? raw : f.def;
+    case 'hours':
+        return typeof raw === 'string' && raw.length === 24 && [...raw].every(c => HOUR_TIERS.includes(c)) ? raw : f.def;
     case 'week':
         return typeof raw === 'string' && raw.length === 7 && [...raw].every(c => DAY_TYPES.includes(c)) ? raw : f.def;
     case 'mask': {
@@ -134,6 +155,7 @@ function toIndex(f, v) {
     case 'enum': return f.values.indexOf(v);
     case 'mask': return v;
     case 'week': return [...v].reduceRight((n, c) => n * 3 + DAY_TYPES.indexOf(c), 0);
+    case 'hours': return [...v].reduceRight((n, c) => n * 3 + HOUR_TIERS.indexOf(c), 0);
     default: return Math.round((v - f.min) / f.step);
     }
 }
@@ -148,6 +170,12 @@ function fromIndex(f, n) {
         if (n >= 3 ** 7) return undefined;
         let s = '';
         for (let i = 0; i < 7; i++) { s += DAY_TYPES[n % 3]; n = Math.floor(n / 3); }
+        return s;
+    }
+    case 'hours': {
+        if (n >= 3 ** 24) return undefined;
+        let s = '';
+        for (let i = 0; i < 24; i++) { s += HOUR_TIERS[n % 3]; n = Math.floor(n / 3); }
         return s;
     }
     default: {
@@ -204,15 +232,15 @@ function fromBase64Url(text) {
 }
 
 /**
- * The key for a set of settings, or null when every one is at its version-4
+ * The key for a set of settings, or null when every one is at its version-5
  * default (the address then carries no `cd` at all).
  */
 export function encodeCostToDriveKey(settings) {
     const s = normalizeCostToDrive(settings);
     let mask = 0;
     const body = [];
-    FIELDS_V4.forEach((f, i) => {
-        if (s[f.key] === V4_DEFAULTS[f.key]) return;
+    FIELDS_V5.forEach((f, i) => {
+        if (s[f.key] === V5_DEFAULTS[f.key]) return;
         mask += 2 ** i;
         if (f.kind === 'text') {
             const utf8 = new TextEncoder().encode(s[f.key]);
@@ -238,13 +266,13 @@ export const GAS_CAR_KEY_FIELDS = Object.freeze(
 
 /**
  * The key for the gas car alone, or null while it is every one at its
- * version-4 default — Road Trip's chart link carries this where Cost & Time's
+ * version-5 default — Road Trip's chart link carries this where Cost & Time's
  * carries the whole key, so the picked car travels with the chart and an
  * untouched car adds nothing to the address. The same `cd` parameter and the
  * same codec, not a second one: App reads it back as every other `cd` key, the
  * rest of the settings at their defaults.
  *
- * Laid over the frozen version-4 defaults rather than today's, so a default
+ * Laid over the frozen version-5 defaults rather than today's, so a default
  * that moves later cannot put a setting this link never meant into it.
  */
 export function encodeGasCarKey(settings) {
@@ -271,7 +299,7 @@ function readText(bytes, at) {
  * @returns {{ settings: Object, error: string|null }}
  */
 export function decodeCostToDriveKey(key) {
-    const defaults = normalizeCostToDrive(V4_DEFAULTS);
+    const defaults = normalizeCostToDrive(V5_DEFAULTS);
     if (key == null || key === '') return { settings: defaults, error: null };
     const dot = String(key).indexOf('.');
     const version = dot < 0 ? '' : key.slice(0, dot);
@@ -280,6 +308,7 @@ export function decodeCostToDriveKey(key) {
         2: [FIELDS_V2, V2_DEFAULTS],
         3: [FIELDS_V3, V3_DEFAULTS],
         4: [FIELDS_V4, V4_DEFAULTS],
+        5: [FIELDS_V5, V5_DEFAULTS],
     }[version] ?? [];
     if (!fields) {
         return { settings: defaults, error: `This link's settings were made by a newer version of the site (key version ${version || '?'}).` };
@@ -288,7 +317,8 @@ export function decodeCostToDriveKey(key) {
         const bytes = fromBase64Url(key.slice(dot + 1));
         const at = { i: 0 };
         const mask = readVarint(bytes, at);
-        const out = { ...frozen };
+        // Fields a version does not have read at today's defaults.
+        const out = { ...V5_DEFAULTS, ...frozen };
         let rest = mask;
         for (let i = 0; rest > 0; i++, rest = Math.floor(rest / 2)) {
             if (rest % 2 === 0) continue;
@@ -299,6 +329,8 @@ export function decodeCostToDriveKey(key) {
             out[f.key] = v;
         }
         if (at.i !== bytes.length) throw new Error('trailing bytes');
+        // Before version 5 one plug-in window served every night: days off keep it.
+        if (Number(version) < 5) { out.offFrom = out.plugFrom; out.offUntil = out.plugUntil; }
         return { settings: normalizeCostToDrive(out), error: null };
     } catch {
         return { settings: defaults, error: 'This link\'s Cost & Time settings could not be read, so the defaults are shown.' };

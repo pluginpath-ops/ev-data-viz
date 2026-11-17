@@ -954,12 +954,13 @@ export default function RoadTripView({
     // EVs run as tested, each at its own temperature, and there is no one to
     // cut the gas car by. Memoized on its fields, not the shared settings'
     // identity, so a Cost & Time-only change does not rebuild the chart.
-    const { gasHwy, gasTank, gasFillAt, gasFillMin } = gasCar;
+    // Null when the reader picked None (`gasCompare`): no gas line, lane or column.
+    const { gasHwy, gasTank, gasFillAt, gasFillMin, gasCompare } = gasCar;
     const gasName = gasCarName(gasCar);
     const gasTemperatureF = correctionMode !== 'none' ? correction.target.temperatureF : null;
     const gas = useMemo(
-        () => ({ settings: { gasHwy, gasTank, gasFillAt, gasFillMin }, temperatureF: gasTemperatureF, name: gasName }),
-        [gasHwy, gasTank, gasFillAt, gasFillMin, gasTemperatureF, gasName]);
+        () => (gasCompare ? { settings: { gasHwy, gasTank, gasFillAt, gasFillMin }, temperatureF: gasTemperatureF, name: gasName } : null),
+        [gasCompare, gasHwy, gasTank, gasFillAt, gasFillMin, gasTemperatureF, gasName]);
 
     const pairStructure = useMemo(() => {
         const map = new Map();
@@ -1705,10 +1706,10 @@ export default function RoadTripView({
                 SPEED_SWEEP_MPH.map(mph => (units === 'metric' ? Math.round(mph * MI_TO_KM) : mph))));
 
             // The gas car's line
-            const gasSpeedData = SPEED_SWEEP_MPH.map(mph => (
-                { x: dispSpeed(mph), y: yOf(gasTripAt(gas, totalDistance, mph).totalMin, mph) }));
-            const gasSpeedYMin = yFloor(gasSpeedData);
-            speedDatasets.unshift({
+            const gasSpeedData = gas ? SPEED_SWEEP_MPH.map(mph => (
+                { x: dispSpeed(mph), y: yOf(gasTripAt(gas, totalDistance, mph).totalMin, mph) })) : null;
+            const gasSpeedYMin = gas ? yFloor(gasSpeedData) : undefined;
+            if (gas) speedDatasets.unshift({
                 label: gasName,
                 data: gasSpeedData,
                 borderColor: SERIES_NEUTRAL,
@@ -1829,10 +1830,10 @@ export default function RoadTripView({
             // plan off, everyone holds the trip speed.
             const gasRange = bestPlanOn ? optimizerGrids?.find(Boolean)?.range : null;
             const gasMph = gasRange ? OPT_SPEED_MPH[gasRange[1]] : speed;
-            const gasDistData = stopXs.map(x => (
-                { x: toDisplay(x), y: yOf(gasTripAt(gas, totalDistance, gasMph).totalMin, gasMph) }));
-            const gasDistYMin = yFloor(gasDistData);
-            distDatasets.unshift({
+            const gasDistData = gas ? stopXs.map(x => (
+                { x: toDisplay(x), y: yOf(gasTripAt(gas, totalDistance, gasMph).totalMin, gasMph) })) : null;
+            const gasDistYMin = gas ? yFloor(gasDistData) : undefined;
+            if (gas) distDatasets.unshift({
                 label: gasName,
                 data: gasDistData,
                 borderColor: SERIES_NEUTRAL,
@@ -1937,7 +1938,9 @@ export default function RoadTripView({
         // By test lane the line is its fuel gauge: full after each stop, down to
         // the fill-up level at the next, and to what is left at the finish.
         const gasLane = validEntries.length; // byTest lane index for the gas car
-        const gasTrip = gasTripAt(gas, roadTripConfig.totalDistance, roadTripConfig.speed);
+        const lanes = validEntries.length + (gas ? 1 : 0);
+        // No gas car (None): no legs, so no line, lane or fill-up boxes.
+        const gasTrip = gas ? gasTripAt(gas, roadTripConfig.totalDistance, roadTripConfig.speed) : { legs: [], stopMin: 0 };
 
         const gasPoints       = [];  // distance / chargeTime mode
         const gasByTestPoints = [];  // byTest mode (fuel lane)
@@ -1986,7 +1989,9 @@ export default function RoadTripView({
             // gasCumDrive does NOT advance during gas stops
         });
 
-        if (isByTestMode) {
+        if (!gas) {
+            // None: nothing to draw.
+        } else if (isByTestMode) {
             datasets.push({
                 label: gasName,
                 data: gasByTestPoints,
@@ -2098,7 +2103,7 @@ export default function RoadTripView({
                     y: isByTestMode ? {
                         reverse: false,
                         min: axisLimits.yMin ?? 0,
-                        max: axisLimits.yMax ?? (validEntries.length + 1), // +1 for the gas car's lane
+                        max: axisLimits.yMax ?? lanes, // one more for the gas car's lane, when there is one
                         title: { display: false },
                         ticks: {
                             stepSize: 0.5,
@@ -2116,14 +2121,14 @@ export default function RoadTripView({
                                     const idx = Math.floor(val); // lane index
                                     const text = idx >= 0 && idx < validEntries.length
                                         ? entryLabel(validEntries[idx])
-                                        : idx === validEntries.length ? gasName : null;
+                                        : gas && idx === validEntries.length ? gasName : null;
                                     if (text != null) {
                                         // Wrapped to the width and lane height the chart has,
                                         // so the axis fits the wrapped label instead of one
                                         // long line being clipped or crowding the plot.
                                         const { maxWidth, maxLines } = laneLabelBudget({
                                             chartWidth: this.chart.width, chartHeight: this.chart.height,
-                                            lanes: validEntries.length + 1, lineHeight: fonts.axis * 1.2,
+                                            lanes, lineHeight: fonts.axis * 1.2,
                                         });
                                         return wrapAxisLabel(this.ctx, `${fonts.axis}px ${fonts.sans}`, text, maxWidth, maxLines);
                                     }
@@ -2181,8 +2186,8 @@ export default function RoadTripView({
             },
             plugins: [zoomStatePlugin, readout.plugin(timelineReadout), makeRoadTripPlugin(simResults.map((s, i) => {
                 return datasets.find(d => d._simIndex === i) ? s : null;
-            }).filter(Boolean), units, yAxis, gasTime,
-                isByTestMode ? { laneIndex: gasLane, gasStops: gasStopSegs, totalTimeMin: gasTime } : null,
+            }).filter(Boolean), units, yAxis, gas ? gasTime : null,
+                isByTestMode && gas ? { laneIndex: gasLane, gasStops: gasStopSegs, totalTimeMin: gasTime } : null,
                 gasName,
             )],
         });
@@ -2235,7 +2240,7 @@ export default function RoadTripView({
 
     // The gas car's total time at the trip speed, for the table's gap to it.
     const gasRefTimeMin = useMemo(
-        () => gasTripAt(gas, totalDistance, speed).totalMin,
+        () => (gas ? gasTripAt(gas, totalDistance, speed).totalMin : null),
         [gas, totalDistance, speed]);
 
     // Display values in current units
@@ -2488,7 +2493,7 @@ export default function RoadTripView({
                             </label>
                             {!optimizer && planRows}
                             <label className="scenario-row"
-                                title="The extra minutes off the route for each charging stop. A gas stop has none: its fill-up minutes, set under Your gas car, are already its whole time off the route.">
+                                title="The extra minutes off the route for each charging stop. A gas stop has none: its fill-up minutes, set under Gas comparison vehicle, are already its whole time off the route.">
                                 <span className="scenario-key">Stop</span>
                                 <NumberInput className="form-input" min={0}
                                     value={overhead}
@@ -2914,7 +2919,7 @@ export default function RoadTripView({
                                     <SortTh col="efficiency">Efficiency</SortTh>
                                     <SortTh col="corrEff">Corrected Eff</SortTh>
                                     <SortTh col="speedAdj">Adjustment</SortTh>
-                                    <SortTh col="vsGas">vs {gasName}</SortTh>
+                                    {gas && <SortTh col="vsGas">vs {gasName}</SortTh>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--color-border)]">
@@ -2973,7 +2978,7 @@ export default function RoadTripView({
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="px-3 py-2 font-medium">
+                                            {gas && <td className="px-3 py-2 font-medium">
                                                 {sim.completed === false ? <span className="text-meta">—</span> : (() => {
                                                     const absDelta = Math.abs(vsGas);
                                                     const h = Math.floor(absDelta / 60);
@@ -2983,7 +2988,7 @@ export default function RoadTripView({
                                                         ? <span className="status-text is-warning">+{label}</span>
                                                         : <span className="status-text is-good">−{label}</span>;
                                                 })()}
-                                            </td>
+                                            </td>}
                                         </tr>
                                     );
                                 })}

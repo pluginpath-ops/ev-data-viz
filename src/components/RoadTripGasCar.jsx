@@ -14,10 +14,12 @@ import GasCarFields from './costToDrive/GasCarFields';
  */
 export default function RoadTripGasCar({ settings, onChange }) {
     const [open, setOpen] = useRememberedOpen('roadtrip-gas-car', false);
-    const note = `${gasCarName(settings)} · ${settings.gasHwy} hwy mpg · ${settings.gasTank} gal · fill at ${settings.gasFillAt}% left`;
+    const note = settings.gasCompare
+        ? `${gasCarName(settings)} · ${settings.gasHwy} hwy mpg · ${settings.gasTank} gal · fill at ${settings.gasFillAt}% left`
+        : 'None';
     return (
         <div className="chart-rail-group">
-            <SectionBand open={open} onToggle={setOpen} label="Your gas car" note={open ? null : note} />
+            <SectionBand open={open} onToggle={setOpen} label="Gas comparison vehicle" note={open ? null : note} />
             {open && (
                 <div className="flex flex-col gap-3">
                     <GasCarFields settings={settings} onChange={onChange} compact picker timeOnly />

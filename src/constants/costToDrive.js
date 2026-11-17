@@ -3,9 +3,11 @@
  * the week is simulated with. Single source of truth for all three; the plan is
  * docs/cost-to-drive-plan.md.
  *
- * Leaf module: imports nothing from the app, so the key codec (which the short
- * link reaches before the constants are seeded) can read it.
+ * Leaf module: imports nothing from the app but the rate plans leaf, so the
+ * key codec (which the short link reaches before the constants are seeded) can
+ * read it.
  */
+import { RATE_PLANS } from './ratePlans';
 
 /**
  * The home charger levels a reader picks from. 40 A and 64 A were dropped on
@@ -160,7 +162,7 @@ export const GAS_CAR_PRESETS = [
  *
  * kinds: 'num' (min, max, step), 'bool', 'enum' (values), 'week' (7 day
  * types), 'mask' (7 days, Monday the low bit), 'text' (up to `max`
- * characters).
+ * characters), 'hours' (24 tier letters, H / M / L, from midnight).
  *
  * `step` is what a value is stored to; `spin`, where given, is what the
  * field's spinner moves by. The two miles fields take any whole mile but spin
@@ -222,6 +224,23 @@ export const COST_TO_DRIVE_FIELDS = [
     // or tank makes it custom.
     { key: 'gasCar',         kind: 'enum', values: ['custom', ...GAS_CAR_PRESETS.map(p => p.key)], def: 'custom' },
     { key: 'gasName',        kind: 'text', max: 24, def: '' },
+    // Key version 5 (owner, 2026-11-17): the home rate plan. 'flat' is One
+    // price (`homePrice`); a plan from RATE_PLANS prices each hour from its
+    // own table; 'custom' from the fields below, which picking a plan fills in
+    // (the shown season's prices) — editing one makes the plan custom, as the
+    // gas car does. Days off charge in their own plug-in window.
+    { key: 'rate',           kind: 'enum', values: ['flat', 'custom', ...RATE_PLANS.map(p => p.key)], def: 'flat' },
+    { key: 'rateHours',      kind: 'hours', def: 'LLLLLLMMMMMMMMMMHHHHHMMM' },
+    { key: 'rateHigh',       kind: 'num',  min: 0,    max: 1.00, step: 0.01, def: 0.45 },
+    { key: 'rateMid',        kind: 'num',  min: 0,    max: 1.00, step: 0.01, def: 0.25 },
+    { key: 'rateLow',        kind: 'num',  min: 0,    max: 1.00, step: 0.01, def: 0.12 },
+    { key: 'rateWeekendOff', kind: 'bool', def: true },
+    { key: 'offFrom',        kind: 'num',  min: 0,    max: 23,   step: 1,    def: 22 },
+    { key: 'offUntil',       kind: 'num',  min: 0,    max: 23,   step: 1,    def: 7 },
+    // Off when the reader picks None for the gas comparison vehicle (owner,
+    // 2026-11-17): no gas car anywhere — no savings, no gas bars, no gas line on
+    // Road Trip. Picking or naming a car turns it back on. Its figures stay.
+    { key: 'gasCompare',     kind: 'bool', def: true },
 ];
 
 /** The settings an untouched page shows. */

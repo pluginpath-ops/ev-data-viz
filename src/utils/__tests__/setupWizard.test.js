@@ -290,6 +290,18 @@ describe('planFromAnswers', () => {
         expect(plan.season).toMatchObject({ season: 'winter', tempF: 15, other: { season: 'summer', tempF: 95 } });
     });
 
+    it('the rate question: a picked time-of-use plan sets it, One price sets One price', () => {
+        const rateOf = (a) => planFromAnswers({ goals: ['cost'], ...a }, { vehicles: fleet }).costToDrive.rate;
+        expect(rateOf({ rate: 'tou', ratePlan: 'gpc-overnight' })).toBe('gpc-overnight');
+        expect(rateOf({ rate: 'tou', ratePlan: null })).toBeUndefined();
+        expect(rateOf({ rate: 'flat' })).toBe('flat');
+        // An answer the question no longer offers is dropped.
+        expect(sanitizeAnswers({ rate: 'unsure' }).rate).toBeNull();
+        // Only the cost goal asks it.
+        expect(planFromAnswers({ goals: ['range'], rate: 'tou', ratePlan: 'gpc-overnight' }, { vehicles: fleet }).costToDrive.rate).toBeUndefined();
+        expect(sanitizeAnswers({ rate: 'tou', ratePlan: 'nope' })).toMatchObject({ rate: 'tou', ratePlan: null });
+    });
+
     it('each home charging answer sets its Cost & Time level: 48 A, 32 A, 120 V, none', () => {
         const levelOf = (home) => planFromAnswers({ goals: ['cost'], home }, { vehicles: fleet }).costToDrive.level;
         expect(['wall48', 'outlet240', 'outlet120', 'none'].map(levelOf)).toEqual([4, 3, 0, NO_HOME_LEVEL]);

@@ -51,6 +51,13 @@ import { prepareFixedReadout } from '../utils/drawFixedReadout';
  * @returns {{ plugin: (config: object) => object, overlay: React.ReactNode }}
  *   config: `{ title(x) → string, describe(row, {nearest}) → object }`, and
  *   optionally `xTolerance` in x-units (default: autoTolerance).
+ *
+ *   A chart whose x is not a line to read along — the Weekly Charging Plan's
+ *   day bars — passes `rowsAt(chart, x) → { x, rows } | null` instead: its own
+ *   rows for the category under the cursor (each `{ key, color, pixelY }`, and
+ *   optionally `swatch`, a CSS background, and `fill`, the canvas fill for the
+ *   PNG), snapped to that category, with no dots on the crosshair; and `step`,
+ *   how far an arrow key moves (1: a day).
  */
 export function useChartReadout() {
     const [store] = useState(createStore);
@@ -128,6 +135,15 @@ function attach(chart, config, store) {
         const xScale = scales.x;
         if (!area || !xScale) return null;
         const x = xOverride ?? xScale.getValueForPixel(px);
+        if (config.rowsAt) {
+            const own = config.rowsAt(chart, x);
+            if (!own?.rows.length) return null;
+            return {
+                mode: forMode, x: own.x, xPx: xScale.getPixelForValue(own.x), cursorY: py,
+                rows: own.rows, missing: 0, dots: [], config,
+                area: { left: area.left, right: area.right, top: area.top, bottom: area.bottom },
+            };
+        }
         const span = Math.abs(xScale.max - xScale.min);
         const tolerance = config.xTolerance
             ?? autoTolerance({ span, pxPerUnit: span > 0 ? xScale.width / span : 0 });
@@ -281,7 +297,8 @@ function attach(chart, config, store) {
         if (!xScale) return;
         const span = xScale.max - xScale.min;
         const from = keyboardX ?? store.get().x ?? xScale.min + span / 2;
-        keyboardX = Math.min(xScale.max, Math.max(xScale.min, from + dir * (span / 100) * (big ? 10 : 1)));
+        const unit = config.step ?? span / 100;
+        keyboardX = Math.min(xScale.max, Math.max(xScale.min, from + dir * unit * (big && !config.step ? 10 : 1)));
         show(xScale.getPixelForValue(keyboardX), null, mode === 'fixed' ? 'fixed' : 'hover', keyboardX);
     };
 

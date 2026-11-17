@@ -15,6 +15,7 @@ import Chart from 'chart.js/auto';
 import { WEEKDAYS } from '../../constants/costToDrive';
 import { withAlpha } from '../../utils/colorUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
+import { drawTierShading } from '../../utils/tierShading';
 import { weekTimeText } from '../../utils/costToDrive';
 import { useChartPng } from '../../hooks/useChartPng';
 import { useTheme } from '../../hooks/useTheme';
@@ -34,20 +35,30 @@ const NO_SOURCES = {};
  * (horizontal dashed lines at left-axis values), the guides drawn after the
  * line so they read across it.
  */
-const weekMarks = ({ stops, guides, windows }) => ({
+const weekMarks = ({ stops, guides, windows, tiers }) => ({
     id: 'weekMarks',
     beforeDatasetsDraw(chart) {
         const { ctx, chartArea: a, scales: { x } } = chart;
-        const { callout, ink, tick } = chartTheme();
+        const theme = chartTheme();
+        const { callout, ink, tick } = theme;
         const fonts = chartFonts();
         ctx.save();
         ctx.fillStyle = tick;
+        ctx.globalAlpha = 0.08;
+        const shade = (from, to) => {
+            const x0 = x.getPixelForValue(from);
+            ctx.fillRect(x0, a.top, x.getPixelForValue(to) - x0, a.bottom - a.top);
+        };
         for (const w of windows) {
-            const x0 = x.getPixelForValue(w.from), x1 = x.getPixelForValue(w.to), xs = x.getPixelForValue(w.spareFrom);
-            ctx.globalAlpha = 0.08;
-            ctx.fillRect(x0, a.top, x1 - x0, a.bottom - a.top);
-            ctx.fillRect(xs, a.top, x1 - xs, a.bottom - a.top);
+            shade(w.from, w.to);
+            // The spare time a shade darker: every part of the window the
+            // charger did not run — after it finished, or, on a time-of-use
+            // plan, waiting for the cheap hours.
+            let at = w.from;
+            for (const [s0, s1] of w.spans) { if (s0 > at) shade(at, s0); at = Math.max(at, s1); }
+            if (w.to > at) shade(at, w.to);
         }
+        drawTierShading(ctx, x, a.top, a.bottom, tiers, theme);
         ctx.globalAlpha = 1;
         for (const s of stops) {
             const x0 = x.getPixelForValue(s.from);
@@ -91,13 +102,14 @@ const weekMarks = ({ stops, guides, windows }) => ({
  * @param {(v: number) => string} format    a left-axis value as the tooltip says it
  * @param {(v: number) => string} [right]   a left-axis value on the right axis ("46%")
  * @param {Array<{from, to, label?, planned?}>} [stops]  bands, in hours of the week
- * @param {Array<{from, to, spareFrom}>} [windows]  each night's plug-in window, in hours of the week (plugWindows)
+ * @param {Array<{from, to, spans}>} [windows]  each night's plug-in window and when the charger ran, in hours of the week (plugWindows)
+ * @param {{spans: Array<{from, to, tier}>, base: number}} [tiers]  on a time-of-use plan, when the charger ran in which tier (0 dearest) and the base tier (rateTiers)
  * @param {number[]} [guides]             left-axis values drawn as dashed lines
  * @param {string} color                    the series color
  * @param {{runs, allRuns, epa}} [sources]  what the line was priced from, for its source line (useSourceLine)
  */
 export default function WeekLineChart({
-    points, max, yLabel, format, right = null, stops = [], windows = [], guides = [], color,
+    points, max, yLabel, format, right = null, stops = [], windows = [], tiers = null, guides = [], color,
     title, subtitle, sources = NO_SOURCES, signature, presentationMode = false, height = '340px', linkButton = false,
 }) {
     const sourceLine = useSourceLine(sources);
@@ -123,7 +135,7 @@ export default function WeekLineChart({
                     tension: 0,
                 }],
             },
-            plugins: [weekMarks({ stops, guides, windows })],
+            plugins: [weekMarks({ stops, guides, windows, tiers })],
             options: {
                 animation: false,
                 responsive: true,

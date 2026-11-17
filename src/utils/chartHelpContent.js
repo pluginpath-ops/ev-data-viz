@@ -206,7 +206,7 @@ export const CHART_HELP_DEFAULTS = {
             'Leg / distance between charges — how far you drive before each stop.\n' +
             'Overhead — the extra minutes off the route for each charging stop (park, plug in, break). ' +
             'A gas stop has none: its fill-up minutes are already its whole time off the route.\n' +
-            'The gas car — the one picked under Your gas car, set once for here and Cost & Time. ' +
+            'The gas car — the one picked under Gas comparison vehicle, set once for here and Cost & Time. ' +
             'It stops when its tank runs down to the fill-up level, and each stop takes the fill-up’s ' +
             'minutes, the total time off the route with nothing added. This chart times it; it ' +
             'prices no fuel.\n' +

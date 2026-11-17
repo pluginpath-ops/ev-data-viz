@@ -21,9 +21,9 @@ import { filterRangeRuns } from '../../utils/runUtils';
 import { SERIES_NEUTRAL } from '../../utils/colorUtils';
 import { HOME_LEVELS, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import {
-    simulateWeek, dollars, minutesText, weekSummary, gasCarName, chargingText, chargerText,
+    simulateWeek, dollars, minutesText, weekSummary, gasCarName, chargingText, chargerText, chargingTiers,
 } from '../../utils/costToDrive';
-import { useCostToDrive } from '../../hooks/useCostToDrive';
+import { useCostToDrive, noCityFigure } from '../../hooks/useCostToDrive';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
 import ChartInfoBubble from '../ChartInfoBubble';
 import CostToDriveSidebar from './CostToDriveSidebar';
@@ -55,6 +55,7 @@ function chartOf(week, profile) {
         guides: GUIDES_PCT.map(p => p * miPerPct),
         stops: week.stops.map(s => ({ from: s.hour, to: s.endHour, planned: s.planned, label: `${Math.round(s.minutes)}m` })),
         windows: week.windows,
+        tiers: chargingTiers(week),
     };
 }
 
@@ -104,7 +105,7 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
 
     return (
         <div className="chart-layout">
-            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} />}
+            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} cityless={noCityFigure(priced)} />}
             <div className="chart-main">
                 {!entry && (
                     <p className="text-note">
@@ -212,7 +213,8 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                                 </div>
                             )}
 
-                            {!presentationMode && (
+                            {/* The gas car's week; none with None picked. */}
+                            {!presentationMode && settings.gasCompare && (
                                 <div className="mt-4 flex flex-col gap-3">
                                     <button type="button" className={`subgroup-header${gasOpen ? ' is-open' : ''}`}
                                             aria-expanded={gasOpen} onClick={() => setGasOpen(o => !o)}>

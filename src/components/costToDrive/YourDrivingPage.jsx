@@ -4,16 +4,17 @@
  * sub-tabs keep every setting in their sidebar too, as the secondary way.
  *
  * Laid out in rows of even height: Your week beside Fast charging (a stop is
- * part of the week), then Home charging, Season and Your gas car, then
- * Efficiency from as one strip. Beside the intro, a live preview of the
+ * part of the week), then Home charging, Electricity rates and Season, then
+ * Gas comparison vehicle beside Efficiency from (one row of four wrapped the
+ * gas car out of sight; owner, 2026-11-17). Beside the intro, a live preview of the
  * selected vehicles against the gas car.
  */
 import { vehicleLabel } from '../../utils/specHelpers';
-import { savedText, extraTimeText, weekSummary, gasCarName } from '../../utils/costToDrive';
-import { useCostToDrive } from '../../hooks/useCostToDrive';
+import { savedText, extraTimeText, weekSummary, gasCarName, ratePlanName, dollars, minutesText, perMonth } from '../../utils/costToDrive';
+import { useCostToDrive, noCityFigure } from '../../hooks/useCostToDrive';
 import ShareSettingsButton from './ShareSettingsButton';
 import {
-    HomeChargingFields, WeekFields, FastChargingFields, SeasonFields, EfficiencyFields,
+    HomeChargingFields, ElectricityRatesFields, WeekFields, FastChargingFields, SeasonFields, EfficiencyFields,
 } from './DriveSections';
 import GasCarFields from './GasCarFields';
 
@@ -30,12 +31,17 @@ function DriveCard({ title, aside, children, className = '' }) {
     );
 }
 
-/** The selected vehicles vs the gas car, as the settings stand. */
+/**
+ * The selected vehicles vs the gas car, as the settings stand: money saved and
+ * time lost a month. With no gas car (None), what each costs and its fast
+ * charging a month instead.
+ */
 function DrivePreview({ priced, settings, onOpenMode }) {
+    const gas = settings.gasCompare;
     return (
         <aside className="drive-preview" aria-label="With these settings">
             <span className="text-secondary">
-                With these settings, a {settings.season} week vs {gasCarName(settings)}
+                With these settings, a {settings.season} week{gas ? ` vs ${gasCarName(settings)}` : ''}
             </span>
             {priced.length === 0 && (
                 <span className="text-note">Add vehicles with ＋ Add above to see them priced.</span>
@@ -49,7 +55,12 @@ function DrivePreview({ priced, settings, onOpenMode }) {
                     </span>
                     {missing
                         ? <span className="text-note drive-preview-missing">Can&rsquo;t price: {missing}</span>
-                        : (
+                        : !gas ? (
+                            <>
+                                <span className="text-data drive-figure">{dollars(comparison.monthly.ev)}/mo</span>
+                                <span className="text-data drive-figure">{minutesText(perMonth(comparison.week.fastMinutes))}/mo fast</span>
+                            </>
+                        ) : (
                             <>
                                 <span className={`text-data drive-figure ${comparison.monthly.saved >= 0 ? 'is-saving' : 'is-costing'}`}>
                                     {savedText(comparison.monthly.saved)}
@@ -95,7 +106,7 @@ export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings
 
             <div className="drive-row is-week">
                 <DriveCard title="Your week" aside={<span className="text-secondary">{weekSummary(settings)}</span>}>
-                    <WeekFields {...props} />
+                    <WeekFields {...props} cityless={noCityFigure(priced)} />
                 </DriveCard>
                 <DriveCard title="Fast charging" aside={<span className="text-secondary">used as needed, on top of home charging</span>}>
                     <FastChargingFields {...props} />
@@ -104,15 +115,20 @@ export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings
 
             <div className="drive-row">
                 <DriveCard title="Home charging"><HomeChargingFields {...props} /></DriveCard>
-                <DriveCard title="Season"><SeasonFields {...props} /></DriveCard>
-                <DriveCard title="Your gas car" aside={<span className="text-secondary">{gasCarName(settings)}</span>}>
-                    <GasCarFields {...props} />
+                <DriveCard title="Electricity rates" aside={<span className="text-secondary">{ratePlanName(settings) ?? 'One price'}</span>}>
+                    <ElectricityRatesFields {...props} />
                 </DriveCard>
+                <DriveCard title="Season"><SeasonFields {...props} /></DriveCard>
             </div>
 
-            <DriveCard title="Efficiency from" className="is-strip">
-                <EfficiencyFields {...props} />
-            </DriveCard>
+            <div className="drive-row">
+                <DriveCard title="Gas comparison vehicle" aside={<span className="text-secondary">{settings.gasCompare ? gasCarName(settings) : 'None'}</span>}>
+                    <GasCarFields {...props} />
+                </DriveCard>
+                <DriveCard title="Efficiency from" className="is-efficiency">
+                    <EfficiencyFields {...props} />
+                </DriveCard>
+            </div>
         </div>
     );
 }

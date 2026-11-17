@@ -8,7 +8,7 @@
  * charging rows are outlined in orange, the chart’s stop color. It replaced
  * the day strip, whose boxes said the same things again.
  */
-import { dollars, minutesText, weekTimeText, plugHours } from '../../utils/costToDrive';
+import { dollars, minutesText, weekTimeText, homeTierOrder } from '../../utils/costToDrive';
 import SortHeader from '../tables/SortHeader';
 import TableCell from '../tables/TableCell';
 
@@ -16,6 +16,8 @@ const TYPE_NAMES = { D: 'Daily', L: 'Long day', O: 'Off' };
 const DASH = '—';
 /** A clock time from an hour of the day, fractional: "4:10 am". */
 const clockText = (h) => weekTimeText(h % 24).slice(4);
+/** Dollars and cents: the rate rows split a night of a few dollars, so whole dollars read "$0". */
+const centsText = (n) => `$${n.toFixed(2)}`;
 
 /**
  * A row a figure: its name, each day's cell, and whether it is a fast-charging
@@ -31,19 +33,27 @@ const ROWS = [
     {
         // When the night ends: the battery full, or the plug-in window over.
         key: 'ready', label: 'Ready at',
-        cell: (d, s) => (d.night.added >= 0.5
-            ? { text: clockText(d.night.ranOut ? s.plugUntil : d.night.fullAt), mark: d.night.ranOut ? '*' : '' }
+        cell: (d) => (d.night.added >= 0.5
+            ? { text: clockText(d.night.ranOut ? d.night.window.to : d.night.fullAt), mark: d.night.ranOut ? '*' : '' }
             : { text: DASH }),
     },
     {
-        // The charger's margin: the plug-in window left once the night was done.
+        // The charger's margin: the plug-in window the charger did not use —
+        // with a time-of-use plan, some of it waiting for the cheap hours.
         // None where the window cut the night short, as the * says.
         key: 'spare', label: 'Spare plug-in time',
-        cell: (d, s) => (d.night.added >= 0.5
-            ? (d.night.ranOut ? { text: 'None', mark: '*' } : { text: minutesText(Math.max(0, plugHours(s) - d.night.hours) * 60) })
+        cell: (d) => (d.night.added >= 0.5
+            ? (d.night.ranOut ? { text: 'None', mark: '*' } : { text: minutesText(Math.max(0, d.night.window.to - d.night.window.from - d.night.hours) * 60) })
             : { text: DASH }),
     },
-    { key: 'homeCost', label: 'Home cost', cell: (d, s, homeCost) => ({ text: d.night.added >= 0.5 ? dollars(homeCost(d.night)) : DASH }) },
+    { key: 'homeCost', label: 'Home cost', cell: (d) => ({ text: d.night.added >= 0.5 ? dollars(d.night.homeCost) : DASH }) },
+    // Here, on a time-of-use plan: each rate's time and cost (tierRows).
+    {
+        // What a kWh cost that night on average, on a time-of-use plan only
+        // (owner, 2026-11-17).
+        key: 'homeRate', label: 'Aggregate rate', tou: true,
+        cell: (d) => ({ text: d.night.added >= 0.5 && d.night.homeKwh > 0 ? `${Math.round(d.night.homeCost / d.night.homeKwh * 100)}¢/kWh` : DASH }),
+    },
     {
         key: 'stops', label: 'Fast stops', fast: true,
         cell: (d) => ({ text: d.stops.length ? `${d.stops.length}${d.stops.some(x => x.planned) ? ' planned' : ''}` : (d.plannedSkipped ? 'skipped' : DASH) }),
@@ -59,9 +69,43 @@ const ROWS = [
 ];
 const FAST_KEYS = ROWS.filter(r => r.fast).map(r => r.key);
 
+/** Hours a night charged in tier `t`. */
+const tierHours = (night, t) => (night.tierSpans ?? []).filter(x => x.tier === t).reduce((h, x) => h + x.to - x.from, 0);
+
+/**
+ * On a time-of-use plan, a time row and a cost row for each rate the week
+ * charged in, cheapest first, as the bars stack (owner, 2026-11-17).
+ */
+function tierRows(week) {
+    const tiers = week.rateTiers;
+    if (!tiers) return [];
+    return homeTierOrder(tiers)
+        .filter(t => week.days.some(d => (d.night.tierKwh?.[t] ?? 0) > 0))
+        .flatMap(t => [
+            {
+                key: `tierTime-${t}`, label: `${tiers.names[t]} time`,
+                cell: (d) => { const h = tierHours(d.night, t); return { text: h * 60 >= 1 ? minutesText(h * 60) : DASH }; },
+            },
+            {
+                key: `tierCost-${t}`, label: `${tiers.names[t]} cost`,
+                cell: (d) => { const c = d.night.tierCost?.[t] ?? 0; return { text: c >= 0.005 ? centsText(c) : DASH }; },
+            },
+        ]);
+}
+
+/** Home cost in cents too when the rate rows split it, so they add up to it. */
+const HOME_COST_CENTS = {
+    key: 'homeCost', label: 'Home cost',
+    cell: (d) => ({ text: d.night.added >= 0.5 ? centsText(d.night.homeCost) : DASH }),
+};
+
 export default function PlanTable({ week, settings }) {
-    // A night's cost: what it bought at the wall, battery warming in, at the home price.
-    const homeCost = (night) => night.homeKwh * settings.homePrice;
+    const split = tierRows(week);
+    const at = ROWS.findIndex(r => r.key === 'homeCost');
+    const rows = split.length
+        ? [...ROWS.slice(0, at), HOME_COST_CENTS, ...split, ...ROWS.slice(at + 1)]
+        : ROWS;
+    const shown = rows.filter(r => !r.tou || settings.rate !== 'flat');
     const cols = [
         { key: 'figure', label: '', holds: 'noted-figures' },
         ...week.days.map(d => ({ key: d.day, label: d.day, numeric: true })),
@@ -73,13 +117,13 @@ export default function PlanTable({ week, settings }) {
                     <tr>{cols.map(c => <SortHeader key={c.key} col={c} />)}</tr>
                 </thead>
                 <tbody>
-                    {ROWS.map(r => {
+                    {shown.map(r => {
                         const edge = !r.fast ? '' : r.key === FAST_KEYS[0] ? ' is-fast-first' : r.key === FAST_KEYS.at(-1) ? ' is-fast-last' : '';
                         return (
                             <tr key={r.key} className={r.fast ? `is-fast${edge}` : undefined}>
                                 <TableCell text={r.label} className="plan-table-label" />
                                 {week.days.map(d => {
-                                    const c = r.cell(d, settings, homeCost);
+                                    const c = r.cell(d);
                                     return <TableCell key={d.day} numeric {...c} />;
                                 })}
                             </tr>
@@ -89,7 +133,8 @@ export default function PlanTable({ week, settings }) {
             </table>
             {week.days.some(d => d.night.ranOut) && (
                 <p className="text-note plan-table-footnote">
-                    * Stopped by your plug-in schedule ({clockText(settings.plugFrom)} to {clockText(settings.plugUntil)}) before reaching its limit.
+                    * Stopped by your plug-in schedule (driving days {clockText(settings.plugFrom)} to {clockText(settings.plugUntil)}; days
+                    off {clockText(settings.offFrom)} to {clockText(settings.offUntil)}) before reaching its limit.
                 </p>
             )}
         </div>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { simulateWeek, taperMinutes } from '../costToDrive';
-import { dayBars } from '../dayBars';
+import { dayBars, dayParts } from '../dayBars';
 import { normalizeCostToDrive } from '../costToDriveKey';
 import { DEFAULT_COST_TO_DRIVE } from '../../constants/costToDrive';
 
@@ -50,6 +50,29 @@ describe('the day by day as bars', () => {
         // 120 V: a night the window cuts short added all it could.
         const cut = dayBars(weeks[1]).filter(b => b.home > 0.05 && Math.abs(b.mostAdd - b.home) < 1e-6);
         expect(cut.length).toBeGreaterThan(0);
+    });
+
+    it('lists a day\'s parts for the readout: costs that add up, ranges on the bars', () => {
+        const w = weeks[1];
+        for (const view of ['day', 'balance']) {
+            dayBars(w).forEach((b, i) => {
+                const parts = dayParts(b, view, w.rateTiers);
+                const sum = (kind, key) => parts.filter(p => p.kind === kind).reduce((t, p) => t + p[key], 0);
+                expect(sum('home', 'pct')).toBeCloseTo(b.home > 0.05 ? b.home : 0, 6);
+                expect(sum('home', 'cost')).toBeCloseTo(b.home > 0.05 ? w.days[i].night.homeCost : 0, 6);
+                expect(sum('fast', 'cost') + sum('planned', 'cost')).toBeCloseTo(b.cost, 6);
+                // The battery row last; every other part sits somewhere on the bars.
+                expect(parts.at(-1)).toMatchObject({ kind: 'battery' });
+                expect(parts.at(-1).pct).toBeCloseTo(b.next - b.start, 6);
+                for (const p of parts.slice(0, -1)) expect(p.range[1]).toBeGreaterThanOrEqual(p.range[0]);
+            });
+        }
+        // A time-of-use plan: the night in parts, base first, costs by tier.
+        const s = normalizeCostToDrive({ ...settings, rate: 'sdge-ev-tou-5', season: 'winter' });
+        const tou = simulateWeek(profile({ kw: 1.44, eff: 0.80, warmEff: 0.9 }), s);
+        const homes = dayBars(tou).flatMap(b => dayParts(b, 'balance', tou.rateTiers)).filter(p => p.kind === 'home');
+        expect(homes.some(p => p.tier !== tou.rateTiers.base)).toBe(true);
+        expect(homes.reduce((t, p) => t + p.cost, 0)).toBeCloseTo(tou.homeCost, 6);
     });
 
     it('a settled week balances: what goes in comes out', () => {
