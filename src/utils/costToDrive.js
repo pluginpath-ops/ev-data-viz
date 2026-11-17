@@ -16,6 +16,7 @@ import {
     SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, GAS_COLD_AT_F, GAS_COLD_LOSS, WEEKDAYS, ENOUGH_MARGIN_MIN,
     GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME,
 } from '../constants/costToDrive';
+import { ratePlan, CUSTOM_TIER_NAMES, TIER_LETTERS } from '../constants/ratePlans';
 import {
     ASSUMED_CHARGER_EFF, FIXED_DRAW_W, BATTERY_WARMING_KWH, DC_FAST_LOSS, HWFET_AVG_MPH, UDDS_AVG_MPH, STANDARD_CONDITIONS,
 } from '../constants/epa';
@@ -28,32 +29,204 @@ import { CHARGER_EFF_BASIS } from './vehicleFigures';
 const WEEKS_PER_MONTH = 52 / 12;
 const finite = (v) => v != null && v !== '' && Number.isFinite(Number(v)) && Number(v) > 0;
 
-/** Hours the car is plugged in a night: 10 pm to 7 am is 9; the same hour twice is all 24. */
-export const plugHours = (s) => ((s.plugUntil - s.plugFrom + 24) % 24) || 24;
+/** Hours between two hours of the day: 10 pm to 7 am is 9; the same hour twice is all 24. */
+const hoursBetween = (from, until) => ((until - from + 24) % 24) || 24;
+
+/** Hours the car is plugged in on a driving day's night: 10 pm to 7 am is 9. */
+export const plugHours = (s) => hoursBetween(s.plugFrom, s.plugUntil);
+
+/** Hours the car is plugged in on a day off's: its own window. */
+export const offHours = (s) => hoursBetween(s.offFrom, s.offUntil);
+
+/**
+ * Day d's plug-in window, in hours of that day (it may run past 24): a day
+ * marked Off uses the days-off window (owner, 2026-11-17), any other day the
+ * driving days'.
+ */
+export function windowOf(s, d) {
+    const off = s.week[d] === 'O';
+    const from = off ? s.offFrom : s.plugFrom;
+    return { from, to: from + hoursBetween(from, off ? s.offUntil : s.plugUntil) };
+}
 
 /**
  * Each night's plug-in window as a span of the week's hours (Monday 0:00 = 0):
- * `{ from, to, spareFrom }`. The charger ran from `from` to `spareFrom`; from
- * there to `to` the battery had what it wanted and the charger had time to
- * spare. A window that runs past Sunday midnight is cut at the week's end and
- * its rest starts the week, as the week's line does.
+ * `{ from, to, spans }`, `spans` the stretches the charger ran (`[from, to]`
+ * pairs) — with a time-of-use plan, not always one stretch from the start. The
+ * rest of the window is the spare plug-in time. A window that runs past Sunday
+ * midnight is cut at the week's end and its rest starts the week, as the
+ * week's line does.
  *
- * @param {Object} s  normalized settings
- * @param {Array<{ hours: number }>} nights  each night's charging hours, Monday's first
+ * @param {Array<{ window: { from, to }, spans: Array<[number, number]> }>} nights  Monday's first, in hours of the week
  */
-export function plugWindows(s, nights) {
+export function plugWindows(nights) {
     const WEEK = 7 * 24;
-    const len = plugHours(s);
-    return nights.flatMap((n, d) => {
-        const from = d * 24 + s.plugFrom, to = from + len;
-        const spareFrom = Math.min(to, from + n.hours);
-        if (to <= WEEK) return [{ from, to, spareFrom }];
+    const clip = (spans, lo, hi, shift) => spans
+        .map(([a, b]) => [Math.max(a, lo) - shift, Math.min(b, hi) - shift])
+        .filter(([a, b]) => b > a + 1e-9);
+    return nights.flatMap(({ window: { from, to }, spans }) => {
+        if (to <= WEEK) return [{ from, to, spans: clip(spans, from, to, 0) }];
         return [
-            { from, to: WEEK, spareFrom: Math.min(spareFrom, WEEK) },
-            { from: 0, to: to - WEEK, spareFrom: Math.max(0, spareFrom - WEEK) },
+            { from, to: WEEK, spans: clip(spans, from, WEEK, 0) },
+            { from: 0, to: to - WEEK, spans: clip(spans, WEEK, to, WEEK) },
         ];
     });
 }
+
+// ── Electricity rates ────────────────────────────────────────────────────────
+
+/**
+ * The home rate for a season: `{ tiers, prices, weekday, weekend }` (see
+ * constants/ratePlans.js), or null for One price. A custom plan's weekend
+ * prices its peak hours as the tier below when "Weekends are off-peak".
+ */
+export function rateSeason(s, season = s.season) {
+    if (s.rate === 'flat') return null;
+    const plan = ratePlan(s.rate);
+    if (plan) return plan.seasons[season];
+    return {
+        tiers: CUSTOM_TIER_NAMES,
+        prices: [s.rateHigh, s.rateMid, s.rateLow],
+        weekday: s.rateHours,
+        weekend: s.rateWeekendOff ? s.rateHours.replaceAll('H', 'M') : s.rateHours,
+    };
+}
+
+/** An hour of the week's tier index (0 dearest) in a rate season; Saturday and Sunday read the weekend map. */
+export function tierAt(rate, weekHour) {
+    const h = ((Math.floor(weekHour) % 168) + 168) % 168;
+    const map = h >= 5 * 24 ? rate.weekend : rate.weekday;
+    return TIER_LETTERS.indexOf(map[h % 24]);
+}
+
+/** A function from an hour of the week to the home price there, $/kWh. */
+export function homePricing(s, season = s.season) {
+    const rate = rateSeason(s, season);
+    if (!rate) return () => s.homePrice;
+    return (weekHour) => rate.prices[tierAt(rate, weekHour)];
+}
+
+/**
+ * A plan as custom fields: its season's hours, prices and weekend rule, so an
+ * edit to a picked plan starts from what the reader sees (the gas car's rule:
+ * editing makes it the reader's own). Empty for One price or a custom plan.
+ */
+export function customFromPlan(s, season = s.season) {
+    const plan = ratePlan(s.rate);
+    if (!plan) return {};
+    const r = plan.seasons[season];
+    return {
+        rateHours: r.weekday,
+        rateHigh: r.prices[0], rateMid: r.prices[1], rateLow: r.prices[2],
+        rateWeekendOff: r.weekend !== r.weekday,
+    };
+}
+
+/** A function from an hour of the week to its tier (0 dearest); null at One price. */
+export function homeTiering(s, season = s.season) {
+    const rate = rateSeason(s, season);
+    return rate ? (weekHour) => tierAt(rate, weekHour) : null;
+}
+
+/**
+ * The season's tiers for the charts: their names, and the **base** — the
+ * cheapest tier its hours use (Super off-peak, or Off-peak where a plan has no
+ * cheaper one), drawn in the car's plain color; dearer ones are striped
+ * (owner, 2026-11-17). Null at One price.
+ */
+export function rateTiers(s, season = s.season) {
+    const rate = rateSeason(s, season);
+    if (!rate) return null;
+    const used = [...rate.weekday, ...rate.weekend].map(c => TIER_LETTERS.indexOf(c));
+    return { names: rate.tiers.map((n, t) => n ?? CUSTOM_TIER_NAMES[t]), base: Math.max(...used) };
+}
+
+/** The rate plan's name for a subtitle or a note: the plan's, "your time-of-use plan", or null for One price. */
+export function ratePlanName(s) {
+    if (s.rate === 'flat') return null;
+    return ratePlan(s.rate)?.label ?? 'your time-of-use plan';
+}
+
+/**
+ * Charge a night in its cheapest hours (owner, 2026-11-17): the window cut
+ * into hour slots on the clock, filled cheapest first, ties earliest — so at
+ * One price the night runs from plug-in, as it always has — and into dearer
+ * hours where the cheap ones cannot hold it. At most `wallKwh`.
+ *
+ * @returns {{ spans: Array<{ from, to, kwh, price }>, kwh: number, cost: number }}  spans in time order
+ */
+export function chargeInCheapestHours({ from, to, kw, wallKwh, priceAt, tierOf = null }) {
+    const slots = [];
+    for (let a = from; a < to - 1e-9;) {
+        const b = Math.min(to, Math.floor(a + 1e-9) + 1);
+        slots.push({ from: a, to: b, price: priceAt(a), tier: tierOf ? tierOf(a) : null });
+        a = b;
+    }
+    const order = slots.map((_, i) => i).sort((i, j) => slots[i].price - slots[j].price || i - j);
+    let left = wallKwh;
+    const spans = [];
+    for (const i of order) {
+        if (left <= 1e-9 || kw <= 0) break;
+        const { from: a, to: b, price, tier } = slots[i];
+        const kwh = Math.min(left, (b - a) * kw);
+        spans.push({ from: a, to: a + kwh / kw, kwh, price, tier });
+        left -= kwh;
+    }
+    spans.sort((x, y) => x.from - y.from);
+    const kwh = wallKwh - Math.max(0, left);
+    return { spans, kwh, cost: spans.reduce((t, x) => t + x.kwh * x.price, 0) };
+}
+
+/**
+ * The home charge's parts as the bars stack them, bottom up: `[null]` (the
+ * whole of it) at One price; on a plan the base tier, then each dearer one.
+ */
+export const homeTierOrder = (tiers) => (tiers ? [tiers.base, ...[1, 0].filter(t => t < tiers.base)] : [null]);
+
+/** A tier's name as a chart label says it: "off-peak", "peak". */
+export const tierWord = (tiers, t) => tiers.names[t].toLowerCase();
+
+/** A week's charging by tier for the week's line: `{ spans, base }`, or null at One price. */
+export function chargingTiers(week) {
+    if (!week.rateTiers) return null;
+    return { spans: week.days.flatMap(d => d.night.tierSpans ?? []), base: week.rateTiers.base };
+}
+
+/**
+ * A night's wall kWh and cost by tier, `[dearest, middle, cheapest]`, split
+ * into what went toward the pack (`packKwh`) and to warming it (`warm`):
+ * warming comes out of the first stretches the charger runs, as the week's
+ * line draws it.
+ */
+const byTier = (spans, warmKwh = 0) => {
+    const kwh = [0, 0, 0], cost = [0, 0, 0], packKwh = [0, 0, 0], warm = [0, 0, 0];
+    let warmLeft = warmKwh;
+    for (const x of spans) {
+        const warmHere = Math.min(warmLeft, x.kwh);
+        warmLeft -= warmHere;
+        kwh[x.tier] += x.kwh;
+        cost[x.tier] += x.kwh * x.price;
+        packKwh[x.tier] += x.kwh - warmHere;
+        warm[x.tier] += warmHere;
+    }
+    return { kwh, cost, packKwh, warm };
+};
+
+/** Charging stretches as `{ from, to, tier }`, touching ones of one tier joined. */
+const mergeTierSpans = (spans) => spans.reduce((acc, x) => {
+    const last = acc.at(-1);
+    if (last && last.tier === x.tier && x.from <= last.to + 1e-9) last.to = Math.max(last.to, x.to);
+    else acc.push({ from: x.from, to: x.to, tier: x.tier });
+    return acc;
+}, []);
+
+/** Charging stretches as `[from, to]` pairs, touching ones joined. */
+const mergeSpans = (spans) => spans.reduce((acc, x) => {
+    const last = acc.at(-1);
+    if (last && x.from <= last[1] + 1e-9) last[1] = Math.max(last[1], x.to);
+    else acc.push([x.from, x.to]);
+    return acc;
+}, []);
 
 // ── Charging speed ───────────────────────────────────────────────────────────
 
@@ -508,6 +681,8 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     // bought at home ever passes the charger's own ceiling.
     const night = nightBudget(profile, s, season);
     const warmKwh = night.warmPackKwh;
+    const priceAt = homePricing(s, season);
+    const tierOf = homeTiering(s, season);
     if (trace && !profile.home.none) {
         const t = trace.group('A night at home');
         t.step('Most a night can buy, at the wall', {
@@ -544,12 +719,15 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     let soc = startSoc;
     // Hours into today the last night's charging ran: the day starts no earlier.
     let morning = 0;
-    const out = { points: [], stops: [], days: [], miles: 0, usedKwh: 0, fastPackKwh: 0, homePackKwh: 0, homeWallKwh: 0, warmWallKwh: 0, fastWarmPackKwh: 0, homeCharges: 0, fastMinutes: 0 };
+    // When the last plug-in window that charged ended, in hours of the week: the next starts no earlier.
+    let prevEnd = -Infinity;
+    const out = { points: [], stops: [], days: [], miles: 0, usedKwh: 0, fastPackKwh: 0, homePackKwh: 0, homeWallKwh: 0, homeCost: 0, homeTierCost: [0, 0, 0], warmWallKwh: 0, fastWarmPackKwh: 0, homeCharges: 0, fastMinutes: 0 };
 
     // Twice: the first only sets Monday's morning (when Sunday night ends).
     for (let w = 0; w < 2; w++) {
         const rec = w === 1;
         soc = startSoc;
+        prevEnd -= 7 * 24;
         for (let d = 0; d < 7; d++) {
             const type = s.week[d];
             const base = d * 24;
@@ -690,39 +868,80 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                 clock = stopAt(spans.length ? clock : Math.max(clock, PLANNED_HOUR), to, false, true);
             }
 
-            // The night: plugged in from plugFrom to plugUntil, to the limit.
+            // The night: in its plug-in window — a day off has its own — from
+            // when the car is home (tomorrow's window when today's has closed),
+            // never before the last window ended, in the cheapest hours the
+            // rate plan offers, to the limit.
             const homeSoc = soc;
             const limit = s.fullBeforeLong && s.week[(d + 1) % 7] === 'L' ? 100 : s.chargeTo;
-            // `hours` the charger ran, warming in; `mostAdd` what the whole window could add at full power after
-            // warming, % of the pack (the home ceiling). `homeKwh` what the night bought at the wall, warming in;
-            // `warmKwh` the warming's share of it.
-            const tonight = { added: 0, endSoc: soc, fullAt: null, ranOut: false, hours: 0, mostAdd: night.addPct, homeKwh: 0, warmKwh: 0 };
-            const plugIn = Math.max(s.plugFrom, clock);
-            if (rec) out.points.push([base + plugIn, soc]);
+            const win = windowOf(s, d);
+            let w0 = base + win.from, w1 = base + win.to;
+            if (w1 <= base + clock) { w0 += 24; w1 += 24; }
+            const from = Math.max(w0, base + clock, prevEnd);
+            const to = Math.max(from, w1);
+            // What the window from arrival could buy at the wall; battery
+            // warming, once a night the charger runs, comes out of it first.
+            // `mostAdd` the rest as % of the pack (the home ceiling).
+            const wallMax = profile.home.none ? 0 : profile.home.kw * (to - from);
+            const warmWall = Math.min(wallMax, warmKwh / profile.home.warmEff);
+            const mostAdd = usable > 0 ? (wallMax - warmWall) * profile.home.eff / usable * 100 : 0;
+            // `hours` the charger ran, warming in; `homeKwh` what the night bought at the wall, warming in,
+            // `warmKwh` the warming's share; `homeCost` at each hour's price; `spans` when it ran.
+            // On a time-of-use plan, `tierKwh`/`tierCost` split the night by tier (at the
+            // wall), `tierPackKwh` what each added to the pack (warming out), and
+            // `tierSpans` say which tier each stretch ran in; null at One price.
+            const tonight = {
+                added: 0, endSoc: soc, fullAt: null, ranOut: false, hours: 0, mostAdd, homeKwh: 0, warmKwh: 0, homeCost: 0,
+                window: { from: w0, to: w1 }, spans: [], tierKwh: null, tierCost: null, tierPackKwh: null, tierWarmKwh: null, tierSpans: null,
+            };
+            if (rec) out.points.push([from, soc]);
             // No home charging: nothing is added overnight, so every kWh comes
             // from the fast-stop rule above, at the fast price.
-            if (night.wallKwh > 0 && soc < limit - 1e-9) {
-                const add = Math.min(limit - soc, night.addPct);
-                const chargeHours = night.addPct > 0 ? add / night.addPct * night.chargeHours : 0;
+            if (wallMax > 0 && soc < limit - 1e-9) {
+                const kw = profile.home.kw;
+                const add = Math.min(limit - soc, mostAdd);
+                const need = warmWall + add / 100 * usable / profile.home.eff;
+                const run = chargeInCheapestHours({ from, to, kw, wallKwh: need, priceAt, tierOf });
+                const end = run.spans.at(-1)?.to ?? from;
                 tonight.added = add;
                 tonight.ranOut = add < limit - soc - 1e-9;
-                tonight.hours = night.warmHours + chargeHours;
-                tonight.fullAt = tonight.ranOut ? null : (s.plugFrom + tonight.hours) % 24;
-                tonight.warmKwh = night.warmWallKwh;
-                tonight.homeKwh = night.warmWallKwh + add / 100 * usable / profile.home.eff;
-                soc += add;
+                tonight.hours = run.spans.reduce((t, x) => t + x.to - x.from, 0);
+                tonight.fullAt = tonight.ranOut ? null : end % 24;
+                tonight.warmKwh = warmWall;
+                tonight.homeKwh = need;
+                tonight.homeCost = run.cost;
+                tonight.spans = mergeSpans(run.spans);
+                if (tierOf) {
+                    const split = byTier(run.spans, warmWall);
+                    tonight.tierKwh = split.kwh;
+                    tonight.tierCost = split.cost;
+                    tonight.tierPackKwh = split.packKwh.map(k => k * profile.home.eff);
+                    tonight.tierWarmKwh = split.warm;
+                    tonight.tierSpans = mergeTierSpans(run.spans);
+                }
                 if (rec) {
-                    // Warming first: the line holds flat, then climbs.
-                    if (night.warmHours > 0) out.points.push([base + plugIn + night.warmHours, soc - add]);
-                    out.points.push([base + plugIn + tonight.hours, soc]);
+                    // Warming first: the line holds flat, then climbs, stretch by stretch.
+                    let warmLeft = warmWall, level = soc;
+                    for (const x of run.spans) {
+                        const warmHere = Math.min(warmLeft, x.kwh);
+                        warmLeft -= warmHere;
+                        out.points.push([x.from, level]);
+                        if (warmHere > 0) out.points.push([x.from + warmHere / kw, level]);
+                        level += (x.kwh - warmHere) * profile.home.eff / usable * 100;
+                        out.points.push([x.to, level]);
+                    }
                     out.homePackKwh += add / 100 * usable;
-                    out.homeWallKwh += tonight.homeKwh;
-                    out.warmWallKwh += tonight.warmKwh;
+                    out.homeWallKwh += need;
+                    out.warmWallKwh += warmWall;
+                    out.homeCost += run.cost;
+                    if (tonight.tierCost) tonight.tierCost.forEach((c, t) => { out.homeTierCost[t] += c; });
                     out.homeCharges += 1;
                 }
+                soc += add;
+                prevEnd = to;
             }
             tonight.endSoc = soc;
-            morning = Math.max(0, plugIn + tonight.hours - 24);
+            morning = Math.max(0, (tonight.spans.at(-1)?.[1] ?? from) - (base + 24));
             if (rec) out.days.push({ ...day, homeSoc, night: tonight });
         }
     }
@@ -815,7 +1034,16 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             result: homeKwh, unit: 'kWh',
         });
         trace.step('Fast cost a week', { formula: 'cost_fast = E_fast × price_fast', values: { E_fast: val(fastKwh, 'kWh'), price_fast: val(s.fastPrice, '$/kWh', 'setting') }, result: fastKwh * s.fastPrice, unit: '$' });
-        trace.step('Home cost a week', { formula: 'cost_home = E_home × price_home', values: { E_home: val(homeKwh, 'kWh'), price_home: val(s.homePrice, '$/kWh', 'setting') }, result: homeKwh * s.homePrice, unit: '$' });
+        if (s.rate === 'flat') {
+            trace.step('Home cost a week', { formula: 'cost_home = E_home × price_home', values: { E_home: val(homeKwh, 'kWh'), price_home: val(s.homePrice, '$/kWh', 'setting') }, result: out.homeCost, unit: '$' });
+        } else {
+            trace.step('Home cost a week', {
+                formula: 'cost_home = Σ E_hour × price_hour',
+                values: { E_home: val(homeKwh, 'kWh'), price_avg: val(homeKwh > 0 ? out.homeCost / homeKwh : 0, '$/kWh') },
+                result: out.homeCost, unit: '$',
+                note: `${ratePlanName(s)}: each night charges in its cheapest hours first, and in dearer ones only where the cheap hours cannot hold it`,
+            });
+        }
         trace.step('Fast-charging time a week', { formula: 'the sum of every t_stop', result: out.fastMinutes, unit: 'min', note: `${out.stops.length} stop${out.stops.length === 1 ? '' : 's'}` });
     }
     return {
@@ -824,11 +1052,15 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
         fastMinutes: out.fastMinutes,
         fastKwh, homeKwh,
         fastCost: fastKwh * s.fastPrice,
-        homeCost: homeKwh * s.homePrice,
+        homeCost: out.homeCost,
+        // On a time-of-use plan: the home cost by tier, [dearest, middle, cheapest],
+        // and the season's tier names and base (rateTiers). Null at One price.
+        homeTierCost: rateTiers(s, season) ? out.homeTierCost : null,
+        rateTiers: profile.home.none ? null : rateTiers(s, season),
         usedKwh: out.usedKwh,
         fastShare: out.usedKwh > 0 ? out.fastPackKwh / out.usedKwh : 0,
         // No charger, no window to have margin in.
-        windows: profile.home.none ? [] : plugWindows(s, out.days.map(d => d.night)),
+        windows: profile.home.none ? [] : plugWindows(out.days.map(d => d.night)),
     };
 }
 
@@ -1093,9 +1325,10 @@ export const chargerText = (level) => (level.none
  */
 export function chargingText(settings, level = null) {
     const held = (t) => t.replace(/ /g, NBSP);
+    const plan = ratePlanName(settings);
     const home = level?.none
         ? chargerText(level)
-        : held(`${level ? chargerText(level) : 'home'} at $${settings.homePrice.toFixed(2)}/kWh`);
+        : held(`${level ? chargerText(level) : 'home'} ${plan ? `on ${plan}` : `at $${settings.homePrice.toFixed(2)}/kWh`}`);
     return `${home} · ${held(`fast charging at $${settings.fastPrice.toFixed(2)}/kWh`)}`;
 }
 
@@ -1134,12 +1367,36 @@ export const perMonth = (weekly) => weekly * WEEKS_PER_MONTH;
  */
 export function homeCostCeiling(profile, settings, trace = null) {
     if (profile.home.none) return null;
-    const ceiling = perMonth(7 * profile.home.kw * plugHours(settings) * settings.homePrice);
+    const kw = profile.home.kw;
+    // One price and one window every night: the plain form, as it always read.
+    if (settings.rate === 'flat' && [...settings.week].every((_, d) => windowOf(settings, d).to - windowOf(settings, d).from === plugHours(settings))) {
+        const ceiling = perMonth(7 * kw * plugHours(settings) * settings.homePrice);
+        trace?.step('Most it could cost at home', {
+            formula: 'cost_max = P_home × h × 7 × price_home × 52 / 12',
+            values: { P_home: val(kw, 'kW'), h: val(plugHours(settings), 'h', 'setting'), price_home: val(settings.homePrice, '$/kWh', 'setting') },
+            result: ceiling, unit: '$/mo',
+            note: 'every night at full power for the whole window; battery warming runs inside it, so it adds nothing here',
+        });
+        return ceiling;
+    }
+    // Each night's window, hour by hour at that hour's price.
+    const priceAt = homePricing(settings);
+    let week = 0, hours = 0;
+    for (let d = 0; d < 7; d++) {
+        const { from, to } = windowOf(settings, d);
+        for (let a = from; a < to - 1e-9;) {
+            const b = Math.min(to, Math.floor(a + 1e-9) + 1);
+            week += kw * (b - a) * priceAt(d * 24 + a);
+            hours += b - a;
+            a = b;
+        }
+    }
+    const ceiling = perMonth(week);
     trace?.step('Most it could cost at home', {
-        formula: 'cost_max = P_home × h × 7 × price_home × 52 / 12',
-        values: { P_home: val(profile.home.kw, 'kW'), h: val(plugHours(settings), 'h', 'setting'), price_home: val(settings.homePrice, '$/kWh', 'setting') },
+        formula: 'cost_max = Σ P_home × price_hour, every hour of every plug-in window, × 52 / 12',
+        values: { P_home: val(kw, 'kW'), h_week: val(hours, 'h', 'setting'), price_avg: val(hours > 0 ? week / (kw * hours) : 0, '$/kWh') },
         result: ceiling, unit: '$/mo',
-        note: 'every night at full power for the whole window; battery warming runs inside it, so it adds nothing here',
+        note: 'every night at full power for the whole window, each hour at its own price; battery warming runs inside it, so it adds nothing here',
     });
     return ceiling;
 }

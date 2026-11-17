@@ -18,7 +18,7 @@
  *                 `asks` together, in step order; a step left with no
  *                 question is skipped. `default` is the goal of a reader who
  *                 skips. Question keys: cars, dailyMi, highway, speedMph,
- *                 tripMi, climate, mountains, home, homePrice, gasMpg,
+ *                 tripMi, climate, mountains, home, rate, homePrice, gasMpg,
  *                 gasPrice. An optional `chart` sets that chart's axes and
  *                 limits on Apply (see the charging goal).
  *   cars          the "Which cars?" step and the starter sets ("kinds of car").
@@ -44,7 +44,9 @@
  *                 seasons, worked out from the correction model, not set here.
  *                 `mountains.ft` is the altitude "Mountains" means.
  *   money         home charging (each option's `level` is an index into
- *                 HOME_LEVELS in constants/costToDrive.js; 6 = no home charging)
+ *                 HOME_LEVELS in constants/costToDrive.js; 6 = no home charging),
+ *                 how electricity is billed (`rate`: its plans are
+ *                 constants/ratePlans.js)
  *                 and the number fields' limits. Their starting values are Cost & Time's own
  *                 defaults (STARTING_ANSWERS in utils/setupWizard.js).
  *   summary       the labels on the last screen.
@@ -83,7 +85,7 @@ export const SETUP_WIZARD = {
         options: [
             // Cost & Time prices a whole week: every driving, weather and money answer feeds it.
             { key: 'cost',     label: 'What it costs to run', detail: 'Per month, against a gas car', mode: 'drivecost',
-              asks: ['cars', 'dailyMi', 'highway', 'speedMph', 'climate', 'mountains', 'home', 'homePrice', 'gasMpg', 'gasPrice'] },
+              asks: ['cars', 'dailyMi', 'highway', 'speedMph', 'climate', 'mountains', 'home', 'rate', 'homePrice', 'gasMpg', 'gasPrice'] },
             // Range & Efficiency corrects every test to a speed, temperature and altitude.
             { key: 'range',    label: 'How far it goes',      detail: 'Real highway range',           mode: 'range',
               asks: ['cars', 'speedMph', 'climate', 'mountains'] },
@@ -166,6 +168,19 @@ export const SETUP_WIZARD = {
                 { key: 'outlet120', label: 'Normal outlet',     detail: '120 V, 12 A',          level: 0 },
                 { key: 'none',      label: 'No home charging',  detail: 'Public chargers only', level: 6 },
             ],
+        },
+        // How home electricity is billed (owner, 2026-11-17). Time of use then
+        // picks a plan from constants/ratePlans.js; One price asks the price
+        // (homePrice), and is also the answer for "not sure" (owner, 2026-11-17).
+        rate: {
+            legend: 'How do you pay for electricity at home?',
+            options: [
+                { key: 'flat', label: 'One price or not sure', detail: 'The same at any hour' },
+                { key: 'tou',  label: 'Time of use',           detail: 'Cheaper at some hours' },
+            ],
+            planLabel: 'Your plan',
+            planPlaceholder: 'Pick your utility’s plan…',
+            planOwn: 'Mine isn’t listed (set it on Your Driving)',
         },
         homePrice: { label: 'Electricity at home',    min: 0,    max: 1,    step: 0.01, prefix: '$', unit: '/ kWh' },
         gasMpg:    { label: "Your gas car's mileage", min: 5,    max: 60,   step: 1,    unit: 'mpg' },

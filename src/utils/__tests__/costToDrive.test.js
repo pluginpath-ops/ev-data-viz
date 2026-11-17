@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
     simulateWeek, simulateGasWeek, gasColdLoss, gasTripLegs, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
     weekSummary, gasCarName, chargerText, chargingText, homeCostCeiling, plugHours, plugWindows,
+    chargeInCheapestHours, homePricing, rateSeason, ratePlanName, windowOf, rateTiers, chargingTiers, homeTierOrder,
 } from '../costToDrive';
+import { RATE_PLANS } from '../../constants/ratePlans';
 import { normalizeCostToDrive } from '../costToDriveKey';
 import { DEFAULT_COST_TO_DRIVE, GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME, MIN_STOP_ADD, STRETCH_CAP_TO, PACK_WARMING_BELOW_F, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, BATTERY_WARMING_KWH, DC_FAST_LOSS, FIXED_DRAW_W } from '../../constants/epa';
@@ -657,7 +659,7 @@ describe('the most home charging could cost', () => {
         expect(plugHours(settings({ plugFrom: 22, plugUntil: 7 }))).toBe(9);
         expect(plugHours(settings({ plugFrom: 7, plugUntil: 22 }))).toBe(15);
         expect(plugHours(settings({ plugFrom: 7, plugUntil: 7 }))).toBe(24);
-        expect(homeCostCeiling(p, settings({ plugFrom: 20, plugUntil: 7, homePrice: 0.2, season: 'summer' })))
+        expect(homeCostCeiling(p, settings({ plugFrom: 20, plugUntil: 7, offFrom: 20, homePrice: 0.2, season: 'summer' })))
             .toBeCloseTo(perMonth(7 * 11.5 * 11 * 0.2), 6);
     });
 
@@ -730,24 +732,165 @@ describe('the margin a night has', () => {
         expect(w.days.every(d => d.night.mostAdd === 0 && d.night.hours === 0)).toBe(true);
     });
 
-    it('draws each night as a span of the week, the charger\'s hours first and the spare time after', () => {
-        const s = settings({ plugFrom: 22, plugUntil: 7 });
-        const spans = plugWindows(s, [0, 1, 2, 3, 4, 5, 6].map(() => ({ hours: 3 })));
+    it('draws each night as a span of the week, with the stretches the charger ran', () => {
+        const nights = [0, 1, 2, 3, 4, 5, 6].map(d => ({ window: { from: d * 24 + 22, to: d * 24 + 31 }, spans: [[d * 24 + 22, d * 24 + 25]] }));
+        const spans = plugWindows(nights);
         // Monday night is 22:00 to 7:00 Tuesday; the charger ran three hours of it.
-        expect(spans[0]).toEqual({ from: 22, to: 31, spareFrom: 25 });
+        expect(spans[0]).toEqual({ from: 22, to: 31, spans: [[22, 25]] });
         // Sunday night runs past the week's end: cut there, the rest from Monday 0:00.
         expect(spans.slice(-2)).toEqual([
-            { from: 6 * 24 + 22, to: 168, spareFrom: 168 },
-            { from: 0, to: 7, spareFrom: 1 },
+            { from: 6 * 24 + 22, to: 168, spans: [[6 * 24 + 22, 168]] },
+            { from: 0, to: 7, spans: [[0, 1]] },
         ]);
-        // A charger that used the whole window leaves none spare.
-        expect(plugWindows(s, [{ hours: 9 }])[0].spareFrom).toBe(31);
     });
 
     it('the week returns its windows, one a night, matching the nights\' hours', () => {
         const w = simulateWeek(profile(), settings());
         // Sunday night is cut in two, so a night more than seven spans.
         expect(w.windows.length).toBe(8);
-        expect(w.windows[0].spareFrom - w.windows[0].from).toBeCloseTo(w.days[0].night.hours, 6);
+        const ran = w.windows[0].spans.reduce((t, [a, b]) => t + b - a, 0);
+        expect(ran).toBeCloseTo(w.days[0].night.hours, 6);
+        // At One price the charger runs from plug-in, in one stretch.
+        expect(w.windows[0].spans).toHaveLength(1);
+        expect(w.windows[0].spans[0][0]).toBe(22);
+    });
+});
+
+describe('time-of-use rates', () => {
+    const hourOfDay = (h) => ((h % 24) + 24) % 24;
+
+    it('every plan has whole maps and a price for every tier it uses', () => {
+        for (const plan of RATE_PLANS) {
+            for (const season of ['summer', 'winter']) {
+                const r = plan.seasons[season];
+                expect(r.prices, plan.key).toHaveLength(3);
+                for (const map of [r.weekday, r.weekend]) {
+                    expect(map, `${plan.key} ${season}`).toMatch(/^[HML]{24}$/);
+                    for (const c of new Set(map)) expect(r.tiers['HML'.indexOf(c)], `${plan.key} ${season} ${c}`).toBeTruthy();
+                }
+                // Dearest first.
+                expect(r.prices[0]).toBeGreaterThanOrEqual(r.prices[1]);
+                expect(r.prices[1]).toBeGreaterThanOrEqual(r.prices[2]);
+            }
+        }
+    });
+
+    it('fills the cheapest hours first, earliest first, and spills into dearer ones', () => {
+        // 22:00 to 7:00; cheap from midnight to 6.
+        const priceAt = (h) => (hourOfDay(h) < 6 ? 0.1 : 0.5);
+        const fits = chargeInCheapestHours({ from: 22, to: 31, kw: 10, wallKwh: 35, priceAt });
+        expect(fits.spans.map(x => [x.from, x.to])).toEqual([[24, 25], [25, 26], [26, 27], [27, 27.5]]);
+        expect(fits.cost).toBeCloseTo(3.5, 9);
+        const spills = chargeInCheapestHours({ from: 22, to: 31, kw: 10, wallKwh: 75, priceAt });
+        expect(spills.kwh).toBeCloseTo(75, 9);
+        expect(spills.cost).toBeCloseTo(60 * 0.1 + 15 * 0.5, 9);
+        // The dearer hours taken are the earliest of them: 22:00 and half of 23:00.
+        expect(spills.spans[0]).toMatchObject({ from: 22, to: 23 });
+        // At one price, one stretch from the start: the night as it always ran.
+        const flat = chargeInCheapestHours({ from: 22.5, to: 31, kw: 10, wallKwh: 20, priceAt: () => 0.2 });
+        expect(flat.spans[0].from).toBe(22.5);
+        expect(flat.spans.at(-1).to).toBeCloseTo(24.5, 9);
+    });
+
+    it('One price prices every hour the same, and names no plan', () => {
+        const s = settings({ homePrice: 0.21 });
+        expect(rateSeason(s)).toBeNull();
+        expect(homePricing(s)(3)).toBe(0.21);
+        expect(ratePlanName(s)).toBeNull();
+        const w = simulateWeek(profile(), s);
+        expect(w.homeCost).toBeCloseTo(w.homeKwh * 0.21, 9);
+    });
+
+    it('a plan reads the weekend map on Saturday and Sunday, by season', () => {
+        const s = settings({ rate: 'dte-tod', season: 'summer' });
+        const at = homePricing(s);
+        expect(at(16)).toBe(0.24);           // Monday 4 pm, peak
+        expect(at(5 * 24 + 16)).toBe(0.18);  // Saturday 4 pm, off-peak
+        expect(homePricing(s, 'winter')(16)).toBe(0.20);
+        expect(ratePlanName(s)).toBe('DTE Time of Day');
+    });
+
+    it('Georgia Power: every night charges inside 11 pm to 7 am, at its super off-peak price', () => {
+        const s = settings({ rate: 'gpc-overnight', season: 'winter' });
+        const w = simulateWeek(profile(), s);
+        for (const d of w.days.filter(x => x.night.homeKwh > 0)) {
+            for (const [a, b] of d.night.spans) {
+                expect(hourOfDay(a) >= 23 || hourOfDay(a) < 7, `${d.day} ${a}`).toBe(true);
+                expect(b - a).toBeLessThanOrEqual(8 + 1e-9);
+            }
+            expect(d.night.homeCost).toBeCloseTo(d.night.homeKwh * 0.02, 9);
+        }
+        expect(w.homeCost).toBeCloseTo(w.homeKwh * 0.02, 9);
+    });
+
+    it('a slow charger on SDG&E spills past the cheap six hours and pays more a kWh', () => {
+        const s = settings({ rate: 'sdge-ev-tou-5', season: 'winter' });
+        const fast = simulateWeek(profile(), s);
+        const slow = simulateWeek(profile({ home: { kw: 3.84, eff: 0.85 } }), s);
+        const avg = (w) => w.homeCost / w.homeKwh;
+        expect(avg(fast)).toBeCloseTo(0.12, 6);
+        expect(avg(slow)).toBeGreaterThan(avg(fast) + 0.01);
+    });
+
+    it('splits each night and the week by tier, and names the base tier for the charts', () => {
+        const s = settings({ rate: 'sdge-ev-tou-5', season: 'winter' });
+        const slow = simulateWeek(profile({ home: { kw: 3.84, eff: 0.85 } }), s);
+        // SDG&E uses all three tiers: super off-peak is the base.
+        expect(slow.rateTiers).toEqual({ names: ['On-peak', 'Off-peak', 'Super off-peak'], base: 2 });
+        for (const d of slow.days.filter(x => x.night.homeKwh > 0)) {
+            const n = d.night;
+            expect(n.tierKwh.reduce((a, k) => a + k, 0)).toBeCloseTo(n.homeKwh, 9);
+            expect(n.tierCost.reduce((a, c) => a + c, 0)).toBeCloseTo(n.homeCost, 9);
+            const ran = n.tierSpans.reduce((a, x) => a + x.to - x.from, 0);
+            expect(ran).toBeCloseTo(n.hours, 9);
+            // Warming out, what each tier put in the pack adds up to the night's charge.
+            expect(n.tierWarmKwh.reduce((a, k) => a + k, 0)).toBeCloseTo(n.warmKwh, 9);
+            expect(n.tierPackKwh.reduce((a, k) => a + k, 0)).toBeCloseTo(n.added / 100 * 75, 6);
+        }
+        // The slow charger spills: some of the week is bought above the base.
+        expect(slow.homeTierCost[1] + slow.homeTierCost[0]).toBeGreaterThan(0);
+        expect(slow.homeTierCost.reduce((a, c) => a + c, 0)).toBeCloseTo(slow.homeCost, 9);
+        expect(chargingTiers(slow).spans.length).toBeGreaterThan(0);
+        expect(homeTierOrder(slow.rateTiers)).toEqual([2, 1, 0]);
+        // A plan with no super off-peak: off-peak (its cheapest) is the base.
+        const dte = simulateWeek(profile(), settings({ rate: 'dte-tod' }));
+        expect(dte.rateTiers.base).toBe(2);
+        expect(rateTiers(settings({ rate: 'custom', rateHours: 'MMMMMMMMMMMMMMMMHHHHHMMM' })).base).toBe(1);
+        expect(homeTierOrder({ base: 1 })).toEqual([1, 0]);
+        // One price: no split.
+        const flat = simulateWeek(profile(), settings());
+        expect(flat.rateTiers).toBeNull();
+        expect(flat.homeTierCost).toBeNull();
+        expect(chargingTiers(flat)).toBeNull();
+        expect(homeTierOrder(null)).toEqual([null]);
+    });
+
+    it('a custom plan prices its own hours; weekends off-peak lowers the peak a tier', () => {
+        const base = { rate: 'custom', rateHours: 'H'.repeat(24), rateHigh: 0.5, rateMid: 0.3, rateLow: 0.1 };
+        expect(homePricing(settings({ ...base, rateWeekendOff: true }))(5 * 24 + 1)).toBe(0.3);
+        expect(homePricing(settings({ ...base, rateWeekendOff: false }))(5 * 24 + 1)).toBe(0.5);
+        expect(homePricing(settings(base))(1)).toBe(0.5);
+    });
+
+    it('a day marked Off charges in the days-off window', () => {
+        const s = settings({ offFrom: 9, offUntil: 7 });
+        expect(windowOf(s, 6)).toEqual({ from: 9, to: 31 });
+        expect(windowOf(s, 0)).toEqual({ from: 22, to: 31 });
+        // A cheap midday the days-off window reaches: Sunday's charge runs in daylight.
+        const sunny = settings({ offFrom: 9, offUntil: 7, rate: 'custom', rateHours: 'MMMMMMMMMMLLLLLLMMMMMMMM', rateWeekendOff: false, chargeTo: 90 });
+        const w = simulateWeek(profile(), sunny);
+        const sunday = w.days[6].night;
+        expect(sunday.window.from).toBe(6 * 24 + 9);
+        if (sunday.homeKwh > 0) expect(hourOfDay(sunday.spans[0][0])).toBeGreaterThanOrEqual(10);
+    });
+
+    it('the most it could cost follows each hour\'s price', () => {
+        const p = profile();
+        const s = settings({ rate: 'custom', rateHours: 'L'.repeat(24), rateLow: 0.1, season: 'summer' });
+        expect(homeCostCeiling(p, s)).toBeCloseTo(perMonth(7 * 11.5 * 9 * 0.1), 6);
+        const g = settings({ rate: 'gpc-overnight', season: 'winter' });
+        for (const lvl of [p, profile(wallOutlet)]) {
+            expect(perMonth(simulateWeek(lvl, g).homeCost)).toBeLessThanOrEqual(homeCostCeiling(lvl, g) + 1e-6);
+        }
     });
 });

@@ -117,7 +117,7 @@ export function prepareFixedReadout(chart, reading, { side = false } = {}) {
             col.indices.forEach((idx, k) => {
                 const cy = at.top + box.headHeight + k * lh + lh / 2;
                 const left = at.left + col.x;
-                ctx.fillStyle = reading.rows[idx].color ?? theme.ink;
+                ctx.fillStyle = reading.rows[idx].fill ?? reading.rows[idx].color ?? theme.ink;
                 ctx.fillRect(left, cy - SIZE / 4, SIZE * 0.6, SIZE / 2);
                 ctx.font = bodyFont;
                 ctx.fillStyle = theme.legend;

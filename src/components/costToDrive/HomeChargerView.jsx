@@ -20,14 +20,14 @@ import { useEffect, useMemo, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { vehicleLabel } from '../../utils/specHelpers';
 import { CHARGER_EFF_BASIS } from '../../utils/vehicleFigures';
-import { fastChargingFill } from '../../utils/stripedFill';
+import { fastChargingFill, homeTierFill } from '../../utils/stripedFill';
 import { SERIES_NEUTRAL } from '../../utils/colorUtils';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { chartTheme, chartFonts, applyChartDefaults } from '../../utils/chartTheme';
 import { drawCeilingMarks, ceilingLegend } from '../../utils/ceilingMark';
 import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
-import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel, chargingText, homeCostCeiling } from '../../utils/costToDrive';
-import { useCostToDriveByLevel } from '../../hooks/useCostToDrive';
+import { dollars, minutesText, perMonth, percentText, weekSummary, enoughLevel, chargingText, homeCostCeiling, homeTierOrder, tierWord } from '../../utils/costToDrive';
+import { useCostToDriveByLevel, noCityFigure } from '../../hooks/useCostToDrive';
 import { useChartPng } from '../../hooks/useChartPng';
 import { useSourceLine } from '../../hooks/useSourceLine';
 import { useTheme } from '../../hooks/useTheme';
@@ -105,6 +105,9 @@ const totalLabels = (isTop, totalOf, homeOf, format = dollars) => ({
         });
         // The home part's own figure, only where fast charging sits on it:
         // with no fast charging the total over the column is the home cost.
+        // On a time-of-use plan home is a part per tier; the figure is all of
+        // it, under the top of the last one.
+        const { y: yScale } = chart.scales;
         chart.data.datasets.forEach((ds, di) => {
             const meta = chart.getDatasetMeta(di);
             if (meta.hidden || ds.part !== 'home') return;
@@ -113,14 +116,15 @@ const totalLabels = (isTop, totalOf, homeOf, format = dollars) => ({
                 if (home == null || !Number.isFinite(bar.x)) return;
                 const text = format(home);
                 if (ctx.measureText(text).width > bar.width + 2) return;
-                const room = Math.abs(bar.base - bar.y);
+                const top = yScale.getPixelForValue(home);
+                const room = Math.abs(bar.base - top);
                 // Inside the home part under its top; above it when too short.
                 if (room >= fonts.badge + 6) {
                     ctx.textBaseline = 'top';
-                    ctx.fillText(text, bar.x, bar.y + 3);
+                    ctx.fillText(text, bar.x, top + 3);
                 } else {
                     ctx.textBaseline = 'bottom';
-                    ctx.fillText(text, bar.x, bar.y - 3);
+                    ctx.fillText(text, bar.x, top - 3);
                 }
             });
         });
@@ -171,6 +175,8 @@ const homeCeilings = (ceilingOf) => ({
  */
 const monthOf = (w) => (w ? {
     homeCost: perMonth(w.homeCost),
+    // By tier on a time-of-use plan (rateTiers), null at One price.
+    homeTierCost: w.homeTierCost?.map(perMonth) ?? null,
     fastCost: perMonth(w.fastCost),
     fastMinutes: perMonth(w.fastMinutes),
     stopCount: perMonth(w.stopCount),
@@ -180,6 +186,15 @@ const fastText = (w) => (!w ? DASH : w.fastMinutes < 0.5 ? '0 min' : minutesText
 const homeCostText = (w) => (!w ? DASH : dollars(w.homeCost));
 const fastCostText = (w) => (!w ? DASH : dollars(w.fastCost));
 const totalText = (w) => (!w ? DASH : dollars(w.fastCost + w.homeCost));
+/**
+ * On a time-of-use plan, the home cost by tier under it, cheapest first, as
+ * the columns stack (owner, 2026-11-17). Home time is not the reader's time,
+ * so no time rows here, unlike the Weekly Charging Plan's table.
+ */
+const tierCostRows = (tiers) => (tiers ? homeTierOrder(tiers).map(t => [
+    `${tiers.names[t]} cost per month`,
+    (w) => (!w ? DASH : (w.homeTierCost?.[t] ?? 0) >= 0.5 ? dollars(w.homeTierCost[t]) : DASH),
+]) : []);
 
 /** Minutes over a time column; "0 min" below half a minute, as the table says. */
 const minutesLabel = (m) => (m < 0.5 ? '0 min' : minutesText(m));
@@ -198,6 +213,8 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
     // charging first. A bar's or column's place is not its level index, so
     // each looks its level up through `shown`.
     const shown = HOME_LEVEL_ORDER.map(i => byLevel[i]);
+    // The rate plan's tiers ({ names, base }), null at One price: one plan, so any week says.
+    const tiers = byLevel.flatMap(l => l.priced).find(p => !p.missing && p.comparison.week.rateTiers)?.comparison.week.rateTiers ?? null;
     const enough = useMemo(() => Object.fromEntries(columns.map(c => [
         c.vehicle.id,
         enoughLevel(byLevel.map(l => {
@@ -214,8 +231,14 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
     useEffect(() => {
         if (!canvasRef.current || !columns.length) return undefined;
         applyChartDefaults(Chart);
-        const { tick, grid, legend } = chartTheme();
+        const theme = chartTheme();
+        const { tick, grid, legend } = theme;
         const cost = !timeView;
+        // Home's parts, bottom up: the whole of it at One price; on a
+        // time-of-use plan the base tier plain, then each dearer one striped,
+        // as on Monthly Cost & Time (owner, 2026-11-17).
+        const homeParts = homeTierOrder(tiers).filter((t, k) => k === 0 || shown.some(l => columns.some(c =>
+            (monthOf(at(l.index, c.vehicle.id)?.comparison?.week)?.homeTierCost?.[t] ?? 0) >= 0.5)));
         const monthAt = (li, c) => monthOf(at(shown[li].index, c.vehicle.id)?.comparison?.week);
         // Level by place on the chart (`shown`), car by place in `columns`.
         const ceilingOf = (li, ci) => {
@@ -228,7 +251,11 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
             keep: (item, data) => data.datasets[item.datasetIndex].part === (cost ? 'home' : 'fast'),
             text: cost ? 'Most it could cost at home' : null,
             // One key for every car's striped part, not each car twice (owner, 2026-11-16).
-            keys: cost ? [{ text: 'Fast charging (striped)', fillStyle: fastChargingFill(SERIES_NEUTRAL) }] : [],
+            // A dearer tier's key the same way: one neutral swatch for every car.
+            keys: cost ? [
+                ...homeParts.slice(1).map(t => ({ text: `Home, ${tierWord(tiers, t)} (striped)`, fillStyle: homeTierFill(SERIES_NEUTRAL, t, tiers.base, theme) })),
+                { text: 'Fast charging (striped)', fillStyle: fastChargingFill(SERIES_NEUTRAL) },
+            ] : [],
             // Hiding a car hides both its bars.
             onClick: (e, item, leg) => {
                 const ch = leg.chart;
@@ -247,16 +274,20 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                 // its desaturated shade, the Monthly Cost & Time cost chart's style. Time: one
                 // bar a car, the fast charging alone.
                 datasets: cost
-                    ? columns.flatMap((c, ci) => ['home', 'fast'].map(part => ({
+                    ? columns.flatMap((c, ci) => [...homeParts.map((t, k) => ['home', t, k]), ['fast']].map(([part, t, k]) => ({
                         label: vehicleLabel(c.vehicle),
-                        part,
+                        // The base (or the whole) is `home`, a dearer tier `homeTier`.
+                        part: part === 'home' && k > 0 ? 'homeTier' : part,
+                        tier: t,
                         vehicleIndex: ci,
                         stack: String(c.vehicle.id),
                         data: shown.map(l => {
                             const w = monthOf(at(l.index, c.vehicle.id)?.comparison?.week);
-                            return w ? (part === 'home' ? w.homeCost : w.fastCost) : null;
+                            if (!w) return null;
+                            if (part === 'fast') return w.fastCost;
+                            return t == null ? w.homeCost : w.homeTierCost?.[t] ?? 0;
                         }),
-                        backgroundColor: part === 'home' ? c.color : fastChargingFill(c.color),
+                        backgroundColor: part === 'fast' ? fastChargingFill(c.color) : homeTierFill(c.color, t, tiers?.base, theme),
                     })))
                     : columns.map((c, ci) => ({
                         label: vehicleLabel(c.vehicle),
@@ -296,9 +327,11 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                 const w = monthAt(ctx.dataIndex, columns[ds.vehicleIndex]);
                                 if (!w) return null;
                                 if (!cost) return `${ds.label}: ${minutesLabel(w.fastMinutes)} of fast charging (about ${Math.round(w.stopCount)} stops) per month`;
+                                if (ds.part === 'homeTier') return `${ds.label}: ${dollars(ctx.raw)} home, ${tierWord(tiers, ds.tier)}`;
                                 const ceiling = ds.part === 'home' ? ceilingOf(ctx.dataIndex, ds.vehicleIndex) : null;
+                                const base = ds.tier == null ? '' : ` (${dollars(ctx.raw)} ${tierWord(tiers, ds.tier)})`;
                                 return ds.part === 'home'
-                                    ? `${ds.label}: ${dollars(w.homeCost)} home${ceiling == null ? '' : ` (most it could cost: ${dollars(ceiling)})`}`
+                                    ? `${ds.label}: ${dollars(w.homeCost)} home${base}${ceiling == null ? '' : ` (most it could cost: ${dollars(ceiling)})`}`
                                     : `${ds.label}: ${dollars(w.fastCost)} fast (${minutesText(w.fastMinutes)}, about ${Math.round(w.stopCount)} stops), ${dollars(w.fastCost + w.homeCost)} total per month`;
                             },
                         },
@@ -340,7 +373,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
 
     return (
         <div className="chart-layout">
-            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} />}
+            {!presentationMode && <CostToDriveSidebar settings={settings} onChange={onChange} cityless={noCityFigure(byLevel[settings.level]?.priced ?? [])} />}
             <div className="chart-main">
                 {missing.length > 0 && (
                     <p className="text-note drive-missing">
@@ -387,7 +420,13 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                                 <tr className="plan-table-group">
                                                     <td colSpan={tableCols.length}>{vehicleLabel(c.vehicle)}</td>
                                                 </tr>
-                                                {[['Fast charging per month', fastText], ['Home cost per month', homeCostText], ['Fast cost per month', fastCostText], ['Total cost per month', totalText]].map(([label, text]) => (
+                                                {[
+                                                    ['Fast charging per month', fastText],
+                                                    ['Home cost per month', homeCostText],
+                                                    ...tierCostRows(tiers),
+                                                    ['Fast cost per month', fastCostText],
+                                                    ['Total cost per month', totalText],
+                                                ].map(([label, text]) => (
                                                     <tr key={label}>
                                                         <TableCell text={label} className="plan-table-label" />
                                                         {shown.map(l => {

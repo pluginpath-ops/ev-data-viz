@@ -6,17 +6,21 @@
  */
 import NumberInput from '../NumberInput';
 import { costToDriveField } from '../../constants/costToDrive';
-import { plugHours } from '../../utils/costToDrive';
+import { plugHours, offHours } from '../../utils/costToDrive';
 
-/** A number setting as one row: label · box · unit. */
-export function DriveNumberField({ settings, onChange, field, label, unit, integer }) {
+/**
+ * A number setting as one row: label · box · unit. `value` shows another
+ * figure than the setting's own — a picked rate plan's price, which an edit
+ * turns into the setting — and `children` go before the label (a swatch).
+ */
+export function DriveNumberField({ settings, onChange, field, label, unit, integer, value, children = null }) {
     const f = costToDriveField(field);
     return (
         <label className="drive-field">
-            <span className="text-label">{label}</span>
+            <span className="text-label flex items-center gap-2">{children}{label}</span>
             <NumberInput
                 className="form-input drive-field-input"
-                value={settings[field]}
+                value={value ?? settings[field]}
                 min={f.min}
                 max={f.max}
                 // The spinner moves by `spin` where a field has one (the miles,
@@ -113,17 +117,27 @@ export function HourSelect({ field, label, settings, onChange, disabled = false 
     );
 }
 
-/** The plug-in window as a sentence: Plugged in [10 pm] to [7 am] · 9 hours. */
+/**
+ * The plug-in windows as sentences, one for driving days and one for days off
+ * (owner, 2026-11-17: a day marked Off may be home all day):
+ * Driving days [10 pm] to [7 am] · 9 hours.
+ */
 export function PlugWindow({ settings, onChange }) {
-    const hours = plugHours(settings);
     const select = (field, label) => <HourSelect field={field} label={label} settings={settings} onChange={onChange} />;
-    return (
-        <div className="flex flex-wrap items-center gap-2">
-            <span className="text-label">Plugged in</span>
-            {select('plugFrom', 'Plugged in from')}
+    const row = (label, from, until, hours) => (
+        <div className="plug-window-row">
+            <span className="text-secondary">{label}</span>
+            {select(from, `${label}: plugged in from`)}
             <span className="text-meta">to</span>
-            {select('plugUntil', 'Plugged in until')}
-            <span className="text-meta">{hours} hours</span>
+            {select(until, `${label}: plugged in until`)}
+            <span className="text-meta">{hours} h</span>
+        </div>
+    );
+    return (
+        <div className="flex flex-col gap-2">
+            <span className="text-label">Plugged in</span>
+            {row('Driving days', 'plugFrom', 'plugUntil', plugHours(settings))}
+            {row('Days off', 'offFrom', 'offUntil', offHours(settings))}
         </div>
     );
 }

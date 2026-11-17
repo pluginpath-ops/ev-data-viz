@@ -148,6 +148,8 @@ const FALLBACK = {
     background: 'rgb(17, 22, 31)',
     good:       'rgb(95, 214, 168)',
     caution:    'rgb(245, 176, 119)',
+    danger:     'rgb(220, 75, 66)',
+    success:    'rgb(35, 180, 126)',
 };
 
 /**
@@ -163,6 +165,8 @@ const FALLBACK = {
  *   background — the flat fill a PNG export is composited onto
  *   callout    — the orange a reference mark drawn OVER the plot is called out in
  *   good, caution — canvas text that says better or worse than a reference
+ *   danger, success — the status red and green: a time-of-use plan's dearest tier
+ *              (its stripes) and its base tier (its tint on a battery line)
  */
 export function chartTheme() {
     if (typeof document === 'undefined' || !document.documentElement) {
@@ -196,6 +200,8 @@ export function chartTheme() {
         // a reference). The status text tints, so they read on the panel.
         good:       read('--color-success-text', FALLBACK.good),
         caution:    read('--color-warning-text', FALLBACK.caution),
+        danger:     read('--color-danger', FALLBACK.danger),
+        success:    read('--color-success', FALLBACK.success),
     };
 }
 

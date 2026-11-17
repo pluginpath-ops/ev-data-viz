@@ -19,6 +19,7 @@
 import { SETUP_WIZARD } from '../constants/setupWizard';
 import { STANDARD_CONDITIONS } from '../constants/epa';
 import { DEFAULT_COST_TO_DRIVE } from '../constants/costToDrive';
+import { ratePlan } from '../constants/ratePlans';
 import { categoryForMode, labelForMode } from '../constants/chartNav';
 import { specProvenance } from './specHelpers';
 import { vehicleDataCategories } from './vehicleDataCategories';
@@ -50,6 +51,8 @@ export const EMPTY_ANSWERS = Object.freeze({
     climate: null,
     mountains: null,   // true | false | null
     home: null,
+    rate: null,        // 'flat' | 'tou' | null
+    ratePlan: null,    // a RATE_PLANS key, or 'custom' (set on Your Driving), with rate 'tou'
     homePrice: null,
     gasMpg: null,
     gasPrice: null,
@@ -76,7 +79,7 @@ export const STEP_ANSWERS = {
     cars: ['cars'],
     driving: ['dailyMi', 'highway', 'speedMph', 'tripMi'],
     weather: ['climate', 'mountains'],
-    money: ['home', 'homePrice', 'gasMpg', 'gasPrice'],
+    money: ['home', 'rate', 'ratePlan', 'homePrice', 'gasMpg', 'gasPrice'],
     summary: [],
 };
 
@@ -103,6 +106,8 @@ export function sanitizeAnswers(raw, config = SETUP_WIZARD) {
     out.climate = keyIn(config.weather.climates, raw.climate);
     out.mountains = typeof raw.mountains === 'boolean' ? raw.mountains : null;
     out.home = keyIn(config.money.home.options, raw.home);
+    out.rate = keyIn(config.money.rate.options, raw.rate);
+    out.ratePlan = raw.ratePlan === 'custom' || ratePlan(raw.ratePlan) ? raw.ratePlan : null;
     out.homePrice = num(raw.homePrice);
     out.gasMpg = num(raw.gasMpg);
     out.gasPrice = num(raw.gasPrice);
@@ -133,7 +138,8 @@ export function visibleSteps(answers, config = SETUP_WIZARD) {
 export function askedAnswers(answers, config = SETUP_WIZARD) {
     const asked = askedQuestions(answers, config);
     return Object.fromEntries(Object.entries({ ...EMPTY_ANSWERS, ...answers })
-        .map(([k, v]) => [k, k === 'goals' || asked.has(k) ? v : EMPTY_ANSWERS[k]]));
+        // The plan picked is part of the rate question's answer.
+        .map(([k, v]) => [k, k === 'goals' || asked.has(k) || (k === 'ratePlan' && asked.has('rate')) ? v : EMPTY_ANSWERS[k]]));
 }
 
 /** How many asked questions were left unanswered — for the site event, never the answers. */
@@ -363,11 +369,16 @@ export function planFromAnswers(answers = EMPTY_ANSWERS, { vehicles = [], select
     // price; the wizard sets both so they agree.
     const home = byKey(config.money.home.options, a.home);
     if (home) plan.costToDrive.level = home.level;
+    // Time of use with a plan picked sets the plan; One price sets One price.
+    // Time of use with none picked leaves the setting as it is.
+    if (a.rate === 'tou' && a.ratePlan) plan.costToDrive.rate = a.ratePlan;
+    if (a.rate === 'flat') plan.costToDrive.rate = 'flat';
     if (a.homePrice != null) {
         plan.costToDrive.homePrice = a.homePrice;
         plan.assumptions.homePrice = a.homePrice;
     }
-    if (a.gasMpg != null) Object.assign(plan.costToDrive, { gasCity: a.gasMpg, gasHwy: a.gasMpg });
+    // A gas car's mileage answered is a gas car to compare with, even after None.
+    if (a.gasMpg != null) Object.assign(plan.costToDrive, { gasCity: a.gasMpg, gasHwy: a.gasMpg, gasCompare: true });
     if (a.gasPrice != null) plan.costToDrive.gasPrice = a.gasPrice;
 
     return plan;
@@ -435,7 +446,9 @@ export function planSummary(plan, answers = EMPTY_ANSWERS, names = {}, units = '
     const charging = [];
     const home = byKey(config.money.home.options, a.home);
     if (home) charging.push(home.label.toLowerCase());
-    if (a.homePrice != null && home?.key !== 'none') charging.push(`${money(a.homePrice)}/kWh`);
+    const tou = a.rate === 'tou' && a.ratePlan;
+    if (tou && home?.key !== 'none') charging.push(ratePlan(a.ratePlan)?.label ?? config.money.rate.planOwn);
+    else if (a.homePrice != null && home?.key !== 'none') charging.push(`${money(a.homePrice)}/kWh`);
     if (charging.length) lines.push({ label: S.charging, text: charging.join(', ') });
 
     const gas = [];

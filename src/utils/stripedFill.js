@@ -38,3 +38,15 @@ export function stripedFill(base, stripe, { width = 3 } = {}) {
  * stripes stand out against it (owner, 2026-11-08: "slightly more contrasted").
  */
 export const fastChargingFill = (color) => stripedFill(withAlpha(desaturate(color, 0.15), 0.5), color);
+
+/**
+ * A car's home charging in one time-of-use tier (0 dearest): the base tier
+ * (rateTiers) in its plain color, a dearer one its color striped with the
+ * tier's — red for the dearest, gray for the middle (owner, 2026-11-17). The
+ * stripe is the car's color's partner, as fast charging's is, so a red or
+ * green car still reads by its label. `theme` is chartTheme().
+ */
+export function homeTierFill(color, tier, base, theme) {
+    if (tier == null || tier === base) return color;
+    return stripedFill(color, tier === 0 ? theme.danger : theme.tick);
+}

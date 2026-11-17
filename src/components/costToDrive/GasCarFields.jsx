@@ -21,6 +21,9 @@ export default function GasCarFields({ settings, onChange, compact = false, pick
     const props = { settings, onChange };
     // The car's own figures: changing one makes it the reader's own car.
     const ownCar = { settings, onChange: (patch) => onChange({ ...patch, gasCar: 'custom' }) };
+    // With None picked the picker is all there is, even where it is usually
+    // left out, so the reader can pick a car back.
+    if (!settings.gasCompare) return <GasCarPicker settings={settings} onChange={onChange} info={timeOnly ? <GasCarStopsInfo /> : null} />;
     return (
         <>
             {picker && <GasCarPicker settings={settings} onChange={onChange} info={timeOnly ? <GasCarStopsInfo /> : null} />}

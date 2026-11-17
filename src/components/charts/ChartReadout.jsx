@@ -180,7 +180,8 @@ export default function ChartReadout({ store }) {
                     } : undefined}>
                     {entries.map(({ row, active: isActive, d }) => (
                         <li key={row.key} data-row={row.key} className={`chart-readout-row${isActive ? ' is-active' : ''}`}>
-                            <span className="series-swatch" style={{ backgroundColor: row.color ?? undefined }} />
+                            {/* A row's own CSS background (a striped bar part) where it has one. */}
+                            <span className="series-swatch" style={row.swatch ? { background: row.swatch } : { backgroundColor: row.color ?? undefined }} />
                             <span className="chart-readout-name" title={d.name}>{d.name}</span>
                             <span className="chart-readout-value">
                                 {row.interpolated && <span className="chart-readout-approx" aria-label="read off the line">≈</span>}

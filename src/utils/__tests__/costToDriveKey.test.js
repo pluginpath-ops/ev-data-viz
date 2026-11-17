@@ -17,6 +17,7 @@ describe('the Cost to Drive key', () => {
                 : f.kind === 'enum' ? f.values
                 : f.kind === 'week' ? ['OOOOOOO', 'LLLLLLL', 'DLODLOD']
                 : f.kind === 'text' ? ['', 'My Accord', 'Café 4×4 🚗', 'x'.repeat(f.max)]
+                : f.kind === 'hours' ? ['H'.repeat(24), 'MLMLMLMLMLMLMLMLMLMLMLML']
                 : [0, 127];
             for (const v of values) {
                 const s = settings({ [f.key]: v });
@@ -38,17 +39,45 @@ describe('the Cost to Drive key', () => {
     // Golden keys: if one of these changes, a field moved and every shared
     // link now says something else. Append fields; never reorder them.
     it('golden keys', () => {
-        expect(encodeCostToDriveKey(settings({ level: 0 }))).toBe('4.AQA');
-        expect(encodeCostToDriveKey(settings({ season: 'summer' }))).toBe('4.gIBAAQ');
-        expect(encodeCostToDriveKey(settings({ week: 'LLLLLLL', longMi: 250 }))).toBe('4.wBDFCPUB');
-        // Version 4's moved defaults and loosened minimums. A price of 0 or a
+        expect(encodeCostToDriveKey(settings({ level: 0 }))).toBe('5.AQA');
+        expect(encodeCostToDriveKey(settings({ season: 'summer' }))).toBe('5.gIBAAQ');
+        expect(encodeCostToDriveKey(settings({ week: 'LLLLLLL', longMi: 250 }))).toBe('5.wBDFCPUB');
+        // Version 4's moved defaults (version 5 kept them) and loosened minimums. A price of 0 or a
         // detour of 0 is index 0 — the bytes version 3 spent on its old
         // minimums, so only the version tells them apart.
-        expect(encodeCostToDriveKey(settings({ stopBy: 30 }))).toBe('4.gIACBA');
-        expect(encodeCostToDriveKey(settings({ homePrice: 0 }))).toBe('4.IAA');
-        expect(encodeCostToDriveKey(settings({ fastPrice: 0 }))).toBe('4.gIAgAA');
-        expect(encodeCostToDriveKey(settings({ detourMin: 0 }))).toBe('4.gIABAA');
-        expect(encodeCostToDriveKey(settings({ homePrice: 0.31, fastPrice: 0.6, detourMin: 12, stopBy: 40 }))).toBe('4.oIAjHwwGPA');
+        expect(encodeCostToDriveKey(settings({ stopBy: 30 }))).toBe('5.gIACBA');
+        expect(encodeCostToDriveKey(settings({ homePrice: 0 }))).toBe('5.IAA');
+        expect(encodeCostToDriveKey(settings({ fastPrice: 0 }))).toBe('5.gIAgAA');
+        expect(encodeCostToDriveKey(settings({ detourMin: 0 }))).toBe('5.gIABAA');
+        expect(encodeCostToDriveKey(settings({ homePrice: 0.31, fastPrice: 0.6, detourMin: 12, stopBy: 40 }))).toBe('5.oIAjHwwGPA');
+        // Version 5: the rate plan, a custom plan's hours and the days-off window.
+        expect(encodeCostToDriveKey(settings({ rate: 'pge-ev2a' }))).toBe('5.gICAgIABAg');
+        expect(encodeCostToDriveKey(settings({ rate: 'custom', rateHours: 'H'.repeat(24), rateLow: 0 }))).toBe('5.gICAgIATAQAA');
+        expect(encodeCostToDriveKey(settings({ offFrom: 9, offUntil: 8 }))).toBe('5.gICAgIDAAQkI');
+        // None for the gas car.
+        expect(encodeCostToDriveKey(settings({ gasCompare: false }))).toBe('5.gICAgICAAgA');
+    });
+
+    it('carries None for the gas car, its figures kept, and older keys compare', () => {
+        const s = settings({ gasCompare: false, gasCar: 'civic', gasCity: 32 });
+        expect(decodeCostToDriveKey(encodeCostToDriveKey(s)).settings).toEqual(s);
+        expect(decodeCostToDriveKey('4.AQA').settings.gasCompare).toBe(true);
+    });
+
+    it('still reads version-4 keys', () => {
+        expect(decodeCostToDriveKey('4.AQA')).toEqual({ settings: settings({ level: 0 }), error: null });
+        expect(decodeCostToDriveKey('4.gIBAAQ')).toEqual({ settings: settings({ season: 'summer' }), error: null });
+        expect(decodeCostToDriveKey('4.oIAjHwwGPA').settings)
+            .toEqual(settings({ homePrice: 0.31, fastPrice: 0.6, detourMin: 12, stopBy: 40 }));
+    });
+
+    it('round-trips a custom plan\'s hours, and refuses a bad map', () => {
+        for (const h of ['HHHHHHHHHHHHHHHHHHHHHHHH', 'LLLLLLLLLLLLLLLLLLLLLLLL', 'LMHLMHLMHLMHLMHLMHLMHLMH']) {
+            const s = settings({ rate: 'custom', rateHours: h });
+            expect(decodeCostToDriveKey(encodeCostToDriveKey(s)).settings.rateHours).toBe(h);
+        }
+        expect(normalizeCostToDrive({ rateHours: 'HML' }).rateHours).toBe(DEFAULT_COST_TO_DRIVE.rateHours);
+        expect(normalizeCostToDrive({ rate: 'nope' }).rate).toBe('flat');
     });
 
     // What versions 1-3 left out of a key for stop-by and fast price.
