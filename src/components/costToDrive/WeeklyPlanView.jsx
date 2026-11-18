@@ -35,11 +35,13 @@ import { levelLabel } from './HomeLevelPicker';
 /** Where the everyday battery range ends, drawn dashed on the week's line. */
 const GUIDES_PCT = [10, 80];
 
-/** "3 fast stops · 1 h 8 min · $23 fast + $49 home per week". */
+/** "3 fast stops (+1 a month) · 1 h 8 min · $23 fast + $49 home per week". */
 function weekLine(week) {
-    const stops = week.stopCount === 0
+    const n = week.stops.length;
+    const month = week.monthly ? ' a month' : '';
+    const stops = !n && !week.monthly
         ? 'No fast stops'
-        : `${week.stopCount} fast stop${week.stopCount === 1 ? '' : 's'} · ${minutesText(week.fastMinutes)}`;
+        : `${n ? `${n} fast stop${n === 1 ? '' : 's'}${month && ' (+1 a month)'}` : `1 fast stop${month}`} · ${minutesText(week.fastMinutes)}`;
     return `${stops} · ${dollars(week.fastCost)} fast + ${dollars(week.homeCost)} home per week`;
 }
 

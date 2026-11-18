@@ -6,7 +6,7 @@ import {
 } from '../costToDrive';
 import { RATE_PLANS } from '../../constants/ratePlans';
 import { normalizeCostToDrive } from '../costToDriveKey';
-import { DEFAULT_COST_TO_DRIVE, GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME, MIN_STOP_ADD, STRETCH_CAP_TO, PACK_WARMING_BELOW_F, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
+import { DEFAULT_COST_TO_DRIVE, GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME, MIN_STOP_ADD, MIN_STOP_MINUTES, MONTHLY_STOP_BELOW, STRETCH_CAP_TO, PACK_WARMING_BELOW_F, HOME_LEVELS, NO_HOME_LEVEL, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import { ASSUMED_CHARGER_EFF, BATTERY_WARMING_KWH, DC_FAST_LOSS, FIXED_DRAW_W } from '../../constants/epa';
 
 // A Model Y-ish profile with fixed numbers, so the rule is tested apart from
@@ -144,6 +144,67 @@ describe('the week', () => {
             expect(closing[0].minutes).toBeCloseTo(closing[0].chargeMinutes + s.detourMin + s.startMin, 6);
             expect(mondayAfter(w)).toBeGreaterThanOrEqual(w.days[0].startSoc - 0.5);
         });
+    });
+
+    describe('a week a little short of Monday morning', () => {
+        // A big truck on a 3.8 kW charger in winter: the weekday nights have a
+        // little spare time, Friday to Sunday run out, and Saturday's long day
+        // leaves Sunday night short.
+        const truck = profile({
+            usableKwh: 128.9, phantom: { pctDay: 1 },
+            whPerMi: { winter: { D: 626, L: 564 }, summer: { D: 400, L: 420 } },
+            home: { kw: 3.8, eff: 0.865, warmEff: 0.88 }, warmKwhPerF: 0.002 * 128.9,
+            fast: { basis: 'maxDc', minutes: (a, b) => taperMinutes(128.9, 220, a, b) },
+        });
+        const week = (longMi) => simulateWeek(truck, settings({ week: 'DDDDDLO', planned: 0, dailyMi: 35, longMi, winterF: 15 }));
+
+        it('starts Monday lower where spare plug-in time makes it up, with no fast stop', () => {
+            const w = week(85);
+            expect(w.stops).toEqual([]);
+            expect(w.monthly).toBe(null);
+            expect(w.days[0].startSoc).toBeLessThan(80);
+            expect(w.days[0].startSoc).toBeGreaterThan(75);
+            // It repeats: Monday morning is where Sunday night leaves it.
+            expect(w.days[6].night.endSoc).toBeCloseTo(w.days[0].startSoc, 0);
+        });
+
+        it('carries a shortfall under MONTHLY_STOP_BELOW to a stop a month, off the chart', () => {
+            const w = week(88);
+            expect(w.stops).toEqual([]);
+            expect(w.days[0].startSoc).toBe(80);
+            expect(w.monthly.shortPct).toBeGreaterThan(0.5);
+            expect(w.monthly.shortPct).toBeLessThan(MONTHLY_STOP_BELOW);
+            // A month of it, 52/12 weeks, plus the detour.
+            expect(w.monthly.toSoc - w.monthly.fromSoc).toBeGreaterThan(perMonth(w.monthly.shortPct));
+            // 12/52 of it in the week's totals.
+            expect(w.stopCount).toBeCloseTo(12 / 52, 9);
+            expect(w.fastMinutes).toBeCloseTo(w.monthly.minutes * 12 / 52, 6);
+            expect(w.fastCost).toBeCloseTo(w.monthly.cost * 12 / 52, 6);
+            // The line steps over it at the week's edge: Monday 0:00 continues into Monday's morning.
+            expect(w.points[0][0]).toBe(0);
+        });
+
+        it('closes on the chart from MONTHLY_STOP_BELOW a week', () => {
+            const w = week(130);
+            expect(w.monthly).toBe(null);
+            expect(w.stops.some(x => x.closesWeek)).toBe(true);
+        });
+    });
+
+    it('a stop adds at least MIN_STOP_ADD %, or MIN_STOP_MINUTES of charging on a slow charger', () => {
+        // 1% a minute: ten minutes is 10%, so a 3%-a-minute car adds 10%, a 0.5%-a-minute one 5%.
+        // Long days just long enough to stop, so the floor, not the day, sizes it.
+        for (const [perMin, least] of [[3, MIN_STOP_ADD], [0.5, MIN_STOP_MINUTES * 0.5]]) {
+            const p = profile({ fast: { basis: 'maxDc', minutes: (a, b) => Math.max(0, b - a) / perMin } });
+            const road = [];
+            for (let longMi = 150; longMi <= 300; longMi += 3) {
+                road.push(...simulateWeek(p, settings({ longMi })).stops.filter(x => !x.planned && !x.closesWeek));
+            }
+            expect(road.length).toBeGreaterThan(0);
+            const adds = road.map(st => st.toSoc - st.fromSoc);
+            expect(Math.min(...adds)).toBeGreaterThanOrEqual(least - 1e-6);
+            expect(Math.min(...adds)).toBeLessThan(least + 1e-6);
+        }
     });
 
     it('charges to 100% the night before a long day, and says when a night runs out', () => {

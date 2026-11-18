@@ -109,7 +109,7 @@ the pack: battery warming, taken from the first hours charged, adds nothing
   reaches **stop to charge by**. If the day STARTS below that, the stop waits
   until it is needed (keep-above + the detour's energy + 2%), never at mile 0.
 - It charges enough, detour included, to finish the day above the floor.
-- It adds at least **10%** (no 30→37% stops).
+- It adds at least **10%**, or **10 minutes** of charging where that comes first (owner, 2026-11-18), so no 30→33% stops.
 - It stays under **charge no higher than**, but stretches to **80%** when that
   saves a second stop. A day that still needs more stops twice.
 - Minutes come from the car's own charging curve (`chargeTimeSession`, the same
@@ -130,9 +130,24 @@ stop charges further, up to 100%, if every night after it ran out of window
 (a night that tops off, or a later stop charging to its own target, would
 absorb the extra); else a stop of its own after the latest driving day whose
 charge reaches Monday, else Sunday. That can be time the week did not
-otherwise need, which is realistic. It replaced three settling weeks, which on
-a slow charger in the cold left the reported week ending lower than it began,
-its missing fast charging uncounted (120 V came out cheaper than 16 A).
+otherwise need, which is realistic.
+
+Two steps come first (owner, 2026-11-18). **Steady state:** where Sunday
+night comes back short, Monday tries starting where it ended; if spare
+plug-in time earlier in the week makes it up, the week repeats from there and
+starts lower, with no fast charging. It counts only if it buys no more fast
+charging than the week at Charge to. **Carried shortfall:** what the week still
+loses, if under 10% (`MONTHLY_STOP_BELOW`), is made up by **one fast stop a
+month**, sized to the month's shortfall plus its detour. It is not on the
+chart (the line steps over it at the week's edge); a note under the table
+says so, and 12/52 of its time, energy and cost are in each week's totals.
+From 10% a week on, the week closes with a stop on the chart as above.
+
+Closing replaced three settling weeks, which on a slow charger in the cold
+left the reported week ending lower than it began, its missing fast charging
+uncounted (120 V came out cheaper than 16 A). The steady state differs: it
+accepts a lower Monday only when the week truly repeats, and a carried
+shortfall still pays for its fast charging.
 
 **Gas car.** Same miles, same city share, mpg blended per day; fills at the set
 level; minutes per fill-up. Fill-ups per week are reported as an average, since

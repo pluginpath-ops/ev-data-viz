@@ -5,7 +5,7 @@
  * page, the sidebar stacks them (`compact`), so the two ways in cannot drift
  * apart. Names: docs/vocabulary.md, Cost to Drive.
  */
-import { COST_TO_DRIVE_PRESETS, DETOUR_MPH, MIN_STOP_ADD, STRETCH_CAP_TO } from '../../constants/costToDrive';
+import { COST_TO_DRIVE_PRESETS, DETOUR_MPH, MIN_STOP_ADD, MIN_STOP_MINUTES, STRETCH_CAP_TO } from '../../constants/costToDrive';
 import { DC_FAST_LOSS, FIXED_DRAW_W, PHANTOM_DRAIN_PCT_DAY } from '../../constants/epa';
 import { RATE_PLANS, ratePlan, CUSTOM_TIER_NAMES } from '../../constants/ratePlans';
 import { percentText, rateSeason, customFromPlan } from '../../utils/costToDrive';
@@ -182,9 +182,10 @@ export function FastChargingFields({ settings, onChange }) {
             </div>
             <span className="text-note">
                 A detour is the time off your route to reach a fast charger and get back; its miles
-                (at {DETOUR_MPH} mph) count in the cost and the time. A stop always adds at least {MIN_STOP_ADD}%, and
-                may go past the cap to {STRETCH_CAP_TO}% when that saves a second stop. If home charging can&rsquo;t
-                bring the battery back by Monday morning, the week&rsquo;s last fast stop charges further.
+                (at {DETOUR_MPH} mph) count in the cost and the time. A stop always adds at least {MIN_STOP_ADD}% or charges {MIN_STOP_MINUTES} minutes,
+                whichever comes first, and may go past the cap to {STRETCH_CAP_TO}% when that saves a second stop. If home
+                charging can&rsquo;t bring the battery back by Monday morning, the week starts lower when spare plug-in
+                time makes it up; otherwise the week&rsquo;s last fast stop charges further.
             </span>
             <span className="text-note">
                 DC fast charging assumes {percentText(DC_FAST_LOSS)} of the energy delivered is lost to battery

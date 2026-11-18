@@ -24,7 +24,9 @@ const centsText = (n) => `$${n.toFixed(2)}`;
  * row. Owner, 2026-11-07: home first, then fast; the % written in the figure,
  * not beside it in the unit style, and no notes under the cells, so every cell
  * is one plain line. A night the plug-in window cut short is marked with an
- * asterisk on its time, explained under the table.
+ * asterisk on its time, explained under the table. A week that carries a
+ * shortfall marks Sunday's fast cells with †, the stop a month, explained
+ * under the table in the fast rows' orange.
  */
 const ROWS = [
     { key: 'type', label: 'Day type', cell: (d) => ({ text: TYPE_NAMES[d.type] }) },
@@ -68,6 +70,23 @@ const ROWS = [
     },
 ];
 const FAST_KEYS = ROWS.filter(r => r.fast).map(r => r.key);
+
+/** The stop a month, as a fast row's figure: "1 a month", "25 min/mo", "$9/mo". */
+const MONTHLY_TEXT = {
+    stops: () => '1 a month',
+    fastMin: (m) => `${minutesText(m.minutes)}/mo`,
+    fastCost: (m) => `${dollars(m.cost)}/mo`,
+};
+const MONTHLY_MARK = '†';
+
+/**
+ * Sunday's fast cell when the week carries a shortfall (owner, 2026-11-18):
+ * the stop a month where Sunday has none of its own, marked † either way and
+ * explained under the table.
+ */
+const withMonthly = (cell, key, monthly) => (cell.text === DASH
+    ? { text: MONTHLY_TEXT[key](monthly), mark: MONTHLY_MARK }
+    : { ...cell, mark: MONTHLY_MARK });
 
 /** Hours a night charged in tier `t`. */
 const tierHours = (night, t) => (night.tierSpans ?? []).filter(x => x.tier === t).reduce((h, x) => h + x.to - x.from, 0);
@@ -122,8 +141,10 @@ export default function PlanTable({ week, settings }) {
                         return (
                             <tr key={r.key} className={r.fast ? `is-fast${edge}` : undefined}>
                                 <TableCell text={r.label} className="plan-table-label" />
-                                {week.days.map(d => {
-                                    const c = r.cell(d);
+                                {week.days.map((d, i) => {
+                                    const c = r.fast && week.monthly && i === week.days.length - 1
+                                        ? withMonthly(r.cell(d), r.key, week.monthly)
+                                        : r.cell(d);
                                     return <TableCell key={d.day} numeric {...c} />;
                                 })}
                             </tr>
@@ -135,6 +156,14 @@ export default function PlanTable({ week, settings }) {
                 <p className="text-note plan-table-footnote">
                     * Stopped by your plug-in schedule (driving days {clockText(settings.plugFrom)} to {clockText(settings.plugUntil)}; days
                     off {clockText(settings.offFrom)} to {clockText(settings.offUntil)}) before reaching its limit.
+                </p>
+            )}
+            {week.monthly && (
+                <p className="text-note plan-table-footnote is-fast">
+                    {MONTHLY_MARK} Home charging leaves the week {week.monthly.shortPct.toFixed(1)}% short of Monday
+                    morning. One fast stop a month makes it up: {Math.round(week.monthly.fromSoc)}% to
+                    {' '}{Math.round(week.monthly.toSoc)}%, {minutesText(week.monthly.minutes)}, {dollars(week.monthly.cost)}.
+                    It is not on the chart, but its share is in the week&rsquo;s fast time and cost.
                 </p>
             )}
         </div>

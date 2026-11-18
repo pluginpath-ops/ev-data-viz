@@ -12,7 +12,7 @@
  */
 import {
     HOME_LEVELS, levelKw, ASSUMED_ONBOARD_AC_KW, PACK_WARMING_BELOW_F, DETOUR_MPH,
-    MIN_STOP_ADD, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS, PLANNED_HOUR,
+    MIN_STOP_ADD, MIN_STOP_MINUTES, MONTHLY_STOP_BELOW, STRETCH_CAP_TO, LATE_STOP_MARGIN, DAY_SPANS, PLANNED_HOUR,
     SETTLE_WEEKS, FALLBACK_DC_KW, EPA_LAB_TEMP_F, GAS_COLD_AT_F, GAS_COLD_LOSS, WEEKDAYS, ENOUGH_MARGIN_MIN,
     GAS_CAR_PRESETS, GAS_CAR_FALLBACK_NAME,
 } from '../constants/costToDrive';
@@ -565,6 +565,9 @@ const CAPPED_TOLERANCE_KW = 0.25;
 /** The most rounds closing a week takes; most close in one or two. */
 const CLOSE_ROUNDS = 8;
 
+/** How close, in %, Sunday night must come to a lower Monday for the week to repeat. */
+const STEADY_TOLERANCE = 0.1;
+
 /**
  * What reaches the pack at `kw`, for a car whose charger efficiency is `effRef`
  * at its onboard charger's full power `refKw`: η = η_ref − P₀(1/P − 1/P_ref).
@@ -588,17 +591,17 @@ const warmEffOf = (effRef, refKw) => Math.min(1, effRef + (FIXED_DRAW_W / 1000) 
  */
 const BATTERY_WARMING_CAR_FACTOR = 1;
 
-/** Battery warming one home charge buys at `temperatureF`, pack side, kWh: none at or above PACK_WARMING_BELOW_F. */
 /**
- * Where the week starts Monday morning, and must end: Sunday night's limit
- * (Charge to, 100% before a Long Monday), or with no home charging, Charge no
- * higher than.
+ * Where the week aims to start Monday morning: Sunday night's limit (Charge
+ * to, 100% before a Long Monday), or with no home charging, Charge no higher
+ * than. simulateWeek starts lower where the week repeats from there.
  */
 const weekStartSoc = (profile, s) => {
     if (profile.home.none) return s.capTo;
     return s.fullBeforeLong && s.week[0] === 'L' ? 100 : s.chargeTo;
 };
 
+/** Battery warming one home charge buys at `temperatureF`, pack side, kWh: none at or above PACK_WARMING_BELOW_F. */
 const batteryWarmingKwh = (warmKwhPerF, temperatureF) => warmKwhPerF * Math.max(0, PACK_WARMING_BELOW_F - temperatureF);
 
 /**
@@ -650,19 +653,29 @@ export function plannedSlot(spans, hour) {
  * Drive a week that closes: it starts Monday morning at `weekStartSoc` and
  * Sunday night must bring it back there (owner, 2026-11-16: "the Monday
  * morning requirement" — nobody lives a week hovering at 20%, and a week that
- * ends lower hides the fast charging it will need). Where the nights cannot,
- * the week's last fast stop charges further, else a stop of its own on the
- * latest driving day whose charge reaches Monday (owner: "add the DCFC to an
- * existing one, or earlier in the week"). That may be time the week did not
- * otherwise need: realistic.
+ * ends lower hides the fast charging it will need).
+ * Where Sunday night comes back short, Monday first tries starting where it
+ * ended (owner, 2026-11-18, the steady state): spare time on the nights before
+ * the shortfall makes it up, so the week repeats from there. It counts only
+ * when it buys no more fast charging than the week at `weekStartSoc` did, so
+ * a week that loses ground every week still pays for it.
+ * What it still loses a week, under MONTHLY_STOP_BELOW, is carried: the
+ * week is drawn from Monday at `weekStartSoc` and a fast stop a month, off the
+ * chart (`monthly`), makes it up, 12/52 of it in each week's totals. A month
+ * of carried shortfall can leave the car lower than the week shows; that is
+ * not modeled.
+ * Else the week's last fast stop charges further, else a stop of its own on
+ * the latest driving day whose charge reaches Monday (owner: "add the DCFC to
+ * an existing one, or earlier in the week"). That may be time the week did
+ * not otherwise need: realistic.
  * The week is driven twice and the second reported, so Monday's morning
  * starts after Sunday night's charging, as the week's line wraps it.
  *
  * The fast-stop rule (docs/cost-to-drive-plan.md): when the rest of the day
  * would end below `keepAbove`, the car stops when it reaches `stopBy` — later,
  * at keepAbove + the detour + LATE_STOP_MARGIN, if the day started below it —
- * and charges enough to finish the day above `keepAbove`, at least MIN_STOP_ADD,
- * under `capTo`, stretching to STRETCH_CAP_TO when that saves a second stop.
+ * and charges enough to finish the day above `keepAbove`, at least MIN_STOP_ADD
+ * or MIN_STOP_MINUTES of charging, whichever is less, under `capTo`, stretching to STRETCH_CAP_TO when that saves a second stop.
  * A planned day tops up to `capTo` unless already above it, at PLANNED_HOUR
  * on a day off and in the gap between drives nearest it on a driving day.
  *
@@ -677,8 +690,9 @@ export function plannedSlot(spans, hour) {
  *                 night: { added: number, endSoc: number, fullAt: number|null, ranOut: boolean,
  *                          hours: number, mostAdd: number } }>,
  *   windows: Array<{ from, to, spareFrom }>,   the plug-in window of each night, in hours of the week (plugWindows)
+ *   monthly: { shortPct, fromSoc, toSoc, minutes, chargeMinutes, kwh, cost }|null,   the stop a month a carried shortfall needs
  *   stopCount, fastMinutes, fastKwh, homeKwh, fastCost, homeCost, usedKwh, fastShare, miles
- * }}  `fastKwh`/`homeKwh` are what was bought (losses in); `fastShare` the share of
+ * }}  `stopCount` and the fast totals hold 12/52 of `monthly`; `fastKwh`/`homeKwh` are what was bought (losses in); `fastShare` the share of
  *     the pack energy used that came from fast chargers
  */
 export function simulateWeek(profile, settings, { season = settings.season, trace = null } = {}) {
@@ -688,6 +702,18 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     const pct = (kwh) => kwh / usable * 100;
     const detourMi = s.detourMin / 60 * DETOUR_MPH;
     const phantomPctHour = (profile.phantom?.pctDay ?? 0) / 24;
+    // The least a stop charges to from `from`: MIN_STOP_ADD % more, or as far
+    // as MIN_STOP_MINUTES of charging gets, whichever is less.
+    const leastStopTo = (from) => {
+        const most = Math.min(100, from + MIN_STOP_ADD);
+        if (profile.fast.minutes(from, most) <= MIN_STOP_MINUTES) return most;
+        let lo = from, hi = most;
+        for (let i = 0; i < 24; i++) {
+            const mid = (lo + hi) / 2;
+            if (profile.fast.minutes(from, mid) <= MIN_STOP_MINUTES) lo = mid; else hi = mid;
+        }
+        return lo;
+    };
     trace?.step('A detour, in miles', {
         formula: 'd_detour = t_detour / 60 × v_detour',
         values: { t_detour: val(s.detourMin, 'min', 'setting'), v_detour: val(DETOUR_MPH, 'mph', 'code:DETOUR_MPH') },
@@ -720,19 +746,15 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             result: night.addPct, unit: '%', note: `to ${s.chargeTo}% (100% before a Long day: ${s.fullBeforeLong ? 'yes' : 'no'})`,
         });
     }
-    const startSoc = weekStartSoc(profile, s);
-    trace?.step('Monday morning', {
-        values: { SoC_start: val(startSoc, '%', 'setting') }, result: startSoc, unit: '%',
-        note: `${profile.home.none ? 'no home charging: Charge no higher than' : `Charge to${s.fullBeforeLong && s.week[0] === 'L' ? ' (100% before a Long day)' : ''}`}. The week must end here too`,
-    });
+    const aimSoc = weekStartSoc(profile, s);
 
     /**
-     * The week, driven from Monday morning. `close` is what closing it adds:
-     * `close.boost['d:n']` % more on day d's n-th fast stop, and
-     * `close.added[d]` % on a stop of its own after day d's driving. `tr`
+     * The week, driven from Monday morning at `startSoc`. `close` is what
+     * closing it adds: `close.boost['d:n']` % more on day d's n-th fast stop,
+     * and `close.added[d]` % on a stop of its own after day d's driving. `tr`
      * traces the run.
      */
-    const drive = (close, tr) => {
+    const drive = (close, tr, startSoc) => {
     // The first stop of the reported week is written out as the example.
     let exampleStop = tr;
 
@@ -884,16 +906,17 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                     // Enough for the day when that fits under the stretch;
                     // else the cap, and the day stops again.
                     const ceiling = Math.max(STRETCH_CAP_TO, s.capTo);
-                    const to = Math.min(ceiling, Math.max(need <= ceiling ? need : s.capTo, soc + MIN_STOP_ADD));
+                    const least = leastStopTo(soc);
+                    const to = Math.min(ceiling, Math.max(need <= ceiling ? need : s.capTo, least));
                     if (rec && exampleStop) {
                         exampleStop.step('How far the first road stop charges', {
                             formula: need <= ceiling ? 'SoC_to = min(ceiling, max(need, SoC + add_min))' : 'SoC_to = min(ceiling, max(cap, SoC + add_min))',
                             values: {
                                 need: val(need, '%'), cap: val(s.capTo, '%', 'setting'), SoC: val(soc, '%'),
-                                add_min: val(MIN_STOP_ADD, '%', 'code:MIN_STOP_ADD'), ceiling: val(ceiling, '%', 'code:STRETCH_CAP_TO'),
+                                add_min: val(least - soc, '%'), ceiling: val(ceiling, '%', 'code:STRETCH_CAP_TO'),
                             },
                             result: to, unit: '%',
-                            note: 'need = the rest of the day + the detour + Keep battery above; past the ceiling it charges to the cap and stops again later',
+                            note: `need = the rest of the day + the detour + Keep battery above; add_min = ${MIN_STOP_ADD}% or what ${MIN_STOP_MINUTES} min of charging adds, whichever is less; past the ceiling it charges to the cap and stops again later`,
                         });
                     }
                     hour = stopAt(hour, to, false);
@@ -911,7 +934,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             if (close.added[d] > 0) {
                 const at = spans.length ? clock : Math.max(clock, PLANNED_HOUR);
                 park(at - clock);
-                const to = Math.min(100, soc + Math.max(close.added[d], MIN_STOP_ADD) + detPct);
+                const to = Math.min(100, Math.max(soc + close.added[d], leastStopTo(soc)) + detPct);
                 clock = stopAt(at, to, false, true);
             }
 
@@ -1008,16 +1031,52 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     return { out, endSoc: soc };
     };
 
-    // Close the week. Drive it; while Monday morning comes back short, charge
-    // the week's last fast stop further, if every night after it ran out of
+    const CLOSE_TOLERANCE = 0.5;
+    const close = { boost: {}, added: Array(7).fill(0) };
+    const atAim = drive(close, null, aimSoc);
+    let startSoc = aimSoc, run = atAim;
+
+    // The steady state. Sunday night came back short: start Monday where it
+    // ended and drive again, until the week repeats. Most repeat on the first
+    // try, since the first night with spare time absorbs the shortfall and
+    // every day after it runs as before. Starting lower may not buy fast
+    // charging the week at aimSoc did not, or it is the week that loses
+    // ground, and closing below pays for it.
+    // Where it does not repeat, `shortPct` is what each week still loses once
+    // the spare time has made up what it can: the last round's shortfall.
+    let shortPct = 0;
+    if (aimSoc - atAim.endSoc > CLOSE_TOLERANCE) {
+        shortPct = aimSoc - atAim.endSoc;
+        const fastOf = (o) => [o.stops.length, o.fastPackKwh];
+        const [aimStops, aimKwh] = fastOf(atAim.out);
+        for (let x = atAim.endSoc, round = 0; round < CLOSE_ROUNDS; round++) {
+            const r = drive(close, null, x);
+            const [stops, kwh] = fastOf(r.out);
+            if (stops > aimStops || kwh > aimKwh + 1e-6) break;
+            if (r.endSoc >= x - STEADY_TOLERANCE) { startSoc = x; run = r; shortPct = 0; break; }
+            shortPct = x - r.endSoc;
+            x = r.endSoc;
+        }
+    }
+    // Under MONTHLY_STOP_BELOW, the week carries it: Monday starts at aimSoc,
+    // Sunday ends that much short, and a stop a month makes it up (below).
+    const carriedPct = shortPct > CLOSE_TOLERANCE && shortPct < MONTHLY_STOP_BELOW ? shortPct : 0;
+    trace?.step('Monday morning', {
+        values: { SoC_aim: val(aimSoc, '%', 'setting') }, result: startSoc, unit: '%',
+        note: `${profile.home.none ? 'no home charging: Charge no higher than' : `Charge to${s.fullBeforeLong && s.week[0] === 'L' ? ' (100% before a Long day)' : ''}`}. ${startSoc < aimSoc
+            ? `Sunday night comes back short of it; the week repeats from ${startSoc.toFixed(1)}%, the spare plug-in time before the shortfall making it up, so it starts there`
+            : carriedPct ? `Sunday night comes back ${carriedPct.toFixed(1)}% short of it each week, under ${MONTHLY_STOP_BELOW}%: a fast stop a month makes it up`
+                : 'The week must end here too'}`,
+    });
+
+    // Close the week. While Monday morning comes back short, charge the
+    // week's last fast stop further, if every night after it ran out of
     // window (a night that tops off, or a later stop charging to its own
     // target, would absorb the extra), up to 100%; else add a stop of its own
     // after the latest driving day whose charge reaches Monday, else Sunday.
-    // Rarely more than two rounds.
-    const CLOSE_TOLERANCE = 0.5;
-    const close = { boost: {}, added: Array(7).fill(0) };
-    for (let round = 0; round < CLOSE_ROUNDS; round++) {
-        const { out: o, endSoc } = drive(close, null);
+    // Rarely more than two rounds. A carried shortfall skips it.
+    for (let round = 0; round < CLOSE_ROUNDS && !carriedPct; round++) {
+        const { out: o, endSoc } = run;
         let left = startSoc - endSoc;
         if (left <= CLOSE_TOLERANCE) break;
         // Days whose charge reaches Monday: every night from there on ran out (or there is none).
@@ -1038,8 +1097,9 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             const d = [6, 5, 4, 3, 2, 1, 0].find(i => i >= after && reaches[i] && s.week[i] !== 'O') ?? 6;
             close.added[d] += left;
         }
+        run = drive(close, null, startSoc);
     }
-    const { out, endSoc: soc } = drive(close, trace);
+    const { out, endSoc: soc } = drive(close, trace, startSoc);
     const closed = out.stops.filter(x => x.closesWeek);
     if (trace && closed.length) {
         trace.step('Closing the week', {
@@ -1050,18 +1110,51 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     }
     // The week wraps. A Sunday night that runs past midnight is, on the line,
     // Monday morning: cut it at the week's end and carry the rest to Monday
-    // 0:00, which (the week being settled) starts where this one ends.
+    // 0:00, which (the week being closed) starts where this one ends. A
+    // carried shortfall is the month's stop's to make up, not the week's: the
+    // line steps over it at the week's edge, where Monday starts.
     const WEEK = 7 * 24;
+    const lift = carriedPct ? startSoc - soc : 0;
     const past = out.points.findIndex(([h]) => h > WEEK);
     if (past > 0) {
         const [h0, s0] = out.points[past - 1], [h1, s1] = out.points[past];
         const atMidnight = s0 + (s1 - s0) * (WEEK - h0) / (h1 - h0);
-        const carried = out.points.slice(past).map(([h, v]) => [h - WEEK, v]);
+        const carried = out.points.slice(past).map(([h, v]) => [h - WEEK, v + lift]);
         out.points.length = past;
         out.points.push([WEEK, atMidnight]);
-        out.points.splice(0, 1, [0, atMidnight], ...carried);
+        out.points.splice(0, 1, [0, atMidnight + lift], ...carried);
     } else {
         out.points.push([WEEK, soc]);
+    }
+
+    // The month's stop, for a carried shortfall: from where a month of it
+    // leaves Monday morning, back up, plus its detour; a twelfth of a year's
+    // worth, so 12/52 of it a week.
+    let monthly = null;
+    if (carriedPct) {
+        const addPct = perMonth(carriedPct);
+        const detourPct = pct(detourMi * whPerMi.D / 1000);
+        const fromSoc = Math.max(s.keepAbove, startSoc - addPct);
+        const toSoc = Math.min(100, fromSoc + addPct + detourPct);
+        const chargeMinutes = profile.fast.minutes(fromSoc, toSoc);
+        const minutes = chargeMinutes + s.detourMin + s.startMin;
+        const packKwh = (toSoc - fromSoc) / 100 * usable;
+        const kwh = (packKwh + warmKwh) / (1 - DC_FAST_LOSS);
+        monthly = { shortPct: carriedPct, fromSoc, toSoc, minutes, chargeMinutes, kwh, cost: kwh * s.fastPrice };
+        const share = 1 / WEEKS_PER_MONTH;
+        out.fastPackKwh += packKwh * share;
+        out.fastWarmPackKwh += warmKwh * share;
+        out.fastMinutes += minutes * share;
+        out.usedKwh += detourPct / 100 * usable * share;
+        trace?.step('A fast stop a month', {
+            formula: 'ΔSoC_month = short × 52 / 12; t_month = t_charge + t_detour + t_start',
+            values: {
+                short: val(carriedPct, '%/wk'), t_charge: val(chargeMinutes, 'min'),
+                t_detour: val(s.detourMin, 'min', 'setting'), t_start: val(s.startMin, 'min', 'setting'),
+            },
+            result: minutes, unit: 'min',
+            note: `Sunday night ends ${carriedPct.toFixed(1)}% short each week, under ${MONTHLY_STOP_BELOW}%: one stop a month, ${fromSoc.toFixed(0)} → ${toSoc.toFixed(0)}% with its detour, off the chart; 12/52 of its time, energy and cost count in each week's`,
+        });
     }
 
     const fastKwh = (out.fastPackKwh + out.fastWarmPackKwh) / (1 - DC_FAST_LOSS);
@@ -1110,11 +1203,15 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                 note: `${ratePlanName(s)}: each night charges in its cheapest hours first, and in dearer ones only where the cheap hours cannot hold it`,
             });
         }
-        trace.step('Fast-charging time a week', { formula: 'the sum of every t_stop', result: out.fastMinutes, unit: 'min', note: `${out.stops.length} stop${out.stops.length === 1 ? '' : 's'}` });
+        trace.step('Fast-charging time a week', { formula: 'the sum of every t_stop', result: out.fastMinutes, unit: 'min', note: `${out.stops.length} stop${out.stops.length === 1 ? '' : 's'}${monthly ? ', and 12/52 of the stop a month' : ''}` });
     }
     return {
         points: out.points, stops: out.stops, days: out.days, miles: out.miles,
-        stopCount: out.stops.length,
+        // The month's stop counts as 12/52 of one.
+        stopCount: out.stops.length + (monthly ? 1 / WEEKS_PER_MONTH : 0),
+        // A carried shortfall's stop a month, off the chart: { shortPct (a week),
+        // fromSoc, toSoc, minutes, chargeMinutes, kwh, cost }, or null.
+        monthly,
         fastMinutes: out.fastMinutes,
         fastKwh, homeKwh,
         fastCost: fastKwh * s.fastPrice,
