@@ -205,6 +205,16 @@ export const SPEC_CATEGORIES = [
             { key: 'preconditioning',             label: 'Battery Preconditioning',        type: 'enum',
               options: ['None', 'Manual', 'Automatic (nav-triggered)', 'Both'], tableLabel: 'Preconditioning' },
             { key: 'heat_pump',                   label: 'Heat Pump',                      type: 'boolean' },
+            // What a PARKED car loses to its own electronics, sleep modes and
+            // security features. Cost & Time takes it only while the car is
+            // parked and falls back to the site's figure (1% a day) when blank.
+            // Cars run about 0–3% a day. The note says where the figure came
+            // from and how the car was set up (Sentry, Gear Guard, sleep).
+            { key: 'phantom_drain_pct_day',       label: 'Phantom Drain (% per day)',      type: 'number', unit: '%',
+              better: 'lower', tableLabel: 'Phantom drain',
+              hint: 'The share of the battery the car loses in a day while parked: its electronics, sleep modes and security features, not driving or charging. About 0–3% a day. Cost & Time uses it for this car; blank uses the site default.' },
+            { key: 'phantom_drain_note',          label: 'Phantom Drain — Source & Setup', type: 'text', tableLabel: 'Drain source',
+              hint: 'Where the figure came from, over how many parked hours, and the settings behind it (Sentry, Gear Guard, sleep mode, cabin overheat).' },
         ],
     },
     {

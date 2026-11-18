@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    simulateWeek, simulateGasWeek, gasColdLoss, gasTripLegs, plannedSlot, costToDriveVehicle, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
+    simulateWeek, simulateGasWeek, gasColdLoss, gasTripLegs, plannedSlot, costToDriveVehicle, phantomDrainOf, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
     weekSummary, gasCarName, chargerText, chargingText, homeCostCeiling, plugHours, plugWindows,
     chargeInCheapestHours, homePricing, rateSeason, ratePlanName, windowOf, rateTiers, chargingTiers, homeTierOrder,
 } from '../costToDrive';
@@ -892,5 +892,47 @@ describe('time-of-use rates', () => {
         for (const lvl of [p, profile(wallOutlet)]) {
             expect(perMonth(simulateWeek(lvl, g).homeCost)).toBeLessThanOrEqual(homeCostCeiling(lvl, g) + 1e-6);
         }
+    });
+});
+
+describe('phantom drain (#590)', () => {
+    const phantom = (pctDay) => ({ phantom: { pctDay, source: 'setting' } });
+    const idleWeek = { week: 'OOOOOOO', planned: 0 };
+
+    it('a week with none is the week it was', () => {
+        const a = simulateWeek(profile(), settings());
+        const b = simulateWeek(profile(phantom(0)), settings());
+        expect(b.homeKwh).toBeCloseTo(a.homeKwh, 9);
+        expect(b.phantomKwh).toBe(0);
+    });
+
+    it('a car that never drives still loses about a day\'s drain a day, less what it spends charging, and buys it back', () => {
+        const w = simulateWeek(profile(phantom(1)), settings(idleWeek));
+        const weekMax = 7 * 0.01 * 75;
+        expect(w.phantomKwh).toBeGreaterThan(weekMax * 0.5);
+        expect(w.phantomKwh).toBeLessThanOrEqual(weekMax + 1e-9);
+        // Bought back at the wall through the charger, so more than it lost.
+        expect(w.homeKwh).toBeGreaterThan(w.phantomKwh * 0.95);
+        for (const d of w.days) expect(d.phantomPct).toBeGreaterThan(0.3);
+    });
+
+    it('a day off slopes down instead of lying flat', () => {
+        const range = (pts) => Math.max(...pts.map(([, v]) => v)) - Math.min(...pts.map(([, v]) => v));
+        expect(range(simulateWeek(profile(), settings(idleWeek)).points)).toBeCloseTo(0, 6);
+        expect(range(simulateWeek(profile(phantom(2)), settings(idleWeek)).points)).toBeGreaterThan(0.5);
+    });
+
+    it('the week still closes: Monday morning is where it began', () => {
+        const w = simulateWeek(profile(phantom(3)), settings());
+        expect(w.points[0][1]).toBeCloseTo(w.points.at(-1)[1], 0);
+    });
+
+    it('is the reader\'s figure, else the car\'s own (0 counts), else the site\'s', () => {
+        const base = settings();
+        expect(phantomDrainOf({}, base)).toEqual({ pctDay: 1, source: 'knob:PHANTOM_DRAIN_PCT_DAY' });
+        expect(phantomDrainOf({ charging: { phantom_drain_pct_day: 0 } }, base).pctDay).toBe(0);
+        expect(phantomDrainOf({ charging: { phantom_drain_pct_day: 2.5 } }, base)).toEqual({ pctDay: 2.5, source: 'data' });
+        const mine = settings({ phantomFrom: 'mine', phantomDrain: 1.5 });
+        expect(phantomDrainOf({ charging: { phantom_drain_pct_day: 2.5 } }, mine).pctDay).toBe(1.5);
     });
 });

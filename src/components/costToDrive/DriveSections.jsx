@@ -6,7 +6,7 @@
  * apart. Names: docs/vocabulary.md, Cost to Drive.
  */
 import { COST_TO_DRIVE_PRESETS, DETOUR_MPH, MIN_STOP_ADD, STRETCH_CAP_TO } from '../../constants/costToDrive';
-import { ASSUMED_CHARGER_EFF, DC_FAST_LOSS, FIXED_DRAW_W } from '../../constants/epa';
+import { DC_FAST_LOSS, FIXED_DRAW_W, PHANTOM_DRAIN_PCT_DAY } from '../../constants/epa';
 import { RATE_PLANS, ratePlan, CUSTOM_TIER_NAMES } from '../../constants/ratePlans';
 import { percentText, rateSeason, customFromPlan } from '../../utils/costToDrive';
 import { DriveNumberField, DriveSlider, DriveChoice, DriveCheckbox, PlugWindow } from './DriveFields';
@@ -186,6 +186,36 @@ export function FastChargingFields({ settings, onChange }) {
                 may go past the cap to {STRETCH_CAP_TO}% when that saves a second stop. If home charging can&rsquo;t
                 bring the battery back by Monday morning, the week&rsquo;s last fast stop charges further.
             </span>
+            <span className="text-note">
+                DC fast charging assumes {percentText(DC_FAST_LOSS)} of the energy delivered is lost to battery
+                heating and thermal management systems (<ExplainerLink topic="evbench-charging-energy">why</ExplainerLink>).
+            </span>
+        </>
+    );
+}
+
+/**
+ * Phantom drain (#590): what a parked car loses a day. Each car's own figure
+ * where its record has one, else the site's; or one figure for every car.
+ * Driving and charging are not charged it (their efficiency carries it), and
+ * the gas car has none.
+ */
+export function PhantomDrainFields({ settings, onChange }) {
+    const props = { settings, onChange };
+    const mine = settings.phantomFrom === 'mine';
+    return (
+        <>
+            <DriveChoice {...props} field="phantomFrom" label="Phantom drain"
+                options={[['car', 'Each car’s own'], ['mine', 'My figure']]} />
+            {mine
+                ? <DriveNumberField {...props} field="phantomDrain" label="Phantom drain, every car" unit="% a day" />
+                : <span className="text-note">A car with no figure of its own loses {PHANTOM_DRAIN_PCT_DAY}% a day.</span>}
+            <span className="text-note">
+                The typical amount of battery lost per day regardless of usage. Consumed by maintenance
+                electronics and security features. Modern EVs typically lose about {PHANTOM_DRAIN_PCT_DAY}% per day,
+                more (up to 3&ndash;5%) with &ldquo;sentry mode&rdquo; or &ldquo;gear guard&rdquo; type systems enabled.
+                This is energy consumed while parked and not charging.
+            </span>
         </>
     );
 }
@@ -224,10 +254,10 @@ export function EfficiencyFields({ settings, onChange }) {
                 elevation, and range tests to your speed too. A car with no range test uses EPA highway for
                 highway miles; one with no EPA city figure uses its highway figure for city miles.
             </span>
-            <span className="text-meta">
-                Charging losses: at the car&rsquo;s full AC power, its own EPA figure, else {percentText(ASSUMED_CHARGER_EFF)} reaches the pack ·
-                below it, less: an assumed {FIXED_DRAW_W} W fixed draw is a larger share of a slower charge (<ExplainerLink topic="evbench-charging-energy">why</ExplainerLink>) ·
-                DC fast {percentText(DC_FAST_LOSS)} lost after the port
+            <span className="text-note">
+                Charging losses: estimated per vehicle by EPA testing certification, adjusted for charging speed.
+                At lower charging speeds, an assumed {FIXED_DRAW_W} W fixed draw is applied beyond the EPA losses
+                (<ExplainerLink topic="evbench-charging-energy">why</ExplainerLink>).
             </span>
         </>
     );

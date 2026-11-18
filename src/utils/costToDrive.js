@@ -18,7 +18,7 @@ import {
 } from '../constants/costToDrive';
 import { ratePlan, CUSTOM_TIER_NAMES, TIER_LETTERS } from '../constants/ratePlans';
 import {
-    ASSUMED_CHARGER_EFF, FIXED_DRAW_W, BATTERY_WARMING_KWH, DC_FAST_LOSS, HWFET_AVG_MPH, UDDS_AVG_MPH, STANDARD_CONDITIONS,
+    ASSUMED_CHARGER_EFF, FIXED_DRAW_W, PHANTOM_DRAIN_PCT_DAY, BATTERY_WARMING_KWH, DC_FAST_LOSS, HWFET_AVG_MPH, UDDS_AVG_MPH, STANDARD_CONDITIONS,
 } from '../constants/epa';
 import { correctionFactor } from './conditionCorrection';
 import { compositeRange } from './compositeRange';
@@ -496,8 +496,14 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
             });
         }
     }
+    const phantom = phantomDrainOf(specs, settings);
+    trace?.step('Phantom drain', {
+        values: { drain: val(phantom.pctDay, '%/day', phantom.source) }, result: phantom.pctDay, unit: '%/day',
+        assumed: phantom.source !== 'data',
+        note: 'the share of the battery a parked car loses in a day; none while it drives or charges, whose efficiency figures already carry it',
+    });
     if (!usableKwh) {
-        return { usableKwh: null, missing: 'no usable battery capacity', whPerMi: null, highwayFrom: null, cityFrom: null, home, warmKwhPerF: null, fast: null };
+        return { usableKwh: null, missing: 'no usable battery capacity', whPerMi: null, highwayFrom: null, cityFrom: null, home, warmKwhPerF: null, fast: null, phantom };
     }
     // Battery warming a home charge buys, pack side, per °F below PACK_WARMING_BELOW_F.
     const warmKwhPerF = BATTERY_WARMING_KWH * BATTERY_WARMING_CAR_FACTOR * usableKwh;
@@ -535,9 +541,22 @@ export function costToDriveVehicle(vehicle, settings, { specs = vehicle?.specs, 
         }
     }
     if (!(whPerMi.winter.L > 0)) {
-        return { usableKwh, missing: 'no range test and no EPA highway figure', whPerMi: null, highwayFrom: null, cityFrom: null, home, warmKwhPerF, fast: null };
+        return { usableKwh, missing: 'no range test and no EPA highway figure', whPerMi: null, highwayFrom: null, cityFrom: null, home, warmKwhPerF, fast: null, phantom };
     }
-    return { usableKwh, missing: null, whPerMi, highwayFrom, cityFrom, home, warmKwhPerF, fast: fastChargeOf(vehicle, specs, usableKwh, trace?.group('Fast charging')) };
+    return { usableKwh, missing: null, phantom, whPerMi, highwayFrom, cityFrom, home, warmKwhPerF, fast: fastChargeOf(vehicle, specs, usableKwh, trace?.group('Fast charging')) };
+}
+
+/**
+ * A parked car's battery loss, % of the pack a day, and where the figure
+ * came from (#590): the reader's own for every car when they set one, else
+ * the car's own (spec `phantom_drain_pct_day`, 0 counts), else the site's
+ * PHANTOM_DRAIN_PCT_DAY. `source` is a calcTrace source.
+ */
+export function phantomDrainOf(specs, settings) {
+    if (settings.phantomFrom === 'mine') return { pctDay: settings.phantomDrain, source: 'setting' };
+    const own = specs?.charging?.phantom_drain_pct_day;
+    if (own != null && own !== '' && Number.isFinite(Number(own)) && Number(own) >= 0) return { pctDay: Number(own), source: 'data' };
+    return { pctDay: PHANTOM_DRAIN_PCT_DAY, source: 'knob:PHANTOM_DRAIN_PCT_DAY' };
 }
 
 /** How far below the wall's kW an onboard charger must be before it is said to cap it. */
@@ -668,6 +687,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     const whPerMi = profile.whPerMi[season];
     const pct = (kwh) => kwh / usable * 100;
     const detourMi = s.detourMin / 60 * DETOUR_MPH;
+    const phantomPctHour = (profile.phantom?.pctDay ?? 0) / 24;
     trace?.step('A detour, in miles', {
         formula: 'd_detour = t_detour / 60 × v_detour',
         values: { t_detour: val(s.detourMin, 'min', 'setting'), v_detour: val(DETOUR_MPH, 'mph', 'code:DETOUR_MPH') },
@@ -721,7 +741,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
     let morning = 0;
     // When the last plug-in window that charged ended, in hours of the week: the next starts no earlier.
     let prevEnd = -Infinity;
-    const out = { points: [], stops: [], days: [], miles: 0, usedKwh: 0, fastPackKwh: 0, homePackKwh: 0, homeWallKwh: 0, homeCost: 0, homeTierCost: [0, 0, 0], warmWallKwh: 0, fastWarmPackKwh: 0, homeCharges: 0, fastMinutes: 0 };
+    const out = { points: [], stops: [], days: [], miles: 0, usedKwh: 0, phantomKwh: 0, fastPackKwh: 0, homePackKwh: 0, homeWallKwh: 0, homeCost: 0, homeTierCost: [0, 0, 0], warmWallKwh: 0, fastWarmPackKwh: 0, homeCharges: 0, fastMinutes: 0 };
 
     // Twice: the first only sets Monday's morning (when Sunday night ends).
     for (let w = 0; w < 2; w++) {
@@ -735,7 +755,17 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             const wh = type === 'O' ? 0 : whPerMi[type];
             const usePct = pct(miles * wh / 1000);
             const detPct = pct(detourMi * (wh || whPerMi.D) / 1000);
-            const day = { day: WEEKDAYS[d], type, miles, kwhUsed: miles * wh / 1000, startSoc: soc, plannedSkipped: false, stops: [] };
+            const day = { day: WEEKDAYS[d], type, miles, kwhUsed: miles * wh / 1000, startSoc: soc, plannedSkipped: false, stops: [], phantomPct: 0 };
+            // The car parked for `hours`, neither driving nor charging: it
+            // loses its phantom drain, which the line draws as a slope
+            // between the two events either side. While the home charger
+            // runs, and on a stop, nothing is taken (those figures carry it).
+            const park = (hours) => {
+                if (!(hours > 0) || !(phantomPctHour > 0)) return;
+                const lost = Math.min(soc, hours * phantomPctHour);
+                soc -= lost;
+                if (rec) { day.phantomPct += lost; out.phantomKwh += lost / 100 * usable; }
+            };
             if (rec) {
                 if (d === 0) out.points.push([0, soc]);
                 out.miles += miles;
@@ -819,11 +849,22 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             // The day's clock: a stop that runs past a span's end pushes the
             // next span later, rather than the line stepping back in time.
             let clock = morning;
-            if (plan?.gap === 0) clock = plannedStop(Math.max(plan.hour, clock));
+            if (plan?.gap === 0) {
+                const at = Math.max(plan.hour, clock);
+                park(at - clock);
+                clock = plannedStop(at);
+            }
             let threshold = soc < s.stopBy ? s.keepAbove + detPct + LATE_STOP_MARGIN : s.stopBy;
             spans.forEach((span, i) => {
                 let hour = Math.max(span.from, clock);
-                if (i > 0 && plan?.gap === i) hour = plannedStop(Math.max(plan.hour, clock));
+                if (i > 0 && plan?.gap === i) {
+                    const at = Math.max(plan.hour, clock);
+                    park(at - clock);
+                    hour = plannedStop(at);
+                    park(span.from - hour);
+                } else {
+                    park(hour - clock);
+                }
                 if (rec) out.points.push([base + hour, soc]);
                 let left = usePct * span.share;
                 const rate = left / (span.to - span.from);
@@ -860,12 +901,18 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                 }
                 clock = hour;
             });
-            if (spans.length && plan?.gap === spans.length) clock = plannedStop(Math.max(plan.hour, clock));
+            if (spans.length && plan?.gap === spans.length) {
+                const at = Math.max(plan.hour, clock);
+                park(at - clock);
+                clock = plannedStop(at);
+            }
             // A stop of its own to close the week, after the day's driving
             // (a trip out, so with the detour), where no stop could carry it.
             if (close.added[d] > 0) {
+                const at = spans.length ? clock : Math.max(clock, PLANNED_HOUR);
+                park(at - clock);
                 const to = Math.min(100, soc + Math.max(close.added[d], MIN_STOP_ADD) + detPct);
-                clock = stopAt(spans.length ? clock : Math.max(clock, PLANNED_HOUR), to, false, true);
+                clock = stopAt(at, to, false, true);
             }
 
             // The night: in its plug-in window — a day off has its own — from
@@ -879,6 +926,11 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             if (w1 <= base + clock) { w0 += 24; w1 += 24; }
             const from = Math.max(w0, base + clock, prevEnd);
             const to = Math.max(from, w1);
+            // Parked from arrival until the window opens. Once the charger
+            // runs nothing is taken; waiting inside the window for the cheap
+            // hours is left out (a plugged-in car tops itself up), so a night
+            // is sized from here.
+            park(Math.min(from, base + 24) - (base + clock));
             // What the window from arrival could buy at the wall; battery
             // warming, once a night the charger runs, comes out of it first.
             // `mostAdd` the rest as % of the pack (the home ceiling).
@@ -941,6 +993,14 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                 prevEnd = to;
             }
             tonight.endSoc = soc;
+            // Parked again from where the charger stopped (or from the window,
+            // when it never ran) to midnight; a night that runs past it hands
+            // the rest to tomorrow's morning.
+            const chargedUntil = tonight.spans.at(-1)?.[1] ?? from;
+            if (chargedUntil < base + 24) {
+                park(base + 24 - chargedUntil);
+                if (rec && phantomPctHour > 0) out.points.push([base + 24, soc]);
+            }
             morning = Math.max(0, (tonight.spans.at(-1)?.[1] ?? from) - (base + 24));
             if (rec) out.days.push({ ...day, homeSoc, night: tonight });
         }
@@ -1016,6 +1076,12 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                 note: `starts ${day.startSoc.toFixed(1)}%, ${day.stops.length} fast stop${day.stops.length === 1 ? '' : 's'}, home at ${day.homeSoc.toFixed(1)}%, night adds ${day.night.added.toFixed(1)}%${day.night.ranOut ? ' (ran out of night)' : ''}`,
             });
         }
+        trace.step('Phantom drain a week', {
+            formula: 'E_phantom = Σ parked hours × drain / 24 × E_usable / 100',
+            values: { drain: val(profile.phantom?.pctDay ?? 0, '%/day', profile.phantom?.source) },
+            result: out.phantomKwh, unit: 'kWh', assumed: profile.phantom?.source !== 'data',
+            note: 'lost while parked, not driving or charging; the nights and fast stops buy it back',
+        });
         trace.step('Fast charging bought', {
             formula: 'E_fast = (E_pack_all + E_warm_fast) / (1 − loss)',
             values: { E_pack_all: val(out.fastPackKwh, 'kWh'), E_warm_fast: val(out.fastWarmPackKwh, 'kWh'), loss: val(DC_FAST_LOSS, null, 'knob:DC_FAST_LOSS') },
@@ -1058,6 +1124,9 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
         homeTierCost: rateTiers(s, season) ? out.homeTierCost : null,
         rateTiers: profile.home.none ? null : rateTiers(s, season),
         usedKwh: out.usedKwh,
+        // The battery a parked car lost over the week (phantom drain), kWh; the
+        // days carry their own share as `phantomPct`.
+        phantomKwh: out.phantomKwh,
         fastShare: out.usedKwh > 0 ? out.fastPackKwh / out.usedKwh : 0,
         // No charger, no window to have margin in.
         windows: profile.home.none ? [] : plugWindows(out.days.map(d => d.night)),

@@ -162,6 +162,14 @@ export const EPA_DEFAULTS = {
     // by efficiency or size (r ≈ 0.19 against the full-power loss). 200 W is
     // the owner's figure (2026-11-15), near the ADAC fit of 210 W.
     FIXED_DRAW_W: 200,
+    // Phantom drain: the share of the battery a parked car loses a day to its
+    // own electronics, sleep modes and security features. Driving and charging
+    // pay it already (it is in the efficiency figures), so Cost & Time takes it
+    // only while the car is parked. The fallback for a car with no figure of
+    // its own (specs: phantom_drain_pct_day), 1% a day (owner, 2026-11-18);
+    // one owner's R1T measured 1.0% a day over 4,900 parked hours (#590).
+    // Cars run roughly 0–3% a day with their sleep and Sentry-style settings.
+    PHANTOM_DRAIN_PCT_DAY: 1,
     // Battery warming a home charge buys, parked outside: kWh per kWh of
     // usable pack per °F below PACK_WARMING_BELOW_F (constants/costToDrive.js).
     // A GUESS (owner, 2026-11-15), loosely one Rivian R1T: about 5 kWh on a
@@ -419,6 +427,7 @@ export const DEFAULT_ACCESSORY_W = resolve('DEFAULT_ACCESSORY_W', EPA_DEFAULTS.D
 export const ACCESSORY_LOAD_KW   = DEFAULT_ACCESSORY_W / 1000;  // derived (kW)
 export const ASSUMED_CHARGER_EFF = resolve('ASSUMED_CHARGER_EFF', EPA_DEFAULTS.ASSUMED_CHARGER_EFF);
 export const FIXED_DRAW_W        = resolve('FIXED_DRAW_W',        EPA_DEFAULTS.FIXED_DRAW_W);
+export const PHANTOM_DRAIN_PCT_DAY = resolve('PHANTOM_DRAIN_PCT_DAY', EPA_DEFAULTS.PHANTOM_DRAIN_PCT_DAY);
 export const BATTERY_WARMING_KWH = resolve('BATTERY_WARMING_KWH', EPA_DEFAULTS.BATTERY_WARMING_KWH);
 export const DC_FAST_LOSS        = resolve('DC_FAST_LOSS',        EPA_DEFAULTS.DC_FAST_LOSS);
 export const AERO_FRACTION        = resolve('AERO_FRACTION',        EPA_DEFAULTS.AERO_FRACTION);

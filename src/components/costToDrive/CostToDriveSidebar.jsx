@@ -16,7 +16,7 @@ import ShareSettingsButton from './ShareSettingsButton';
 import { hourText } from './DriveFields';
 import { levelLabel } from './HomeLevelPicker';
 import {
-    HomeChargingFields, ElectricityRatesFields, WeekFields, FastChargingFields, SeasonFields, EfficiencyFields,
+    HomeChargingFields, ElectricityRatesFields, WeekFields, FastChargingFields, SeasonFields, EfficiencyFields, PhantomDrainFields,
 } from './DriveSections';
 import GasCarFields from './GasCarFields';
 
@@ -50,6 +50,10 @@ const GROUPS = [
     {
         key: 'efficiency', label: 'Efficiency from', open: false, Fields: EfficiencyFields,
         note: (s) => s.efficiencyFrom === 'epa' ? 'EPA only' : 'Tested + EPA',
+    },
+    {
+        key: 'phantom', label: 'Phantom drain', open: false, Fields: PhantomDrainFields,
+        note: (s) => (s.phantomFrom === 'mine' ? `${s.phantomDrain}% a day` : 'Each car’s own'),
     },
 ];
 
