@@ -21,6 +21,7 @@ import { PRESENTED_HALF_HEIGHT } from '../../utils/presentedHeight';
 import {
     dollars, minutesText, savedText, perMonth, weekSummary, gasCarName, chargingText, homeTierOrder, tierWord,
 } from '../../utils/costToDrive';
+import FastSpeedNote from './FastSpeedNote';
 import { HOME_LEVELS } from '../../constants/costToDrive';
 import { useCostToDrive, noCityFigure } from '../../hooks/useCostToDrive';
 import { useTheme } from '../../hooks/useTheme';
@@ -243,6 +244,7 @@ export default function CostTimeView({ vehicles, selectedVehicleIds, settings, o
                 )}
                 {shown.length > 0 && (
                     <>
+                        <FastSpeedNote entries={shown} />
                         <PlotFrame
                             title={costTitle}
                             subtitle={subtitle}

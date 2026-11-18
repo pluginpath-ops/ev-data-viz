@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     simulateWeek, simulateGasWeek, gasColdLoss, gasTripLegs, plannedSlot, costToDriveVehicle, phantomDrainOf, costToDriveComparison, taperMinutes, perMonth, enoughLevel, weekTimeText,
     weekSummary, gasCarName, chargerText, chargingText, homeCostCeiling, plugHours, plugWindows,
-    chargeInCheapestHours, homePricing, rateSeason, ratePlanName, windowOf, rateTiers, chargingTiers, homeTierOrder,
+    chargeInCheapestHours, homePricing, rateSeason, ratePlanName, windowOf, rateTiers, chargingTiers, homeTierOrder, fastIsAssumed,
 } from '../costToDrive';
 import { RATE_PLANS } from '../../constants/ratePlans';
 import { normalizeCostToDrive } from '../costToDriveKey';
@@ -934,5 +934,14 @@ describe('phantom drain (#590)', () => {
         expect(phantomDrainOf({ charging: { phantom_drain_pct_day: 2.5 } }, base)).toEqual({ pctDay: 2.5, source: 'data' });
         const mine = settings({ phantomFrom: 'mine', phantomDrain: 1.5 });
         expect(phantomDrainOf({ charging: { phantom_drain_pct_day: 2.5 } }, mine).pctDay).toBe(1.5);
+    });
+});
+
+describe('fastIsAssumed: which fast-charging bases warn', () => {
+    it.each([['assumed', true], ['maxDc', false], ['spec', false], ['tested', false]])('%s -> %s', (basis, warns) => {
+        expect(fastIsAssumed({ fast: { basis } })).toBe(warns);
+    });
+    it('is false with no profile', () => {
+        expect(fastIsAssumed(null)).toBe(false);
     });
 });

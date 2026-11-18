@@ -96,7 +96,7 @@ export const ENOUGH_MARGIN_MIN = 5;
 export const SETTLE_WEEKS = 2;
 
 /** The DC rate assumed for a car with no charging test, no 10→80% time and no max DC spec, kW. */
-export const FALLBACK_DC_KW = 50;
+export const FALLBACK_DC_KW = 140;
 
 /**
  * The temperature EPA's two-cycle tests are driven at, °F — the lab's, so a

@@ -19,6 +19,7 @@ import { useMemo, useState } from 'react';
 import { vehicleLabel } from '../../utils/specHelpers';
 import { filterRangeRuns } from '../../utils/runUtils';
 import { SERIES_NEUTRAL } from '../../utils/colorUtils';
+import FastSpeedNote from './FastSpeedNote';
 import { HOME_LEVELS, HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import {
     simulateWeek, dollars, minutesText, weekSummary, gasCarName, chargingText, chargerText, chargingTiers,
@@ -158,6 +159,7 @@ export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings,
                                     <span className="text-secondary">{weekLine(week)}</span>
                                 </div>
                             )}
+                            <FastSpeedNote entries={[entry]} />
                             <PlanChart
                                 kind={chartKind}
                                 week={week}

@@ -43,6 +43,7 @@ import { HOME_LEVEL_ORDER } from '../../constants/costToDrive';
 import { FIXED_DRAW_W } from '../../constants/epa';
 import { hourText } from './DriveFields';
 import PackWarmingNote from './PackWarmingNote';
+import FastSpeedNote from './FastSpeedNote';
 import ExplainerLink from '../../explainers/ExplainerLink';
 import HomeChargerMath from '../calcTrace/HomeChargerMath';
 
@@ -392,6 +393,7 @@ export default function HomeChargerView({ vehicles, selectedVehicleIds, settings
                                 </div>
                             </div>
                         )}
+                        <FastSpeedNote entries={columns} />
                         <PlotFrame
                             title={title}
                             subtitle={subtitle}
