@@ -63,12 +63,24 @@ export const DETOUR_MPH = 40;
 
 /**
  * The fast-stop rule (docs/cost-to-drive-plan.md). A stop adds at least
- * MIN_STOP_ADD %, so a stop is never a 30→37% top-up; it may go past the
+ * MIN_STOP_ADD % or MIN_STOP_MINUTES of charging, whichever comes first
+ * (owner, 2026-11-18: a slow-charging car need not sit 25 minutes for 10%),
+ * so a stop is never a 30→33% top-up; it may go past the
  * reader's cap up to STRETCH_CAP_TO % when that saves a second stop; and a day
  * that starts below "stop to charge by" waits until the floor plus the detour's
  * energy plus LATE_STOP_MARGIN % rather than stopping at mile 0.
  */
 export const MIN_STOP_ADD = 10;
+export const MIN_STOP_MINUTES = 10;
+
+/**
+ * A week that comes back short of Monday morning by less than this, %, once
+ * spare plug-in time has made up what it can, carries the shortfall: one fast
+ * stop a month makes it up, off the week's chart, counted as 12/52 of a stop
+ * in each week's fast cost and time (owner, 2026-11-18). From this on, the
+ * week closes with a stop on the chart.
+ */
+export const MONTHLY_STOP_BELOW = 10;
 export const STRETCH_CAP_TO = 80;
 export const LATE_STOP_MARGIN = 2;
 
