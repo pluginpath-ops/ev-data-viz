@@ -241,6 +241,12 @@ export const COST_TO_DRIVE_FIELDS = [
     // 2026-11-17): no gas car anywhere — no savings, no gas bars, no gas line on
     // Road Trip. Picking or naming a car turns it back on. Its figures stay.
     { key: 'gasCompare',     kind: 'bool', def: true },
+    // Key version 6 (owner, 2026-11-18, #590): phantom drain, the battery a
+    // parked car loses. 'car' takes each car's own figure (its Phantom Drain
+    // spec), else the site's PHANTOM_DRAIN_PCT_DAY (1% a day); 'mine' one
+    // figure, `phantomDrain`, for every car. Cars run 0–3% a day; 5 leaves room.
+    { key: 'phantomFrom',    kind: 'enum', values: ['car', 'mine'], def: 'car' },
+    { key: 'phantomDrain',   kind: 'num',  min: 0,    max: 5,    step: 0.1,  def: 1 },
 ];
 
 /** The settings an untouched page shows. */

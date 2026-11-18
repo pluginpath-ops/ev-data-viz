@@ -10061,9 +10061,8 @@ a.is-test-link:focus-visible {
 /* A note at the foot of a card sits at the bottom, whatever the card beside it holds. */
 .drive-card-body > .text-note:last-child { margin-top: auto; }
 /* Efficiency from: a two-way choice, so a small one, not the card's width
-   (owner, 2026-11-17); its note sits under it. */
+   (owner, 2026-11-17); its note sits under it, and the card's last note at the foot. */
 .drive-card.is-efficiency .drive-choice { align-self: flex-start; }
-.drive-card.is-efficiency .text-note { margin-top: 0; }
 /* A setting the reader moves that cannot change a selected car (no EPA city
    figure for City share): an orange callout box, plain not italic (owner,
    2026-11-17). Colors from .callout.is-warning. */

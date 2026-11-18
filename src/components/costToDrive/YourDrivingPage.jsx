@@ -14,7 +14,7 @@ import { savedText, extraTimeText, weekSummary, gasCarName, ratePlanName, dollar
 import { useCostToDrive, noCityFigure } from '../../hooks/useCostToDrive';
 import ShareSettingsButton from './ShareSettingsButton';
 import {
-    HomeChargingFields, ElectricityRatesFields, WeekFields, FastChargingFields, SeasonFields, EfficiencyFields,
+    HomeChargingFields, ElectricityRatesFields, WeekFields, FastChargingFields, SeasonFields, EfficiencyFields, PhantomDrainFields,
 } from './DriveSections';
 import GasCarFields from './GasCarFields';
 
@@ -127,6 +127,9 @@ export default function YourDrivingPage({ vehicles, selectedVehicleIds, settings
                 </DriveCard>
                 <DriveCard title="Efficiency from" className="is-efficiency">
                     <EfficiencyFields {...props} />
+                </DriveCard>
+                <DriveCard title="Phantom drain" aside={<span className="text-secondary">{settings.phantomFrom === 'mine' ? `${settings.phantomDrain}% a day` : 'each car’s own'}</span>}>
+                    <PhantomDrainFields {...props} />
                 </DriveCard>
             </div>
         </div>
