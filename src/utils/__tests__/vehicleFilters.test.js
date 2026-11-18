@@ -65,6 +65,18 @@ describe('matching', () => {
         expect(searchMatches(fleet[2], '2025')).toBe(true);    // 2024-2026
         expect(searchMatches(fleet[1], '2025')).toBe(false);
     });
+
+    it('matches each word on its own, in any order', () => {
+        const r1t = { id: 9, name: 'R1T Dual Large', make: 'Rivian', model: 'R1T', year: '2022-2024' };
+        expect(searchMatches(r1t, 'R1T 2023')).toBe(true);
+        expect(searchMatches(r1t, '2024 rivian large')).toBe(true);
+        expect(searchMatches(r1t, 'R1T 2025')).toBe(false);
+        expect(ids(setSearch(EMPTY_VEHICLE_FILTERS, 'suv 2025'))).toEqual([1, 3]);
+    });
+
+    it('does not search spec fields', () => {
+        expect(ids(setSearch(EMPTY_VEHICLE_FILTERS, 'rwd'))).toEqual([]);
+    });
 });
 
 describe('counts', () => {
