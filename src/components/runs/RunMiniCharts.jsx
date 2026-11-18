@@ -10,7 +10,7 @@ const PAD = { l: 30, r: 6, t: 6, b: 18 };
 /**
  * One small plot: every point as a dot, joined in time order, so a typo in
  * data entry (a 15 where 150 was meant, a time out of order) stands out.
- * Min and max on each axis, no gridlines — it is a spot check, not a chart.
+ * Both axes start at 0 (SoC runs to 100%); ticks show each axis's ends, no gridlines — it is a spot check, not a chart.
  */
 function MiniPlot({ series, xLabel, yLabel, color }) {
     if (!series) return <div className="run-mini-plot is-empty">No {yLabel} × {xLabel} points</div>;
@@ -68,7 +68,7 @@ export default function RunMiniCharts({ run, color }) {
                 <div className="run-mini-plot is-empty">Loading points…</div>
             ) : (
                 <>
-                    <MiniPlot series={miniPlotSeries(points, 'soc', 'chargeRate')} xLabel="SoC %" yLabel="kW" color={stroke} />
+                    <MiniPlot series={miniPlotSeries(points, 'soc', 'chargeRate', { xMax: 100 })} xLabel="SoC %" yLabel="kW" color={stroke} />
                     <MiniPlot series={miniPlotSeries(points, 'time', 'soc')} xLabel="min" yLabel="SoC %" color={stroke} />
                 </>
             )}
