@@ -28,7 +28,9 @@
  *              peak — while another test of the same car drew HELD_BACK_MARGIN
  *              more at the same SoC. Flatness is what separates a charger limit
  *              from a cold pack: a cold session reads low too, but it climbs as
- *              it warms instead of holding a ceiling, and it stays in.
+ *              it warms instead of holding a ceiling, and it stays in. So does
+ *              a hot one: it steps down from its own best earlier than the
+ *              others (STEPPED_DOWN_SHARE), and a charger never does that.
  *
  * Everything set aside is NAMED, with the SoC span, never silently dropped —
  * the stance `alignmentExclusion` takes for race mode.
@@ -94,6 +96,19 @@ export const COMPOSITE_MIN_TESTS = 2;
  * first fifteen percent counted and dragged the composite to 284 kW at 10%.
  */
 export const PLATEAU_SHARE = 0.85;
+
+/**
+ * A reading below this share of the most its test had drawn by then has
+ * stepped down, and is not on a ceiling however near its peak it sits.
+ *
+ * A charger holds a curve flat or, limiting current, sloping up; it does not
+ * take back power the car was already drawing. A drop from the session's own
+ * best is the car's taper. The R1S Quad steps from ~208 to ~190 kW and again
+ * to ~170, and a hot pack moves the step earlier: one EA session stepped at
+ * 35%, the others at 43%. Without this, 85% of peak still read as a ceiling
+ * and the early step was left out as charger-limited (owner, 2026-11-18).
+ */
+export const STEPPED_DOWN_SHARE = 0.95;
 
 /** How much more another test must draw at the same SoC for a ceiling reading
  *  to count as held back. Wide enough that two sessions merely a little apart
@@ -210,9 +225,14 @@ export function buildComposite(tests, { minTests = COMPOSITE_MIN_TESTS } = {}) {
     const series = (tests ?? [])
         .map(({ run, points }) => {
             const bySoc = resampleBySoc(points);
+            // bestBy: the most this test had drawn at or below each SoC.
             let peak = 0;
-            for (const { kw } of bySoc.values()) if (kw > peak) peak = kw;
-            return { run, bySoc, peak };
+            const bestBy = new Map();
+            for (const [soc, { kw }] of bySoc) {
+                if (kw > peak) peak = kw;
+                bestBy.set(soc, peak);
+            }
+            return { run, bySoc, peak, bestBy };
         })
         .filter(s => s.bySoc.size > 0);
     if (series.length < minTests) return null;
@@ -236,7 +256,8 @@ export function buildComposite(tests, { minTests = COMPOSITE_MIN_TESTS } = {}) {
 
         const top = Math.max(...readings.map(r => r.at.kw));
         const counted = readings.filter(({ s, at }) => {
-            const onCeiling = at.kw >= s.peak * PLATEAU_SHARE;
+            const onCeiling = at.kw >= s.peak * PLATEAU_SHARE
+                && at.kw >= s.bestBy.get(soc) * STEPPED_DOWN_SHARE;
             const outdrawn  = top >= at.kw * HELD_BACK_MARGIN;
             if (onCeiling && outdrawn) { heldAt.get(s.run.id).push(soc); return false; }
             return true;
@@ -752,7 +773,7 @@ export function spreadAlong(series, xs) {
  * excluded — so Admin → Data checks can say which stored composites were built
  * the old way.
  */
-export const COMPOSITE_VERSION = 3;   // 3: a zero-minute step keeps the clock running; 2: inherited tests count, the clock starts at the first timed test
+export const COMPOSITE_VERSION = 4;   // 4: a test stepped down from its own best is not charger-limited; 3: a zero-minute step keeps the clock running; 2: inherited tests count, the clock starts at the first timed test
 
 /**
  * What a vehicle's composites are built FROM, as one comparable string. A
