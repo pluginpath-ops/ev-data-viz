@@ -762,7 +762,8 @@ export default function VehiclesView({
     return (
         <div className={barVisible ? 'pb-20' : ''}>
             {/* Header */}
-            <div className="flex justify-between items-center mb-4">
+            {/* Wraps: a curator's Import… and + Add Vehicle ran 30px past a phone. */}
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
                 <div className="flex items-baseline gap-2">
                     <h2 className="text-2xl font-bold">Vehicles</h2>
                     {/* A survey of the corpus, not of the selection. It sat in

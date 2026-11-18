@@ -252,25 +252,33 @@ function facetMatches(facet, state, vehicle, ctx) {
         : state.in.some(v => values.includes(v));
 }
 
+// Spec fields are deliberately not searched: tried 2026-11-18, it matched too
+// much (owner). Facets and the quick-add's toggles narrow by data instead.
 const haystack = (v) => [v.name, v.make, v.manufacturer?.name, v.model, v.trim, v.year, ...(v.tags ?? []).map(t => t.name)]
     .filter(x => x != null && x !== '').join(' ').toLowerCase();
 
+const wordMatches = (text, year, word) => {
+    if (text.includes(word)) return true;
+    const span = yearSpan(year);
+    const y = Number(word);
+    return /^\d{4}$/.test(word) && !!span && y >= span[0] && y <= span[1];
+};
+
 /**
- * Whether a search matches a vehicle: anywhere in its name, make, model, trim,
- * year or tags — and a year inside a span, so "2023" finds a "2022-2024".
+ * Whether a search matches a vehicle. Each word is matched on its own, in any
+ * order, against name, make, model, trim, year and tags. A year inside a span
+ * counts, so "r1t 2023" finds a "2022-2024" R1T.
  */
-export function searchMatches(vehicle, needle) {
-    if (!needle) return true;
-    if (haystack(vehicle).includes(needle)) return true;
-    const year = Number.parseInt(needle, 10);
-    const span = /^(\d{4})\s*[-–]\s*(\d{4})$/.exec(String(vehicle.year ?? ''));
-    return /^\d{4}$/.test(needle) && !!span && year >= Number(span[1]) && year <= Number(span[2]);
+export function searchMatches(vehicle, query) {
+    const words = String(query ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return true;
+    const text = haystack(vehicle);
+    return words.every(w => wordMatches(text, vehicle.year, w));
 }
 
 /** Whether a vehicle passes every filter. */
 export function vehicleMatches(vehicle, filters, ctx, { skip = null } = {}) {
-    const needle = filters?.search?.trim().toLowerCase();
-    if (!searchMatches(vehicle, needle)) return false;
+    if (!searchMatches(vehicle, filters?.search)) return false;
     if (ctx.curator) {
         for (const c of DATA_CATEGORIES) {
             const range = countRange(filters, c.key);

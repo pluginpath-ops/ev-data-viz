@@ -2153,6 +2153,15 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 .vehicle-quick-add-empty {
     @apply px-3 py-2 italic;
 }
+/* The card's figures under the name: battery · EPA range · test counts. */
+.vehicle-quick-add-figures,
+.vehicle-quick-add-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 6px;
+    font-variant-numeric: tabular-nums;
+}
+.vehicle-quick-add-counts { gap: 0 8px; }
 
 /* ── Saved selections ────────────────────────────────────────────────────────
  *
@@ -3579,10 +3588,14 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
  *
  * The toolbar above it is labeled Share; Link and Image name what each copies.
  */
+/* Wraps when the controls outgrow the width (a phone, with Colors and a
+   curator's ★ Feature): unwrapped it ran ~220px past a 375px screen, which
+   widened the whole page and every bottom sheet and fixed bar with it. */
 .chart-export-strip {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    gap: 6px 10px;
     margin-bottom: 8px;
 }
 .chart-export-rule {
@@ -3592,7 +3605,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     background-color: var(--color-border);
 }
 /* The toolbar's label (PlotFrame, "Share", `truncate`) gives way first: every control keeps
-   its width, so the label truncates before any of them is squeezed or wrapped. */
+   its width, so the label truncates before any of them is squeezed; past that, the row wraps. */
 .chart-export-strip > :not(.truncate):not(.chart-export-rule) {
     flex-shrink: 0;
 }

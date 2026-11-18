@@ -69,7 +69,9 @@ export function useAnchoredPosition(openKey, onScrollAway) {
         setPos(placePopover(
             anchor.getBoundingClientRect(),
             { width: panel.offsetWidth, height: panel.offsetHeight },
-            { width: window.innerWidth, height: window.innerHeight },
+            // The page's visible box, not the window: innerWidth counts the
+            // scrollbar, so a wide panel at the right edge slid under it.
+            { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight },
         ));
     }, []);
 
@@ -104,7 +106,7 @@ export function useAnchoredPosition(openKey, onScrollAway) {
         if (!openKey || !panel || typeof ResizeObserver === 'undefined') return;
         const observer = new ResizeObserver(() => {
             const box = panel.getBoundingClientRect();
-            const fits = box.top >= MARGIN && box.bottom <= window.innerHeight - MARGIN;
+            const fits = box.top >= MARGIN && box.bottom <= document.documentElement.clientHeight - MARGIN;
             // Size changes fire this; position changes do not, so re-placing
             // here cannot feed itself.
             if (!fits && anchorRef.current) place(panel);
