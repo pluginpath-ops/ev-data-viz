@@ -267,6 +267,13 @@ function curveMinutes(summary, from, to) {
 }
 
 /**
+ * True when a profile's fast-charging minutes rest on FALLBACK_DC_KW alone: no
+ * test, no 10→80% time and no max DC kW. 'maxDc' does not count: a maker's
+ * peak is data, and only the taper's shape is the model's.
+ */
+export const fastIsAssumed = (profile) => profile?.fast?.basis === 'assumed';
+
+/**
  * How long a fast charge takes for this vehicle, from where, and a function for
  * any window. The car's own curve (the same pick as every chart's default,
  * `chargeTimeSession`) where it reaches; outside it, the taper calibrated to
