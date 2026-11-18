@@ -101,6 +101,19 @@ describe('buildComposite', () => {
         expect(at(c, 20).chargeRate).toBeCloseTo((car(20) + cold(20)) / 2);
     });
 
+    it('keeps a hot session in: it steps down from its own best early, and a charger never does that', () => {
+        // The R1S Quad: ~208 kW, a step to ~190, then ~170. One session's pack
+        // ran hot and stepped at 35%, the other at 43%. The hot one is still
+        // within PLATEAU_SHARE of its peak between the two, and outdrawn there.
+        const r1 = (stepAt) => (s) => (s < stepAt ? 200 + s * 0.2 : s < 45 ? 190 : 170 - (s - 45));
+        const c = buildComposite([
+            { run: run('cool'), points: test({ kwAt: r1(43) }) },
+            { run: run('hot'),  points: test({ kwAt: r1(35) }) },
+        ]);
+        expect(c.heldBack).toEqual([]);
+        expect(at(c, 40).n).toBe(2);
+    });
+
     it('extends past the shortest test with fewer contributors, and says so on every point', () => {
         const c = buildComposite([
             { run: run(1), points: test({ to: 80, kwAt: car }) },
