@@ -211,7 +211,7 @@ export function photoPlacement(view, photo, profile) {
         return { x: A + (from - a) * perFrac, w: (to - from) * perFrac, from, to };
     };
 
-    if (view === 'front') {
+    if (isEndView(view)) {
         const half = profile.width / 2;
         return { top, h, slices: [piece(0, 1, m.left, -half, m.right, half)] };
     }
