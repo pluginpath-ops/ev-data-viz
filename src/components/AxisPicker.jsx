@@ -1,12 +1,11 @@
 import { Fragment } from 'react';
-import { groupAxes } from '../utils/chargingAxes';
+import { groupAxes, RANGE_BASES } from '../utils/chargingAxes';
 
 /**
  * Which axes Charging Curves plots: the spec chart's field picker, for a chart
  * that has three. A grouped list, each row carrying an X, a Y and a Y2 toggle.
  * Three dropdowns of twelve ungrouped names asked the reader to know where
- * "Range Rate" sat among them; the groups (Time, Charging speed, Range, Range
- * added) say what each choice measures before its unit does.
+ * "Range Rate" sat among them; the groups (Time, Charging speed, Battery) say what each choice measures before its unit does.
  *
  * Twelve rows do not need a filter and the list shows whole, so the lit toggles
  * are always in view. What is plotted is stated in the section header above.
@@ -16,8 +15,11 @@ import { groupAxes } from '../utils/chargingAxes';
  * @param {Array}  options  chargingAxisOptions(units)
  * @param {{x, y, y2}} axes  the three axis keys; y2 may be null
  * @param {Function} onChange  ({ x, y, y2 }) with the one that changed
+ * @param {string} basis  'tested' | 'epa': the range the range axes and the
+ *                        range-rate axes rest on, set under the list
+ * @param {Function} onBasis  (basis)
  */
-export default function AxisPicker({ options, axes, onChange }) {
+export default function AxisPicker({ options, axes, onChange, basis, onBasis }) {
     const choose = (key, axis) => {
         const next = { x: axes.x, y: axes.y, y2: axes.y2 ?? null, [axis]: key };
         if (axis === 'y2' && axes.y2 === key) next.y2 = null;
@@ -56,6 +58,22 @@ export default function AxisPicker({ options, axes, onChange }) {
                         })}
                     </Fragment>
                 ))}
+            </div>
+            <div className="segmented-group">
+                <span className="text-nano">Range basis</span>
+                <div className="segmented" role="group" aria-label="Range basis">
+                    {Object.entries(RANGE_BASES).reverse().map(([key, { label }]) => (
+                        <button
+                            key={key}
+                            type="button"
+                            className={basis === key ? 'active' : ''}
+                            aria-pressed={basis === key}
+                            onClick={() => onBasis(key)}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
             </div>
         </div>
     );

@@ -27,6 +27,8 @@ export function defaultChartConfig() {
         xAxis: 'soc',
         yAxis: 'chargeRate',
         y2Axis: null,
+        // Which range the range axes and range-rate axes rest on: 'tested' | 'epa'.
+        rangeBasis: 'tested',
         selectedRuns: [],
         // Time-axis alignment is on by default (#195): unaligned, every run
         // starts at zero whatever SoC it began at, which compares nothing.

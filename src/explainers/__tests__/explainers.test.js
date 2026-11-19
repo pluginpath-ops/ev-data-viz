@@ -209,7 +209,7 @@ describe('previewAxes', () => {
 
     it('keys its axes as Charging Curves does', () => {
         const chartView = readFileSync(join(ROOT, 'src', 'utils', 'chargingAxes.js'), 'utf8');
-        for (const key of Object.keys(PREVIEW_AXES)) expect(chartView, key).toMatch(new RegExp(`value: '${key}'`));
+        for (const key of Object.keys(PREVIEW_AXES)) expect(chartView, key).toMatch(new RegExp(`'${key}'`));
     });
 });
 

@@ -41,7 +41,7 @@ import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useRunSelection } from '../hooks/useRunSelection';
 import { convDistance } from '../utils/unitConversions';
-import { chargingAxisOptions } from '../utils/chargingAxes';
+import { chargingAxisOptions, axisForBasis, DEFAULT_RANGE_BASIS } from '../utils/chargingAxes';
 import AxisPicker from './AxisPicker';
 import ZoomHint from './ZoomHint';
 import { useChartZoom } from '../hooks/useChartZoom';
@@ -343,7 +343,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // Memoized because the frame's title derives from it: a fresh array every
     // render made that memo churn, which the lint spotted before anyone noticed
     // the work. Only the unit system moves it.
-    const axisOptions = useMemo(() => chargingAxisOptions(units), [units]);
+    const rangeBasis = chartConfig.rangeBasis ?? DEFAULT_RANGE_BASIS;
+    const axisOptions = useMemo(() => chargingAxisOptions(units, rangeBasis), [units, rangeBasis]);
     const [axesOpen, setAxesOpen] = useRememberedOpen('charging-axes', true);
 
     // Convert a stored (imperial) field value to the current unit system for display.
@@ -357,7 +358,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     /**
      * Get the value for a field key, computing virtual fields (cRate, socRate, rangeRate, rangeRateHr)
      * on-the-fly from stored chargeRate + vehicle metadata.
-     * vehicleBattery = kWh, vehicleRange = rated miles
+     * vehicleBattery = kWh, vehicleRange = the full-pack range for the range-rate axes (EPA or tested, per the range basis)
      */
     // The correction factor for a run's RANGE axis, recomputed on every render so
     // the dropdown takes effect immediately. Cheap and synchronous: the pairing
@@ -701,8 +702,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
 
         // The axes actually plotted — race mode replaces X with time.
         const plottedAxes = [raceActive ? null : chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis].filter(Boolean);
-        const axisFigures = new Set(plottedAxes.flatMap(a => AXIS_FIGURES[a] ?? []));
-        const plotsTestedRange = plottedAxes.some(a => a === 'range' || a === 'deltaRange');
+        const axisFigures = new Set(plottedAxes.flatMap(a =>
+            (rangeBasis === 'tested' && (a === 'rangeRate' || a === 'rangeRateHr')) ? ['capacity'] : (AXIS_FIGURES[a] ?? [])));
+        // The rate axes rest on the range basis: EPA's range, or the tested one.
+        const testedRates = rangeBasis === 'tested' && plottedAxes.some(a => a === 'rangeRate' || a === 'rangeRateHr');
+        const plotsTestedRange = testedRates || plottedAxes.some(a => a === 'range' || a === 'deltaRange');
 
         const spreadEstimates = {};   // composite id → full-context band width, filled below
         const datasets = allSelectedRuns.flatMap((run) => {
@@ -723,6 +727,15 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // effect without refetching. Declared before getX and the point
             // mapping that read it.
             const rangeK = rangeFactorFor(run.id);
+            // The full-pack range the rate axes multiply by: the vehicle's EPA
+            // range, or the one its resolved range test gives (miles per % ×
+            // 100, corrected like the range axis). Null when no test gave one.
+            const rateRange = rangeBasis === 'epa'
+                ? vehicleRange
+                : (() => {
+                    const mps = rangeSourceFor(run.id, run)?.miPerSoc;
+                    return mps != null ? mps * 100 * rangeK : null;
+                })();
             const color = colorMap[run.id] || DEFAULT_RUN_COLOR;
 
             // 1. Cut at the start SoC (slice from anchor; exclude if ineligible)
@@ -745,10 +758,10 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // 3. X value mapper
             const getX = raceActive
                 ? (d) => (d.time != null ? Math.round((d.time - timeOffset) * 10) / 10 : null)
-                : (d) => convertAxisValue(scaleRange(getFieldValue(d, chartConfig.xAxis, vehicleBattery, vehicleRange), chartConfig.xAxis, rangeK), chartConfig.xAxis);
+                : (d) => convertAxisValue(scaleRange(getFieldValue(d, chartConfig.xAxis, vehicleBattery, rateRange), chartConfig.xAxis, rangeK), chartConfig.xAxis);
 
             // 4. Y1 dataset
-            const getY = (d) => convertAxisValue(scaleRange(getFieldValue(d, chartConfig.yAxis, vehicleBattery, vehicleRange), chartConfig.yAxis, rangeK), chartConfig.yAxis);
+            const getY = (d) => convertAxisValue(scaleRange(getFieldValue(d, chartConfig.yAxis, vehicleBattery, rateRange), chartConfig.yAxis, rangeK), chartConfig.yAxis);
             const composite = run.composite;
             const y1Points = workingData
                 // A composite's points carry how many tests stand behind them and
@@ -862,7 +875,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // 5. Y2 dataset (hidden from legend; dashed line + triangle points)
             if (chartConfig.y2Axis) {
                 const y2Points = workingData
-                    .map(d => ({ x: getX(d), y: convertAxisValue(scaleRange(getFieldValue(d, chartConfig.y2Axis, vehicleBattery, vehicleRange), chartConfig.y2Axis, rangeK), chartConfig.y2Axis) }))
+                    .map(d => ({ x: getX(d), y: convertAxisValue(scaleRange(getFieldValue(d, chartConfig.y2Axis, vehicleBattery, rateRange), chartConfig.y2Axis, rangeK), chartConfig.y2Axis) }))
                     .filter(p => p.x != null && p.y != null);
                 if (y2Points.length > 0) {
                     result.push({
@@ -1057,11 +1070,13 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const fleetRuns = useMemo(() => selectedVehicles.flatMap(v => v.runs || []), [selectedVehicles]);
     const sourceEpa = useMemo(() => {
         const axes = [raceActive ? null : chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis].filter(Boolean);
-        const figures = new Set(axes.flatMap(a => AXIS_FIGURES[a] ?? []));
-        const testedRange = axes.some(a => a === 'range' || a === 'deltaRange')
+        const figures = new Set(axes.flatMap(a =>
+            (rangeBasis === 'tested' && (a === 'rangeRate' || a === 'rangeRateHr')) ? ['capacity'] : (AXIS_FIGURES[a] ?? [])));
+        const testedRange = axes.some(a => a === 'range' || a === 'deltaRange'
+            || (rangeBasis === 'tested' && (a === 'rangeRate' || a === 'rangeRateHr')))
             && sourceRuns.some(r => isEpaPartnerId(rangePartnersOfCharging(pairings, r.id)[0]));
         return epaCredits(selectedVehicles, { capacity: figures.has('capacity'), range: figures.has('range') || testedRange });
-    }, [raceActive, chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis, sourceRuns, selectedVehicles, pairings]);
+    }, [raceActive, rangeBasis, chartConfig.xAxis, chartConfig.yAxis, chartConfig.y2Axis, sourceRuns, selectedVehicles, pairings]);
     const sourceLine = useSourceLine({ runs: sourceRuns, allRuns: fleetRuns, epa: sourceEpa });
 
     // ── PNG export ───────────────────────────────────────────────────────────
@@ -1134,6 +1149,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                             options={axisOptions}
                             axes={{ x: chartConfig.xAxis, y: chartConfig.yAxis, y2: chartConfig.y2Axis ?? null }}
                             onChange={({ x, y, y2 }) => setChartConfig({ ...chartConfig, xAxis: x, yAxis: y, y2Axis: y2 })}
+                            basis={rangeBasis}
+                            // A range axis already picked follows the basis.
+                            onBasis={(b) => setChartConfig({
+                                ...chartConfig, rangeBasis: b,
+                                xAxis: axisForBasis(chartConfig.xAxis, b),
+                                yAxis: axisForBasis(chartConfig.yAxis, b),
+                                y2Axis: axisForBasis(chartConfig.y2Axis, b),
+                            })}
                         />
                     )}
                 </div>

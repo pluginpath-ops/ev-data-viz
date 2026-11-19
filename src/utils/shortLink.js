@@ -72,6 +72,8 @@ const NAMES_V1 = [
     'sd',
     // What the Size chart's front and rear views line up on (#608).
     'se',
+    // Charging Curves' range basis (EPA; tested is the default and unwritten).
+    'rb',
 ];
 
 // Values that recur: tabs, modes, axes, chart types, units, presets, and the
