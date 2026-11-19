@@ -267,7 +267,7 @@ nothing else. **Green** is data and status, never chrome.
 | A vehicle whose specs, tests, color, photo and tags come from another until set | **a variant**; it **inherits from** its source. Made with **＋ Variant** | `spec_source_vehicle_id`, [vehicleInheritance.js](../src/utils/vehicleInheritance.js) |
 | The vehicle it inherits from | **its source** / **source vehicle** ("Inherits from"). None = an origin. Not "parent". Not a performance-result **source** | [SourceVehiclePicker.jsx](../src/components/SourceVehiclePicker.jsx) |
 | What a variant shows but doesn't set | **inherited** — "Inherited from *source*" | `vehicle.inheritedFrom` |
-| A vehicle's values before inheritance | **its own** — what editors read and write | `vehicle.own`, `ownValues()` |
+| A vehicle's values before inheritance | **its own** — what editors read and write. **Make its own copy** turns an inherited size photo into its own. Not "anchor" (a Size chart alignment point) | `vehicle.own`, `ownValues()` |
 | A source's charging tests reaching its variants automatically | they **come down the lineage**. Charging only; range tests need a link | [lineageCharging.js](../src/utils/lineageCharging.js) |
 | A variant whose pack differs in chemistry or build, so nothing comes down to it | **a battery revision** — a cut on one edge, not a branch. Not "disconnect", "detach" or "cut-off" | `vehicles.battery_revision`, [BatteryRevisionNote.jsx](../src/components/vehicles/BatteryRevisionNote.jsx) |
 | Same battery, different size | **capacity factor** — a vehicle's scales every test coming down, multiplied down the chain; a link's scales one test. 1 unless set | `vehicles.capacity_factor`, `spec_links.capacity_factor` |
