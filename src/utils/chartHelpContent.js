@@ -486,7 +486,8 @@ export const CHART_HELP_DEFAULTS = {
             'wheelbase, front overhang, width (with and without mirrors), track, ground clearance and ' +
             'tire size. A vehicle with a size photo is drawn as that photo, stretched so each point ' +
             'marked on it lands where the specs put it: bumpers and axles at the length, overhangs and ' +
-            'wheelbase (from the front, its body edges at the width), ground and roof at the height. ' +
+            'wheelbase (from the front or rear, its body edges at the width), ground and roof at the height. ' +
+            'Click a vehicle to put it at the back and measure the figures from it. ' +
             'Photos bend a little to fit, since a camera squeezes a car’s ends. Otherwise its outline is ' +
             'a generic shape for its body style, stretched to its own figures. Draw: Outlines shows ' +
             'outlines for every vehicle.',

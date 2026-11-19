@@ -5,6 +5,7 @@ import { svgToCanvas } from '../../utils/svgRaster';
 import { sideSilhouette, frontSilhouette } from '../../utils/silhouettes';
 import { sizeChartLayout, gridStepIn, SIZE_MARGIN, SIZE_ROW_PX } from '../../utils/sizeChartLayout';
 import { fmtDimension } from '../../utils/unitConversions';
+import { isEndView, trackKeyOf } from '../../utils/sizePhotoMarks';
 
 /** Labels in the right margin, pushed apart so none overlaps the one above. */
 function spreadLabels(ys, gap) {
@@ -34,35 +35,40 @@ const wheelsEstimated = (p) => p.estimated.has('frontOverhang') || p.estimated.h
  * Props:
  *   items       [{ id, label, color, profile, photo }] drawable in this view,
  *               selection order; `photo` (with its `placement`, in inches) or null
- *   view        'side' | 'front'
+ *   view        'side' | 'front' | 'rear'
  *   anchor      a SIZE_ANCHORS key (side view)
+ *   endAnchor   a SIZE_END_ANCHORS key (front and rear views)
  *   units       'imperial' | 'metric'
  *   lines       draw the dimension lines
  *   grid        draw the grid
- *   activeId    the vehicle brought forward, or null
- *   onActive    (id|null) => void
+ *   activeId    the picked vehicle, drawn at the back, or null
+ *   onPick      (id) => void        a click: measure the figures from this vehicle
+ *   opacity     the photos' opacity over the back one, which is solid (the active one, else the largest)
  *   exportRef   receives `{ canvas }`, the drawing as the PNG export reads it
  */
-export default function SizeChartCanvas({ items, view, anchor, units, lines, grid, activeId, onActive, exportRef }) {
+export default function SizeChartCanvas({ items, view, anchor, endAnchor, units, lines, grid, activeId, onPick, opacity = 0.6, exportRef }) {
+    const endView = isEndView(view);
     const [ref, widthPx] = useElementWidth();
     const svgRef = useRef(null);
     const { isDark } = useTheme();
     const layout = useMemo(
-        () => sizeChartLayout(items, { view, anchor, widthPx, lines }),
-        [items, view, anchor, widthPx, lines],
+        () => sizeChartLayout(items, { view, anchor, endAnchor, widthPx, lines }),
+        [items, view, anchor, endAnchor, widthPx, lines],
     );
 
     const shapes = useMemo(() => new Map(items.map(({ id, profile }) => [
-        id, view === 'front' ? frontSilhouette(profile) : sideSilhouette(profile),
-    ])), [items, view]);
+        // The rear outline is the front's, on the rear track.
+        id, endView ? frontSilhouette(view === 'rear' ? { ...profile, trackFront: profile.trackRear } : profile) : sideSilhouette(profile),
+    ])), [items, view, endView]);
 
-    // Largest first; the active one last, on top.
+    // The active one first, at the back, then largest first; with photos, the
+    // back one is solid and the rest see-through over it.
     const drawOrder = useMemo(() => {
-        const area = ({ profile: p }) => (view === 'front' ? p.width : p.length) * p.height;
+        const area = ({ profile: p }) => (endView ? p.width : p.length) * p.height;
         const sorted = [...items].sort((a, b) => area(b) - area(a));
         const active = sorted.find(i => i.id === activeId);
-        return active ? [...sorted.filter(i => i !== active), active] : sorted;
-    }, [items, view, activeId]);
+        return active ? [active, ...sorted.filter(i => i !== active)] : sorted;
+    }, [items, endView, activeId]);
 
     // The export copies a canvas, so the drawing is rasterized whenever it
     // changes; the last one to finish wins.
@@ -93,11 +99,11 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
             <svg
                 ref={svgRef}
                 className={`size-chart-svg${items.length > 1 ? ' is-overlaid' : ''}`}
+                style={{ '--size-photo-opacity': opacity }}
                 width={widthPx}
                 height={heightPx}
                 role="img"
                 aria-label={`${items.length} vehicle${items.length === 1 ? '' : 's'} drawn to scale, ${view} view`}
-                onPointerLeave={() => onActive(null)}
             >
                 {grid && (
                     <g className="size-grid">
@@ -114,18 +120,20 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
                     const shape = shapes.get(id);
                     const place = places.get(id);
                     const x0 = px(place);
-                    const dashed = view === 'side' ? wheelsEstimated(p) : p.estimated.has('trackFront') || p.estimated.has('tireDiameter');
-                    const cls = `size-silhouette${activeId === id ? ' is-active' : ''}${activeId && activeId !== id ? ' is-quiet' : ''}`;
+                    const dashed = view === 'side' ? wheelsEstimated(p) : p.estimated.has(trackKeyOf(view)) || p.estimated.has('tireDiameter');
+                    // The back-most photo is drawn solid: nothing behind it would show through.
+                    const back = id === drawOrder[0].id;
+                    const cls = `size-silhouette${activeId === id ? ' is-active' : ''}${activeId && activeId !== id ? ' is-quiet' : ''}${back ? ' is-back' : ''}${photo ? ' is-photo' : ''}`;
                     if (photo) {
                         const { top, h, slices } = photo.placement;
-                        const [g0, g1] = view === 'front' ? [-p.width / 2, p.width / 2] : [0, p.length];
+                        const [g0, g1] = endView ? [-p.width / 2, p.width / 2] : [0, p.length];  // from `place`
                         const W = photo.width_px;
                         const H = photo.height_px;
                         // Each piece is a window (a nested <svg>, which clips) onto
                         // its part of the photo, stretched to its span. The group
                         // takes the opacity, so the pieces' seams don't double up.
                         return (
-                            <g key={id} className={cls} style={{ '--series': color }} onPointerEnter={() => onActive(id)}>
+                            <g key={id} className={cls} style={{ '--series': color }} onClick={() => onPick(id)}>
                                 <g className="size-photo">
                                     {slices.map(s => (
                                         <svg
@@ -151,9 +159,10 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
                             className={cls}
                             style={{ '--series': color }}
                             transform={`translate(${x0} ${groundY}) scale(${scale} ${-scale})`}
-                            onPointerEnter={() => onActive(id)}
+                           
+                            onClick={() => onPick(id)}
                         >
-                            {view === 'front' && shape.tires.map((t, i) => (
+                            {endView && shape.tires.map((t, i) => (
                                 <rect key={i} className={`size-wheel${dashed ? ' is-estimated' : ''}`} x={t.x} y={0} width={t.w} height={t.h} rx={t.w * 0.25} vectorEffect="non-scaling-stroke" />
                             ))}
                             <path className="size-body" d={shape.body} vectorEffect="non-scaling-stroke" />
@@ -180,17 +189,18 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
                     );
                 })}
 
-                {lines && items.map(({ id, color, profile: p }, i) => {
+                {lines && items.map(({ id, color, label, profile: p }, i) => {
                     const y = barsTop + i * SIZE_ROW_PX + SIZE_ROW_PX / 2;
-                    const start = view === 'front' ? -p.width / 2 : places.get(id);
-                    const end = view === 'front' ? p.width / 2 : start + p.length;
-                    const mirrors = view === 'front' && p.widthMirrors > p.width ? p.widthMirrors / 2 : null;
+                    const start = endView ? places.get(id) - p.width / 2 : places.get(id);
+                    const end = endView ? places.get(id) + p.width / 2 : start + p.length;
+                    const mirrors = endView && p.widthMirrors > p.width ? p.widthMirrors / 2 : null;  // either side of `place`
                     const axles = view === 'side' ? [start + p.frontOverhang, start + p.frontOverhang + p.wheelbase] : [];
                     return (
                         <g key={`b${id}`} className="size-callout" style={{ '--series': color }}
-                            onPointerEnter={() => onActive(id)}>
+                            onClick={() => onPick(id)}>
+                            <text className="size-callout-name" x={mirrors ? px(places.get(id) - mirrors) : px(start)} y={y - 7}>{label}</text>
                             {mirrors && (
-                                <line className="size-callout-mirrors" x1={px(-mirrors)} x2={px(mirrors)} y1={y} y2={y} />
+                                <line className="size-callout-mirrors" x1={px(places.get(id) - mirrors)} x2={px(places.get(id) + mirrors)} y1={y} y2={y} />
                             )}
                             <line className="size-callout-bar" x1={px(start)} x2={px(end)} y1={y} y2={y} />
                             {[start, end].map(x => <line key={x} className="size-callout-bar" x1={px(x)} x2={px(x)} y1={y - 5} y2={y + 5} />)}
@@ -198,7 +208,7 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
                                 <circle key={x} className={`size-callout-axle${wheelsEstimated(p) ? ' is-estimated' : ''}`} cx={px(x)} cy={y} r={3.5} />
                             ))}
                             <text x={right + 8} y={y + 4}>
-                                {fmtDimension(view === 'front' ? p.width : p.length, units)}
+                                {fmtDimension(endView ? p.width : p.length, units)}
                             </text>
                         </g>
                     );

@@ -3,6 +3,7 @@ import { hasTransparency, removePlainBackground, visibleBounds, trimBox } from '
 import {
     startingMarks, mirrorMarks, carryMarks, photoScale, figuresFromMarks, photoPlacement, fillMarks,
 } from '../sizePhotoMarks';
+import { endAnchorX } from '../sizeChartLayout';
 import { profileFromSpecs } from '../vehicleProfile';
 
 /** A w×h image of `bg`, with a `fg` box from (x0,y0) to (x1,y1) exclusive. */
@@ -81,6 +82,21 @@ describe('size photo marks', () => {
         const end = mirrorMarks('rear', { left: 0.1, right: 0.9, mirrorLeft: 0.02, mirrorRight: 0.97 });
         expect(end.mirrorLeft).toBeCloseTo(0.03);
         expect(end.mirrorRight).toBeCloseTo(0.98);
+    });
+
+    it('lines end views up on the photo\'s own marks, else the specs', () => {
+        const profile = { width: 80, widthMirrors: 88, height: 70, tireWidth: 10, trackRear: 66, estimated: new Set() };
+        const p = photo({ mirrorLeft: 0.12, left: 0.15, right: 0.85, ground: 0.9, roof: 0.1 }, 500, 500);
+        const item = { profile, photo: { ...p, placement: photoPlacement('rear', p, profile) } };
+        // Mirror mark 0.03 of the photo outside the body edge, at 80 in / 0.7 per photo width.
+        expect(endAnchorX(item, 'rear', 'leftMirror')).toBeCloseTo(40 + 0.03 * 80 / 0.7);
+        expect(endAnchorX(item, 'rear', 'leftBody')).toBeCloseTo(40);
+        expect(endAnchorX(item, 'rear', 'leftTire')).toBeCloseTo(33); // no tire marks: track 66 / 2
+        const tires = { ...item, photo: { ...item.photo, marks: { ...item.photo.marks, tireLeft: 0.2, tireRight: 0.75 } } };
+        // Spacing 0.55 of the photo (the track), centered on the body: center 0.225 → 0.275 photo left of center.
+        expect(endAnchorX(tires, 'rear', 'leftTire')).toBeCloseTo(0.275 * 80 / 0.7);
+        expect(endAnchorX({ profile }, 'rear', 'leftMirror')).toBeCloseTo(44);
+        expect(endAnchorX(item, 'rear', 'centerline')).toBe(0);
     });
 
     it('reads a rear photo like a front one, from the width spec', () => {

@@ -33,15 +33,23 @@ export const isEndView = (view) => view !== 'side';
  * and `rearAxle` are their x, `frontAxleY` and `rearAxleY` their y (the wheel
  * centers), dragged together as one dot (`point` names the x it goes with).
  * `underbody` is the lowest point of the body, for ground clearance; front and
- * rear, `mirrorLeft` and `mirrorRight` are the mirrors' outer edges, for the
- * width with mirrors. The axle heights, underbody and mirrors are recorded for
- * later use (#603); nothing draws from them yet.
+ * rear, `mirrorLeft` and `mirrorRight` are the mirrors' outer edges, and
+ * `tireLeft` and `tireRight` the LEFT edge of each tire at the ground: edge to
+ * matching edge is the track (center to center) with no tire width needed,
+ * and an edge is easier to see than a center. Only their spacing counts: the
+ * pair is taken as centered on the body (between the body edge marks), so
+ * where along the tires they sit doesn't matter (a flip turns them into
+ * right edges, same spacing). The front track on the front photo, the rear on
+ * the rear. Left and right are as the photo shows them. The
+ * axle heights and underbody are recorded for later use (#603).
  */
 const END_MARKS = [
     { key: 'mirrorLeft', axis: 'x', label: 'Left mirror' },
     { key: 'left',      axis: 'x', label: 'Left body edge' },
     { key: 'right',     axis: 'x', label: 'Right body edge' },
     { key: 'mirrorRight', axis: 'x', label: 'Right mirror' },
+    { key: 'tireLeft',  axis: 'x', label: 'Left tire, left edge' },
+    { key: 'tireRight', axis: 'x', label: 'Right tire, left edge' },
     { key: 'ground',    axis: 'y', label: 'Ground' },
     { key: 'underbody', axis: 'y', label: 'Underbody' },
     { key: 'roof',      axis: 'y', label: 'Roof' },
@@ -64,6 +72,9 @@ export const MARKS = {
 
 const axisOf = (view, key) => MARKS[view].find(m => m.key === key)?.axis;
 
+/** The track an end view shows: the front photo the front track, the rear the rear. */
+export const trackKeyOf = (view) => (view === 'rear' ? 'trackRear' : 'trackFront');
+
 /**
  * The marks added after photos were first saved — the axle heights, the
  * underbody and the mirrors — filled in where a photo lacks them: the axles
@@ -83,6 +94,11 @@ export function fillMarks(view, marks, profile = null) {
         const extra = profile?.widthMirrors > profile?.width ? (profile.widthMirrors - profile.width) / 2 / profile.width : 0.05;
         if (out.mirrorLeft == null) out.mirrorLeft = Math.max(0, marks.left - body * extra);
         if (out.mirrorRight == null) out.mirrorRight = Math.min(1, marks.right + body * extra);
+        const track = profile?.[trackKeyOf(view)];
+        const half = (profile?.width > 0 && track > 0 ? track / profile.width : 0.86) * body / 2;
+        const center = (marks.left + marks.right) / 2 - 0.03 * body;   // left edges sit left of the centers
+        if (out.tireLeft == null) out.tireLeft = center - half;
+        if (out.tireRight == null) out.tireRight = center + half;
     } else if (!isEndView(view)) {
         const axleY = up(profile?.tireDiameter / 2, 0.2);
         if (out.frontAxleY == null) out.frontAxleY = axleY;
@@ -121,6 +137,7 @@ export function mirrorMarks(view, marks) {
         return {
             ...marks, left: flip(marks.right), right: flip(marks.left),
             mirrorLeft: flip(marks.mirrorRight), mirrorRight: flip(marks.mirrorLeft),
+            tireLeft: flip(marks.tireRight), tireRight: flip(marks.tireLeft),
         };
     }
     return {
@@ -170,7 +187,9 @@ export function figuresFromMarks(view, photo, profile) {
     const m = photo.marks;
     const across = (a, b) => (a != null && b != null ? ((b - a) * photo.width_px) / k : null);
     const height = m.roof != null && m.ground != null ? ((m.ground - m.roof) * photo.height_px) / k : null;
-    if (isEndView(view)) return { height };
+    if (isEndView(view)) {
+        return { height, track: across(m.tireLeft, m.tireRight) };
+    }
     return {
         wheelbase: across(m.frontAxle, m.rearAxle),
         frontOverhang: across(m.front, m.frontAxle),

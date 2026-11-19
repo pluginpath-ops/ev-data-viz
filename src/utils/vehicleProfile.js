@@ -103,6 +103,7 @@ export function profileFromSpecs(specs, photos = null) {
             length && wheelbase && length <= wheelbase && 'a wheelbase shorter than the length'].filter(Boolean),
         front: [!width && 'width', !height && 'height'].filter(Boolean),
     };
+    missing.rear = missing.front;
 
     return {
         length, height, wheelbase, frontOverhang, rearOverhang, groundClearance,

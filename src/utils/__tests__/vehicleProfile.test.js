@@ -51,7 +51,7 @@ describe('profileFromSpecs', () => {
         expect(p.rearOverhang).toBeCloseTo(184.8 - 113.2 - 35, 5);
         expect(p.bodyStyle).toBe('Sedan');
         expect([...p.estimated]).toEqual([]);
-        expect(p.missing).toEqual({ side: [], front: [] });
+        expect(p.missing).toEqual({ side: [], front: [], rear: [] });
     });
 
     it('splits the overhangs by body style when the front one is missing, and says so', () => {

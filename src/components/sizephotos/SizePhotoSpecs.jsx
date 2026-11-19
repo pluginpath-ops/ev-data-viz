@@ -1,7 +1,6 @@
 import { useAppContext } from '../../context/AppContext';
 import { fallbackSpecs } from '../../utils/specHelpers';
 import { SPEC_CATEGORIES } from '../../utils/vehicleSpecSchema';
-import { isEndView } from '../../utils/sizePhotoMarks';
 import { SpecField } from '../EditSpecsForm';
 
 /**
@@ -11,7 +10,8 @@ import { SpecField } from '../EditSpecsForm';
  */
 const FIELDS = {
     side: ['length_in', 'wheelbase_in', 'height_in', 'ground_clearance_in'],
-    end: ['width_in', 'width_mirrors_in', 'height_in', 'ground_clearance_in'],
+    front: ['width_in', 'width_mirrors_in', 'track_front_in', 'height_in', 'ground_clearance_in'],
+    rear: ['width_in', 'width_mirrors_in', 'track_rear_in', 'height_in', 'ground_clearance_in'],
 };
 const DIMENSIONS = SPEC_CATEGORIES.find(c => c.key === 'dimensions');
 
@@ -32,7 +32,7 @@ export default function SizePhotoSpecs({ vehicle, view, drafts, changed, onDraft
     return (
         <div className="flex flex-col gap-1">
             <div className="spec-fix-fields">
-                {FIELDS[isEndView(view) ? 'end' : 'side'].map(field => (
+                {FIELDS[view].map(field => (
                     <span key={field} className="spec-fix-field">
                         <span className="text-note">{DIMENSIONS.fields.find(f => f.key === field).label}</span>
                         <SpecField

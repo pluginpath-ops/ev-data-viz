@@ -70,6 +70,8 @@ const NAMES_V1 = [
     'sv', 'sa',
     // Photos or outlines on the Size chart.
     'sd',
+    // What the Size chart's front and rear views line up on (#608).
+    'se',
 ];
 
 // Values that recur: tabs, modes, axes, chart types, units, presets, and the
@@ -140,6 +142,8 @@ const WORDS_V1 = [
     'dimensions.track_front_in', 'dimensions.track_rear_in',
     // The Size chart's Draw setting (`sd`).
     'photos', 'outlines',
+    // The Size chart's front and rear alignment (`se`).
+    'centerline', 'leftMirror', 'leftBody', 'leftTire',
 ];
 
 /**

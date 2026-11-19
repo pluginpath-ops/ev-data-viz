@@ -31,8 +31,9 @@
  *                 (written before the optimizer had its own tab) opens here.
  *   specs         sf (the field charted)
  *   specscatter   scx scy
- *   specsize      sv sa (view, written only for front; what the vehicles are
- *                 lined up on, written only when not the front bumper)
+ *   specsize      sv sa se sd (view, written only when not side; what the side view
+ *                 lines up on, only when not the front bumper; what the front and rear
+ *                 views line up on, only when not the centerline; photos or outlines)
  *   drivecharger  hc (the chart: written only for 'time', absent is the cost chart)
  *   epacurves     epa_ya epa_m epa_ov
  *   specstable    vt_* (carried over, written by the table itself) and filters
@@ -64,6 +65,7 @@ import {
 import { encodeShortLink } from './shortLink';
 import {
     SIZE_ANCHORS, SIZE_VIEWS, SIZE_DRAWS, DEFAULT_SIZE_ANCHOR, DEFAULT_SIZE_VIEW, DEFAULT_SIZE_DRAW,
+    SIZE_END_ANCHORS, DEFAULT_SIZE_END_ANCHOR,
 } from '../constants/sizeChart';
 import { COST_TO_DRIVE_PARAM, encodeCostToDriveKey, encodeGasCarKey } from './costToDriveKey';
 
@@ -159,6 +161,7 @@ export function parseChartUrl(search) {
     const homeChart = p.get('hc');
     const sizeView = p.get('sv');
     const sizeAnchor = p.get('sa');
+    const sizeEndAnchor = p.get('se');
     const sizeDraw = p.get('sd');
     // A stale or hand-edited ?m= would otherwise fall through to the charging
     // chart with no indication why.
@@ -196,6 +199,7 @@ export function parseChartUrl(search) {
         homeChargerChart: HOME_CHARGER_CHARTS.includes(homeChart) ? homeChart : null,
         sizeView:   SIZE_VIEWS.some(v => v.key === sizeView) ? sizeView : null,
         sizeAnchor: SIZE_ANCHORS.some(a => a.key === sizeAnchor) ? sizeAnchor : null,
+        sizeEndAnchor: SIZE_END_ANCHORS.some(a => a.key === sizeEndAnchor) ? sizeEndAnchor : null,
         sizeDraw:   SIZE_DRAWS.some(d => d.key === sizeDraw) ? sizeDraw : null,
         correction:    decodeCorrection(p.toString()),
     };
@@ -301,7 +305,7 @@ export function chartConfigFromParsed(chart, base) {
         // A link names its view, alignment and draw either way: absent means the defaults.
         ...(s.chartMode === 'specsize' && {
             sizeView: s.sizeView ?? DEFAULT_SIZE_VIEW, sizeAnchor: s.sizeAnchor ?? DEFAULT_SIZE_ANCHOR,
-            sizeDraw: s.sizeDraw ?? DEFAULT_SIZE_DRAW,
+            sizeDraw: s.sizeDraw ?? DEFAULT_SIZE_DRAW, sizeEndAnchor: s.sizeEndAnchor ?? DEFAULT_SIZE_END_ANCHOR,
         }),
         correctionMode:   s.correction.mode,
         correctionTarget: s.correction.target,
@@ -404,6 +408,7 @@ export function buildChartParams({
         if (chartConfig.sizeView && chartConfig.sizeView !== DEFAULT_SIZE_VIEW) p.set('sv', chartConfig.sizeView);
         if (chartConfig.sizeAnchor && chartConfig.sizeAnchor !== DEFAULT_SIZE_ANCHOR) p.set('sa', chartConfig.sizeAnchor);
         if (chartConfig.sizeDraw && chartConfig.sizeDraw !== DEFAULT_SIZE_DRAW) p.set('sd', chartConfig.sizeDraw);
+        if (chartConfig.sizeEndAnchor && chartConfig.sizeEndAnchor !== DEFAULT_SIZE_END_ANCHOR) p.set('se', chartConfig.sizeEndAnchor);
     }
 
     // Charge Stop
@@ -514,6 +519,7 @@ export function withDefaultsWrittenOut(search) {
         if (!p.has('sv')) p.set('sv', DEFAULT_SIZE_VIEW);
         if (!p.has('sa')) p.set('sa', DEFAULT_SIZE_ANCHOR);
         if (!p.has('sd')) p.set('sd', DEFAULT_SIZE_DRAW);
+        if (!p.has('se')) p.set('se', DEFAULT_SIZE_END_ANCHOR);
     }
     if (mode === 'roadtrip' || mode === 'optimizer') {
         const defaults = defaultRoadTripConfig();

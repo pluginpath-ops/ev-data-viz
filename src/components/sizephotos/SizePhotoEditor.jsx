@@ -4,7 +4,7 @@ import { resolveEffectiveSpecs } from '../../utils/specHelpers';
 import { profileFromSpecs } from '../../utils/vehicleProfile';
 import { fmtDimension } from '../../utils/unitConversions';
 import {
-    MARKS, startingMarks, mirrorMarks, carryMarks, figuresFromMarks, fillMarks, isEndView,
+    MARKS, startingMarks, mirrorMarks, carryMarks, figuresFromMarks, fillMarks, isEndView, trackKeyOf,
 } from '../../utils/sizePhotoMarks';
 import {
     loadCanvas, isCutout, cutOut, finishCutout, flipCanvas, visibleFractions, toBlob, CUTOUT_MAX_SIDE,
@@ -32,6 +32,7 @@ const withScheme = (text) => {
 const KIND = {
     front: 'bumper', rear: 'bumper', left: 'bumper', right: 'bumper', frontAxle: 'axle', rearAxle: 'axle',
     ground: 'ground', roof: 'roof', underbody: 'underbody', mirrorLeft: 'mirror', mirrorRight: 'mirror',
+    tireLeft: 'track', tireRight: 'track',
 };
 
 /** The marks that must run in order along the photo, by view. */
@@ -320,6 +321,10 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
                         </>
                     )}
                     {read && <CheckRow label="Height" read={read.height} spec={profile.height} units={units} limit={SIZE_PHOTO_HEIGHT_PCT} />}
+                    {read && isEndView(view) && (
+                        <CheckRow label={view === 'rear' ? 'Rear track' : 'Front track'} read={read.track}
+                            spec={profile.estimated.has(trackKeyOf(view)) ? null : profile[trackKeyOf(view)]} units={units} limit={SIZE_PHOTO_WHEELBASE_PCT} />
+                    )}
                     {specs && <SizePhotoSpecs vehicle={vehicle} view={view} {...specs} />}
                 </div>
             )}

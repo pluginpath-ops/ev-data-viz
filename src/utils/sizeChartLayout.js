@@ -10,10 +10,41 @@
  */
 
 import { anchorX } from './vehicleProfile';
+import { isEndView, trackKeyOf } from './sizePhotoMarks';
+
+/** Where an end-view landmark is on a photo, as a fraction across, or null when unmarked. */
+const markOf = (m, anchor) => {
+    if (anchor === 'leftMirror') return m.mirrorLeft ?? null;
+    if (anchor === 'leftBody') return m.left ?? null;
+    // The left tire's center: the tire pair's spacing (the track), centered on the body.
+    if (anchor === 'leftTire' && m.tireLeft != null && m.tireRight != null && m.left != null && m.right != null) {
+        return (m.left + m.right) / 2 - Math.abs(m.tireRight - m.tireLeft) / 2;
+    }
+    return null;
+};
+
+/**
+ * How far an end-view landmark sits left of the centerline, in inches: what
+ * the front and rear views line up on (SIZE_END_ANCHORS), left as drawn. A
+ * photo's own mark says where, as drawn (perspective puts a mirror nearer
+ * the body than its spec does); else the specs, a mirror without a mirror
+ * width falling back to the body edge.
+ *
+ * @param {{ profile, photo? }} item  `photo` with its `placement` (sizePhotoMarks)
+ */
+export function endAnchorX({ profile: p, photo }, view, anchor) {
+    const f = photo?.marks ? markOf(photo.marks, anchor) : null;
+    const slice = f != null && photo.placement?.slices.find(s => f >= s.from && f <= s.to);
+    if (slice) return -(slice.x + ((f - slice.from) / (slice.to - slice.from)) * slice.w);
+    if (anchor === 'leftMirror') return (p.widthMirrors ?? p.width) / 2;
+    if (anchor === 'leftBody') return p.width / 2;
+    if (anchor === 'leftTire') return (p[trackKeyOf(view)] ?? p.width) / 2;
+    return 0;
+}
 
 export const SIZE_MARGIN = { left: 12, right: 104, top: 18 };
 /** The tallest the drawing gets, so a narrow selection doesn't fill the screen. */
-export const SIZE_MAX_DRAW_PX = { side: 300, front: 320 };
+export const SIZE_MAX_DRAW_PX = { side: 300, front: 320, rear: 320 };
 export const SIZE_ROW_PX = 26;
 const BARS_GAP_PX = 16;
 
@@ -26,25 +57,28 @@ export const frontHalfWidth = (p) => Math.max(
 /**
  * @param {Array<{ id, profile }>} items  vehicles drawable in this view, in selection order
  * @param {object} opts
- * @param {'side'|'front'} opts.view
+ * @param {'side'|'front'|'rear'} opts.view
  * @param {string} opts.anchor      a SIZE_ANCHORS key (side view)
+ * @param {string} opts.endAnchor   a SIZE_END_ANCHORS key (front and rear views)
  * @param {number} opts.widthPx     the drawing's width
  * @param {boolean} opts.lines      draw the dimension lines below the ground
  * @returns {null | { scale, originX, groundY, heightPx, barsTop, places: Map<id, number> }}
- *          `places` is each vehicle's front bumper (side) or centerline (front), in world x
+ *          `places` is each vehicle's front bumper (side) or centerline (front, rear), in world x
  */
-export function sizeChartLayout(items, { view, anchor, widthPx, lines }) {
+export function sizeChartLayout(items, { view, anchor, endAnchor, widthPx, lines }) {
     if (!items.length || widthPx <= 0) return null;
     const places = new Map();
     let minX = Infinity;
     let maxX = -Infinity;
     let maxH = 0;
-    for (const { id, profile: p } of items) {
-        if (view === 'front') {
+    for (const item of items) {
+        const { id, profile: p } = item;
+        if (isEndView(view)) {
             const half = frontHalfWidth(p);
-            places.set(id, 0);
-            minX = Math.min(minX, -half);
-            maxX = Math.max(maxX, half);
+            const center = endAnchorX(item, view, endAnchor);
+            places.set(id, center);
+            minX = Math.min(minX, center - half);
+            maxX = Math.max(maxX, center + half);
         } else {
             const start = -anchorX(p, anchor);
             places.set(id, start);
