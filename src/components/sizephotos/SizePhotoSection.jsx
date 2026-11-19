@@ -12,7 +12,13 @@ import SizePhotoEditor from './SizePhotoEditor';
  * nothing; any of them takes a new file.
  */
 function Slot({ vehicle, view, label, pending, specs }) {
-    const { deleteSizePhoto } = useAppContext();
+    const { deleteSizePhoto, copySizePhoto } = useAppContext();
+    const [copying, setCopying] = useState(false);
+    const makeOwn = async () => {
+        setCopying(true);
+        await copySizePhoto(vehicle.id, view, shown);
+        setCopying(false);
+    };
     const own = ownValues(vehicle).size_photos?.[view] ?? null;
     const shown = vehicle.size_photos?.[view] ?? null;
     const inheritedFrom = own ? null : vehicle.inheritedFrom?.sizePhotos?.[view] ?? null;
@@ -39,7 +45,7 @@ function Slot({ vehicle, view, label, pending, specs }) {
                 </div>
             )}
             {inheritedFrom && (
-                <p className="text-note">Inherited from {inheritedFrom.name}. Add one to override it.</p>
+                <p className="text-note">Inherited from {inheritedFrom.name}. Add one to override it, or make its own copy to edit apart from {inheritedFrom.name}.</p>
             )}
             <div className="inline-row flex-wrap">
                 <label className="image-upload-label">
@@ -47,6 +53,12 @@ function Slot({ vehicle, view, label, pending, specs }) {
                     <input type="file" accept="image/*" className="hidden"
                         onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) start(f); }} />
                 </label>
+                {inheritedFrom && (
+                    <button type="button" className="btn btn-secondary text-sm" disabled={copying} onClick={makeOwn}
+                        title={`Copy ${inheritedFrom.name}’s photo and marks to this vehicle, so each can change without the other`}>
+                        {copying ? 'Copying…' : 'Make its own copy'}
+                    </button>
+                )}
                 {own && <button type="button" className="btn btn-secondary text-sm" onClick={() => start(null)}>Edit</button>}
                 {own && (
                     <button type="button" className="btn btn-secondary text-sm"

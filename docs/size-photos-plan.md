@@ -134,6 +134,11 @@ when inherited, like the card photo.
   the original (`trim`), so the marks are carried across to the new trim.
 - **Replace with a new file:** the one case that clears the marks, because they
   belong to a picture that's gone.
+- **Make its own copy** (on an inherited photo): the source's cutout and
+  original are copied to this vehicle's paths and its own row written with
+  the same marks, so the two can change apart. Files are named by vehicle id
+  (`size/<id>-<view>.png`), so a row can't simply be pointed at another
+  vehicle's files: that vehicle's next upload would overwrite them.
 
 New pure modules (unit-tested):
 - `utils/cutout.js` — on `ImageData`: has-transparency, flood-fill a plain

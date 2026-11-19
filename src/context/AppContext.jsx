@@ -1125,6 +1125,20 @@ export function AppProvider({ children }) {
         }
     };
 
+    // A vehicle's own copy of the size photo it inherits (SizePhotoSection).
+    const copySizePhoto = async (vehicleId, view, from) => {
+        try {
+            const row = await dataService.copySizePhoto(vehicleId, view, from);
+            setVehicles(prev => prev.map(v => v.id === vehicleId
+                ? { ...v, size_photos: { ...(v.size_photos ?? {}), [view]: row } } : v));
+            return row;
+        } catch (error) {
+            logIfUnauthorized('copy_size_photo', 'vehicle', vehicleId, error);
+            showError('Error copying the size photo: ' + error.message);
+            return null;
+        }
+    };
+
     const deleteSizePhoto = async (vehicleId, view) => {
         const row = vehicles.find(v => v.id === vehicleId)?.size_photos?.[view];
         try {
@@ -2324,6 +2338,7 @@ export function AppProvider({ children }) {
         syncVehicleTags,
         uploadVehicleImage,
         saveSizePhoto,
+        copySizePhoto,
         deleteSizePhoto,
         backfillVehicleThumbnails,
         backfillChargeSummaries,

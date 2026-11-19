@@ -369,6 +369,9 @@ const EPA_STARTUP_FIELDS = `${EPA_SLIM_LAB_FIELDS}, ${CERTIFICATIONS_EMBED}`;
 /** What startup leaves out, keyed by test_vehicle_id (see EPA_SLIM_LAB_FIELDS). */
 const EPA_DETAIL_FIELDS = `test_vehicle_id, epa_coefficient_sets(id, category, is_primary, target_a, target_b, target_c, set_a, set_b, set_c, equiv_test_weight_lbs), epa_tests(id, test_number, test_date, procedure_code, total_dc_energy_kwh, ac_recharge_kwh, cd_range_combined_calc, cd_range_hwy_calc, mfr_test_vehicle_comments, mfr_test_comments, epa_test_phases(id, phase_index, phase_type, dc_energy_kwh, distance_mi))`;
 
+/** A vehicle-images public URL's path inside the bucket: ".../vehicle-images/size/30-side.png?v=1" → "size/30-side.png". */
+const vehicleImagePathOf = (url) => decodeURIComponent(new URL(url).pathname.split('/vehicle-images/')[1] ?? '');
+
 class DataService {
   constructor() {
     this.user = null;
@@ -1211,8 +1214,45 @@ class DataService {
       .from('vehicle_size_photos').delete().eq('vehicle_id', vehicleId).eq('view', view);
     if (error) throw error;
     const stem = `size/${vehicleId}-${view}`;
-    const originalPath = originalUrl ? decodeURIComponent(new URL(originalUrl).pathname.split('/vehicle-images/')[1] ?? '') : null;
+    const originalPath = originalUrl ? vehicleImagePathOf(originalUrl) : null;
     await getSupabase().storage.from('vehicle-images').remove([`${stem}.png`, ...(originalPath ? [originalPath] : [])]);
+  }
+
+  /**
+   * Give a vehicle its own copy of the size photo it inherits: the cutout and
+   * the original copied to its own paths (size/<vehicleId>-<view>…), then its
+   * own row, with the same marks, trim, source and credit. After this, the
+   * source vehicle's photo can be replaced or deleted without touching it.
+   *
+   * Files first, then the row, as saveSizePhoto does. An insert, not an
+   * upsert: a vehicle with its own photo has nothing to inherit.
+   *
+   * @param {number} vehicleId  the vehicle getting the copy
+   * @param {'side'|'front'|'rear'} view
+   * @param {object} from  the inherited row
+   * @returns {Promise<object>} the new row
+   */
+  async copySizePhoto(vehicleId, view, from) {
+    const stem = `size/${vehicleId}-${view}`;
+    // Fetched from the public URL and uploaded again, rather than a Storage
+    // copy: the same read and write every size photo save already relies on.
+    const copyTo = async (url, to) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`couldn't read ${vehicleImagePathOf(url)} (${res.status})`);
+      const blob = await res.blob();
+      return this.#putVehicleImageObject(to, blob, blob.type || 'image/png');
+    };
+    const originalExt = from.original_url ? vehicleImagePathOf(from.original_url).split('.').pop() : null;
+    const [imageUrl, originalUrl] = await Promise.all([
+      copyTo(from.image_url, `${stem}.png`),
+      from.original_url ? copyTo(from.original_url, `${stem}-original.${originalExt}`) : null,
+    ]);
+    // Dropped: the new row is this vehicle's, by whoever copies it.
+    const { vehicle_id: _from, updated_by: _by, ...fields } = from;
+    const row = { ...fields, vehicle_id: vehicleId, view, image_url: imageUrl, original_url: originalUrl, updated_at: new Date().toISOString() };
+    const { data, error } = await getSupabase().from('vehicle_size_photos').insert(row).select().single();
+    if (error) throw error;
+    return data;
   }
 
   /**
