@@ -34,10 +34,13 @@ export const isEndView = (view) => view !== 'side';
  * centers), dragged together as one dot (`point` names the x it goes with).
  * `underbody` is the lowest point of the body, for ground clearance; front and
  * rear, `mirrorLeft` and `mirrorRight` are the mirrors' outer edges, and
- * `tireLeft` and `tireRight` the tires' outside edges where they meet the
- * ground — easier to see than a tire's center. The track (center to center)
- * is that span less one tire width: the front track on the front photo, the
- * rear on the rear. Left and right are as the photo shows them. The
+ * `tireLeft` and `tireRight` the LEFT edge of each tire at the ground: edge to
+ * matching edge is the track (center to center) with no tire width needed,
+ * and an edge is easier to see than a center. Only their spacing counts: the
+ * pair is taken as centered on the body (between the body edge marks), so
+ * where along the tires they sit doesn't matter (a flip turns them into
+ * right edges, same spacing). The front track on the front photo, the rear on
+ * the rear. Left and right are as the photo shows them. The
  * axle heights and underbody are recorded for later use (#603).
  */
 const END_MARKS = [
@@ -45,8 +48,8 @@ const END_MARKS = [
     { key: 'left',      axis: 'x', label: 'Left body edge' },
     { key: 'right',     axis: 'x', label: 'Right body edge' },
     { key: 'mirrorRight', axis: 'x', label: 'Right mirror' },
-    { key: 'tireLeft',  axis: 'x', label: 'Left tire outside' },
-    { key: 'tireRight', axis: 'x', label: 'Right tire outside' },
+    { key: 'tireLeft',  axis: 'x', label: 'Left tire, left edge' },
+    { key: 'tireRight', axis: 'x', label: 'Right tire, left edge' },
     { key: 'ground',    axis: 'y', label: 'Ground' },
     { key: 'underbody', axis: 'y', label: 'Underbody' },
     { key: 'roof',      axis: 'y', label: 'Roof' },
@@ -92,9 +95,8 @@ export function fillMarks(view, marks, profile = null) {
         if (out.mirrorLeft == null) out.mirrorLeft = Math.max(0, marks.left - body * extra);
         if (out.mirrorRight == null) out.mirrorRight = Math.min(1, marks.right + body * extra);
         const track = profile?.[trackKeyOf(view)];
-        const outside = track > 0 ? track + (profile?.tireWidth ?? 0) : null;
-        const half = (profile?.width > 0 && outside ? outside / profile.width : 0.95) * body / 2;
-        const center = (marks.left + marks.right) / 2;
+        const half = (profile?.width > 0 && track > 0 ? track / profile.width : 0.86) * body / 2;
+        const center = (marks.left + marks.right) / 2 - 0.03 * body;   // left edges sit left of the centers
         if (out.tireLeft == null) out.tireLeft = center - half;
         if (out.tireRight == null) out.tireRight = center + half;
     } else if (!isEndView(view)) {
@@ -186,8 +188,7 @@ export function figuresFromMarks(view, photo, profile) {
     const across = (a, b) => (a != null && b != null ? ((b - a) * photo.width_px) / k : null);
     const height = m.roof != null && m.ground != null ? ((m.ground - m.roof) * photo.height_px) / k : null;
     if (isEndView(view)) {
-        const outside = across(m.tireLeft, m.tireRight);
-        return { height, track: outside != null && profile?.tireWidth > 0 ? outside - profile.tireWidth : null };
+        return { height, track: across(m.tireLeft, m.tireRight) };
     }
     return {
         wheelbase: across(m.frontAxle, m.rearAxle),

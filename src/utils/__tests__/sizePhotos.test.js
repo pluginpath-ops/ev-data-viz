@@ -91,7 +91,10 @@ describe('size photo marks', () => {
         // Mirror mark 0.03 of the photo outside the body edge, at 80 in / 0.7 per photo width.
         expect(endAnchorX(item, 'rear', 'leftMirror')).toBeCloseTo(40 + 0.03 * 80 / 0.7);
         expect(endAnchorX(item, 'rear', 'leftBody')).toBeCloseTo(40);
-        expect(endAnchorX(item, 'rear', 'leftTire')).toBeCloseTo(38); // no tire mark: (66 + 10) / 2
+        expect(endAnchorX(item, 'rear', 'leftTire')).toBeCloseTo(33); // no tire marks: track 66 / 2
+        const tires = { ...item, photo: { ...item.photo, marks: { ...item.photo.marks, tireLeft: 0.2, tireRight: 0.75 } } };
+        // Spacing 0.55 of the photo (the track), centered on the body: center 0.225 → 0.275 photo left of center.
+        expect(endAnchorX(tires, 'rear', 'leftTire')).toBeCloseTo(0.275 * 80 / 0.7);
         expect(endAnchorX({ profile }, 'rear', 'leftMirror')).toBeCloseTo(44);
         expect(endAnchorX(item, 'rear', 'centerline')).toBe(0);
     });

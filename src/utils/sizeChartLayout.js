@@ -12,7 +12,16 @@
 import { anchorX } from './vehicleProfile';
 import { isEndView, trackKeyOf } from './sizePhotoMarks';
 
-const END_MARK = { leftMirror: 'mirrorLeft', leftBody: 'left', leftTire: 'tireLeft' };
+/** Where an end-view landmark is on a photo, as a fraction across, or null when unmarked. */
+const markOf = (m, anchor) => {
+    if (anchor === 'leftMirror') return m.mirrorLeft ?? null;
+    if (anchor === 'leftBody') return m.left ?? null;
+    // The left tire's center: the tire pair's spacing (the track), centered on the body.
+    if (anchor === 'leftTire' && m.tireLeft != null && m.tireRight != null && m.left != null && m.right != null) {
+        return (m.left + m.right) / 2 - Math.abs(m.tireRight - m.tireLeft) / 2;
+    }
+    return null;
+};
 
 /**
  * How far an end-view landmark sits left of the centerline, in inches: what
@@ -24,12 +33,12 @@ const END_MARK = { leftMirror: 'mirrorLeft', leftBody: 'left', leftTire: 'tireLe
  * @param {{ profile, photo? }} item  `photo` with its `placement` (sizePhotoMarks)
  */
 export function endAnchorX({ profile: p, photo }, view, anchor) {
-    const f = photo?.marks?.[END_MARK[anchor]];
+    const f = photo?.marks ? markOf(photo.marks, anchor) : null;
     const slice = f != null && photo.placement?.slices.find(s => f >= s.from && f <= s.to);
     if (slice) return -(slice.x + ((f - slice.from) / (slice.to - slice.from)) * slice.w);
     if (anchor === 'leftMirror') return (p.widthMirrors ?? p.width) / 2;
     if (anchor === 'leftBody') return p.width / 2;
-    if (anchor === 'leftTire') return ((p[trackKeyOf(view)] ?? p.width) + (p.tireWidth ?? 0)) / 2;
+    if (anchor === 'leftTire') return (p[trackKeyOf(view)] ?? p.width) / 2;
     return 0;
 }
 
