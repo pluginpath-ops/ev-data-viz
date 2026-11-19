@@ -17,34 +17,37 @@ const STEP_PX = { plain: 1, shift: 10, fine: 0.25 };
  *   grabbing a mark never makes it jump. Option (Alt) held slows it 8×.
  * - Arrow keys move it in PHOTO pixels (not screen pixels): 1, Shift 10,
  *   Option ¼.
- * - `onPointer` gets where the mark is, for the loupe.
+ * - `onPointer` gets where the mark is, for the loupe. It stays up while the
+ *   mark has focus (after a click, or Tab), marked `fine` so the loupe zooms
+ *   to photo pixels and a ¼-pixel nudge shows; blur takes it down.
  *
  * @param {object} o
  * @param {{ current: Element }} o.frameRef  the frame the fractions are of
  * @param {{ x?: number, y?: number }} o.value  the mark: x, y or both
  * @param {{ w: number, h: number }} o.photoPx  the photo's size in its own pixels
  * @param {(next: { x?: number, y?: number }) => void} o.onChange
- * @param {({ fx, fy, w, h } | null) => void} o.onPointer
+ * @param {({ fx, fy, w, h, axis, fine } | null) => void} o.onPointer
  */
 export function useMarkDrag({ frameRef, value, photoPx, onChange, onPointer }) {
     const drag = useRef(null);
+    // Where along a line the loupe sits: the pointer's last place, kept for keys.
+    const along = useRef({ fx: 0.5, fy: 0.5 });
     const hasX = value.x != null;
     const hasY = value.y != null;
+    const axis = hasX && hasY ? 'xy' : hasX ? 'x' : 'y';
 
     const rect = () => frameRef.current.getBoundingClientRect();
-    const show = (v, r, e) => onPointer({
-        fx: v.x ?? clamp((e.clientX - r.left) / r.width),
-        fy: v.y ?? clamp((e.clientY - r.top) / r.height),
-        w: r.width,
-        h: r.height,
-    });
+    const show = (v, r, e, fine) => {
+        if (e) along.current = { fx: clamp((e.clientX - r.left) / r.width), fy: clamp((e.clientY - r.top) / r.height) };
+        onPointer({ fx: v.x ?? along.current.fx, fy: v.y ?? along.current.fy, w: r.width, h: r.height, axis, fine });
+    };
 
     const onPointerDown = (e) => {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
         e.currentTarget.focus();
         drag.current = { x0: e.clientX, y0: e.clientY, start: value };
-        show(value, rect(), e);
+        show(value, rect(), e, false);
     };
     const onPointerMove = (e) => {
         const d = drag.current;
@@ -57,9 +60,10 @@ export function useMarkDrag({ frameRef, value, photoPx, onChange, onPointer }) {
         // A change of speed mid-drag restarts from here, so the mark doesn't jump.
         if (d.slow !== slow) drag.current = { x0: e.clientX, y0: e.clientY, start: next, slow };
         onChange(next);
-        show(next, r, e);
+        show(next, r, e, false);
     };
-    const end = () => { drag.current = null; onPointer(null); };
+    // Let go: the mark keeps focus, so the loupe stays for the arrow keys.
+    const end = () => { drag.current = null; show(value, rect(), null, true); };
     const onKeyDown = (e) => {
         const dir = {
             ArrowLeft: hasX && ['x', -1], ArrowRight: hasX && ['x', 1],
@@ -70,11 +74,14 @@ export function useMarkDrag({ frameRef, value, photoPx, onChange, onPointer }) {
         const step = e.altKey ? STEP_PX.fine : e.shiftKey ? STEP_PX.shift : STEP_PX.plain;
         const [axis, sign] = dir;
         const px = axis === 'x' ? photoPx.w : photoPx.h;
-        onChange({ ...value, [axis]: clamp(value[axis] + (sign * step) / px) });
+        const next = { ...value, [axis]: clamp(value[axis] + (sign * step) / px) };
+        onChange(next);
+        show(next, rect(), null, true);
     };
 
     return {
         onPointerDown, onPointerMove, onPointerUp: end, onPointerCancel: end, onKeyDown,
+        onFocus: () => { if (!drag.current) show(value, rect(), null, true); },
         onBlur: () => onPointer(null),
     };
 }

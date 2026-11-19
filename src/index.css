@@ -6680,6 +6680,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border: 1px solid var(--color-accent-orange);
     border-radius: 50%;
 }
+/* At rest on a mark: square photo pixels, and a hairline where the mark is. */
+.size-photo-loupe.is-fine { image-rendering: pixelated; }
+.size-photo-loupe::before {
+    content: '';
+    position: absolute;
+    border: 0 solid var(--color-accent-orange);
+    opacity: 0.7;
+}
+.size-photo-loupe.is-x::before { top: 0; bottom: 0; left: 50%; border-left-width: 1px; }
+.size-photo-loupe.is-y::before { left: 0; right: 0; top: 50%; border-top-width: 1px; }
 
 .size-photo-fields { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .size-photo-fields label { display: flex; flex-direction: column; gap: 4px; }

@@ -15,6 +15,8 @@ import MarkPoint from './MarkPoint';
 
 const DEFAULT_TOLERANCE = 24;
 const LOUPE_ZOOM = 4;
+/** At rest on a focused mark, screen px per PHOTO px, so a ¼-pixel nudge moves 2 px. */
+const LOUPE_FINE_PX = 8;
 /** The loupe's diameter; .size-photo-loupe in index.css matches it. */
 const LOUPE_PX = 120;
 
@@ -273,20 +275,24 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
                             onPointer={setLoupe}
                         />
                     ))}
-                    {loupe && (
-                        <div
-                            className="size-photo-loupe"
-                            aria-hidden="true"
-                            style={{
-                                left: `${loupe.fx * 100}%`,
-                                top: `${loupe.fy * 100}%`,
-                                backgroundImage: `url(${imageSrc})`,
-                                // In px, so the point under the pointer sits at the loupe's center.
-                                backgroundSize: `${loupe.w * LOUPE_ZOOM}px ${loupe.h * LOUPE_ZOOM}px`,
-                                backgroundPosition: `${LOUPE_PX / 2 - loupe.fx * loupe.w * LOUPE_ZOOM}px ${LOUPE_PX / 2 - loupe.fy * loupe.h * LOUPE_ZOOM}px`,
-                            }}
-                        />
-                    )}
+                    {loupe && (() => {
+                        // Dragging: 4× the frame. At rest: photo pixels, big enough to see a ¼-pixel nudge.
+                        const zoom = loupe.fine && size ? LOUPE_FINE_PX * size.w / loupe.w : LOUPE_ZOOM;
+                        return (
+                            <div
+                                className={`size-photo-loupe is-${loupe.axis}${loupe.fine ? ' is-fine' : ''}`}
+                                aria-hidden="true"
+                                style={{
+                                    left: `${loupe.fx * 100}%`,
+                                    top: `${loupe.fy * 100}%`,
+                                    backgroundImage: `url(${imageSrc})`,
+                                    // In px, so the mark's point sits at the loupe's center.
+                                    backgroundSize: `${loupe.w * zoom}px ${loupe.h * zoom}px`,
+                                    backgroundPosition: `${LOUPE_PX / 2 - loupe.fx * loupe.w * zoom}px ${LOUPE_PX / 2 - loupe.fy * loupe.h * zoom}px`,
+                                }}
+                            />
+                        );
+                    })()}
                 </div>
             )}
 
