@@ -55,15 +55,21 @@ function CheckRow({ label, read, spec, units, limit }) {
  * and Redo cutout produce a new cutout; the marks follow them rather than
  * starting over. Only a new file starts the marks again.
  *
+ * It lives inside the vehicle form, so its work must not be lost to the
+ * form's own Save: while open it puts its save in `pending` (keyed by view),
+ * and the form runs that first. Enter in its fields stays here rather than
+ * submitting the form.
+ *
  * Props:
  *   vehicle   the vehicle (resolved)
  *   view      'side' | 'front'
  *   row       its saved photo for this view, or null
  *   file      a newly chosen file, or null
  *   onClose   () => void
+ *   pending   Map, view → () => Promise: the form's list of unsaved photo work
  */
-export default function SizePhotoEditor({ vehicle, view, row, file, onClose }) {
-    const { vehicles, units, saveSizePhoto } = useAppContext();
+export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pending }) {
+    const { vehicles, units, saveSizePhoto, showError } = useAppContext();
     const profile = useMemo(() => profileFromSpecs(resolveEffectiveSpecs(vehicle, vehicles)), [vehicle, vehicles]);
 
     const [original, setOriginal] = useState(null);      // canvas of the upload (new file, or a redo)
@@ -155,18 +161,36 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose }) {
     const outOfOrder = marks && ORDER[view].some((k, i, keys) => i > 0 && !(marks[keys[i - 1]] < marks[k]));
     const scaleSpec = view === 'front' ? profile.width : profile.length;
 
+    // Throws when it can't save; saveSizePhoto shows its own errors.
+    const persist = async () => {
+        const problem = !marks || !size ? 'is still loading'
+            : outOfOrder ? 'has its marks out of order' : null;
+        if (problem) {
+            showError(`The ${view} size photo ${problem}. Fix it or Cancel it, then save again.`);
+            throw new Error(problem);
+        }
+        await saveSizePhoto(vehicle.id, view, {
+            cutout: cutout ? await toBlob(cutout) : null,
+            original: file && original ? await toBlob(original, needsBackground ? 'image/jpeg' : 'image/png', 0.9) : null,
+            originalExt: needsBackground ? 'jpg' : 'png',
+            fields: {
+                width_px: size.w, height_px: size.h, marks, trim, mirrored,
+                source_url: withScheme(sourceUrl), credit: credit.trim() || null,
+            },
+        });
+    };
+
+    // Re-registered every render, so the form always runs the latest state.
+    useEffect(() => {
+        if (!pending) return undefined;
+        pending.set(view, persist);
+        return () => { pending.delete(view); };
+    });
+
     const save = async () => {
         setWorking(true);
         try {
-            await saveSizePhoto(vehicle.id, view, {
-                cutout: cutout ? await toBlob(cutout) : null,
-                original: file && original ? await toBlob(original, needsBackground ? 'image/jpeg' : 'image/png', 0.9) : null,
-                originalExt: needsBackground ? 'jpg' : 'png',
-                fields: {
-                    width_px: size.w, height_px: size.h, marks, trim, mirrored,
-                    source_url: withScheme(sourceUrl), credit: credit.trim() || null,
-                },
-            });
+            await persist();
             onClose();
         } catch {
             // saveSizePhoto has said what went wrong; the work stays open.
@@ -176,7 +200,8 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose }) {
     };
 
     return (
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2.5"
+            onKeyDown={e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault(); }}>
             {view === 'side' && <p className="text-note">Side photos face left, front bumper on the left. Flip one that doesn’t.</p>}
 
             {needsBackground && (

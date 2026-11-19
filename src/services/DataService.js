@@ -1194,8 +1194,13 @@ class DataService {
     ]);
     if (imageUrl) row.image_url = imageUrl;
     if (originalUrl) row.original_url = originalUrl;
-    const { data, error } = await getSupabase()
-      .from('vehicle_size_photos').upsert(row, { onConflict: 'vehicle_id,view' }).select().single();
+    // No new image means the row exists and only its marks or credit change.
+    // That must be an UPDATE: an upsert is an INSERT first, and Postgres
+    // refuses its missing image_url (NOT NULL) before the conflict is reached.
+    const table = getSupabase().from('vehicle_size_photos');
+    const { data, error } = imageUrl
+      ? await table.upsert(row, { onConflict: 'vehicle_id,view' }).select().single()
+      : await table.update(row).eq('vehicle_id', vehicleId).eq('view', view).select().single();
     if (error) throw error;
     return data;
   }

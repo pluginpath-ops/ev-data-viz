@@ -10,7 +10,7 @@ import SizePhotoEditor from './SizePhotoEditor';
  * inherits from its model line (read-only, with where it comes from), or
  * nothing; any of them takes a new file.
  */
-function Slot({ vehicle, view, label }) {
+function Slot({ vehicle, view, label, pending }) {
     const { deleteSizePhoto } = useAppContext();
     const own = ownValues(vehicle).size_photos?.[view] ?? null;
     const shown = vehicle.size_photos?.[view] ?? null;
@@ -22,7 +22,7 @@ function Slot({ vehicle, view, label }) {
             <div className="size-photo-slot">
                 <span className="text-micro">{label}</span>
                 <SizePhotoEditor vehicle={vehicle} view={view} row={editing.file ? null : own}
-                    file={editing.file} onClose={() => setEditing(null)} />
+                    file={editing.file} onClose={() => setEditing(null)} pending={pending} />
             </div>
         );
     }
@@ -56,13 +56,17 @@ function Slot({ vehicle, view, label }) {
     );
 }
 
-export default function SizePhotoSection({ vehicle }) {
+/**
+ * `pending` is the vehicle form's list of unsaved photo work (an open editor
+ * adds its save), so the form's Save saves photos too.
+ */
+export default function SizePhotoSection({ vehicle, pending }) {
     return (
         <div className="form-section mt-4">
             <label className="block font-medium mb-2">Size photos</label>
             <p className="text-note mb-2">For the Size chart: the car cut out, with its bumpers, axles and ground marked. Scaled from the length spec (front: width).</p>
             <div className="size-photo-slots">
-                {SIZE_VIEWS.map(v => <Slot key={v.key} vehicle={vehicle} view={v.key} label={v.label} />)}
+                {SIZE_VIEWS.map(v => <Slot key={v.key} vehicle={vehicle} view={v.key} label={v.label} pending={pending} />)}
             </div>
         </div>
     );

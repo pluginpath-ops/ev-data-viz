@@ -203,9 +203,26 @@ export default function EditVehicleForm({
         }
     };
 
+    // An open size photo edit is saved before the vehicle (and the form stays
+    // open if it can't be), and Cancel asks before dropping one.
+    const [photoSaves] = useState(() => new Map());
+    const submit = async (e) => {
+        e.preventDefault();
+        try {
+            await Promise.all([...photoSaves.values()].map(save => save()));
+        } catch {
+            return;
+        }
+        onSubmit(e);
+    };
+    const cancel = () => {
+        if (photoSaves.size > 0 && !window.confirm('Discard the unsaved size photo?')) return;
+        onCancel();
+    };
+
     return (
         <>
-            <form onSubmit={onSubmit} className="card">
+            <form onSubmit={submit} className="card">
                 <h3 className="section-title mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
                 <div className="form-grid gap-4">
                     <input
@@ -527,15 +544,15 @@ export default function EditVehicleForm({
                     </div>
                 )}
 
-                {/* Size photos save on their own, apart from the form's Save:
-                    each is a file and a row of its own (vehicle_size_photos). */}
-                {editingId && editingVehicle && <SizePhotoSection vehicle={editingVehicle} />}
+                {/* Size photos are a file and a row of their own
+                    (vehicle_size_photos); an open one is saved by Save below. */}
+                {editingId && editingVehicle && <SizePhotoSection vehicle={editingVehicle} pending={photoSaves} />}
 
                 {/* EPA test vehicles are assigned in Tests & Data, not here — keeps
                     this modal compact regardless of how many are linked. */}
 
                 <div className="form-actions mt-4">
-                    <button type="button" onClick={onCancel} className="btn btn-secondary text-sm">
+                    <button type="button" onClick={cancel} className="btn btn-secondary text-sm">
                         Cancel
                     </button>
                     <button type="submit" className="btn btn-commit text-sm">
