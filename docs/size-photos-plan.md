@@ -57,7 +57,17 @@ half-saved photo can't leave two.
 **Marks**, x across and y down the image, as fractions so a resize never
 moves them:
 - side: `front`, `frontAxle`, `rearAxle`, `rear` (x); `ground`, `roof` (y)
-- front: `left`, `right` (x, body edges, mirrors not included); `ground`, `roof` (y)
+- front and rear: `left`, `right` (x, body edges, mirrors not included); `ground`, `roof` (y)
+
+Recorded for later, not yet read by the chart (#603; added 2026-11-19 so
+curators mark each photo once):
+- side: `underbody` (y, the lowest body point: ground clearance), and the axle
+  centers as points — `frontAxleY`, `rearAxleY` (y) with the axle x marks.
+- front and rear: `underbody`, and `mirrorLeft`, `mirrorRight` (x, mirror tips).
+- A **rear** photo (view `'rear'`, migration 103), marked like the front.
+
+A photo saved before these marks existed has them filled in where they would
+start (`fillMarks`: from clearance, mirror width and tire size), until moved.
 
 The marks are the truth for drawing (owner, 2026-11-19): each lands where the
 specs put that point. Up, ground to roof spans `height_in`. Across, the side
@@ -96,9 +106,10 @@ when inherited, like the card photo.
 3. **Face left.** Side photos face left; **Flip** mirrors it and sets
    `mirrored`.
 4. **Mark.** Lines start where the cutout says: bumpers at the left/right edge
-   of the car's pixels, ground at the bottom, axles at a guess. Drag, or Tab
-   between them and nudge with the arrows (Shift = 10 px). A magnified view
-   follows the line being moved.
+   of the car's pixels, ground at the bottom, axles at a guess. Drag (Option
+   held: 8× finer), or Tab between them and nudge with the arrows in photo
+   pixels (1; Shift 10; Option ¼), so a mark can sit between pixels. A
+   magnified view follows the mark being moved.
 5. **Check, live:** "Wheelbase from photo 112.6 in · spec 113.2 in (−0.5%)",
    the same for height, and the front overhang it implies.
 6. **Source and credit**, then Save: upload, then upsert the row. Delete
@@ -125,7 +136,8 @@ New pure modules (unit-tested):
 
 Components: `components/sizephotos/SizePhotoSection.jsx` (the slots),
 `SizePhotoEditor.jsx` (cutout, flip, marks, check), `MarkLine.jsx` (one
-draggable line).
+draggable line), `MarkPoint.jsx` (an axle center); both move by
+`hooks/useMarkDrag.js`.
 
 ## The chart
 

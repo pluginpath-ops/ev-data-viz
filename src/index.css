@@ -6624,6 +6624,26 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .size-mark--axle   { --mark: var(--color-accent-blue); }
 .size-mark--ground { --mark: var(--color-accent-green); }
 .size-mark--roof   { --mark: var(--color-accent-violet); }
+.size-mark--underbody { --mark: var(--color-accent-green); }
+.size-mark--mirror { --mark: var(--color-accent-orange); }
+/* Marks recorded for later (the underbody, the mirrors) are dashed. */
+.size-mark--underbody::before,
+.size-mark--mirror::before { background: none; border: 0 dashed var(--mark); }
+.size-mark--underbody::before { height: 0; border-top-width: 1px; }
+.size-mark--mirror::before { width: 0; border-left-width: 1px; }
+/* An axle's center: a ring with a hole, so the wheel's hub shows through. */
+.size-mark-point {
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    margin: -7px 0 0 -7px;
+    border: 2px solid var(--color-accent-blue);
+    border-radius: 50%;
+    cursor: move;
+    outline: none;
+}
+.size-mark-point:hover,
+.size-mark-point:focus-visible { box-shadow: 0 0 0 2px var(--color-popover); }
 .size-mark-label {
     position: absolute;
     white-space: nowrap;

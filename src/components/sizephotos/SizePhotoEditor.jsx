@@ -4,13 +4,14 @@ import { resolveEffectiveSpecs } from '../../utils/specHelpers';
 import { profileFromSpecs } from '../../utils/vehicleProfile';
 import { fmtDimension } from '../../utils/unitConversions';
 import {
-    MARKS, startingMarks, mirrorMarks, carryMarks, figuresFromMarks,
+    MARKS, startingMarks, mirrorMarks, carryMarks, figuresFromMarks, fillMarks, isEndView,
 } from '../../utils/sizePhotoMarks';
 import {
     loadCanvas, isCutout, cutOut, finishCutout, flipCanvas, visibleFractions, toBlob, CUTOUT_MAX_SIDE,
 } from '../../utils/sizePhotoImages';
 import { SIZE_PHOTO_WHEELBASE_PCT, SIZE_PHOTO_HEIGHT_PCT } from '../../constants/sizeChart';
 import MarkLine from './MarkLine';
+import MarkPoint from './MarkPoint';
 
 const DEFAULT_TOLERANCE = 24;
 const LOUPE_ZOOM = 4;
@@ -24,10 +25,13 @@ const withScheme = (text) => {
     return /^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `https://${t}`;
 };
 
-const KIND = { front: 'bumper', rear: 'bumper', left: 'bumper', right: 'bumper', frontAxle: 'axle', rearAxle: 'axle', ground: 'ground', roof: 'roof' };
+const KIND = {
+    front: 'bumper', rear: 'bumper', left: 'bumper', right: 'bumper', frontAxle: 'axle', rearAxle: 'axle',
+    ground: 'ground', roof: 'roof', underbody: 'underbody', mirrorLeft: 'mirror', mirrorRight: 'mirror',
+};
 
 /** The marks that must run in order along the photo, by view. */
-const ORDER = { side: ['front', 'frontAxle', 'rearAxle', 'rear'], front: ['left', 'right'] };
+const ORDER = { side: ['front', 'frontAxle', 'rearAxle', 'rear'], front: ['left', 'right'], rear: ['left', 'right'] };
 
 /** A figure read from the marks, beside the spec it is checked against. */
 function CheckRow({ label, read, spec, units, limit }) {
@@ -81,7 +85,8 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
     const [tolerance, setTolerance] = useState(DEFAULT_TOLERANCE);
     const [trim, setTrim] = useState(row?.trim ?? null);
     const [mirrored, setMirrored] = useState(row?.mirrored ?? false);
-    const [marks, setMarks] = useState(row?.marks ?? null);
+    // A photo saved before a mark existed gets it filled in where it would start.
+    const [marks, setMarks] = useState(() => (row?.marks ? fillMarks(view, row.marks, profile) : null));
     const [sourceUrl, setSourceUrl] = useState(row?.source_url ?? '');
     const [credit, setCredit] = useState(row?.credit ?? '');
     const [message, setMessage] = useState(null);
@@ -159,7 +164,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
     const photo = marks && size ? { marks, width_px: size.w, height_px: size.h } : null;
     const read = photo ? figuresFromMarks(view, photo, profile) : null;
     const outOfOrder = marks && ORDER[view].some((k, i, keys) => i > 0 && !(marks[keys[i - 1]] < marks[k]));
-    const scaleSpec = view === 'front' ? profile.width : profile.length;
+    const scaleSpec = isEndView(view) ? profile.width : profile.length;
 
     // Throws when it can't save; saveSizePhoto shows its own errors.
     const persist = async () => {
@@ -204,6 +209,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
         <div className="flex flex-col gap-2.5"
             onKeyDown={e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault(); }}>
             {view === 'side' && <p className="text-note">Side photos face left, front bumper on the left. Flip one that doesn’t.</p>}
+            <p className="text-meta">Drag a mark, or click it and use the arrow keys (1 photo pixel; Shift 10; Option ¼). Hold Option while dragging for fine moves.{view === 'side' ? ' The axles are the dots: put each on its wheel’s center.' : ''}</p>
 
             {refused === 'busy' && (
                 <div className="flex flex-col gap-2">
@@ -243,14 +249,27 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
             {imageSrc && marks && (
                 <div className="size-photo-frame" ref={frameRef} style={{ aspectRatio: `${size.w} / ${size.h}` }}>
                     <img src={imageSrc} alt="" draggable={false} />
-                    {MARKS[view].map(mark => (
+                    {MARKS[view].filter(mark => !mark.point).map(mark => (
                         <MarkLine
                             key={mark.key}
                             mark={mark}
                             value={marks[mark.key] ?? 0}
                             frameRef={frameRef}
+                            photoPx={size}
                             kind={KIND[mark.key]}
                             onChange={v => setMarks(m => ({ ...m, [mark.key]: v }))}
+                            onPointer={setLoupe}
+                        />
+                    ))}
+                    {MARKS[view].filter(mark => mark.point).map(mark => (
+                        <MarkPoint
+                            key={mark.key}
+                            label={mark.label}
+                            x={marks[mark.point] ?? 0}
+                            y={marks[mark.key] ?? 0}
+                            frameRef={frameRef}
+                            photoPx={size}
+                            onChange={v => setMarks(m => ({ ...m, [mark.point]: v.x, [mark.key]: v.y }))}
                             onPointer={setLoupe}
                         />
                     ))}
@@ -273,7 +292,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
 
             {read && (
                 <div className="flex flex-col gap-1">
-                    {!scaleSpec && <p className="text-note">No {view === 'front' ? 'width' : 'length'} spec yet, so nothing can be checked.</p>}
+                    {!scaleSpec && <p className="text-note">No {isEndView(view) ? 'width' : 'length'} spec yet, so nothing can be checked.</p>}
                     {view === 'side' && (
                         <>
                             <CheckRow label="Wheelbase" read={read.wheelbase} spec={profile.wheelbase} units={units} limit={SIZE_PHOTO_WHEELBASE_PCT} />

@@ -68,6 +68,8 @@ export const CONSTRUCTED = {
     'size-mark--axle':   'MarkLine builds `size-mark--${kind}`.',
     'size-mark--ground': 'MarkLine builds `size-mark--${kind}`.',
     'size-mark--roof':   'MarkLine builds `size-mark--${kind}`.',
+    'size-mark--underbody': 'MarkLine builds `size-mark--${kind}`.',
+    'size-mark--mirror': 'MarkLine builds `size-mark--${kind}`.',
     'nav-menu-sub':  'NavMenu builds `nav-menu-${level}`.',
     'is-prose':      'RunSpecRows builds `is-${cell.tone}`.',
     'is-charging':   'RunKindBadge builds `run-kind is-${flag.key}` — a test is charging or range.',

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { hasTransparency, removePlainBackground, visibleBounds, trimBox } from '../cutout';
 import {
-    startingMarks, mirrorMarks, carryMarks, photoScale, figuresFromMarks, photoPlacement,
+    startingMarks, mirrorMarks, carryMarks, photoScale, figuresFromMarks, photoPlacement, fillMarks,
 } from '../sizePhotoMarks';
 import { profileFromSpecs } from '../vehicleProfile';
 
@@ -58,7 +58,35 @@ describe('size photo marks', () => {
         expect(m.roof).toBeCloseTo(0.2);
         expect(m.frontAxle).toBeCloseTo(0.1 + 0.2 * 0.8);
         expect(m.rearAxle).toBeCloseTo(0.9 - 0.25 * 0.8);
-        expect(startingMarks('front', bounds)).toEqual({ left: 0.1, right: 0.9, ground: expect.closeTo(0.8), roof: 0.2 });
+        expect(startingMarks('front', bounds)).toMatchObject({ left: 0.1, right: 0.9, ground: expect.closeTo(0.8), roof: 0.2 });
+    });
+
+    it('fills the later marks from the specs: underbody, mirrors, axle heights', () => {
+        const side = fillMarks('side', { front: 0, frontAxle: 0.2, rearAxle: 0.8, rear: 1, ground: 1, roof: 0 },
+            { height: 60, groundClearance: 6, tireDiameter: 30 });
+        expect(side.underbody).toBeCloseTo(0.9);
+        expect(side.frontAxleY).toBeCloseTo(0.75);
+        expect(side.rearAxleY).toBeCloseTo(0.75);
+        const rear = fillMarks('rear', { left: 0.1, right: 0.9, ground: 1, roof: 0 }, { width: 80, widthMirrors: 88 });
+        expect(rear.mirrorLeft).toBeCloseTo(0.06);
+        expect(rear.mirrorRight).toBeCloseTo(0.94);
+        // A mark already placed is kept.
+        expect(fillMarks('front', { left: 0.1, right: 0.9, ground: 1, roof: 0, underbody: 0.5 }).underbody).toBe(0.5);
+    });
+
+    it('mirrors the axle heights and the mirrors with their sides', () => {
+        const side = mirrorMarks('side', { front: 0, frontAxle: 0.2, rearAxle: 0.8, rear: 1, frontAxleY: 0.7, rearAxleY: 0.72 });
+        expect(side.frontAxleY).toBe(0.72);
+        expect(side.rearAxleY).toBe(0.7);
+        const end = mirrorMarks('rear', { left: 0.1, right: 0.9, mirrorLeft: 0.02, mirrorRight: 0.97 });
+        expect(end.mirrorLeft).toBeCloseTo(0.03);
+        expect(end.mirrorRight).toBeCloseTo(0.98);
+    });
+
+    it('reads a rear photo like a front one, from the width spec', () => {
+        const p = photo({ left: 0.2, right: 0.8, ground: 0.9, roof: 0.3 }, 500, 500);
+        expect(photoScale('rear', p, { width: 75 })).toBeCloseTo(4);
+        expect(figuresFromMarks('rear', p, { width: 75 }).height).toBeCloseTo(75);
     });
 
     it('mirrors marks, swapping front for rear', () => {

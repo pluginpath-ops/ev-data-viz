@@ -533,7 +533,7 @@ function sizeFindings(ctx) {
  */
 function sizePhotoFindings(vehicle, ctx) {
     const photos = vehicle.size_photos;
-    if (!photos?.side && !photos?.front) return [];
+    if (!photos?.side && !photos?.front && !photos?.rear) return [];
     const profile = profileFromSpecs(ctx.specs);
     const out = [];
     const note = (view) => {
@@ -551,9 +551,9 @@ function sizePhotoFindings(vehicle, ctx) {
     }
 
     const heights = [];
-    for (const view of ['side', 'front']) {
+    for (const view of ['side', 'front', 'rear']) {
         if (!photos[view]) continue;
-        const read = view === 'side' ? side : figuresFromMarks('front', photos.front, profile);
+        const read = view === 'side' ? side : figuresFromMarks(view, photos[view], profile);
         const h = off(read?.height, profile.height);
         if (h != null && Math.abs(h) > SIZE_PHOTO_HEIGHT_PCT) heights.push({ view, read: oneDp(read.height), pct: h });
     }
