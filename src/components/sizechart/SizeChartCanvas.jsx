@@ -27,8 +27,9 @@ const wheelsEstimated = (p) => p.estimated.has('frontOverhang') || p.estimated.h
  * Each vehicle is its size photo, or an outline in its series color. Either
  * way it stands on a short ground line in that color, so a photo still says
  * whose it is. The largest is drawn first so a smaller one is never hidden
- * behind it; the one under the pointer (or its row in the figures table) comes
- * to the front and the rest fade.
+ * behind it; with more than one, photos are see-through so the cars behind
+ * still show. The one under the pointer (or its row in the figures table)
+ * comes to the front, solid, and the rest fade.
  *
  * Props:
  *   items       [{ id, label, color, profile, photo }] drawable in this view,
@@ -91,7 +92,7 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
         return (
             <svg
                 ref={svgRef}
-                className="size-chart-svg"
+                className={`size-chart-svg${items.length > 1 ? ' is-overlaid' : ''}`}
                 width={widthPx}
                 height={heightPx}
                 role="img"
@@ -121,6 +122,7 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
                         return (
                             <g key={id} className={cls} style={{ '--series': color }} onPointerEnter={() => onActive(id)}>
                                 <image
+                                    className="size-photo"
                                     href={photo.image_url}
                                     x={px(place + x)}
                                     y={py(top)}
