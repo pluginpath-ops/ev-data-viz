@@ -15,14 +15,16 @@ function Slot({ vehicle, view, label, pending }) {
     const own = ownValues(vehicle).size_photos?.[view] ?? null;
     const shown = vehicle.size_photos?.[view] ?? null;
     const inheritedFrom = own ? null : vehicle.inheritedFrom?.sizePhotos?.[view] ?? null;
-    const [editing, setEditing] = useState(null); // { file } | { file: null }
+    // { file, n } | { file: null, n }: n remounts the editor for each new file.
+    const [editing, setEditing] = useState(null);
+    const start = (file) => setEditing(e => ({ file, n: (e?.n ?? 0) + 1 }));
 
     if (editing) {
         return (
             <div className="size-photo-slot">
                 <span className="text-micro">{label}</span>
-                <SizePhotoEditor vehicle={vehicle} view={view} row={editing.file ? null : own}
-                    file={editing.file} onClose={() => setEditing(null)} pending={pending} />
+                <SizePhotoEditor key={editing.n} vehicle={vehicle} view={view} row={editing.file ? null : own}
+                    file={editing.file} onClose={() => setEditing(null)} pending={pending} onPickFile={start} />
             </div>
         );
     }
@@ -42,9 +44,9 @@ function Slot({ vehicle, view, label, pending }) {
                 <label className="image-upload-label">
                     <span className="btn btn-secondary text-sm">{own ? 'Replace' : 'Add photo'}</span>
                     <input type="file" accept="image/*" className="hidden"
-                        onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setEditing({ file: f }); }} />
+                        onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) start(f); }} />
                 </label>
-                {own && <button type="button" className="btn btn-secondary text-sm" onClick={() => setEditing({ file: null })}>Edit</button>}
+                {own && <button type="button" className="btn btn-secondary text-sm" onClick={() => start(null)}>Edit</button>}
                 {own && (
                     <button type="button" className="btn btn-secondary text-sm"
                         onClick={() => { if (window.confirm(`Delete the ${label.toLowerCase()} photo?`)) deleteSizePhoto(vehicle.id, view); }}>

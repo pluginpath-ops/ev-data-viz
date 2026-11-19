@@ -67,8 +67,9 @@ function CheckRow({ label, read, spec, units, limit }) {
  *   file      a newly chosen file, or null
  *   onClose   () => void
  *   pending   Map, view → () => Promise: the form's list of unsaved photo work
+ *   onPickFile (File) => void   start again on another file
  */
-export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pending }) {
+export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pending, onPickFile }) {
     const { vehicles, units, saveSizePhoto, showError } = useAppContext();
     const profile = useMemo(() => profileFromSpecs(resolveEffectiveSpecs(vehicle, vehicles)), [vehicle, vehicles]);
 
@@ -76,6 +77,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
     const [cut, setCut] = useState(null);                 // the original with its background removed
     const [cutout, setCutout] = useState(null);           // canvas of the finished cutout, once changed
     const [needsBackground, setNeedsBackground] = useState(false);
+    const [refused, setRefused] = useState(null);         // why the background couldn't come off: 'busy' | 'empty'
     const [tolerance, setTolerance] = useState(DEFAULT_TOLERANCE);
     const [trim, setTrim] = useState(row?.trim ?? null);
     const [mirrored, setMirrored] = useState(row?.mirrored ?? false);
@@ -91,12 +93,8 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
     // cutout). Marks carry across from the last trim when there were any.
     const applyCut = (source, tol, { keepMarks }) => {
         const res = cutOut(source, tol);
-        if (!res.ok) {
-            setMessage(res.reason === 'busy'
-                ? 'The background is not one plain color. Cut the car out elsewhere and upload the PNG.'
-                : 'Nothing is left once the background is removed. Lower the tolerance.');
-            return;
-        }
+        setRefused(res.ok ? null : res.reason);
+        if (!res.ok) return;
         const finished = finishCutout(res.canvas, res.trim, mirrored);
         setCut(res.canvas);
         setCutout(finished);
@@ -155,6 +153,8 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
     };
 
     const imageSrc = useMemo(() => (cutout ? cutout.toDataURL('image/png') : row?.image_url ?? null), [cutout, row]);
+    // The upload as it came, shown when its background couldn't be removed.
+    const uncut = useMemo(() => (refused && original ? original.toDataURL('image/jpeg', 0.8) : null), [refused, original]);
     const size = cutout ? { w: cutout.width, h: cutout.height } : row ? { w: row.width_px, h: row.height_px } : null;
     const photo = marks && size ? { marks, width_px: size.w, height_px: size.h } : null;
     const read = photo ? figuresFromMarks(view, photo, profile) : null;
@@ -181,8 +181,9 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
     };
 
     // Re-registered every render, so the form always runs the latest state.
+    // Only once there is a photo with marks: a refused upload has nothing to save.
     useEffect(() => {
-        if (!pending) return undefined;
+        if (!pending || !marks || !size) return undefined;
         pending.set(view, persist);
         return () => { pending.delete(view); };
     });
@@ -204,7 +205,26 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
             onKeyDown={e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault(); }}>
             {view === 'side' && <p className="text-note">Side photos face left, front bumper on the left. Flip one that doesn’t.</p>}
 
-            {needsBackground && (
+            {refused === 'busy' && (
+                <div className="flex flex-col gap-2">
+                    <div className="size-photo-thumb"><img src={uncut} alt="The photo as uploaded" /></div>
+                    <p className="text-note status-text is-warning">
+                        This photo’s background can’t be removed here. Only one plain color comes off
+                        (a studio shot on white or gray); this one has sky, scenery or ground behind the car.
+                    </p>
+                    <p className="text-note">
+                        Cut the car out first, then upload that PNG. On a Mac: right-click the file in
+                        Finder, Quick Actions → Remove Background. Or pick a photo on a plain background.
+                    </p>
+                    <label className="image-upload-label self-start">
+                        <span className="btn btn-secondary text-sm">Choose another photo</span>
+                        <input type="file" accept="image/*" className="hidden"
+                            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onPickFile?.(f); }} />
+                    </label>
+                </div>
+            )}
+
+            {needsBackground && refused !== 'busy' && (
                 <div className="inline-row flex-wrap">
                     <label className="text-label" htmlFor={`tol-${view}`}>Background tolerance</label>
                     <input id={`tol-${view}`} type="range" min={4} max={80} value={tolerance}
@@ -216,6 +236,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
                     </button>
                 </div>
             )}
+            {refused === 'empty' && <p className="text-note status-text is-warning">Nothing is left once the background is removed. Lower the tolerance and press Remove background.</p>}
             {message && <p className="text-note status-text is-warning">{message}</p>}
             {working && !imageSrc && <p className="text-meta">Reading the photo…</p>}
 
@@ -265,6 +286,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
             )}
             {outOfOrder && <p className="text-note status-text is-warning">The marks are out of order: {ORDER[view].map(k => MARKS[view].find(m => m.key === k).label.toLowerCase()).join(', then ')}.</p>}
 
+            {imageSrc && (<>
             <div className="size-photo-fields">
                 {/* Text, not type="url": this sits inside the vehicle form, whose
                     submit a bare "www.…" would otherwise block. */}
@@ -276,16 +298,20 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
                 </label>
             </div>
 
+            </>)}
+
             <div className="inline-row flex-wrap">
-                <button type="button" className="btn btn-secondary text-sm" disabled={working || !imageSrc} onClick={flip}>Flip</button>
-                {row?.original_url && !file && (
+                {imageSrc && <button type="button" className="btn btn-secondary text-sm" disabled={working} onClick={flip}>Flip</button>}
+                {imageSrc && row?.original_url && !file && (
                     <button type="button" className="btn btn-secondary text-sm" disabled={working} onClick={redoCutout}>Redo cutout</button>
                 )}
                 <span className="flex-1" />
                 <button type="button" className="btn btn-secondary text-sm" disabled={working} onClick={onClose}>Cancel</button>
-                <button type="button" className="btn btn-primary text-sm" disabled={working || !marks || outOfOrder || !size} onClick={save}>
-                    {working ? 'Saving…' : 'Save'}
-                </button>
+                {imageSrc && (
+                    <button type="button" className="btn btn-primary text-sm" disabled={working || !marks || outOfOrder || !size} onClick={save}>
+                        {working ? 'Saving…' : 'Save'}
+                    </button>
+                )}
             </div>
         </div>
     );
