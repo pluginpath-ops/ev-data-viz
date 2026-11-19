@@ -5,13 +5,28 @@
  *
  * An SVG loaded as an image sees none of the page's CSS, so every element's
  * computed paint is written onto a copy first — which is also what resolves
- * the theme's tokens and each vehicle's `--series` color.
+ * the theme's tokens and each vehicle's `--series` color. Likewise an
+ * `<image>` (a size photo) is inlined as a data URL, since an SVG drawn as an
+ * image may not load anything outside itself.
  */
 
 const PAINT = [
     'fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-dasharray',
-    'stroke-linejoin', 'opacity', 'font-family', 'font-size', 'font-weight', 'font-variant-numeric',
+    'stroke-linejoin', 'stroke-linecap', 'opacity', 'font-family', 'font-size', 'font-weight', 'font-variant-numeric',
 ];
+
+/** A URL's bytes as a data URL; the photo's host must allow the fetch (Storage's public bucket does). */
+async function dataUrlOf(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const blob = await res.blob();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
 
 /**
  * @param {SVGSVGElement} svg  on screen, laid out
@@ -35,6 +50,12 @@ export async function svgToCanvas(svg) {
         to[i].removeAttribute('class');
     });
     copy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    await Promise.all([...copy.querySelectorAll('image')].map(async (el) => {
+        const href = el.getAttribute('href');
+        if (!href || href.startsWith('data:')) return;
+        // A photo that can't be fetched is left out of the image, not the whole export.
+        try { el.setAttribute('href', await dataUrlOf(href)); } catch { el.remove(); }
+    }));
 
     const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(copy))}`;
     const img = new Image();

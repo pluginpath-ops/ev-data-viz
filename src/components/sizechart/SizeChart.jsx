@@ -5,8 +5,12 @@ import { resolveEffectiveSpecs } from '../../utils/specHelpers';
 import { buildVehicleLabels } from '../../utils/seriesLabel';
 import { profileFromSpecs } from '../../utils/vehicleProfile';
 import { gridStepIn } from '../../utils/sizeChartLayout';
-import { SIZE_ANCHORS, SIZE_VIEWS, DEFAULT_SIZE_ANCHOR, DEFAULT_SIZE_VIEW } from '../../constants/sizeChart';
+import {
+    SIZE_ANCHORS, SIZE_VIEWS, SIZE_DRAWS, DEFAULT_SIZE_ANCHOR, DEFAULT_SIZE_VIEW, DEFAULT_SIZE_DRAW,
+} from '../../constants/sizeChart';
+import { photoPlacement } from '../../utils/sizePhotoMarks';
 import { useSourceLine } from '../../hooks/useSourceLine';
+import { sourceLineText } from '../../utils/sources';
 import { useChartPng } from '../../hooks/useChartPng';
 import PlotFrame from '../charts/PlotFrame';
 import CopyLinkButton from '../charts/CopyLinkButton';
@@ -18,18 +22,29 @@ import SizeFiguresTable from './SizeFiguresTable';
 
 const nameList = (items) => items.map(i => i.label).join(', ');
 
+/** A photo's credit for the source line: its credit, else its source's site. */
+function creditOf(photo) {
+    let name = photo.credit?.trim();
+    if (!name && photo.source_url) {
+        try { name = new URL(photo.source_url).hostname.replace(/^www\./, ''); } catch { name = null; }
+    }
+    return name ? { name: photo.mirrored ? `${name} (mirrored)` : name, url: photo.source_url || null } : null;
+}
+
 /**
  * The Size chart: the selected vehicles drawn to one scale from their
  * dimension specs, side or front, lined up on a point the reader picks.
  *
- * The outlines are silhouettes (utils/silhouettes.js), not photos: a body
- * style's shape stretched to each vehicle's own length, height, wheelbase and
- * overhangs. What a vehicle lacks is said under the chart — left out for want
- * of a length, height or wheelbase; drawn with its axles estimated for want of
- * a front overhang.
+ * Each vehicle is its size photo (docs/size-photos-plan.md), scaled from its
+ * length spec (front: width), when it has one and Draw is Photos; otherwise a
+ * silhouette (utils/silhouettes.js), a body style's shape stretched to its own
+ * length, height, wheelbase and overhangs. What a vehicle lacks is said under
+ * the chart — left out for want of a length, height or wheelbase; drawn with
+ * its axles estimated for want of a front overhang.
  *
- * Settings are App's chartConfig (`sizeView`, `sizeAnchor` in the link;
- * `sizeLines`, `sizeGrid` for this visit), so the pop-out draws the same chart.
+ * Settings are App's chartConfig (`sizeView`, `sizeAnchor`, `sizeDraw` in the
+ * link; `sizeLines`, `sizeGrid` for this visit), so the pop-out draws the same
+ * chart.
  */
 export default function SizeChart({ vehicles, chartConfig, setChartConfig, presentationMode = false }) {
     const { units, vehicles: allVehicles } = useAppContext();
@@ -37,6 +52,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     const anchor = SIZE_ANCHORS.some(a => a.key === chartConfig.sizeAnchor) ? chartConfig.sizeAnchor : DEFAULT_SIZE_ANCHOR;
     const lines = chartConfig.sizeLines ?? true;
     const grid = chartConfig.sizeGrid ?? true;
+    const draw = SIZE_DRAWS.some(d => d.key === chartConfig.sizeDraw) ? chartConfig.sizeDraw : DEFAULT_SIZE_DRAW;
     const [activeId, setActiveId] = useState(null);
 
     // A vehicle's color is the same here as on every chart.
@@ -48,13 +64,20 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
 
     const all = useMemo(() => {
         const labels = buildVehicleLabels(vehicles);
-        return vehicles.map(v => ({
-            id: v.id,
-            label: labels.get(v.id)?.short ?? v.name,
-            color: colorMap[v.id],
-            profile: profileFromSpecs(resolveEffectiveSpecs(v, allVehicles)),
-        }));
-    }, [vehicles, allVehicles, colorMap]);
+        return vehicles.map(v => {
+            const profile = profileFromSpecs(resolveEffectiveSpecs(v, allVehicles), v.size_photos);
+            const photo = draw === 'photos' ? v.size_photos?.[view] ?? null : null;
+            // A photo the specs can't scale (no length, or no width from the front) isn't drawn.
+            const placement = photo ? photoPlacement(view, photo, profile) : null;
+            return {
+                id: v.id,
+                label: labels.get(v.id)?.short ?? v.name,
+                color: colorMap[v.id],
+                profile,
+                photo: placement ? { ...photo, placement } : null,
+            };
+        });
+    }, [vehicles, allVehicles, colorMap, draw, view]);
 
     const drawn = useMemo(() => all.filter(i => i.profile.missing[view].length === 0), [all, view]);
     const left = all.filter(i => i.profile.missing[view].length > 0);
@@ -67,7 +90,9 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
             (() => { const e = drawn.filter(i => i.profile.estimated.has('width')); return e.length > 0 && `Body width estimated from the width with mirrors: ${nameList(e)}.`; })(),
             (() => { const e = drawn.filter(i => i.profile.estimated.has('trackFront')); return e.length > 0 && `Track estimated: ${nameList(e)}.`; })(),
         ]),
-        (() => { const e = drawn.filter(i => i.profile.estimated.has('bodyStyle')); return e.length > 0 && `Generic outline (no body style): ${nameList(e)}.`; })(),
+        (() => { const e = drawn.filter(i => !i.photo && i.profile.estimated.has('bodyStyle')); return e.length > 0 && `Generic outline (no body style): ${nameList(e)}.`; })(),
+        view === 'side' && (() => { const e = drawn.filter(i => i.profile.fromPhoto.has('frontOverhang')); return e.length > 0 && `Front and rear overhang split as the photo shows it (no front overhang spec): ${nameList(e)}.`; })(),
+        (() => { const e = drawn.filter(i => i.photo?.mirrored); return e.length > 0 && `Mirrored photo (the other side of the car, flipped): ${nameList(e)}.`; })(),
     ].filter(Boolean);
 
     const onChange = (patch) => setChartConfig(p => ({ ...p, ...patch }));
@@ -78,12 +103,21 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
         units === 'metric' ? 'metric' : 'imperial',
         view === 'side' ? `lined up on the ${anchorLabel}` : null,
         gridNote,
-        'outlines are generic shapes; the figures are the specs',
+        drawn.every(i => i.photo) ? 'photos scaled to the specs' : 'outlines are generic shapes; the figures are the specs',
     ].filter(Boolean).join(' · ');
-    const sourceLine = useSourceLine({});
+    const dataLine = useSourceLine({});
+    const sourceLine = useMemo(() => {
+        const seen = new Map();
+        for (const i of drawn) {
+            const c = i.photo && creditOf(i.photo);
+            if (c && !seen.has(c.name)) seen.set(c.name, c);
+        }
+        const photos = [...seen.values()];
+        return photos.length ? { ...dataLine, photos, text: sourceLineText({ ...dataLine, photos }, dataLine.showGaps) } : dataLine;
+    }, [dataLine, drawn]);
     const exportRef = useRef(null);
     const { copyPng, copied: imageCopied, preview, dismissPreview } = useChartPng(exportRef, {
-        title, subtitle, sources: sourceLine.text, signature: `${drawn.map(i => i.id).join(',')}|${anchor}`,
+        title, subtitle, sources: sourceLine.text, signature: `${drawn.map(i => i.id).join(',')}|${anchor}|${draw}`,
     });
 
     // One tree, like every chart's: the pop-out drops the sidebar, and the
@@ -91,7 +125,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     return (
         <div className="chart-layout">
             {!presentationMode && (
-                <SizeChartSidebar view={view} anchor={anchor} lines={lines} grid={grid} onChange={onChange} />
+                <SizeChartSidebar view={view} anchor={anchor} draw={draw} lines={lines} grid={grid} onChange={onChange} />
             )}
             <div className="chart-main">
             <PlotFrame

@@ -6,15 +6,16 @@ import { fmtDimension } from '../../utils/unitConversions';
  *
  * A figure the drawing filled with a stand-in is shown as "est." where the
  * stand-in still says something (the axles placed by a typical overhang split)
- * and as a blank where it would only be a guess dressed as a figure.
+ * and as a blank where it would only be a guess dressed as a figure. A figure
+ * read off the vehicle's size photo is marked "photo": measured, not a spec.
  */
 const COLUMNS = {
     side: [
         { key: 'length',          label: 'Length' },
         { key: 'height',          label: 'Height' },
         { key: 'wheelbase',       label: 'Wheelbase' },
-        { key: 'frontOverhang',   label: 'Front overhang', est: 'frontOverhang', show: true },
-        { key: 'rearOverhang',    label: 'Rear overhang',  est: 'frontOverhang', show: true },
+        { key: 'frontOverhang',   label: 'Front overhang', est: 'frontOverhang', show: true, photo: 'frontOverhang' },
+        { key: 'rearOverhang',    label: 'Rear overhang',  est: 'frontOverhang', show: true, photo: 'frontOverhang' },
         { key: 'groundClearance', label: 'Clearance',      est: 'groundClearance' },
     ],
     front: [
@@ -30,7 +31,7 @@ function cellOf(profile, col) {
     const value = profile[col.key];
     const estimated = col.est ? profile.estimated.has(col.est) : false;
     if (value == null || (estimated && !col.show)) return { value: null, estimated: false };
-    return { value, estimated };
+    return { value, estimated, fromPhoto: col.photo ? profile.fromPhoto.has(col.photo) : false };
 }
 
 const signed = (diff, units) => (Math.abs(diff) < 0.05 ? '±0' : `${diff > 0 ? '+' : '−'}${fmtDimension(Math.abs(diff), units)}`);
@@ -72,6 +73,7 @@ export default function SizeFiguresTable({ items, view, units, activeId, onActiv
                                             <>
                                                 <span className="size-figure">{fmtDimension(cell.value, units)}</span>
                                                 {cell.estimated && <span className="text-meta"> est.</span>}
+                                                {cell.fromPhoto && <span className="text-meta" title="Read off the size photo's marks"> photo</span>}
                                                 {diff != null && <div className="text-meta">{signed(diff, units)}</div>}
                                             </>
                                         )}

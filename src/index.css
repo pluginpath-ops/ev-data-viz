@@ -3743,7 +3743,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: var(--color-text-meta);
 }
 .plot-frame-sources > * + *::before { content: '·'; margin-right: 6px; color: var(--color-text-faint); }
-.plot-frame-sources > span:first-child + *::before { content: none; }
+.plot-frame-sources > .plot-frame-sources-label + *::before { content: none; }
 .plot-frame-sources a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
 .plot-frame-sources a:hover { color: var(--color-text-primary); }
 .plot-frame-sources-gap { color: var(--color-warning-text, var(--color-text-meta)); }
@@ -6563,6 +6563,8 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .size-silhouette rect.size-wheel.is-estimated { stroke-dasharray: 4 3; }
 .size-silhouette.is-active .size-body { fill-opacity: 0.3; stroke-width: 3; }
 .size-silhouette.is-quiet { opacity: 0.45; }
+.size-silhouette .size-photo-ground { stroke: var(--series); stroke-width: 3; stroke-linecap: round; }
+.size-silhouette.is-active .size-photo-ground { stroke-width: 5; }
 
 .size-callout text {
     fill: var(--color-text-value);

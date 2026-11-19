@@ -23,6 +23,13 @@ export const SIZE_VIEWS = [
 ];
 export const DEFAULT_SIZE_VIEW = 'side';
 
+/** What a vehicle is drawn as: its size photo when it has one, or always the outline. */
+export const SIZE_DRAWS = [
+    { key: 'photos', label: 'Photos' },
+    { key: 'outlines', label: 'Outlines' },
+];
+export const DEFAULT_SIZE_DRAW = 'photos';
+
 /** The outline drawn when a vehicle has no body style. */
 export const FALLBACK_BODY_STYLE = 'Crossover';
 

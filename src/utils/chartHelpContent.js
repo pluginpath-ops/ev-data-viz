@@ -484,12 +484,14 @@ export const CHART_HELP_DEFAULTS = {
         data_source:
             'The selected vehicles drawn to one scale from their dimension specs: length, height, ' +
             'wheelbase, front overhang, width (with and without mirrors), track, ground clearance and ' +
-            'tire size. Each outline is a generic shape for the vehicle’s body style, stretched to its ' +
-            'own figures — it is not a photo of the car.',
+            'tire size. A vehicle with a size photo is drawn as that photo, scaled so its bumpers span ' +
+            'the length spec (from the front, its body edges span the width). Otherwise its outline is ' +
+            'a generic shape for its body style, stretched to its own figures. Draw: Outlines shows ' +
+            'outlines for every vehicle.',
         how_to_read:
             'From the side, the vehicles stand on one ground line, lined up on the point you pick: a ' +
             'bumper, an axle, or the middle of the wheelbase or the length. From the front, they share ' +
-            'a centerline. Each vehicle is outlined in its series color; point at one, or its row in the ' +
+            'a centerline. Each vehicle is in its series color (a photo stands on a line in it); point at one, or its row in the ' +
             'table, to bring it forward. The lines below the ground give each vehicle’s length (dots ' +
             'mark the axles) or width (the lighter line reaches the mirrors). The table compares every ' +
             'figure with the first vehicle’s.',
@@ -498,6 +500,7 @@ export const CHART_HELP_DEFAULTS = {
             'Overhang — bumper to the nearest axle. Rear overhang is length less wheelbase and front overhang.\n' +
             'Track — center of one tire to the center of the other, across the vehicle.\n' +
             'Est. — drawn from a typical value because the spec is missing; the notes under the chart list which.\n' +
+            'Photo — an overhang split as the size photo shows it, because the front overhang spec is missing.\n' +
             'Units follow your imperial/metric toggle.',
         math_approach:
             'No calculation beyond placing the figures: one scale fits the widest drawing to the frame. ' +

@@ -3,6 +3,7 @@ import { hasTransparency, removePlainBackground, visibleBounds, trimBox } from '
 import {
     startingMarks, mirrorMarks, carryMarks, photoScale, figuresFromMarks, photoPlacement,
 } from '../sizePhotoMarks';
+import { profileFromSpecs } from '../vehicleProfile';
 
 /** A w×h image of `bg`, with a `fg` box from (x0,y0) to (x1,y1) exclusive. */
 function image(w, h, bg, fg, [x0, y0, x1, y1]) {
@@ -101,4 +102,20 @@ describe('size photo marks', () => {
         expect(photoPlacement('front', fp, { width: 75 })).toEqual({ x: expect.closeTo(-62.5), top: expect.closeTo(118.75), w: expect.closeTo(125), h: expect.closeTo(125) });
     });
 
+    it('fills a missing front overhang from the side photo, and never overrides a spec', () => {
+        const dims = { length_in: 200, height_in: 60, wheelbase_in: 125 };
+        const side = photo({ front: 0.1, frontAxle: 0.3, rearAxle: 0.8, rear: 0.9, ground: 0.9 });
+        const p = profileFromSpecs({ dimensions: dims }, { side });
+        expect(p.frontOverhang).toBeCloseTo(50);
+        expect(p.fromPhoto.has('frontOverhang')).toBe(true);
+        expect(p.estimated.has('frontOverhang')).toBe(false);
+        // A photo whose wheelbase reads long still splits only the specs' 75 in.
+        const off = photo({ front: 0.1, frontAxle: 0.25, rearAxle: 0.85, rear: 0.9, ground: 0.9 });
+        const split = profileFromSpecs({ dimensions: dims }, { side: off });
+        expect(split.frontOverhang + split.rearOverhang).toBeCloseTo(75);
+        expect(split.frontOverhang).toBeCloseTo(75 * (0.15 / 0.2));
+        const spec = profileFromSpecs({ dimensions: { ...dims, front_overhang_in: 40 } }, { side });
+        expect(spec.frontOverhang).toBe(40);
+        expect(spec.fromPhoto.size).toBe(0);
+    });
 });

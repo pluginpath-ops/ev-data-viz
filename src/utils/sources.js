@@ -361,8 +361,11 @@ export function attributionFor({ runs = [], sources = [], runById = () => undefi
  * `showGaps` is the curator's: it says how many plotted runs have no source.
  * Empty when there is nothing to say.
  */
-export function sourceLineText({ entries = [], unattributed = 0 } = {}, showGaps = false) {
+export function sourceLineText({ entries = [], unattributed = 0, photos = [] } = {}, showGaps = false) {
     const parts = entries.map(e => e.name);
     if (showGaps && unattributed > 0) parts.push(`⚠ ${unattributed} unattributed`);
-    return parts.length ? `Data: ${parts.join(' · ')}` : '';
+    return [
+        parts.length ? `Data: ${parts.join(' · ')}` : '',
+        photos.length ? `Photos: ${photos.map(e => e.name).join(' · ')}` : '',
+    ].filter(Boolean).join(' · ');
 }

@@ -68,6 +68,8 @@ const NAMES_V1 = [
     'hc',
     // The Size chart's view and alignment.
     'sv', 'sa',
+    // Photos or outlines on the Size chart.
+    'sd',
 ];
 
 // Values that recur: tabs, modes, axes, chart types, units, presets, and the
@@ -136,6 +138,8 @@ const WORDS_V1 = [
     'specsize', 'side', 'front', 'frontAxle', 'wheelbaseCenter', 'lengthCenter', 'rearAxle', 'rear',
     'dimensions.body_style', 'dimensions.width_mirrors_in', 'dimensions.front_overhang_in',
     'dimensions.track_front_in', 'dimensions.track_rear_in',
+    // The Size chart's Draw setting (`sd`).
+    'photos', 'outlines',
 ];
 
 /**

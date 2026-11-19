@@ -125,7 +125,16 @@ describe('Size chart', () => {
 
     it('writes its defaults out for a short link', () => {
         const out = new URLSearchParams(withDefaultsWrittenOut('tab=specifications&m=specsize'));
-        expect([out.get('sv'), out.get('sa')]).toEqual(['side', 'front']);
+        expect([out.get('sv'), out.get('sa'), out.get('sd')]).toEqual(['side', 'front', 'photos']);
+    });
+
+    it('writes Outlines, reads it back, and reads absent as Photos', () => {
+        const q = build({ chartMode: 'specsize', chartConfig: { ...baseConfig(), sizeDraw: 'outlines' } });
+        expect(q).toContain('sd=outlines');
+        expect(chartConfigFromParsed(parseChartUrl(q).chart, baseConfig()).sizeDraw).toBe('outlines');
+        const plain = build({ chartMode: 'specsize', chartConfig: { ...baseConfig(), sizeDraw: 'photos' } });
+        expect(plain).not.toContain('sd=');
+        expect(chartConfigFromParsed(parseChartUrl(plain).chart, { ...baseConfig(), sizeDraw: 'outlines' }).sizeDraw).toBe('photos');
     });
 });
 

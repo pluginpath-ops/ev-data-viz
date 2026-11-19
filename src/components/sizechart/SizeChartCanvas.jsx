@@ -24,12 +24,15 @@ const wheelsEstimated = (p) => p.estimated.has('frontOverhang') || p.estimated.h
  * The Size chart's drawing: the selected vehicles to one scale, laid over each
  * other on one ground line, with a dimension line per vehicle below.
  *
- * Each vehicle is outlined in its series color. The largest is drawn first so a
- * smaller one is never hidden behind it; the one under the pointer (or its row
- * in the figures table) comes to the front.
+ * Each vehicle is its size photo, or an outline in its series color. Either
+ * way it stands on a short ground line in that color, so a photo still says
+ * whose it is. The largest is drawn first so a smaller one is never hidden
+ * behind it; the one under the pointer (or its row in the figures table) comes
+ * to the front and the rest fade.
  *
  * Props:
- *   items       [{ id, label, color, profile }] drawable in this view, selection order
+ *   items       [{ id, label, color, profile, photo }] drawable in this view,
+ *               selection order; `photo` (with its `placement`, in inches) or null
  *   view        'side' | 'front'
  *   anchor      a SIZE_ANCHORS key (side view)
  *   units       'imperial' | 'metric'
@@ -106,11 +109,29 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
                 )}
                 <line className="size-ground" x1={SIZE_MARGIN.left} x2={right} y1={groundY} y2={groundY} />
 
-                {drawOrder.map(({ id, color, profile: p }) => {
+                {drawOrder.map(({ id, color, profile: p, photo }) => {
                     const shape = shapes.get(id);
-                    const x0 = px(places.get(id));
+                    const place = places.get(id);
+                    const x0 = px(place);
                     const dashed = view === 'side' ? wheelsEstimated(p) : p.estimated.has('trackFront') || p.estimated.has('tireDiameter');
                     const cls = `size-silhouette${activeId === id ? ' is-active' : ''}${activeId && activeId !== id ? ' is-quiet' : ''}`;
+                    if (photo) {
+                        const { x, top, w, h } = photo.placement;
+                        const [g0, g1] = view === 'front' ? [-p.width / 2, p.width / 2] : [0, p.length];
+                        return (
+                            <g key={id} className={cls} style={{ '--series': color }} onPointerEnter={() => onActive(id)}>
+                                <image
+                                    href={photo.image_url}
+                                    x={px(place + x)}
+                                    y={py(top)}
+                                    width={w * scale}
+                                    height={h * scale}
+                                    preserveAspectRatio="none"
+                                />
+                                <line className="size-photo-ground" x1={px(place + g0)} x2={px(place + g1)} y1={groundY} y2={groundY} />
+                            </g>
+                        );
+                    }
                     return (
                         <g
                             key={id}

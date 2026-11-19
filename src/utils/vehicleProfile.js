@@ -12,10 +12,15 @@
  * have no stand-in: without them the side view leaves the vehicle out and
  * `missing.side` says why. The front view needs a width and the height.
  *
+ * A size photo (docs/size-photos-plan.md) fills one gap: the front overhang,
+ * read from its axle marks at the length spec's scale. That goes in
+ * `fromPhoto`, not `estimated`. A recorded spec always wins over a photo.
+ *
  * Pure module.
  */
 
 import { parseTireSize } from './tireSize';
+import { figuresFromMarks } from './sizePhotoMarks';
 import {
     BODY_SHAPES, FALLBACK_BODY_STYLE, FALLBACK_GROUND_CLEARANCE_IN, FALLBACK_SIDEWALLS_IN,
     FALLBACK_TIRE_WIDTH_IN, FALLBACK_TRACK_SHARE, FALLBACK_BODY_WIDTH_SHARE,
@@ -28,12 +33,14 @@ const positive = (v) => {
 
 /**
  * @param {object} specs   a vehicle's effective specs (specHelpers.resolveEffectiveSpecs)
+ * @param {object} [photos]  its size photos, `{ side?, front? }`
  * @returns {object} the profile; see the module note
  */
-export function profileFromSpecs(specs) {
+export function profileFromSpecs(specs, photos = null) {
     const dims = specs?.dimensions ?? {};
     const wheels = specs?.wheels ?? {};
     const estimated = new Set();
+    const fromPhoto = new Set();
 
     const length = positive(dims.length_in);
     const height = positive(dims.height_in);
@@ -47,6 +54,17 @@ export function profileFromSpecs(specs) {
     const overhangs = length && wheelbase && length > wheelbase ? length - wheelbase : null;
     let frontOverhang = positive(dims.front_overhang_in);
     if (frontOverhang != null && (overhangs == null || frontOverhang >= overhangs)) frontOverhang = null;
+    if (frontOverhang == null && overhangs != null && photos?.side) {
+        // The photo's SPLIT of the overhangs, applied to the specs' total, so
+        // front + rear always equals length − wheelbase whatever the photo's
+        // small errors of scale.
+        const read = figuresFromMarks('side', photos.side, { length });
+        const total = (read?.frontOverhang ?? 0) + (read?.rearOverhang ?? 0);
+        if (read?.frontOverhang > 0 && read?.rearOverhang > 0) {
+            frontOverhang = overhangs * (read.frontOverhang / total);
+            fromPhoto.add('frontOverhang');
+        }
+    }
     if (frontOverhang == null && overhangs != null) {
         frontOverhang = overhangs * BODY_SHAPES[bodyStyle].frontShare;
         estimated.add('frontOverhang');
@@ -89,7 +107,7 @@ export function profileFromSpecs(specs) {
     return {
         length, height, wheelbase, frontOverhang, rearOverhang, groundClearance,
         width, widthMirrors, trackFront, trackRear, tireDiameter, tireWidth, rim,
-        bodyStyle, estimated, missing,
+        bodyStyle, estimated, fromPhoto, missing,
     };
 }
 

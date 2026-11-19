@@ -1,13 +1,13 @@
 import SidebarDisplaySection from '../SidebarDisplaySection';
 import AnchorIcon from './AnchorIcon';
-import { SIZE_ANCHORS, SIZE_VIEWS } from '../../constants/sizeChart';
+import { SIZE_ANCHORS, SIZE_VIEWS, SIZE_DRAWS } from '../../constants/sizeChart';
 
 /**
  * The Size chart's sidebar: which view, what the vehicles are lined up on, and
- * Display. The vehicles are the selection, picked from the chips like every
+ * Display (photos or outlines, lines, grid). The vehicles are the selection, picked from the chips like every
  * chart's.
  */
-export default function SizeChartSidebar({ view, anchor, lines, grid, onChange }) {
+export default function SizeChartSidebar({ view, anchor, draw, lines, grid, onChange }) {
     return (
         <aside className="chart-rail">
             <div className="chart-rail-group">
@@ -48,6 +48,19 @@ export default function SizeChartSidebar({ view, anchor, lines, grid, onChange }
             )}
 
             <SidebarDisplaySection title="Display">
+                <div className="segmented" role="group" aria-label="Draw">
+                    {SIZE_DRAWS.map(d => (
+                        <button
+                            key={d.key}
+                            type="button"
+                            className={draw === d.key ? 'active' : ''}
+                            aria-pressed={draw === d.key}
+                            onClick={() => onChange({ sizeDraw: d.key })}
+                        >
+                            {d.label}
+                        </button>
+                    ))}
+                </div>
                 <div className="chart-toggles">
                     <label className="toggle-label">
                         <input type="checkbox" checked={lines} onChange={e => onChange({ sizeLines: e.target.checked })} />
