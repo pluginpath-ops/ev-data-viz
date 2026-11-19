@@ -33,8 +33,7 @@ export const isEndView = (view) => view !== 'side';
  * and `rearAxle` are their x, `frontAxleY` and `rearAxleY` their y (the wheel
  * centers), dragged together as one dot (`point` names the x it goes with).
  * `underbody` is the lowest point of the body, for ground clearance; front and
- * rear, `mirrorLeft` and `mirrorRight` are the mirrors' outer edges (they
- * stretch the photo to the width with mirrors, see photoPlacement), and
+ * rear, `mirrorLeft` and `mirrorRight` are the mirrors' outer edges, and
  * `trackLeft` and `trackRight` the centers of the tires where they meet the
  * ground (the track: front track on the front photo, rear on the rear). The
  * axle heights and underbody are recorded for later use (#603).
@@ -225,26 +224,8 @@ export function photoPlacement(view, photo, profile) {
     };
 
     if (isEndView(view)) {
-        // Across in three pieces when both widths are specs and the mirrors are
-        // marked outside the body: the body edges land on the width and the
-        // mirror tips on the width with mirrors. Mirrors sit further from the
-        // camera than the body, so one scale would draw them too narrow (or the
-        // body too wide). With the width only a stand-in, the mirrors alone.
         const half = profile.width / 2;
-        const mh = profile.widthMirrors / 2;
-        const mirrors = mh > half && m.mirrorLeft < m.left && m.right < m.mirrorRight;
-        if (mirrors && profile.estimated?.has('width')) {
-            return { top, h, slices: [piece(0, 1, m.mirrorLeft, -mh, m.mirrorRight, mh)] };
-        }
-        if (!mirrors) return { top, h, slices: [piece(0, 1, m.left, -half, m.right, half)] };
-        return {
-            top, h,
-            slices: [
-                piece(0, m.left, m.mirrorLeft, -mh, m.left, -half),
-                piece(m.left, m.right, m.left, -half, m.right, half),
-                piece(m.right, 1, m.right, half, m.mirrorRight, mh),
-            ],
-        };
+        return { top, h, slices: [piece(0, 1, m.left, -half, m.right, half)] };
     }
     const { length, wheelbase, frontOverhang } = profile;
     const axles = m.front < m.frontAxle && m.frontAxle < m.rearAxle && m.rearAxle < m.rear

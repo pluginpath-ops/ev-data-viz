@@ -17,6 +17,15 @@ export const SIZE_ANCHORS = [
 ];
 export const DEFAULT_SIZE_ANCHOR = 'front';
 
+/** What the front and rear views can line vehicles up on: the centerline, or one side's landmark. */
+export const SIZE_END_ANCHORS = [
+    { key: 'centerline', label: 'Centerline' },
+    { key: 'leftMirror', label: 'Left mirror' },
+    { key: 'leftBody',   label: 'Left body edge' },
+    { key: 'leftTire',   label: 'Left tire' },
+];
+export const DEFAULT_SIZE_END_ANCHOR = 'centerline';
+
 export const SIZE_VIEWS = [
     { key: 'side',  label: 'Side' },
     { key: 'front', label: 'Front' },

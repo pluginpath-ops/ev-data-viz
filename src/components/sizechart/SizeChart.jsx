@@ -7,7 +7,7 @@ import { profileFromSpecs } from '../../utils/vehicleProfile';
 import { gridStepIn } from '../../utils/sizeChartLayout';
 import {
     SIZE_ANCHORS, SIZE_VIEWS, SIZE_DRAWS, DEFAULT_SIZE_ANCHOR, DEFAULT_SIZE_VIEW, DEFAULT_SIZE_DRAW,
-    SIZE_PHOTO_CHART_PCT, DEFAULT_SIZE_PHOTO_OPACITY,
+    SIZE_PHOTO_CHART_PCT, DEFAULT_SIZE_PHOTO_OPACITY, SIZE_END_ANCHORS, DEFAULT_SIZE_END_ANCHOR,
 } from '../../constants/sizeChart';
 import { photoPlacement, figuresFromMarks, isEndView, trackKeyOf } from '../../utils/sizePhotoMarks';
 import { useSourceLine } from '../../hooks/useSourceLine';
@@ -57,7 +57,7 @@ function creditOf(photo) {
  * the chart — left out for want of a length, height or wheelbase; drawn with
  * its axles estimated for want of a front overhang.
  *
- * Settings are App's chartConfig (`sizeView`, `sizeAnchor`, `sizeDraw` in the
+ * Settings are App's chartConfig (`sizeView`, `sizeAnchor`, `sizeEndAnchor`, `sizeDraw` in the
  * link; `sizeLines`, `sizeGrid`, `sizeOpacity` for this visit), so the pop-out
  * draws the same chart. A click on a vehicle (or its row) picks the one the
  * figures are measured from, and keeps it forward; a second click lets go.
@@ -66,6 +66,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     const { units, vehicles: allVehicles } = useAppContext();
     const view = SIZE_VIEWS.some(v => v.key === chartConfig.sizeView) ? chartConfig.sizeView : DEFAULT_SIZE_VIEW;
     const anchor = SIZE_ANCHORS.some(a => a.key === chartConfig.sizeAnchor) ? chartConfig.sizeAnchor : DEFAULT_SIZE_ANCHOR;
+    const endAnchor = SIZE_END_ANCHORS.some(a => a.key === chartConfig.sizeEndAnchor) ? chartConfig.sizeEndAnchor : DEFAULT_SIZE_END_ANCHOR;
     const lines = chartConfig.sizeLines ?? true;
     const grid = chartConfig.sizeGrid ?? true;
     const draw = SIZE_DRAWS.some(d => d.key === chartConfig.sizeDraw) ? chartConfig.sizeDraw : DEFAULT_SIZE_DRAW;
@@ -115,19 +116,18 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
         (() => { const e = drawn.filter(i => !i.photo && i.profile.estimated.has('bodyStyle')); return e.length > 0 && `Generic outline (no body style): ${nameList(e)}.`; })(),
         view === 'side' && (() => { const e = drawn.filter(i => i.profile.fromPhoto.has('frontOverhang')); return e.length > 0 && `Front and rear overhang split as the photo shows it (no front overhang spec): ${nameList(e)}.`; })(),
         (() => { const e = drawn.filter(i => i.photo?.mirrored); return e.length > 0 && `Mirrored photo (the other side of the car, flipped): ${nameList(e)}.`; })(),
-        (() => {
-            const e = drawn.filter(i => i.photo).map(i => [i, photoErrors(view, i)]).filter(([, errs]) => errs.length);
-            return e.length > 0 && `Photo marks off the specs by more than ${SIZE_PHOTO_CHART_PCT}% (drawn to the specs; the photo may be distorted): ${e.map(([i, errs]) => `${i.label} (${errs.join(', ')})`).join('; ')}.`;
-        })(),
+        // One line per vehicle.
+        ...drawn.filter(i => i.photo).map(i => [i, photoErrors(view, i)]).filter(([, errs]) => errs.length)
+            .map(([i, errs]) => `${i.label}: photo marks off the specs by more than ${SIZE_PHOTO_CHART_PCT}% (${errs.join(', ')}); drawn to the specs, the photo may be distorted.`),
     ].filter(Boolean);
 
     const onChange = (patch) => setChartConfig(p => ({ ...p, ...patch }));
-    const anchorLabel = SIZE_ANCHORS.find(a => a.key === anchor).label.toLowerCase();
+    const anchorLabel = (isEndView(view) ? SIZE_END_ANCHORS.find(a => a.key === endAnchor) : SIZE_ANCHORS.find(a => a.key === anchor)).label.toLowerCase();
     const title = `Size, from the ${view}`;
     const gridNote = grid ? `grid ${units === 'metric' ? '0.5 m' : `${gridStepIn(units) / 12} ft`}` : null;
     const subtitle = [
         units === 'metric' ? 'metric' : 'imperial',
-        view === 'side' ? `lined up on the ${anchorLabel}` : null,
+        `lined up on the ${anchorLabel}`,
         gridNote,
         drawn.every(i => i.photo) ? 'photos scaled to the specs' : 'outlines are generic shapes; the figures are the specs',
     ].filter(Boolean).join(' · ');
@@ -143,7 +143,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     }, [dataLine, drawn]);
     const exportRef = useRef(null);
     const { copyPng, copied: imageCopied, preview, dismissPreview } = useChartPng(exportRef, {
-        title, subtitle, sources: sourceLine.text, signature: `${drawn.map(i => i.id).join(',')}|${anchor}|${draw}`,
+        title, subtitle, sources: sourceLine.text, signature: `${drawn.map(i => i.id).join(',')}|${view}|${anchor}|${endAnchor}|${draw}`,
     });
 
     // One tree, like every chart's: the pop-out drops the sidebar, and the
@@ -151,7 +151,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     return (
         <div className="chart-layout">
             {!presentationMode && (
-                <SizeChartSidebar view={view} anchor={anchor} draw={draw} lines={lines} grid={grid} opacity={opacity} onChange={onChange} />
+                <SizeChartSidebar view={view} anchor={anchor} endAnchor={endAnchor} draw={draw} lines={lines} grid={grid} opacity={opacity} onChange={onChange} />
             )}
             <div className="chart-main">
             <PlotFrame
@@ -175,7 +175,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
                 )}
             >
                 {drawn.length > 0
-                    ? <SizeChartCanvas items={drawn} view={view} anchor={anchor} units={units} lines={lines} grid={grid} activeId={activeId} onActive={setHoverId} onPick={pick} opacity={opacity} exportRef={exportRef} />
+                    ? <SizeChartCanvas items={drawn} view={view} anchor={anchor} endAnchor={endAnchor} units={units} lines={lines} grid={grid} activeId={activeId} onActive={setHoverId} onPick={pick} opacity={opacity} exportRef={exportRef} />
                     : <p className="text-note size-chart-empty">No selected vehicle has the figures this view needs.</p>}
             </PlotFrame>
             {drawn.length > 0 && <SizeFiguresTable items={drawn} view={view} units={units} activeId={activeId} onActive={setHoverId} fromId={fromId} onPick={pick} />}

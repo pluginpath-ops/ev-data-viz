@@ -37,23 +37,24 @@ const wheelsEstimated = (p) => p.estimated.has('frontOverhang') || p.estimated.h
  *               selection order; `photo` (with its `placement`, in inches) or null
  *   view        'side' | 'front' | 'rear'
  *   anchor      a SIZE_ANCHORS key (side view)
+ *   endAnchor   a SIZE_END_ANCHORS key (front and rear views)
  *   units       'imperial' | 'metric'
  *   lines       draw the dimension lines
  *   grid        draw the grid
  *   activeId    the vehicle brought forward, or null
  *   onActive    (id|null) => void   the vehicle under the pointer
  *   onPick      (id) => void        a click: measure the figures from this vehicle
- *   opacity     the photos' opacity when more than one is drawn (the back-most is solid)
+ *   opacity     the photos' opacity over the back one, which is solid (the active one, else the largest)
  *   exportRef   receives `{ canvas }`, the drawing as the PNG export reads it
  */
-export default function SizeChartCanvas({ items, view, anchor, units, lines, grid, activeId, onActive, onPick, opacity = 0.6, exportRef }) {
+export default function SizeChartCanvas({ items, view, anchor, endAnchor, units, lines, grid, activeId, onActive, onPick, opacity = 0.6, exportRef }) {
     const endView = isEndView(view);
     const [ref, widthPx] = useElementWidth();
     const svgRef = useRef(null);
     const { isDark } = useTheme();
     const layout = useMemo(
-        () => sizeChartLayout(items, { view, anchor, widthPx, lines }),
-        [items, view, anchor, widthPx, lines],
+        () => sizeChartLayout(items, { view, anchor, endAnchor, widthPx, lines }),
+        [items, view, anchor, endAnchor, widthPx, lines],
     );
 
     const shapes = useMemo(() => new Map(items.map(({ id, profile }) => [
@@ -61,12 +62,13 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
         id, endView ? frontSilhouette(view === 'rear' ? { ...profile, trackFront: profile.trackRear } : profile) : sideSilhouette(profile),
     ])), [items, view, endView]);
 
-    // Largest first; the active one last, on top.
+    // The active one first, at the back, then largest first; with photos, the
+    // back one is solid and the rest see-through over it.
     const drawOrder = useMemo(() => {
         const area = ({ profile: p }) => (endView ? p.width : p.length) * p.height;
         const sorted = [...items].sort((a, b) => area(b) - area(a));
         const active = sorted.find(i => i.id === activeId);
-        return active ? [...sorted.filter(i => i !== active), active] : sorted;
+        return active ? [active, ...sorted.filter(i => i !== active)] : sorted;
     }, [items, endView, activeId]);
 
     // The export copies a canvas, so the drawing is rasterized whenever it
@@ -122,11 +124,11 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
                     const x0 = px(place);
                     const dashed = view === 'side' ? wheelsEstimated(p) : p.estimated.has(trackKeyOf(view)) || p.estimated.has('tireDiameter');
                     // The back-most photo is drawn solid: nothing behind it would show through.
-                    const back = id === drawOrder[0].id && activeId !== id;
-                    const cls = `size-silhouette${activeId === id ? ' is-active' : ''}${activeId && activeId !== id ? ' is-quiet' : ''}${back ? ' is-back' : ''}`;
+                    const back = id === drawOrder[0].id;
+                    const cls = `size-silhouette${activeId === id ? ' is-active' : ''}${activeId && activeId !== id ? ' is-quiet' : ''}${back ? ' is-back' : ''}${photo ? ' is-photo' : ''}`;
                     if (photo) {
                         const { top, h, slices } = photo.placement;
-                        const [g0, g1] = endView ? [-p.width / 2, p.width / 2] : [0, p.length];
+                        const [g0, g1] = endView ? [-p.width / 2, p.width / 2] : [0, p.length];  // from `place`
                         const W = photo.width_px;
                         const H = photo.height_px;
                         // Each piece is a window (a nested <svg>, which clips) onto
@@ -191,16 +193,16 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
 
                 {lines && items.map(({ id, color, label, profile: p }, i) => {
                     const y = barsTop + i * SIZE_ROW_PX + SIZE_ROW_PX / 2;
-                    const start = endView ? -p.width / 2 : places.get(id);
-                    const end = endView ? p.width / 2 : start + p.length;
-                    const mirrors = endView && p.widthMirrors > p.width ? p.widthMirrors / 2 : null;
+                    const start = endView ? places.get(id) - p.width / 2 : places.get(id);
+                    const end = endView ? places.get(id) + p.width / 2 : start + p.length;
+                    const mirrors = endView && p.widthMirrors > p.width ? p.widthMirrors / 2 : null;  // either side of `place`
                     const axles = view === 'side' ? [start + p.frontOverhang, start + p.frontOverhang + p.wheelbase] : [];
                     return (
                         <g key={`b${id}`} className="size-callout" style={{ '--series': color }}
                             onPointerEnter={() => onActive(id)} onClick={() => onPick(id)}>
-                            <text className="size-callout-name" x={px(mirrors ? -mirrors : start)} y={y - 7}>{label}</text>
+                            <text className="size-callout-name" x={mirrors ? px(places.get(id) - mirrors) : px(start)} y={y - 7}>{label}</text>
                             {mirrors && (
-                                <line className="size-callout-mirrors" x1={px(-mirrors)} x2={px(mirrors)} y1={y} y2={y} />
+                                <line className="size-callout-mirrors" x1={px(places.get(id) - mirrors)} x2={px(places.get(id) + mirrors)} y1={y} y2={y} />
                             )}
                             <line className="size-callout-bar" x1={px(start)} x2={px(end)} y1={y} y2={y} />
                             {[start, end].map(x => <line key={x} className="size-callout-bar" x1={px(x)} x2={px(x)} y1={y - 5} y2={y + 5} />)}

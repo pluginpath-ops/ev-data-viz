@@ -10,7 +10,19 @@
  */
 
 import { anchorX } from './vehicleProfile';
-import { isEndView } from './sizePhotoMarks';
+import { isEndView, trackKeyOf } from './sizePhotoMarks';
+
+/**
+ * How far an end-view landmark sits left of the centerline, in inches: what
+ * the front and rear views line up on (SIZE_END_ANCHORS). A mirror without a
+ * mirror width spec falls back to the body edge.
+ */
+export function endAnchorX(p, view, anchor) {
+    if (anchor === 'leftMirror') return (p.widthMirrors ?? p.width) / 2;
+    if (anchor === 'leftBody') return p.width / 2;
+    if (anchor === 'leftTire') return (p[trackKeyOf(view)] ?? p.width) / 2;
+    return 0;
+}
 
 export const SIZE_MARGIN = { left: 12, right: 104, top: 18 };
 /** The tallest the drawing gets, so a narrow selection doesn't fill the screen. */
@@ -29,12 +41,13 @@ export const frontHalfWidth = (p) => Math.max(
  * @param {object} opts
  * @param {'side'|'front'|'rear'} opts.view
  * @param {string} opts.anchor      a SIZE_ANCHORS key (side view)
+ * @param {string} opts.endAnchor   a SIZE_END_ANCHORS key (front and rear views)
  * @param {number} opts.widthPx     the drawing's width
  * @param {boolean} opts.lines      draw the dimension lines below the ground
  * @returns {null | { scale, originX, groundY, heightPx, barsTop, places: Map<id, number> }}
- *          `places` is each vehicle's front bumper (side) or centerline (front), in world x
+ *          `places` is each vehicle's front bumper (side) or centerline (front, rear), in world x
  */
-export function sizeChartLayout(items, { view, anchor, widthPx, lines }) {
+export function sizeChartLayout(items, { view, anchor, endAnchor, widthPx, lines }) {
     if (!items.length || widthPx <= 0) return null;
     const places = new Map();
     let minX = Infinity;
@@ -43,9 +56,10 @@ export function sizeChartLayout(items, { view, anchor, widthPx, lines }) {
     for (const { id, profile: p } of items) {
         if (isEndView(view)) {
             const half = frontHalfWidth(p);
-            places.set(id, 0);
-            minX = Math.min(minX, -half);
-            maxX = Math.max(maxX, half);
+            const center = endAnchorX(p, view, endAnchor);
+            places.set(id, center);
+            minX = Math.min(minX, center - half);
+            maxX = Math.max(maxX, center + half);
         } else {
             const start = -anchorX(p, anchor);
             places.set(id, start);

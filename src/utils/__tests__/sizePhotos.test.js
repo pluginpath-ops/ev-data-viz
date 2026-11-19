@@ -83,19 +83,6 @@ describe('size photo marks', () => {
         expect(end.mirrorRight).toBeCloseTo(0.98);
     });
 
-    it('stretches an end view in three pieces so body edges and mirror tips both land on their specs', () => {
-        const p = photo({ mirrorLeft: 0.1, left: 0.15, right: 0.85, mirrorRight: 0.9, ground: 0.9, roof: 0.1 }, 500, 500);
-        const { slices } = photoPlacement('rear', p, { width: 80, widthMirrors: 88, height: 70, estimated: new Set() });
-        expect(slices).toHaveLength(3);
-        const at = (f) => { const s = slices.find(x => f >= x.from && f <= x.to); return s.x + (f - s.from) / (s.to - s.from) * s.w; };
-        expect(at(0.1)).toBeCloseTo(-44);
-        expect(at(0.15)).toBeCloseTo(-40);
-        expect(at(0.85)).toBeCloseTo(40);
-        expect(at(0.9)).toBeCloseTo(44);
-        // No mirror spec: one piece on the body width.
-        expect(photoPlacement('front', p, { width: 80, height: 70, estimated: new Set() }).slices).toHaveLength(1);
-    });
-
     it('reads a rear photo like a front one, from the width spec', () => {
         const p = photo({ left: 0.2, right: 0.8, ground: 0.9, roof: 0.3 }, 500, 500);
         expect(photoScale('rear', p, { width: 75 })).toBeCloseTo(4);

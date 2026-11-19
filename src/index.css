@@ -6562,7 +6562,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .size-silhouette .size-wheel.is-estimated circle,
 .size-silhouette rect.size-wheel.is-estimated { stroke-dasharray: 4 3; }
 .size-silhouette.is-active .size-body { fill-opacity: 0.3; stroke-width: 3; }
-.size-silhouette.is-quiet { opacity: 0.45; }
+.size-silhouette.is-quiet:not(.is-photo) { opacity: 0.45; }
 .size-silhouette .size-photo-ground { stroke: var(--series); stroke-width: 3; stroke-linecap: round; }
 .size-silhouette.is-active .size-photo-ground { stroke-width: 5; }
 /* Overlaid photos are see-through, so a car behind another still shows; the
