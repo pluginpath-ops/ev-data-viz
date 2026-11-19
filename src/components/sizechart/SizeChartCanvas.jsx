@@ -29,7 +29,7 @@ const wheelsEstimated = (p) => p.estimated.has('frontOverhang') || p.estimated.h
  * whose it is. The largest is drawn first so a smaller one is never hidden
  * behind it; with more than one, photos are see-through so the cars behind
  * still show. The one under the pointer (or its row in the figures table)
- * comes to the front, stronger, and the rest fade.
+ * comes to the front and the rest fade further.
  *
  * Props:
  *   items       [{ id, label, color, profile, photo }] drawable in this view,
