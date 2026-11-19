@@ -6624,6 +6624,26 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .size-mark--axle   { --mark: var(--color-accent-blue); }
 .size-mark--ground { --mark: var(--color-accent-green); }
 .size-mark--roof   { --mark: var(--color-accent-violet); }
+.size-mark--underbody { --mark: var(--color-accent-green); }
+.size-mark--mirror { --mark: var(--color-accent-orange); }
+/* Marks recorded for later (the underbody, the mirrors) are dashed. */
+.size-mark--underbody::before,
+.size-mark--mirror::before { background: none; border: 0 dashed var(--mark); }
+.size-mark--underbody::before { height: 0; border-top-width: 1px; }
+.size-mark--mirror::before { width: 0; border-left-width: 1px; }
+/* An axle's center: a ring with a hole, so the wheel's hub shows through. */
+.size-mark-point {
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    margin: -7px 0 0 -7px;
+    border: 2px solid var(--color-accent-blue);
+    border-radius: 50%;
+    cursor: move;
+    outline: none;
+}
+.size-mark-point:hover,
+.size-mark-point:focus-visible { box-shadow: 0 0 0 2px var(--color-popover); }
 .size-mark-label {
     position: absolute;
     white-space: nowrap;
@@ -6660,6 +6680,16 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     border: 1px solid var(--color-accent-orange);
     border-radius: 50%;
 }
+/* At rest on a mark: square photo pixels, and a hairline where the mark is. */
+.size-photo-loupe.is-fine { image-rendering: pixelated; }
+.size-photo-loupe::before {
+    content: '';
+    position: absolute;
+    border: 0 solid var(--color-accent-orange);
+    opacity: 0.7;
+}
+.size-photo-loupe.is-x::before { top: 0; bottom: 0; left: 50%; border-left-width: 1px; }
+.size-photo-loupe.is-y::before { left: 0; right: 0; top: 50%; border-top-width: 1px; }
 
 .size-photo-fields { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .size-photo-fields label { display: flex; flex-direction: column; gap: 4px; }
@@ -7470,10 +7500,13 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .data-check-fixes {
     @apply flex flex-wrap items-center gap-2 mt-1;
 }
-.data-check-fix-field {
+/* One spec field edited where it's needed (specs/SpecFixField): a finding, the
+   size photo editor. */
+.spec-fix-field {
     @apply flex items-center gap-2;
 }
-.data-check-fix-field .form-input { @apply w-36; }
+.spec-fix-field .form-input { @apply w-36; }
+.spec-fix-fields { @apply flex flex-wrap items-center gap-x-4 gap-y-2; }
 
 .data-check-row {
     @apply border-b border-[var(--color-border)] last:border-b-0;

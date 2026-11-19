@@ -15,32 +15,88 @@
  * Pure module.
  */
 
-/** Each view's marks, and which way each runs. */
+/**
+ * The photos a vehicle can carry. Side and front are drawn on the Size chart;
+ * the rear is kept, marked, for later.
+ */
+export const SIZE_PHOTO_VIEWS = [
+    { key: 'side',  label: 'Side' },
+    { key: 'front', label: 'Front' },
+    { key: 'rear',  label: 'Rear' },
+];
+
+/** Front and rear photos are marked alike: body edges, not bumpers and axles. */
+export const isEndView = (view) => view !== 'side';
+
+/*
+ * Each view's marks, and which way each runs. The axles are points: `frontAxle`
+ * and `rearAxle` are their x, `frontAxleY` and `rearAxleY` their y (the wheel
+ * centers), dragged together as one dot (`point` names the x it goes with).
+ * `underbody` is the lowest point of the body, for ground clearance; front and
+ * rear, `mirrorLeft` and `mirrorRight` are the mirrors' outer edges, for the
+ * width with mirrors. The axle heights, underbody and mirrors are recorded for
+ * later use (#603); nothing draws from them yet.
+ */
+const END_MARKS = [
+    { key: 'mirrorLeft', axis: 'x', label: 'Left mirror' },
+    { key: 'left',      axis: 'x', label: 'Left body edge' },
+    { key: 'right',     axis: 'x', label: 'Right body edge' },
+    { key: 'mirrorRight', axis: 'x', label: 'Right mirror' },
+    { key: 'ground',    axis: 'y', label: 'Ground' },
+    { key: 'underbody', axis: 'y', label: 'Underbody' },
+    { key: 'roof',      axis: 'y', label: 'Roof' },
+];
 export const MARKS = {
     side: [
-        { key: 'front',     axis: 'x', label: 'Front bumper' },
-        { key: 'frontAxle', axis: 'x', label: 'Front axle' },
-        { key: 'rearAxle',  axis: 'x', label: 'Rear axle' },
-        { key: 'rear',      axis: 'x', label: 'Rear bumper' },
-        { key: 'ground',    axis: 'y', label: 'Ground' },
-        { key: 'roof',      axis: 'y', label: 'Roof' },
+        { key: 'front',      axis: 'x', label: 'Front bumper' },
+        { key: 'frontAxle',  axis: 'x', label: 'Front axle' },
+        { key: 'rearAxle',   axis: 'x', label: 'Rear axle' },
+        { key: 'rear',       axis: 'x', label: 'Rear bumper' },
+        { key: 'ground',     axis: 'y', label: 'Ground' },
+        { key: 'underbody',  axis: 'y', label: 'Underbody' },
+        { key: 'roof',       axis: 'y', label: 'Roof' },
+        { key: 'frontAxleY', axis: 'y', label: 'Front axle', point: 'frontAxle' },
+        { key: 'rearAxleY',  axis: 'y', label: 'Rear axle',  point: 'rearAxle' },
     ],
-    front: [
-        { key: 'left',   axis: 'x', label: 'Left body edge' },
-        { key: 'right',  axis: 'x', label: 'Right body edge' },
-        { key: 'ground', axis: 'y', label: 'Ground' },
-        { key: 'roof',   axis: 'y', label: 'Roof' },
-    ],
+    front: END_MARKS,
+    rear: END_MARKS,
 };
 
 const axisOf = (view, key) => MARKS[view].find(m => m.key === key)?.axis;
+
+/**
+ * The marks added after photos were first saved — the axle heights, the
+ * underbody and the mirrors — filled in where a photo lacks them: the axles
+ * half a tire up from the ground, the underbody at the clearance (each a share
+ * of ground to roof), the mirrors out from the body edges by the width with
+ * mirrors (a share of edge to edge); from the specs, else a typical share.
+ * Marks already there stay.
+ */
+export function fillMarks(view, marks, profile = null) {
+    if (!marks || marks.ground == null || marks.roof == null) return marks;
+    const span = marks.ground - marks.roof;
+    const up = (inches, share) => marks.ground - span * (profile?.height > 0 && inches > 0 ? inches / profile.height : share);
+    const out = { ...marks };
+    if (out.underbody == null) out.underbody = up(profile?.groundClearance, 0.1);
+    if (isEndView(view) && marks.left != null && marks.right != null) {
+        const body = marks.right - marks.left;
+        const extra = profile?.widthMirrors > profile?.width ? (profile.widthMirrors - profile.width) / 2 / profile.width : 0.05;
+        if (out.mirrorLeft == null) out.mirrorLeft = Math.max(0, marks.left - body * extra);
+        if (out.mirrorRight == null) out.mirrorRight = Math.min(1, marks.right + body * extra);
+    } else if (!isEndView(view)) {
+        const axleY = up(profile?.tireDiameter / 2, 0.2);
+        if (out.frontAxleY == null) out.frontAxleY = axleY;
+        if (out.rearAxleY == null) out.rearAxleY = axleY;
+    }
+    return out;
+}
 
 /**
  * Where the marks start on a fresh cutout: the bumpers (or body edges) at the
  * car's visible edges, the ground at its lowest pixel, the roof at its highest,
  * and the axles where the specs put them (else a typical spot).
  *
- * @param {'side'|'front'} view
+ * @param {'side'|'front'|'rear'} view
  * @param {{ x, y, w, h }} bounds  the visible pixels, as fractions of the cutout
  * @param {object} [profile]       vehicleProfile's, for the axles
  */
@@ -49,23 +105,29 @@ export function startingMarks(view, bounds, profile = null) {
     const x1 = bounds.x + bounds.w;
     const ground = bounds.y + bounds.h;
     const roof = bounds.y;
-    if (view === 'front') return { left: x0, right: x1, ground, roof };
+    if (isEndView(view)) return fillMarks(view, { left: x0, right: x1, ground, roof }, profile);
     const share = (inches, fallback) => (profile?.length && inches != null ? inches / profile.length : fallback);
     const front = share(profile?.frontOverhang, 0.19);
     const rear = share(profile?.rearOverhang, 0.21);
-    return {
+    return fillMarks(view, {
         front: x0, frontAxle: x0 + front * bounds.w, rearAxle: x1 - rear * bounds.w, rear: x1, ground, roof,
-    };
+    }, profile);
 }
 
 /** The marks of a photo flipped left to right. */
 export function mirrorMarks(view, marks) {
     const flip = (v) => (v == null ? v : 1 - v);
-    if (view === 'front') return { ...marks, left: flip(marks.right), right: flip(marks.left) };
+    if (isEndView(view)) {
+        return {
+            ...marks, left: flip(marks.right), right: flip(marks.left),
+            mirrorLeft: flip(marks.mirrorRight), mirrorRight: flip(marks.mirrorLeft),
+        };
+    }
     return {
         ...marks,
         front: flip(marks.rear), rear: flip(marks.front),
         frontAxle: flip(marks.rearAxle), rearAxle: flip(marks.frontAxle),
+        frontAxleY: marks.rearAxleY, rearAxleY: marks.frontAxleY,
     };
 }
 
@@ -92,8 +154,8 @@ export function carryMarks(view, marks, fromTrim, toTrim, mirrored = false) {
  */
 export function photoScale(view, photo, profile) {
     const m = photo?.marks ?? {};
-    const span = view === 'front' ? m.right - m.left : m.rear - m.front;
-    const spec = view === 'front' ? profile?.width : profile?.length;
+    const span = isEndView(view) ? m.right - m.left : m.rear - m.front;
+    const spec = isEndView(view) ? profile?.width : profile?.length;
     if (!(span > 0) || !(spec > 0)) return null;
     return (span * photo.width_px) / spec;
 }
@@ -108,7 +170,7 @@ export function figuresFromMarks(view, photo, profile) {
     const m = photo.marks;
     const across = (a, b) => (a != null && b != null ? ((b - a) * photo.width_px) / k : null);
     const height = m.roof != null && m.ground != null ? ((m.ground - m.roof) * photo.height_px) / k : null;
-    if (view === 'front') return { height };
+    if (isEndView(view)) return { height };
     return {
         wheelbase: across(m.frontAxle, m.rearAxle),
         frontOverhang: across(m.front, m.frontAxle),
@@ -149,7 +211,7 @@ export function photoPlacement(view, photo, profile) {
         return { x: A + (from - a) * perFrac, w: (to - from) * perFrac, from, to };
     };
 
-    if (view === 'front') {
+    if (isEndView(view)) {
         const half = profile.width / 2;
         return { top, h, slices: [piece(0, 1, m.left, -half, m.right, half)] };
     }

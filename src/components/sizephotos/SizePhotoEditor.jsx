@@ -4,16 +4,21 @@ import { resolveEffectiveSpecs } from '../../utils/specHelpers';
 import { profileFromSpecs } from '../../utils/vehicleProfile';
 import { fmtDimension } from '../../utils/unitConversions';
 import {
-    MARKS, startingMarks, mirrorMarks, carryMarks, figuresFromMarks,
+    MARKS, startingMarks, mirrorMarks, carryMarks, figuresFromMarks, fillMarks, isEndView,
 } from '../../utils/sizePhotoMarks';
 import {
     loadCanvas, isCutout, cutOut, finishCutout, flipCanvas, visibleFractions, toBlob, CUTOUT_MAX_SIDE,
 } from '../../utils/sizePhotoImages';
 import { SIZE_PHOTO_WHEELBASE_PCT, SIZE_PHOTO_HEIGHT_PCT } from '../../constants/sizeChart';
 import MarkLine from './MarkLine';
+import MarkPoint from './MarkPoint';
+import { withSpecValues } from '../../utils/dataCheckFixes';
+import SizePhotoSpecs from './SizePhotoSpecs';
 
 const DEFAULT_TOLERANCE = 24;
 const LOUPE_ZOOM = 4;
+/** At rest on a focused mark, screen px per PHOTO px, so a ¼-pixel nudge moves 2 px. */
+const LOUPE_FINE_PX = 8;
 /** The loupe's diameter; .size-photo-loupe in index.css matches it. */
 const LOUPE_PX = 120;
 
@@ -24,10 +29,13 @@ const withScheme = (text) => {
     return /^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `https://${t}`;
 };
 
-const KIND = { front: 'bumper', rear: 'bumper', left: 'bumper', right: 'bumper', frontAxle: 'axle', rearAxle: 'axle', ground: 'ground', roof: 'roof' };
+const KIND = {
+    front: 'bumper', rear: 'bumper', left: 'bumper', right: 'bumper', frontAxle: 'axle', rearAxle: 'axle',
+    ground: 'ground', roof: 'roof', underbody: 'underbody', mirrorLeft: 'mirror', mirrorRight: 'mirror',
+};
 
 /** The marks that must run in order along the photo, by view. */
-const ORDER = { side: ['front', 'frontAxle', 'rearAxle', 'rear'], front: ['left', 'right'] };
+const ORDER = { side: ['front', 'frontAxle', 'rearAxle', 'rear'], front: ['left', 'right'], rear: ['left', 'right'] };
 
 /** A figure read from the marks, beside the spec it is checked against. */
 function CheckRow({ label, read, spec, units, limit }) {
@@ -68,10 +76,18 @@ function CheckRow({ label, read, spec, units, limit }) {
  *   onClose   () => void
  *   pending   Map, view → () => Promise: the form's list of unsaved photo work
  *   onPickFile (File) => void   start again on another file
+ *   specs     { drafts, changed, onDraft }: the dimension specs typed here and
+ *             not yet saved (SizePhotoSection); the readouts use them already
  */
-export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pending, onPickFile }) {
+export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pending, onPickFile, specs }) {
     const { vehicles, units, saveSizePhoto, showError } = useAppContext();
-    const profile = useMemo(() => profileFromSpecs(resolveEffectiveSpecs(vehicle, vehicles)), [vehicle, vehicles]);
+    const typed = specs?.changed;
+    const profile = useMemo(() => {
+        const effective = resolveEffectiveSpecs(vehicle, vehicles);
+        // A cleared field falls back to what it inherits once saved; until then, keep the old figure.
+        const set = Object.fromEntries(Object.entries(typed ?? {}).filter(([, v]) => v != null));
+        return profileFromSpecs(withSpecValues(effective, 'dimensions', set));
+    }, [vehicle, vehicles, typed]);
 
     const [original, setOriginal] = useState(null);      // canvas of the upload (new file, or a redo)
     const [cut, setCut] = useState(null);                 // the original with its background removed
@@ -81,7 +97,8 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
     const [tolerance, setTolerance] = useState(DEFAULT_TOLERANCE);
     const [trim, setTrim] = useState(row?.trim ?? null);
     const [mirrored, setMirrored] = useState(row?.mirrored ?? false);
-    const [marks, setMarks] = useState(row?.marks ?? null);
+    // A photo saved before a mark existed gets it filled in where it would start.
+    const [marks, setMarks] = useState(() => (row?.marks ? fillMarks(view, row.marks, profile) : null));
     const [sourceUrl, setSourceUrl] = useState(row?.source_url ?? '');
     const [credit, setCredit] = useState(row?.credit ?? '');
     const [message, setMessage] = useState(null);
@@ -159,7 +176,6 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
     const photo = marks && size ? { marks, width_px: size.w, height_px: size.h } : null;
     const read = photo ? figuresFromMarks(view, photo, profile) : null;
     const outOfOrder = marks && ORDER[view].some((k, i, keys) => i > 0 && !(marks[keys[i - 1]] < marks[k]));
-    const scaleSpec = view === 'front' ? profile.width : profile.length;
 
     // Throws when it can't save; saveSizePhoto shows its own errors.
     const persist = async () => {
@@ -204,6 +220,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
         <div className="flex flex-col gap-2.5"
             onKeyDown={e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault(); }}>
             {view === 'side' && <p className="text-note">Side photos face left, front bumper on the left. Flip one that doesn’t.</p>}
+            <p className="text-meta">Drag a mark, or click it and use the arrow keys (1 photo pixel; Shift 10; Option ¼). Hold Option while dragging for fine moves.{view === 'side' ? ' The axles are the dots: put each on its wheel’s center.' : ''}</p>
 
             {refused === 'busy' && (
                 <div className="flex flex-col gap-2">
@@ -243,45 +260,67 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
             {imageSrc && marks && (
                 <div className="size-photo-frame" ref={frameRef} style={{ aspectRatio: `${size.w} / ${size.h}` }}>
                     <img src={imageSrc} alt="" draggable={false} />
-                    {MARKS[view].map(mark => (
+                    {MARKS[view].filter(mark => !mark.point).map(mark => (
                         <MarkLine
                             key={mark.key}
                             mark={mark}
                             value={marks[mark.key] ?? 0}
                             frameRef={frameRef}
+                            photoPx={size}
                             kind={KIND[mark.key]}
                             onChange={v => setMarks(m => ({ ...m, [mark.key]: v }))}
                             onPointer={setLoupe}
                         />
                     ))}
-                    {loupe && (
-                        <div
-                            className="size-photo-loupe"
-                            aria-hidden="true"
-                            style={{
-                                left: `${loupe.fx * 100}%`,
-                                top: `${loupe.fy * 100}%`,
-                                backgroundImage: `url(${imageSrc})`,
-                                // In px, so the point under the pointer sits at the loupe's center.
-                                backgroundSize: `${loupe.w * LOUPE_ZOOM}px ${loupe.h * LOUPE_ZOOM}px`,
-                                backgroundPosition: `${LOUPE_PX / 2 - loupe.fx * loupe.w * LOUPE_ZOOM}px ${LOUPE_PX / 2 - loupe.fy * loupe.h * LOUPE_ZOOM}px`,
-                            }}
+                    {MARKS[view].filter(mark => mark.point).map(mark => (
+                        <MarkPoint
+                            key={mark.key}
+                            label={mark.label}
+                            x={marks[mark.point] ?? 0}
+                            y={marks[mark.key] ?? 0}
+                            frameRef={frameRef}
+                            photoPx={size}
+                            onChange={v => setMarks(m => ({ ...m, [mark.point]: v.x, [mark.key]: v.y }))}
+                            onPointer={setLoupe}
                         />
-                    )}
+                    ))}
+                    {loupe && (() => {
+                        // Dragging: 4× the frame. At rest: photo pixels, big enough to see a ¼-pixel nudge.
+                        const zoom = loupe.fine && size ? LOUPE_FINE_PX * size.w / loupe.w : LOUPE_ZOOM;
+                        return (
+                            <div
+                                className={`size-photo-loupe is-${loupe.axis}${loupe.fine ? ' is-fine' : ''}`}
+                                aria-hidden="true"
+                                style={{
+                                    left: `${loupe.fx * 100}%`,
+                                    top: `${loupe.fy * 100}%`,
+                                    backgroundImage: `url(${imageSrc})`,
+                                    // In px, so the mark's point sits at the loupe's center.
+                                    backgroundSize: `${loupe.w * zoom}px ${loupe.h * zoom}px`,
+                                    backgroundPosition: `${LOUPE_PX / 2 - loupe.fx * loupe.w * zoom}px ${LOUPE_PX / 2 - loupe.fy * loupe.h * zoom}px`,
+                                }}
+                            />
+                        );
+                    })()}
                 </div>
             )}
 
-            {read && (
+            {photo && (
                 <div className="flex flex-col gap-1">
-                    {!scaleSpec && <p className="text-note">No {view === 'front' ? 'width' : 'length'} spec yet, so nothing can be checked.</p>}
-                    {view === 'side' && (
+                    {!read && (
+                        <p className="text-note status-text is-warning">
+                            No {isEndView(view) ? 'width' : 'length'} spec yet, so the marks can’t be read in inches or checked. Add it below; the marks keep until then.
+                        </p>
+                    )}
+                    {read && view === 'side' && (
                         <>
                             <CheckRow label="Wheelbase" read={read.wheelbase} spec={profile.wheelbase} units={units} limit={SIZE_PHOTO_WHEELBASE_PCT} />
                             <CheckRow label="Front overhang" read={read.frontOverhang}
                                 spec={profile.estimated.has('frontOverhang') ? null : profile.frontOverhang} units={units} limit={SIZE_PHOTO_WHEELBASE_PCT} />
                         </>
                     )}
-                    <CheckRow label="Height" read={read.height} spec={profile.height} units={units} limit={SIZE_PHOTO_HEIGHT_PCT} />
+                    {read && <CheckRow label="Height" read={read.height} spec={profile.height} units={units} limit={SIZE_PHOTO_HEIGHT_PCT} />}
+                    {specs && <SizePhotoSpecs vehicle={vehicle} view={view} {...specs} />}
                 </div>
             )}
             {outOfOrder && <p className="text-note status-text is-warning">The marks are out of order: {ORDER[view].map(k => MARKS[view].find(m => m.key === k).label.toLowerCase()).join(', then ')}.</p>}

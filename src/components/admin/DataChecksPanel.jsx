@@ -11,7 +11,7 @@ import { KNOB_GROUPS } from '../../constants/knobs';
 import { setOverride } from '../../constants/overrides';
 import { vehicleLabel, fallbackSpecs } from '../../utils/specHelpers';
 import { columnMoves, checkFields, withSpecValues, epaSectionHref, EPA_SECTION_CHECKS, nativeFillPlan } from '../../utils/dataCheckFixes';
-import { SpecField } from '../EditSpecsForm';
+import SpecFixField from '../specs/SpecFixField';
 import PrimaryConfigurationPicker from '../epa/PrimaryConfigurationPicker';
 import { useEpaDetail } from '../../hooks/useEpaDetail';
 import {
@@ -95,34 +95,6 @@ function Tally({ row }) {
 }
 
 /**
- * One spec field a finding compares, edited where the finding is.
- *
- * Save is always present and disabled until the value changes, so typing never
- * moves a control a curator is about to click. The caller keys this by the
- * stored value, so a save from elsewhere resets the draft.
- */
-function FixField({ vehicle, category, field, def, inheritedValue, providedBy, onSave }) {
-    const own = vehicle.specs?.[category]?.[field] ?? null;
-    const [draft, setDraft] = useState(own);
-    const [saving, setSaving] = useState(false);
-    const dirty = (draft ?? null) !== own;
-    const save = async () => {
-        setSaving(true);
-        await onSave(category, { [field]: draft });
-        setSaving(false);
-    };
-    return (
-        <span className="data-check-fix-field">
-            <span className="text-note">{def.label}</span>
-            <SpecField field={def} value={draft} onChange={setDraft} inheritedValue={inheritedValue} providedBy={providedBy} />
-            <button type="button" className="btn btn-secondary text-sm" disabled={!dirty || saving} onClick={save}>
-                {saving ? 'Saving…' : 'Save'}
-            </button>
-        </span>
-    );
-}
-
-/**
  * What can be done about one finding (#321): moves out of the retiring columns,
  * the spec fields it compares, the primary configuration, and its EPA section.
  * See utils/dataCheckFixes.js for which finding offers what.
@@ -154,7 +126,7 @@ function FindingFixes({ finding: f, vehicle, fleet, onMove, onSaveSpec, onChoose
                 </button>
             ))}
             {fields.map(({ category, field, def }) => (
-                <FixField
+                <SpecFixField
                     key={`${category}.${field}:${vehicle.specs?.[category]?.[field] ?? ''}`}
                     vehicle={vehicle}
                     category={category}

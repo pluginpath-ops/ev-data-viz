@@ -1,53 +1,26 @@
-import { useRef } from 'react';
-
-const clamp = (v) => Math.min(1, Math.max(0, v));
+import { useMarkDrag } from '../../hooks/useMarkDrag';
 
 /**
- * One mark on a size photo: a line across the frame (vertical for a bumper or
- * axle, horizontal for the ground or roof) that is dragged, or focused and
- * nudged with the arrow keys (Shift for 10 px). The pattern of
- * CardBandPreview: pointer capture, the drag held in a ref.
+ * One mark on a size photo: a line across the frame (vertical for a bumper,
+ * axle, body edge or mirror; horizontal for the ground, underbody or roof),
+ * dragged or nudged with the arrow keys (useMarkDrag: Option for fine).
  *
  * Props:
  *   mark      { key, axis: 'x'|'y', label }
  *   value     where it is, a fraction of the frame
  *   frameRef  the frame the fraction is of
- *   kind      'bumper' | 'axle' | 'ground' | 'roof' (its color)
+ *   photoPx   { w, h } the photo's own pixels, for arrow-key steps
+ *   kind      'bumper' | 'axle' | 'ground' | 'roof' | 'underbody' | 'mirror' (its color)
  *   onChange  (fraction) => void
- *   onPointer ({ fx, fy, w, h } | null) => void   where the pointer is (and the
- *             frame's size in px), for the loupe
+ *   onPointer ({ fx, fy, w, h } | null) => void   where the mark is, for the loupe
  */
-export default function MarkLine({ mark, value, frameRef, kind, onChange, onPointer }) {
-    const dragging = useRef(false);
+export default function MarkLine({ mark, value, frameRef, photoPx, kind, onChange, onPointer }) {
     const vertical = mark.axis === 'x';
-
-    const at = (e) => {
-        const r = frameRef.current.getBoundingClientRect();
-        return { fx: clamp((e.clientX - r.left) / r.width), fy: clamp((e.clientY - r.top) / r.height), w: r.width, h: r.height };
-    };
-    const onPointerDown = (e) => {
-        e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
-        e.currentTarget.focus();
-        dragging.current = true;
-        onPointer(at(e));
-    };
-    const onPointerMove = (e) => {
-        if (!dragging.current) return;
-        const p = at(e);
-        onChange(vertical ? p.fx : p.fy);
-        onPointer(p);
-    };
-    const end = () => { dragging.current = false; onPointer(null); };
-    const onKeyDown = (e) => {
-        const keys = vertical ? { ArrowLeft: -1, ArrowRight: 1 } : { ArrowUp: -1, ArrowDown: 1 };
-        if (!(e.key in keys)) return;
-        e.preventDefault();
-        const r = frameRef.current.getBoundingClientRect();
-        const px = (e.shiftKey ? 10 : 1) * keys[e.key];
-        onChange(clamp(value + px / (vertical ? r.width : r.height)));
-    };
-
+    const handlers = useMarkDrag({
+        frameRef, photoPx, onPointer,
+        value: vertical ? { x: value } : { y: value },
+        onChange: (v) => onChange(vertical ? v.x : v.y),
+    });
     return (
         <div
             role="slider"
@@ -56,15 +29,10 @@ export default function MarkLine({ mark, value, frameRef, kind, onChange, onPoin
             aria-orientation={vertical ? 'horizontal' : 'vertical'}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={Math.round(value * 100)}
+            aria-valuenow={Math.round(value * 1000) / 10}
             className={`size-mark size-mark--${kind} ${vertical ? 'is-vertical' : 'is-horizontal'}`}
             style={vertical ? { left: `${value * 100}%` } : { top: `${value * 100}%` }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={end}
-            onPointerCancel={end}
-            onKeyDown={onKeyDown}
-            onBlur={() => onPointer(null)}
+            {...handlers}
         >
             <span className="size-mark-label">{mark.label}</span>
         </div>

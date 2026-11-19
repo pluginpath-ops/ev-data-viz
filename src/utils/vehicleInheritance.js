@@ -52,6 +52,7 @@
  */
 import { vehicleLabel } from './specHelpers';
 import { isCompositeRun, runKindFrom } from './runUtils';
+import { SIZE_PHOTO_VIEWS as SIZE_PHOTO_VIEW_LIST } from './sizePhotoMarks';
 
 /* One unit. The focal point is a property OF the photo -- it says which slice
    of that particular image the card's band shows -- so it can only ever be
@@ -72,7 +73,7 @@ const brandRef = (m) => ({ id: null, name: m.name, brand: true });
 const hasPhoto = (v) => Boolean(v?.image_url || v?.image_thumb_url);
 
 /* The Size chart's photos, one per view, keyed by view. */
-const SIZE_PHOTO_VIEWS = ['side', 'front'];
+const SIZE_PHOTO_VIEWS = SIZE_PHOTO_VIEW_LIST.map(v => v.key);
 const sizePhotoOf = (v, view) => v?.size_photos?.[view] ?? null;
 
 /* A name as a list of comparable tokens: case, punctuation and anything in
