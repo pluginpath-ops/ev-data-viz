@@ -2,6 +2,7 @@
 // Lifted to module level so React never unmounts it mid-keystroke due to a new
 // function reference being created inside a parent render.
 import { ownValues } from '../utils/vehicleInheritance';
+import SizePhotoSection from './sizephotos/SizePhotoSection';
 import { useState, useRef, useCallback } from 'react';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -525,6 +526,10 @@ export default function EditVehicleForm({
                         <p className="text-xs text-meta mt-1">16:9 crop · max 1600×900 · saved as JPEG</p>
                     </div>
                 )}
+
+                {/* Size photos save on their own, apart from the form's Save:
+                    each is a file and a row of its own (vehicle_size_photos). */}
+                {editingId && editingVehicle && <SizePhotoSection vehicle={editingVehicle} />}
 
                 {/* EPA test vehicles are assigned in Tests & Data, not here — keeps
                     this modal compact regardless of how many are linked. */}

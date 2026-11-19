@@ -42,6 +42,14 @@ export const FALLBACK_TRACK_SHARE = 0.86;
 export const FALLBACK_BODY_WIDTH_SHARE = 0.9;
 
 /**
+ * How far a size photo's marks may read from the specs before Data Checks
+ * lists it (and the editor colors the figure). Height gets more room: the roof
+ * line is softer to place than an axle, and roof rails count or don't.
+ */
+export const SIZE_PHOTO_WHEELBASE_PCT = 3;
+export const SIZE_PHOTO_HEIGHT_PCT = 4;
+
+/**
  * Each body style's outline, as shares of the vehicle's own figures, so the
  * shape stretches to any size and the wheel arches land on the real axles.
  *

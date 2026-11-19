@@ -34,6 +34,9 @@ const CHECK_FIELDS = {
     'size-inconsistent':   [['dimensions', 'length_in'], ['dimensions', 'wheelbase_in'], ['dimensions', 'front_overhang_in'],
                             ['dimensions', 'width_in'], ['dimensions', 'width_mirrors_in'],
                             ['dimensions', 'track_front_in'], ['dimensions', 'track_rear_in']],
+    // The photo's marks are fixed in the vehicle form's Size photos; the spec here.
+    'size-photo-wheelbase': [['dimensions', 'wheelbase_in'], ['dimensions', 'length_in']],
+    'size-photo-height':   [['dimensions', 'height_in'], ['dimensions', 'width_in']],
 };
 
 /** Checks whose other half is on the vehicle's EPA section: a link, a label, a test. */

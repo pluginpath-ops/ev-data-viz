@@ -362,8 +362,12 @@ describe('the seams that broke before', () => {
         // Presence checks (`vehicle.image_url ? 'Replace' : 'Upload'`) are fine
         // and deliberately not matched here — only uses that put the URL on the
         // wire are.
+        //
+        // Size photos (components/sizephotos/) are a different image with the
+        // same column name: a cutout with no card rendition, shown only in the
+        // vehicle form while a curator edits it.
         const rendersRaw = ALL.filter(({ file, text }) =>
-            /\.jsx$/.test(file) && (
+            /\.jsx$/.test(file) && !file.includes('components/sizephotos/') && (
                 /src=\{[^}]*\.image_url/.test(text) ||
                 /url\(\$\{[^}]*\.image_url/.test(text)
             ));

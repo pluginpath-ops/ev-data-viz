@@ -6584,6 +6584,79 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .size-anchor-icon circle { fill: none; stroke: currentColor; stroke-width: 1; }
 .size-anchor-icon-mark { stroke: var(--color-accent-orange); stroke-width: 1.5; }
 
+/* ── Size photos (sizephotos/) ────────────────────────────────────────────────
+   The vehicle form's Side and Front slots and the editor in them: a cutout on
+   a checkerboard (so see-through reads as see-through), the marks over it,
+   and a loupe that follows the mark being moved. */
+.size-photo-slots { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.size-photo-slot { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.size-photo-thumb,
+.size-photo-frame {
+    background-color: var(--color-card);
+    background-image:
+        linear-gradient(45deg, var(--color-surface-sunken) 25%, transparent 25%, transparent 75%, var(--color-surface-sunken) 75%),
+        linear-gradient(45deg, var(--color-surface-sunken) 25%, transparent 25%, transparent 75%, var(--color-surface-sunken) 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 8px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+}
+.size-photo-thumb img { display: block; width: 100%; max-height: 160px; object-fit: contain; }
+.size-photo-frame { position: relative; width: 100%; touch-action: none; user-select: none; }
+.size-photo-frame img { display: block; width: 100%; height: 100%; pointer-events: none; }
+
+.size-mark { position: absolute; outline: none; }
+.size-mark.is-vertical { top: 0; bottom: 0; width: 13px; margin-left: -6px; cursor: ew-resize; }
+.size-mark.is-horizontal { left: 0; right: 0; height: 13px; margin-top: -6px; cursor: ns-resize; }
+.size-mark::before { content: ''; position: absolute; background: var(--mark); }
+.size-mark.is-vertical::before { top: 0; bottom: 0; left: 6px; width: 1px; }
+.size-mark.is-horizontal::before { left: 0; right: 0; top: 6px; height: 1px; }
+.size-mark:focus-visible::before,
+.size-mark:hover::before { box-shadow: 0 0 0 1px var(--mark); }
+.size-mark--bumper { --mark: var(--color-accent-orange); }
+.size-mark--axle   { --mark: var(--color-accent-blue); }
+.size-mark--ground { --mark: var(--color-accent-green); }
+.size-mark--roof   { --mark: var(--color-accent-violet); }
+.size-mark-label {
+    position: absolute;
+    white-space: nowrap;
+    padding: 0 4px;
+    border-radius: var(--radius-track);
+    background: var(--color-popover);
+    color: var(--mark);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    pointer-events: none;
+}
+.size-mark.is-vertical .size-mark-label { top: 2px; left: 9px; }
+.size-mark.is-horizontal .size-mark-label { left: 2px; top: -16px; }
+.size-mark:nth-of-type(odd).is-vertical .size-mark-label { top: auto; bottom: 2px; }
+
+.size-photo-loupe {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    transform: translate(-50%, calc(-100% - 16px));
+    border-radius: 50%;
+    border: 2px solid var(--color-border-strong);
+    background-color: var(--color-card);
+    background-repeat: no-repeat;
+    background-origin: border-box; /* the editor centers the photo on the outer box */
+    pointer-events: none;
+    box-shadow: 0 4px 12px var(--color-hover-lift);
+}
+.size-photo-loupe::after {
+    content: '';
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 9px; height: 9px;
+    margin: -4px 0 0 -4px;
+    border: 1px solid var(--color-accent-orange);
+    border-radius: 50%;
+}
+
+.size-photo-fields { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.size-photo-fields label { display: flex; flex-direction: column; gap: 4px; }
+
 /* The figures under the drawing, one row per vehicle. */
 .size-figures-container { @apply overflow-x-auto mt-3; }
 .size-figures { @apply w-full text-sm; }

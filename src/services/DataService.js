@@ -441,7 +441,12 @@ class DataService {
       .from('vehicles')
       .select(select)
       .order('created_at', { ascending: false });
-    const { data, error } = await query(`${base}, epa_vehicle_mappings(*, epa_test_vehicles(${EPA_STARTUP_FIELDS}))`);
+    // Size photos (migration 102) are read beside it, not embedded: a site
+    // whose database lacks the table draws outlines instead of failing to load.
+    const [{ data, error }, sizePhotos] = await Promise.all([
+      query(`${base}, epa_vehicle_mappings(*, epa_test_vehicles(${EPA_STARTUP_FIELDS}))`),
+      this.#getSizePhotos(),
+    ]);
 
     // Never swallow this. Destructuring only `data` made a failed query look
     // identical to an empty account, which turned a missing migration into a
@@ -484,6 +489,7 @@ class DataService {
           epaTestVehicle:  viewForVehicle(v.year, m.epa_test_vehicles),
         })),
         green_ncap: v.green_ncap_assessments || [],
+        size_photos: sizePhotos.get(v.id) ?? {},
         tags:  (v.vehicle_tags || []).map(vt => vt.tags).filter(Boolean),
         runs:  (v.runs || []).map(shapeRun),
       };
@@ -1114,12 +1120,12 @@ class DataService {
    * every cache while the object itself can be held for a year. Without the
    * stamp a long max-age would pin the old picture in browsers indefinitely.
    */
-  async #putVehicleImageObject(path, blob) {
+  async #putVehicleImageObject(path, blob, contentType = 'image/jpeg') {
     const { error } = await getSupabase().storage
       .from('vehicle-images')
       .upload(path, blob, {
         upsert: true,
-        contentType: 'image/jpeg',
+        contentType,
         cacheControl: String(IMAGE_CACHE_SECONDS),
       });
     if (error) throw error;
@@ -1147,6 +1153,61 @@ class DataService {
       refused.code = '42501';
       throw refused;
     }
+  }
+
+  /**
+   * Every size photo, as a Map of vehicle id → { side, front }. Empty, with a
+   * warning, where the table is missing (migration 102 not applied).
+   */
+  async #getSizePhotos() {
+    const { data, error } = await getSupabase().from('vehicle_size_photos').select('*');
+    const byVehicle = new Map();
+    if (error) {
+      console.warn('Size photos not loaded:', error.message);
+      return byVehicle;
+    }
+    for (const row of data || []) {
+      byVehicle.set(row.vehicle_id, { ...(byVehicle.get(row.vehicle_id) ?? {}), [row.view]: row });
+    }
+    return byVehicle;
+  }
+
+  /**
+   * Save a vehicle's side or front size photo (docs/size-photos-plan.md).
+   *
+   * Files first, then the row, so a failed upload never leaves a row pointing
+   * at nothing. `cutout` (PNG) and `original` are Blobs, each only when it
+   * changed: moving the marks or editing the credit writes the row alone.
+   *
+   * @param {number} vehicleId
+   * @param {'side'|'front'} view
+   * @param {{ cutout?: Blob, original?: Blob, originalExt?: string,
+   *           fields: { width_px, height_px, marks, trim, mirrored, source_url, credit } }} save
+   * @returns {Promise<object>} the saved row
+   */
+  async saveSizePhoto(vehicleId, view, { cutout = null, original = null, originalExt = 'jpg', fields }) {
+    const row = { vehicle_id: vehicleId, view, ...fields, updated_at: new Date().toISOString() };
+    const stem = `size/${vehicleId}-${view}`;
+    const [imageUrl, originalUrl] = await Promise.all([
+      cutout ? this.#putVehicleImageObject(`${stem}.png`, cutout, 'image/png') : null,
+      original ? this.#putVehicleImageObject(`${stem}-original.${originalExt}`, original, original.type || 'image/jpeg') : null,
+    ]);
+    if (imageUrl) row.image_url = imageUrl;
+    if (originalUrl) row.original_url = originalUrl;
+    const { data, error } = await getSupabase()
+      .from('vehicle_size_photos').upsert(row, { onConflict: 'vehicle_id,view' }).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  /** Remove a size photo: its row, then its files (a stray file is harmless; a row without one is not). */
+  async deleteSizePhoto(vehicleId, view, originalUrl = null) {
+    const { error } = await getSupabase()
+      .from('vehicle_size_photos').delete().eq('vehicle_id', vehicleId).eq('view', view);
+    if (error) throw error;
+    const stem = `size/${vehicleId}-${view}`;
+    const originalPath = originalUrl ? decodeURIComponent(new URL(originalUrl).pathname.split('/vehicle-images/')[1] ?? '') : null;
+    await getSupabase().storage.from('vehicle-images').remove([`${stem}.png`, ...(originalPath ? [originalPath] : [])]);
   }
 
   /**
