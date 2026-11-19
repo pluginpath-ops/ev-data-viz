@@ -3252,7 +3252,7 @@ describe('the spec chart plots the vehicle table’s columns (#450)', () => {
     it('Charging Curves chooses its axes through the axis picker, from the one axis list', () => {
         const view = read('src/components/ChargingView.jsx');
         expect(view).toMatch(/<AxisPicker/);
-        expect(view).toMatch(/chargingAxisOptions\(units\)/);
+        expect(view).toMatch(/chargingAxisOptions\(units, rangeBasis\)/);
         expect(read('src/utils/chartUrlState.js')).toMatch(/isChargingAxis\(s\.xAxis\)/);
     });
 

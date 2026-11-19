@@ -52,7 +52,7 @@
 import { ALL_CHART_MODES, DEFAULT_CHART_MODE, categoryForMode } from '../constants/chartNav';
 import { decodeCorrection, encodeCorrection } from './correctionSettings';
 import { encodePairings, decodePairings } from './pairings';
-import { isChargingAxis } from './chargingAxes';
+import { isChargingAxis, axisForBasis, basisOfAxes } from './chargingAxes';
 import {
     AXIS_LIMITS_PARAM, axisLimitsOf, axisLimitsOfLink, encodeAxisLimits, hasAxisLimits, withAxisLimits,
 } from './axisLimits';
@@ -177,6 +177,7 @@ export function parseChartUrl(search) {
         xAxis:         p.get('x')  || null,
         yAxis:         p.get('y')  || null,
         y2Axis:        p.get('y2') || null,
+        rangeBasis:    p.get('rb') === 'epa' ? 'epa' : p.get('rb') === 'tested' ? 'tested' : null,
         alignRaw:      p.get('raw') === '1',
         raceThreshold: p.get('rt')  ? Number(p.get('rt'))  : null,
         // The limits of the chart this link opens: all six, defaults filled in,
@@ -276,13 +277,17 @@ export function parseChartUrl(search) {
  */
 export function chartConfigFromParsed(chart, base) {
     const s = chart;
+    // A link without `rb` is an older one: it meant EPA only if it plotted an
+    // EPA range axis.
+    const basis = s.rangeBasis ?? basisOfAxes([s.xAxis, s.yAxis, s.y2Axis].filter(Boolean));
     return {
         ...base,
         // An axis the chart no longer offers (Temperature, Frame) is left at
         // what `base` has, so an old link or saved comparison still opens.
-        ...(isChargingAxis(s.xAxis)  && { xAxis: s.xAxis }),
-        ...(isChargingAxis(s.yAxis)  && { yAxis: s.yAxis }),
-        ...(isChargingAxis(s.y2Axis) && { y2Axis: s.y2Axis }),
+        ...(isChargingAxis(s.xAxis)  && { xAxis: axisForBasis(s.xAxis, basis) }),
+        ...(isChargingAxis(s.yAxis)  && { yAxis: axisForBasis(s.yAxis, basis) }),
+        ...(isChargingAxis(s.y2Axis) && { y2Axis: axisForBasis(s.y2Axis, basis) }),
+        rangeBasis: basis,
         ...(s.runIds.length > 0 && (s.chartMode === 'charging' || s.chartMode === 'range') && { selectedRuns: s.runIds }),
         alignRaw:      s.alignRaw,
         raceThreshold: s.raceThreshold,
@@ -376,6 +381,7 @@ export function buildChartParams({
         p.set('x', chartConfig.xAxis);
         p.set('y', chartConfig.yAxis);
         if (chartConfig.y2Axis)               p.set('y2',   chartConfig.y2Axis);
+        if (chartConfig.rangeBasis === 'epa') p.set('rb',   'epa');
     }
     if (chartConfig.alignRaw)                 p.set('raw', '1');
     if (chartConfig.raceThreshold != null)    p.set('rt',   String(chartConfig.raceThreshold));
