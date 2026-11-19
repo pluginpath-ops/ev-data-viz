@@ -166,7 +166,6 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
     const photo = marks && size ? { marks, width_px: size.w, height_px: size.h } : null;
     const read = photo ? figuresFromMarks(view, photo, profile) : null;
     const outOfOrder = marks && ORDER[view].some((k, i, keys) => i > 0 && !(marks[keys[i - 1]] < marks[k]));
-    const scaleSpec = isEndView(view) ? profile.width : profile.length;
 
     // Throws when it can't save; saveSizePhoto shows its own errors.
     const persist = async () => {
@@ -296,17 +295,21 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
                 </div>
             )}
 
-            {read && (
+            {photo && (
                 <div className="flex flex-col gap-1">
-                    {!scaleSpec && <p className="text-note">No {isEndView(view) ? 'width' : 'length'} spec yet, so nothing can be checked.</p>}
-                    {view === 'side' && (
+                    {!read && (
+                        <p className="text-note status-text is-warning">
+                            No {isEndView(view) ? 'width' : 'length'} spec yet, so the marks can’t be read in inches or checked. Add it under Exterior Dimensions; the marks keep until then.
+                        </p>
+                    )}
+                    {read && view === 'side' && (
                         <>
                             <CheckRow label="Wheelbase" read={read.wheelbase} spec={profile.wheelbase} units={units} limit={SIZE_PHOTO_WHEELBASE_PCT} />
                             <CheckRow label="Front overhang" read={read.frontOverhang}
                                 spec={profile.estimated.has('frontOverhang') ? null : profile.frontOverhang} units={units} limit={SIZE_PHOTO_WHEELBASE_PCT} />
                         </>
                     )}
-                    <CheckRow label="Height" read={read.height} spec={profile.height} units={units} limit={SIZE_PHOTO_HEIGHT_PCT} />
+                    {read && <CheckRow label="Height" read={read.height} spec={profile.height} units={units} limit={SIZE_PHOTO_HEIGHT_PCT} />}
                 </div>
             )}
             {outOfOrder && <p className="text-note status-text is-warning">The marks are out of order: {ORDER[view].map(k => MARKS[view].find(m => m.key === k).label.toLowerCase()).join(', then ')}.</p>}
