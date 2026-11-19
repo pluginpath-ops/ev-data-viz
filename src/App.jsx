@@ -39,6 +39,7 @@ import { flipSeason, skippedCount } from './utils/setupWizard';
 import { readSetupReview, writeSetupReview } from './utils/setupWizardStorage';
 import { parseChartUrl, buildChartParams, chartConfigFromParsed, vehicleIdsOfLink, chartQueryString } from './utils/chartUrlState';
 import SpecChart from './components/SpecChart';
+import SizeChart from './components/sizechart/SizeChart';
 import EpaCurvesView from './components/EpaCurvesView';
 import PerformanceCompareView from './components/PerformanceCompareView';
 import PerformanceCurveView from './components/PerformanceCurveView';
@@ -1333,7 +1334,7 @@ export default function App() {
                       * listed here, so every new chart mode must be added to this
                       * exclusion list or it silently renders the charging chart
                       * instead of itself. */}
-                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && chartMode !== 'drivesetup' && chartMode !== 'drivecost' && chartMode !== 'driveplan' && chartMode !== 'drivecharger' && (
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode !== 'compare' && chartMode !== 'specs' && chartMode !== 'specstable' && chartMode !== 'specscatter' && chartMode !== 'specsize' && chartMode !== 'roadtrip' && chartMode !== 'optimizer' && chartMode !== 'epacurves' && chartMode !== 'perfcompare' && chartMode !== 'perfcurve' && chartMode !== 'drivesetup' && chartMode !== 'drivecost' && chartMode !== 'driveplan' && chartMode !== 'drivecharger' && (
                         <ChargingView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
@@ -1403,6 +1404,13 @@ export default function App() {
                             setChartConfig={setChartConfig}
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
                             correctionTarget={chartConfig.correctionTarget}
+                        />
+                    )}
+                    {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'specsize' && (
+                        <SizeChart
+                            vehicles={selectedVehicles.map(id => chartVehicles.find(v => v.id === id)).filter(Boolean)}
+                            chartConfig={chartConfig}
+                            setChartConfig={setChartConfig}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'epacurves' && (

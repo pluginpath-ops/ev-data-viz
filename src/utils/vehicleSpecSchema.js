@@ -119,13 +119,30 @@ export const SPEC_CATEGORIES = [
         ],
     },
     {
+        // The Size chart draws from these (utils/vehicleProfile.js). Rear
+        // overhang is not a field: it is length − wheelbase − front overhang,
+        // and a second home for it could disagree with the other three.
         key: 'dimensions',
         label: 'Exterior Dimensions',
         fields: [
+            { key: 'body_style',          label: 'Body Style',              type: 'enum',
+              options: ['Sedan', 'Hatchback', 'Wagon', 'Crossover', 'SUV', 'Pickup', 'Van'],
+              hint: 'The outline the Size chart draws.' },
             { key: 'length_in',           label: 'Length (in)',             type: 'number', unitGroup: 'dimension' },
-            { key: 'width_in',            label: 'Width (in)',              type: 'number', unitGroup: 'dimension' },
+            // Published widths mix the two: some count the mirrors, some not.
+            // This one never does; the mirrors have their own field.
+            { key: 'width_in',            label: 'Width, excl. Mirrors (in)', type: 'number', unitGroup: 'dimension', tableLabel: 'Width',
+              hint: 'Body width without mirrors (or with them folded). A figure that counts the mirrors goes in Width incl. Mirrors.' },
+            { key: 'width_mirrors_in',    label: 'Width incl. Mirrors (in)', type: 'number', unitGroup: 'dimension', tableLabel: 'Width w/ mirrors',
+              hint: 'Overall width with the mirrors out.' },
             { key: 'height_in',           label: 'Height (in)',             type: 'number', unitGroup: 'dimension' },
             { key: 'wheelbase_in',        label: 'Wheelbase (in)',          type: 'number', unitGroup: 'dimension' },
+            { key: 'front_overhang_in',   label: 'Front Overhang (in)',     type: 'number', unitGroup: 'dimension',
+              hint: 'Front bumper to the center of the front wheel. Places the axles on the Size chart.' },
+            { key: 'track_front_in',      label: 'Front Track (in)',        type: 'number', unitGroup: 'dimension',
+              hint: 'Center of one front tire to the center of the other.' },
+            { key: 'track_rear_in',       label: 'Rear Track (in)',         type: 'number', unitGroup: 'dimension',
+              hint: 'Center of one rear tire to the center of the other.' },
             { key: 'ground_clearance_in', label: 'Ground Clearance (in)',   type: 'number', unitGroup: 'dimension' },
             { key: 'bed_length_in',       label: 'Truck Bed Length (in)',   type: 'number', unitGroup: 'dimension' },
         ],

@@ -6535,6 +6535,72 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .spec-chart-canvas.is-scatter { height: 640px; }
 .spec-chart-dropped { margin-top: 8px; }
 
+/* ── Size chart ───────────────────────────────────────────────────────────────
+   The selected vehicles drawn to one scale (sizechart/). Each silhouette takes
+   its series color from `--series`, set on its group; everything else is the
+   chart's own furniture, from the chart tokens. */
+.size-chart-canvas { width: 100%; min-height: 120px; }
+.size-chart-svg { display: block; overflow: visible; }
+.size-chart-empty,
+.size-chart-note { margin-top: 8px; }
+
+.size-grid line { stroke: var(--color-chart-grid); stroke-width: 1; }
+.size-ground { stroke: var(--color-chart-axis); stroke-width: 1.5; }
+.size-anchor-line { stroke: var(--color-chart-axis); stroke-width: 1; stroke-dasharray: 4 4; }
+
+.size-silhouette .size-body {
+    fill: var(--series);
+    fill-opacity: 0.14;
+    stroke: var(--series);
+    stroke-width: 2;
+    stroke-linejoin: round;
+}
+.size-silhouette .size-glass { fill: var(--series); fill-opacity: 0.1; stroke: var(--series); stroke-width: 1; stroke-opacity: 0.6; }
+.size-silhouette .size-wheel circle,
+.size-silhouette rect.size-wheel { fill: var(--series); fill-opacity: 0.22; stroke: var(--series); stroke-width: 1.5; }
+.size-silhouette .size-wheel .size-rim { fill: none; stroke-opacity: 0.6; stroke-width: 1; }
+.size-silhouette .size-wheel.is-estimated circle,
+.size-silhouette rect.size-wheel.is-estimated { stroke-dasharray: 4 3; }
+.size-silhouette.is-active .size-body { fill-opacity: 0.3; stroke-width: 3; }
+.size-silhouette.is-quiet { opacity: 0.45; }
+
+.size-callout text {
+    fill: var(--color-text-value);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    font-variant-numeric: tabular-nums;
+}
+.size-callout-lead { stroke: var(--series); stroke-width: 1; stroke-dasharray: 2 3; }
+.size-callout-bar { stroke: var(--series); stroke-width: 2.5; }
+.size-callout-mirrors { stroke: var(--series); stroke-width: 2.5; stroke-opacity: 0.35; }
+.size-callout-axle { fill: var(--color-card); stroke: var(--series); stroke-width: 2; }
+.size-callout-axle.is-estimated { stroke-dasharray: 2 2; }
+
+/* "Line up on": the six anchors, two to a row, each with its picture. */
+.segmented.size-anchors { display: grid; grid-template-columns: 1fr 1fr; }
+.segmented.size-anchors button { display: flex; align-items: center; gap: 6px; text-align: left; }
+.size-anchor-icon { width: 36px; height: 14px; flex: none; }
+.size-anchor-icon path,
+.size-anchor-icon circle { fill: none; stroke: currentColor; stroke-width: 1; }
+.size-anchor-icon-mark { stroke: var(--color-accent-orange); stroke-width: 1.5; }
+
+/* The figures under the drawing, one row per vehicle. */
+.size-figures-container { @apply overflow-x-auto mt-3; }
+.size-figures { @apply w-full text-sm; }
+.size-figures th {
+    @apply text-left font-medium py-2 pr-4 border-b whitespace-nowrap;
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+}
+.size-figures td {
+    @apply py-1.5 pr-4 align-top border-b whitespace-nowrap;
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+.size-figures tr.is-active td { background-color: var(--color-hover-lift); }
+.size-figures-name { @apply flex items-center gap-2; color: var(--color-text-primary); }
+.size-figure { @apply font-medium tabular-nums; color: var(--color-text-value); }
+
 /* The field picker (tables/FieldPicker), on `.guide-facet-panel`'s stack: the column picker's rows, choosing what
    to draw rather than what to show. A list that scrolls inside the sidebar so a
    hundred-odd columns cannot push the sections below it off the screen. */

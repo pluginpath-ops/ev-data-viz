@@ -66,6 +66,8 @@ const NAMES_V1 = [
     'cd',
     // Charging Speeds' chart (`hc=time`), appended after #476.
     'hc',
+    // The Size chart's view and alignment.
+    'sv', 'sa',
 ];
 
 // Values that recur: tabs, modes, axes, chart types, units, presets, and the
@@ -129,6 +131,11 @@ const WORDS_V1 = [
     'cost', 'drivesetup', 'drivecost', 'driveplan', 'drivecharger',
     // The vehicle table's EPA charger efficiency column, appended.
     'figures.chargerEfficiency',
+    // The Size chart (`m=specsize`) and its settings, and the dimension
+    // fields added with it, appended.
+    'specsize', 'side', 'front', 'frontAxle', 'wheelbaseCenter', 'lengthCenter', 'rearAxle', 'rear',
+    'dimensions.body_style', 'dimensions.width_mirrors_in', 'dimensions.front_overhang_in',
+    'dimensions.track_front_in', 'dimensions.track_rear_in',
 ];
 
 /**

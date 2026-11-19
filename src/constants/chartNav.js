@@ -126,6 +126,8 @@ export const CHART_CATEGORIES = [
             // lights Chart for either.
             { key: 'specs',       label: 'Chart' },
             { key: 'specscatter', label: 'Chart', navAlias: 'specs' },
+            // The selected vehicles drawn to one scale from their dimensions.
+            { key: 'specsize',    label: 'Size' },
         ],
     },
 ];

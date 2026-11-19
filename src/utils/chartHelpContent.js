@@ -479,6 +479,33 @@ export const CHART_HELP_DEFAULTS = {
             'for display only (e.g. kW↔hp, mi↔km). Bars show the raw values from zero.',
     },
 
+    specsize: {
+        title: 'About the Size chart',
+        data_source:
+            'The selected vehicles drawn to one scale from their dimension specs: length, height, ' +
+            'wheelbase, front overhang, width (with and without mirrors), track, ground clearance and ' +
+            'tire size. Each outline is a generic shape for the vehicle’s body style, stretched to its ' +
+            'own figures — it is not a photo of the car.',
+        how_to_read:
+            'From the side, the vehicles stand on one ground line, lined up on the point you pick: a ' +
+            'bumper, an axle, or the middle of the wheelbase or the length. From the front, they share ' +
+            'a centerline. Each vehicle is outlined in its series color; point at one, or its row in the ' +
+            'table, to bring it forward. The lines below the ground give each vehicle’s length (dots ' +
+            'mark the axles) or width (the lighter line reaches the mirrors). The table compares every ' +
+            'figure with the first vehicle’s.',
+        key_terms:
+            'Wheelbase — front axle to rear axle.\n' +
+            'Overhang — bumper to the nearest axle. Rear overhang is length less wheelbase and front overhang.\n' +
+            'Track — center of one tire to the center of the other, across the vehicle.\n' +
+            'Est. — drawn from a typical value because the spec is missing; the notes under the chart list which.\n' +
+            'Units follow your imperial/metric toggle.',
+        math_approach:
+            'No calculation beyond placing the figures: one scale fits the widest drawing to the frame. ' +
+            'Without a front overhang the axles are placed by a typical split of the two overhangs for ' +
+            'the body style; without a tire size the wheel is the rim size plus a typical sidewall. ' +
+            'Neither stand-in is stored.',
+    },
+
     specscatter: {
         title: 'About the Spec Scatter chart',
         data_source:

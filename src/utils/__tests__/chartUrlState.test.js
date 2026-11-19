@@ -103,6 +103,32 @@ describe('Range & Efficiency', () => {
     });
 });
 
+describe('Size chart', () => {
+    it('writes the front view and an anchor off the default, and reads them back', () => {
+        const q = build({ chartMode: 'specsize', chartConfig: { ...baseConfig(), sizeView: 'front', sizeAnchor: 'rearAxle' } });
+        expect(q).toContain('sv=front');
+        expect(q).toContain('sa=rearAxle');
+        const cfg = chartConfigFromParsed(parseChartUrl(q).chart, baseConfig());
+        expect(cfg.sizeView).toBe('front');
+        expect(cfg.sizeAnchor).toBe('rearAxle');
+    });
+
+    it('leaves the defaults out, reads absent as them, and drops what it does not know', () => {
+        const q = build({ chartMode: 'specsize', chartConfig: { ...baseConfig(), sizeView: 'side', sizeAnchor: 'front' } });
+        expect(q).not.toContain('sv=');
+        expect(q).not.toContain('sa=');
+        const stale = { ...baseConfig(), sizeView: 'front', sizeAnchor: 'rear' };
+        const cfg = chartConfigFromParsed(parseChartUrl(q).chart, stale);
+        expect([cfg.sizeView, cfg.sizeAnchor]).toEqual(['side', 'front']);
+        expect(parseChartUrl('tab=specifications&m=specsize&sv=top&sa=roof').chart).toMatchObject({ sizeView: null, sizeAnchor: null });
+    });
+
+    it('writes its defaults out for a short link', () => {
+        const out = new URLSearchParams(withDefaultsWrittenOut('tab=specifications&m=specsize'));
+        expect([out.get('sv'), out.get('sa')]).toEqual(['side', 'front']);
+    });
+});
+
 describe('Home Charger', () => {
     const base = { ...baseConfig(), homeChargerChart: 'cost' };
     it('writes the time chart and reads it back', () => {

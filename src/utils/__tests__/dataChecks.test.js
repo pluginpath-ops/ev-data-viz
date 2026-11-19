@@ -713,3 +713,28 @@ describe('range test pack against EPA tested', () => {
         expect(findingOf([range(45, { start_soc: 60, end_soc: 10 })])).toBeUndefined();
     });
 });
+
+describe('size (the Size chart\'s figures)', () => {
+    const dims = (d) => vehicle({ specs: { dimensions: d } });
+    const full = { body_style: 'Sedan', length_in: 184.8, height_in: 56.7, wheelbase_in: 113.2, front_overhang_in: 35 };
+
+    it('lists nothing for a vehicle with every figure, or with none', () => {
+        expect(checksFor(dims(full)).filter(c => c.startsWith('size'))).toEqual([]);
+        expect(checksFor(vehicle()).filter(c => c.startsWith('size'))).toEqual([]);
+        expect(checksFor(dims({ body_style: 'SUV' })).filter(c => c.startsWith('size'))).toEqual([]);
+    });
+
+    it('names what a partly measured vehicle lacks', () => {
+        const f = findingsFor(dims({ length_in: 180, height_in: 60 })).find(x => x.check === 'size-incomplete');
+        expect(f.text).toContain('wheelbase, front overhang, body style');
+        expect(f.evidence).toEqual({ lacking: ['body_style', 'front_overhang_in', 'wheelbase_in'] });
+    });
+
+    it('catches overhangs, mirrors and tracks that cannot all be right', () => {
+        expect(checksFor(dims({ ...full, front_overhang_in: 80 }))).toContain('size-inconsistent');
+        expect(checksFor(dims({ ...full, width_in: 80, width_mirrors_in: 78 }))).toContain('size-inconsistent');
+        expect(checksFor(dims({ ...full, width_in: 72, track_front_in: 73 }))).toContain('size-inconsistent');
+        expect(checksFor(dims({ ...full, width_in: 72.8, width_mirrors_in: 82.2, track_front_in: 62 }))).not.toContain('size-inconsistent');
+    });
+
+});

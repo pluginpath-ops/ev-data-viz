@@ -48,11 +48,12 @@ describe('Vehicles & Specs (#338)', () => {
         expect(categoryForMode('specstable').key).toBe('specifications');   // old links land under Vehicles & Specs
     });
 
-    it('shows Table and one Chart item for the two spec charts, in a named section', () => {
+    it('shows Table, one Chart item for the two spec charts, and Size, in a named section', () => {
         const items = chartModesUnder('vehicles');
         expect(items.map(m => [m.key, m.label, m.group])).toEqual([
             ['specstable', 'Table', 'Specifications & Data'],
             ['specs', 'Chart', 'Specifications & Data'],
+            ['specsize', 'Size', 'Specifications & Data'],
         ]);
         expect(navItemForMode('specscatter')).toBe('specs');
         expect(navItemForMode('specs')).toBe('specs');

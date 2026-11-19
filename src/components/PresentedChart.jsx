@@ -3,6 +3,7 @@ import { DEFAULT_SERIES_PALETTE } from '../utils/colorUtils';
 import ChargeCompareView from './ChargeCompareView';
 import RoadTripView from './RoadTripView';
 import SpecChart from './SpecChart';
+import SizeChart from './sizechart/SizeChart';
 import { DEFAULT_READER_MODE } from '../utils/correctionSettings';
 import EpaCurvesView from './EpaCurvesView';
 import PerformanceCompareView from './PerformanceCompareView';
@@ -52,6 +53,15 @@ export default function PresentedChart({
                 setChartConfig={setChartConfig ?? (() => {})}
                 correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
                 correctionTarget={chartConfig?.correctionTarget}
+                presentationMode
+            />
+        )}
+
+        {selectedVehicles.length > 0 && chartMode === 'specsize' && (
+            <SizeChart
+                vehicles={selectedVehicles.map(id => vehicles.find(v => v.id === id)).filter(Boolean)}
+                chartConfig={chartConfig}
+                setChartConfig={setChartConfig ?? (() => {})}
                 presentationMode
             />
         )}
