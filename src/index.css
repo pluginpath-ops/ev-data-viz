@@ -6577,7 +6577,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
     font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
     font-variant-numeric: tabular-nums;
 }
-.size-callout-lead { stroke: var(--series); stroke-width: 1; stroke-dasharray: 2 3; }
+.size-callout-lead { stroke: var(--series); stroke-width: 1.5; stroke-dasharray: 6 4; }
 .size-callout-bar { stroke: var(--series); stroke-width: 2.5; }
 .size-callout-mirrors { stroke: var(--series); stroke-width: 2.5; stroke-opacity: 0.35; }
 .size-callout-axle { fill: var(--color-card); stroke: var(--series); stroke-width: 2; }

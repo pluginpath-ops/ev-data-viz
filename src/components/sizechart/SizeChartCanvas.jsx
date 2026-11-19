@@ -3,7 +3,7 @@ import { useElementWidth } from '../../hooks/useElementWidth';
 import { useTheme } from '../../hooks/useTheme';
 import { svgToCanvas } from '../../utils/svgRaster';
 import { sideSilhouette, frontSilhouette } from '../../utils/silhouettes';
-import { sizeChartLayout, gridStepIn, frontHalfWidth, SIZE_MARGIN, SIZE_ROW_PX } from '../../utils/sizeChartLayout';
+import { sizeChartLayout, gridStepIn, SIZE_MARGIN, SIZE_ROW_PX } from '../../utils/sizeChartLayout';
 import { fmtDimension } from '../../utils/unitConversions';
 
 /** Labels in the right margin, pushed apart so none overlaps the one above. */
@@ -160,10 +160,10 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
                 {lines && items.map(({ id, color, profile: p }, i) => {
                     const y = heightYs[i];
                     const roofY = py(p.height);
-                    const reach = view === 'front' ? px(frontHalfWidth(p)) : px(places.get(id) + p.length);
+                    // Across the whole drawing, so each roof can be read against every car.
                     return (
                         <g key={`h${id}`} className="size-callout" style={{ '--series': color }}>
-                            <line className="size-callout-lead" x1={reach} x2={right + 4} y1={roofY} y2={roofY} />
+                            <line className="size-callout-lead" x1={px(minX)} x2={right + 4} y1={roofY} y2={roofY} />
                             <text x={right + 8} y={y + 4}>{fmtDimension(p.height, units)}</text>
                         </g>
                     );
