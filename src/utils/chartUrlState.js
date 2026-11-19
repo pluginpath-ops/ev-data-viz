@@ -31,6 +31,8 @@
  *                 (written before the optimizer had its own tab) opens here.
  *   specs         sf (the field charted)
  *   specscatter   scx scy
+ *   specsize      sv sa (view, written only for front; what the vehicles are
+ *                 lined up on, written only when not the front bumper)
  *   drivecharger  hc (the chart: written only for 'time', absent is the cost chart)
  *   epacurves     epa_ya epa_m epa_ov
  *   specstable    vt_* (carried over, written by the table itself) and filters
@@ -60,6 +62,9 @@ import {
     defaultCompareConfig, defaultRoadTripConfig,
 } from './chartDefaults';
 import { encodeShortLink } from './shortLink';
+import {
+    SIZE_ANCHORS, SIZE_VIEWS, SIZE_DRAWS, DEFAULT_SIZE_ANCHOR, DEFAULT_SIZE_VIEW, DEFAULT_SIZE_DRAW,
+} from '../constants/sizeChart';
 import { COST_TO_DRIVE_PARAM, encodeCostToDriveKey, encodeGasCarKey } from './costToDriveKey';
 
 // The defaults live with the rest of a fresh page's settings (chartDefaults.js);
@@ -152,6 +157,9 @@ export function parseChartUrl(search) {
     const rangeChartType = p.get('rc');
     const effUnit = p.get('eff');
     const homeChart = p.get('hc');
+    const sizeView = p.get('sv');
+    const sizeAnchor = p.get('sa');
+    const sizeDraw = p.get('sd');
     // A stale or hand-edited ?m= would otherwise fall through to the charging
     // chart with no indication why.
     const linkedMode = ALL_CHART_MODES.includes(p.get('m')) ? p.get('m') : DEFAULT_CHART_MODE;
@@ -186,6 +194,9 @@ export function parseChartUrl(search) {
         rangeChartType: RANGE_CHART_TYPES.includes(rangeChartType) ? rangeChartType : null,
         effUnit:        EFFICIENCY_UNITS.includes(effUnit) ? effUnit : null,
         homeChargerChart: HOME_CHARGER_CHARTS.includes(homeChart) ? homeChart : null,
+        sizeView:   SIZE_VIEWS.some(v => v.key === sizeView) ? sizeView : null,
+        sizeAnchor: SIZE_ANCHORS.some(a => a.key === sizeAnchor) ? sizeAnchor : null,
+        sizeDraw:   SIZE_DRAWS.some(d => d.key === sizeDraw) ? sizeDraw : null,
         correction:    decodeCorrection(p.toString()),
     };
 
@@ -287,6 +298,11 @@ export function chartConfigFromParsed(chart, base) {
         ...(s.effUnit       && { effUnit: s.effUnit }),
         // A link names its chart either way: absent means the cost chart.
         ...(s.chartMode === 'drivecharger' && { homeChargerChart: s.homeChargerChart ?? DEFAULT_HOME_CHARGER_CHART }),
+        // A link names its view, alignment and draw either way: absent means the defaults.
+        ...(s.chartMode === 'specsize' && {
+            sizeView: s.sizeView ?? DEFAULT_SIZE_VIEW, sizeAnchor: s.sizeAnchor ?? DEFAULT_SIZE_ANCHOR,
+            sizeDraw: s.sizeDraw ?? DEFAULT_SIZE_DRAW,
+        }),
         correctionMode:   s.correction.mode,
         correctionTarget: s.correction.target,
     };
@@ -382,6 +398,13 @@ export function buildChartParams({
 
     // Charging Speeds' chart: the minutes view only; absent is the cost chart.
     if (chartMode === 'drivecharger' && chartConfig.homeChargerChart === 'time') p.set('hc', 'time');
+
+    // The Size chart's view, alignment and draw, each only off its default.
+    if (chartMode === 'specsize') {
+        if (chartConfig.sizeView && chartConfig.sizeView !== DEFAULT_SIZE_VIEW) p.set('sv', chartConfig.sizeView);
+        if (chartConfig.sizeAnchor && chartConfig.sizeAnchor !== DEFAULT_SIZE_ANCHOR) p.set('sa', chartConfig.sizeAnchor);
+        if (chartConfig.sizeDraw && chartConfig.sizeDraw !== DEFAULT_SIZE_DRAW) p.set('sd', chartConfig.sizeDraw);
+    }
 
     // Charge Stop
     if (chartMode === 'compare') {
@@ -487,6 +510,11 @@ export function withDefaultsWrittenOut(search) {
     };
     const mode = p.get('m');
     if (mode === 'compare') fill(COMPARE_PARAMS, defaultCompareConfig());
+    if (mode === 'specsize') {
+        if (!p.has('sv')) p.set('sv', DEFAULT_SIZE_VIEW);
+        if (!p.has('sa')) p.set('sa', DEFAULT_SIZE_ANCHOR);
+        if (!p.has('sd')) p.set('sd', DEFAULT_SIZE_DRAW);
+    }
     if (mode === 'roadtrip' || mode === 'optimizer') {
         const defaults = defaultRoadTripConfig();
         // An old Road Trip link on a sweep axis opens the optimizer; writing

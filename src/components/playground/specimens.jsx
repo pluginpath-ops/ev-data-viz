@@ -288,10 +288,12 @@ export const COMPOSITES = {
                 <span className="plot-frame-subtitle">corrected for wind · 70°F · 0 ft · imperial</span>
             </div>
             <p className="plot-frame-sources">
-                <span>Data:</span>
+                <span className="plot-frame-sources-label">Data:</span>
                 <a href="https://www.fueleconomy.gov">fueleconomy.gov</a>
                 <span>Out of Spec</span>
                 <span className="plot-frame-sources-gap">⚠ 2 unattributed</span>
+                <span className="plot-frame-sources-label">Photos:</span>
+                <span>Ford Media</span>
             </p>
         </div>
     ),

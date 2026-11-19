@@ -3743,7 +3743,7 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     color: var(--color-text-meta);
 }
 .plot-frame-sources > * + *::before { content: '·'; margin-right: 6px; color: var(--color-text-faint); }
-.plot-frame-sources > span:first-child + *::before { content: none; }
+.plot-frame-sources > .plot-frame-sources-label + *::before { content: none; }
 .plot-frame-sources a { color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
 .plot-frame-sources a:hover { color: var(--color-text-primary); }
 .plot-frame-sources-gap { color: var(--color-warning-text, var(--color-text-meta)); }
@@ -6534,6 +6534,152 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .spec-chart-canvas { position: relative; }
 .spec-chart-canvas.is-scatter { height: 640px; }
 .spec-chart-dropped { margin-top: 8px; }
+
+/* ── Size chart ───────────────────────────────────────────────────────────────
+   The selected vehicles drawn to one scale (sizechart/). Each silhouette takes
+   its series color from `--series`, set on its group; everything else is the
+   chart's own furniture, from the chart tokens. */
+.size-chart-canvas { width: 100%; min-height: 120px; }
+.size-chart-svg { display: block; overflow: visible; }
+.size-chart-empty,
+.size-chart-note { margin-top: 8px; }
+
+.size-grid line { stroke: var(--color-chart-grid); stroke-width: 1; }
+.size-ground { stroke: var(--color-chart-axis); stroke-width: 1.5; }
+.size-anchor-line { stroke: var(--color-chart-axis); stroke-width: 1; stroke-dasharray: 4 4; }
+
+.size-silhouette .size-body {
+    fill: var(--series);
+    fill-opacity: 0.14;
+    stroke: var(--series);
+    stroke-width: 2;
+    stroke-linejoin: round;
+}
+.size-silhouette .size-glass { fill: var(--series); fill-opacity: 0.1; stroke: var(--series); stroke-width: 1; stroke-opacity: 0.6; }
+.size-silhouette .size-wheel circle,
+.size-silhouette rect.size-wheel { fill: var(--series); fill-opacity: 0.22; stroke: var(--series); stroke-width: 1.5; }
+.size-silhouette .size-wheel .size-rim { fill: none; stroke-opacity: 0.6; stroke-width: 1; }
+.size-silhouette .size-wheel.is-estimated circle,
+.size-silhouette rect.size-wheel.is-estimated { stroke-dasharray: 4 3; }
+.size-silhouette.is-active .size-body { fill-opacity: 0.3; stroke-width: 3; }
+.size-silhouette.is-quiet { opacity: 0.45; }
+.size-silhouette .size-photo-ground { stroke: var(--series); stroke-width: 3; stroke-linecap: round; }
+.size-silhouette.is-active .size-photo-ground { stroke-width: 5; }
+/* Overlaid photos are see-through, so a car behind another still shows; the
+   one pointed at comes to the front, unchanged, while the rest fade further.
+   Outlines are already see-through by their fill. */
+.size-chart-svg.is-overlaid .size-photo { opacity: 0.6; }
+.size-chart-svg.is-overlaid .size-silhouette.is-active .size-photo { opacity: 0.6; }
+
+.size-callout text {
+    fill: var(--color-text-value);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    font-variant-numeric: tabular-nums;
+}
+.size-callout-lead { stroke: var(--series); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.size-callout-bar { stroke: var(--series); stroke-width: 2.5; }
+.size-callout-mirrors { stroke: var(--series); stroke-width: 2.5; stroke-opacity: 0.35; }
+.size-callout-axle { fill: var(--color-card); stroke: var(--series); stroke-width: 2; }
+.size-callout-axle.is-estimated { stroke-dasharray: 2 2; }
+
+/* "Line up on": the six anchors, two to a row, each with its picture. */
+.segmented.size-anchors { display: grid; grid-template-columns: 1fr 1fr; }
+.segmented.size-anchors button { display: flex; align-items: center; gap: 6px; text-align: left; }
+.size-anchor-icon { width: 36px; height: 14px; flex: none; }
+.size-anchor-icon path,
+.size-anchor-icon circle { fill: none; stroke: currentColor; stroke-width: 1; }
+.size-anchor-icon-mark { stroke: var(--color-accent-orange); stroke-width: 1.5; }
+
+/* ── Size photos (sizephotos/) ────────────────────────────────────────────────
+   The vehicle form's Side and Front slots and the editor in them: a cutout on
+   a checkerboard (so see-through reads as see-through), the marks over it,
+   and a loupe that follows the mark being moved. */
+.size-photo-slots { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.size-photo-slot { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.size-photo-thumb,
+.size-photo-frame {
+    background-color: var(--color-card);
+    background-image:
+        linear-gradient(45deg, var(--color-surface-sunken) 25%, transparent 25%, transparent 75%, var(--color-surface-sunken) 75%),
+        linear-gradient(45deg, var(--color-surface-sunken) 25%, transparent 25%, transparent 75%, var(--color-surface-sunken) 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 8px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+}
+.size-photo-thumb img { display: block; width: 100%; max-height: 160px; object-fit: contain; }
+.size-photo-frame { position: relative; width: 100%; touch-action: none; user-select: none; }
+.size-photo-frame img { display: block; width: 100%; height: 100%; pointer-events: none; }
+
+.size-mark { position: absolute; outline: none; }
+.size-mark.is-vertical { top: 0; bottom: 0; width: 13px; margin-left: -6px; cursor: ew-resize; }
+.size-mark.is-horizontal { left: 0; right: 0; height: 13px; margin-top: -6px; cursor: ns-resize; }
+.size-mark::before { content: ''; position: absolute; background: var(--mark); }
+.size-mark.is-vertical::before { top: 0; bottom: 0; left: 6px; width: 1px; }
+.size-mark.is-horizontal::before { left: 0; right: 0; top: 6px; height: 1px; }
+.size-mark:focus-visible::before,
+.size-mark:hover::before { box-shadow: 0 0 0 1px var(--mark); }
+.size-mark--bumper { --mark: var(--color-accent-orange); }
+.size-mark--axle   { --mark: var(--color-accent-blue); }
+.size-mark--ground { --mark: var(--color-accent-green); }
+.size-mark--roof   { --mark: var(--color-accent-violet); }
+.size-mark-label {
+    position: absolute;
+    white-space: nowrap;
+    padding: 0 4px;
+    border-radius: var(--radius-track);
+    background: var(--color-popover);
+    color: var(--mark);
+    font-size: var(--fs-meta, calc(var(--fs-body) * var(--fs-step)));
+    pointer-events: none;
+}
+.size-mark.is-vertical .size-mark-label { top: 2px; left: 9px; }
+.size-mark.is-horizontal .size-mark-label { left: 2px; top: -16px; }
+.size-mark:nth-of-type(odd).is-vertical .size-mark-label { top: auto; bottom: 2px; }
+
+.size-photo-loupe {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    transform: translate(-50%, calc(-100% - 16px));
+    border-radius: 50%;
+    border: 2px solid var(--color-border-strong);
+    background-color: var(--color-card);
+    background-repeat: no-repeat;
+    background-origin: border-box; /* the editor centers the photo on the outer box */
+    pointer-events: none;
+    box-shadow: 0 4px 12px var(--color-hover-lift);
+}
+.size-photo-loupe::after {
+    content: '';
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 9px; height: 9px;
+    margin: -4px 0 0 -4px;
+    border: 1px solid var(--color-accent-orange);
+    border-radius: 50%;
+}
+
+.size-photo-fields { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.size-photo-fields label { display: flex; flex-direction: column; gap: 4px; }
+
+/* The figures under the drawing, one row per vehicle. */
+.size-figures-container { @apply overflow-x-auto mt-3; }
+.size-figures { @apply w-full text-sm; }
+.size-figures th {
+    @apply text-left font-medium py-2 pr-4 border-b whitespace-nowrap;
+    border-color: var(--color-border);
+    color: var(--color-text-muted);
+}
+.size-figures td {
+    @apply py-1.5 pr-4 align-top border-b whitespace-nowrap;
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+}
+.size-figures tr.is-active td { background-color: var(--color-hover-lift); }
+.size-figures-name { @apply flex items-center gap-2; color: var(--color-text-primary); }
+.size-figure { @apply font-medium tabular-nums; color: var(--color-text-value); }
 
 /* The field picker (tables/FieldPicker), on `.guide-facet-panel`'s stack: the column picker's rows, choosing what
    to draw rather than what to show. A list that scrolls inside the sidebar so a

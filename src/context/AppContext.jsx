@@ -1109,6 +1109,37 @@ export function AppProvider({ children }) {
         }
     };
 
+    // A size photo (docs/size-photos-plan.md): saved, then patched into the
+    // vehicle's own photos; inheritance resolves the rest on the next render.
+    // Rethrows, so the editor keeps the curator's work on a failed save.
+    const saveSizePhoto = async (vehicleId, view, save) => {
+        try {
+            const row = await dataService.saveSizePhoto(vehicleId, view, save);
+            setVehicles(prev => prev.map(v => v.id === vehicleId
+                ? { ...v, size_photos: { ...(v.size_photos ?? {}), [view]: row } } : v));
+            return row;
+        } catch (error) {
+            logIfUnauthorized('save_size_photo', 'vehicle', vehicleId, error);
+            showError('Error saving the size photo: ' + error.message);
+            throw error;
+        }
+    };
+
+    const deleteSizePhoto = async (vehicleId, view) => {
+        const row = vehicles.find(v => v.id === vehicleId)?.size_photos?.[view];
+        try {
+            await dataService.deleteSizePhoto(vehicleId, view, row?.original_url ?? null);
+            setVehicles(prev => prev.map(v => {
+                if (v.id !== vehicleId) return v;
+                const { [view]: _gone, ...rest } = v.size_photos ?? {};
+                return { ...v, size_photos: rest };
+            }));
+        } catch (error) {
+            logIfUnauthorized('delete_size_photo', 'vehicle', vehicleId, error);
+            showError('Error deleting the size photo: ' + error.message);
+        }
+    };
+
     const backfillVehicleThumbnails = async (onProgress) => {
         const result = await dataService.backfillVehicleThumbnails(onProgress);
         // Re-read rather than patching locally: the backfill writes rows this
@@ -2292,6 +2323,8 @@ export function AppProvider({ children }) {
         createTag,
         syncVehicleTags,
         uploadVehicleImage,
+        saveSizePhoto,
+        deleteSizePhoto,
         backfillVehicleThumbnails,
         backfillChargeSummaries,
         rebuildAllComposites,

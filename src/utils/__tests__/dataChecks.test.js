@@ -713,3 +713,45 @@ describe('range test pack against EPA tested', () => {
         expect(findingOf([range(45, { start_soc: 60, end_soc: 10 })])).toBeUndefined();
     });
 });
+
+describe('size (the Size chart\'s figures)', () => {
+    const dims = (d) => vehicle({ specs: { dimensions: d } });
+    const full = { body_style: 'Sedan', length_in: 184.8, height_in: 56.7, wheelbase_in: 113.2, front_overhang_in: 35 };
+
+    it('lists nothing for a vehicle with every figure, or with none', () => {
+        expect(checksFor(dims(full)).filter(c => c.startsWith('size'))).toEqual([]);
+        expect(checksFor(vehicle()).filter(c => c.startsWith('size'))).toEqual([]);
+        expect(checksFor(dims({ body_style: 'SUV' })).filter(c => c.startsWith('size'))).toEqual([]);
+    });
+
+    it('names what a partly measured vehicle lacks', () => {
+        const f = findingsFor(dims({ length_in: 180, height_in: 60 })).find(x => x.check === 'size-incomplete');
+        expect(f.text).toContain('wheelbase, front overhang, body style');
+        expect(f.evidence).toEqual({ lacking: ['body_style', 'front_overhang_in', 'wheelbase_in'] });
+    });
+
+    it('catches overhangs, mirrors and tracks that cannot all be right', () => {
+        expect(checksFor(dims({ ...full, front_overhang_in: 80 }))).toContain('size-inconsistent');
+        expect(checksFor(dims({ ...full, width_in: 80, width_mirrors_in: 78 }))).toContain('size-inconsistent');
+        expect(checksFor(dims({ ...full, width_in: 72, track_front_in: 73 }))).toContain('size-inconsistent');
+        expect(checksFor(dims({ ...full, width_in: 72.8, width_mirrors_in: 82.2, track_front_in: 62 }))).not.toContain('size-inconsistent');
+    });
+
+    // A 1000 px wide side photo, bumpers at 0.1 and 0.9: 800 px = the 184.8 in length.
+    const sidePhoto = (marks) => ({
+        width_px: 1000, height_px: 400,
+        marks: { front: 0.1, frontAxle: 0.252, rearAxle: 0.742, rear: 0.9, ground: 0.9, roof: 0.3, ...marks },
+    });
+    const withPhoto = (side) => vehicle({ specs: { dimensions: full }, size_photos: { side } });
+
+    it('passes a size photo whose marks agree with the specs', () => {
+        expect(checksFor(withPhoto(sidePhoto({})))).not.toContain('size-photo-wheelbase');
+        expect(checksFor(withPhoto(sidePhoto({})))).not.toContain('size-photo-height');
+    });
+
+    it('lists a size photo whose wheelbase or height reads off the specs', () => {
+        const f = findingsFor(withPhoto(sidePhoto({ rearAxle: 0.8 }))).find(x => x.check === 'size-photo-wheelbase');
+        expect(f.text).toContain('wheelbase spec is 113.2 in');
+        expect(checksFor(withPhoto(sidePhoto({ roof: 0.2 })))).toContain('size-photo-height');
+    });
+});

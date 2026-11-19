@@ -20,6 +20,10 @@
  *           picture: a C-HR that inherits an Uncharted's figures must not wear
  *           the Uncharted's photo, and an R1T is not an R1S. With no match the
  *           vehicle shows the placeholder until it has a photo of its own
+ *   size photos  each view (side, front) from the nearest vehicle in the same
+ *           model line with that view, like the photo. The marks travel with
+ *           their picture; the variant's own length sets the scale (#size
+ *           photos, docs/size-photos-plan.md)
  *   platforms  each of the two platform links (#318) from the nearest vehicle
  *           with that link set, separately: a variant can keep its source's
  *           structure and change its electrics (the 2025 R1 did)
@@ -66,6 +70,10 @@ const hasColor = (v) => v?.color != null && v.color !== '';
    from <vehicle>", and the absence of an `id` that any lineage link could use. */
 const brandRef = (m) => ({ id: null, name: m.name, brand: true });
 const hasPhoto = (v) => Boolean(v?.image_url || v?.image_thumb_url);
+
+/* The Size chart's photos, one per view, keyed by view. */
+const SIZE_PHOTO_VIEWS = ['side', 'front'];
+const sizePhotoOf = (v, view) => v?.size_photos?.[view] ?? null;
 
 /* A name as a list of comparable tokens: case, punctuation and anything in
    parentheses dropped, so "F-150 Lightning" and "F150 Lightning" agree, and
@@ -248,6 +256,7 @@ export function ownValues(vehicle) {
         mechanical_platform_id: vehicle?.mechanical_platform_id ?? null,
         electrical_platform_id: vehicle?.electrical_platform_id ?? null,
         tags: vehicle?.tags ?? [],
+        size_photos: vehicle?.size_photos ?? {},
     };
 }
 
@@ -279,8 +288,9 @@ export function withInheritance(vehicles = [], manufacturers = []) {
             mechanical_platform_id: vehicle.mechanical_platform_id ?? null,
             electrical_platform_id: vehicle.electrical_platform_id ?? null,
             tags: vehicle.tags ?? [],
+            size_photos: vehicle.size_photos ?? {},
         };
-        const none = { color: null, photo: null, mechanical_platform_id: null, electrical_platform_id: null, tags: {} };
+        const none = { color: null, photo: null, mechanical_platform_id: null, electrical_platform_id: null, tags: {}, sizePhotos: {} };
         const chain = inheritanceChain(vehicle, byId);
         const brand = hasColor(vehicle) ? null : brandFor(vehicle);
         if (chain.length === 0) {
@@ -290,7 +300,7 @@ export function withInheritance(vehicles = [], manufacturers = []) {
         }
 
         const resolved = {};
-        const inheritedFrom = { ...none, tags: {} };
+        const inheritedFrom = { ...none, tags: {}, sizePhotos: {} };
 
         if (!hasColor(vehicle)) {
             const source = chain.find(hasColor);
@@ -308,6 +318,15 @@ export function withInheritance(vehicles = [], manufacturers = []) {
             if (source) {
                 for (const key of PHOTO_KEYS) resolved[key] = source[key] ?? null;
                 inheritedFrom.photo = sourceRef(source);
+            }
+        }
+
+        for (const view of SIZE_PHOTO_VIEWS) {
+            if (sizePhotoOf(vehicle, view)) continue;
+            const source = chain.find(v => sizePhotoOf(v, view) && sameModelLine(vehicle, v));
+            if (source) {
+                resolved.size_photos = { ...(resolved.size_photos ?? own.size_photos), [view]: sizePhotoOf(source, view) };
+                inheritedFrom.sizePhotos[view] = sourceRef(source);
             }
         }
 

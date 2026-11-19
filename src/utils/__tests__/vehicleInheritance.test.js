@@ -40,7 +40,7 @@ describe('withInheritance', () => {
         expect(out[3].inheritedFrom.photo.id).toBe(1);
         expect(out[3].own).toEqual({
             color: null, image_url: null, image_thumb_url: null, image_focal_y: null,
-            mechanical_platform_id: null, electrical_platform_id: null, tags: [],
+            mechanical_platform_id: null, electrical_platform_id: null, tags: [], size_photos: {},
         });
     });
 
@@ -122,7 +122,7 @@ describe('withInheritance', () => {
         expect(out.color).toBe('#333333');
         expect(out.tags).toEqual(plain.tags);
         expect(out.inheritedFrom).toEqual({
-            color: null, photo: null, mechanical_platform_id: null, electrical_platform_id: null, tags: {},
+            color: null, photo: null, mechanical_platform_id: null, electrical_platform_id: null, tags: {}, sizePhotos: {},
         });
     });
 });
@@ -470,5 +470,31 @@ describe('the brand color (#311)', () => {
 
     it('changes nothing when no brand colors are given', () => {
         expect(byId([v(1, { manufacturer_id: 7 })])[1].color).toBeNull();
+    });
+
+    describe('size photos', () => {
+        const photo = (id, view) => ({ vehicle_id: id, view, image_url: `u${id}${view}`, marks: {} });
+        it('takes each view from the nearest source in the same model line, separately', () => {
+            const fleet = [
+                v(1, { make: 'Ford', model: 'F-150 Lightning', size_photos: { side: photo(1, 'side') } }),
+                v(2, { make: 'Ford', model: 'F-150 Lightning', spec_source_vehicle_id: 1, size_photos: { front: photo(2, 'front') } }),
+                v(3, { make: 'Ford', model: 'F-150 Lightning', spec_source_vehicle_id: 2 }),
+            ];
+            const out = withInheritance(fleet)[2];
+            expect(out.size_photos.side.image_url).toBe('u1side');
+            expect(out.size_photos.front.image_url).toBe('u2front');
+            expect(out.inheritedFrom.sizePhotos).toEqual({ side: { id: 1, name: expect.any(String) }, front: { id: 2, name: expect.any(String) } });
+            expect(out.own.size_photos).toEqual({});
+        });
+
+        it('keeps its own view and lends nothing across model lines', () => {
+            const fleet = [
+                v(1, { make: 'Rivian', model: 'R1S', size_photos: { side: photo(1, 'side'), front: photo(1, 'front') } }),
+                v(2, { make: 'Rivian', model: 'R1T', spec_source_vehicle_id: 1, size_photos: { side: photo(2, 'side') } }),
+            ];
+            const out = withInheritance(fleet)[1];
+            expect(out.size_photos.side.image_url).toBe('u2side');
+            expect(out.size_photos.front).toBeUndefined();
+        });
     });
 });

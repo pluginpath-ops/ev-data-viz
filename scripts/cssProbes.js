@@ -64,6 +64,10 @@ const MIN_DECLS = 3;
  */
 export const CONSTRUCTED = {
     'nav-menu-main': 'NavMenu builds `nav-menu-${level}`.',
+    'size-mark--bumper': 'MarkLine builds `size-mark--${kind}` — a mark is a bumper, axle, ground or roof.',
+    'size-mark--axle':   'MarkLine builds `size-mark--${kind}`.',
+    'size-mark--ground': 'MarkLine builds `size-mark--${kind}`.',
+    'size-mark--roof':   'MarkLine builds `size-mark--${kind}`.',
     'nav-menu-sub':  'NavMenu builds `nav-menu-${level}`.',
     'is-prose':      'RunSpecRows builds `is-${cell.tone}`.',
     'is-charging':   'RunKindBadge builds `run-kind is-${flag.key}` — a test is charging or range.',

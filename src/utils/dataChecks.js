@@ -67,6 +67,9 @@ import {
     TEST_WEIGHT_OFFSET_LBS_BAND, VOLTAGE_400_CLASS_BAND, VOLTAGE_800_CLASS_BAND,
     CLAIMED_060_GAP_SEC,
 } from '../constants/epa';
+import { SIZE_PHOTO_WHEELBASE_PCT, SIZE_PHOTO_HEIGHT_PCT } from '../constants/sizeChart';
+import { profileFromSpecs } from './vehicleProfile';
+import { figuresFromMarks } from './sizePhotoMarks';
 
 /** The figures findings are grouped under, in display order. */
 export const CHECK_FIGURES = [
@@ -77,6 +80,7 @@ export const CHECK_FIGURES = [
     { key: 'drive',       label: 'Drive type' },
     { key: 'voltage',     label: 'Voltage' },
     { key: 'performance', label: 'Performance' },
+    { key: 'size',        label: 'Size' },
 ];
 
 /** Every per-vehicle check, with the kind of finding it produces. */
@@ -100,6 +104,10 @@ export const DATA_CHECKS = [
     { key: 'no-400v-support',    figure: 'voltage',     kind: 'gap',       label: '400 V class, no 400 V support' },
     { key: 'native-on-800v',     figure: 'voltage',     kind: 'disagrees', label: '800 V class says Native on 400 V' },
     { key: 'claimed-060-quicker', figure: 'performance', kind: 'disagrees', label: 'Claimed 0–60 quicker than tested' },
+    { key: 'size-incomplete',    figure: 'size',        kind: 'gap',       label: 'Some dimensions, not all the Size chart needs' },
+    { key: 'size-inconsistent',  figure: 'size',        kind: 'disagrees', label: 'Dimensions that cannot all be right' },
+    { key: 'size-photo-wheelbase', figure: 'size',      kind: 'disagrees', label: 'Size photo wheelbase off the spec' },
+    { key: 'size-photo-height',  figure: 'size',        kind: 'disagrees', label: 'Size photo height off the spec' },
 ];
 
 const CHECK_BY_KEY = Object.fromEntries(DATA_CHECKS.map(c => [c.key, c]));
@@ -472,6 +480,91 @@ function dc400Findings(vehicle, ctx) {
     return [];
 }
 
+/** What the Size chart draws from, with the words a finding names each by. */
+const SIZE_FIGURES = [
+    ['length_in', 'length'], ['height_in', 'height'], ['wheelbase_in', 'wheelbase'],
+    ['front_overhang_in', 'front overhang'], ['body_style', 'body style'],
+];
+
+/**
+ * The Size chart's figures (vehicleProfile.js): a vehicle with some dimensions
+ * but not all the chart needs, and dimensions that contradict each other.
+ * A vehicle with no dimensions at all is not listed — that is most of the
+ * fleet, and a list of everything is a list of nothing.
+ */
+function sizeFindings(ctx) {
+    const val = (field) => specValue(ctx, 'dimensions', field);
+    const num = (field) => positive(val(field));
+    const out = [];
+
+    const have = SIZE_FIGURES.filter(([f]) => val(f) != null && val(f) !== '');
+    const lacking = SIZE_FIGURES.filter(([f]) => val(f) == null || val(f) === '');
+    if (have.some(([f]) => f !== 'body_style') && lacking.length > 0) {
+        out.push(finding('size-incomplete',
+            `Has ${have.map(([, w]) => w).join(', ')}; the Size chart also needs ${lacking.map(([, w]) => w).join(', ')}.`,
+            { lacking: lacking.map(([f]) => f).sort() }));
+    }
+
+    const length = num('length_in');
+    const wheelbase = num('wheelbase_in');
+    const front = num('front_overhang_in');
+    const width = num('width_in');
+    const mirrors = num('width_mirrors_in');
+    const tracks = [num('track_front_in'), num('track_rear_in')].filter(Boolean);
+    const problems = [];
+    if (length && wheelbase && wheelbase >= length) problems.push(`wheelbase ${wheelbase} in is not shorter than length ${length} in`);
+    else if (length && wheelbase && front && front >= length - wheelbase) {
+        problems.push(`front overhang ${front} in leaves no rear overhang (length ${length} − wheelbase ${wheelbase} = ${oneDp(length - wheelbase)} in)`);
+    }
+    if (width && mirrors && mirrors <= width) problems.push(`width incl. mirrors ${mirrors} in is not wider than width ${width} in`);
+    if (width && tracks.some(t => t >= width)) problems.push(`a track of ${Math.max(...tracks)} in is as wide as the body (${width} in)`);
+    if (problems.length > 0) {
+        out.push(finding('size-inconsistent', `${problems.join('; ')}.`.replace(/^./, c => c.toUpperCase()),
+            { length, wheelbase, front, width, mirrors, tracks: ascending(tracks) }));
+    }
+    return out;
+}
+
+/**
+ * Size photos whose marks disagree with the specs they are scaled by: the side
+ * photo's wheelbase, either photo's height. Checked on the photo the vehicle
+ * draws, inherited or its own — a variant with a longer wheelbase needs its
+ * own photo, and this is how a curator finds out.
+ */
+function sizePhotoFindings(vehicle, ctx) {
+    const photos = vehicle.size_photos;
+    if (!photos?.side && !photos?.front) return [];
+    const profile = profileFromSpecs(ctx.specs);
+    const out = [];
+    const note = (view) => {
+        const from = vehicle.inheritedFrom?.sizePhotos?.[view];
+        return from ? ` (photo inherited from ${from.name})` : '';
+    };
+    const off = (read, spec) => (read != null && spec ? ((read - spec) / spec) * 100 : null);
+
+    const side = photos.side ? figuresFromMarks('side', photos.side, profile) : null;
+    const wb = off(side?.wheelbase, profile.wheelbase);
+    if (wb != null && Math.abs(wb) > SIZE_PHOTO_WHEELBASE_PCT) {
+        out.push(finding('size-photo-wheelbase',
+            `The side photo's axles read ${oneDp(side.wheelbase)} in apart; the wheelbase spec is ${profile.wheelbase} in (${wb > 0 ? '+' : ''}${oneDp(wb)}%)${note('side')}.`,
+            { read: oneDp(side.wheelbase), spec: profile.wheelbase }));
+    }
+
+    const heights = [];
+    for (const view of ['side', 'front']) {
+        if (!photos[view]) continue;
+        const read = view === 'side' ? side : figuresFromMarks('front', photos.front, profile);
+        const h = off(read?.height, profile.height);
+        if (h != null && Math.abs(h) > SIZE_PHOTO_HEIGHT_PCT) heights.push({ view, read: oneDp(read.height), pct: h });
+    }
+    if (heights.length > 0) {
+        out.push(finding('size-photo-height',
+            `${heights.map(h => `The ${h.view} photo reads ${h.read} in tall (${h.pct > 0 ? '+' : ''}${oneDp(h.pct)}%)${note(h.view)}`).join('; ')}; the height spec is ${profile.height} in.`,
+            { reads: heights.map(h => `${h.view}:${h.read}`), spec: profile.height }));
+    }
+    return out;
+}
+
 /**
  * A manufacturer's claim quicker than anyone measured.
  *
@@ -662,6 +755,8 @@ export function runDataChecks(vehicles = [], {
                 ...voltageFindings(links, ctx, limits),
                 ...dc400Findings(vehicle, ctx),
                 ...performanceFindings(ctx, perf, limits),
+                ...sizeFindings(ctx),
+                ...sizePhotoFindings(vehicle, ctx),
             ], skipsByKey);
             const open = findings.filter(f => !f.skipped);
             return {
