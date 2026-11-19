@@ -6566,10 +6566,10 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .size-silhouette .size-photo-ground { stroke: var(--series); stroke-width: 3; stroke-linecap: round; }
 .size-silhouette.is-active .size-photo-ground { stroke-width: 5; }
 /* Overlaid photos are see-through, so a car behind another still shows; the
-   one pointed at comes to the front at 50% while the rest fade further.
+   one pointed at comes to the front, unchanged, while the rest fade further.
    Outlines are already see-through by their fill. */
 .size-chart-svg.is-overlaid .size-photo { opacity: 0.6; }
-.size-chart-svg.is-overlaid .size-silhouette.is-active .size-photo { opacity: 0.5; }
+.size-chart-svg.is-overlaid .size-silhouette.is-active .size-photo { opacity: 0.6; }
 
 .size-callout text {
     fill: var(--color-text-value);
