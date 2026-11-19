@@ -1,0 +1,177 @@
+{
+  "about": "One owner's 2022 R1T Quad Large (Gen 1, 20\" all-terrain tires), from a Roamer export, 2026-01-16 to 2026-11-16. Weeks with a fast charge, a charge away from home, a drive over 120 mi or a raised charge limit are dropped. Season averages only: no dates per day, no places. Summer is a week averaging 18 °C (64 °F) or warmer, winter 8 °C (46 °F) or colder; the weeks between are left out, since the model has two seasons. Built by LocalDev/curation/r1t-routine (scripts/fixture.mjs).",
+  "vehicle": {
+    "name": "R1T Quad Large",
+    "year": "2022-2023",
+    "evbenchId": 3
+  },
+  "usableKwh": 126,
+  "charger": {
+    "kw": 7.4,
+    "startHour": 2.5,
+    "chargeTo": 60
+  },
+  "summer": {
+    "weeks": 18,
+    "tempF": 76,
+    "whPerMi": 437,
+    "settings": {
+      "week": "DDDDDLO",
+      "dailyMi": 20,
+      "longMi": 37,
+      "dailyMph": 75,
+      "longMph": 75,
+      "dailyCity": 20,
+      "longCity": 20
+    },
+    "real": {
+      "weekMi": 138,
+      "drivePct": 47.8,
+      "homePct": 55,
+      "homeKwh": 86,
+      "morningSoc": [
+        59.8,
+        59.6,
+        59.6,
+        59.5,
+        59.1,
+        59.5,
+        57.3
+      ],
+      "eveningSoc": [
+        49.5,
+        51.2,
+        48.7,
+        50.5,
+        52.4,
+        52.2,
+        53.7
+      ]
+    }
+  },
+  "winter": {
+    "weeks": 7,
+    "tempF": 40,
+    "whPerMi": 584,
+    "settings": {
+      "week": "DDDDDLO",
+      "dailyMi": 31,
+      "longMi": 18,
+      "dailyMph": 75,
+      "longMph": 75,
+      "dailyCity": 20,
+      "longCity": 20
+    },
+    "real": {
+      "weekMi": 173,
+      "drivePct": 80.4,
+      "homePct": 83.6,
+      "homeKwh": 123,
+      "morningSoc": [
+        59.9,
+        59.6,
+        59.4,
+        59.6,
+        59.9,
+        48.8,
+        59.6
+      ],
+      "eveningSoc": [
+        44.6,
+        43.6,
+        44.6,
+        45.6,
+        44.6,
+        59.8,
+        58.8
+      ]
+    }
+  },
+  "whPerMiByF": {
+    "20-30": {
+      "mi": 214,
+      "whPerMi": 668
+    },
+    "30-40": {
+      "mi": 353,
+      "whPerMi": 580
+    },
+    "40-50": {
+      "mi": 626,
+      "whPerMi": 525
+    },
+    "50-60": {
+      "mi": 1091,
+      "whPerMi": 517
+    },
+    "60-70": {
+      "mi": 1056,
+      "whPerMi": 460
+    },
+    "70-80": {
+      "mi": 1288,
+      "whPerMi": 436
+    },
+    "80-90": {
+      "mi": 668,
+      "whPerMi": 424
+    }
+  },
+  "selfAssessed": {
+    "key": "5.-b6C8AUDAgAPmQ8ZBwIjBwEWFvwCCgY",
+    "settings": {
+      "week": "LDDDDOO",
+      "dailyMi": 30,
+      "dailyMph": 80,
+      "dailyCity": 10,
+      "longMi": 40,
+      "longMph": 80,
+      "longCity": 20,
+      "chargeTo": 60,
+      "fullBeforeLong": false,
+      "level": 3,
+      "rate": "flat",
+      "homePrice": 0.15,
+      "plugFrom": 22,
+      "plugUntil": 7,
+      "offFrom": 22,
+      "offUntil": 7
+    }
+  },
+  "evbench": {
+    "readOn": "2026-11-17",
+    "usableKwh": 131,
+    "epaCityMi": 331.8,
+    "epaHwyMi": 292.9,
+    "maxAcKw": 11.5,
+    "rangeTests": [
+      {
+        "id": 385,
+        "kind": "range",
+        "speed_mph": 64,
+        "speed_basis": "steady",
+        "temperature_f": 59,
+        "altitude_ft": 600,
+        "elevation_gain_ft": 0,
+        "distance_miles": 302,
+        "energy_kwh": 123,
+        "start_soc": 100,
+        "end_soc": 4
+      },
+      {
+        "id": 386,
+        "kind": "range",
+        "speed_mph": 75,
+        "speed_basis": "steady",
+        "temperature_f": 35,
+        "altitude_ft": 700,
+        "elevation_gain_ft": 100,
+        "avg_wind_speed_mph": 8,
+        "distance_miles": 213,
+        "energy_kwh": 120,
+        "start_soc": 100,
+        "end_soc": 4
+      }
+    ]
+  }
+}
