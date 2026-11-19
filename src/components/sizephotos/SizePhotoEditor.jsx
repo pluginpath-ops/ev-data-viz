@@ -12,6 +12,7 @@ import {
 import { SIZE_PHOTO_WHEELBASE_PCT, SIZE_PHOTO_HEIGHT_PCT } from '../../constants/sizeChart';
 import MarkLine from './MarkLine';
 import MarkPoint from './MarkPoint';
+import SizePhotoSpecs from './SizePhotoSpecs';
 
 const DEFAULT_TOLERANCE = 24;
 const LOUPE_ZOOM = 4;
@@ -299,7 +300,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
                 <div className="flex flex-col gap-1">
                     {!read && (
                         <p className="text-note status-text is-warning">
-                            No {isEndView(view) ? 'width' : 'length'} spec yet, so the marks can’t be read in inches or checked. Add it under Exterior Dimensions; the marks keep until then.
+                            No {isEndView(view) ? 'width' : 'length'} spec yet, so the marks can’t be read in inches or checked. Add it below; the marks keep until then.
                         </p>
                     )}
                     {read && view === 'side' && (
@@ -310,6 +311,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
                         </>
                     )}
                     {read && <CheckRow label="Height" read={read.height} spec={profile.height} units={units} limit={SIZE_PHOTO_HEIGHT_PCT} />}
+                    <SizePhotoSpecs vehicle={vehicle} view={view} />
                 </div>
             )}
             {outOfOrder && <p className="text-note status-text is-warning">The marks are out of order: {ORDER[view].map(k => MARKS[view].find(m => m.key === k).label.toLowerCase()).join(', then ')}.</p>}

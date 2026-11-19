@@ -7500,10 +7500,13 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .data-check-fixes {
     @apply flex flex-wrap items-center gap-2 mt-1;
 }
-.data-check-fix-field {
+/* One spec field edited where it's needed (specs/SpecFixField): a finding, the
+   size photo editor. */
+.spec-fix-field {
     @apply flex items-center gap-2;
 }
-.data-check-fix-field .form-input { @apply w-36; }
+.spec-fix-field .form-input { @apply w-36; }
+.spec-fix-fields { @apply flex flex-wrap items-center gap-x-4 gap-y-2; }
 
 .data-check-row {
     @apply border-b border-[var(--color-border)] last:border-b-0;

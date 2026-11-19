@@ -112,6 +112,12 @@ when inherited, like the card photo.
    magnified view follows the mark being moved.
 5. **Check, live:** "Wheelbase from photo 112.6 in · spec 113.2 in (−0.5%)",
    the same for height, and the front overhang it implies.
+   The view's dimension specs sit under it as fields (length, wheelbase,
+   front overhang, height, clearance; front and rear: widths, height,
+   clearance), each saved on its own button straight to the vehicle's specs,
+   so a missing or wrong spec is fixed while marking (`SpecFixField`, shared
+   with Data Checks). Without the length (width) spec nothing can be read, and
+   the editor says so.
 6. **Source and credit**, then Save: upload, then upsert the row. Delete
    removes the row and both files.
 
