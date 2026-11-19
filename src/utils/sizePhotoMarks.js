@@ -3,10 +3,14 @@
  * what follows from them (docs/size-photos-plan.md).
  *
  * Marks are fractions of the cutout, x across and y down, so a resize never
- * moves them. The photo is scaled from the vehicle's SPEC — bumper to bumper
- * is its length, edge to edge (front view) its width — one scale both ways.
- * Everything else the marks say (wheelbase, overhang, height) is read back at
- * that scale, as a check or to fill a figure the specs lack.
+ * moves them. The marks are the truth for drawing: each lands exactly where
+ * the specs put that point — bumpers at 0 and the length, axles at the front
+ * overhang and a wheelbase later (front view: edges at ± half the width), the
+ * roof at the height. Perspective and lenses keep a photo's proportions from
+ * matching the specs (the ends come out squeezed), so the photo is stretched
+ * piece by piece to fit, and the chart's anchors line up on its marks. To CHECK a photo, its
+ * figures are read at the length scale alone (photoScale, figuresFromMarks):
+ * how far they stray is how far the drawing had to bend it.
  *
  * Pure module.
  */
@@ -117,14 +121,50 @@ export function figuresFromMarks(view, photo, profile) {
  * Where the photo lands in the chart's world, in inches: x from the vehicle's
  * front bumper (side) or centerline (front), y up from the ground.
  *
- * @returns {{ x: number, top: number, w: number, h: number } | null}  left edge, top edge, size
+ * Up, one scale: ground to roof spans the height spec (without a roof mark or
+ * a height spec, up takes the bumper-to-bumper scale). Across, the side photo
+ * is three pieces cut at the axles, each stretched so its marks land on the
+ * specs: front bumper → front axle on the front overhang, axle to axle on the
+ * wheelbase, rear axle → rear bumper on the rear overhang; the margin beyond a
+ * bumper goes with its piece. Without both axles (in order) or the figures to
+ * place them, and in the front view, it is one piece, bumper to bumper (edge
+ * to edge) on the length (width).
+ *
+ * @returns {{ top: number, h: number, slices: Array<{ x: number, w: number, from: number, to: number }> } | null}
+ *          top edge and height; each piece's left edge and width in inches,
+ *          and which part of the photo it is (`from`–`to`, fractions across)
  */
 export function photoPlacement(view, photo, profile) {
     const k = photoScale(view, photo, profile);
     if (!k) return null;
-    const w = photo.width_px / k;
-    const h = photo.height_px / k;
     const m = photo.marks;
-    const originX = view === 'front' ? (m.left + m.right) / 2 : m.front;
-    return { x: -originX * w, top: m.ground * h, w, h };
+    const rise = m.roof != null && m.ground != null ? (m.ground - m.roof) * photo.height_px : 0;
+    const kUp = rise > 0 && profile?.height > 0 ? rise / profile.height : k;
+    const h = photo.height_px / kUp;
+    const top = m.ground * h;
+
+    // A piece: photo fractions [from, to], placed so mark a lands at inches A and b at B.
+    const piece = (from, to, a, A, b, B) => {
+        const perFrac = (B - A) / (b - a);
+        return { x: A + (from - a) * perFrac, w: (to - from) * perFrac, from, to };
+    };
+
+    if (view === 'front') {
+        const half = profile.width / 2;
+        return { top, h, slices: [piece(0, 1, m.left, -half, m.right, half)] };
+    }
+    const { length, wheelbase, frontOverhang } = profile;
+    const axles = m.front < m.frontAxle && m.frontAxle < m.rearAxle && m.rearAxle < m.rear
+        && wheelbase > 0 && frontOverhang > 0 && frontOverhang + wheelbase < length;
+    if (!axles) return { top, h, slices: [piece(0, 1, m.front, 0, m.rear, length)] };
+    const fa = frontOverhang;
+    const ra = frontOverhang + wheelbase;
+    return {
+        top, h,
+        slices: [
+            piece(0, m.frontAxle, m.front, 0, m.frontAxle, fa),
+            piece(m.frontAxle, m.rearAxle, m.frontAxle, fa, m.rearAxle, ra),
+            piece(m.rearAxle, 1, m.rearAxle, ra, m.rear, length),
+        ],
+    };
 }

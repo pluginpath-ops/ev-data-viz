@@ -96,10 +96,52 @@ describe('size photo marks', () => {
     });
 
     it('places the photo with its front bumper at 0 and its ground on the ground', () => {
+        // No axle figures: one piece, bumper to bumper on the length.
         const p = photo({ front: 0.1, frontAxle: 0.3, rearAxle: 0.8, rear: 0.9, ground: 0.9 });
-        expect(photoPlacement('side', p, { length: 200 })).toEqual({ x: expect.closeTo(-25), top: expect.closeTo(90), w: expect.closeTo(250), h: expect.closeTo(100) });
+        const one = photoPlacement('side', p, { length: 200 });
+        expect(one.slices).toEqual([{ x: expect.closeTo(-25), w: expect.closeTo(250), from: 0, to: 1 }]);
+        expect([one.top, one.h]).toEqual([expect.closeTo(90), expect.closeTo(100)]);
         const fp = photo({ left: 0.2, right: 0.8, ground: 0.95 }, 500, 500);
-        expect(photoPlacement('front', fp, { width: 75 })).toEqual({ x: expect.closeTo(-62.5), top: expect.closeTo(118.75), w: expect.closeTo(125), h: expect.closeTo(125) });
+        const front = photoPlacement('front', fp, { width: 75 });
+        expect(front.slices).toEqual([{ x: expect.closeTo(-62.5), w: expect.closeTo(125), from: 0, to: 1 }]);
+        expect([front.top, front.h]).toEqual([expect.closeTo(118.75), expect.closeTo(125)]);
+    });
+
+    it('lands every mark on its spec: bumpers, axles, ground and roof', () => {
+        // The photo's ends are squeezed: its overhangs read short, its wheelbase long.
+        const p = photo({ front: 0.1, frontAxle: 0.2, rearAxle: 0.8, rear: 0.9, ground: 0.9, roof: 0.3 });
+        const spec = { length: 200, wheelbase: 120, frontOverhang: 35, height: 50 };
+        const { slices, top, h } = photoPlacement('side', p, spec);
+        // Where a photo fraction lands, through the piece that holds it.
+        const at = (f) => {
+            const s = slices.find(x => f >= x.from && f <= x.to);
+            return s.x + ((f - s.from) / (s.to - s.from)) * s.w;
+        };
+        expect(at(0.1)).toBeCloseTo(0);
+        expect(at(0.2)).toBeCloseTo(35);
+        expect(at(0.8)).toBeCloseTo(155);
+        expect(at(0.9)).toBeCloseTo(200);
+        // The pieces meet edge to edge, and cover the whole photo.
+        expect(slices[0].from).toBe(0);
+        expect(slices[2].to).toBe(1);
+        expect(slices[0].x + slices[0].w).toBeCloseTo(slices[1].x);
+        expect(slices[1].x + slices[1].w).toBeCloseTo(slices[2].x);
+        // Up: ground at 0, roof at the height spec.
+        expect(top - 0.9 * h).toBeCloseTo(0);
+        expect(top - 0.3 * h).toBeCloseTo(50);
+    });
+
+    it('falls back to one piece when the axles are out of order', () => {
+        const p = photo({ front: 0.1, frontAxle: 0.85, rearAxle: 0.8, rear: 0.9, ground: 0.9 });
+        expect(photoPlacement('side', p, { length: 200, wheelbase: 120, frontOverhang: 35 }).slices).toHaveLength(1);
+    });
+
+    it('draws ground to roof at the height spec; no height spec, one scale both ways', () => {
+        const p = photo({ front: 0.1, rear: 0.9, ground: 0.9, roof: 0.3 });
+        const low = photoPlacement('side', p, { length: 200, height: 50 });
+        expect(low.slices[0].w).toBeCloseTo(250);
+        expect((0.9 - 0.3) * low.h).toBeCloseTo(50);
+        expect(photoPlacement('side', p, { length: 200 }).h).toBeCloseTo(100);
     });
 
     it('fills a missing front overhang from the side photo, and never overrides a spec', () => {

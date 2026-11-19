@@ -117,19 +117,30 @@ export default function SizeChartCanvas({ items, view, anchor, units, lines, gri
                     const dashed = view === 'side' ? wheelsEstimated(p) : p.estimated.has('trackFront') || p.estimated.has('tireDiameter');
                     const cls = `size-silhouette${activeId === id ? ' is-active' : ''}${activeId && activeId !== id ? ' is-quiet' : ''}`;
                     if (photo) {
-                        const { x, top, w, h } = photo.placement;
+                        const { top, h, slices } = photo.placement;
                         const [g0, g1] = view === 'front' ? [-p.width / 2, p.width / 2] : [0, p.length];
+                        const W = photo.width_px;
+                        const H = photo.height_px;
+                        // Each piece is a window (a nested <svg>, which clips) onto
+                        // its part of the photo, stretched to its span. The group
+                        // takes the opacity, so the pieces' seams don't double up.
                         return (
                             <g key={id} className={cls} style={{ '--series': color }} onPointerEnter={() => onActive(id)}>
-                                <image
-                                    className="size-photo"
-                                    href={photo.image_url}
-                                    x={px(place + x)}
-                                    y={py(top)}
-                                    width={w * scale}
-                                    height={h * scale}
-                                    preserveAspectRatio="none"
-                                />
+                                <g className="size-photo">
+                                    {slices.map(s => (
+                                        <svg
+                                            key={s.from}
+                                            x={px(place + s.x)}
+                                            y={py(top)}
+                                            width={s.w * scale}
+                                            height={h * scale}
+                                            viewBox={`${s.from * W} 0 ${(s.to - s.from) * W} ${H}`}
+                                            preserveAspectRatio="none"
+                                        >
+                                            <image href={photo.image_url} width={W} height={H} />
+                                        </svg>
+                                    ))}
+                                </g>
                                 <line className="size-photo-ground" x1={px(place + g0)} x2={px(place + g1)} y1={groundY} y2={groundY} />
                             </g>
                         );

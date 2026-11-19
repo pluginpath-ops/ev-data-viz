@@ -484,8 +484,10 @@ export const CHART_HELP_DEFAULTS = {
         data_source:
             'The selected vehicles drawn to one scale from their dimension specs: length, height, ' +
             'wheelbase, front overhang, width (with and without mirrors), track, ground clearance and ' +
-            'tire size. A vehicle with a size photo is drawn as that photo, scaled so its bumpers span ' +
-            'the length spec (from the front, its body edges span the width). Otherwise its outline is ' +
+            'tire size. A vehicle with a size photo is drawn as that photo, stretched so each point ' +
+            'marked on it lands where the specs put it: bumpers and axles at the length, overhangs and ' +
+            'wheelbase (from the front, its body edges at the width), ground and roof at the height. ' +
+            'Photos bend a little to fit, since a camera squeezes a car’s ends. Otherwise its outline is ' +
             'a generic shape for its body style, stretched to its own figures. Draw: Outlines shows ' +
             'outlines for every vehicle.',
         how_to_read:

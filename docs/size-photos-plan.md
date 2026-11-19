@@ -56,12 +56,19 @@ half-saved photo can't leave two.
 
 **Marks**, x across and y down the image, as fractions so a resize never
 moves them:
-- side: `front`, `frontAxle`, `rearAxle`, `rear` (x); `ground` (y); `roof` (y, optional, for the height check)
+- side: `front`, `frontAxle`, `rearAxle`, `rear` (x); `ground`, `roof` (y)
 - front: `left`, `right` (x, body edges, mirrors not included); `ground`, `roof` (y)
 
-The photo is drawn to scale from the **spec**: bumper to bumper = `length_in`
-(front view: left to right = `width_in`), one scale both ways. The marked
-axles are read back as figures:
+The marks are the truth for drawing (owner, 2026-11-19): each lands where the
+specs put that point. Up, ground to roof spans `height_in`. Across, the side
+photo is drawn in three pieces cut at the axles, front bumper → front axle on
+the front overhang, axle to axle on the wheelbase, rear axle → rear bumper on
+the rear overhang (front view: one piece, edge to edge on `width_in`). So the
+chart's anchors line up on the photo's own marks. Why: perspective and lenses
+squeeze a car's ends, and one scale both ways put the roof wherever the photo
+did (two photos 2.9 in apart in spec drew 0.7 in apart). Without a roof mark
+or height spec, up takes the across scale; without both axles in order, across
+is one piece. For checks, the marks are read at the length scale alone:
 - **the overhang split from the photo** fills in when the spec lacks a front
   overhang: the photo's front-to-rear ratio is applied to length − wheelbase
   from the specs, so the two overhangs still add up. Shown as "photo" rather

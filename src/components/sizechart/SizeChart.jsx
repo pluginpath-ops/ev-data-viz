@@ -35,8 +35,9 @@ function creditOf(photo) {
  * The Size chart: the selected vehicles drawn to one scale from their
  * dimension specs, side or front, lined up on a point the reader picks.
  *
- * Each vehicle is its size photo (docs/size-photos-plan.md), scaled from its
- * length spec (front: width), when it has one and Draw is Photos; otherwise a
+ * Each vehicle is its size photo (docs/size-photos-plan.md), its marks
+ * stretched to its length (front: width) and height specs, when it has one and
+ * Draw is Photos; otherwise a
  * silhouette (utils/silhouettes.js), a body style's shape stretched to its own
  * length, height, wheelbase and overhangs. What a vehicle lacks is said under
  * the chart — left out for want of a length, height or wheelbase; drawn with
