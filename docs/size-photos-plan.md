@@ -113,7 +113,7 @@ when inherited, like the card photo.
 5. **Check, live:** "Wheelbase from photo 112.6 in · spec 113.2 in (−0.5%)",
    the same for height, and the front overhang it implies.
    The view's dimension specs sit under it as fields (length, wheelbase,
-   front overhang, height, clearance; front and rear: widths, height,
+   height, clearance — not the front overhang, which the marks supply; front and rear: widths, height,
    clearance), so a missing or wrong spec is fixed while marking. What is
    typed is one draft shared by the open editors; the readouts use it at once,
    and the vehicle form's Save writes it to the vehicle's specs (the same ones

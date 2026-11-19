@@ -4,9 +4,13 @@ import { SPEC_CATEGORIES } from '../../utils/vehicleSpecSchema';
 import { isEndView } from '../../utils/sizePhotoMarks';
 import { SpecField } from '../EditSpecsForm';
 
-/** The dimensions a size photo is read and drawn by, per view. */
+/**
+ * The dimensions a size photo is read and drawn by, per view. Not the front
+ * overhang: rarely published, and with none the side photo's own marks split
+ * the overhangs (vehicleProfile `fromPhoto`). It stays in the specs form.
+ */
 const FIELDS = {
-    side: ['length_in', 'wheelbase_in', 'front_overhang_in', 'height_in', 'ground_clearance_in'],
+    side: ['length_in', 'wheelbase_in', 'height_in', 'ground_clearance_in'],
     end: ['width_in', 'width_mirrors_in', 'height_in', 'ground_clearance_in'],
 };
 const DIMENSIONS = SPEC_CATEGORIES.find(c => c.key === 'dimensions');
