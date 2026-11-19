@@ -114,10 +114,11 @@ when inherited, like the card photo.
    the same for height, and the front overhang it implies.
    The view's dimension specs sit under it as fields (length, wheelbase,
    front overhang, height, clearance; front and rear: widths, height,
-   clearance), each saved on its own button straight to the vehicle's specs,
-   so a missing or wrong spec is fixed while marking (`SpecFixField`, shared
-   with Data Checks). Without the length (width) spec nothing can be read, and
-   the editor says so.
+   clearance), so a missing or wrong spec is fixed while marking. What is
+   typed is one draft shared by the open editors; the readouts use it at once,
+   and the vehicle form's Save writes it to the vehicle's specs (the same ones
+   the specs form edits) in one update. Without the length (width) spec nothing
+   can be read, and the editor says so.
 6. **Source and credit**, then Save: upload, then upsert the row. Delete
    removes the row and both files.
 

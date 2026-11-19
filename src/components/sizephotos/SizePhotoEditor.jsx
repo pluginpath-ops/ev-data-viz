@@ -12,6 +12,7 @@ import {
 import { SIZE_PHOTO_WHEELBASE_PCT, SIZE_PHOTO_HEIGHT_PCT } from '../../constants/sizeChart';
 import MarkLine from './MarkLine';
 import MarkPoint from './MarkPoint';
+import { withSpecValues } from '../../utils/dataCheckFixes';
 import SizePhotoSpecs from './SizePhotoSpecs';
 
 const DEFAULT_TOLERANCE = 24;
@@ -75,10 +76,18 @@ function CheckRow({ label, read, spec, units, limit }) {
  *   onClose   () => void
  *   pending   Map, view → () => Promise: the form's list of unsaved photo work
  *   onPickFile (File) => void   start again on another file
+ *   specs     { drafts, changed, onDraft }: the dimension specs typed here and
+ *             not yet saved (SizePhotoSection); the readouts use them already
  */
-export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pending, onPickFile }) {
+export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pending, onPickFile, specs }) {
     const { vehicles, units, saveSizePhoto, showError } = useAppContext();
-    const profile = useMemo(() => profileFromSpecs(resolveEffectiveSpecs(vehicle, vehicles)), [vehicle, vehicles]);
+    const typed = specs?.changed;
+    const profile = useMemo(() => {
+        const effective = resolveEffectiveSpecs(vehicle, vehicles);
+        // A cleared field falls back to what it inherits once saved; until then, keep the old figure.
+        const set = Object.fromEntries(Object.entries(typed ?? {}).filter(([, v]) => v != null));
+        return profileFromSpecs(withSpecValues(effective, 'dimensions', set));
+    }, [vehicle, vehicles, typed]);
 
     const [original, setOriginal] = useState(null);      // canvas of the upload (new file, or a redo)
     const [cut, setCut] = useState(null);                 // the original with its background removed
@@ -311,7 +320,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
                         </>
                     )}
                     {read && <CheckRow label="Height" read={read.height} spec={profile.height} units={units} limit={SIZE_PHOTO_HEIGHT_PCT} />}
-                    <SizePhotoSpecs vehicle={vehicle} view={view} />
+                    {specs && <SizePhotoSpecs vehicle={vehicle} view={view} {...specs} />}
                 </div>
             )}
             {outOfOrder && <p className="text-note status-text is-warning">The marks are out of order: {ORDER[view].map(k => MARKS[view].find(m => m.key === k).label.toLowerCase()).join(', then ')}.</p>}

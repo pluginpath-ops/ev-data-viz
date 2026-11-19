@@ -216,7 +216,7 @@ export default function EditVehicleForm({
         onSubmit(e);
     };
     const cancel = () => {
-        if (photoSaves.size > 0 && !window.confirm('Discard the unsaved size photo?')) return;
+        if (photoSaves.size > 0 && !window.confirm('Discard the unsaved size photo work?')) return;
         onCancel();
     };
 

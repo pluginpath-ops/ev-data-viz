@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { SpecField } from '../EditSpecsForm';
 
 /**
- * One spec field, edited where it is needed rather than in the specs form:
- * a Data Checks finding (#321), the size photo editor. It writes straight
- * away on Save, through the caller's `onSave`.
+ * One spec field, edited where a Data Checks finding (#321) needs it rather
+ * than in the specs form. It writes straight away on its own Save, through
+ * the caller's `onSave`. (The size photo editor drafts its specs instead, for
+ * the vehicle form's Save: sizephotos/SizePhotoSpecs.)
  *
  * Save is always present and disabled until the value changes, so typing never
  * moves a control a curator is about to click. The caller keys this by the
