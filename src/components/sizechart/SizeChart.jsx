@@ -71,8 +71,8 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     const grid = chartConfig.sizeGrid ?? true;
     const draw = SIZE_DRAWS.some(d => d.key === chartConfig.sizeDraw) ? chartConfig.sizeDraw : DEFAULT_SIZE_DRAW;
     const opacity = chartConfig.sizeOpacity ?? DEFAULT_SIZE_PHOTO_OPACITY;
-    const [hoverId, setHoverId] = useState(null);
-    // A click picks the vehicle the figures are measured from; it stays forward.
+    // A click picks the vehicle the figures are measured from, drawn at the
+    // back; hovering changes nothing (it reordered the drawing under the pointer).
     const [pickedId, setPickedId] = useState(null);
 
     // A vehicle's color is the same here as on every chart.
@@ -101,7 +101,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
 
     const drawn = useMemo(() => all.filter(i => i.profile.missing[view].length === 0), [all, view]);
     const fromId = drawn.some(i => i.id === pickedId) ? pickedId : null;
-    const activeId = hoverId ?? fromId;
+    const activeId = fromId;
     const pick = (id) => setPickedId(p => (p === id ? null : id));
     const left = all.filter(i => i.profile.missing[view].length > 0);
     const notes = [
@@ -175,10 +175,10 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
                 )}
             >
                 {drawn.length > 0
-                    ? <SizeChartCanvas items={drawn} view={view} anchor={anchor} endAnchor={endAnchor} units={units} lines={lines} grid={grid} activeId={activeId} onActive={setHoverId} onPick={pick} opacity={opacity} exportRef={exportRef} />
+                    ? <SizeChartCanvas items={drawn} view={view} anchor={anchor} endAnchor={endAnchor} units={units} lines={lines} grid={grid} activeId={activeId} onPick={pick} opacity={opacity} exportRef={exportRef} />
                     : <p className="text-note size-chart-empty">No selected vehicle has the figures this view needs.</p>}
             </PlotFrame>
-            {drawn.length > 0 && <SizeFiguresTable items={drawn} view={view} units={units} activeId={activeId} onActive={setHoverId} fromId={fromId} onPick={pick} />}
+            {drawn.length > 0 && <SizeFiguresTable items={drawn} view={view} units={units} activeId={activeId} fromId={fromId} onPick={pick} />}
             {notes.map(n => <p key={n} className="text-note size-chart-note">{n}</p>)}
             {!presentationMode && <ChartInfoBubble chartKey="specsize" />}
             </div>{/* .chart-main */}

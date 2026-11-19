@@ -41,13 +41,12 @@ const wheelsEstimated = (p) => p.estimated.has('frontOverhang') || p.estimated.h
  *   units       'imperial' | 'metric'
  *   lines       draw the dimension lines
  *   grid        draw the grid
- *   activeId    the vehicle brought forward, or null
- *   onActive    (id|null) => void   the vehicle under the pointer
+ *   activeId    the picked vehicle, drawn at the back, or null
  *   onPick      (id) => void        a click: measure the figures from this vehicle
  *   opacity     the photos' opacity over the back one, which is solid (the active one, else the largest)
  *   exportRef   receives `{ canvas }`, the drawing as the PNG export reads it
  */
-export default function SizeChartCanvas({ items, view, anchor, endAnchor, units, lines, grid, activeId, onActive, onPick, opacity = 0.6, exportRef }) {
+export default function SizeChartCanvas({ items, view, anchor, endAnchor, units, lines, grid, activeId, onPick, opacity = 0.6, exportRef }) {
     const endView = isEndView(view);
     const [ref, widthPx] = useElementWidth();
     const svgRef = useRef(null);
@@ -105,7 +104,6 @@ export default function SizeChartCanvas({ items, view, anchor, endAnchor, units,
                 height={heightPx}
                 role="img"
                 aria-label={`${items.length} vehicle${items.length === 1 ? '' : 's'} drawn to scale, ${view} view`}
-                onPointerLeave={() => onActive(null)}
             >
                 {grid && (
                     <g className="size-grid">
@@ -135,7 +133,7 @@ export default function SizeChartCanvas({ items, view, anchor, endAnchor, units,
                         // its part of the photo, stretched to its span. The group
                         // takes the opacity, so the pieces' seams don't double up.
                         return (
-                            <g key={id} className={cls} style={{ '--series': color }} onPointerEnter={() => onActive(id)} onClick={() => onPick(id)}>
+                            <g key={id} className={cls} style={{ '--series': color }} onClick={() => onPick(id)}>
                                 <g className="size-photo">
                                     {slices.map(s => (
                                         <svg
@@ -161,7 +159,7 @@ export default function SizeChartCanvas({ items, view, anchor, endAnchor, units,
                             className={cls}
                             style={{ '--series': color }}
                             transform={`translate(${x0} ${groundY}) scale(${scale} ${-scale})`}
-                            onPointerEnter={() => onActive(id)}
+                           
                             onClick={() => onPick(id)}
                         >
                             {endView && shape.tires.map((t, i) => (
@@ -199,7 +197,7 @@ export default function SizeChartCanvas({ items, view, anchor, endAnchor, units,
                     const axles = view === 'side' ? [start + p.frontOverhang, start + p.frontOverhang + p.wheelbase] : [];
                     return (
                         <g key={`b${id}`} className="size-callout" style={{ '--series': color }}
-                            onPointerEnter={() => onActive(id)} onClick={() => onPick(id)}>
+                            onClick={() => onPick(id)}>
                             <text className="size-callout-name" x={mirrors ? px(places.get(id) - mirrors) : px(start)} y={y - 7}>{label}</text>
                             {mirrors && (
                                 <line className="size-callout-mirrors" x1={px(places.get(id) - mirrors)} x2={px(places.get(id) + mirrors)} y1={y} y2={y} />

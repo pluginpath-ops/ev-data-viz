@@ -12,15 +12,24 @@
 import { anchorX } from './vehicleProfile';
 import { isEndView, trackKeyOf } from './sizePhotoMarks';
 
+const END_MARK = { leftMirror: 'mirrorLeft', leftBody: 'left', leftTire: 'tireLeft' };
+
 /**
  * How far an end-view landmark sits left of the centerline, in inches: what
- * the front and rear views line up on (SIZE_END_ANCHORS). A mirror without a
- * mirror width spec falls back to the body edge.
+ * the front and rear views line up on (SIZE_END_ANCHORS), left as drawn. A
+ * photo's own mark says where, as drawn (perspective puts a mirror nearer
+ * the body than its spec does); else the specs, a mirror without a mirror
+ * width falling back to the body edge.
+ *
+ * @param {{ profile, photo? }} item  `photo` with its `placement` (sizePhotoMarks)
  */
-export function endAnchorX(p, view, anchor) {
+export function endAnchorX({ profile: p, photo }, view, anchor) {
+    const f = photo?.marks?.[END_MARK[anchor]];
+    const slice = f != null && photo.placement?.slices.find(s => f >= s.from && f <= s.to);
+    if (slice) return -(slice.x + ((f - slice.from) / (slice.to - slice.from)) * slice.w);
     if (anchor === 'leftMirror') return (p.widthMirrors ?? p.width) / 2;
     if (anchor === 'leftBody') return p.width / 2;
-    if (anchor === 'leftTire') return (p[trackKeyOf(view)] ?? p.width) / 2;
+    if (anchor === 'leftTire') return ((p[trackKeyOf(view)] ?? p.width) + (p.tireWidth ?? 0)) / 2;
     return 0;
 }
 
@@ -53,10 +62,11 @@ export function sizeChartLayout(items, { view, anchor, endAnchor, widthPx, lines
     let minX = Infinity;
     let maxX = -Infinity;
     let maxH = 0;
-    for (const { id, profile: p } of items) {
+    for (const item of items) {
+        const { id, profile: p } = item;
         if (isEndView(view)) {
             const half = frontHalfWidth(p);
-            const center = endAnchorX(p, view, endAnchor);
+            const center = endAnchorX(item, view, endAnchor);
             places.set(id, center);
             minX = Math.min(minX, center - half);
             maxX = Math.max(maxX, center + half);

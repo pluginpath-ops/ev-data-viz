@@ -38,7 +38,7 @@ function cellOf(profile, col) {
 
 const signed = (diff, units) => (Math.abs(diff) < 0.05 ? '±0' : `${diff > 0 ? '+' : '−'}${fmtDimension(Math.abs(diff), units)}`);
 
-export default function SizeFiguresTable({ items, view, units, activeId, onActive, fromId, onPick }) {
+export default function SizeFiguresTable({ items, view, units, activeId, fromId, onPick }) {
     const cols = COLUMNS[view];
     const first = items.find(i => i.id === fromId) ?? items[0];
     return (
@@ -55,8 +55,6 @@ export default function SizeFiguresTable({ items, view, units, activeId, onActiv
                         <tr
                             key={item.id}
                             className={item.id === activeId ? 'is-active' : ''}
-                            onPointerEnter={() => onActive(item.id)}
-                            onPointerLeave={() => onActive(null)}
                             onClick={() => onPick(item.id)}
                             title={item === first ? undefined : `Measure the figures from ${item.label}`}
                         >

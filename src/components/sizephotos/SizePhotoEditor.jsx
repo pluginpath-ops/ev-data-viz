@@ -32,7 +32,7 @@ const withScheme = (text) => {
 const KIND = {
     front: 'bumper', rear: 'bumper', left: 'bumper', right: 'bumper', frontAxle: 'axle', rearAxle: 'axle',
     ground: 'ground', roof: 'roof', underbody: 'underbody', mirrorLeft: 'mirror', mirrorRight: 'mirror',
-    trackLeft: 'track', trackRight: 'track',
+    tireLeft: 'track', tireRight: 'track',
 };
 
 /** The marks that must run in order along the photo, by view. */
