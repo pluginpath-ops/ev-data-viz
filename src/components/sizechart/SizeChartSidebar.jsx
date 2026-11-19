@@ -1,13 +1,13 @@
 import SidebarDisplaySection from '../SidebarDisplaySection';
 import AnchorIcon from './AnchorIcon';
-import { SIZE_ANCHORS, SIZE_VIEWS, SIZE_DRAWS } from '../../constants/sizeChart';
+import { SIZE_ANCHORS, SIZE_VIEWS, SIZE_DRAWS, MIN_SIZE_PHOTO_OPACITY } from '../../constants/sizeChart';
 
 /**
  * The Size chart's sidebar: which view, what the vehicles are lined up on, and
  * Display (photos or outlines, lines, grid). The vehicles are the selection, picked from the chips like every
  * chart's.
  */
-export default function SizeChartSidebar({ view, anchor, draw, lines, grid, onChange }) {
+export default function SizeChartSidebar({ view, anchor, draw, lines, grid, opacity, onChange }) {
     return (
         <aside className="chart-rail">
             <div className="chart-rail-group">
@@ -61,6 +61,13 @@ export default function SizeChartSidebar({ view, anchor, draw, lines, grid, onCh
                         </button>
                     ))}
                 </div>
+                {draw === 'photos' && (
+                    <label className="size-opacity">
+                        <span className="text-control">Photo opacity {Math.round(opacity * 100)}%</span>
+                        <input type="range" min={MIN_SIZE_PHOTO_OPACITY} max={1} step={0.05} value={opacity}
+                            onChange={e => onChange({ sizeOpacity: Number(e.target.value) })} />
+                    </label>
+                )}
                 <div className="chart-toggles">
                     <label className="toggle-label">
                         <input type="checkbox" checked={lines} onChange={e => onChange({ sizeLines: e.target.checked })} />

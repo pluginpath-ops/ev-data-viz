@@ -20,6 +20,7 @@ export const DEFAULT_SIZE_ANCHOR = 'front';
 export const SIZE_VIEWS = [
     { key: 'side',  label: 'Side' },
     { key: 'front', label: 'Front' },
+    { key: 'rear',  label: 'Rear' },
 ];
 export const DEFAULT_SIZE_VIEW = 'side';
 
@@ -55,6 +56,13 @@ export const FALLBACK_BODY_WIDTH_SHARE = 0.9;
  */
 export const SIZE_PHOTO_WHEELBASE_PCT = 3;
 export const SIZE_PHOTO_HEIGHT_PCT = 4;
+
+/** How far a drawn photo's marks may read from the specs before the chart says so (owner, #608). */
+export const SIZE_PHOTO_CHART_PCT = 4;
+
+/** The photos' opacity when more than one vehicle is drawn: the default, and the slider's floor. */
+export const DEFAULT_SIZE_PHOTO_OPACITY = 0.6;
+export const MIN_SIZE_PHOTO_OPACITY = 0.2;
 
 /**
  * Each body style's outline, as shares of the vehicle's own figures, so the

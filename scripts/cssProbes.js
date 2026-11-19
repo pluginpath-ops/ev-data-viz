@@ -70,6 +70,7 @@ export const CONSTRUCTED = {
     'size-mark--roof':   'MarkLine builds `size-mark--${kind}`.',
     'size-mark--underbody': 'MarkLine builds `size-mark--${kind}`.',
     'size-mark--mirror': 'MarkLine builds `size-mark--${kind}`.',
+    'size-mark--track':  'MarkLine builds `size-mark--${kind}`.',
     'is-x':          'SizePhotoEditor builds the loupe\'s `is-${loupe.axis}` (useMarkDrag: x, y or xy).',
     'is-y':          'SizePhotoEditor builds the loupe\'s `is-${loupe.axis}`.',
     'nav-menu-sub':  'NavMenu builds `nav-menu-${level}`.',

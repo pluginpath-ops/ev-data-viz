@@ -33,15 +33,19 @@ export const isEndView = (view) => view !== 'side';
  * and `rearAxle` are their x, `frontAxleY` and `rearAxleY` their y (the wheel
  * centers), dragged together as one dot (`point` names the x it goes with).
  * `underbody` is the lowest point of the body, for ground clearance; front and
- * rear, `mirrorLeft` and `mirrorRight` are the mirrors' outer edges, for the
- * width with mirrors. The axle heights, underbody and mirrors are recorded for
- * later use (#603); nothing draws from them yet.
+ * rear, `mirrorLeft` and `mirrorRight` are the mirrors' outer edges (they
+ * stretch the photo to the width with mirrors, see photoPlacement), and
+ * `trackLeft` and `trackRight` the centers of the tires where they meet the
+ * ground (the track: front track on the front photo, rear on the rear). The
+ * axle heights and underbody are recorded for later use (#603).
  */
 const END_MARKS = [
     { key: 'mirrorLeft', axis: 'x', label: 'Left mirror' },
     { key: 'left',      axis: 'x', label: 'Left body edge' },
     { key: 'right',     axis: 'x', label: 'Right body edge' },
     { key: 'mirrorRight', axis: 'x', label: 'Right mirror' },
+    { key: 'trackLeft',  axis: 'x', label: 'Left tire center' },
+    { key: 'trackRight', axis: 'x', label: 'Right tire center' },
     { key: 'ground',    axis: 'y', label: 'Ground' },
     { key: 'underbody', axis: 'y', label: 'Underbody' },
     { key: 'roof',      axis: 'y', label: 'Roof' },
@@ -64,6 +68,9 @@ export const MARKS = {
 
 const axisOf = (view, key) => MARKS[view].find(m => m.key === key)?.axis;
 
+/** The track an end view shows: the front photo the front track, the rear the rear. */
+export const trackKeyOf = (view) => (view === 'rear' ? 'trackRear' : 'trackFront');
+
 /**
  * The marks added after photos were first saved — the axle heights, the
  * underbody and the mirrors — filled in where a photo lacks them: the axles
@@ -83,6 +90,11 @@ export function fillMarks(view, marks, profile = null) {
         const extra = profile?.widthMirrors > profile?.width ? (profile.widthMirrors - profile.width) / 2 / profile.width : 0.05;
         if (out.mirrorLeft == null) out.mirrorLeft = Math.max(0, marks.left - body * extra);
         if (out.mirrorRight == null) out.mirrorRight = Math.min(1, marks.right + body * extra);
+        const track = profile?.[trackKeyOf(view)];
+        const half = (profile?.width > 0 && track > 0 ? track / profile.width : 0.86) * body / 2;
+        const center = (marks.left + marks.right) / 2;
+        if (out.trackLeft == null) out.trackLeft = center - half;
+        if (out.trackRight == null) out.trackRight = center + half;
     } else if (!isEndView(view)) {
         const axleY = up(profile?.tireDiameter / 2, 0.2);
         if (out.frontAxleY == null) out.frontAxleY = axleY;
@@ -121,6 +133,7 @@ export function mirrorMarks(view, marks) {
         return {
             ...marks, left: flip(marks.right), right: flip(marks.left),
             mirrorLeft: flip(marks.mirrorRight), mirrorRight: flip(marks.mirrorLeft),
+            trackLeft: flip(marks.trackRight), trackRight: flip(marks.trackLeft),
         };
     }
     return {
@@ -170,7 +183,7 @@ export function figuresFromMarks(view, photo, profile) {
     const m = photo.marks;
     const across = (a, b) => (a != null && b != null ? ((b - a) * photo.width_px) / k : null);
     const height = m.roof != null && m.ground != null ? ((m.ground - m.roof) * photo.height_px) / k : null;
-    if (isEndView(view)) return { height };
+    if (isEndView(view)) return { height, track: across(m.trackLeft, m.trackRight) };
     return {
         wheelbase: across(m.frontAxle, m.rearAxle),
         frontOverhang: across(m.front, m.frontAxle),
@@ -212,8 +225,26 @@ export function photoPlacement(view, photo, profile) {
     };
 
     if (isEndView(view)) {
+        // Across in three pieces when both widths are specs and the mirrors are
+        // marked outside the body: the body edges land on the width and the
+        // mirror tips on the width with mirrors. Mirrors sit further from the
+        // camera than the body, so one scale would draw them too narrow (or the
+        // body too wide). With the width only a stand-in, the mirrors alone.
         const half = profile.width / 2;
-        return { top, h, slices: [piece(0, 1, m.left, -half, m.right, half)] };
+        const mh = profile.widthMirrors / 2;
+        const mirrors = mh > half && m.mirrorLeft < m.left && m.right < m.mirrorRight;
+        if (mirrors && profile.estimated?.has('width')) {
+            return { top, h, slices: [piece(0, 1, m.mirrorLeft, -mh, m.mirrorRight, mh)] };
+        }
+        if (!mirrors) return { top, h, slices: [piece(0, 1, m.left, -half, m.right, half)] };
+        return {
+            top, h,
+            slices: [
+                piece(0, m.left, m.mirrorLeft, -mh, m.left, -half),
+                piece(m.left, m.right, m.left, -half, m.right, half),
+                piece(m.right, 1, m.right, half, m.mirrorRight, mh),
+            ],
+        };
     }
     const { length, wheelbase, frontOverhang } = profile;
     const axles = m.front < m.frontAxle && m.frontAxle < m.rearAxle && m.rearAxle < m.rear

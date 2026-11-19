@@ -10,10 +10,11 @@
  */
 
 import { anchorX } from './vehicleProfile';
+import { isEndView } from './sizePhotoMarks';
 
 export const SIZE_MARGIN = { left: 12, right: 104, top: 18 };
 /** The tallest the drawing gets, so a narrow selection doesn't fill the screen. */
-export const SIZE_MAX_DRAW_PX = { side: 300, front: 320 };
+export const SIZE_MAX_DRAW_PX = { side: 300, front: 320, rear: 320 };
 export const SIZE_ROW_PX = 26;
 const BARS_GAP_PX = 16;
 
@@ -26,7 +27,7 @@ export const frontHalfWidth = (p) => Math.max(
 /**
  * @param {Array<{ id, profile }>} items  vehicles drawable in this view, in selection order
  * @param {object} opts
- * @param {'side'|'front'} opts.view
+ * @param {'side'|'front'|'rear'} opts.view
  * @param {string} opts.anchor      a SIZE_ANCHORS key (side view)
  * @param {number} opts.widthPx     the drawing's width
  * @param {boolean} opts.lines      draw the dimension lines below the ground
@@ -40,7 +41,7 @@ export function sizeChartLayout(items, { view, anchor, widthPx, lines }) {
     let maxX = -Infinity;
     let maxH = 0;
     for (const { id, profile: p } of items) {
-        if (view === 'front') {
+        if (isEndView(view)) {
             const half = frontHalfWidth(p);
             places.set(id, 0);
             minX = Math.min(minX, -half);

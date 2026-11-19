@@ -2,7 +2,8 @@ import { fmtDimension } from '../../utils/unitConversions';
 
 /**
  * The figures under the Size chart: one row per drawn vehicle, each figure with
- * how far it is from the first vehicle's.
+ * how far it is from the vehicle they are measured from (`fromId`, picked by a
+ * click; else the first).
  *
  * A figure the drawing filled with a stand-in is shown as "est." where the
  * stand-in still says something (the axles placed by a typical overhang split)
@@ -26,6 +27,7 @@ const COLUMNS = {
         { key: 'trackRear',    label: 'Rear track',       est: 'trackRear' },
     ],
 };
+COLUMNS.rear = COLUMNS.front;
 
 function cellOf(profile, col) {
     const value = profile[col.key];
@@ -36,15 +38,15 @@ function cellOf(profile, col) {
 
 const signed = (diff, units) => (Math.abs(diff) < 0.05 ? '±0' : `${diff > 0 ? '+' : '−'}${fmtDimension(Math.abs(diff), units)}`);
 
-export default function SizeFiguresTable({ items, view, units, activeId, onActive }) {
+export default function SizeFiguresTable({ items, view, units, activeId, onActive, fromId, onPick }) {
     const cols = COLUMNS[view];
-    const [first] = items;
+    const first = items.find(i => i.id === fromId) ?? items[0];
     return (
         <div className="size-figures-container">
             <table className="size-figures">
                 <thead>
                     <tr>
-                        <th>Vehicle</th>
+                        <th>{items.length > 1 ? `Vehicle · differences from ${first.label}` : 'Vehicle'}</th>
                         {cols.map(c => <th key={c.key}>{c.label}</th>)}
                     </tr>
                 </thead>
@@ -55,6 +57,8 @@ export default function SizeFiguresTable({ items, view, units, activeId, onActiv
                             className={item.id === activeId ? 'is-active' : ''}
                             onPointerEnter={() => onActive(item.id)}
                             onPointerLeave={() => onActive(null)}
+                            onClick={() => onPick(item.id)}
+                            title={item === first ? undefined : `Measure the figures from ${item.label}`}
                         >
                             <td>
                                 <span className="size-figures-name">

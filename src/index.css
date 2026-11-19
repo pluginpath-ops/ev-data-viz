@@ -6568,8 +6568,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* Overlaid photos are see-through, so a car behind another still shows; the
    one pointed at comes to the front, unchanged, while the rest fade further.
    Outlines are already see-through by their fill. */
-.size-chart-svg.is-overlaid .size-photo { opacity: 0.6; }
-.size-chart-svg.is-overlaid .size-silhouette.is-active .size-photo { opacity: 0.6; }
+.size-chart-svg.is-overlaid .size-photo { opacity: var(--size-photo-opacity); }
+.size-chart-svg.is-overlaid .size-silhouette.is-back .size-photo { opacity: 1; }
+.size-silhouette, .size-callout { cursor: pointer; }
 
 .size-callout text {
     fill: var(--color-text-value);
@@ -6579,6 +6580,9 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 }
 .size-callout-lead { stroke: var(--series); stroke-width: 1.5; stroke-dasharray: 6 4; }
 .size-callout-bar { stroke: var(--series); stroke-width: 2.5; }
+.size-callout text.size-callout-name { fill: var(--color-text-secondary); font-family: inherit; }
+/* The sidebar's photo opacity slider. */
+.size-opacity { @apply flex flex-col gap-1; }
 .size-callout-mirrors { stroke: var(--series); stroke-width: 2.5; stroke-opacity: 0.35; }
 .size-callout-axle { fill: var(--color-card); stroke: var(--series); stroke-width: 2; }
 .size-callout-axle.is-estimated { stroke-dasharray: 2 2; }
@@ -6626,6 +6630,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 .size-mark--roof   { --mark: var(--color-accent-violet); }
 .size-mark--underbody { --mark: var(--color-accent-green); }
 .size-mark--mirror { --mark: var(--color-accent-orange); }
+.size-mark--track  { --mark: var(--color-accent-blue); }
 /* Marks recorded for later (the underbody, the mirrors) are dashed. */
 .size-mark--underbody::before,
 .size-mark--mirror::before { background: none; border: 0 dashed var(--mark); }

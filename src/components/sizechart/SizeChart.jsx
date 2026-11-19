@@ -7,8 +7,9 @@ import { profileFromSpecs } from '../../utils/vehicleProfile';
 import { gridStepIn } from '../../utils/sizeChartLayout';
 import {
     SIZE_ANCHORS, SIZE_VIEWS, SIZE_DRAWS, DEFAULT_SIZE_ANCHOR, DEFAULT_SIZE_VIEW, DEFAULT_SIZE_DRAW,
+    SIZE_PHOTO_CHART_PCT, DEFAULT_SIZE_PHOTO_OPACITY,
 } from '../../constants/sizeChart';
-import { photoPlacement } from '../../utils/sizePhotoMarks';
+import { photoPlacement, figuresFromMarks, isEndView, trackKeyOf } from '../../utils/sizePhotoMarks';
 import { useSourceLine } from '../../hooks/useSourceLine';
 import { sourceLineText } from '../../utils/sources';
 import { useChartPng } from '../../hooks/useChartPng';
@@ -21,6 +22,19 @@ import SizeChartCanvas from './SizeChartCanvas';
 import SizeFiguresTable from './SizeFiguresTable';
 
 const nameList = (items) => items.map(i => i.label).join(', ');
+
+/** Where a drawn photo's marks read further than SIZE_PHOTO_CHART_PCT from the specs: "height +7.4%". */
+function photoErrors(view, item) {
+    const read = figuresFromMarks(view, item.photo, item.profile);
+    if (!read) return [];
+    const p = item.profile;
+    const checks = isEndView(view)
+        ? [['height', read.height, p.height], ['track', read.track, p.estimated.has(trackKeyOf(view)) ? null : p[trackKeyOf(view)]]]
+        : [['wheelbase', read.wheelbase, p.wheelbase], ['height', read.height, p.height]];
+    return checks
+        .filter(([, got, spec]) => got != null && spec > 0 && Math.abs(got / spec - 1) * 100 > SIZE_PHOTO_CHART_PCT)
+        .map(([name, got, spec]) => { const pct = (got / spec - 1) * 100; return `${name} ${pct > 0 ? '+' : '−'}${Math.abs(pct).toFixed(1)}%`; });
+}
 
 /** A photo's credit for the source line: its credit, else its source's site. */
 function creditOf(photo) {
@@ -44,8 +58,9 @@ function creditOf(photo) {
  * its axles estimated for want of a front overhang.
  *
  * Settings are App's chartConfig (`sizeView`, `sizeAnchor`, `sizeDraw` in the
- * link; `sizeLines`, `sizeGrid` for this visit), so the pop-out draws the same
- * chart.
+ * link; `sizeLines`, `sizeGrid`, `sizeOpacity` for this visit), so the pop-out
+ * draws the same chart. A click on a vehicle (or its row) picks the one the
+ * figures are measured from, and keeps it forward; a second click lets go.
  */
 export default function SizeChart({ vehicles, chartConfig, setChartConfig, presentationMode = false }) {
     const { units, vehicles: allVehicles } = useAppContext();
@@ -54,7 +69,10 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     const lines = chartConfig.sizeLines ?? true;
     const grid = chartConfig.sizeGrid ?? true;
     const draw = SIZE_DRAWS.some(d => d.key === chartConfig.sizeDraw) ? chartConfig.sizeDraw : DEFAULT_SIZE_DRAW;
-    const [activeId, setActiveId] = useState(null);
+    const opacity = chartConfig.sizeOpacity ?? DEFAULT_SIZE_PHOTO_OPACITY;
+    const [hoverId, setHoverId] = useState(null);
+    // A click picks the vehicle the figures are measured from; it stays forward.
+    const [pickedId, setPickedId] = useState(null);
 
     // A vehicle's color is the same here as on every chart.
     const palette = chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE;
@@ -81,6 +99,9 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     }, [vehicles, allVehicles, colorMap, draw, view]);
 
     const drawn = useMemo(() => all.filter(i => i.profile.missing[view].length === 0), [all, view]);
+    const fromId = drawn.some(i => i.id === pickedId) ? pickedId : null;
+    const activeId = hoverId ?? fromId;
+    const pick = (id) => setPickedId(p => (p === id ? null : id));
     const left = all.filter(i => i.profile.missing[view].length > 0);
     const notes = [
         left.length > 0 && `Not drawn: ${left.map(i => `${i.label} (no ${i.profile.missing[view].join(', ')})`).join('; ')}.`,
@@ -89,16 +110,20 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
             (() => { const e = drawn.filter(i => i.profile.estimated.has('tireDiameter')); return e.length > 0 && `Wheel size estimated (no tire size): ${nameList(e)}.`; })(),
         ] : [
             (() => { const e = drawn.filter(i => i.profile.estimated.has('width')); return e.length > 0 && `Body width estimated from the width with mirrors: ${nameList(e)}.`; })(),
-            (() => { const e = drawn.filter(i => i.profile.estimated.has('trackFront')); return e.length > 0 && `Track estimated: ${nameList(e)}.`; })(),
+            (() => { const e = drawn.filter(i => i.profile.estimated.has(trackKeyOf(view))); return e.length > 0 && `Track estimated: ${nameList(e)}.`; })(),
         ]),
         (() => { const e = drawn.filter(i => !i.photo && i.profile.estimated.has('bodyStyle')); return e.length > 0 && `Generic outline (no body style): ${nameList(e)}.`; })(),
         view === 'side' && (() => { const e = drawn.filter(i => i.profile.fromPhoto.has('frontOverhang')); return e.length > 0 && `Front and rear overhang split as the photo shows it (no front overhang spec): ${nameList(e)}.`; })(),
         (() => { const e = drawn.filter(i => i.photo?.mirrored); return e.length > 0 && `Mirrored photo (the other side of the car, flipped): ${nameList(e)}.`; })(),
+        (() => {
+            const e = drawn.filter(i => i.photo).map(i => [i, photoErrors(view, i)]).filter(([, errs]) => errs.length);
+            return e.length > 0 && `Photo marks off the specs by more than ${SIZE_PHOTO_CHART_PCT}% (drawn to the specs; the photo may be distorted): ${e.map(([i, errs]) => `${i.label} (${errs.join(', ')})`).join('; ')}.`;
+        })(),
     ].filter(Boolean);
 
     const onChange = (patch) => setChartConfig(p => ({ ...p, ...patch }));
     const anchorLabel = SIZE_ANCHORS.find(a => a.key === anchor).label.toLowerCase();
-    const title = view === 'front' ? 'Size, from the front' : 'Size, from the side';
+    const title = `Size, from the ${view}`;
     const gridNote = grid ? `grid ${units === 'metric' ? '0.5 m' : `${gridStepIn(units) / 12} ft`}` : null;
     const subtitle = [
         units === 'metric' ? 'metric' : 'imperial',
@@ -126,7 +151,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     return (
         <div className="chart-layout">
             {!presentationMode && (
-                <SizeChartSidebar view={view} anchor={anchor} draw={draw} lines={lines} grid={grid} onChange={onChange} />
+                <SizeChartSidebar view={view} anchor={anchor} draw={draw} lines={lines} grid={grid} opacity={opacity} onChange={onChange} />
             )}
             <div className="chart-main">
             <PlotFrame
@@ -150,10 +175,10 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
                 )}
             >
                 {drawn.length > 0
-                    ? <SizeChartCanvas items={drawn} view={view} anchor={anchor} units={units} lines={lines} grid={grid} activeId={activeId} onActive={setActiveId} exportRef={exportRef} />
+                    ? <SizeChartCanvas items={drawn} view={view} anchor={anchor} units={units} lines={lines} grid={grid} activeId={activeId} onActive={setHoverId} onPick={pick} opacity={opacity} exportRef={exportRef} />
                     : <p className="text-note size-chart-empty">No selected vehicle has the figures this view needs.</p>}
             </PlotFrame>
-            {drawn.length > 0 && <SizeFiguresTable items={drawn} view={view} units={units} activeId={activeId} onActive={setActiveId} />}
+            {drawn.length > 0 && <SizeFiguresTable items={drawn} view={view} units={units} activeId={activeId} onActive={setHoverId} fromId={fromId} onPick={pick} />}
             {notes.map(n => <p key={n} className="text-note size-chart-note">{n}</p>)}
             {!presentationMode && <ChartInfoBubble chartKey="specsize" />}
             </div>{/* .chart-main */}
