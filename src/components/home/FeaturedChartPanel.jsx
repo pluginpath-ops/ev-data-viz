@@ -4,6 +4,7 @@ import MarkdownText from '../MarkdownText';
 import { useAppContext } from '../../context/AppContext';
 import { useInView } from '../../hooks/useInView';
 import PresentedVehicleTable from '../vehicles/PresentedVehicleTable';
+import { applyVehicleBases } from '../../utils/vehicleBase';
 import { chartStateOf, defaultChartTitle, vehiclesInOrder, explicitChartParams } from '../../utils/featuredComparisons';
 
 /**
@@ -32,9 +33,12 @@ export default function FeaturedChartPanel({ comparison, index, onOpen }) {
     const [roadTripConfig, setRoadTripConfig] = useState(() => seed?.roadTripConfig);
     const [epaConfig, setEpaConfig] = useState(() => seed?.epaConfig);
 
+    // With the saved chart's session bases on, as App gives the live charts theirs.
+    const drawn = useMemo(() => applyVehicleBases(vehicles, chartConfig?.vehicleBases), [vehicles, chartConfig?.vehicleBases]);
+
     if (!seed || !chart) return null;
     // In the comparison's order: it is the order the series are drawn and listed in.
-    const shown = vehiclesInOrder(seed.vehicleIds, vehicles);
+    const shown = vehiclesInOrder(seed.vehicleIds, drawn);
 
     // The vehicle table is not a chart: it has no frame to size, and a table is too
     // wide for half a row, so its panel takes the whole row.

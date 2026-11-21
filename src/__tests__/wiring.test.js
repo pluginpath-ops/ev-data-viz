@@ -1779,9 +1779,12 @@ describe('constants exposed for tuning are reachable in the Admin panel', () => 
         expect(read('src/components/PresentedChart.jsx')).toMatch(/<EpaCurvesView[\s\S]{0,400}correctionTarget=\{chartConfig\?\.correctionTarget\}/);
         expect(read('src/App.jsx')).toMatch(/<EpaSection[^>]*correctionTarget=\{chartConfig\.correctionTarget\}[^>]*setChartConfig=\{setChartConfig\}/);
         const view = read('src/components/EpaCurvesView.jsx');
-        expect(view, 'the extras travel in epaConfig').toMatch(/driven: presentationMode \? \(epaConfig\.extras/);
-        expect(view, 'and are written there by the window that has the controls').toMatch(/extras: JSON\.parse\(extrasKey\)/);
-        expect(read('src/utils/chartUrlState.js'), 'the extras stay out of the link, and so out of the short link (#476)').not.toMatch(/windSpeed|gradeGain|extras/);
+        // Held in epaConfig, so the pop-out, the link and a featured chart draw
+        // them. They ride in the settings key, written only when set, so an
+        // untouched link stays short (#476).
+        expect(view, 'the extras are held in epaConfig').toMatch(/values: epaConfig\.extras \?\? NO_EXTRAS/);
+        expect(view, 'and only the window with the controls writes them').toMatch(/setValues: presentationMode \? null : setExtras/);
+        expect(read('src/utils/settingsKey.js'), 'the link carries them').toMatch(/\['epa_x',.*'epa',\s*'extras'/);
     });
 
     it('reads the accessory load in the correction and takes a run’s own consumption to it (#449)', () => {
@@ -2036,15 +2039,98 @@ describe('every chart that reads handSet is passed it', () => {
     });
 });
 
+describe('a view\'s plot settings live in chartConfig, so the link carries them', () => {
+    // Held in the view, they reset on a sub-tab switch and never reached the
+    // chart link, the pop-out or a featured comparison.
+    it.each([
+        ['PerformanceCompareView', 'src/App.jsx'],
+        ['PerformanceCurveView', 'src/App.jsx'],
+        ['WeeklyPlanView', 'src/App.jsx'],
+        ['PerformanceCompareView', 'src/components/PresentedChart.jsx'],
+        ['PerformanceCurveView', 'src/components/PresentedChart.jsx'],
+        ['WeeklyPlanView', 'src/components/PresentedChart.jsx'],
+    ])('%s is given chartConfig where it is rendered (%s)', (view, file) => {
+        const text = ALL.find(x => x.file === file).text;
+        const open = text.indexOf(`<${view}`);
+        const props = text.slice(open, text.indexOf('/>', open));
+        expect(props).toMatch(/chartConfig=\{chartConfig\}/);
+    });
+
+    it.each([
+        'src/components/PerformanceCompareView.jsx',
+        'src/components/PerformanceCurveView.jsx',
+        'src/components/costToDrive/WeeklyPlanView.jsx',
+    ])('%s reads its settings through useChartSetting', (file) => {
+        expect(ALL.find(x => x.file === file).text).toMatch(/useChartSetting\(\.\.\.cfg, /);
+    });
+});
+
+describe('every chart setting is carried by the link', () => {
+    // A setting held in chart state but missing from the link is dropped by a
+    // shared link, a featured comparison and a sub-tab switch, with nothing to
+    // say so — how Road Trip lost its ticked rows and colors (2026-11-21). The
+    // check is loose (the field's name must appear in the link's two modules),
+    // so it catches a new field nobody wired, not a wrong one.
+    const link = ['src/utils/chartUrlState.js', 'src/utils/settingsKey.js']
+        .map(f => ALL.find(x => x.file === f).text).join('\n');
+
+    const fields = new Map();
+    for (const { file, text } of ALL) {
+        for (const m of text.matchAll(/\b(chartConfig|roadTripConfig|epaConfig|compareConfig)\??\.(\w+)/g)) {
+            fields.set(m[2], file);
+        }
+        for (const m of text.matchAll(/set(?:Chart|RoadTrip|Epa|Compare)Config\??\.?\(\s*prev\s*=>\s*\(\{\s*\.\.\.prev,\s*(\w+)\s*:/g)) {
+            fields.set(m[1], file);
+        }
+        for (const m of text.matchAll(/setField\('(\w+)'/g)) fields.set(m[1], file);
+    }
+
+    it('names every field the views read or set', () => {
+        expect(fields.size).toBeGreaterThan(60);
+        const missing = [...fields].filter(([f]) => !new RegExp(`\\b${f}\\b`).test(link))
+            .map(([f, file]) => `${f} (${file})`);
+        expect(missing, 'add a SETTINGS row in utils/settingsKey.js').toEqual([]);
+    });
+
+    it('has a SETTINGS row for every useChartSetting', () => {
+        const rows = [];
+        for (const { file, text } of ALL) {
+            const group = text.match(/const cfg = \[chartConfig, setChartConfig, '(\w+)'\]/)?.[1];
+            for (const m of text.matchAll(/useChartSetting\(\.\.\.cfg, '(\w+)'/g)) rows.push([file, group, m[1]]);
+        }
+        expect(rows.length).toBeGreaterThan(10);
+        const missing = rows.filter(([, group, field]) => !link.includes(`['${group}', '${field}']`))
+            .map(([file, group, field]) => `${group}.${field} (${file})`);
+        expect(missing).toEqual([]);
+    });
+});
+
 describe('the picks map outlives the palette', () => {
     const hook = () => ALL.find(x => x.file === 'src/hooks/useStickyChartColors.js').text;
 
     it('keys picks on resetKey, not on the session key', () => {
         const text = hook();
-        expect(text).toMatch(/useState\(\{ key: resetKey, map: EMPTY \}\)/);
-        expect(text).toMatch(/overrideState\.key === resetKey/);
+        // Held in chartConfig.colorPicks (utils/colorPicks.js), per chart and
+        // vehicle set — never the palette.
+        expect(text).toMatch(/const picks = picksFor\(colorPicks, chart, resetKey\);/);
+        expect(text).toMatch(/withPicks\(all, chart, resetKey, update\)/);
         // The assignments still reset with the palette.
         expect(text).toMatch(/assignedKey\.current !== sessionKey/);
+    });
+
+    // The picks used to live in the hook, so a sub-tab switch dropped them and
+    // a link or featured comparison could not carry them.
+    it.each([
+        ['RangeChartView', 'src/components/ChargingView.jsx'],
+        ['ChargeCompareView', 'src/App.jsx'],
+        ['RoadTripView', 'src/App.jsx'],
+        ['ChargeCompareView', 'src/components/PresentedChart.jsx'],
+        ['RoadTripView', 'src/components/PresentedChart.jsx'],
+    ])('%s is given the held picks where it is rendered (%s)', (view, file) => {
+        const text = ALL.find(x => x.file === file).text;
+        const open = text.indexOf(`<${view}`);
+        const props = text.slice(open, text.indexOf('/>', open));
+        expect(props).toMatch(/colorPicks=\{chartConfig\??\.colorPicks\}/);
     });
 
     it('applies picks only while hand-set is in force', () => {
@@ -2086,6 +2172,16 @@ describe('Road Trip pairings are selected and colored apart (#379)', () => {
     const road = read('src/components/RoadTripView.jsx');
     const selector = read('src/components/RunSelector.jsx');
 
+    it('the ticked rows are held in roadTripConfig, so a sub-tab switch and a link keep them', () => {
+        // Held in the view, leaving the sub-tab re-bootstrapped one default row
+        // per vehicle, and a featured comparison saved only that.
+        expect(road).toMatch(/value: roadTripConfig\.selected \?\? \[\]/);
+        expect(road).not.toMatch(/window\.location\.search\)\.get\('rt_r'\)/);
+        const url = read('src/utils/chartUrlState.js');
+        expect(url).toMatch(/p\.set\('rt_r', roadTripConfig\.selected\.join\(','\)\)/);
+        expect(url).toMatch(/selected: p\.get\('rt_r'\)/);
+    });
+
     it('the selection group is per pairing slot, so an added pairing can be unticked', () => {
         // One group per range test lets the hook's carry rule re-tick a row whose
         // parent is still selected.
@@ -2095,7 +2191,8 @@ describe('Road Trip pairings are selected and colored apart (#379)', () => {
 
     it('an added pairing\'s swatch writes a pair-keyed color, and the selector is told to', () => {
         expect(road).toMatch(/\bpairColors\b/);
-        expect(road).toMatch(/pairPicks\[entry\.key\]/);
+        // A hand-set pick like any other, held in chartConfig.colorPicks.
+        expect(road).toMatch(/picksInForce\[entry\.key\]/);
         expect(selector).toMatch(/pairColors \? \{ \.\.\.run, id: rowKey\(partnerId\) \} : run/);
     });
 });
@@ -2578,6 +2675,10 @@ describe('a chart link is read and written in one module (#448 layer 1)', () => 
         }
         const tabled = [...parseSrc.matchAll(/\['((?:cmp|rt)_[a-z]+)', '/g)].map(m => m[1]);
         expect(tabled.length).toBe(20);
+        // The settings key is a table too (utils/settingsKey.js): one list for
+        // the read and the write.
+        expect(parseSrc).toMatch(/readSettings\(p\)/);
+        expect(buildSrc).toMatch(/writeSettings\(settings, chartMode/);
         // Trip Optimizer's chart is a table row for the write and read apart
         // (an unknown chart is dropped).
         expect(buildSrc).toMatch(/writeParams\(p, OPTIMIZER_CHART_PARAM/);
@@ -2620,7 +2721,7 @@ describe('a chart link is read and written in one module (#448 layer 1)', () => 
 
     it('the plotted tests are applied from the link for range as well as charging', () => {
         expect(codec).toMatch(/s\.chartMode === 'charging' \|\| s\.chartMode === 'range'/);
-        expect(app).toMatch(/chartConfigFromParsed\(s, prev\)/);
+        expect(app).toMatch(/chartConfigFromParsed\(s, prev, vehicleIds\)/);
     });
 });
 
@@ -2971,7 +3072,8 @@ describe('a curator\'s text on Home is drawn as basic Markdown, never as HTML (#
 describe('a featured comparison keeps its vehicles in the order the curator set (#448)', () => {
     it('Home and its panels take the order from the comparison, not from the vehicle list', () => {
         expect(read('src/components/home/HomeView.jsx')).toMatch(/vehiclesInOrder\(liveVehicleIds\(shown, vehicles\), vehicles\)/);
-        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/vehiclesInOrder\(seed\.vehicleIds, vehicles\)/);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/vehiclesInOrder\(seed\.vehicleIds, drawn\)/);
+        expect(read('src/components/home/FeaturedChartPanel.jsx')).toMatch(/applyVehicleBases\(vehicles, chartConfig\?\.vehicleBases\)/);
         // The failure was `vehicles.filter(v => ids.has(v.id))`, which is list order.
         for (const f of ['HomeView', 'FeaturedChartPanel']) {
             expect(read(`src/components/home/${f}.jsx`), f).not.toMatch(/vehicles\.filter\(v => (ids|seed)/);

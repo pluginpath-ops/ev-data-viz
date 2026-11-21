@@ -18,7 +18,7 @@ import WeeklyPlanView from './components/costToDrive/WeeklyPlanView';
 import HomeChargerView from './components/costToDrive/HomeChargerView';
 import YourDrivingPage from './components/costToDrive/YourDrivingPage';
 import { DEFAULT_COST_TO_DRIVE } from './constants/costToDrive';
-import { decodeCostToDriveKey, normalizeCostToDrive } from './utils/costToDriveKey';
+import { decodeCostToDriveKey, normalizeCostToDrive, withGasCarOf } from './utils/costToDriveKey';
 import PopoutView from './components/PopoutView';
 import VehicleTable from './components/VehicleTable';
 import { testHref } from './utils/testDetails';
@@ -480,6 +480,13 @@ export default function App() {
         setRoadTripConfig(state.roadTripConfig);
         setEpaConfig(state.epaConfig);
         setPairings(state.pairings);
+        // Cost & Time's charts are priced from the saved week; Road Trip and
+        // Trip Optimizer time the saved gas car. Any other chart leaves the
+        // reader's own settings alone.
+        if (state.view === 'cost') setCostToDrive(state.costToDrive);
+        else if (state.chartMode === 'roadtrip' || state.chartMode === 'optimizer') {
+            setCostToDrive(prev => withGasCarOf(prev, state.costToDrive));
+        }
         setView(state.view);
         window.scrollTo(0, 0);
     }, [vehicles, setVehicleSelection, setVehicleFilters]);
@@ -784,7 +791,7 @@ export default function App() {
         if (vehicleIds.length > 0) setVehicleSelection(vehicleIds);
         if (s.chartMode) setChartMode(s.chartMode);
 
-        setChartConfig(prev => chartConfigFromParsed(s, prev));
+        setChartConfig(prev => chartConfigFromParsed(s, prev, vehicleIds));
         // Land on the category that owns the restored mode.
         setView(categoryForMode(s.chartMode).key);
     }, [loading]);
@@ -1359,6 +1366,7 @@ export default function App() {
                             setPairings={setPairings}
                             palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
+                            colorPicks={chartConfig.colorPicks}
                             verboseLabels={chartConfig.verboseLabels ?? false}
                             correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
                             correctionTarget={chartConfig.correctionTarget}
@@ -1388,6 +1396,7 @@ export default function App() {
                             correctionTarget={chartConfig.correctionTarget}
                             palette={chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                             handSet={chartConfig.handSet ?? false}
+                            colorPicks={chartConfig.colorPicks}
                             testSpread={chartConfig.testSpread ?? true}
                             setChartConfig={setChartConfig}
                         />
@@ -1431,12 +1440,16 @@ export default function App() {
                         <PerformanceCompareView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
+                            chartConfig={chartConfig}
+                            setChartConfig={setChartConfig}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'perfcurve' && (
                         <PerformanceCurveView
                             vehicles={chartVehicles}
                             selectedVehicleIds={selectedVehicles}
+                            chartConfig={chartConfig}
+                            setChartConfig={setChartConfig}
                         />
                     )}
                     {/* Your Driving needs no selection: it is where the week is set,
@@ -1465,6 +1478,8 @@ export default function App() {
                             selectedVehicleIds={selectedVehicles}
                             settings={costToDrive}
                             onChange={updateCostToDrive}
+                            chartConfig={chartConfig}
+                            setChartConfig={setChartConfig}
                         />
                     )}
                     {activeChartCategory && selectedVehicles.length > 0 && chartMode === 'drivecharger' && (

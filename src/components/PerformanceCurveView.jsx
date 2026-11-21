@@ -31,6 +31,8 @@ import { useSourceLine } from '../hooks/useSourceLine';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 import CopyPngButton from './charts/CopyPngButton';
 import CopyLinkButton from './charts/CopyLinkButton';
+import { useChartSetting } from '../hooks/useChartSetting';
+import { keepPlotted } from '../utils/settingsKey';
 
 /** Okabe-Ito, in this chart's own order: blue first, yellow last. */
 const PALETTE = [4, 5, 2, 6, 0, 1, 3].map(i => OKABE_ITO[i]);
@@ -45,7 +47,9 @@ const CURVE_ATOMS = [
     { key: 'source', of: s => s.source },
 ];
 
-export default function PerformanceCurveView({ vehicles, selectedVehicleIds, presentationMode }) {
+const NO_COLOR_EDITS = {};
+
+export default function PerformanceCurveView({ vehicles, selectedVehicleIds, presentationMode, chartConfig = null, setChartConfig = null }) {
     const { isDark } = useTheme();
     const canvasRef  = useRef(null);
     const chartRef   = useRef(null);
@@ -55,29 +59,33 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
     const [summariesByVehicle, setSummariesByVehicle] = useState({});
     // Published-only vehicles can't otherwise appear here at all, so this is on
     // by default; the dashes keep them from being mistaken for measured traces.
-    const [showPublished, setShowPublished] = useState(true);
+    // The chart's settings live in chartConfig.perfCurve, so a sub-tab switch,
+    // the link (settings key) and a featured comparison keep them.
+    const cfg = [chartConfig, setChartConfig, 'perfCurve'];
+    const [showPublished, setShowPublished] = useChartSetting(...cfg, 'showPublished', true);
     const [loading, setLoading] = useState(true);
     // 'mode'   — quickest run in each drive mode (default: the mode comparison)
     // 'vehicle' — one line per vehicle, its single quickest run
     // 'all'     — every run, for run-to-run consistency
-    const [grouping, setGrouping] = useState('mode');
+    const [grouping, setGrouping] = useChartSetting(...cfg, 'grouping', 'mode');
     // Axis limits, in chartConfig (#478) so the chart link, a Home panel and the
     // pop-out carry them — including the Focus select below, which sets xMax.
     const { limits: scale, setLimit: setScaleLimit } = useAxisLimits('perfcurve');
     // Only consulted when grouping is 'all'; null means "not curated yet", which
     // shows everything rather than an empty chart on first switch.
-    const [pickedRunIds, setPickedRunIds] = useState(null);
-    // Color picks are LOCAL TO THIS VIEW and deliberately not written to the
-    // database. Recoloring a line to read a chart is a viewing preference, not
-    // a change to the data — and persisting it would need contributor rights,
+    const [pickedRunIds, setPickedRunIds] = useChartSetting(...cfg, 'pickedRunIds', null);
+    // Color picks are deliberately not written to the database. Recoloring a
+    // line to read a chart is a viewing preference, not a change to the data —
+    // and persisting it would need contributor rights,
     // so a signed-out visitor would recolor a line, see it change, and have it
     // silently revert on reload. Anyone can recolor here; nobody's choice
-    // leaks onto anyone else's view.
-    const [colorEdits, setColorEdits] = useState({});
+    // leaks onto anyone else's view. Held in chartConfig like the rest, so the
+    // link carries them to whoever it is sent to.
+    const [colorEdits, setColorEdits] = useChartSetting(...cfg, 'colorEdits', NO_COLOR_EDITS);
     // Acceleration between points, as a second axis. Off by default — it's a
     // derivative, so it's spikier than the speed curve and would distract from
     // the primary read.
-    const [showG, setShowG] = useState(false);
+    const [showG, setShowG] = useChartSetting(...cfg, 'showG', false);
 
     const selected = useMemo(
         () => selectedVehicleIds.map(id => vehicles.find(v => v.id === id)).filter(Boolean),
@@ -131,6 +139,26 @@ export default function PerformanceCurveView({ vehicles, selectedVehicleIds, pre
         () => selectorVehicles.flatMap(v => v.runs.map(r => r.id)),
         [selectorVehicles],
     );
+
+    /**
+     * Every run of the selected vehicles, once all of them have loaded; null
+     * until then, so a run still loading is not taken for one that is gone.
+     */
+    const loadedRunIds = useMemo(() => {
+        if (!sessionsByVehicle || !selected.every(v => v.id in sessionsByVehicle)) return null;
+        return new Set(selected.flatMap(v => sessionsByVehicle[v.id]
+            .flatMap(s => (s.performance_runs || []).map(r => String(r.id)))));
+    }, [sessionsByVehicle, selected]);
+
+    // Picks and colors for runs no longer here (a removed vehicle's, a deleted
+    // test's) are dropped, so the link carries only what is plotted. The link
+    // cannot do this itself: it never sees which runs a vehicle has.
+    useEffect(() => {
+        if (!loadedRunIds) return;
+        const gone = id => !loadedRunIds.has(String(id));
+        setPickedRunIds(prev => (prev?.some(gone) ? keepPlotted(prev, loadedRunIds) : prev));
+        setColorEdits(prev => (Object.keys(prev).some(gone) ? keepPlotted(prev, loadedRunIds) : prev));
+    }, [loadedRunIds, setPickedRunIds, setColorEdits]);
 
     /**
      * Color per run, from the same Okabe-Ito resolver the charging and range

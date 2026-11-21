@@ -74,6 +74,13 @@ const NAMES_V1 = [
     'se',
     // Charging Curves' range basis (EPA; tested is the default and unwritten).
     'rb',
+    // The settings key (settingsKey.js), and the settings it packs. Flat in a
+    // short link, beside the rest.
+    'sk', 'pal', 'vb', 'col', 'vl', 'tsp', 'rpts', 'sz_l', 'sz_g', 'sz_o', 'sz_p',
+    'rt_pr', 'rt_mk', 'rt_tsp', 'rt_ds', 'epa_mc',
+    'pc_sd', 'pc_bm', 'pc_or', 'pc_mt', 'pc_bk',
+    'pv_pub', 'pv_grp', 'pv_runs', 'pv_col', 'pv_g',
+    'wp_ch', 'wp_pick', 'wp_cmp', 'wp_lvl', 'epa_x',
 ];
 
 // Values that recur: tabs, modes, axes, chart types, units, presets, and the
@@ -146,6 +153,9 @@ const WORDS_V1 = [
     'photos', 'outlines',
     // The Size chart's front and rear alignment (`se`).
     'centerline', 'leftMirror', 'leftBody', 'leftTire',
+    // The palettes (`pal`), and the Performance and Weekly Plan views' choices.
+    'colorful', 'okabe-ito', 'evbench', 'vehicle', 'mono-blue', 'mono-green', 'mono-orange', 'mono-ice', 'legacy',
+    'best', 'worst', 'source', 'session', 'published', 'g', 'balance', 'day', 'line', 'season', 'level',
 ];
 
 /**
@@ -257,14 +267,22 @@ function fromBase64Url(text) {
 export function encodeShortLink(search) {
     const p = new URLSearchParams(search ?? '');
     p.delete(SHORT_LINK_PARAM);
-    const implied = impliedOf(p);
+    return `${SHORT_LINK_VERSION}.${packParams(p, impliedOf(p))}`;
+}
+
+/**
+ * Parameters packed as a version-1 body (no version tag), leaving out any that
+ * hold the value `implied` gives them. Also what the chart link's settings key
+ * is made of (settingsKey.js), with nothing implied.
+ */
+export function packParams(p, implied = {}) {
     const out = [];
     for (const [name, value] of p) {
         if (implied[name] === value) continue;
         // A parameter version 1 has no name for travels spelled out.
         pushValue(out, NAME_INDEX.get(name) ?? 0, value, name);
     }
-    return `${SHORT_LINK_VERSION}.${toBase64Url(out)}`;
+    return toBase64Url(out);
 }
 
 // ── Reading ────────────────────────────────────────────────────────────────
@@ -310,6 +328,13 @@ class Reader {
 }
 
 function decodeV1(body) {
+    const p = unpackParams(body);
+    for (const [name, value] of Object.entries(impliedOf(p))) if (!p.has(name)) p.set(name, value);
+    return p.toString();
+}
+
+/** A version-1 body back to its parameters, nothing implied put back. Throws on a bad body. */
+export function unpackParams(body) {
     const r = new Reader(fromBase64Url(body));
     const p = new URLSearchParams();
     while (!r.done) {
@@ -332,8 +357,7 @@ function decodeV1(body) {
         }
         p.append(name, value);
     }
-    for (const [name, value] of Object.entries(impliedOf(p))) if (!p.has(name)) p.set(name, value);
-    return p.toString();
+    return p;
 }
 
 const DECODERS = { 1: decodeV1 };

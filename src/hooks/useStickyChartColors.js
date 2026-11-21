@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { useTheme } from './useTheme';
 import { resolveChartColors, applyColorOverrides, VEHICLE_PALETTE } from '../utils/colorUtils';
+import { picksFor, withPicks } from '../utils/colorPicks';
 
 const EMPTY = {};
 
@@ -43,6 +44,12 @@ const EMPTY = {};
  * @param {Object}  opts
  * @param {string}  opts.palette    VEHICLE_PALETTE, or a SERIES_PALETTES id
  * @param {string}  opts.resetKey   changes when the vehicle set changes
+ *                                  (utils/colorPicks.js `vehicleSetKey`)
+ * @param {string}  opts.chart      the chart mode whose picks these are
+ * @param {Object}  [opts.colorPicks]    chartConfig.colorPicks — where the
+ *                                  picks are held, so they outlive this view
+ * @param {Function} [opts.setColorPicks] (update) => void, an updater over the
+ *                                  whole colorPicks; without it picks are read-only
  * @param {Array}   [opts.vehicles] the runs' vehicles, for their curated
  *                                  colors; without it the palette assigns
  * @param {Array}   [opts.plottedIds] run IDs actually drawn, when `runs` is
@@ -57,6 +64,7 @@ const EMPTY = {};
  */
 export function useStickyChartColors(runs, {
     palette = VEHICLE_PALETTE, handSet = false, resetKey, vehicles = null, onHandSet = null, plottedIds = null,
+    chart, colorPicks = null, setColorPicks = null,
 }) {
     // A MONOTONIC generation, not a key derived from the boolean. Deriving it
     // from autoColor looked equivalent and was not: toggling off and back on
@@ -101,9 +109,13 @@ export function useStickyChartColors(runs, {
      * They still reset together when the VEHICLE SET changes, which is right —
      * a different comparison is a different plot, and a pick names a run that
      * may not be on it any more.
+     *
+     * The picks are held in chartConfig.colorPicks, not here, so a sub-tab
+     * switch, the pop-out and a link keep them (utils/colorPicks.js). Still
+     * keyed on `resetKey` alone; the palette is not part of their key.
      */
-    const [overrideState, setOverrideState] = useState({ key: resetKey, map: EMPTY });
-    const picks = overrideState.key === resetKey ? overrideState.map : EMPTY;
+    const picks = picksFor(colorPicks, chart, resetKey);
+    const updatePicks = update => setColorPicks?.(all => withPicks(all, chart, resetKey, update));
 
     // What actually reaches the chart. Parked picks are stored, not drawn — and
     // because the swatch beside a run reads this same map, a parked pick does
@@ -122,15 +134,11 @@ export function useStickyChartColors(runs, {
         // is no separate "apply my picks" step. Clearing one is not, or "Back to
         // auto" on the last pick would switch the mode on as it emptied it.
         if (color != null) onHandSet?.(true);
-        setOverrideState(prev => {
-            const base = prev.key === resetKey ? prev.map : EMPTY;
-            // Clearing a run that has no override is a no-op, and returning the
-            // same object keeps the chart from re-solving the palette for it.
-            if (color == null && !(runId in base)) {
-                return prev.key === resetKey ? prev : { key: resetKey, map: EMPTY };
-            }
-            return { key: resetKey, map: applyColorOverrides(base, { [runId]: color }) };
-        });
+        // Clearing a run that has no override is a no-op, and returning the
+        // same object keeps the chart from re-solving the palette for it.
+        updatePicks(base => (color == null && !(runId in base)
+            ? base
+            : applyColorOverrides(base, { [runId]: color })));
     };
 
     // A whole derived set at once, and the ONE reason this is not a loop over
@@ -142,10 +150,7 @@ export function useStickyChartColors(runs, {
         // One update, not a loop over setColorOverride: clearing twenty runs one
         // at a time would re-solve the palette after each and shuffle the
         // colors it had not reached yet.
-        setOverrideState(prev => ({
-            key: resetKey,
-            map: applyColorOverrides(prev.key === resetKey ? prev.map : EMPTY, map),
-        }));
+        updatePicks(base => applyColorOverrides(base, map));
     };
 
 
@@ -215,7 +220,7 @@ export function useStickyChartColors(runs, {
         // Drop every pick at once — Clear picks in the run picker's color line
         // (ColorSourceNote). Back to auto in the color panel does the same at
         // one scope; this is the whole set.
-        clearHandSet: () => setOverrideState({ key: resetKey, map: EMPTY }),
+        clearHandSet: () => updatePicks(() => EMPTY),
         /**
          * The color this run holds by hand, in force or PARKED — or null.
          *

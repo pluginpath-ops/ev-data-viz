@@ -261,7 +261,7 @@ export function chartStateOf(comparison, index, vehicles) {
     return {
         view:           categoryForMode(mode).key,
         chartMode:      mode,
-        chartConfig:    chartConfigFromParsed(parsed.chart, defaultChartConfig()),
+        chartConfig:    chartConfigFromParsed(parsed.chart, defaultChartConfig(), vehicleIds),
         compareConfig:  { ...defaultCompareConfig(), ...(parsed.compare ?? {}) },
         roadTripConfig: { ...defaultRoadTripConfig(), ...(parsed.roadTrip ?? {}) },
         epaConfig:      { ...defaultEpaConfig(), ...(parsed.epa ?? {}) },

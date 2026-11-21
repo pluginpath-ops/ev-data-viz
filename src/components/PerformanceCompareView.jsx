@@ -24,6 +24,7 @@ import PerformanceCompareChart from './performance/PerformanceCompareChart';
 import { groupIntervals } from '../utils/performanceDerivations';
 import { PERFORMANCE_SCALARS as SCALARS, metricEntries, brakingGEntries as brakingGEntriesOf } from '../utils/performanceCompare';
 import PerformanceMath from './calcTrace/PerformanceMath';
+import { useChartSetting } from '../hooks/useChartSetting';
 
 
 // What distinguishes two performance bars beyond the vehicle itself: who
@@ -59,15 +60,20 @@ const CATEGORIES = [
     },
 ];
 
-export default function PerformanceCompareView({ vehicles, selectedVehicleIds, presentationMode }) {
+const NO_METRICS = {};
+
+export default function PerformanceCompareView({ vehicles, selectedVehicleIds, presentationMode, chartConfig = null, setChartConfig = null }) {
     const { isDark } = useTheme();
 
-    const [sortDir, setSortDir]   = useState('best');
+    // The chart's settings live in chartConfig.perfCompare, so a sub-tab
+    // switch, the link (settings key) and a featured comparison keep them.
+    const cfg = [chartConfig, setChartConfig, 'perfCompare'];
+    const [sortDir, setSortDir]   = useChartSetting(...cfg, 'sortDir', 'best');
     // 'best' — one bar per vehicle; 'source' — one per vehicle+source
-    const [barMode, setBarMode]   = useState('best');
-    const [origin, setOrigin]     = useState('all');   // all | session | published
-    const [metrics, setMetrics]   = useState({});      // per-category metric key
-    const [brakingMode, setBrakingMode] = useState('distance');
+    const [barMode, setBarMode]   = useChartSetting(...cfg, 'barMode', 'best');
+    const [origin, setOrigin]     = useChartSetting(...cfg, 'origin', 'all');   // all | session | published
+    const [metrics, setMetrics]   = useChartSetting(...cfg, 'metrics', NO_METRICS);      // per-category metric key
+    const [brakingMode, setBrakingMode] = useChartSetting(...cfg, 'brakingMode', 'distance');
     const [data, setData]         = useState(null);
     const [loading, setLoading]   = useState(true);
 

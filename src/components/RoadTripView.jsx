@@ -64,6 +64,7 @@ import { loadRunPoints, runsByIdString } from '../utils/runPoints';
 import { gasTripLegs, gasCarName } from '../utils/costToDrive';
 import { DEFAULT_COST_TO_DRIVE } from '../constants/costToDrive';
 import RoadTripGasCar from './RoadTripGasCar';
+import { vehicleSetKey, colorPicksSetter, picksFor, NO_PICKS } from '../utils/colorPicks';
 
 Chart.register(ZoomPlugin);
 
@@ -88,7 +89,6 @@ const ZOOM_DRAG = {
 // ── Speed sweep constants ────────────────────────────────────────────────────
 const SPEED_SWEEP_MIN  = 45;   // mph
 const SPEED_SWEEP_MAX  = 100;  // mph
-const EMPTY_PICKS = {};      // stable identity for "no pairing colors set"
 const SPEED_SWEEP_STEP = 5;    // mph
 const SPEED_SWEEP_MPH  = Array.from(
     { length: Math.floor((SPEED_SWEEP_MAX - SPEED_SWEEP_MIN) / SPEED_SWEEP_STEP) + 1 },
@@ -863,6 +863,8 @@ export default function RoadTripView({
     correctionMode = 'none',
     correctionTarget = undefined,
     setChartConfig = null,
+    // chartConfig.colorPicks: the hand-set colors, held in App (utils/colorPicks.js).
+    colorPicks = null,
     // The gas car the EVs are timed against: Cost & Time's settings, shared
     // (#555) — the one `costToDrive` state in App, so a car picked in either
     // tab is the car in the other, the pop-out and the chart link. Read-only
@@ -889,12 +891,6 @@ export default function RoadTripView({
 
     const [runDataCache, setRunDataCache] = useState({});
     const [loading, setLoading] = useState(false);
-    // Pair keys restored from the URL on first render (rt_r=70::12,71::13).
-    // Strings, not numbers: a pair key is 'rangeId::chargingId'.
-    const initialRunIds = useRef(
-        (new URLSearchParams(window.location.search).get('rt_r') || '')
-            .split(',').filter(Boolean)
-    ).current;
     // Axis limits, in chartConfig (#478) so the chart link, a Home panel and the
     // pop-out carry them. Stored as typed: in the unit the control's label names,
     // which for a time axis is HOURS (the plot is in minutes, so those go through
@@ -905,11 +901,13 @@ export default function RoadTripView({
     const roadTripLimits  = useAxisLimits('roadtrip');
     const optimizerLimits = useAxisLimits('optimizer');
     const { limits: axisLimits, setLimit: onAxisChange } = optimizer ? optimizerLimits : roadTripLimits;
-    // PROTOTYPE, local to this view: not in chartConfig, not in the URL.
-    const [showTestSpread, setShowTestSpread] = useState(false);
+    // PROTOTYPE. In roadTripConfig with the rest, so the link carries it.
+    const showTestSpread = roadTripConfig.testSpread ?? false;
+    const setShowTestSpread = on => setRoadTripConfig(prev => ({ ...prev, testSpread: on }));
     // Which plotted trip Trip Optimizer's map shows: one grid is one vehicle's.
-    // Local, like the spread: a pair key that names nothing falls back to the first.
-    const [mapKey, setMapKey] = useState(null);
+    // A pair key that names nothing falls back to the first.
+    const mapKey = roadTripConfig.mapKey ?? null;
+    const setMapKey = key => setRoadTripConfig(prev => ({ ...prev, mapKey: key }));
     const [sortCol, setSortCol] = useState(null);   // column key or null
     const [sortDir, setSortDir] = useState('asc');  // 'asc' | 'desc'
 
@@ -1063,8 +1061,16 @@ export default function RoadTripView({
         return pick ? [pick.key] : [];
     }, [selectedVehicles]);
 
+    // The ticked rows, by pair key ('rangeId::chargingId'), held in
+    // roadTripConfig as Charge Stop holds its own: leaving the sub-tab, the
+    // link (rt_r), the pop-out and a featured comparison all keep them. Held
+    // here, a sub-tab switch re-bootstrapped one default row per vehicle.
     const { selected: selectedRunIds, toggle: toggleRunId, setSelected: setSelectedRunIds } = useRunSelection(
-        selectionRows, { initial: initialRunIds, shouldBootstrap: bootstrapOneRow }
+        selectionRows, {
+            value: roadTripConfig.selected ?? [],
+            onChange: keys => setRoadTripConfig(prev => ({ ...prev, selected: keys })),
+            shouldBootstrap: bootstrapOneRow,
+        }
     );
 
     // ── Resolve chart colors ─────────────────────────────────────────────────
@@ -1091,29 +1097,25 @@ export default function RoadTripView({
         () => selectedRunIds.map(k => parsePairKey(k).rangeRunId),
         [selectedRunIds]
     );
+    // Road Trip and Trip Optimizer are one view, but each keeps its own picks,
+    // as each did when they lived in the view.
+    const pickChart = optimizer ? 'optimizer' : 'roadtrip';
+    const pickSetKey = vehicleSetKey(selectedVehicleIds);
     const { colorMap, setColorOverride, setColorOverrides, isColorOverridden, handSetCount, handSetColorOf, clearHandSet } = useStickyChartColors(colorableRuns, {
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
-        resetKey: selectedVehicleIds.join(','),
+        resetKey: pickSetKey,
         vehicles: selectedVehicles,
         plottedIds,
+        chart: pickChart,
+        colorPicks,
+        setColorPicks: colorPicksSetter(setChartConfig),
     });
-
-    // A pairing's own color, set from the swatch on its row (#379). Colors above
-    // are keyed on the RANGE test, so without this an added pairing's swatch
-    // edited its parent's color. Keyed on the pair key and held here rather than
-    // in the sticky-color hook, which only knows run ids. Resets with the
-    // vehicle set, as the hook's picks do: a pick names a pairing that may not be
-    // on the next plot.
-    const vehicleSetKey = selectedVehicleIds.join(',');
-    const [pairPickState, setPairPickState] = useState({ key: vehicleSetKey, map: {} });
-    const pairPicks = pairPickState.key === vehicleSetKey ? pairPickState.map : EMPTY_PICKS;
-    const setPairPick = (pairKeyStr, color) => setPairPickState(prev => {
-        const map = { ...(prev.key === vehicleSetKey ? prev.map : {}) };
-        if (color) map[pairKeyStr] = color; else delete map[pairKeyStr];
-        return { key: vehicleSetKey, map };
-    });
+    // The picks in force, read straight from chartConfig for their stable
+    // identity: the hook's accessors are new each render, and allPairsInfo
+    // feeds every simulation and the chart's build effect (#456).
+    const picksInForce = handSet ? picksFor(colorPicks, pickChart, pickSetKey) : NO_PICKS;
 
     // ── Attach colors, now that colorMap knows what's actually selected ───────
     const allPairsInfo = useMemo(() => {
@@ -1133,11 +1135,16 @@ export default function RoadTripView({
             key: e.key, primaryId: e.rangeRun.id, baseColor: e.color,
         })));
         for (const entry of map.values()) {
-            entry.color = pairPicks[entry.key] ?? pairColors[entry.key] ?? entry.color;
+            // A pairing's own pick, set from the swatch on its row (#379), keyed
+            // on the pair key: colors above are keyed on the RANGE test, so the
+            // added pairing's swatch would otherwise edit its parent's color. It
+            // is a hand-set pick like any other — parked under a palette,
+            // counted in Hand-set (N), carried by the link.
+            entry.color = picksInForce[entry.key] ?? pairColors[entry.key] ?? entry.color;
         }
 
         return map;
-    }, [pairStructure, colorMap, pairPicks]);
+    }, [pairStructure, colorMap, picksInForce]);
 
     // What the selector's swatches should show: the range-keyed colors, plus the
     // drawn color of every pairing by its pair key.
@@ -2619,7 +2626,7 @@ export default function RoadTripView({
                             onToggleRun={toggleRunId}
                             onUpdateRunColor={(_vehicleId, runId, color) =>
                                 // An added pairing's swatch hands over its pair key.
-                                (String(runId).includes('::') ? setPairPick : setColorOverride)(runId, color)}
+                                setColorOverride(runId, color)}
                             colorSeries={seriesRowsOf(runEntries.map(e => e.rangeRun), selectedVehicles, isColorOverridden)}
                             onUpdateRunColors={setColorOverrides}
                             colorMap={selectorColorMap}
@@ -2745,7 +2752,7 @@ export default function RoadTripView({
                         <>
                             {setChartConfig && <SeriesPaletteSelect palette={palette} handSet={handSet} handSetCount={handSetCount} setChartConfig={setChartConfig} />}
                             <FeatureChartButton />
-                            <CopyLinkButton withExtra={p => { if (selectedRunIds.length) p.set('rt_r', selectedRunIds.join(',')); else p.delete('rt_r'); }}
+                            <CopyLinkButton
                                 title="Copy a short link to this Road Trip chart" />
                             <CopyPngButton readout={readout} onCopy={copyPng} onCopyBeside={copyPngBeside} copied={imageCopied} copiedBeside={copiedBeside} />
                         </>

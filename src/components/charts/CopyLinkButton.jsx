@@ -11,8 +11,8 @@ import { SHORT_LINK_PARAM } from '../../utils/shortLink';
  * copies of the same inline button, each copying `window.location.href`.
  *
  * @param {(search: URLSearchParams) => void} [withExtra]  adds what the view
- *   keeps outside App's state to the query before it is packed (Road Trip's
- *   `rt_r`; the Performance views' tab and mode)
+ *   keeps outside App's state to the query before it is packed (the
+ *   Performance views' tab and mode)
  * @param {string} [title]
  * @param {string} [label]      the button's text; "Link" on a chart's toolbar
  * @param {string} [className]  a page button's classes in place of the toolbar's

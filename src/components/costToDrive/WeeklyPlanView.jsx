@@ -32,6 +32,7 @@ import WeekLineChart from './WeekLineChart';
 import DayBarsChart from './DayBarsChart';
 import PlanTable from './PlanTable';
 import { levelLabel } from './HomeLevelPicker';
+import { useChartSetting } from '../../hooks/useChartSetting';
 
 /** Where the everyday battery range ends, drawn dashed on the week's line. */
 const GUIDES_PCT = [10, 80];
@@ -80,16 +81,20 @@ function PlanChart({ kind, week, profile, presentationMode, height, ...chart }) 
     return <DayBarsChart week={week} view={kind} presentationMode={presentationMode} height={tall} {...chart} />;
 }
 
-export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings, onChange, presentationMode = false }) {
+export default function WeeklyPlanView({ vehicles, selectedVehicleIds, settings, onChange, presentationMode = false, chartConfig = null, setChartConfig = null }) {
     const priced = useCostToDrive(vehicles, selectedVehicleIds, settings);
     const shown = priced.filter(p => !p.missing);
-    const [pickedId, setPickedId] = useState(null);
-    const [chartKind, setChartKind] = useState(PLAN_CHARTS[0][0]);
+    // The plan's chart choices live in chartConfig.weeklyPlan, so a sub-tab
+    // switch, the link (settings key) and a featured comparison keep them.
+    const cfg = [chartConfig, setChartConfig, 'weeklyPlan'];
+    const [pickedId, setPickedId] = useChartSetting(...cfg, 'pickedId', null);
+    const [chartKind, setChartKind] = useChartSetting(...cfg, 'chartKind', PLAN_CHARTS[0][0]);
     const entry = shown.find(p => p.vehicle.id === pickedId) ?? shown[0] ?? null;
 
     // The comparison: none, the other season, or another charger level.
-    const [compare, setCompare] = useState('none');
-    const [compareLevel, setCompareLevel] = useState(settings.level === 0 ? 4 : 0);
+    const [compare, setCompare] = useChartSetting(...cfg, 'compare', 'none');
+    // Until one is chosen, the level beside the reader's own.
+    const [compareLevel, setCompareLevel] = useChartSetting(...cfg, 'compareLevel', settings.level === 0 ? 4 : 0);
     const otherSeason = settings.season === 'winter' ? 'summer' : 'winter';
     const levelSettings = useMemo(() => ({ ...settings, level: compareLevel }), [settings, compareLevel]);
     const atLevel = useCostToDrive(vehicles, entry ? [entry.vehicle.id] : [], levelSettings)[0] ?? null;

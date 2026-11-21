@@ -274,6 +274,17 @@ export const GAS_CAR_KEY_FIELDS = Object.freeze(
     ['gasCar', 'gasName', 'gasCity', 'gasHwy', 'gasTank', 'gasFillAt', 'gasFillMin']);
 
 /**
+ * `settings` with the gas car of `from`, the rest kept: what opening a Road
+ * Trip chart does to the reader's Cost & Time settings, since its link carries
+ * the car alone.
+ */
+export function withGasCarOf(settings, from) {
+    const out = { ...settings };
+    for (const key of GAS_CAR_KEY_FIELDS) out[key] = from?.[key];
+    return normalizeCostToDrive(out);
+}
+
+/**
  * The key for the gas car alone, or null while it is every one at its
  * version-6 default — Road Trip's chart link carries this where Cost & Time's
  * carries the whole key, so the picked car travels with the chart and an

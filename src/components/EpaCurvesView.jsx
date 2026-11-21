@@ -40,7 +40,7 @@ import { useRunSelection } from '../hooks/useRunSelection';
 import WindAndElevationFields from './epa/WindAndElevationFields';
 import CorrectionTargetFields from './CorrectionTargetFields';
 import { normalizeCorrectionTarget, accessoryText } from '../utils/correctionSettings';
-import { useViewingConditions } from '../hooks/useViewingConditions';
+import { useViewingConditions, NO_EXTRAS } from '../hooks/useViewingConditions';
 import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import { useAxisLimits } from '../hooks/useAxisLimits';
@@ -193,14 +193,19 @@ export default function EpaCurvesView({
     // The curve is drawn under the SHARED correction target — altitude,
     // temperature and accessory load, the same sliders every chart and the
     // vehicle table read — and under two extras of its own, wind and elevation
-    // gain/loss, held in the hook and mirrored to epaConfig so a pop-out is
-    // driven by them (it has no controls, and used to draw standard conditions
-    // whatever the main window showed). Display-time only: none of it touches
-    // stored coefficients, accessory fields, or the standard-condition η.
+    // gain/loss, held in epaConfig.extras so the pop-out, the link (settings
+    // key) and a featured chart draw them too. A pop-out has no controls, so
+    // it only reads them. Display-time only: none of it touches stored
+    // coefficients, accessory fields, or the standard-condition η.
     // Shared with the certification-anchored curves (#237), so the two cannot
     // compute air density slightly differently.
+    const setExtras = useCallback(
+        update => setEpaConfig?.(prev => ({ ...prev, extras: update(prev.extras) })),
+        [setEpaConfig],
+    );
     const conditions = useViewingConditions({
-        driven: presentationMode ? (epaConfig.extras ?? null) : null,
+        values: epaConfig.extras ?? NO_EXTRAS,
+        setValues: presentationMode ? null : setExtras,
         target: correctionTarget,
     });
     const {
@@ -208,11 +213,6 @@ export default function EpaCurvesView({
         windAdjusted, windSpeedMphNum, windDirectionDegNum,
         gradeGainFtNum, gradeDistanceMilesNum, gradeAdjusted,
     } = conditions.derived;
-    const extrasKey = JSON.stringify(conditions.values);
-    useEffect(() => {
-        if (presentationMode) return;
-        setEpaConfig?.(prev => (JSON.stringify(prev.extras) === extrasKey ? prev : { ...prev, extras: JSON.parse(extrasKey) }));
-    }, [extrasKey, presentationMode, setEpaConfig]);
 
     // Overlay real-world range-test points on top of the curve. null = off.
     // 'corrected' scales each point (temp, wind, and elevation gain/loss) to

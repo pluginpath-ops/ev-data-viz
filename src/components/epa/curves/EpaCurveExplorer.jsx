@@ -204,7 +204,7 @@ export default function EpaCurveExplorer({
     // The extras (wind, elevation change) are this chart's own and reach a
     // pop-out in `synced.conditions`; the target is the site's and reaches it in
     // chartConfig, like every chart's.
-    const conditions = useViewingConditions({ driven: synced?.conditions ?? null, target: correctionTarget });
+    const conditions = useViewingConditions({ values: synced?.conditions ?? null, target: correctionTarget });
     const {
         densityRatio, accessoryDeltaW, windSpeedMphNum, windDirectionDegNum,
         gradeGainFtNum, gradeDistanceMilesNum,
