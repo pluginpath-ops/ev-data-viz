@@ -365,9 +365,10 @@ describe('the seams that broke before', () => {
         //
         // Size photos (components/sizephotos/) are a different image with the
         // same column name: a cutout with no card rendition, shown only in the
-        // vehicle form while a curator edits it.
+        // vehicle form while a curator edits it, and in the card/row preview
+        // (SizePhotoStrip) while a photo filter is on.
         const rendersRaw = ALL.filter(({ file, text }) =>
-            /\.jsx$/.test(file) && !file.includes('components/sizephotos/') && (
+            /\.jsx$/.test(file) && !file.includes('components/sizephotos/') && !file.endsWith('vehicles/SizePhotoStrip.jsx') && (
                 /src=\{[^}]*\.image_url/.test(text) ||
                 /url\(\$\{[^}]*\.image_url/.test(text)
             ));

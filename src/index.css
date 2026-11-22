@@ -2538,6 +2538,25 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
     padding: 0 6px;
     font-size: var(--fs-micro, calc(var(--fs-body) * 0.7143));
 }
+/* The size photos a Curation filter asks for, previewed on a card or row
+   (SizePhotoStrip). A fixed height with each photo at its own width, so side,
+   front and rear compare at one scale on screen. */
+.size-photo-strip {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    min-width: 0;
+    overflow: hidden;
+    padding-top: 2px;
+}
+.size-photo-preview {
+    height: 64px;
+    width: auto;
+    max-width: 48%;
+    object-fit: contain;
+    flex: 0 1 auto;
+}
+
 /* A figure column: right-aligned so values compare down the column, the basis
    beneath. */
 .vehicle-list-figure {
@@ -6616,6 +6635,7 @@ button.vehicle-media-badge:hover { background-color: rgba(8, 12, 18, 0.9); }
 /* An open editor takes the whole row; the slots beside it wait below. */
 .size-photo-slot.is-editing { grid-column: 1 / -1; }
 .size-photo-thumb,
+.size-photo-preview,
 .size-photo-frame {
     background-color: var(--color-card);
     background-image:
