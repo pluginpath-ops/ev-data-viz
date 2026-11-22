@@ -161,6 +161,21 @@ describe('the Curation facet', () => {
         expect(cids(inc('origin'))).toEqual([1]);   // has variants and no source of its own
     });
 
+    it('asks for size photos and the four key specs', () => {
+        const sfleet = [
+            { id: 1, size_photos: { side: {}, front: {} }, specs: { dimensions: { length_in: 200, width_in: 80, height_in: 70, wheelbase_in: 120 } } },
+            { id: 2, size_photos: {}, specs: { dimensions: { length_in: 200, width_in: 80, height_in: 70 } } },
+            { id: 3, specs: { dimensions: { length_in: 200, width_in: 80, height_in: 70, wheelbase_in: 120 } } },
+        ];
+        const sctx = vehicleFilterContext(sfleet, {}, { curator: true });
+        const sids = (...keys) => filterVehicles(sfleet, inc(...keys), sctx).map(v => v.id);
+        expect(sids('side-photo')).toEqual([1]);
+        expect(sids('front-photo')).toEqual([1]);
+        expect(sids('rear-photo')).toEqual([]);
+        expect(sids('key-specs')).toEqual([1, 3]);   // 2 has no wheelbase
+        expect(filterVehicles(sfleet, toggleExclude(EMPTY_VEHICLE_FILTERS, 'curation', 'key-specs'), sctx).map(v => v.id)).toEqual([2]);
+    });
+
     it('offers every check, even one no vehicle passes', () => {
         const counts = vehicleFacetCounts(cfleet, EMPTY_VEHICLE_FILTERS, cctx);
         expect(counts.curation.values).toContain('own-photo');

@@ -1163,9 +1163,14 @@ class DataService {
    * warning, where the table is missing (migration 102 not applied).
    */
   async #getSizePhotos() {
-    const { data, error } = await getSupabase().from('vehicle_size_photos').select('*');
+    // Up to three rows a vehicle, so a bare select stops at 1000 rows — about
+    // 330 photographed vehicles — and says nothing. Paged, in key order.
     const byVehicle = new Map();
-    if (error) {
+    let data;
+    try {
+      data = await fetchAllRows(() => getSupabase().from('vehicle_size_photos').select('*')
+        .order('vehicle_id', { ascending: true }).order('view', { ascending: true }));
+    } catch (error) {
       console.warn('Size photos not loaded:', error.message);
       return byVehicle;
     }

@@ -43,6 +43,22 @@ import { DATA_CATEGORIES, hasDataCategory } from './vehicleDataCategories';
 import { ownValues } from './vehicleInheritance';
 import { yearSpan } from './vehicleImportPlan';
 
+/** The Size chart's views, in the order the filter and the previews list them. */
+export const SIZE_PHOTO_VIEWS = ['side', 'front', 'rear'];
+
+/**
+ * The views the Curation filter asks to HAVE a photo of: "Side photo" included.
+ * Excluded ones ask for none, so there is nothing to show. The cards and rows
+ * preview these (SizePhotoStrip).
+ */
+export function photoViewsAsked(filters) {
+    const asked = facetState(filters, 'curation').in;
+    return SIZE_PHOTO_VIEWS.filter(view => asked.includes(`${view}-photo`));
+}
+
+/** Length, width, height and wheelbase: what "Key specs complete" asks for. */
+const KEY_SIZE_SPECS = ['length_in', 'width_in', 'height_in', 'wheelbase_in'];
+
 /**
  * What a curator audits a vehicle for: one yes/no question per entry, each
  * true or false of a vehicle. They share ONE facet (Curation) because the
@@ -62,6 +78,16 @@ export const CURATION_CHECKS = [
       has: (v) => !!v.image_url },
     { key: 'own-photo',     label: 'Own photo',
       has: (v) => !!ownValues(v).image_url },
+    // The Size chart's views. `size_photos` is what the vehicle draws, its own
+    // or its model line's (vehicleInheritance.js), as "Photo set" is.
+    ...SIZE_PHOTO_VIEWS.map(view => ({
+        key: `${view}-photo`, label: `${view[0].toUpperCase()}${view.slice(1)} photo`,
+        has: (v) => !!v.size_photos?.[view],
+    })),
+    // The four figures every size comparison stands on, through inheritance
+    // and the platform, as the table shows them.
+    { key: 'key-specs',     label: 'Key specs complete',
+      has: (v, ctx) => KEY_SIZE_SPECS.every(f => Number(ctx.specsOf(v)?.dimensions?.[f]) > 0) },
     { key: 'battery',       label: 'Battery size',
       has: (v) => v.socWindowKwh != null },
     { key: 'epa-range',     label: 'EPA range',

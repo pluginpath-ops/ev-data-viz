@@ -25,7 +25,8 @@ import EditSpecsForm from './EditSpecsForm';
 import ViewSpecsModal from './ViewSpecsModal';
 import VehicleFilterBar from './vehicles/VehicleFilterBar';
 import { useFilteredVehicles } from '../hooks/useFilteredVehicles';
-import { EMPTY_VEHICLE_FILTERS, filtersActive } from '../utils/vehicleFilters';
+import { EMPTY_VEHICLE_FILTERS, filtersActive, photoViewsAsked } from '../utils/vehicleFilters';
+import SizePhotoStrip from './vehicles/SizePhotoStrip';
 import VehicleListHeader from './vehicles/VehicleListHeader';
 import VehicleRowMenu from './vehicles/VehicleRowMenu';
 import TestCounts from './vehicles/TestCounts';
@@ -217,6 +218,8 @@ export default function VehiclesView({
     // The filters are Vehicles & Specs' own, shared with List and Table (#338);
     // committed deletes are the only narrowing this view adds.
     const { ctx: filterCtx, filtered: filteredVehicles } = useFilteredVehicles(vehicles, filters, performanceCounts);
+    // The size photos the Curation filter asks for, previewed on each card and row.
+    const photoViews = useMemo(() => filterCtx.curator ? photoViewsAsked(filters) : [], [filters, filterCtx]);
     const shownVehicles = filteredVehicles.filter(v => !committedDeletes.has(v.id));
 
     // Each card's stack, and the Lineage view, read the whole fleet for
@@ -359,6 +362,8 @@ export default function VehiclesView({
                         onOpenSubtab={onViewRuns}
                     />
 
+                    <SizePhotoStrip vehicle={vehicle} views={photoViews} />
+
                     {/* Actions at the foot of the card, in two rows.
                         The first is what anyone can do with the
                         vehicle, the same for every reader. The
@@ -461,6 +466,7 @@ export default function VehiclesView({
                         <TagPills vehicle={vehicle} />
                         <PlatformLine vehicle={vehicle} bare />
                     </span>
+                    <SizePhotoStrip vehicle={vehicle} views={photoViews} />
                 </span>
                 <span role="cell" className="vehicle-list-figure" title={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.note}>
                     <ListFigure value={vehicle.socWindowKwh} unit="kWh" basis={SOC_WINDOW_BASIS[vehicle.socWindowBasis]?.label} />
