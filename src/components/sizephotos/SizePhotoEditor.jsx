@@ -4,7 +4,7 @@ import { resolveEffectiveSpecs } from '../../utils/specHelpers';
 import { profileFromSpecs } from '../../utils/vehicleProfile';
 import { fmtDimension } from '../../utils/unitConversions';
 import {
-    MARKS, startingMarks, mirrorMarks, carryMarks, figuresFromMarks, fillMarks, isEndView, trackKeyOf,
+    MARKS, startingMarks, mirrorMarks, carryMarks, figuresFromMarks, fillMarks, clampMarks, isEndView, trackKeyOf,
 } from '../../utils/sizePhotoMarks';
 import {
     loadCanvas, isCutout, cutOut, finishCutout, flipCanvas, visibleFractions, toBlob, CUTOUT_MAX_SIDE,
@@ -21,6 +21,8 @@ const LOUPE_ZOOM = 4;
 const LOUPE_FINE_PX = 8;
 /** The loupe's diameter; .size-photo-loupe in index.css matches it. */
 const LOUPE_PX = 120;
+/** The tallest the marking canvas draws, in percent of the window height. */
+const SIZE_PHOTO_MAX_VH = 70;
 
 /** A typed link with its scheme, or null when blank: "www.tesla.com" → "https://www.tesla.com". */
 const withScheme = (text) => {
@@ -191,7 +193,7 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
             original: file && original ? await toBlob(original, needsBackground ? 'image/jpeg' : 'image/png', 0.9) : null,
             originalExt: needsBackground ? 'jpg' : 'png',
             fields: {
-                width_px: size.w, height_px: size.h, marks, trim, mirrored,
+                width_px: size.w, height_px: size.h, marks: clampMarks(marks), trim, mirrored,
                 source_url: withScheme(sourceUrl), credit: credit.trim() || null,
             },
         });
@@ -259,7 +261,11 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
             {working && !imageSrc && <p className="text-meta">Reading the photo…</p>}
 
             {imageSrc && marks && (
-                <div className="size-photo-frame" ref={frameRef} style={{ aspectRatio: `${size.w} / ${size.h}` }}>
+                <div className="size-photo-frame" ref={frameRef} style={{
+                    aspectRatio: `${size.w} / ${size.h}`,
+                    // As wide as the column allows, but no taller than the window: a near-square front photo would otherwise run off the screen.
+                    maxWidth: `calc(${SIZE_PHOTO_MAX_VH}vh * ${size.w / size.h})`,
+                }}>
                     <img src={imageSrc} alt="" draggable={false} />
                     {MARKS[view].filter(mark => !mark.point).map(mark => (
                         <MarkLine

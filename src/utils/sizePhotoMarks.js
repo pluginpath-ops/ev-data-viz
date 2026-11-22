@@ -148,6 +148,11 @@ export function mirrorMarks(view, marks) {
     };
 }
 
+/** Marks held to the canvas, 0 to 1: what is saved (carryMarks may leave one past it). */
+export function clampMarks(marks) {
+    return Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, v == null ? v : Math.min(1, Math.max(0, v))]));
+}
+
 /**
  * Marks carried from one cutout of an original to another (a redone cutout
  * trims differently). Both trims are fractions of the original; a mirrored
@@ -158,6 +163,10 @@ export function carryMarks(view, marks, fromTrim, toTrim, mirrored = false) {
     const out = {};
     for (const [key, v] of Object.entries(plain)) {
         if (v == null) { out[key] = v; continue; }
+        // Not clamped: a tighter trim (a higher background tolerance) can put a
+        // mark past the canvas, and a looser one must bring it back to the same
+        // spot on the car. The editor draws it at the edge meanwhile and clamps
+        // it on save (clampMarks).
         out[key] = axisOf(view, key) === 'y'
             ? (fromTrim.y + v * fromTrim.h - toTrim.y) / toTrim.h
             : (fromTrim.x + v * fromTrim.w - toTrim.x) / toTrim.w;

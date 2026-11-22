@@ -224,6 +224,10 @@ export default function EditVehicleForm({
         <>
             <form onSubmit={submit} className="card">
                 <h3 className="section-title mb-4">{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
+                {/* Editing: the fields on the left, the Size photos (the part that
+                    wants room) on the right. Adding: just the fields. */}
+                <div className={editingId ? 'vehicle-form-split' : undefined}>
+                <div className="min-w-0">
                 <div className="form-grid gap-4">
                     <input
                         placeholder="Display Name (e.g., Model 3 LR 2024)"
@@ -544,9 +548,16 @@ export default function EditVehicleForm({
                     </div>
                 )}
 
+                </div>
+
                 {/* Size photos are a file and a row of their own
                     (vehicle_size_photos); an open one is saved by Save below. */}
-                {editingId && editingVehicle && <SizePhotoSection vehicle={editingVehicle} pending={photoSaves} />}
+                {editingId && editingVehicle && (
+                    <div className="vehicle-form-photos">
+                        <SizePhotoSection vehicle={editingVehicle} pending={photoSaves} />
+                    </div>
+                )}
+                </div>
 
                 {/* EPA test vehicles are assigned in Tests & Data, not here — keeps
                     this modal compact regardless of how many are linked. */}

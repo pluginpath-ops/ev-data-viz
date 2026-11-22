@@ -13,7 +13,9 @@ import { useMarkDrag } from '../../hooks/useMarkDrag';
  *   onChange  ({ x, y }) => void
  *   onPointer ({ fx, fy, w, h } | null) => void   where it is, for the loupe
  */
-export default function MarkPoint({ label, x, y, frameRef, photoPx, onChange, onPointer }) {
+export default function MarkPoint({ label, x: storedX, y: storedY, frameRef, photoPx, onChange, onPointer }) {
+    const x = Math.min(1, Math.max(0, storedX));   // off the canvas: drawn at its edge
+    const y = Math.min(1, Math.max(0, storedY));
     const handlers = useMarkDrag({ frameRef, photoPx, onPointer, value: { x, y }, onChange });
     return (
         <div
