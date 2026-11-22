@@ -82,6 +82,7 @@ export default function PresentedChart({
                 vehicles={vehicles}
                 selectedVehicleIds={selectedVehicles}
                 settings={costToDrive}
+                chartConfig={chartConfig}
                 presentationMode
             />
         )}
@@ -100,6 +101,7 @@ export default function PresentedChart({
             <PerformanceCompareView
                 vehicles={vehicles}
                 selectedVehicleIds={selectedVehicles}
+                chartConfig={chartConfig}
                 presentationMode
             />
         )}
@@ -108,6 +110,7 @@ export default function PresentedChart({
             <PerformanceCurveView
                 vehicles={vehicles}
                 selectedVehicleIds={selectedVehicles}
+                chartConfig={chartConfig}
                 presentationMode
             />
         )}
@@ -124,6 +127,7 @@ export default function PresentedChart({
                 correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
                 correctionTarget={chartConfig?.correctionTarget}
                 handSet={chartConfig?.handSet ?? false}
+                colorPicks={chartConfig?.colorPicks}
                 verboseLabels={chartConfig?.verboseLabels ?? false}
                 palette={chartConfig?.seriesPalette ?? DEFAULT_SERIES_PALETTE}
                 gasCar={costToDrive}
@@ -163,6 +167,7 @@ export default function PresentedChart({
                 correctionMode={chartConfig?.correctionMode ?? DEFAULT_READER_MODE}
                 correctionTarget={chartConfig?.correctionTarget}
                 handSet={chartConfig?.handSet ?? false}
+                colorPicks={chartConfig?.colorPicks}
                 presentationMode
             />
         )}

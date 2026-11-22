@@ -82,14 +82,14 @@ export default function WindAndElevationFields({ conditions }) {
                 <button
                     type="button"
                     className={`subgroup-header${gradeExpanded ? ' is-open' : ''}`}
-                    onClick={() => setGradeExpanded(e => {
-                        const next = !e;
-                        if (!next) {
+                    onClick={() => {
+                        // Closing it clears the route, so nothing hidden scales the curve.
+                        setGradeExpanded(!gradeExpanded);
+                        if (gradeExpanded) {
                             setGradeGainFt('');
                             setGradeDistanceMiles('');
                         }
-                        return next;
-                    })}
+                    }}
                     title="Adjust for a net elevation gain/loss over a route (advanced — usually 0)"
                 >
                     <span style={{ display: 'inline-block', transform: gradeExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>&#9660;</span>

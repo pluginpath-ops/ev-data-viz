@@ -21,6 +21,11 @@ export function targetRatios(target = DEFAULT_CORRECTION_TARGET) {
     };
 }
 
+/** The extras untouched: every input empty ("not set"), elevation closed. */
+export const NO_EXTRAS = Object.freeze({
+    windSpeedMph: '', windDirectionDeg: '', gradeExpanded: false, gradeGainFt: '', gradeDistanceMiles: '',
+});
+
 /**
  * What a Modeled Efficiency curve is drawn under, and everything derived from it
  * (#237, #449).
@@ -37,33 +42,44 @@ export function targetRatios(target = DEFAULT_CORRECTION_TARGET) {
  * always drew (density 1, the record's own accessory load), whatever the Admin
  * has set the standard conditions to.
  *
- * The extras are owned here rather than by each view, so the raw-string-to-number
- * handling — an empty input means "not set", not zero — has one implementation.
+ * The raw-string-to-number handling — an empty input means "not set", not
+ * zero — has one implementation, here.
+ *
+ * Where the extras are held:
+ *   no `values`              here, for a chart that keeps them to itself
+ *   `values` + `setValues`   by the caller (Modeled Efficiency: epaConfig.extras,
+ *                            so the link, a featured chart and the pop-out carry them)
+ *   `values` alone           driven by another window: a pop-out has no
+ *                            controls, and without them a chart drawn at 20 mph
+ *                            of headwind would pop out at standard conditions
  */
-export function useViewingConditions({ driven = null, target = DEFAULT_CORRECTION_TARGET } = {}) {
+export function useViewingConditions({ values: outside = null, setValues = null, target = DEFAULT_CORRECTION_TARGET } = {}) {
+    const [own, setOwn] = useState(NO_EXTRAS);
+    const held = outside != null;
+    const write = held ? setValues : setOwn;
     // Wind uses the same 0=tailwind / 180=headwind / 90|270=crosswind
     // convention as runs.wind_direction_deg (#142), applied as apparent
     // airspeed. Never persisted; η untouched.
-    const [windSpeedMphState, setWindSpeedMph] = useState('');
-    const [windDirectionDegState, setWindDirectionDeg] = useState('');
+    //
     // Elevation gain/loss is a ROUTE effect, distinct from static altitude,
     // which is an air-density one. Almost always zero, and the physics behind
     // it (weight-based potential energy, a regen approximation on descents) is
     // more involved than the others — hence its own disclosure.
-    const [gradeExpandedState, setGradeExpanded] = useState(false);
-    const [gradeGainFtState, setGradeGainFt] = useState('');
-    const [gradeDistanceMilesState, setGradeDistanceMiles] = useState('');
-
-    // A pop-out window has no controls to hold these, so it is DRIVEN by the
-    // window that does: pass the other window's `values` and they replace this
-    // one's own state. Without it a pop-out of a chart drawn at 20 mph of
-    // headwind would draw the standard-conditions curve, silently.
-    const pick = (name, own) => (driven && driven[name] !== undefined ? driven[name] : own);
-    const windSpeedMph       = pick('windSpeedMph', windSpeedMphState);
-    const windDirectionDeg   = pick('windDirectionDeg', windDirectionDegState);
-    const gradeExpanded      = pick('gradeExpanded', gradeExpandedState);
-    const gradeGainFt        = pick('gradeGainFt', gradeGainFtState);
-    const gradeDistanceMiles = pick('gradeDistanceMiles', gradeDistanceMilesState);
+    const { windSpeedMph, windDirectionDeg, gradeExpanded, gradeGainFt, gradeDistanceMiles } =
+        held ? { ...NO_EXTRAS, ...outside } : own;
+    const set = useMemo(() => {
+        const setterOf = name => next => write?.(prev => {
+            const base = { ...NO_EXTRAS, ...(prev ?? {}) };
+            return { ...base, [name]: typeof next === 'function' ? next(base[name]) : next };
+        });
+        return {
+            setWindSpeedMph: setterOf('windSpeedMph'),
+            setWindDirectionDeg: setterOf('windDirectionDeg'),
+            setGradeExpanded: setterOf('gradeExpanded'),
+            setGradeGainFt: setterOf('gradeGainFt'),
+            setGradeDistanceMiles: setterOf('gradeDistanceMiles'),
+        };
+    }, [write]);
 
     const { densityRatio, accessoryDeltaW } = useMemo(
         () => targetRatios(target),
@@ -84,7 +100,7 @@ export function useViewingConditions({ driven = null, target = DEFAULT_CORRECTIO
         // The extras only: what a pop-out is driven with. The target travels in
         // chartConfig, which the pop-out already receives.
         values: { windSpeedMph, windDirectionDeg, gradeExpanded, gradeGainFt, gradeDistanceMiles },
-        set: { setWindSpeedMph, setWindDirectionDeg, setGradeExpanded, setGradeGainFt, setGradeDistanceMiles },
+        set,
         derived: {
             densityRatio, densityAdjusted, accessoryDeltaW, accessoryAdjusted,
             windAdjusted, windSpeedMphNum, windDirectionDegNum,

@@ -40,6 +40,7 @@ import ColorSourceNote from './ColorSourceNote';
 import { useAppContext } from '../context/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { useRunSelection } from '../hooks/useRunSelection';
+import { vehicleSetKey, colorPicksSetter } from '../utils/colorPicks';
 import { convDistance } from '../utils/unitConversions';
 import { chargingAxisOptions, axisForBasis, DEFAULT_RANGE_BASIS } from '../utils/chargingAxes';
 import AxisPicker from './AxisPicker';
@@ -202,8 +203,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette: chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE,
-        resetKey: selectedVehicleIds.join(','),
+        resetKey: vehicleSetKey(selectedVehicleIds),
         vehicles: selectedVehicles,
+        chart: 'charging',
+        colorPicks: chartConfig.colorPicks,
+        setColorPicks: colorPicksSetter(setChartConfig),
     });
 
     // A pairing change invalidates cached range values: the derived range is
@@ -1103,11 +1107,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 // palette. RangeChartView is rendered from HERE rather than from
                 // App, so it misses anything App hands the other charts.
                 handSet={chartConfig.handSet ?? false}
-                // Without this the Range sub-tab could never return to Hand-set:
-                // selecting it wrote chartConfig.handSet, the prop defaulted to
-                // false on the way back down, and the field snapped to the
-                // palette. RangeChartView is rendered from HERE rather than from
-                // App, so it misses anything App hands the other charts.
+                colorPicks={chartConfig.colorPicks}
+                showPoints={chartConfig.rangePoints ?? true}
                 verboseLabels={chartConfig.verboseLabels ?? false}
                 correctionMode={chartConfig.correctionMode ?? DEFAULT_READER_MODE}
                 correctionTarget={chartConfig.correctionTarget}

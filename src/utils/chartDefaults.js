@@ -12,6 +12,7 @@
  */
 import { DEFAULT_SERIES_PALETTE } from './colorUtils';
 import { NO_VEHICLE_BASES } from './vehicleBase';
+import { NO_PICKS } from './colorPicks';
 import { DEFAULT_CORRECTION_TARGET, DEFAULT_READER_MODE } from './correctionSettings';
 import { DEFAULT_ASSUMPTIONS } from './vehicleTable';
 
@@ -55,6 +56,10 @@ export function defaultChartConfig() {
         // (utils/vehicleBase.js). Lives here so the pop-out window gets it with
         // the rest of the chart's state.
         vehicleBases: NO_VEHICLE_BASES,
+        // The hand-set colors, per chart and per vehicle set
+        // (utils/colorPicks.js). Here so a sub-tab switch, the pop-out and the
+        // link keep them; the views used to hold them.
+        colorPicks: NO_PICKS,
         // The vehicle table's assumptions (utils/vehicleTable.js): the charge
         // window, the stop distance, electricity prices. Here so the table and
         // the spec chart, which plots its calculated columns, share one set.
@@ -104,6 +109,9 @@ export function defaultRoadTripConfig() {
         // The map first: it answers both settings at once, which is what the
         // tab is for; the sweeps are its slices, a click away.
         optimizerChart: 'map',    // 'map' | 'speed' | 'tripDist' (charge per stop)
+        // The ticked rows, by pair key, shared with Trip Optimizer; the view
+        // fills it on first sight of a vehicle, as Charge Stop's does.
+        selected: [],
         bestPlan: true,           // each sweep point takes the best of the other setting
         // The speeds the BEST plan may use. The fastest is still drawn, and
         // labeled as such: 95 mph wins on a fast charger, and nobody should

@@ -7,6 +7,7 @@ import {
 import { DEFAULT_READER_MODE, DEFAULT_CORRECTION_TARGET } from '../correctionSettings';
 import { defaultChartConfig, defaultCompareConfig, defaultRoadTripConfig } from '../chartDefaults';
 import { AXIS_LIMIT_CHARTS, axisLimitsOf } from '../axisLimits';
+import { openSettingsKey } from '../settingsKey';
 
 const baseConfig = () => ({
     xAxis: 'soc', yAxis: 'chargeRate', y2Axis: null, selectedRuns: [],
@@ -382,5 +383,115 @@ describe('the address bar leaves out what a fresh page would show (#476)', () =>
         expect(out.get('rt_ya')).toBe(defaultRoadTripConfig().yAxis);
         expect(out.has('rt_te')).toBe(false);
         expect(withDefaultsWrittenOut('tab=efficiency&m=range&r=5')).toBe('tab=efficiency&m=range&r=5');
+    });
+});
+
+describe('a link carries how the chart draws, in its settings key', () => {
+    const colored = (over = {}) => ({
+        ...baseConfig(), seriesPalette: 'evbench', handSet: false, vehicleBases: {}, colorPicks: {}, ...over,
+    });
+    const settingsOf = q => openSettingsKey(q);
+
+    it('writes no key for a chart drawn the default way', () => {
+        expect(new URLSearchParams(build({ chartConfig: colored(), selectedVehicles: [3] })).has('sk')).toBe(false);
+    });
+
+    it('packs the settings into sk, after the readable parameters', () => {
+        const q = build({ chartMode: 'range', chartConfig: colored({ seriesPalette: 'okabe-ito', verboseLabels: true }), selectedVehicles: [3] });
+        const keys = [...new URLSearchParams(q).keys()];
+        expect(keys.at(-1)).toBe('sk');
+        expect(keys).not.toContain('pal');
+        const s = settingsOf(q);
+        expect(s.get('pal')).toBe('okabe-ito');
+        expect(s.get('vl')).toBe('1');
+    });
+
+    it('round-trips the palette, the selected vehicles\' bases, the chart\'s picks and Road Trip\'s settings', () => {
+        const chartConfig = colored({
+            seriesPalette: 'okabe-ito',
+            vehicleBases: { 3: '#112233', 9: '#445566' },   // 9 is not selected
+            handSet: true,
+            colorPicks: { roadtrip: { key: '3,4', map: { '434::351': '#aabbcc', 434: '#ddeeff' } } },
+        });
+        const roadTripConfig = {
+            selected: ['434::351'], destinationMinSoc: 20,
+            perRun: { '434::351': { minSoc: 5, legDistance: 120 } }, testSpread: true,
+        };
+        const q = chartQueryString(buildChartParams(baseState({ chartMode: 'roadtrip', chartConfig, selectedVehicles: [4, 3], roadTripConfig })));
+        expect(settingsOf(q).get('vb')).toBe('3:112233');
+
+        const parsed = parseChartUrl(q);
+        expect(parsed.roadTrip).toMatchObject(roadTripConfig);
+        const applied = chartConfigFromParsed(parsed.chart, defaultChartConfig(), [3, 4]);
+        expect(applied.seriesPalette).toBe('okabe-ito');
+        expect(applied.vehicleBases).toEqual({ 3: '#112233' });
+        expect(applied.handSet).toBe(true);
+        expect(applied.colorPicks.roadtrip).toEqual({ key: '3,4', map: { '434::351': '#aabbcc', 434: '#ddeeff' } });
+    });
+
+    it('round-trips a view\'s group of settings, merged over the config\'s own', () => {
+        const chartConfig = colored({ perfCurve: { grouping: 'all', pickedRunIds: [7, 8], colorEdits: { 7: '#aabbcc' }, showG: true } });
+        const q = build({ chartMode: 'perfcurve', chartConfig, selectedVehicles: [3] });
+        const applied = chartConfigFromParsed(parseChartUrl(q).chart, { ...defaultChartConfig(), perfCurve: { showPublished: false } });
+        expect(applied.perfCurve).toEqual({ showPublished: false, grouping: 'all', pickedRunIds: [7, 8], colorEdits: { 7: '#aabbcc' }, showG: true });
+    });
+
+    it('writes a chart\'s own settings only for that chart', () => {
+        const chartConfig = colored({ perfCurve: { showG: true }, sizeGrid: false });
+        expect(settingsOf(build({ chartMode: 'range', chartConfig, selectedVehicles: [3] })).has('pv_g')).toBe(false);
+        expect(settingsOf(build({ chartMode: 'specsize', chartConfig, selectedVehicles: [3] })).get('sz_g')).toBe('0');
+    });
+
+    it('leaves parked picks, and picks made for another vehicle set, out', () => {
+        const picks = { charging: { key: '3', map: { 11: '#aabbcc' } } };
+        const parked = build({ chartConfig: colored({ colorPicks: picks }), selectedVehicles: [3] });
+        expect(settingsOf(parked).has('col')).toBe(false);
+        const otherSet = build({ chartConfig: colored({ handSet: true, colorPicks: picks }), selectedVehicles: [3, 4] });
+        expect(settingsOf(otherSet).has('col')).toBe(false);
+    });
+
+    it('carries picks and routing only for the rows on the chart', () => {
+        const chartConfig = colored({
+            handSet: true,
+            colorPicks: { roadtrip: { key: '3', map: { '434::351': '#aabbcc', 434: '#ddeeff', 500: '#123456' } } },
+        });
+        const roadTripConfig = {
+            selected: ['434::351'],
+            perRun: { '434::351': { minSoc: 5 }, '500::': { minSoc: 8 } },   // 500 was unticked
+        };
+        const q = chartQueryString(buildChartParams(baseState({ chartMode: 'roadtrip', chartConfig, selectedVehicles: [3], roadTripConfig })));
+        const s = settingsOf(q);
+        expect(s.get('col')).toBe('434:ddeeff,434::351:aabbcc');   // 500 is gone
+        expect(parseChartUrl(q).roadTrip.perRun).toEqual({ '434::351': { minSoc: 5 } });
+
+        const charging = build({
+            chartConfig: colored({ handSet: true, selectedRuns: [11], colorPicks: { charging: { key: '3', map: { 11: '#aabbcc', 12: '#ddeeff' } } } }),
+            selectedVehicles: [3],
+        });
+        expect(settingsOf(charging).get('col')).toBe('11:aabbcc');
+    });
+
+    it('reads the same settings unpacked, as a short link and a featured comparison hold them', () => {
+        expect(parseChartUrl('tab=efficiency&m=range&pal=okabe-ito&vl=1').chart.settings)
+            .toEqual({ seriesPalette: 'okabe-ito', verboseLabels: true });
+    });
+
+    it('opens a link with no picks with hand-set off', () => {
+        const applied = chartConfigFromParsed(parseChartUrl('tab=efficiency&m=range').chart,
+            { ...defaultChartConfig(), handSet: true });
+        expect(applied.handSet).toBe(false);
+    });
+
+    it('drops what it cannot read, and opens the chart anyway', () => {
+        expect(parseChartUrl('tab=efficiency&pal=rainbow&pc_bm=sideways').chart.settings).toEqual({});
+        expect(parseChartUrl('tab=efficiency&m=range&sk=1.!!').chart.chartMode).toBe('range');
+        expect(parseChartUrl('tab=efficiency&m=range&sk=9.AAAA').chart.settings).toEqual({});
+    });
+
+    it('a short link packs the settings flat, not a key inside a key', () => {
+        const q = build({ chartMode: 'range', chartConfig: colored({ seriesPalette: 'okabe-ito' }), selectedVehicles: [3] });
+        const written = new URLSearchParams(withDefaultsWrittenOut(q));
+        expect(written.has('sk')).toBe(false);
+        expect(written.get('pal')).toBe('okabe-ito');
     });
 });

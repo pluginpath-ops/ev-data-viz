@@ -18,6 +18,11 @@
  * ── What the query holds, by mode ────────────────────────────────────────────
  *   every chart   tab m v  raw rt  line pts cspread aspread  corr c_spd c_tmp
  *                 c_alt c_acc  pairs
+ *   sk            the settings key (utils/settingsKey.js): how the chart
+ *                 draws, packed — the palette, session bases (vb) and hand-set
+ *                 picks (col, only while hand-set is in force), labels, test
+ *                 spread, routing overrides, and the Performance, Size and
+ *                 Weekly Plan views' controls. Read the same unpacked.
  *   axis limits   ax (utils/axisLimits.js) for the five modes that have them
  *                 — charging range roadtrip perfcurve epacurves. The
  *                 xn xx yn yx y2n y2x of links written before #478 are still read.
@@ -25,7 +30,7 @@
  *   range         r (the plotted tests), rc (chart type), eff (efficiency unit)
  *   compare       cmp_soc cmp_mins cmp_mi  cmp_o (orientation)  cmp_sel (the
  *                 plotted pairs)
- *   roadtrip      rt_*
+ *   roadtrip      rt_*, and rt_r (the plotted pairs)
  *   optimizer     rt_* and rt_otd rt_oc rt_bp rt_osn rt_osx (its own distance,
  *                 chart, best-plan switch and the speeds the best plan may use). A roadtrip link whose rt_xa is a sweep
  *                 (written before the optimizer had its own tab) opens here.
@@ -51,7 +56,7 @@
  */
 import { ALL_CHART_MODES, DEFAULT_CHART_MODE, categoryForMode } from '../constants/chartNav';
 import { decodeCorrection, encodeCorrection } from './correctionSettings';
-import { encodePairings, decodePairings } from './pairings';
+import { encodePairings, decodePairings, parsePairKey } from './pairings';
 import { isChargingAxis, axisForBasis, basisOfAxes } from './chargingAxes';
 import {
     AXIS_LIMITS_PARAM, axisLimitsOf, axisLimitsOfLink, encodeAxisLimits, hasAxisLimits, withAxisLimits,
@@ -68,6 +73,10 @@ import {
     SIZE_END_ANCHORS, DEFAULT_SIZE_END_ANCHOR,
 } from '../constants/sizeChart';
 import { COST_TO_DRIVE_PARAM, encodeCostToDriveKey, encodeGasCarKey } from './costToDriveKey';
+import { encodeColorMap, decodeColorMap, picksFor, withPicks, vehicleSetKey } from './colorPicks';
+import {
+    SETTINGS_KEY_PARAM, writeSettings, readSettings, mergeSettings, encodeSettingsKey, openSettingsKey, keepPlotted,
+} from './settingsKey';
 
 // The defaults live with the rest of a fresh page's settings (chartDefaults.js);
 // re-exported because the views have always found them here.
@@ -79,6 +88,30 @@ const ROAD_TRIP_SWEEPS = ['speed', 'tripDist'];
 /** Charging Speeds' charts: the cost per month, or the minutes of fast charging. */
 export const HOME_CHARGER_CHARTS = ['cost', 'time'];
 export const DEFAULT_HOME_CHARGER_CHART = 'cost';
+
+/** The one chart mode that draws no series, so has no colors to carry. */
+export const colorsMode = mode => mode !== 'specstable';
+
+/**
+ * Every id on the chart, as strings: the vehicles, and the tests, pairs or EPA
+ * curves this chart plots. A pair key brings its tests too, since a chart's
+ * colors are keyed on its range test. The settings key writes only the part of
+ * a setting that names one of these, so a link carries nothing for a row that
+ * was unticked or a vehicle that was removed.
+ */
+function plottedIdsOf(chartMode, { chartConfig, selectedVehicles, roadTripConfig, compareConfig, epaConfig }) {
+    const ids = [...selectedVehicles];
+    if (chartMode === 'charging' || chartMode === 'range') ids.push(...(chartConfig.selectedRuns ?? []));
+    const pairs = chartMode === 'roadtrip' || chartMode === 'optimizer' ? roadTripConfig?.selected
+        : chartMode === 'compare' ? compareConfig?.selected
+        : null;
+    for (const key of pairs ?? []) {
+        const { rangeRunId, chargingRunId } = parsePairKey(key);
+        ids.push(key, rangeRunId, chargingRunId);
+    }
+    if (chartMode === 'epacurves') ids.push(...(epaConfig?.selectedMappings ?? []));
+    return new Set(ids.filter(id => id != null).map(String));
+}
 
 /** Trip Optimizer's charts. */
 export const OPTIMIZER_CHARTS = ['speed', 'tripDist', 'map'];
@@ -154,7 +187,8 @@ const idList = raw => (raw?.split(',').filter(Boolean) || []).map(idOf);
  *   none of its keys so an untouched mode keeps its defaults.
  */
 export function parseChartUrl(search) {
-    const p = new URLSearchParams(search ?? '');
+    const p = openSettingsKey(search);
+    const settings = readSettings(p);
 
     const rangeChartType = p.get('rc');
     const effUnit = p.get('eff');
@@ -203,6 +237,10 @@ export function parseChartUrl(search) {
         sizeEndAnchor: SIZE_END_ANCHORS.some(a => a.key === sizeEndAnchor) ? sizeEndAnchor : null,
         sizeDraw:   SIZE_DRAWS.some(d => d.key === sizeDraw) ? sizeDraw : null,
         correction:    decodeCorrection(p.toString()),
+        // How it draws (the settings key), as a chartConfig fragment.
+        settings:      settings.chart,
+        vehicleBases:  p.has('vb') ? decodeColorMap(p.get('vb')) : null,
+        colorPicks:    p.has('col') ? decodeColorMap(p.get('col')) : null,
     };
 
     // Charge Stop
@@ -231,12 +269,15 @@ export function parseChartUrl(search) {
         ...(p.get('rt_bp') === '1' && { bestPlan: true }),
         ...(p.get('rt_tw') === '1' && { towingMode: true }),
         ...readParams(p, TOWING_PARAMS),
+        // Pair keys ('70::12'), so they stay strings.
+        ...(p.get('rt_r') && { selected: p.get('rt_r').split(',').filter(Boolean) }),
+        ...settings.roadTrip,
     };
     // The sweep was its X axis; on the optimizer it is the chart, above.
     if (sweepLink) delete roadTrip.xAxis;
 
     // Modeled Efficiency · selected vehicles
-    const epa = {};
+    const epa = { ...settings.epa };
     if (p.get('epa_ya')) epa.yAxis = p.get('epa_ya');
     const epaOv = p.get('epa_ov');
     if (epaOv === 'corrected' || epaOv === 'uncorrected') epa.overlay = epaOv;
@@ -274,13 +315,15 @@ export function parseChartUrl(search) {
  *
  * @param {object} chart  `parseChartUrl(...).chart`
  * @param {object} base   the chartConfig to lay it over
+ * @param {Array}  [vehicleIds]  the vehicles the link selects
+ *   (`vehicleIdsOfLink`): its hand-set picks are kept for that set
  */
-export function chartConfigFromParsed(chart, base) {
+export function chartConfigFromParsed(chart, base, vehicleIds = []) {
     const s = chart;
     // A link without `rb` is an older one: it meant EPA only if it plotted an
     // EPA range axis.
     const basis = s.rangeBasis ?? basisOfAxes([s.xAxis, s.yAxis, s.y2Axis].filter(Boolean));
-    return {
+    const out = {
         ...base,
         // An axis the chart no longer offers (Temperature, Frame) is left at
         // what `base` has, so an old link or saved comparison still opens.
@@ -314,6 +357,17 @@ export function chartConfigFromParsed(chart, base) {
         }),
         correctionMode:   s.correction.mode,
         correctionTarget: s.correction.target,
+    };
+    // How it draws: what the link names, over what `base` has. Hand-set is in
+    // force exactly when the link carries picks, which are this chart's, for
+    // the link's vehicles; the other charts' picks stay as they were.
+    return {
+        ...mergeSettings(out, s.settings),
+        ...(s.vehicleBases && { vehicleBases: s.vehicleBases }),
+        handSet: !!s.colorPicks,
+        ...(s.colorPicks && {
+            colorPicks: withPicks(base.colorPicks, s.chartMode, vehicleSetKey(vehicleIds), () => s.colorPicks),
+        }),
     };
 }
 
@@ -400,6 +454,7 @@ export function buildChartParams({
     // One correction for every chart and the table, so written for every mode.
     for (const [key, value] of encodeCorrection({ mode: chartConfig.correctionMode, target: chartConfig.correctionTarget })) p.set(key, value);
 
+
     // Range & Efficiency
     if (chartMode === 'range') {
         if (chartConfig.rangeChartType && chartConfig.rangeChartType !== DEFAULT_RANGE_CHART_TYPE) p.set('rc', chartConfig.rangeChartType);
@@ -434,6 +489,9 @@ export function buildChartParams({
     if (chartMode === 'roadtrip' || chartMode === 'optimizer') {
         const defaults = defaultRoadTripConfig();
         writeParams(p, ROAD_TRIP_PARAMS, roadTripConfig, defaults);
+        // The ticked rows. Left out, a link plotted each vehicle's default
+        // range test alone, whatever the sender had ticked.
+        if (roadTripConfig.selected?.length) p.set('rt_r', roadTripConfig.selected.join(','));
         if (chartMode === 'optimizer') {
             writeParams(p, OPTIMIZER_PARAMS, roadTripConfig, defaults);
             writeParams(p, OPTIMIZER_CHART_PARAM, roadTripConfig, defaults);
@@ -500,6 +558,24 @@ export function buildChartParams({
         for (const [key, value] of encodeVehicleFilters(vehicleFilters)) p.set(key, value);
     }
 
+    // How the chart draws, packed in the settings key (utils/settingsKey.js).
+    // Written last, so the readable parameters lead the address.
+    if (colorsMode(chartMode)) {
+        const settings = new URLSearchParams();
+        const plotted = plottedIdsOf(chartMode, { chartConfig, selectedVehicles, roadTripConfig, compareConfig, epaConfig });
+        writeSettings(settings, chartMode, { chart: chartConfig, roadTrip: roadTripConfig, epa: epaConfig }, plotted);
+        // The bases asked of the selected vehicles, and this chart's picks for
+        // this vehicle set while hand-set is in force (utils/colorPicks.js).
+        const bases = encodeColorMap(chartConfig.vehicleBases, selectedVehicles);
+        if (bases) settings.set('vb', bases);
+        if (chartConfig.handSet) {
+            const picks = encodeColorMap(keepPlotted(picksFor(chartConfig.colorPicks, chartMode, vehicleSetKey(selectedVehicles)), plotted));
+            if (picks) settings.set('col', picks);
+        }
+        const key = encodeSettingsKey(settings);
+        if (key) p.set(SETTINGS_KEY_PARAM, key);
+    }
+
     return p;
 }
 
@@ -515,7 +591,10 @@ export function buildChartParams({
  * @returns {string}
  */
 export function withDefaultsWrittenOut(search) {
-    const p = new URLSearchParams(search ?? '');
+    // Flat: the settings key opened out, so the short link packs its
+    // parameters beside the rest rather than a key inside a key, and a featured
+    // comparison stores them where a curator can read them.
+    const p = openSettingsKey(search);
     const fill = (table, defaults) => {
         for (const [param, key] of table) if (!p.has(param)) p.set(param, String(defaults[key]));
     };

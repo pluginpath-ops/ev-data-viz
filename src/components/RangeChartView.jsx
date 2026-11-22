@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import SidebarDisplaySection from './SidebarDisplaySection';
 import Chart from 'chart.js/auto';
 import AxisScaleControls from './AxisScaleControls';
@@ -45,6 +45,7 @@ import { PRESENTED_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyPngButton from './charts/CopyPngButton';
 import CopyLinkButton from './charts/CopyLinkButton';
+import { vehicleSetKey, colorPicksSetter } from '../utils/colorPicks';
 
 // ── Chart type definitions ────────────────────────────────────────────────────
 const CHART_TYPES = [
@@ -82,7 +83,7 @@ const hasDataForType = (run, type) => {
 // behavior, and the reason a run could be switched off here and come back.
 export default function RangeChartView({ selectedVehicles, selectedRuns, toggleRun, setChartConfig, presentationMode = false, palette = DEFAULT_SERIES_PALETTE,
     chartType = DEFAULT_RANGE_CHART_TYPE, effUnit = DEFAULT_EFFICIENCY_UNIT,
-    handSet = false, verboseLabels = false, correctionMode = 'none', correctionTarget = undefined, testSpread = true }) {
+    handSet = false, colorPicks = null, showPoints = true, verboseLabels = false, correctionMode = 'none', correctionTarget = undefined, testSpread = true }) {
     const { units, testSessions } = useAppContext();
     const { isDark } = useTheme();
     const chartRef      = useRef(null);
@@ -97,7 +98,10 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
     // In chartConfig (#478), so a chart link, a Home panel and the pop-out all
     // draw with the limits the sender set; this view used to keep them here.
     const { limits: { xMin, xMax, yMin, yMax }, setLimit, resetLimits } = useAxisLimits('range');
-    const [showPoints,       setShowPoints]       = useState(true);
+    // Its own, apart from Charging Curves' Points: on by default here, where a
+    // bar or a sparse line reads better with its marks. In chartConfig
+    // (`rangePoints`) so the link carries it.
+    const setShowPoints = on => setChartConfig(prev => ({ ...prev, rangePoints: on }));
 
     // Reset all scale overrides (back to defaults) when switching chart types,
     // since axis semantics change between chart types.
@@ -158,9 +162,12 @@ export default function RangeChartView({ selectedVehicles, selectedRuns, toggleR
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
-        resetKey: selectedVehicles.map(v => v.id).join(','),
+        resetKey: vehicleSetKey(selectedVehicles.map(v => v.id)),
         vehicles: selectedVehicles,
         plottedIds: selectedRangeRuns.map(r => r.id),
+        chart: 'range',
+        colorPicks,
+        setColorPicks: colorPicksSetter(setChartConfig),
     });
 
     // Value-identity for the resolved colors — see the render effect's deps.

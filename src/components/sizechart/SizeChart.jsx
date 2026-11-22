@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { resolveChartColors, DEFAULT_SERIES_PALETTE } from '../../utils/colorUtils';
 import { resolveEffectiveSpecs } from '../../utils/specHelpers';
@@ -58,8 +58,8 @@ function creditOf(photo) {
  * its axles estimated for want of a front overhang.
  *
  * Settings are App's chartConfig (`sizeView`, `sizeAnchor`, `sizeEndAnchor`, `sizeDraw` in the
- * link; `sizeLines`, `sizeGrid`, `sizeOpacity` for this visit), so the pop-out
- * draws the same chart. A click on a vehicle (or its row) picks the one the
+ * link; `sizeLines`, `sizeGrid`, `sizeOpacity` and the picked vehicle in its
+ * settings key), so the pop-out and a featured comparison draw the same chart. A click on a vehicle (or its row) picks the one the
  * figures are measured from, and keeps it forward; a second click lets go.
  */
 export default function SizeChart({ vehicles, chartConfig, setChartConfig, presentationMode = false }) {
@@ -73,7 +73,8 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     const opacity = chartConfig.sizeOpacity ?? DEFAULT_SIZE_PHOTO_OPACITY;
     // A click picks the vehicle the figures are measured from, drawn at the
     // back; hovering changes nothing (it reordered the drawing under the pointer).
-    const [pickedId, setPickedId] = useState(null);
+    // In chartConfig (`sizePicked`), so the link carries it.
+    const pickedId = chartConfig.sizePicked ?? null;
 
     // A vehicle's color is the same here as on every chart.
     const palette = chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE;
@@ -102,7 +103,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     const drawn = useMemo(() => all.filter(i => i.profile.missing[view].length === 0), [all, view]);
     const fromId = drawn.some(i => i.id === pickedId) ? pickedId : null;
     const activeId = fromId;
-    const pick = (id) => setPickedId(p => (p === id ? null : id));
+    const pick = (id) => setChartConfig?.(prev => ({ ...prev, sizePicked: prev.sizePicked === id ? null : id }));
     const left = all.filter(i => i.profile.missing[view].length > 0);
     const notes = [
         left.length > 0 && `Not drawn: ${left.map(i => `${i.label} (no ${i.profile.missing[view].join(', ')})`).join('; ')}.`,

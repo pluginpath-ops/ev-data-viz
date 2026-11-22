@@ -38,6 +38,7 @@ import { countParts } from '../utils/plotCaption';
 import { PRESENTED_HALF_HEIGHT } from '../utils/presentedHeight';
 import FeatureChartButton from './home/FeatureChartButton';
 import CopyLinkButton from './charts/CopyLinkButton';
+import { vehicleSetKey, colorPicksSetter } from '../utils/colorPicks';
 import { loadRunPoints, runsByIdString } from '../utils/runPoints';
 
 
@@ -385,6 +386,8 @@ export default function ChargeCompareView({
     correctionTarget = undefined,
     palette = DEFAULT_SERIES_PALETTE,
     handSet = false,
+    // chartConfig.colorPicks: the hand-set colors, held in App (utils/colorPicks.js).
+    colorPicks = null,
     testSpread = true,
     setChartConfig = null,
     // Lifted to App with the rest of the controls (compareConfig), so a link and
@@ -562,9 +565,12 @@ export default function ChargeCompareView({
         handSet,
         onHandSet: on => setChartConfig(prev => ({ ...prev, handSet: on })),
         palette,
-        resetKey: selectedVehicleIds.join(','),
+        resetKey: vehicleSetKey(selectedVehicleIds),
         vehicles: selectedVehicles,
         plottedIds,
+        chart: 'compare',
+        colorPicks,
+        setColorPicks: colorPicksSetter(setChartConfig),
     });
 
     // Name each bar by what distinguishes it from the OTHER BARS ON SCREEN, so
