@@ -1006,7 +1006,7 @@ export default function VehiclesView({
             {/* Add / Edit vehicle modal */}
             {showForm && (
                 <div className="modal-overlay" onClick={handleCancel}>
-                    <div className="modal-panel max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    <div className={`modal-panel ${editingId ? 'modal-panel-wide' : 'max-w-xl'} w-full mx-4 max-h-[90vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>
                         <LazyBoundary><EditVehicleForm {...editFormProps} /></LazyBoundary>
                     </div>
                 </div>

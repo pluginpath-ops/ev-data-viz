@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { hasTransparency, removePlainBackground, visibleBounds, trimBox } from '../cutout';
 import {
-    startingMarks, mirrorMarks, carryMarks, photoScale, figuresFromMarks, photoPlacement, fillMarks,
+    startingMarks, mirrorMarks, carryMarks, clampMarks, photoScale, figuresFromMarks, photoPlacement, fillMarks,
 } from '../sizePhotoMarks';
 import { endAnchorX } from '../sizeChartLayout';
 import { profileFromSpecs } from '../vehicleProfile';
@@ -125,6 +125,18 @@ describe('size photo marks', () => {
         expect(out.ground).toBeCloseTo(0.9);
         const back = carryMarks('side', out, to, from, true);
         for (const k of Object.keys(m)) expect(back[k]).toBeCloseTo(m[k]);
+    });
+
+    it('carries a mark past the canvas and back to the same spot; clampMarks holds it to the canvas', () => {
+        const wide = { x: 0, y: 0, w: 1, h: 1 };
+        const tight = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
+        const m = { left: 0.05, right: 0.95, ground: 0.5 };
+        const out = carryMarks('front', m, wide, tight);
+        expect(out.left).toBeLessThan(0);
+        expect(out.right).toBeGreaterThan(1);
+        const back = carryMarks('front', out, tight, wide);
+        for (const k of Object.keys(m)) expect(back[k]).toBeCloseTo(m[k]);
+        expect(clampMarks(out)).toMatchObject({ left: 0, right: 1 });
     });
 
     it('scales from the length spec and reads the other figures back', () => {

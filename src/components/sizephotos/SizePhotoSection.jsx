@@ -28,7 +28,7 @@ function Slot({ vehicle, view, label, pending, specs }) {
 
     if (editing) {
         return (
-            <div className="size-photo-slot">
+            <div className="size-photo-slot is-editing">
                 <span className="text-micro">{label}</span>
                 <SizePhotoEditor key={editing.n} vehicle={vehicle} view={view} row={editing.file ? null : own}
                     file={editing.file} onClose={() => setEditing(null)} pending={pending} onPickFile={start} specs={specs} />
@@ -101,7 +101,7 @@ export default function SizePhotoSection({ vehicle, pending }) {
 
     const specs = { drafts, changed, onDraft: (field, value) => setDrafts(d => ({ ...d, [field]: value })) };
     return (
-        <div className="form-section mt-4">
+        <div>
             <label className="block font-medium mb-2">Size photos</label>
             <p className="text-note mb-2">For the Size chart: the car cut out, with its bumpers, axles, ground and roof marked (front and rear: body edges and mirrors). Drawn to the specs. The rear isn’t drawn yet; it is kept for later.</p>
             <div className="size-photo-slots">
