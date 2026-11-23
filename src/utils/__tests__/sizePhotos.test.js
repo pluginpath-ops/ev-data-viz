@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { hasTransparency, removePlainBackground, visibleBounds, trimBox } from '../cutout';
 import {
-    startingMarks, mirrorMarks, carryMarks, clampMarks, photoScale, figuresFromMarks, photoPlacement, fillMarks,
+    startingMarks, mirrorMarks, carryMarks, clampMarks, photoScale, figuresFromMarks, photoPlacement, fillMarks, lengthOffPct,
 } from '../sizePhotoMarks';
 import { endAnchorX } from '../sizeChartLayout';
 import { profileFromSpecs } from '../vehicleProfile';
@@ -151,6 +151,58 @@ describe('size photo marks', () => {
         expect(photoScale('side', p, {})).toBeNull();
     });
 
+    it('scales a side photo from the wheelbase, and reads length and tire diameter back', () => {
+        // Axles 0.5 apart on a 1000 px photo = 500 px for a 100 in wheelbase: 5 px/in.
+        const p = photo({ front: 0.1, frontAxle: 0.25, rearAxle: 0.75, rear: 0.9, ground: 0.9, roof: 0.3, frontAxleY: 0.8, rearAxleY: 0.8 });
+        const profile = { length: 200, wheelbase: 100 };
+        expect(photoScale('side', p, profile)).toBeCloseTo(5);
+        const f = figuresFromMarks('side', p, profile);
+        expect(f.wheelbase).toBeCloseTo(100);
+        expect(f.length).toBeCloseTo(160);                  // 800 px / 5: reads 20% short here
+        expect(f.tireDiameter).toBeCloseTo(2 * 0.1 * 400 / 5);
+        expect(lengthOffPct(f, profile, 0)).toBeCloseTo(-20);
+        expect(lengthOffPct(f, profile, 18)).toBeCloseTo(-2); // relative to a good photo's 18% short
+        // Without a wheelbase spec it falls back to the length scale.
+        expect(photoScale('side', p, { length: 200 })).toBeCloseTo(4);
+    });
+
+    it('lengthens the overhangs only by the excess over the baseline', () => {
+        // Overhangs read 15 in each (75 px at 5 px/in); spec overhangs 25 + 25, length 150.
+        const p = photo({ front: 0.175, frontAxle: 0.25, rearAxle: 0.75, rear: 0.825, ground: 0.9 });
+        const spec = { length: 150, wheelbase: 100, frontOverhang: 25 };
+        const bumpers = (pct) => {
+            const { slices } = photoPlacement('side', p, spec, pct);
+            const at = (f) => { const s = slices.find(x => f >= x.from && f <= x.to); return s.x + ((f - s.from) / (s.to - s.from)) * s.w; };
+            return [at(0.175), at(0.825)];
+        };
+        const [f0, r0] = bumpers(0);
+        expect([f0, r0]).toEqual([expect.closeTo(0), expect.closeTo(150)]);            // no baseline: all the way to spec
+        // 10% of the length (15 in) is left alone: that is 30% of the 50 in of overhang, so each is drawn at 25 × 0.7 = 17.5.
+        const [f1, r1] = bumpers(10);
+        expect(f1).toBeCloseTo(25 - 17.5);
+        expect(r1).toBeCloseTo(125 + 17.5);
+        // A photo already better than the baseline is left as it is, not shortened.
+        const [f2, r2] = bumpers(50);
+        expect(f2).toBeCloseTo(25 - 15);
+        expect(r2).toBeCloseTo(125 + 15);
+    });
+
+    it('slides a stretched photo so its aligned bumper tip meets the line', () => {
+        // Overhangs read 15 in each at 5 px/in; spec overhangs 25 + 25, wheelbase 100; 10% baseline draws each at 17.5.
+        const p = photo({ front: 0.175, frontAxle: 0.25, rearAxle: 0.75, rear: 0.825, ground: 0.9 });
+        const spec = { length: 150, wheelbase: 100, frontOverhang: 25 };
+        const at = (pl, f) => { const s = pl.slices.find(x => f >= x.from && f <= x.to); return s.x + ((f - s.from) / (s.to - s.from)) * s.w; };
+        const front = photoPlacement('side', p, spec, 10, 'front');
+        expect(at(front, 0.175)).toBeCloseTo(0);              // front tip on the line
+        expect(at(front, 0.25)).toBeCloseTo(17.5);             // axle 7.5 in off its spec
+        expect(at(front, 0.825)).toBeCloseTo(17.5 + 100 + 17.5);
+        const rear = photoPlacement('side', p, spec, 10, 'rear');
+        expect(at(rear, 0.825)).toBeCloseTo(150);
+        expect(at(rear, 0.75)).toBeCloseTo(132.5);
+        // No alignment: the baseline rule alone.
+        expect(at(photoPlacement('side', p, spec, 10, null), 0.25)).toBeCloseTo(25);
+    });
+
     it('places the photo with its front bumper at 0 and its ground on the ground', () => {
         // No axle figures: one piece, bumper to bumper on the length.
         const p = photo({ front: 0.1, frontAxle: 0.3, rearAxle: 0.8, rear: 0.9, ground: 0.9 });
@@ -167,7 +219,7 @@ describe('size photo marks', () => {
         // The photo's ends are squeezed: its overhangs read short, its wheelbase long.
         const p = photo({ front: 0.1, frontAxle: 0.2, rearAxle: 0.8, rear: 0.9, ground: 0.9, roof: 0.3 });
         const spec = { length: 200, wheelbase: 120, frontOverhang: 35, height: 50 };
-        const { slices, top, h } = photoPlacement('side', p, spec);
+        const { slices, top, h } = photoPlacement('side', p, spec, 0);
         // Where a photo fraction lands, through the piece that holds it.
         const at = (f) => {
             const s = slices.find(x => f >= x.from && f <= x.to);

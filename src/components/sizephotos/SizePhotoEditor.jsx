@@ -9,7 +9,7 @@ import {
 import {
     loadCanvas, isCutout, cutOut, finishCutout, flipCanvas, visibleFractions, toBlob, CUTOUT_MAX_SIDE,
 } from '../../utils/sizePhotoImages';
-import { SIZE_PHOTO_WHEELBASE_PCT, SIZE_PHOTO_HEIGHT_PCT } from '../../constants/sizeChart';
+import { SIZE_PHOTO_FIGURE_PCT, SIZE_PHOTO_HEIGHT_PCT, SIZE_PHOTO_LENGTH_BASELINE_PCT } from '../../constants/sizeChart';
 import MarkLine from './MarkLine';
 import MarkPoint from './MarkPoint';
 import { withSpecValues } from '../../utils/dataCheckFixes';
@@ -41,9 +41,10 @@ const KIND = {
 const ORDER = { side: ['front', 'frontAxle', 'rearAxle', 'rear'], front: ['left', 'right'], rear: ['left', 'right'] };
 
 /** A figure read from the marks, beside the spec it is checked against. */
-function CheckRow({ label, read, spec, units, limit }) {
+function CheckRow({ label, read, spec, units, limit, baselinePct = 0 }) {
     if (read == null) return null;
-    const off = spec ? ((read - spec) / spec) * 100 : null;
+    // A baseline is how short a good photo reads: the figure is flagged by its excess over it.
+    const off = spec ? ((read - spec) / spec) * 100 + baselinePct : null;
     return (
         <div className="inline-row flex-wrap">
             <span className="text-label">{label}</span>
@@ -321,15 +322,16 @@ export default function SizePhotoEditor({ vehicle, view, row, file, onClose, pen
                     )}
                     {read && view === 'side' && (
                         <>
-                            <CheckRow label="Wheelbase" read={read.wheelbase} spec={profile.wheelbase} units={units} limit={SIZE_PHOTO_WHEELBASE_PCT} />
-                            <CheckRow label="Front overhang" read={read.frontOverhang}
-                                spec={profile.estimated.has('frontOverhang') ? null : profile.frontOverhang} units={units} limit={SIZE_PHOTO_WHEELBASE_PCT} />
+                            <CheckRow label="Length" read={read.length} spec={profile.length} units={units}
+                                limit={SIZE_PHOTO_FIGURE_PCT} baselinePct={SIZE_PHOTO_LENGTH_BASELINE_PCT} />
+                            <CheckRow label="Tire diameter" read={read.tireDiameter}
+                                spec={profile.estimated.has('tireDiameter') ? null : profile.tireDiameter} units={units} limit={SIZE_PHOTO_HEIGHT_PCT} />
                         </>
                     )}
                     {read && <CheckRow label="Height" read={read.height} spec={profile.height} units={units} limit={SIZE_PHOTO_HEIGHT_PCT} />}
                     {read && isEndView(view) && (
                         <CheckRow label={view === 'rear' ? 'Rear track' : 'Front track'} read={read.track}
-                            spec={profile.estimated.has(trackKeyOf(view)) ? null : profile[trackKeyOf(view)]} units={units} limit={SIZE_PHOTO_WHEELBASE_PCT} />
+                            spec={profile.estimated.has(trackKeyOf(view)) ? null : profile[trackKeyOf(view)]} units={units} limit={SIZE_PHOTO_FIGURE_PCT} />
                     )}
                     {specs && <SizePhotoSpecs vehicle={vehicle} view={view} {...specs} />}
                 </div>

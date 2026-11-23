@@ -91,6 +91,36 @@ Loaded with the vehicles (`vehicle_size_photos(*)` in the embed): a few small
 rows each. A variant resolves its photo by the same walk as the card photo,
 and its own length sets the scale.
 
+## Scale from the wheelbase (#616, owner 2026-11-23)
+
+Scaling a side photo from bumper tips read wheelbase +4.6% (median, to +8.8)
+and height +3.8% against the specs: the tips sit on the centerline, half a
+body width farther from the camera than the wheels, so perspective shrinks
+them and everything nearer reads long. So:
+
+- **Scale = wheelbase** (`photoScale`): the axle marks are near-plane points.
+  No wheelbase spec or axles out of order → the length, as before.
+- **Length** is then read back, and reads SHORT (median −4.4%, −2.0 to −8.1
+  over the stored photos). A good photo reads a little short too, so the
+  drawing and the checks use a **baseline**, `SIZE_PHOTO_LENGTH_BASELINE_PCT`
+  (constants/sizeChart.js): the median shortfall of the owner's reference
+  photos — vehicle ids 458, 24, 169, 453, 121, 48, 59, 26 (96 shares its
+  photo), 107; 234 has no length spec yet. Median 4.4%; the owner set **3%** after trying it on the chart (a typical photo gets a small stretch; a studio shot is left alone).
+- **Drawing:** each overhang hangs from its axle at the photo's own scale and
+  is lengthened only by its excess over the baseline's share, never past the
+  spec (`photoPlacement`). A photo within the baseline is not touched; the
+  bumper dimension lines still sit at the specs, so a good photo ends a hair
+  short of them. Height still stretches ground-to-roof to the height spec
+  (median −1.6% at this scale, −4.8 to +3.9).
+- **Bumper-aligned chart** (anchor Front or Rear bumper): the photo is stretched by the baseline rule above, then slid as a whole so that bumper's tip is on the line. The axles move off their specs by the shortfall left after the stretch (a few inches); the other end falls short of the spec by its own. Axle and center anchors don't slide. Tried 2026-11-23: tips that stopped short of the bar looked ragged when lined up on a bumper, and full stretch looked awkward.
+- **Editor readout:** Length, relative to the baseline; Tire diameter (twice
+  the axles' height above the ground) against the tire size; Height. The
+  front-overhang row is gone — overhangs read short by design.
+- **Front and rear:** width is a single plane (both body edges equally far
+  from the camera), so no wheelbase-like bias; nothing changed. Height at the
+  width scale reads −3.5% (median of 27, −14 to +4.2), likely roof marks and
+  ride height rather than perspective; left to the height pin.
+
 ## The editor
 
 A **Size photos** section in the vehicle edit form, under Photo, with a Side
@@ -168,7 +198,7 @@ draggable line), `MarkPoint.jsx` (an axle center); both move by
 
 ## Data Checks
 
-- `size-photo-wheelbase` — wheelbase from the photo vs spec, past 3%.
+- `size-photo-length` — length from the photo (at its wheelbase scale) vs spec, past 3% beyond the baseline (below).
 - `size-photo-height` — height from the photo vs spec, past 4% (roofs racks
   and antennas make this one looser).
 

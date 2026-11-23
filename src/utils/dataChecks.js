@@ -67,9 +67,9 @@ import {
     TEST_WEIGHT_OFFSET_LBS_BAND, VOLTAGE_400_CLASS_BAND, VOLTAGE_800_CLASS_BAND,
     CLAIMED_060_GAP_SEC,
 } from '../constants/epa';
-import { SIZE_PHOTO_WHEELBASE_PCT, SIZE_PHOTO_HEIGHT_PCT } from '../constants/sizeChart';
+import { SIZE_PHOTO_FIGURE_PCT, SIZE_PHOTO_HEIGHT_PCT } from '../constants/sizeChart';
 import { profileFromSpecs } from './vehicleProfile';
-import { figuresFromMarks } from './sizePhotoMarks';
+import { figuresFromMarks, lengthOffPct } from './sizePhotoMarks';
 
 /** The figures findings are grouped under, in display order. */
 export const CHECK_FIGURES = [
@@ -106,7 +106,7 @@ export const DATA_CHECKS = [
     { key: 'claimed-060-quicker', figure: 'performance', kind: 'disagrees', label: 'Claimed 0–60 quicker than tested' },
     { key: 'size-incomplete',    figure: 'size',        kind: 'gap',       label: 'Some dimensions, not all the Size chart needs' },
     { key: 'size-inconsistent',  figure: 'size',        kind: 'disagrees', label: 'Dimensions that cannot all be right' },
-    { key: 'size-photo-wheelbase', figure: 'size',      kind: 'disagrees', label: 'Size photo wheelbase off the spec' },
+    { key: 'size-photo-length', figure: 'size',      kind: 'disagrees', label: 'Size photo length off the spec' },
     { key: 'size-photo-height',  figure: 'size',        kind: 'disagrees', label: 'Size photo height off the spec' },
 ];
 
@@ -543,11 +543,13 @@ function sizePhotoFindings(vehicle, ctx) {
     const off = (read, spec) => (read != null && spec ? ((read - spec) / spec) * 100 : null);
 
     const side = photos.side ? figuresFromMarks('side', photos.side, profile) : null;
-    const wb = off(side?.wheelbase, profile.wheelbase);
-    if (wb != null && Math.abs(wb) > SIZE_PHOTO_WHEELBASE_PCT) {
-        out.push(finding('size-photo-wheelbase',
-            `The side photo's axles read ${oneDp(side.wheelbase)} in apart; the wheelbase spec is ${profile.wheelbase} in (${wb > 0 ? '+' : ''}${oneDp(wb)}%)${note('side')}.`,
-            { read: oneDp(side.wheelbase), spec: profile.wheelbase }));
+    // Side photos are scaled from the wheelbase, so the check is the length,
+    // relative to how short a good photo reads (SIZE_PHOTO_LENGTH_BASELINE_PCT).
+    const len = lengthOffPct(side, profile);
+    if (len != null && Math.abs(len) > SIZE_PHOTO_FIGURE_PCT) {
+        out.push(finding('size-photo-length',
+            `The side photo's bumpers read ${oneDp(side.length)} in apart at its wheelbase scale; the length spec is ${profile.length} in (${len > 0 ? '+' : ''}${oneDp(len)}% against a good photo)${note('side')}.`,
+            { read: oneDp(side.length), spec: profile.length }));
     }
 
     const heights = [];
