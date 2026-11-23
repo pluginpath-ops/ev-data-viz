@@ -15,8 +15,10 @@ import { copyChartAsPng, chartToPngDataUrl } from '../utils/chartUtils';
  * cannot be present on one chart and missing on the next.
  *
  * @param {{current: object}} chartRef  Ref holding the Chart.js INSTANCE.
- * @param {{title: string, subtitle: string, sources?: string}} frame  Caption drawn onto the PNG;
- *        `sources` is the source line's text (useSourceLine).
+ * @param {{title: string, subtitle: string, sources?: string, stamp?: () => string|null}} frame
+ *        Caption drawn onto the PNG; `sources` is the source line's text
+ *        (useSourceLine); `stamp`, read at copy time, is added to the title
+ *        (the playback clock, which moves too fast to be a render-time string).
  */
 export function useChartPng(chartRef, frame) {
     const [copied, setCopied] = useState(false);
@@ -45,7 +47,8 @@ export function useChartPng(chartRef, frame) {
     const copy = async (side) => {
         const chart = chartRef?.current;
         if (!chart) return;
-        const opts = { title: frame?.title, subtitle: frame?.subtitle, sources: frame?.sources, side };
+        const title = [frame?.title, frame?.stamp?.()].filter(Boolean).join(' · ');
+        const opts = { title, subtitle: frame?.subtitle, sources: frame?.sources, side };
         try {
             setPreview(await copyChartAsPng(chart, opts));
             setCopied(true);
