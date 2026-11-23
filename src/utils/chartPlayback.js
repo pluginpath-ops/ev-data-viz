@@ -101,6 +101,39 @@ function yAtX(points, x) {
 
 const hasClock = (data) => data.some(p => isNum(p?.t));
 
+/** The last clock a series has: when it finishes. */
+function lastClock(data) {
+    for (let i = data.length - 1; i >= 0; i--) if (isNum(data[i]?.t)) return data[i].t;
+    return null;
+}
+
+/**
+ * "Done at" labels beside finished series' dots, in their colors: right of the
+ * dot, or left when it would run off the plot. Labels that would overlap are
+ * stepped apart vertically, in order down the chart.
+ */
+function drawFinishLabels(chart, labels, hours) {
+    if (!labels.length) return;
+    const { ctx, chartArea } = chart;
+    const font = chart.options.font ?? {};
+    const size = font.size ?? 12;
+    ctx.font = `600 ${size}px ${font.family ?? 'sans-serif'}`;
+    ctx.textBaseline = 'middle';
+    const gap = size + 4;
+    labels.sort((a, b) => a.py - b.py);
+    let lastY = -Infinity;
+    for (const l of labels) {
+        const y = Math.max(l.py, lastY + gap);
+        lastY = y;
+        const text = formatClock(l.end, hours);
+        const w = ctx.measureText(text).width;
+        const right = l.px + 9 + w <= chartArea.right;
+        ctx.textAlign = right ? 'left' : 'right';
+        ctx.fillStyle = l.color;
+        ctx.fillText(text, right ? l.px + 9 : l.px - 9, y);
+    }
+}
+
 /**
  * Where playback runs: from the earliest clock any series has (below zero
  * when a curve starts before the start SoC; never above zero) to the last.
@@ -151,7 +184,8 @@ export function playbackPlugins(stateRef) {
                     ? sliceByClock(ds._playbackFull, s.now)
                     : ds._playbackFull;
             }
-            s.onExtent?.(clockExtent(chart.data.datasets, s.clockFromX));
+            s.extent = clockExtent(chart.data.datasets, s.clockFromX);
+            s.onExtent?.(s.extent);
         },
         // Hold the axes at the whole chart's extent, so they do not grow as the
         // series do. A limit the reader set stands.
@@ -193,7 +227,10 @@ export function playbackPlugins(stateRef) {
                     ctx.globalAlpha = 1;
                 }
             }
-            // A dot at the head of each series: where each one is now.
+            // A dot at the head of each series: where each one is now. A series
+            // whose points have run out is done, not slow: a square, labeled
+            // with when it finished.
+            const finished = [];
             chart.data.datasets.forEach((ds, i) => {
                 if (!chart.isDatasetVisible(i) || ds.spreadOf != null || ds._spread) return;
                 const full = ds._playbackFull ?? ds.data;
@@ -210,11 +247,22 @@ export function playbackPlugins(stateRef) {
                 if (!yScale) return;
                 const px = xScale.getPixelForValue(head.x), py = yScale.getPixelForValue(head.y);
                 if (px < chartArea.left || px > chartArea.right || py < chartArea.top || py > chartArea.bottom) return;
-                ctx.fillStyle = typeof ds.borderColor === 'string' ? ds.borderColor : '#888';
+                const color = typeof ds.borderColor === 'string' ? ds.borderColor : '#888';
+                const r = ds.yAxisID === 'y2' ? 3.5 : 5;
+                // Done: its last clock is behind the playback clock. Not where X
+                // is the clock — those charts label their own finishes.
+                const end = s.clockFromX ? null : lastClock(full);
+                const done = end != null && s.now >= end;
+                ctx.fillStyle = color;
                 ctx.beginPath();
-                ctx.arc(px, py, ds.yAxisID === 'y2' ? 3.5 : 5, 0, Math.PI * 2);
+                // Moving, a dot; done, a square — and one label a series, not
+                // on the right axis' twin.
+                if (done) ctx.rect(px - r, py - r, r * 2, r * 2);
+                else ctx.arc(px, py, r, 0, Math.PI * 2);
                 ctx.fill();
+                if (done && ds.yAxisID !== 'y2') finished.push({ px, py, color, end });
             });
+            drawFinishLabels(chart, finished, Math.max(-(s.extent?.start ?? 0), s.extent?.end ?? 0) >= 60);
             ctx.restore();
         },
     };
