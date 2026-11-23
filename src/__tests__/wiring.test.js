@@ -3227,12 +3227,13 @@ describe('the line charts read every series at the cursor\'s X (#455)', () => {
     it('the charts that must deviate keep a tooltip, and say why', () => {
         // Range & Efficiency draws bars from the same Chart: bars keep theirs.
         expect(read('src/components/RangeChartView.jsx')).toMatch(/enabled: built\.kind !== 'line'[\s\S]{0,80}filter: suppressBarTooltip/);
-        // Road Trip: all four of its charts read through the one readout, the
+        // Road Trip: all five of its charts read through the one readout, the
         // timeline with its own describe (it says what each vehicle is DOING),
-        // and Trip Optimizer's map with its own (its lines are the ridge of
-        // best stop plans and the reader's own stop plan).
+        // Trip Optimizer's map with its own (its lines are the ridge of best
+        // stop plans and the reader's own stop plan), and SoC by distance with
+        // its own (when each vehicle was there).
         const trip = read('src/components/RoadTripView.jsx');
-        expect(trip.match(/readout\.plugin\(/g)).toHaveLength(4);
+        expect(trip.match(/readout\.plugin\(/g)).toHaveLength(5);
         expect(trip).toMatch(/tooltip: \{ enabled: false \}/);
         expect(trip).not.toMatch(/displayColors: true/);
         // The spec scatter plots one point per vehicle; there is no shared X.

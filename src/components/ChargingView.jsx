@@ -53,6 +53,10 @@ import { rangePartnersOfCharging, setChargingPartner } from '../utils/pairings';
 import { resolveRangeSource, epaRangeOption, isEpaPartnerId, EPA_PARTNER_ID } from '../utils/rangeSource';
 import { chartTheme, applyChartDefaults } from '../utils/chartTheme';
 import PlotFrame from './charts/PlotFrame';
+import PlaybackControl from './charts/PlaybackControl';
+import PlaybackStamp, { playbackStampText } from './charts/PlaybackStamp';
+import { formatElapsed } from '../utils/chartPlayback';
+import { useChartPlayback } from '../hooks/useChartPlayback';
 import { useChartPng } from '../hooks/useChartPng';
 import { useStickyChartColors } from '../hooks/useStickyChartColors';
 import { seriesRowsOf, DEFAULT_RUN_COLOR, DEFAULT_SERIES_PALETTE, withAlpha } from '../utils/colorUtils';
@@ -103,6 +107,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const chartInstance = useRef(null);
     const readout = useChartReadout();
     const { zoomed, resetZoom, zoomOptions, plugin: zoomStatePlugin } = useChartZoom(chartInstance);
+    const playback = useChartPlayback();
     const [runDataCache, setRunDataCache] = useState({});
     const [loadingData, setLoadingData] = useState(false);
 
@@ -465,6 +470,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     const spreadOnAdded = ADDED_AXES.has(chartConfig.yAxis) && (raceActive || ADDED_SPREAD_X.has(chartConfig.xAxis));
     const spreadAvailable = SPREAD_AXES.has(chartConfig.yAxis) || spreadOnAdded;
     const spreadShown = spreadOnAdded ? (chartConfig.addedSpread ?? false) : (chartConfig.compositeSpread ?? true);
+    // Playback does NOT cut at the start: its clock is minutes from the start
+    // SoC, below zero before it (clockOf in the chart build), so pressing Play
+    // leaves the curves and axes as they were.
     const measuresFromStart = raceActive || plotsAdded;
     const [compositeMembers, setCompositeMembers] = useState({});
     /** Composite id → the typical width of its test spread with every test
@@ -764,6 +772,14 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 ? (d) => (d.time != null ? Math.round((d.time - timeOffset) * 10) / 10 : null)
                 : (d) => convertAxisValue(scaleRange(getFieldValue(d, chartConfig.xAxis, vehicleBattery, rateRange), chartConfig.xAxis, rangeK), chartConfig.xAxis);
 
+            // The playback clock: minutes from the start SoC (utils/chartPlayback),
+            // negative before it. Cut at the start, that is the cut's own offset;
+            // otherwise the same interpolated crossing, the curve left whole. A
+            // test that never reaches the start runs from its own first minute.
+            const clockZero = measuresFromStart ? timeOffset
+                : (alignSeries(rawData, raceThreshold)?.offset ?? rawData.find(p => p.time != null)?.time ?? 0);
+            const clockOf = (d) => (d.time != null ? d.time - clockZero : null);
+
             // 4. Y1 dataset
             const getY = (d) => convertAxisValue(scaleRange(getFieldValue(d, chartConfig.yAxis, vehicleBattery, rateRange), chartConfig.yAxis, rangeK), chartConfig.yAxis);
             const composite = run.composite;
@@ -772,8 +788,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 // its test spread. An interpolated race-mode start reads n from
                 // its neighbors; a projected one has none and counts as thin.
                 .map(d => composite
-                    ? { x: getX(d), y: getY(d), n: d.n ?? 1, hi: d.spreadHi, lo: d.spreadLo }
-                    : { x: getX(d), y: getY(d) })
+                    ? { x: getX(d), y: getY(d), t: clockOf(d), n: d.n ?? 1, hi: d.spreadHi, lo: d.spreadLo }
+                    : { x: getX(d), y: getY(d), t: clockOf(d) })
                 .filter(p => p.x != null && p.y != null);
             if (y1Points.length === 0) return [];
 
@@ -804,7 +820,9 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     const xs = y1Points.map(p => p.x);
                     const used = new Set((live?.tests ?? []).map(t => String(t.runId)));
                     const band = live ? spreadAlong(seriesFrom(members.filter(m => used.has(String(m.run.id))), live.start), xs) : [];
-                    edge = (key) => band.map(b => ({ x: b.x, y: key === 'spreadLo' ? b.lo : b.hi }));
+                    // The spread is read at the curve's own x's, so it takes their clock.
+                    edge = (key) => band.map((b, i) => ({ x: b.x, y: key === 'spreadLo' ? b.lo : b.hi,
+                        t: y1Points[i]?.x === b.x ? y1Points[i].t : null }));
 
                     // When the start leaves tests out, the band rests on the
                     // few that remain — two near-identical tests draw a hairline
@@ -822,7 +840,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     }
                 } else {
                     edge = (key) => workingData
-                        .map(d => ({ x: getX(d), y: d[key] != null ? getY({ ...d, chargeRate: d[key] }) : null }))
+                        .map(d => ({ x: getX(d), y: d[key] != null ? getY({ ...d, chargeRate: d[key] }) : null, t: clockOf(d) }))
                         .filter(p => p.x != null);
                 }
                 const lo = edge('spreadLo');
@@ -879,7 +897,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             // 5. Y2 dataset (hidden from legend; dashed line + triangle points)
             if (chartConfig.y2Axis) {
                 const y2Points = workingData
-                    .map(d => ({ x: getX(d), y: convertAxisValue(scaleRange(getFieldValue(d, chartConfig.y2Axis, vehicleBattery, rateRange), chartConfig.y2Axis, rangeK), chartConfig.y2Axis) }))
+                    .map(d => ({ x: getX(d), y: convertAxisValue(scaleRange(getFieldValue(d, chartConfig.y2Axis, vehicleBattery, rateRange), chartConfig.y2Axis, rangeK), chartConfig.y2Axis), t: clockOf(d) }))
                     .filter(p => p.x != null && p.y != null);
                 if (y2Points.length > 0) {
                     result.push({
@@ -970,7 +988,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
         chartInstance.current = new Chart(ctx, {
             type: 'scatter',
             data: { datasets },
-            plugins: [readout.plugin(readoutConfig), zoomStatePlugin],
+            plugins: [playback.plugins.open, readout.plugin(readoutConfig), zoomStatePlugin, playback.plugins.close],
             options: {
                 animation: false,
                 responsive: true,
@@ -1036,7 +1054,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                 chartInstance.current.destroy();
             }
         };
-    }, [chartConfig, limits, selectedVehicles, runDataCache, units, isDark, colorMap, liveComposites, compositeMembers]);
+    }, [chartConfig, limits, selectedVehicles, runDataCache, units, isDark, colorMap, liveComposites, compositeMembers, measuresFromStart]);
 
     // ── The frame's caption ──────────────────────────────────────────────────
     // Computed here rather than inside the chart effect, because the frame is
@@ -1056,6 +1074,12 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // the frame. A chart pasted into a thread has to answer "on what, corrected
     // how, in which units" without anyone typing a caption. The run and vehicle
     // counts lead only under Full Labels (see utils/plotCaption.js).
+    // The playback clock in the title: from the start, how long in.
+    // The title already says "from N% SoC" when the curves are cut there.
+    const stampText = (now) => (now < 0
+        ? `${formatElapsed(-now)} before ${raceThreshold}% SoC`
+        : `${measuresFromStart ? '' : `from ${raceThreshold}% SoC `}after ${formatElapsed(now)}`);
+
     const plotSubtitle = useMemo(() => {
         const runs = colorableRuns.filter(r => !isCompositeRun(r)).length;
         const vehicles = selectedVehicles.filter(
@@ -1086,6 +1110,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
     // ── PNG export ───────────────────────────────────────────────────────────
     const { copyPng, copyPngBeside, copiedBeside, copied: imageCopied, preview, dismissPreview } =
         useChartPng(chartInstance, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
+            stamp: () => playbackStampText(playback, stampText),
             signature: `${selectedRuns.join(',')}|${selectedComposites.length}` });
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -1168,8 +1193,8 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     indented: it modifies X, it is not a fourth axis. An "… Added"
                     axis always measures from the start, so it shows the start
                     alone — no switch, as there is nothing to turn off. */}
-                {(isTimeAxis || plotsAdded) && (
-                    <div className={`race-mode${measuresFromStart ? ' is-on' : ''}`}>
+                {(isTimeAxis || plotsAdded || playback.engaged) && (
+                    <div className={`race-mode${measuresFromStart || playback.engaged ? ' is-on' : ''}`}>
                         {isTimeAxis ? (
                             <label className="race-mode-switch" title="Shift every run so the chosen SoC lands at t = 0, making the curves comparable. Off, each run starts at its own zero.">
                                 <input
@@ -1181,7 +1206,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 <span className="race-mode-label">Race mode</span>
                             </label>
                         ) : (
-                            <span className="race-mode-label">Added from</span>
+                            <span className="race-mode-label">{plotsAdded ? 'Added from' : 'Playback from'}</span>
                         )}
                         <span className="race-mode-start">
                             {/* Cleared, it follows the data again (commonSoc). */}
@@ -1191,7 +1216,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                                 value={chartConfig.raceThreshold ?? commonSoc}
                                 placeholder={commonSoc != null ? String(commonSoc) : '10'}
                                 onChange={v => setChartConfig({ ...chartConfig, raceThreshold: v })}
-                                disabled={!measuresFromStart}
+                                disabled={!measuresFromStart && !playback.engaged}
                                 className="form-input soc-input"
                                 title={commonSoc != null && chartConfig.raceThreshold == null
                                     ? `Lowest SoC every selected run reaches (${commonSoc}%) — no run is dropped at this value.`
@@ -1437,6 +1462,7 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
             <PlotFrame
                 title={plotTitle}
                 subtitle={plotSubtitle}
+                stamp={<PlaybackStamp playback={playback} text={stampText} />}
                 sourceLine={sourceLine}
                 preview={preview}
                 onDismissPreview={dismissPreview}
@@ -1456,6 +1482,11 @@ export default function ChargingView({ vehicles, selectedVehicleIds, chartConfig
                     {readout.overlay}
                 </div>
             </PlotFrame>
+
+            {selectedRuns.length > 0 && (
+                <PlaybackControl playback={playback} chartRef={chartInstance}
+                    minSpeed={10} maxSpeed={1000} defaultSpeed={100} />
+            )}
 
             {!presentationMode && (
                 <ZoomHint onReset={resetZoom} />

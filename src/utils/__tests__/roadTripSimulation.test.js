@@ -1,3 +1,4 @@
+import { chargeTrace, segmentsToSocByDistance } from '../roadTripSimulation';
 import { describe, it, expect } from 'vitest';
 import { simulateRoadTrip, untimedSpans } from '../roadTripSimulation';
 
@@ -361,5 +362,28 @@ describe('untimedSpans', () => {
         expect(untimedSpans(LINEAR_CURVE)).toEqual([]);
         expect(untimedSpans([{ soc: 10, time: 0 }, { soc: 80, time: 30 }])).toEqual([]);
         expect(untimedSpans(null)).toEqual([]);
+    });
+});
+
+describe('chargeTrace (road trip stops along the curve)', () => {
+    // 10→80% in 20 min, fast first then tapering.
+    const curve = [{ time: 0, soc: 10 }, { time: 10, soc: 60 }, { time: 20, soc: 80 }];
+    const seg = { type: 'charge', startTime: 100, endTime: 125, startDist: 200, endDist: 200,
+        startSoc: 10, endSoc: 80, curveFrom: 0, overhead: 5 };
+    it('holds flat through the overhead, then follows the curve minute by minute', () => {
+        const tr = chargeTrace(seg, curve);
+        expect(tr[0]).toEqual({ t: 100, soc: 10 });
+        expect(tr[1]).toEqual({ t: 105, soc: 10 });
+        expect(tr.find(p => p.t === 115).soc).toBeCloseTo(60);   // 10 min into charging
+        expect(tr.at(-1)).toEqual({ t: 125, soc: 80 });
+    });
+    it('is null for a stop with no curve, which stays a straight line', () => {
+        expect(chargeTrace({ ...seg, curveFrom: null }, curve)).toBeNull();
+        expect(chargeTrace({ type: 'drive' }, curve)).toBeNull();
+    });
+    it('gives the Distance chart a climb at one distance, timed by the curve', () => {
+        const pts = segmentsToSocByDistance([seg], 'imperial', curve);
+        expect(new Set(pts.map(p => p.x)).size).toBe(1);
+        expect(pts.length).toBeGreaterThan(10);
     });
 });

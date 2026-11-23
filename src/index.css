@@ -3613,6 +3613,36 @@ button:hover > .disclosure-caret { color: var(--color-text-primary); }
 /* Wraps when the controls outgrow the width (a phone, with Colors and a
    curator's ★ Feature): unwrapped it ran ~220px past a 375px screen, which
    widened the whole page and every bottom sheet and fixed bar with it. */
+/* Playback (PlaybackControl): scrubber and clock over play, reset and speed —
+   under the plot, outside the frame a PNG captures. It wears .race-mode: the
+   same bordered box, orange while it changes what the chart shows. Stacked as
+   two rows here. Raised over Home's panel cover (.home-panel-cover), which
+   would otherwise take its clicks and open the tab. */
+.race-mode.playback-control {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    margin-top: 8px;
+    position: relative;
+    z-index: 1;
+}
+.playback-play { min-width: 5.5rem; }
+.playback-scrubber {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--color-accent-orange-text);
+}
+.playback-clock {
+    font-size: calc(var(--fs-body) * var(--fs-step));
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+}
+.playback-speed-slider {
+    width: 7rem;
+    accent-color: var(--color-primary);
+}
+
 .chart-export-strip {
     display: flex;
     flex-wrap: wrap;
