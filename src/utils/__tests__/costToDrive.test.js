@@ -817,6 +817,70 @@ describe('the margin a night has', () => {
     });
 });
 
+describe('a night counts from when the car is home', () => {
+    // The default Commuter week: out 7 to 8 and 17 to 18, so the car is home at 18:00.
+    const commuter = (over = {}) => normalizeCostToDrive({ ...DEFAULT_COST_TO_DRIVE, season: 'winter', ...over });
+    const L2_16A = { kw: 3.84, eff: 0.885 };
+    const nightsOf = (home, over) => simulateWeek(profile({ home }), commuter(over)).days;
+
+    it('plugged in from 15:00, a night is the part of the window after the car got home', () => {
+        const mon = nightsOf(L2_16A, { plugFrom: 15, plugUntil: 7 })[0].night;
+        expect(mon.window).toEqual({ from: 18, to: 31 });
+        expect(mon.spans[0][0]).toBe(18);
+        // The spare time is the 13 hours the car was there less what the charger ran, not the 16 hours of the window.
+        const spare = mon.window.to - mon.window.from - mon.hours;
+        expect(spare).toBeCloseTo(13 - mon.hours, 9);
+        expect(spare).toBeLessThan(16 - mon.hours - 2.9);
+    });
+
+    it('a window that opens after the car is home still starts when it opens', () => {
+        const mon = nightsOf(L2_16A, { plugFrom: 22, plugUntil: 7 })[0].night;
+        expect(mon.window).toEqual({ from: 22, to: 31 });
+    });
+
+    it('a night the window cut short has no spare time, counted from when the car got home', () => {
+        const days = nightsOf({ kw: 1.44, eff: 0.80 }, { plugFrom: 15, plugUntil: 7, dailyMi: 50 });
+        const cut = days.filter(d => d.night.ranOut);
+        expect(cut.length).toBeGreaterThan(0);
+        for (const d of cut) {
+            // The charger ran for all of the time the car was there.
+            expect(d.night.hours).toBeCloseTo(d.night.window.to - d.night.window.from, 6);
+        }
+        // Home at 18:00 on a day with no stop: 18:00 to 7:00 is 13 hours, not the window's 16.
+        const plain = cut.filter(d => d.type === 'D' && !d.stops.length);
+        expect(plain.length).toBeGreaterThan(0);
+        for (const d of plain) expect(d.night.window.to - d.night.window.from).toBeCloseTo(13, 9);
+    });
+
+    it('the week line shades the night from when the car got home, and the charger ran inside it', () => {
+        const w = simulateWeek(profile({ home: L2_16A }), commuter({ plugFrom: 15, plugUntil: 7 }));
+        expect(w.windows[0]).toMatchObject({ from: 18, to: 31 });
+        expect(w.windows[0].spans[0][0]).toBe(18);
+    });
+
+    it('whatever the plug-in window, the charger ran inside the window and no night opens before the car is home', () => {
+        for (const home of [L2_16A, { kw: 11.5, eff: 0.885 }]) {
+            for (const plugFrom of [0, 3, 8, 12, 15, 17, 18, 19, 22]) {
+                for (const plugUntil of [1, 7, 12, 18]) {
+                    const w = simulateWeek(profile({ home }), commuter({ plugFrom, plugUntil }));
+                    const tag = `${home.kw} kW, ${plugFrom} to ${plugUntil}`;
+                    w.days.forEach((d, i) => {
+                        const { window: win, spans, hours } = d.night;
+                        expect(win.to, tag).toBeGreaterThanOrEqual(win.from);
+                        expect(hours, tag).toBeLessThanOrEqual(win.to - win.from + 1e-9);
+                        for (const [a, b] of spans) {
+                            expect(a, tag).toBeGreaterThanOrEqual(win.from - 1e-9);
+                            expect(b, tag).toBeLessThanOrEqual(win.to + 1e-9);
+                        }
+                        // A day with no stop is home at 18:00.
+                        if (d.type === 'D' && !d.stops.length) expect(win.from, tag).toBeGreaterThanOrEqual(i * 24 + 18 - 1e-9);
+                    });
+                }
+            }
+        }
+    });
+});
+
 describe('time-of-use rates', () => {
     const hourOfDay = (h) => ((h % 24) + 24) % 24;
 
@@ -941,7 +1005,10 @@ describe('time-of-use rates', () => {
         const sunny = settings({ offFrom: 9, offUntil: 7, rate: 'custom', rateHours: 'MMMMMMMMMMLLLLLLMMMMMMMM', rateWeekendOff: false, chargeTo: 90 });
         const w = simulateWeek(profile(), sunny);
         const sunday = w.days[6].night;
-        expect(sunday.window.from).toBe(6 * 24 + 9);
+        // The window ends where the days-off window does, and starts no earlier than it opens
+        // (the car is home when it starts, which can be later).
+        expect(sunday.window.to).toBe(6 * 24 + 31);
+        expect(sunday.window.from).toBeGreaterThanOrEqual(6 * 24 + 9);
         if (sunday.homeKwh > 0) expect(hourOfDay(sunday.spans[0][0])).toBeGreaterThanOrEqual(10);
     });
 
