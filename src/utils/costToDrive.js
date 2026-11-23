@@ -50,7 +50,8 @@ export function windowOf(s, d) {
 }
 
 /**
- * Each night's plug-in window as a span of the week's hours (Monday 0:00 = 0):
+ * Each night's plug-in window as a span of the week's hours (Monday 0:00 = 0),
+ * from when the car got home or the window opened, if that is later:
  * `{ from, to, spans }`, `spans` the stretches the charger ran (`[from, to]`
  * pairs) — with a time-of-use plan, not always one stretch from the start. The
  * rest of the window is the spare plug-in time. A window that runs past Sunday
@@ -967,6 +968,9 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             const wallMax = profile.home.none ? 0 : profile.home.kw * (to - from);
             const warmWall = Math.min(wallMax, warmKwh / profile.home.warmEff);
             const mostAdd = usable > 0 ? (wallMax - warmWall) * profile.home.eff / usable * 100 : 0;
+            // `window` the part of the plug-in window the car was there for: from when
+            // it got home, or when the window opened if that is later. The spare time
+            // and the week line's shading count from here, not from the window's opening.
             // `hours` the charger ran, warming in; `homeKwh` what the night bought at the wall, warming in,
             // `warmKwh` the warming's share; `homeCost` at each hour's price; `spans` when it ran.
             // On a time-of-use plan, `tierKwh`/`tierCost` split the night by tier (at the
@@ -974,7 +978,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             // `tierSpans` say which tier each stretch ran in; null at One price.
             const tonight = {
                 added: 0, endSoc: soc, fullAt: null, ranOut: false, hours: 0, mostAdd, homeKwh: 0, warmKwh: 0, homeCost: 0,
-                window: { from: w0, to: w1 }, spans: [], tierKwh: null, tierCost: null, tierPackKwh: null, tierWarmKwh: null, tierSpans: null,
+                window: { from, to }, spans: [], tierKwh: null, tierCost: null, tierPackKwh: null, tierWarmKwh: null, tierSpans: null,
             };
             if (rec) out.points.push([from, soc]);
             // No home charging: nothing is added overnight, so every kWh comes
