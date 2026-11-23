@@ -16,11 +16,13 @@ import SourceLine from './SourceLine';
  * `sourceLine` is who the plotted data came from (useSourceLine); the export
  * draws the same words as text, since a canvas cannot hold a link.
  *
+ * `stamp` follows the title: the playback clock (PlaybackStamp).
+ *
  * `loading` is the view's real data-loading state (#453). The indicator is
  * DOM laid over the frame, out of flow, and the export draws the canvas — so
  * it can appear and clear without moving anything or reaching a PNG.
  */
-export default function PlotFrame({ title, subtitle, sourceLine, exportControls, preview, onDismissPreview, loading = false, loadingMessage, children }) {
+export default function PlotFrame({ title, subtitle, stamp, sourceLine, exportControls, preview, onDismissPreview, loading = false, loadingMessage, children }) {
     return (
         <>
             {exportControls && (
@@ -50,7 +52,7 @@ export default function PlotFrame({ title, subtitle, sourceLine, exportControls,
             <div className="plot-frame" aria-busy={loading || undefined}>
                 <div className="plot-frame-head">
                     <div>
-                        <h3 className="plot-frame-title">{title}</h3>
+                        <h3 className="plot-frame-title">{title}{stamp}</h3>
                         {subtitle && <p className="plot-frame-subtitle">{subtitle}</p>}
                     </div>
                     {/* Wordmark inside the frame, so an exported image carries

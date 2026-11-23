@@ -297,6 +297,10 @@ export function simulateRoadTrip({
             endDist:   currentDist, // no distance during charging
             startSoc:  round1(currentSoc),
             endSoc:    round1(targetSoc),
+            // Where on the curve the stop began and the minutes before it did,
+            // so a chart can draw the stop's shape (chargeTrace).
+            curveFrom: tStart,
+            overhead:  overheadMinutes,
         });
 
         currentTime += chargeTime;
@@ -339,6 +343,8 @@ export function simulateRoadTrip({
                 endDist:   currentDist,
                 startSoc:  round1(currentSoc),
                 endSoc:    round1(targetSoc),
+                curveFrom: tStart,
+                overhead:  overheadMinutes,
             });
 
             currentTime += chargeTime;
@@ -362,7 +368,33 @@ export function simulateRoadTrip({
         warnings,
         miPerKwh,
         completed,
+        // The curve the stops were read from, by reference: chargeTrace draws
+        // a stop from it only for a trip that is plotted, so the sweeps' and
+        // the optimizer's thousands of trips pay nothing for it.
+        curveByTime,
     };
+}
+
+/**
+ * A charge stop as the curve charged it: SoC each minute, after the stop's
+ * overhead (parking and plugging in, flat). Null when the stop has no curve
+ * to read (a fallback stop), so it stays a straight line. Each SoC is held
+ * inside the stop's own start and end, which are what the trip used.
+ * @returns {Array<{t: number, soc: number}>|null}  t in trip minutes.
+ */
+export function chargeTrace(seg, curveByTime) {
+    if (seg.type !== 'charge' || seg.curveFrom == null || !curveByTime?.length) return null;
+    const lead = Math.min(seg.overhead ?? 0, seg.endTime - seg.startTime);
+    const span = seg.endTime - seg.startTime - lead;
+    const lo = Math.min(seg.startSoc, seg.endSoc), hi = Math.max(seg.startSoc, seg.endSoc);
+    const trace = [{ t: seg.startTime, soc: seg.startSoc }];
+    if (lead > 0) trace.push({ t: seg.startTime + lead, soc: seg.startSoc });
+    for (let k = 1; k < span; k++) {
+        const soc = interpolate(curveByTime, 'time', 'soc', seg.curveFrom + k, false, true);
+        if (soc != null) trace.push({ t: seg.startTime + lead + k, soc: Math.min(hi, Math.max(lo, soc)) });
+    }
+    trace.push({ t: seg.endTime, soc: seg.endSoc });
+    return trace;
 }
 
 // ── Chart helpers ────────────────────────────────────────────────────────────
@@ -412,11 +444,39 @@ export function segmentsToChartPointsChargeTime(segments, driveTimeX = false) {
  * Y formula: runIndex + 0.5 + soc / 100
  *   → run 0 spans Y ∈ [0.5, 1.5], run 1 spans Y ∈ [1.5, 2.5], etc.
  */
-export function segmentsToChartPointsByTest(segments, runIndex) {
+export function segmentsToChartPointsByTest(segments, runIndex, curveByTime) {
     const points = [];
     for (const seg of segments) {
-        points.push({ x: round1(seg.startTime), y: round1(runIndex + seg.startSoc / 100) });
+        // `stop` marks where a charge begins, which the chart draws as a dot.
+        const trace = chargeTrace(seg, curveByTime);
+        if (trace) {
+            trace.forEach((p, i) => points.push({ x: round1(p.t), y: round3(runIndex + p.soc / 100), ...(i === 0 && { stop: true }) }));
+            continue;
+        }
+        points.push({ x: round1(seg.startTime), y: round1(runIndex + seg.startSoc / 100), ...(seg.type === 'charge' && { stop: true }) });
         points.push({ x: round1(seg.endTime),   y: round1(runIndex + seg.endSoc   / 100) });
+    }
+    return points;
+}
+
+/**
+ * Convert simulation segments to Chart.js data points for SoC against
+ * distance. Each point carries `t`, the elapsed minutes it happens at, for
+ * playback (utils/chartPlayback): a charge stop is a vertical run at one
+ * distance, and only the clock says how long it took.
+ */
+export function segmentsToSocByDistance(segments, units, curveByTime) {
+    const points = [];
+    for (const seg of segments) {
+        // A stop climbs at one distance; its trace is how fast, minute by minute.
+        const trace = chargeTrace(seg, curveByTime);
+        if (trace) {
+            const x = convDistance(seg.startDist, units);
+            for (const p of trace) points.push({ x, y: round1(p.soc), t: round1(p.t) });
+            continue;
+        }
+        points.push({ x: convDistance(seg.startDist, units), y: round1(seg.startSoc), t: round1(seg.startTime) });
+        points.push({ x: convDistance(seg.endDist, units),   y: round1(seg.endSoc),   t: round1(seg.endTime) });
     }
     return points;
 }
@@ -433,3 +493,4 @@ export function formatTime(minutes) {
 
 // ── Internal ─────────────────────────────────────────────────────────────────
 const round1 = v => roundTo(v, 1);
+const round3 = v => roundTo(v, 3);

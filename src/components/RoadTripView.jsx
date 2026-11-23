@@ -31,7 +31,7 @@ import ZoomHint from './ZoomHint';
 import { useChartZoom } from '../hooks/useChartZoom';
 import {
     simulateRoadTrip, segmentsToChartPoints, segmentsToChartPointsChargeTime,
-    segmentsToChartPointsByTest,
+    segmentsToChartPointsByTest, segmentsToSocByDistance,
     formatTime, untimedSpans,
 } from '../utils/roadTripSimulation';
 import { useRunSelection } from '../hooks/useRunSelection';
@@ -42,6 +42,10 @@ import { chartTheme, chartFonts, applyChartDefaults, fade } from '../utils/chart
 import ChartInfoBubble from './ChartInfoBubble';
 import InfoIcon from './InfoIcon';
 import PlotFrame from './charts/PlotFrame';
+import PlaybackControl from './charts/PlaybackControl';
+import PlaybackStamp, { playbackStampText } from './charts/PlaybackStamp';
+import { formatElapsed } from '../utils/chartPlayback';
+import { useChartPlayback } from '../hooks/useChartPlayback';
 import { useChartPng } from '../hooks/useChartPng';
 import { wrapAxisLabel, laneLabelBudget } from '../utils/wrapCanvasText';
 import SpeedBadge from './charts/SpeedBadge';
@@ -353,6 +357,9 @@ const SIM_MODES = [
 const X_AXES = [
     { value: 'totalTime', label: 'Total time' },
     { value: 'driveTime', label: 'Drive time' },
+    // SoC against distance: Y is the battery, overlaid or By test
+    // (SOC_Y_AXES). Played back over elapsed time.
+    { value: 'distance',  label: 'Distance' },
 ];
 
 /**
@@ -409,6 +416,16 @@ const TRIP_Y_AXES = [
     { value: 'distance',   label: 'Distance' },
     { value: 'chargeTime', label: 'Charge time' },
     { value: 'byTest',     label: 'By test' },
+];
+
+/**
+ * Y on the Distance X: the battery, overlaid or a lane per test. Stored as
+ * the timeline's own values — 'distance' (its default) stands for State of
+ * charge here — so switching X back never leaves a Y the timeline lacks.
+ */
+const SOC_Y_AXES = [
+    { value: 'distance', label: 'State of charge' },
+    { value: 'byTest',   label: 'By test' },
 ];
 
 /**
@@ -569,7 +586,11 @@ function RoutingOverridesPanel({ entries, labels, perRun, mode, global, units, d
 }
 
 // ── Chart.js plugin: charging badges + finish labels ─────────────────────────
-function makeRoadTripPlugin(simResults, units, yAxis, gasTimeMin, gasByTestInfo, gasName) {
+// `shownBy()` is the latest trip minute to label: playback's clock while it
+// runs, else Infinity. The labels sit right of a line's end, so playback's clip
+// would cut them; this plugin goes after playback's in the list (drawn
+// unclipped) and holds each label until the clock reaches what it marks.
+function makeRoadTripPlugin(simResults, units, yAxis, gasTimeMin, gasByTestInfo, gasName, shownBy = () => Infinity) {
     // Read once per plugin build, like the palette above it: the plugin is
     // rebuilt whenever the chart is, so this follows a scale change without
     // re-measuring on every frame.
@@ -619,6 +640,8 @@ function makeRoadTripPlugin(simResults, units, yAxis, gasTimeMin, gasByTestInfo,
 
         afterDatasetsDraw(chart) {
             const ctx = chart.ctx;
+            // Half a minute of slack: plotted times are rounded to a tenth.
+            const reached = (min) => min <= shownBy() + 0.5;
 
             // ── byTest mode: draw elapsed-time + vs-the-gas-car callout at end of each run ──
             if (yAxis === 'byTest') {
@@ -626,7 +649,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, gasTimeMin, gasByTestInfo,
                 chart.data.datasets.forEach((ds, di) => {
                     if (ds._isGas || ds._spread) return;
                     const sim = simResults[simIdx++];
-                    if (!sim || !ds.data.length) return;
+                    if (!sim || !ds.data.length || !reached(sim.totalTimeMin)) return;
                     const meta   = chart.getDatasetMeta(di);
                     const lastPt = meta.data[meta.data.length - 1];
                     if (!lastPt) return;
@@ -668,7 +691,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, gasTimeMin, gasByTestInfo,
                 });
 
                 // The gas car's own callout
-                if (gasByTestInfo) {
+                if (gasByTestInfo && reached(gasByTestInfo.totalTimeMin)) {
                     const gasDsIdx = chart.data.datasets.findIndex(d => d._isGas);
                     if (gasDsIdx >= 0) {
                         const gasMeta = chart.getDatasetMeta(gasDsIdx);
@@ -703,7 +726,7 @@ function makeRoadTripPlugin(simResults, units, yAxis, gasTimeMin, gasByTestInfo,
 
                 let ptIdx = 0;
                 for (const seg of sim.segments) {
-                    if (seg.type === 'charge' && ptIdx + 1 < data.length) {
+                    if (seg.type === 'charge' && ptIdx + 1 < data.length && reached(seg.endTime)) {
                         const startPt  = data[ptIdx];
                         const endPt    = data[ptIdx + 1];
                         const segWidth = Math.abs(endPt.x - startPt.x);
@@ -756,14 +779,14 @@ function makeRoadTripPlugin(simResults, units, yAxis, gasTimeMin, gasByTestInfo,
 
                 if (ds._isGas) {
                     const lastRaw = ds.data[ds.data.length - 1];
-                    if (lastRaw) finishLabels.push({
+                    if (lastRaw && reached(lastRaw.x)) finishLabels.push({
                         x: lastPt.x, y: lastPt.y,
                         text: `${gasName} — ${formatTime(lastRaw.x)}`,
                         color: ds.borderColor,
                     });
                 } else {
                     const sim = simResults[si++];
-                    if (sim) finishLabels.push({
+                    if (sim && reached(sim.totalTimeMin)) finishLabels.push({
                         x: lastPt.x, y: lastPt.y,
                         text: sim.completed === false
                             ? `${ds.label} — did not finish`
@@ -888,6 +911,12 @@ export default function RoadTripView({
     const readout   = useChartReadout();
     const chartRef  = useRef(null);
     const { zoomed, resetZoom, zoomOptions, plugin: zoomStatePlugin } = useChartZoom(chartRef);
+    // Playback on the Elapsed Time timeline, where X is the clock, and on
+    // Distance, where each point carries its time. Drive Time folds the stops
+    // away, and the sweeps are not trips.
+    const isDistanceX = roadTripConfig.xAxis === 'distance';
+    const playback = useChartPlayback({ clockFromX: !isDistanceX });
+    const playsBack = roadTripConfig.xAxis === 'totalTime' || isDistanceX;
 
     const [runDataCache, setRunDataCache] = useState({});
     const [loading, setLoading] = useState(false);
@@ -1900,23 +1929,170 @@ export default function RoadTripView({
             return () => { chartRef.current?.destroy(); chartRef.current = null; };
         }
 
+        // The By test Y: a lane per vehicle, and the gas car's after them, each
+        // its battery from empty to full. The timeline's and Distance's.
+        const gasLane = validEntries.length;
+        const lanes = validEntries.length + (gas ? 1 : 0);
+        const laneYScale = () => ({
+            reverse: false,
+            min: axisLimits.yMin ?? 0,
+            max: axisLimits.yMax ?? lanes, // one more for the gas car's lane, when there is one
+            title: { display: false },
+            ticks: {
+                stepSize: 0.5,
+                color: tickColor,
+                // Off: the callback already decides which ticks carry
+                // a label, and Chart.js sizes its skip spacing from the
+                // TALLEST label — a wrapped one would drop lane labels.
+                autoSkip: false,
+                // A function, not an arrow: `this` is the scale, which
+                // knows the canvas it is drawn on.
+                callback: function (val) {
+                    // Half-integer positions = lane centers → show label
+                    const frac = val - Math.floor(val);
+                    if (Math.abs(frac - 0.5) < 0.01) {
+                        const idx = Math.floor(val); // lane index
+                        const text = idx >= 0 && idx < validEntries.length
+                            ? entryLabel(validEntries[idx])
+                            : gas && idx === validEntries.length ? gasName : null;
+                        if (text != null) {
+                            // Wrapped to the width and lane height the chart has,
+                            // so the axis fits the wrapped label instead of one
+                            // long line being clipped or crowding the plot.
+                            const { maxWidth, maxLines } = laneLabelBudget({
+                                chartWidth: this.chart.width, chartHeight: this.chart.height,
+                                lanes, lineHeight: fonts.axis * 1.2,
+                            });
+                            return wrapAxisLabel(this.ctx, `${fonts.axis}px ${fonts.sans}`, text, maxWidth, maxLines);
+                        }
+                    }
+                    return ''; // suppress integer tick labels (lane boundaries shown as gridlines)
+                },
+            },
+            grid: {
+                color: (ctx) => {
+                    const v   = ctx.tick?.value;
+                    const frac = v != null ? (v - Math.floor(v)) : 0;
+                    return Math.abs(frac) < 0.01
+                        ? chartTheme().axis   // heavy — lane boundary (integer)
+                        : chartTheme().grid;  // light — lane center
+                },
+                lineWidth: (ctx) => {
+                    const v   = ctx.tick?.value;
+                    const frac = v != null ? (v - Math.floor(v)) : 0;
+                    return Math.abs(frac) < 0.01 ? 1.5 : 0.5;
+                },
+            },
+        });
+
+        // ── State of charge against distance ─────────────────────────────────
+        // Each vehicle's battery along the road, the gas car's tank beside
+        // them. A stop is a vertical run; its length in time is in the points'
+        // `t`, which playback reads. No test spread: the spread is a spread of
+        // finish times.
+        if (xAxis === 'distance') {
+            // By test puts each in its own lane: SoC 0–100% is lane to lane + 1.
+            const inLane = (pts, lane) => (isByTestMode ? pts.map(p => ({ ...p, y: lane + p.y / 100 })) : pts);
+            const socDatasets = validEntries.map((entry, i) => {
+                const sim = simResults[i];
+                if (!sim) return null;
+                return {
+                    label: entryLabel(entry),
+                    _fullLabel: entryLabelFull(entry),
+                    data: inLane(segmentsToSocByDistance(sim.segments, units, sim.curveByTime), i),
+                    _lane: i,
+                    borderColor: entry.color,
+                    backgroundColor: entry.color,
+                    borderWidth: 2.5,
+                    tension: 0,
+                    pointRadius: 0,
+                    fill: false,
+                    _simIndex: i,
+                };
+            }).filter(Boolean);
+            if (gas) {
+                const { legs, stopMin } = gasTripAt(gas, totalDistance, speed);
+                const pts = [];
+                let mi = 0, min = 0;
+                legs.forEach((leg, li) => {
+                    pts.push({ x: convDistance(mi, units), y: 100, t: min });
+                    mi += leg.driveMi; min += leg.driveMin;
+                    pts.push({ x: convDistance(mi, units), y: Math.round(leg.fuelLeft * 1000) / 10, t: min });
+                    if (li < legs.length - 1) min += stopMin;
+                });
+                socDatasets.unshift({
+                    label: gasName, data: inLane(pts, gasLane), _lane: gasLane, borderColor: SERIES_NEUTRAL, backgroundColor: SERIES_NEUTRAL,
+                    borderWidth: 1.5, borderDash: [6, 4], tension: 0, pointRadius: 0, fill: false, order: 1, _isGas: true,
+                });
+            }
+            const socReadout = {
+                title: (x) => `Distance: ${readoutNumber(x)} ${dl}`,
+                subtitle: gas ? `State of charge (%) · ${gasName}: fuel tank (%)` : 'State of charge (%)',
+                describe(row, { nearest }) {
+                    const ds = socDatasets[row.datasetIndex];
+                    const sim = ds._simIndex != null ? simResults[ds._simIndex] : null;
+                    const t = ds.data[row.dataIndex]?.t;
+                    const seg = sim && t != null ? segmentAtTime(sim.segments, t, false) : null;
+                    return {
+                        name: ds._fullLabel ?? ds.label,
+                        value: `${Math.round(isByTestMode ? (row.y - ds._lane) * 100 : row.y)}%`,
+                        companion: t != null ? `at ${formatTime(t)}` : null,
+                        detail: nearest && seg ? segmentLines(seg, sim, units, dl) : [],
+                    };
+                },
+            };
+            chartRef.current = new Chart(canvasRef.current, {
+                type: 'line',
+                data: { datasets: socDatasets },
+                plugins: [playback.plugins.open, zoomStatePlugin, readout.plugin(socReadout), playback.plugins.close],
+                options: {
+                    animation: false,
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'nearest', axis: 'xy', intersect: false },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: axisLimits.xMin ?? 0,
+                            max: axisLimits.xMax ?? totalDistDisplay,
+                            title: { display: true, text: `Distance Traveled (${dl})`, font: { size: fonts.axis }, color: legendColor },
+                            ticks: { color: tickColor },
+                            grid: { color: gridColor },
+                        },
+                        y: isByTestMode ? laneYScale() : {
+                            min: axisLimits.yMin ?? 0,
+                            max: axisLimits.yMax ?? 100,
+                            title: { display: true, text: 'State of Charge (%)', font: { size: fonts.axis }, color: legendColor },
+                            ticks: { color: tickColor },
+                            grid: { color: gridColor },
+                        },
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 40, color: legendColor } },
+                        tooltip: { enabled: false },
+                        zoom: { zoom: { drag: ZOOM_DRAG, mode: 'xy', ...zoomOptions } },
+                    },
+                },
+            });
+            return () => { chartRef.current?.destroy(); chartRef.current = null; };
+        }
+
         // ── Timeline chart (total time or drive-time X) ──────────────────────
         const datasets = validEntries.map((entry, i) => {
             const sim = simResults[i];
             if (!sim) return null;
 
             const points = isByTestMode
-                ? segmentsToChartPointsByTest(sim.segments, i)
+                ? segmentsToChartPointsByTest(sim.segments, i, sim.curveByTime)
                 : isChargeTimeMode
                     ? segmentsToChartPointsChargeTime(sim.segments, isDriveTimeXAxis)
                     : segmentsToChartPoints(sim.segments, units, isDriveTimeXAxis);
 
-            // Mark charge-start points with larger radius
-            const pointRadii = [];
-            for (const seg of sim.segments) {
-                pointRadii.push(seg.type === 'charge' ? 4 : 0);
-                pointRadii.push(0);
-            }
+            // Mark charge-start points with larger radius. By test draws each
+            // stop along its curve, so its points carry the mark themselves.
+            const pointRadii = isByTestMode
+                ? points.map(p => (p.stop ? 4 : 0))
+                : sim.segments.flatMap(seg => [seg.type === 'charge' ? 4 : 0, 0]);
 
             return {
                 _spreadFinish: spreadTimeline?.[i]?.finish,
@@ -1944,8 +2120,6 @@ export default function RoadTripView({
         // own minutes (not the EVs' stop time), and goes on (gasTripAt). In the
         // By test lane the line is its fuel gauge: full after each stop, down to
         // the fill-up level at the next, and to what is left at the finish.
-        const gasLane = validEntries.length; // byTest lane index for the gas car
-        const lanes = validEntries.length + (gas ? 1 : 0);
         // No gas car (None): no legs, so no line, lane or fill-up boxes.
         const gasTrip = gas ? gasTripAt(gas, roadTripConfig.totalDistance, roadTripConfig.speed) : { legs: [], stopMin: 0 };
 
@@ -2107,57 +2281,7 @@ export default function RoadTripView({
                         },
                         grid: { color: gridColor },
                     },
-                    y: isByTestMode ? {
-                        reverse: false,
-                        min: axisLimits.yMin ?? 0,
-                        max: axisLimits.yMax ?? lanes, // one more for the gas car's lane, when there is one
-                        title: { display: false },
-                        ticks: {
-                            stepSize: 0.5,
-                            color: tickColor,
-                            // Off: the callback already decides which ticks carry
-                            // a label, and Chart.js sizes its skip spacing from the
-                            // TALLEST label — a wrapped one would drop lane labels.
-                            autoSkip: false,
-                            // A function, not an arrow: `this` is the scale, which
-                            // knows the canvas it is drawn on.
-                            callback: function (val) {
-                                // Half-integer positions = lane centers → show label
-                                const frac = val - Math.floor(val);
-                                if (Math.abs(frac - 0.5) < 0.01) {
-                                    const idx = Math.floor(val); // lane index
-                                    const text = idx >= 0 && idx < validEntries.length
-                                        ? entryLabel(validEntries[idx])
-                                        : gas && idx === validEntries.length ? gasName : null;
-                                    if (text != null) {
-                                        // Wrapped to the width and lane height the chart has,
-                                        // so the axis fits the wrapped label instead of one
-                                        // long line being clipped or crowding the plot.
-                                        const { maxWidth, maxLines } = laneLabelBudget({
-                                            chartWidth: this.chart.width, chartHeight: this.chart.height,
-                                            lanes, lineHeight: fonts.axis * 1.2,
-                                        });
-                                        return wrapAxisLabel(this.ctx, `${fonts.axis}px ${fonts.sans}`, text, maxWidth, maxLines);
-                                    }
-                                }
-                                return ''; // suppress integer tick labels (lane boundaries shown as gridlines)
-                            },
-                        },
-                        grid: {
-                            color: (ctx) => {
-                                const v   = ctx.tick?.value;
-                                const frac = v != null ? (v - Math.floor(v)) : 0;
-                                return Math.abs(frac) < 0.01
-                                    ? chartTheme().axis   // heavy — lane boundary (integer)
-                                    : chartTheme().grid;  // light — lane center
-                            },
-                            lineWidth: (ctx) => {
-                                const v   = ctx.tick?.value;
-                                const frac = v != null ? (v - Math.floor(v)) : 0;
-                                return Math.abs(frac) < 0.01 ? 1.5 : 0.5;
-                            },
-                        },
-                    } : isChargeTimeMode ? {
+                    y: isByTestMode ? laneYScale() : isChargeTimeMode ? {
                         reverse: true,
                         title: { display: true, text: 'Cumulative Charge Time (min)', font: { size: fonts.axis }, color: legendColor },
                         min: axisLimits.yMin ?? 0,
@@ -2191,11 +2315,12 @@ export default function RoadTripView({
                     },
                 },
             },
-            plugins: [zoomStatePlugin, readout.plugin(timelineReadout), makeRoadTripPlugin(simResults.map((s, i) => {
+            plugins: [playback.plugins.open, zoomStatePlugin, readout.plugin(timelineReadout), playback.plugins.close, makeRoadTripPlugin(simResults.map((s, i) => {
                 return datasets.find(d => d._simIndex === i) ? s : null;
             }).filter(Boolean), units, yAxis, gas ? gasTime : null,
                 isByTestMode && gas ? { laneIndex: gasLane, gasStops: gasStopSegs, totalTimeMin: gasTime } : null,
                 gasName,
+                () => (playback.stateRef.current.active ? playback.stateRef.current.now : Infinity),
             )],
         });
 
@@ -2264,8 +2389,8 @@ export default function RoadTripView({
     // list would offer options that silently do nothing on half the x-axes,
     // which is what four separate button groups were quietly doing.
     const yAxisOptions = useMemo(
-        () => (isSweepMode ? SWEEP_Y_AXES : TRIP_Y_AXES),
-        [isSweepMode],
+        () => (isSweepMode ? SWEEP_Y_AXES : isDistanceX ? SOC_Y_AXES : TRIP_Y_AXES),
+        [isSweepMode, isDistanceX],
     );
 
     // ── The frame's caption, and its export ─────────────────────────────────
@@ -2287,6 +2412,9 @@ export default function RoadTripView({
         if (!bestPlan || !isSweepMode) return title;
         return `${title}, ${isSpeedMode ? 'fastest stop plan at each speed' : 'best speed in your range at each stop plan'}`;
     }, [isSpeedMode, isTripDistMode, isSweepMode, isMapMode, mode, bestPlan, sweepYAxis, validEntries, mapKey, seriesLabels, vehicleNames]);
+
+    // The playback clock in the title: how long into the trip.
+    const stampText = (now) => `after ${formatElapsed(now)}`;
 
     const plotSubtitle = useMemo(() => {
         const runs = validEntries.length;
@@ -2322,6 +2450,7 @@ export default function RoadTripView({
 
     const { copyPng, copyPngBeside, copiedBeside, copied: imageCopied, preview, dismissPreview } =
         useChartPng(chartRef, { title: plotTitle, subtitle: plotSubtitle, sources: sourceLine.text,
+            stamp: () => playbackStampText(playback, stampText),
             signature: String(validEntries.length) });
 
     const dispLeg          = units === 'metric' ? Math.round(legDistance * MI_TO_KM) : legDistance;
@@ -2424,7 +2553,7 @@ export default function RoadTripView({
                                     <span className="axis-row-key">Y</span>
                                     <select
                                         className="form-input"
-                                        value={isSweepMode ? sweepYAxis : yAxis}
+                                        value={isSweepMode ? sweepYAxis : isDistanceX && yAxis !== 'byTest' ? 'distance' : yAxis}
                                         onChange={e => setField(isSweepMode ? 'sweepYAxis' : 'yAxis', e.target.value)}
                                     >
                                         {yAxisOptions.map(o => (
@@ -2745,6 +2874,7 @@ export default function RoadTripView({
                 <PlotFrame
                     title={plotTitle}
                     subtitle={plotSubtitle}
+                    stamp={<PlaybackStamp playback={playback} text={stampText} />}
                     sourceLine={sourceLine}
                     preview={preview}
                     onDismissPreview={dismissPreview}
@@ -2780,7 +2910,7 @@ export default function RoadTripView({
                         <canvas ref={canvasRef} />
                         {readout.overlay}
                     </div>
-                    {(spreadSweep || spreadTimeline) && (
+                    {(spreadSweep || spreadTimeline) && !isDistanceX && (
                         <p className="text-note text-center mt-1">
                             {yAxis === 'byTest'
                                 ? 'Faint traces: the trip from each of the vehicle\u2019s range tests; the finish range is printed at the end of the lane'
@@ -2811,6 +2941,11 @@ export default function RoadTripView({
                 </PlotFrame>
             )}
 
+            {playsBack && !loading && simResults.some(Boolean) && (
+                <PlaybackControl playback={playback} chartRef={chartRef}
+                    minSpeed={100} maxSpeed={10000} defaultSpeed={1000} />
+            )}
+
             {!presentationMode && !loading && validEntries.length > 0 && (
                 <ZoomHint onReset={resetZoom} />
             )}
@@ -2826,7 +2961,7 @@ export default function RoadTripView({
                     zoomed={zoomed} onResetZoom={resetZoom}
                     xAxisLabel={isSpeedMode || isMapMode ? `X-Axis Scale (${sl})`
                         : isTripDistMode ? `X-Axis Scale (${mode === 'time' ? 'min' : dl})`
-                            : 'X-Axis Scale (hrs)'}
+                            : isDistanceX ? `X-Axis Scale (${dl})` : 'X-Axis Scale (hrs)'}
                     yAxisLabel={isMapMode ? `Y-Axis Scale (${mode === 'time' ? 'min' : dl})`
                         : isSweepMode ? `Y-Axis Scale (${sweepYAxis === 'avgSpeed' ? sl : 'hrs'})` : 'Left Axis Scale'}
                 />
