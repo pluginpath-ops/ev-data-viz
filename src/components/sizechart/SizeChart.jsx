@@ -7,9 +7,9 @@ import { profileFromSpecs } from '../../utils/vehicleProfile';
 import { gridStepIn } from '../../utils/sizeChartLayout';
 import {
     SIZE_ANCHORS, SIZE_VIEWS, SIZE_DRAWS, DEFAULT_SIZE_ANCHOR, DEFAULT_SIZE_VIEW, DEFAULT_SIZE_DRAW,
-    SIZE_PHOTO_CHART_PCT, DEFAULT_SIZE_PHOTO_OPACITY, SIZE_END_ANCHORS, DEFAULT_SIZE_END_ANCHOR,
+    SIZE_PHOTO_CHART_PCT, SIZE_PHOTO_LENGTH_BASELINE_PCT, DEFAULT_SIZE_PHOTO_OPACITY, SIZE_END_ANCHORS, DEFAULT_SIZE_END_ANCHOR,
 } from '../../constants/sizeChart';
-import { photoPlacement, figuresFromMarks, isEndView, trackKeyOf } from '../../utils/sizePhotoMarks';
+import { photoPlacement, figuresFromMarks, lengthOffPct, isEndView, trackKeyOf } from '../../utils/sizePhotoMarks';
 import { useSourceLine } from '../../hooks/useSourceLine';
 import { sourceLineText } from '../../utils/sources';
 import { useChartPng } from '../../hooks/useChartPng';
@@ -24,16 +24,22 @@ import SizeFiguresTable from './SizeFiguresTable';
 const nameList = (items) => items.map(i => i.label).join(', ');
 
 /** Where a drawn photo's marks read further than SIZE_PHOTO_CHART_PCT from the specs: "height +7.4%". */
-function photoErrors(view, item) {
+function photoErrors(view, item, baseline) {
     const read = figuresFromMarks(view, item.photo, item.profile);
     if (!read) return [];
     const p = item.profile;
     const checks = isEndView(view)
         ? [['height', read.height, p.height], ['track', read.track, p.estimated.has(trackKeyOf(view)) ? null : p[trackKeyOf(view)]]]
-        : [['wheelbase', read.wheelbase, p.wheelbase], ['height', read.height, p.height]];
-    return checks
-        .filter(([, got, spec]) => got != null && spec > 0 && Math.abs(got / spec - 1) * 100 > SIZE_PHOTO_CHART_PCT)
-        .map(([name, got, spec]) => { const pct = (got / spec - 1) * 100; return `${name} ${pct > 0 ? '+' : '−'}${Math.abs(pct).toFixed(1)}%`; });
+        : [['height', read.height, p.height]];
+    const pcts = checks
+        .filter(([, got, spec]) => got != null && spec > 0)
+        .map(([name, got, spec]) => [name, (got / spec - 1) * 100]);
+    // A side photo's length is held to the baseline (a good photo reads a little short).
+    const len = isEndView(view) ? null : lengthOffPct(read, p, baseline);
+    if (len != null) pcts.push(['length', len]);
+    return pcts
+        .filter(([, pct]) => Math.abs(pct) > SIZE_PHOTO_CHART_PCT)
+        .map(([name, pct]) => `${name} ${pct > 0 ? '+' : '−'}${Math.abs(pct).toFixed(1)}%`);
 }
 
 /** A photo's credit for the source line: its credit, else its source's site. */
@@ -75,6 +81,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
     // back; hovering changes nothing (it reordered the drawing under the pointer).
     // In chartConfig (`sizePicked`), so the link carries it.
     const pickedId = chartConfig.sizePicked ?? null;
+    const baseline = SIZE_PHOTO_LENGTH_BASELINE_PCT;
 
     // A vehicle's color is the same here as on every chart.
     const palette = chartConfig.seriesPalette ?? DEFAULT_SERIES_PALETTE;
@@ -89,7 +96,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
             const profile = profileFromSpecs(resolveEffectiveSpecs(v, allVehicles), v.size_photos);
             const photo = draw === 'photos' ? v.size_photos?.[view] ?? null : null;
             // A photo the specs can't scale (no length, or no width from the front) isn't drawn.
-            const placement = photo ? photoPlacement(view, photo, profile) : null;
+            const placement = photo ? photoPlacement(view, photo, profile, baseline, anchor === 'front' || anchor === 'rear' ? anchor : null) : null;
             return {
                 id: v.id,
                 label: labels.get(v.id)?.short ?? v.name,
@@ -98,7 +105,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
                 photo: placement ? { ...photo, placement } : null,
             };
         });
-    }, [vehicles, allVehicles, colorMap, draw, view]);
+    }, [vehicles, allVehicles, colorMap, draw, view, baseline, anchor]);
 
     const drawn = useMemo(() => all.filter(i => i.profile.missing[view].length === 0), [all, view]);
     const fromId = drawn.some(i => i.id === pickedId) ? pickedId : null;
@@ -118,7 +125,7 @@ export default function SizeChart({ vehicles, chartConfig, setChartConfig, prese
         view === 'side' && (() => { const e = drawn.filter(i => i.profile.fromPhoto.has('frontOverhang')); return e.length > 0 && `Front and rear overhang split as the photo shows it (no front overhang spec): ${nameList(e)}.`; })(),
         (() => { const e = drawn.filter(i => i.photo?.mirrored); return e.length > 0 && `Mirrored photo (the other side of the car, flipped): ${nameList(e)}.`; })(),
         // One line per vehicle.
-        ...drawn.filter(i => i.photo).map(i => [i, photoErrors(view, i)]).filter(([, errs]) => errs.length)
+        ...drawn.filter(i => i.photo).map(i => [i, photoErrors(view, i, baseline)]).filter(([, errs]) => errs.length)
             .map(([i, errs]) => `${i.label}: photo marks off the specs by more than ${SIZE_PHOTO_CHART_PCT}% (${errs.join(', ')}); drawn to the specs, the photo may be distorted.`),
     ].filter(Boolean);
 

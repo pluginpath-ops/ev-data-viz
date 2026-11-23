@@ -737,21 +737,21 @@ describe('size (the Size chart\'s figures)', () => {
         expect(checksFor(dims({ ...full, width_in: 72.8, width_mirrors_in: 82.2, track_front_in: 62 }))).not.toContain('size-inconsistent');
     });
 
-    // A 1000 px wide side photo, bumpers at 0.1 and 0.9: 800 px = the 184.8 in length.
+    // A 1000 px wide side photo scaled by its wheelbase (490 px = 113.2 in), bumpers 3% short of the length (the baseline).
     const sidePhoto = (marks) => ({
         width_px: 1000, height_px: 400,
-        marks: { front: 0.1, frontAxle: 0.252, rearAxle: 0.742, rear: 0.9, ground: 0.9, roof: 0.3, ...marks },
+        marks: { front: 0.112, frontAxle: 0.252, rearAxle: 0.742, rear: 0.888, ground: 0.9, roof: 0.3, ...marks },
     });
     const withPhoto = (side) => vehicle({ specs: { dimensions: full }, size_photos: { side } });
 
     it('passes a size photo whose marks agree with the specs', () => {
-        expect(checksFor(withPhoto(sidePhoto({})))).not.toContain('size-photo-wheelbase');
+        expect(checksFor(withPhoto(sidePhoto({})))).not.toContain('size-photo-length');
         expect(checksFor(withPhoto(sidePhoto({})))).not.toContain('size-photo-height');
     });
 
-    it('lists a size photo whose wheelbase or height reads off the specs', () => {
-        const f = findingsFor(withPhoto(sidePhoto({ rearAxle: 0.8 }))).find(x => x.check === 'size-photo-wheelbase');
-        expect(f.text).toContain('wheelbase spec is 113.2 in');
+    it('lists a size photo whose length or height reads off the specs', () => {
+        const f = findingsFor(withPhoto(sidePhoto({ rear: 0.97 }))).find(x => x.check === 'size-photo-length');
+        expect(f.text).toContain('length spec is 184.8 in');
         expect(checksFor(withPhoto(sidePhoto({ roof: 0.2 })))).toContain('size-photo-height');
     });
 });

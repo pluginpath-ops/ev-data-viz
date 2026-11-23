@@ -3,17 +3,20 @@
  * what follows from them (docs/size-photos-plan.md).
  *
  * Marks are fractions of the cutout, x across and y down, so a resize never
- * moves them. The marks are the truth for drawing: each lands exactly where
- * the specs put that point — bumpers at 0 and the length, axles at the front
- * overhang and a wheelbase later (front view: edges at ± half the width), the
- * roof at the height. Perspective and lenses keep a photo's proportions from
+ * moves them. The marks are the truth for drawing: axles land at the front
+ * overhang and a wheelbase later, the roof at the height, the bumpers at the
+ * ends less the baseline (front view: edges at ± half the width).
+ * Perspective and lenses keep a photo's proportions from
  * matching the specs (the ends come out squeezed), so the photo is stretched
- * piece by piece to fit, and the chart's anchors line up on its marks. To CHECK a photo, its
- * figures are read at the length scale alone (photoScale, figuresFromMarks):
- * how far they stray is how far the drawing had to bend it.
+ * piece by piece to fit, and the chart's anchors line up on its marks. A side
+ * photo is scaled from its wheelbase (photoScale); its length, height and tire
+ * diameter are then read back to CHECK it, the length against a baseline of
+ * how short even a good photo reads (constants/sizeChart.js, #616).
  *
  * Pure module.
  */
+
+import { SIZE_PHOTO_LENGTH_BASELINE_PCT } from '../constants/sizeChart';
 
 /**
  * The photos a vehicle can carry. Side and front are drawn on the Size chart;
@@ -176,19 +179,28 @@ export function carryMarks(view, marks, fromTrim, toTrim, mirrored = false) {
 
 /**
  * Cutout px per inch, from the spec the view is scaled by, or null when the
- * spec or the marks can't give one.
+ * spec or the marks can't give one. A side photo is scaled from the WHEELBASE
+ * (the axles are near-plane points; the bumper tips sit on the centerline,
+ * farther from the camera, so a length scale reads everything near the camera
+ * long); without a wheelbase spec or both axles in order, from the length.
  */
 export function photoScale(view, photo, profile) {
     const m = photo?.marks ?? {};
-    const span = isEndView(view) ? m.right - m.left : m.rear - m.front;
-    const spec = isEndView(view) ? profile?.width : profile?.length;
-    if (!(span > 0) || !(spec > 0)) return null;
-    return (span * photo.width_px) / spec;
+    if (isEndView(view)) {
+        const span = m.right - m.left;
+        return span > 0 && profile?.width > 0 ? (span * photo.width_px) / profile.width : null;
+    }
+    const axles = m.rearAxle - m.frontAxle;
+    if (axles > 0 && profile?.wheelbase > 0) return (axles * photo.width_px) / profile.wheelbase;
+    const span = m.rear - m.front;
+    return span > 0 && profile?.length > 0 ? (span * photo.width_px) / profile.length : null;
 }
 
 /**
- * What the marks say, in inches, at the spec's scale: the figures a curator
+ * What the marks say, in inches, at the view's scale: the figures a curator
  * checks against the specs, and the front overhang when the specs have none.
+ * Side: `length` is what the checks hold to the baseline; `tireDiameter` is
+ * twice the axles' height above the ground, a cross-check of the scale.
  */
 export function figuresFromMarks(view, photo, profile) {
     const k = photoScale(view, photo, profile);
@@ -199,12 +211,25 @@ export function figuresFromMarks(view, photo, profile) {
     if (isEndView(view)) {
         return { height, track: across(m.tireLeft, m.tireRight) };
     }
+    const radii = [m.frontAxleY, m.rearAxleY].filter(y => y != null && m.ground != null).map(y => (m.ground - y) * photo.height_px / k);
     return {
+        length: across(m.front, m.rear),
         wheelbase: across(m.frontAxle, m.rearAxle),
         frontOverhang: across(m.front, m.frontAxle),
         rearOverhang: across(m.rearAxle, m.rear),
         height,
+        tireDiameter: radii.length ? (2 * radii.reduce((a, b) => a + b, 0)) / radii.length : null,
     };
+}
+
+/**
+ * How far a side photo's length reads from the spec, in percent, RELATIVE TO
+ * THE BASELINE: 0 at the baseline's shortfall, so a flag means the photo is
+ * worse than a good one. Null without both figures.
+ */
+export function lengthOffPct(read, profile, baselinePct = SIZE_PHOTO_LENGTH_BASELINE_PCT) {
+    if (!(read?.length > 0) || !(profile?.length > 0)) return null;
+    return (read.length / profile.length - 1) * 100 + baselinePct;
 }
 
 /**
@@ -212,19 +237,24 @@ export function figuresFromMarks(view, photo, profile) {
  * front bumper (side) or centerline (front), y up from the ground.
  *
  * Up, one scale: ground to roof spans the height spec (without a roof mark or
- * a height spec, up takes the bumper-to-bumper scale). Across, the side photo
- * is three pieces cut at the axles, each stretched so its marks land on the
- * specs: front bumper → front axle on the front overhang, axle to axle on the
- * wheelbase, rear axle → rear bumper on the rear overhang; the margin beyond a
- * bumper goes with its piece. Without both axles (in order) or the figures to
- * place them, and in the front view, it is one piece, bumper to bumper (edge
- * to edge) on the length (width).
+ * a height spec, up takes the across scale). Across, the side photo is three
+ * pieces cut at the axles: the axle-to-axle piece on the wheelbase, and the
+ * two overhang pieces hung from the axles at the photo's own scale, each
+ * lengthened only as far as it falls short of its spec by MORE than the
+ * baseline allows (`baselinePct` of the length: perspective shortens a bumper
+ * tip a little even in a studio shot, and that is left alone), never past the
+ * spec. With `align` 'front' or 'rear' (the chart lined up on a bumper) the
+ * stretched photo is then slid so that bumper's tip lands on the spec's bumper
+ * line; the axles move off their specs by the shortfall left after the stretch. The margin beyond a bumper goes
+ * with its piece. Without both
+ * axles (in order) or the figures to place them, and in the front view, it is
+ * one piece, bumper to bumper (edge to edge) on the length (width).
  *
  * @returns {{ top: number, h: number, slices: Array<{ x: number, w: number, from: number, to: number }> } | null}
  *          top edge and height; each piece's left edge and width in inches,
  *          and which part of the photo it is (`from`–`to`, fractions across)
  */
-export function photoPlacement(view, photo, profile) {
+export function photoPlacement(view, photo, profile, baselinePct = SIZE_PHOTO_LENGTH_BASELINE_PCT, align = null) {
     const k = photoScale(view, photo, profile);
     if (!k) return null;
     const m = photo.marks;
@@ -249,12 +279,24 @@ export function photoPlacement(view, photo, profile) {
     if (!axles) return { top, h, slices: [piece(0, 1, m.front, 0, m.rear, length)] };
     const fa = frontOverhang;
     const ra = frontOverhang + wheelbase;
+    // Each overhang as the photo has it (at the wheelbase scale) and as drawn:
+    // lengthened to its spec less the baseline's share, never past the spec.
+    // The baseline is a shortfall of the length, all of it in the overhangs.
+    const rearOverhang = length - wheelbase - frontOverhang;
+    const allowed = (baselinePct / 100) * length / (length - wheelbase);
+    const drawn = (photoIn, specIn) => Math.min(specIn, Math.max(photoIn, specIn * (1 - allowed)));
+    const front = drawn(((m.frontAxle - m.front) * photo.width_px) / k, frontOverhang);
+    const rear = drawn(((m.rear - m.rearAxle) * photo.width_px) / k, rearOverhang);
+    let dx = 0;
+    if (align) {
+        dx = align === 'front' ? front - fa : length - (ra + rear);
+    }
     return {
         top, h,
         slices: [
-            piece(0, m.frontAxle, m.front, 0, m.frontAxle, fa),
+            piece(0, m.frontAxle, m.front, fa - front, m.frontAxle, fa),
             piece(m.frontAxle, m.rearAxle, m.frontAxle, fa, m.rearAxle, ra),
-            piece(m.rearAxle, 1, m.rearAxle, ra, m.rear, length),
-        ],
+            piece(m.rearAxle, 1, m.rearAxle, ra, m.rear, ra + rear),
+        ].map(sl => ({ ...sl, x: sl.x + dx })),
     };
 }

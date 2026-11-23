@@ -35,7 +35,7 @@ const CHECK_FIELDS = {
                             ['dimensions', 'width_in'], ['dimensions', 'width_mirrors_in'],
                             ['dimensions', 'track_front_in'], ['dimensions', 'track_rear_in']],
     // The photo's marks are fixed in the vehicle form's Size photos; the spec here.
-    'size-photo-wheelbase': [['dimensions', 'wheelbase_in'], ['dimensions', 'length_in']],
+    'size-photo-length': [['dimensions', 'wheelbase_in'], ['dimensions', 'length_in']],
     'size-photo-height':   [['dimensions', 'height_in'], ['dimensions', 'width_in']],
 };
 

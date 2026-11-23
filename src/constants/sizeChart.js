@@ -63,8 +63,28 @@ export const FALLBACK_BODY_WIDTH_SHARE = 0.9;
  * lists it (and the editor colors the figure). Height gets more room: the roof
  * line is softer to place than an axle, and roof rails count or don't.
  */
-export const SIZE_PHOTO_WHEELBASE_PCT = 3;
+export const SIZE_PHOTO_FIGURE_PCT = 3;
 export const SIZE_PHOTO_HEIGHT_PCT = 4;
+
+/**
+ * Side photos are scaled from the wheelbase (the axles are near-plane points),
+ * so the bumper tips, half a body width farther from the camera, read SHORT:
+ * across the stored side photos the length reads −4.4% at that scale (median;
+ * −2.0 to −8.1). A good photo reads a little short too, and that residue is
+ * left alone: the drawing lengthens a photo's overhangs only by the excess over
+ * this baseline, and the editor flags a photo by its excess. Percent short of
+ * the length spec. Set to 3 by the owner (2026-11-23), below the MEDIAN (4.4)
+ * of the reference photos and near their best (Slate −2.1, Bolt −2.7): a
+ * typical photo gets a small stretch, a studio shot is left alone. Chart
+ * anchored on a bumper: the stretched photo is then slid so that tip meets
+ * the line. Reference photos the owner named
+ * (2026-11-23, #616): Slate Truck 458 (−2.1), Bolt 24 (−2.7), Cybertruck 169
+ * (−4.1), iX5 453 (−4.4), bZ 121 (−4.4), iX3 48 (−4.5), Equinox EV 59 (−5.4),
+ * R2 26 (−5.2; its variant 96 draws the same photo), Model Y L 107 (−6.5).
+ * 234 (R1S) has no length spec yet to read it against. Revisit when more
+ * studio photos are marked: rerun the list, take the best quartile.
+ */
+export const SIZE_PHOTO_LENGTH_BASELINE_PCT = 3;
 
 /** How far a drawn photo's marks may read from the specs before the chart says so (owner, #608). */
 export const SIZE_PHOTO_CHART_PCT = 4;
