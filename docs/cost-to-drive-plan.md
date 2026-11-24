@@ -117,7 +117,8 @@ the pack: battery warming, taken from the first hours charged, adds nothing
   generic taper from `max_dc_kw`. Detour minutes and time to start and pay are
   added. Energy bought = added ÷ (1 − `DC_FAST_LOSS`).
 - A **planned fast charge** tops up to the cap and is skipped when the car is
-  already above it. It happens at **5 pm** (`PLANNED_HOUR`; a
+  already above it; a skipped one changes nothing about the day (the night's
+  charge starts when the car is home, not at the planned hour). It happens at **5 pm** (`PLANNED_HOUR`; a
   setting until 2026-11-10, dropped as one nobody would use): at that hour on a day off, and on a driving day in the gap between
   drives nearest it — before the drive home on a Daily, after a Long day.
 

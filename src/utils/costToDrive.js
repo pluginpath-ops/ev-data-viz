@@ -867,10 +867,17 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                 soc = toSoc - detourPct;
                 return hour + minutes / 60;
             };
-            const plannedStop = (hour) => {
-                if (soc < s.capTo - 0.5) return stopAt(hour, s.capTo, true);
-                if (rec) day.plannedSkipped = true;
-                return hour;
+            // The planned stop, at its slot or when the car is next free. Where the
+            // battery is already above the cap the car does not go: the day runs
+            // as it would without one, and the clock is where it was.
+            const plannedStop = (clock) => {
+                if (soc >= s.capTo - 0.5) {
+                    if (rec) day.plannedSkipped = true;
+                    return clock;
+                }
+                const at = Math.max(plan.hour, clock);
+                park(at - clock);
+                return stopAt(at, s.capTo, true);
             };
 
             const spans = DAY_SPANS[type];
@@ -878,22 +885,12 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
             // The day's clock: a stop that runs past a span's end pushes the
             // next span later, rather than the line stepping back in time.
             let clock = morning;
-            if (plan?.gap === 0) {
-                const at = Math.max(plan.hour, clock);
-                park(at - clock);
-                clock = plannedStop(at);
-            }
+            if (plan?.gap === 0) clock = plannedStop(clock);
             let threshold = soc < s.stopBy ? s.keepAbove + detPct + LATE_STOP_MARGIN : s.stopBy;
             spans.forEach((span, i) => {
+                if (i > 0 && plan?.gap === i) clock = plannedStop(clock);
                 let hour = Math.max(span.from, clock);
-                if (i > 0 && plan?.gap === i) {
-                    const at = Math.max(plan.hour, clock);
-                    park(at - clock);
-                    hour = plannedStop(at);
-                    park(span.from - hour);
-                } else {
-                    park(hour - clock);
-                }
+                park(hour - clock);
                 if (rec) out.points.push([base + hour, soc]);
                 let left = usePct * span.share;
                 const rate = left / (span.to - span.from);
@@ -931,11 +928,7 @@ export function simulateWeek(profile, settings, { season = settings.season, trac
                 }
                 clock = hour;
             });
-            if (spans.length && plan?.gap === spans.length) {
-                const at = Math.max(plan.hour, clock);
-                park(at - clock);
-                clock = plannedStop(at);
-            }
+            if (spans.length && plan?.gap === spans.length) clock = plannedStop(clock);
             // A stop of its own to close the week, after the day's driving
             // (a trip out, so with the detour), where no stop could carry it.
             if (close.added[d] > 0) {
