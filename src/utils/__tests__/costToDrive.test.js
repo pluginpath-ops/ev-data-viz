@@ -240,6 +240,31 @@ describe('when a planned fast charge happens', () => {
         expect(plannedSlot([], 17)).toEqual({ gap: 0, hour: 17 });
     });
 
+    it('a planned stop that is skipped changes nothing about the day, wherever it would have been', () => {
+        // Short drives and a low cap: the battery is above it whenever a planned stop comes, so every one is skipped.
+        const short = { dailyMi: 10, longMi: 20, capTo: 50 };
+        for (const week of ['LDLDLDO', 'DDDDDLO', 'LLLLLLL', 'OOOOOOO']) {
+            for (const over of [{}, { offFrom: 9, offUntil: 7 }, { plugFrom: 15, plugUntil: 7 }]) {
+                const none = simulateWeek(profile(), settings({ week, planned: 0, ...short, ...over }));
+                const all = simulateWeek(profile(), settings({ week, planned: 0b1111111, ...short, ...over }));
+                const tag = `${week} ${JSON.stringify(over)}`;
+                expect(all.days.every(d => d.plannedSkipped), tag).toBe(true);
+                expect(all.days.map(d => d.night), tag).toEqual(none.days.map(d => d.night));
+                expect(all.stops, tag).toEqual(none.stops);
+                expect(all.points, tag).toEqual(none.points);
+                expect(all.homeCost, tag).toBe(none.homeCost);
+            }
+        }
+    });
+
+    it('a skipped stop on a day off does not hold the night\'s charge until 5 pm', () => {
+        // Days off charge from 9 am; the battery is above the cap on Sunday, so the planned stop is skipped.
+        const w = simulateWeek(profile(), settings({ offFrom: 9, offUntil: 7, chargeTo: 90 }));
+        expect(w.days[6].plannedSkipped).toBe(true);
+        expect(w.days[6].night.added).toBeGreaterThan(0);
+        expect(w.days[6].night.spans[0][0]).toBe(6 * 24 + 9);
+    });
+
     it('keeps the line running forward wherever the stop lands', () => {
         for (const week of ['LDLDLDO', 'DDDDDLO', 'LLLLLLL', 'OOOOOOO']) {
             for (const p of [profile(), profile(wallOutlet)]) {
